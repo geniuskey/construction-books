@@ -57,29 +57,30 @@ window.CONSTRUCTION_BOOKS = [
   },
   {
     "id": "geotechbook",
-    "code": "GEO",
     "title": "GeotechBook",
     "subtitle": "지반공학 교과서",
     "headline": "모든 구조물은 땅 위에 선다",
-    "description": "흙의 분류와 유효응력, 투수와 압밀, 전단강도, 지지력과 기초, 사면 안정, 흙막이와 옹벽, 말뚝까지 침하 곡선과 활동면을 직접 그려 보며 배우는 지반공학 교과서.",
+    "description": "흙과 지반 조사, 상 관계와 분류, 유효응력과 침투, 지중 응력, 압밀과 연약지반 개량, 전단강도와 토압, 옹벽과 흙막이, 사면 안정, 얕은 기초와 말뚝, 액상화와 암반까지 — 지층을 쌓고 하중을 올려 보며 기준 지반 G-10과 B-10의 굴착·기초 숫자로 익히는 지반공학 교과서.",
     "stage": "foundations",
-    "status": "planned",
+    "status": "published",
     "color": "#8a5a2b",
     "colorDark": "#d8a06a",
     "topics": [
-      "유효응력",
-      "압밀 침하",
-      "전단강도",
-      "지지력·기초",
-      "사면 안정",
-      "흙막이·말뚝"
+      "지반 조사·분류",
+      "유효응력·침투",
+      "압밀·지반 개량",
+      "전단강도·토압",
+      "흙막이·사면",
+      "지지력·말뚝",
+      "액상화·암반"
     ],
     "motif": "soil",
-    "slug": "geotech",
-    "url": "#",
+    "code": "GEO",
     "legacyUrl": null,
-    "chapters": 0,
-    "simulators": 0
+    "slug": "geotech",
+    "url": "geotech/",
+    "chapters": 17,
+    "simulators": 129
   },
   {
     "id": "structurebook",

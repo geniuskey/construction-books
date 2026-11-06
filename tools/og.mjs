@@ -1,5 +1,5 @@
 // Copyright (c) 2026 geniuskey and ConstructionBooks contributors. MIT. Based on the MathBooks og renderer.
-// Render the 1200×630 share images: og.png (shelf home), mechanics/og.png (MechanicsBook) and materials/og.png (MaterialsBook).
+// Render the 1200×630 share images: og.png (shelf home), mechanics/og.png, materials/og.png and geotech/og.png.
 // Usage: node tools/og.mjs   (rerun after books, chapters or simulators change). Needs Playwright.
 // Covers use the same shelf.css and covers.js as the home page; stats are counted like shared/js/shelf.js.
 import { chromium } from 'playwright';
@@ -30,6 +30,12 @@ sandbox.window = sandbox;
 vm.createContext(sandbox);
 vm.runInContext(read('materials/js/common.js'), sandbox);
 const CB = sandbox.CB;
+// GeotechBook's copy adds the soil models (CB.soil).
+const sandbox2 = { ...sandbox, document: { ...sandbox.document, currentScript: { src: 'http://x/geotech/js/common.js' } } };
+sandbox2.window = sandbox2;
+vm.createContext(sandbox2);
+vm.runInContext(read('geotech/js/common.js'), sandbox2);
+CB.soil = sandbox2.CB.soil;
 
 const base = `
   html, body { margin:0; width:1200px; height:630px; overflow:hidden; }
@@ -156,9 +162,43 @@ const matPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><sty
   <div class="art">${matArt}</div>
 </body></html>`;
 
+// GeotechBook: the G-10 boring log with total stress, pore pressure and effective stress, and the E-4 time–settlement curve.
+const geoArt = (() => {
+  let s = '';
+  const site = CB.soil.SITE, p = CB.soil.site(), zMax = 24, X0 = 60, W = 120, Y = (z) => 56 + z * 16.5;
+  const fills = ['#b08a5a', '#c9a86b', '#6f6a5e', '#a7865a', '#8a6b4a', '#5d5852'];
+  site.layers.forEach((l, i) => { const b = Math.min(l.bottom, zMax); if (l.top >= zMax) return; s += `<rect x="${X0}" y="${Y(l.top)}" width="${W}" height="${Y(b) - Y(l.top)}" fill="${fills[i]}" opacity=".9"/>`; s += `<text x="${X0 + W + 10}" y="${(Y(l.top) + Y(b)) / 2 + 5}" fill="#cfd6e4" font-size="15" font-weight="600">${l.name}</text>`; });
+  s += `<line x1="${X0 - 14}" y1="${Y(site.gwl)}" x2="${X0 + W}" y2="${Y(site.gwl)}" stroke="#5b8cff" stroke-width="2.5" stroke-dasharray="6 4"/><path d="M${X0 - 22} ${Y(site.gwl) - 14}h16l-8 12z" fill="#5b8cff"/>`;
+  const gx = 330, gw = 210, smax = 450, Xs = (v) => gx + (v / smax) * gw;
+  s += `<line x1="${gx}" y1="${Y(0)}" x2="${gx}" y2="${Y(zMax)}" stroke="#4a5670" stroke-width="2"/><line x1="${gx}" y1="${Y(0)}" x2="${gx + gw}" y2="${Y(0)}" stroke="#4a5670" stroke-width="2"/>`;
+  const line = (key, color, wdt) => { let d = ''; for (let k = 0; k <= 96; k++) { const z = (zMax * k) / 96; d += (k ? 'L' : 'M') + Xs(p.at(z)[key]).toFixed(1) + ' ' + Y(z).toFixed(1); } s += `<path d="${d}" fill="none" stroke="${color}" stroke-width="${wdt}" stroke-linecap="round"/>`; };
+  line('sv', '#8b95a7', 3); line('u', '#5b8cff', 3); line('s', '#d8a06a', 5);
+  s += `<text x="${Xs(p.at(zMax).sv) - 4}" y="${Y(zMax) + 22}" text-anchor="end" fill="#8b95a7" font-family="monospace" font-size="16" font-weight="700">σ</text><text x="${Xs(p.at(zMax).u)}" y="${Y(zMax) + 22}" text-anchor="middle" fill="#5b8cff" font-family="monospace" font-size="16" font-weight="700">u</text><text x="${Xs(p.at(zMax).s) + 4}" y="${Y(zMax) + 22}" fill="#d8a06a" font-family="monospace" font-size="16" font-weight="700">σ′</text>`;
+  // E-4 time–settlement inset
+  const S = CB.soil.settlement({ H: 8, e0: 1.5, Cc: 0.55, Cr: 0.08, s0: p.at(10).s, ds: 76 }), ix = 70, iy = 556, iw = 470;
+  let d = '';
+  for (let k = 0; k <= 80; k++) { const t = (20 * k) / 80, U = CB.soil.U((1.5 * t) / 16); d += (k ? 'L' : 'M') + (ix + (t / 20) * iw).toFixed(1) + ' ' + (iy - 40 + U * 40).toFixed(1); }
+  s += `<path d="${d}" fill="none" stroke="#ffa94d" stroke-width="4"/><text x="${ix + iw}" y="${iy - 48}" text-anchor="end" fill="#ffa94d" font-family="monospace" font-size="17" font-weight="700">E-4 성토 침하 ${S.toFixed(2)} m · t90 9년</text>`;
+  return `<svg viewBox="0 0 600 600" width="600" height="600"><defs><clipPath id="c3"><rect x="20" y="20" width="560" height="560" rx="28"/></clipPath></defs><rect x="20" y="20" width="560" height="560" rx="28" fill="#0f1625" stroke="#26324a"/><g clip-path="url(#c3)">${s}</g></svg>`;
+})();
+const geotech = books.find((b) => b.id === 'geotechbook');
+const geoPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>${read('shelf.css')}</style><style>${base}
+  .art { position:absolute; right:40px; top:15px; }
+</style></head><body>
+  <div class="left">
+    <div class="brand">${read('geotech/favicon.svg')}<span>GeotechBook</span></div>
+    <div class="eyebrow">INTERACTIVE GEOTECHNICAL ENGINEERING</div>
+    <h1>모든 구조물은<br><span class="soft">땅 위에</span><br><span class="warm">선다</span></h1>
+    <p class="lead">유효응력과 침투, 압밀과 지반 개량, 토압과 흙막이,<br>지지력과 말뚝, 액상화를 직접 계산하는 지반공학.</p>
+    <div class="stats"><span><b>4</b>부</span><span><b>16</b>개 장</span><span><b>${Math.floor(geotech.simulators / 10) * 10}+</b>시뮬레이터</span></div>
+  </div>
+  <div class="url">construction.euiyun.com/geotech/</div>
+  <div class="art">${geoArt}</div>
+</body></html>`;
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
-for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png']]) {
+for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png']]) {
   await page.setContent(html, { waitUntil: 'networkidle' });
   await page.addScriptTag({ content: read('shared/js/covers.js') });
   await page.evaluate(async () => {
@@ -168,4 +208,4 @@ for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [m
   await page.screenshot({ path: join(root, out) });
 }
 await browser.close();
-console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators} simulators`);
+console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators} simulators`);

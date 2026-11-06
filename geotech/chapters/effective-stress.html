@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>유효응력 · GeotechBook</title>
+<meta name="description" content="흙의 강도와 변형을 정하는 단 하나의 응력. 테르자기의 유효응력 원리, G-10 지층의 전응력·간극수압·유효응력 단면, 수중 단위중량, 양수에 따른 침하, 모관 상승과 부(−)의 간극수압, 상향 침투와 한계 동수경사·분사 현상, B-10 굴착 바닥의 양압력과 들림 안전율을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .es-stack { display: grid; grid-template-columns: 1fr; }
+  .es-stack > div { position: relative; min-width: 0; }
+  .es-stack > div + div { border-top: 1px solid var(--border); }
+  .es-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .es-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .es-msg b { color: var(--text); }
+  .es-msg.ok { color: var(--ok); font-weight: 600; }
+  .es-msg.bad { color: var(--bad); font-weight: 600; }
+  .es-tbl td, .es-tbl th { font-variant-numeric: tabular-nums; }
+  .es-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .es-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--border); font-size: 14.5px; }
+  .es-ask input { width: 7.5em; font: 600 15px var(--mono); padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+  #es-cv-profile, #es-cv-uplift { touch-action: none; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="geotech"></script>
+</head>
+<body data-chapter="effective-stress">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="es-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="es-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="es-ah-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+      <marker id="es-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="es-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 04</div>
+    <h1 data-no-glossary>유효응력</h1>
+    <p class="lead">흙은 알갱이와 그 사이의 물로 이루어져 있습니다(2장). 땅속 한 점에 걸리는 연직 응력은 위에 있는 흙과 물의 무게이지만, 그 무게를 모두 알갱이가 받는 것은 아닙니다. 지하수위 아래에서는 물이 일부를 떠받칩니다. 흙이 얼마나 단단한지, 얼마나 내려앉을지를 정하는 것은 <b>알갱이끼리 주고받는 몫</b>, 곧 유효응력입니다. 이 장은 \(\sigma' = \sigma - u\) 하나로 기준 지반 G-10의 응력 단면을 그리고, 지하수를 퍼내면 왜 땅이 내려앉는지, 모래가 왜 끓어오르는지(분사 현상), 그리고 B-10의 깊이 11 m 굴착 바닥과 기초 매트가 왜 88.3 kPa의 물 압력으로 떠오르려 하는지를 숫자로 계산합니다.</p>
+    <ul class="objectives">
+      <li>테르자기의 유효응력 원리 \(\sigma' = \sigma - u\)를 입자 접촉력으로 설명하고, 흙의 강도·변형이 유효응력으로 정해진다는 뜻을 안다.</li>
+      <li>층을 이룬 지반의 전응력·간극수압·유효응력 단면을 손으로 계산하고(G-10의 11 m: 194.5, 88.3, 106.2 kPa), 수중 단위중량 \(\gamma'\)로 검산한다.</li>
+      <li>지하수위가 내려가거나 올라갈 때 유효응력과 침하가 어떻게 변하는지 계산한다.</li>
+      <li>모관 상승 높이와 부(−)의 간극수압을 계산하고 불포화 흙의 유효응력을 간단히 설명한다.</li>
+      <li>상향·하향 침투에서 유효응력과 침투력 \(i\gamma_w\)를 구하고, 한계 동수경사 \(i_c = \gamma'/\gamma_w\)와 분사 현상, 하중 직후의 간극수압(B 계수)을 설명한다.</li>
+      <li>B-10 굴착 바닥의 피압과 기초 매트의 양압력으로 들림 안전율을 계산하고, 압축 + 부호 규약을 MechanicsBook과 비교한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>물에 잠긴 흙은 왜 약해지나 — 아무도 설명하지 못했다</b></div>
+      <div class="o-body"><p>19세기의 공학자들은 같은 흙이 마른 날과 물에 젖은 날에 전혀 다르게 행동한다는 것을 경험으로 알았지만, 그 이유를 계산할 수 없었습니다. 1920년대 오스트리아 출신의 테르자기(K. Terzaghi)는 점토 시료를 누르는 실험과 압밀 이론을 세우는 과정에서, 흙의 압축과 강도를 정하는 것이 전체 응력이 아니라 <b>전응력에서 간극수압을 뺀 값</b>이라는 생각에 이르렀습니다. 1925년 그의 책 『Erdbaumechanik』가 현대 토질역학의 출발점으로 꼽히고, 1936년 첫 국제 토질역학 기초공학 학회에서 그는 "응력 변화가 일으키는 측정 가능한 모든 효과 — 압축, 뒤틀림, 전단 저항의 변화 — 는 오로지 유효응력의 변화 때문"이라고 원리를 분명히 했습니다.</p>
+        <div class="o-chain"><span>흙의 무게 · 물의 압력</span><i>→</i><span class="tool">σ′ = σ − u</span><i>→</i><span>침하 · 강도 · 분사 현상 · 양압력</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="principle">
+    <h2>테르자기의 유효응력 원리</h2>
+    <div class="problem"><strong>물을 부으면 흙이 더 무거워지는데, 왜 더 약해지나</strong>
+      <p>마른 모래를 담은 상자에 물을 부으면 상자 바닥이 받는 전체 무게는 늘어납니다. 그런데 모래 알갱이끼리 누르는 힘은 오히려 줄어듭니다. 물이 알갱이를 떠받치는 <span class="term">부력</span><span class="en">(buoyancy)</span> 때문입니다. 무게가 늘었는데 흙은 약해지는 이 역설을 푸는 것이 이 장의 첫 식입니다.</p></div>
+    <p>땅속 한 점의 수평면에 작용하는 연직 응력은 그 위에 있는 모든 것(흙 알갱이, 물, 지표 하중)의 무게를 면적으로 나눈 것으로, 이를 <span class="term">전응력</span><span class="en">(total stress)</span> \(\sigma\)라 합니다. 포화된 흙에서는 이 하중을 알갱이의 골격과 간극의 물이 나누어 받습니다. 간극 속 물의 압력이 <span class="term">간극수압</span><span class="en">(pore water pressure)</span> \(u\)입니다.</p>
+    <figure class="diagram" id="fig-es-contact">
+      <svg viewBox="0 0 860 300" role="img" aria-label="흙 알갱이를 지나는 물결 모양 단면에서 입자 접촉력과 간극수압의 분담">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <rect x="0" y="0" width="330" height="230" style="fill:color-mix(in srgb, var(--blue) 12%, transparent);stroke:var(--text-dim)"/>
+          <g style="fill:var(--accent);opacity:.55;stroke:var(--accent)">
+            <circle cx="40" cy="40" r="34"/><circle cx="112" cy="58" r="38"/><circle cx="190" cy="36" r="32"/><circle cx="268" cy="54" r="36"/>
+            <circle cx="62" cy="128" r="40"/><circle cx="150" cy="134" r="36"/><circle cx="232" cy="126" r="38"/><circle cx="306" cy="140" r="28"/>
+            <circle cx="30" cy="206" r="28"/><circle cx="108" cy="206" r="36"/><circle cx="190" cy="208" r="34"/><circle cx="270" cy="206" r="32"/>
+          </g>
+          <path d="M0 96 C30 100 50 88 76 92 S120 108 150 99 S200 86 230 90 S290 104 330 96" style="fill:none;stroke:var(--accent-2);stroke-width:2.4;stroke-dasharray:6 4"/>
+          <text x="334" y="92" class="t-mono" style="fill:var(--accent-2)">a–a</text>
+          <g style="stroke:var(--text);stroke-width:2.6" marker-end="url(#es-ah)"><line x1="86" y1="80" x2="96" y2="100"/><line x1="150" y1="84" x2="150" y2="104"/><line x1="230" y1="82" x2="234" y2="104"/></g>
+          <g style="fill:var(--text)"><circle cx="90" cy="92" r="3.5"/><circle cx="150" cy="96" r="3.5"/><circle cx="232" cy="94" r="3.5"/></g>
+          <text x="165" y="252" text-anchor="middle" class="t-dim">단면 a–a 는 알갱이 접촉점(●)과 물만 지난다</text>
+        </g>
+        <g transform="translate(420,40)">
+          <text x="0" y="10" class="t" style="font-weight:700">면적 A 의 단면에서 연직 힘의 평형</text>
+          <text x="0" y="44" class="t-mono">σ·A = Σ N(접촉력) + u·(A − A_c)</text>
+          <text x="0" y="72" class="t-mono">σ = Σ N / A + u·(1 − a),   a = A_c / A ≈ 0</text>
+          <rect x="0" y="92" width="380" height="44" rx="8" class="f-acc-soft"/>
+          <text x="190" y="120" text-anchor="middle" class="t-acc">σ′ = Σ N / A = σ − u</text>
+          <text x="0" y="168" class="t-dim">접촉 면적 비 a는 매우 작아 무시한다.</text>
+          <text x="0" y="190" class="t-dim">σ′ 은 실제 접촉점의 응력(매우 큼)이 아니라</text>
+          <text x="0" y="212" class="t-dim">접촉력의 합을 전체 면적으로 나눈 "평균"이다.</text>
+          <text x="0" y="240" class="t-mono" style="fill:var(--blue)">물은 전단을 받지 못한다 → 강도는 σ′ 이 정한다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-1.</b> 유효응력의 뜻(개념도). 알갱이 사이를 물결 모양으로 지나는 단면 a–a에서 연직 힘을 모으면, 전응력은 접촉력의 몫과 물의 몫으로 나뉜다. 접촉력의 몫을 전체 면적으로 나눈 것이 유효응력이다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 4.1 (유효응력의 원리)</strong> 포화된 흙에서 어떤 면에 작용하는 <span class="term">유효응력</span><span class="en">(effective stress)</span>은
+      <div class="formula">$$\sigma' = \sigma - u$$<div class="where">\(\sigma\): 전응력, \(u\): 간극수압(kPa, 압축 +). 흙의 압축(부피 변화)과 전단 강도는 전응력이 아니라 유효응력의 변화로만 정해진다. 간극수압은 모든 방향으로 같게 작용하고(정수압), 물은 전단 응력을 받지 못하므로 전단 응력은 \(\tau' = \tau\)이다.</div></div></div>
+    <p>원리 4.1은 단순한 정의처럼 보이지만 실험으로 확인된 <b>법칙</b>입니다. 같은 시료에 전응력과 간극수압을 똑같이 100 kPa씩 올리면(유효응력 변화 0) 흙은 거의 줄어들지 않고 강도도 그대로입니다. 알갱이 자체는 물 압력에 거의 압축되지 않으므로, 사방에서 같은 물 압력이 걸려도 알갱이 배열은 바뀌지 않기 때문입니다. 반대로 전응력은 그대로인데 간극수압이 올라가면(지진 때의 느슨한 모래, 15장) 유효응력이 줄어 흙은 약해지고, 0이 되면 액체처럼 흐릅니다.</p>
+    <div class="callout"><strong>예제 4.1 (상자 속 모래에 물 붓기)</strong> 높이 1.0 m의 모래(\(\gamma_d = 16\) kN/m³, \(\gamma_{sat} = 20\) kN/m³)를 담은 상자 바닥에서.
+      <ol style="margin:6px 0 0">
+        <li><b>마른 상태.</b> \(\sigma = 16 \times 1.0 = 16.0\) kPa, \(u = 0\), \(\sigma' = 16.0\) kPa.</li>
+        <li><b>물을 모래 윗면까지.</b> \(\sigma = 20 \times 1.0 = 20.0\) kPa(늘었다), \(u = 9.81 \times 1.0 = 9.81\) kPa, \(\sigma' = 10.2\) kPa(줄었다). 알갱이마다 부력을 받아 접촉력이 약 36 % 줄었다.</li>
+        <li><b>물을 모래 위 1.0 m 더.</b> \(\sigma = 20 + 9.81 = 29.8\) kPa, \(u = 9.81 \times 2.0 = 19.6\) kPa, \(\sigma' = 10.2\) kPa. <b>위에 고인 물은 유효응력을 바꾸지 않는다.</b> 그래서 바다 밑 수천 m의 퇴적층도 해저면의 유효응력은 0이다.</li>
+        <li><b>판으로 50 kPa를 눌러 오래 두면</b>(물이 빠질 시간이 지나면) \(\sigma' = 10.2 + 50 = 60.2\) kPa.</li>
+      </ol></div>
+    <div class="sim" id="sim-es-contact">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>입자 접촉력 모형: 물을 넣으면 접촉력이 준다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-contact" aria-label="모래 상자의 알갱이 접촉력과 깊이별 응력"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>수위 h<sub>w</sub>(상자 바닥에서)</span> <output id="es-ct-hw-out"></output></span><input type="range" id="es-ct-hw" min="0" max="2" step="0.01" value="0"></label>
+          <label class="ctrl"><span>상재 하중 q(판) <output id="es-ct-q-out"></output></span><input type="range" id="es-ct-q" min="0" max="80" step="1" value="0"></label>
+          <div class="ctrl"><span>모래</span><div class="seg" id="es-ct-soil"><button data-value="loose">느슨 (γ<sub>d</sub> 15, γ<sub>sat</sub> 19)</button><button data-value="dense" class="on">조밀 (γ<sub>d</sub> 16, γ<sub>sat</sub> 20)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">바닥 전응력 σ</span><span class="v" id="es-ct-s">—</span></div>
+        <div class="stat"><span class="k">바닥 간극수압 u</span><span class="v" id="es-ct-u">—</span></div>
+        <div class="stat"><span class="k">바닥 유효응력 σ′</span><span class="v" id="es-ct-e">—</span></div>
+        <div class="stat"><span class="k">마른 상태 대비 접촉력</span><span class="v" id="es-ct-r">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 수위를 0 → 1.0 m(모래 윗면)까지 올리면 바닥 σ는 늘고 σ′은 줄어듭니다 · 1.0 m를 넘겨 물을 고이게 하면 σ와 u가 똑같이 늘어 σ′은 그대로입니다 · 판으로 누르면(배수 후) σ′이 q만큼 늘어 화살표가 굵어집니다 · 모델: 원리 4.1, 상자 높이 1.0 m, 수위 위는 γ<sub>d</sub>(마른 모래), 아래는 γ<sub>sat</sub>, u = γ<sub>w</sub>(h<sub>w</sub> − 높이), γ<sub>w</sub> = 9.81 kN/m³(CB.soil.gw). 화살표 굵기는 그 깊이의 σ′에 비례합니다. 모관 상승은 무시(4.5절).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="profile">
+    <h2>지층 속 응력 단면: G-10</h2>
+    <div class="problem"><strong>B-10 굴착 바닥(깊이 11 m)의 흙은 지금 얼마나 눌려 있나</strong>
+      <p>굴착하면 위의 흙이 없어지고, 기초를 놓으면 다시 하중이 생깁니다. 바닥 점토가 얼마나 내려앉을지, 얼마나 버틸지를 계산하려면 먼저 "지금" 걸려 있는 유효응력, 곧 초기 연직 유효응력 \(\sigma'_{v0}\)를 알아야 합니다. 7장 압밀, 9장 강도, 13장 지지력이 모두 이 숫자에서 시작합니다.</p></div>
+    <div class="callout def"><strong>정의 4.2 (연직 전응력과 정수압)</strong> 지표에서 깊이 \(z\)인 점에서, 위에 두께 \(h_k\), 단위중량 \(\gamma_k\)인 층이 쌓여 있고 지하수위가 깊이 \(z_w\)에 있으면
+      <div class="formula">$$\sigma_v = q + \sum_k \gamma_k h_k, \qquad u = \gamma_w (z - z_w) \;\; (z \gt z_w), \qquad \sigma'_v = \sigma_v - u$$<div class="where">지하수위 위는 습윤 단위중량 \(\gamma_t\), 아래는 포화 단위중량 \(\gamma_{sat}\)를 쓴다. \(q\): 넓게 깔린 지표 하중(장기, 배수 완료 상태). 물이 흐르지 않을 때(<span class="term">정수압</span><span class="en">(hydrostatic pressure)</span>) 간극수압은 <span class="term">지하수위</span><span class="en">(groundwater table)</span>에서 0이고 깊이에 따라 \(\gamma_w = 9.81\) kN/m³씩 늘어난다. 지하수위 위의 간극수압은 0으로 둔다(모관 상승은 4.5절).</div></div></div>
+    <figure class="diagram" id="fig-es-g10">
+      <svg viewBox="0 0 860 420" role="img" aria-label="G-10 지층 단면과 깊이별 전응력, 간극수압, 유효응력 분포">
+        <rect x="10" y="10" width="840" height="400" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <rect x="0" y="0" width="150" height="30" style="fill:var(--accent);opacity:.28"/>
+          <rect x="0" y="30" width="150" height="60" style="fill:var(--accent);opacity:.18"/>
+          <rect x="0" y="90" width="150" height="120" style="fill:var(--accent);opacity:.48"/>
+          <rect x="0" y="210" width="150" height="75" style="fill:var(--accent);opacity:.12"/>
+          <rect x="0" y="285" width="150" height="45" style="fill:var(--accent);opacity:.34"/>
+          <rect x="0" y="0" width="150" height="330" style="fill:none;stroke:var(--text-dim)"/>
+          <g class="t-mono"><text x="8" y="19">매립층 γt 18</text><text x="8" y="64">실트질 모래 γsat 19</text><text x="8" y="154">연약 점토 γsat 16.5</text><text x="8" y="251">모래 자갈 γsat 20.5</text><text x="8" y="311">풍화토 21</text></g>
+          <line x1="-14" y1="30" x2="164" y2="30" style="stroke:var(--blue);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <path d="M150 22 l8 0 l-4 7z" style="fill:var(--blue)"/><text x="160" y="26" class="t-mono" style="fill:var(--blue)">GL −2.0</text>
+          <g class="t-mono" text-anchor="end"><text x="-6" y="4">0</text><text x="-6" y="34">2</text><text x="-6" y="94">6</text><text x="-6" y="169">11</text><text x="-6" y="214">14</text><text x="-6" y="289">19</text></g>
+          <text x="-34" y="170" class="t-mono" transform="rotate(-90 -34 170)" text-anchor="middle">깊이 z (m)</text>
+          <line x1="0" y1="165" x2="150" y2="165" style="stroke:var(--accent-2);stroke-width:1.6;stroke-dasharray:3 3"/>
+          <text x="75" y="182" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">B-10 굴착 바닥</text>
+        </g>
+        <g transform="translate(300,40)">
+          <line x1="0" y1="0" x2="500" y2="0" class="s-axis"/><line x1="0" y1="0" x2="0" y2="330" class="s-axis"/>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="-8">0</text><text x="125" y="-8">100</text><text x="250" y="-8">200</text><text x="375" y="-8">300</text><text x="490" y="-8">kPa</text></g>
+          <polyline points="0,0 45,30 140,90 243.1,165 305,210 433,285" style="fill:none;stroke:var(--text-dim);stroke-width:2.6"/>
+          <polyline points="0,0 0,30 49,90 110.4,165 147.2,210 208.5,285" style="fill:none;stroke:var(--blue);stroke-width:2.2;stroke-dasharray:7 4"/>
+          <polyline points="0,0 45,30 91,90 132.8,165 157.9,210 224.6,285" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <g style="fill:var(--text)"><circle cx="243.1" cy="165" r="4"/><circle cx="110.4" cy="165" r="4" style="fill:var(--blue)"/><circle cx="132.8" cy="165" r="4" style="fill:var(--accent)"/></g>
+          <text x="252" y="160" class="t-mono">σ 194.5</text>
+          <text x="54" y="182" class="t-mono" style="fill:var(--blue)">u 88.3</text>
+          <text x="154" y="186" class="t-mono" style="fill:var(--accent)">σ′ 106.2</text>
+          <text x="445" y="282" class="t-mono" style="fill:var(--text-dim)">σ 전응력</text>
+          <text x="214" y="300" class="t-mono" style="fill:var(--blue)">u 간극수압</text>
+          <text x="232" y="262" class="t-mono" style="fill:var(--accent)">σ′ 유효응력</text>
+          <text x="250" y="325" class="t-dim">σ′ 의 기울기는 수위 위 γt, 아래 γ′ = γsat − γw</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-2.</b> 기준 지반 G-10의 연직 응력 단면(엔진 <code>CB.soil.site()</code>의 값). 지하수위(GL −2.0 m, 파란 ▽) 아래에서 간극수압이 직선으로 늘고, 유효응력의 기울기는 수중 단위중량으로 줄어든다. 연약 점토(γ′ = 6.69)에서 σ′이 가장 천천히 늘어난다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 4.2 (G-10의 깊이 11 m: B-10 굴착 바닥)</strong>
+      <ol style="margin:6px 0 0">
+        <li><b>전응력.</b> \(\sigma_v = 18.0 \times 2 + 19.0 \times 4 + 16.5 \times 5 = 36.0 + 76.0 + 82.5 = 194.5\) kPa.</li>
+        <li><b>간극수압.</b> \(u = 9.81 \times (11 - 2) = 88.3\) kPa.</li>
+        <li><b>유효응력.</b> \(\sigma'_v = 194.5 - 88.3 = 106.2\) kPa.</li>
+        <li><b>점토층 중앙(10 m).</b> \(\sigma_v = 36 + 76 + 16.5 \times 4 = 178.0\), \(u = 78.5\), \(\sigma'_v = 99.5\) kPa — 7장에서 E-4 성토의 압밀 침하를 계산할 때 쓰는 \(\sigma'_{v0}\)다.</li>
+      </ol></div>
+    <div class="sim" id="sim-es-profile">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>G-10 응력 단면: 지하수위를 끌어 보세요</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-profile" aria-label="G-10 지층 기둥과 전응력, 간극수압, 유효응력 깊이 분포. 지하수위 기호를 끌 수 있다"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>지하수위 z<sub>w</sub></span> <output id="es-pf-gw-out"></output></span><input type="range" id="es-pf-gw" min="0" max="14" step="0.1" value="2"></label>
+          <label class="ctrl"><span>읽을 깊이 z <output id="es-pf-z-out"></output></span><input type="range" id="es-pf-z" min="0" max="25" step="0.1" value="11"></label>
+          <label class="ctrl"><span>넓은 지표 하중 q(장기) <output id="es-pf-q-out"></output></span><input type="range" id="es-pf-q" min="0" max="100" step="1" value="0"></label>
+          <div class="btn-row"><button class="btn" id="es-pf-reset">G-10 기본값</button><button class="btn" id="es-pf-e4">E-4 성토 76 kPa</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">층</span><span class="v" id="es-pf-layer">—</span></div>
+        <div class="stat"><span class="k">전응력 σ<sub>v</sub></span><span class="v" id="es-pf-s">—</span></div>
+        <div class="stat"><span class="k">간극수압 u</span><span class="v" id="es-pf-u">—</span></div>
+        <div class="stat"><span class="k">유효응력 σ′<sub>v</sub></span><span class="v" id="es-pf-e">—</span></div>
+      </div>
+      <div class="es-msg" id="es-pf-msg"></div>
+      <div class="sim-note">해볼 것: 왼쪽 기둥의 ▽(또는 슬라이더)를 끌어 지하수위를 0 m(지표)에서 6 m까지 바꿔 보세요. 11 m의 σ′이 어떻게 바뀌나요? · 지하수위를 지표까지 올리면 얕은 곳의 σ′이 가장 크게 줄어듭니다 · q는 성토처럼 넓은 하중이 오래 놓여 물이 빠진 뒤의 상태입니다(직후는 4.7절) · 모델: <code>CB.soil.profile(CB.soil.SITE.layers, z<sub>w</sub>, { q })</code>, 정의 4.2. 매립층은 수위 아래로 잠기면 γ<sub>sat</sub> 19, 실트질 모래는 수위 위로 드러나면 γ<sub>t</sub> 18(엔진 값).</div>
+    </div>
+    <div class="callout site"><strong>G-10의 연직 유효응력</strong> <code>CB.soil.site().at(z).s</code>로 읽은 값: 2 m 36.0, 6 m 72.8, 10 m 99.5, 11 m 106.2, 14 m 126.3, 19 m 179.7 kPa. 11 m에서 전응력 194.5 kPa, 간극수압 88.3 kPa. 이 숫자들이 이 책 전체의 출발점이다 — 점토층 중앙의 99.5 kPa는 E-4 압밀 침하(7장)에, 굴착 바닥의 194.5 kPa는 B-10의 보상 기초(13장)에, 88.3 kPa는 매트의 양압력(4.8절)에, 4 m의 유효응력은 액상화 판정(15장)에 쓰인다. 실제 현장에서는 지하수위가 계절·조석에 따라 변하므로 관측정 기록으로 설계 수위를 정한다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="buoyancy">
+    <h2>수중 단위중량과 부력</h2>
+    <p><span class="term">연직 유효응력</span><span class="en">(vertical effective stress)</span>은 지하수위 아래에서 깊이에 따라 \(\gamma_{sat} - \gamma_w\)씩만 늘어납니다. 흙 알갱이가 아르키메데스의 부력을 받아 가벼워진 셈이며, 이 값을 <span class="term">수중 단위중량</span><span class="en">(submerged unit weight)</span>이라 합니다.</p>
+    <div class="callout def"><strong>정의 4.3 (수중 단위중량)</strong>
+      <div class="formula">$$\gamma' = \gamma_{sat} - \gamma_w = \frac{(G_s - 1)\,\gamma_w}{1 + e}, \qquad \sigma'_v = \sum_{\text{수위 위}} \gamma_t h + \sum_{\text{수위 아래}} \gamma' h$$<div class="where">물이 흐르지 않을 때(정수압) 유효응력은 수위 아래 층에 \(\gamma'\)를 곱해 바로 더해도 된다. \(G_s = 2.70\), \(e = 1.50\)인 G-10 점토는 \(\gamma' = 1.70 \times 9.81/2.50 = 6.67\) kN/m³(엔진의 \(\gamma_{sat}\) 16.5에서 6.69). 흙 알갱이 부피만큼의 물 무게를 덜어 낸 값이라고 생각하면 기억하기 쉽다.</div></div></div>
+    <div class="callout"><strong>예제 4.3 (γ′로 다시 푸는 11 m)</strong> 수위 위: \(18.0 \times 2 = 36.0\). 수위 아래: 실트질 모래 \(\gamma' = 19.0 - 9.81 = 9.19\), 점토 \(\gamma' = 6.69\). \(\sigma'_v = 36.0 + 9.19 \times 4 + 6.69 \times 5 = 36.0 + 36.76 + 33.45 = 106.2\) kPa. 예제 4.2와 같다. 정수압 상태에서는 이 방법이 빠르지만, 물이 흐르면(4.6절) 통하지 않으므로 늘 \(\sigma - u\)로 검산하는 습관을 들인다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="water-table">
+    <h2>지하수위가 변하면: 양수와 지반 침하</h2>
+    <div class="problem"><strong>지하수를 퍼 올렸을 뿐인데 건물이 내려앉았다</strong>
+      <p>흙을 한 삽도 옮기지 않았는데, 넓은 지역의 땅이 수십 cm, 곳에 따라 수 m 내려앉는 <span class="term">지반 침하</span><span class="en">(land subsidence)</span>가 일어납니다. 멕시코시티는 지하수 양수로 20세기 동안 곳에 따라 수 m 넘게 침하한 것으로 알려져 있습니다. 원인은 줄어든 간극수압만큼 늘어난 유효응력입니다.</p></div>
+    <div class="callout def"><strong>원리 4.4 (지하수위 변화와 유효응력)</strong> 지하수위가 \(\Delta z_w\)만큼 내려가면, 새 수위 아래의 점에서
+      <div class="formula">$$\Delta u = -\gamma_w\,\Delta z_w, \qquad \Delta\sigma_v = -(\gamma_{sat} - \gamma_t)\,\Delta z_w, \qquad \Delta\sigma'_v = (\gamma_w - \gamma_{sat} + \gamma_t)\,\Delta z_w$$<div class="where">물이 빠진 층이 포화 상태에서 습윤 상태로 가벼워지는 만큼(둘째 식) 전응력은 조금 줄지만, 간극수압이 그보다 훨씬 크게 줄어 유효응력은 는다. G-10 실트질 모래(\(\gamma_t\) 18, \(\gamma_{sat}\) 19)에서 \(\Delta\sigma'_v \approx 8.81\,\Delta z_w\) kPa. 아래 피압층의 수두만 낮추면 전응력은 그대로이고 간극수압만 준다. 점토는 투수 계수가 작아 늘어난 유효응력이 압밀(7장)로 수년에 걸쳐 침하를 만든다. 수위가 올라가면 반대로 유효응력이 줄어 지지력·사면 안정·액상화 저항이 떨어진다.</div></div></div>
+    <figure class="diagram" id="fig-es-drawdown">
+      <svg viewBox="0 0 860 320" role="img" aria-label="양수정 주변의 지하수위 저하 곡선과 점토층의 압밀 침하">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <rect x="40" y="60" width="780" height="60" style="fill:var(--accent);opacity:.16"/>
+        <rect x="40" y="120" width="780" height="90" style="fill:var(--accent);opacity:.46"/>
+        <rect x="40" y="210" width="780" height="70" style="fill:var(--accent);opacity:.12"/>
+        <line x1="40" y1="60" x2="820" y2="60" style="stroke:var(--text-dim);stroke-width:1.6"/>
+        <path d="M40 72 L820 72" style="stroke:var(--blue);stroke-width:1.4;stroke-dasharray:6 4"/>
+        <path d="M40 74 C200 76 320 84 380 112 L430 118 L480 112 C540 84 660 76 820 74" style="fill:none;stroke:var(--blue);stroke-width:2.4"/>
+        <rect x="424" y="40" width="12" height="230" style="fill:var(--surface-2);stroke:var(--text)"/>
+        <line x1="430" y1="40" x2="430" y2="20" style="stroke:var(--blue);stroke-width:2" marker-end="url(#es-ah-w)"/>
+        <text x="444" y="30" class="t-mono" style="fill:var(--blue)">양수</text>
+        <path d="M60 60 L60 56 M200 60 L200 54 M380 60 L380 48 M480 60 L480 48 M660 60 L660 54" style="stroke:var(--bad);stroke-width:2"/>
+        <path d="M40 58 C200 58 330 62 380 70 L480 70 C530 62 660 58 820 58" style="fill:none;stroke:var(--bad);stroke-width:1.8;stroke-dasharray:4 3"/>
+        <text x="560" y="52" class="t-mono" style="fill:var(--bad)">내려앉은 지표(과장)</text>
+        <text x="60" y="88" class="t-mono" style="fill:var(--blue)">▽ 원래 지하수위</text>
+        <text x="250" y="104" class="t-mono" style="fill:var(--blue)">낮아진 지하수위</text>
+        <text x="60" y="170" class="t">연약 점토: σ′ 증가 → 압밀 → 수년에 걸친 침하</text>
+        <text x="60" y="250" class="t">모래 자갈(피압 대수층): 수두 저하 → 점토 아래쪽부터 u 감소</text>
+        <path d="M720 140 L720 190" style="stroke:var(--accent);stroke-width:2.4" marker-end="url(#es-ah-acc)"/><text x="730" y="170" class="t-mono" style="fill:var(--accent)">Δσ′</text>
+      </svg>
+      <figcaption><b>그림 4-3.</b> 양수에 따른 지하수위 저하와 지반 침하(개념도). 우물 주변의 수위가 깔때기 모양으로 낮아지면 그만큼 간극수압이 줄고 유효응력이 는다. 모래는 즉시, 점토는 압밀 속도대로 천천히 내려앉으므로, 양수를 멈춘 뒤에도 침하가 한동안 이어진다. 넓게 고르지 않게 침하하면 인접 건물에 부등 침하(8장)를 일으킨다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 4.4 (B-10 주변에서 위 모래층의 지하수위를 4 m 낮추면)</strong> 굴착 중 배수로 실트질 모래층의 수위가 GL −2에서 −6 m로 내려갔다고 하자.
+      <ol style="margin:6px 0 0">
+        <li><b>점토층의 유효응력 증가.</b> 6 m 아래에서는 \(\Delta\sigma'_v = (9.81 - 19 + 18) \times 4 = 35.2\) kPa가 깊이와 상관없이 같다.</li>
+        <li><b>점토 중앙(10 m).</b> \(\sigma'_{v0} = 99.5\) → 134.7 kPa.</li>
+        <li><b>최종 압밀 침하</b>(정규압밀, 한 층으로): \(S = \frac{0.55 \times 8}{1 + 1.50}\log\frac{134.7}{99.5} = 1.76 \times 0.1316 \approx 0.23\) m.</li>
+        <li><b>시간.</b> 양면 배수, \(H_{dr} = 4\) m, \(c_v = 1.5\) m²/년이면 90 % 압밀에 약 9년(7장). 실제 굴착 배수는 몇 달로 짧고 범위가 국한되어 침하는 이보다 작지만, 배수를 오래 하거나 넓게 하면 주변 도로·건물이 수 cm–수십 cm 내려앉을 수 있다. 그래서 B-10은 차수성 지하연속벽(11장)으로 바깥 수위를 지킨다.</li>
+      </ol></div>
+    <div class="sim" id="sim-es-drawdown">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>양수 → 지하수위 저하 → 유효응력 증가 → 침하</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-dd" aria-label="지층 단면의 수위 변화와 깊이별 유효응력 증가"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>어느 층에서 퍼내나</span><div class="seg" id="es-dd-mode"><button data-value="top" class="on">위 실트질 모래(자유면)</button><button data-value="conf">아래 모래 자갈(피압)</button></div></div>
+          <label class="ctrl"><span>수위(수두) 저하 Δ <output id="es-dd-d-out"></output></span><input type="range" id="es-dd-d" min="0" max="10" step="0.1" value="4"></label>
+          <label class="ctrl"><span><span>점토 압축 지수 C<sub>c</sub></span> <output id="es-dd-cc-out"></output></span><input type="range" id="es-dd-cc" min="0.2" max="1.0" step="0.01" value="0.55"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">점토 중앙 Δσ′</span><span class="v" id="es-dd-ds">—</span></div>
+        <div class="stat"><span class="k">점토 중앙 σ′: 전 → 후</span><span class="v" id="es-dd-s01">—</span></div>
+        <div class="stat"><span class="k">최종 압밀 침하 S</span><span class="v" id="es-dd-S">—</span></div>
+        <div class="stat"><span class="k">90 % 압밀 시간</span><span class="v" id="es-dd-t">—</span></div>
+      </div>
+      <div class="es-msg" id="es-dd-msg"></div>
+      <div class="sim-note">해볼 것: 위 모래에서 Δ = 4 m(예제 4.4)이면 약 0.23 m입니다 · 피압 모드로 바꿔 같은 4 m를 낮추면? 점토 아래쪽만 크게 눌려 침하가 더 작습니다 · 모델: 자유면 모드는 <code>CB.soil.profile</code>로 수위 2 → 2 + Δ m(실트질 모래 바닥 6 m까지)의 σ′ 차이를 구합니다. 피압 모드는 모래 자갈의 수두만 Δ 낮추고 점토 속 간극수압이 장기적으로 직선 분포가 된다고 봅니다(Δσ′ = γ<sub>w</sub>Δ(z − 6)/8). 침하는 점토 8 m를 1 m 8개로 나눠 <code>CB.soil.settlement</code>(정규압밀, e₀ 1.50)의 합. 시간은 양면 배수 H<sub>dr</sub> 4 m, c<sub>v</sub> 1.5 m²/년, T<sub>v90</sub> = 0.848.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="capillary">
+    <h2>모관 상승과 부(−)의 간극수압</h2>
+    <div class="problem"><strong>지하수위 위의 흙이 왜 젖어 있나</strong>
+      <p>지하수위가 GL −2 m인데 시추 시료를 보면 1.5 m 깊이의 모래도 축축합니다. 가는 관에 물이 빨려 올라가듯, 흙의 좁은 간극도 물을 지하수위 위로 끌어 올립니다. 그 물은 압력이 대기압보다 <b>낮은</b> 상태, 곧 부(−)의 간극수압을 가집니다.</p></div>
+    <p>물의 <span class="term">표면 장력</span><span class="en">(surface tension)</span> \(T\)는 가는 관 벽을 따라 물기둥을 끌어 올립니다. 기둥의 무게와 표면 장력의 연직 성분이 평형을 이루는 높이가 <span class="term">모관 상승</span><span class="en">(capillary rise)</span> 높이입니다. 그 물기둥 속의 압력은 수면(대기압, u = 0)보다 낮아 \(u = -\gamma_w h\)이며, 이 음의 압력을 <span class="term">흡입력</span><span class="en">(suction)</span>이라고도 합니다.</p>
+    <div class="callout def"><strong>정의 4.5 (모관 상승 높이)</strong>
+      <div class="formula">$$h_c = \frac{4T\cos\alpha}{\gamma_w\,d} \approx \frac{0.030}{d\,(\text{mm})}\ \text{m}, \qquad h_c \approx \frac{C}{e\,D_{10}} \ \ (\text{흙, 하젠 형태})$$<div class="where">\(T\): 표면 장력(20 °C에서 약 0.073 N/m), \(\alpha\): 접촉각(깨끗한 유리와 물은 약 0°), \(d\): 관 지름. 흙에서는 관 지름 대신 간극 크기를 쓰고, 경험적으로 \(C\) = 약 0.1–0.5 cm²(\(D_{10}\)은 cm, \(h_c\)는 cm)를 쓴다. <span class="term">모관대</span><span class="en">(capillary zone)</span>(포화된 부분) 안의 점은 \(u = -\gamma_w (z_w - z)\)이고, 유효응력은 그만큼 <b>커진다</b>. 모래성이 서 있는 이유다.</div></div></div>
+    <figure class="diagram" id="fig-es-cap">
+      <svg viewBox="0 0 860 300" role="img" aria-label="지름이 다른 모세관 속 물의 상승 높이와 흙 속 모관대의 간극수압 분포">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <rect x="0" y="180" width="320" height="50" style="fill:color-mix(in srgb, var(--blue) 22%, transparent);stroke:var(--text-dim)"/>
+          <rect x="40" y="20" width="22" height="200" style="fill:none;stroke:var(--text)"/><rect x="41" y="160" width="20" height="60" style="fill:var(--blue);opacity:.5"/>
+          <rect x="140" y="20" width="12" height="200" style="fill:none;stroke:var(--text)"/><rect x="141" y="110" width="10" height="110" style="fill:var(--blue);opacity:.5"/>
+          <rect x="240" y="20" width="6" height="200" style="fill:none;stroke:var(--text)"/><rect x="241" y="40" width="4" height="180" style="fill:var(--blue);opacity:.5"/>
+          <line x1="-6" y1="180" x2="320" y2="180" style="stroke:var(--blue);stroke-dasharray:5 4"/>
+          <text x="51" y="244" text-anchor="middle" class="t-mono">굵은 관</text><text x="146" y="244" text-anchor="middle" class="t-mono">가는 관</text><text x="243" y="244" text-anchor="middle" class="t-mono">더 가는 관</text>
+          <path d="M270 40 L270 180" style="stroke:var(--accent-2);stroke-width:1.6" marker-start="url(#es-ah)" marker-end="url(#es-ah)"/><text x="276" y="110" class="t-mono" style="fill:var(--accent-2)">h_c ∝ 1/d</text>
+        </g>
+        <g transform="translate(450,30)">
+          <rect x="0" y="0" width="140" height="80" style="fill:var(--accent);opacity:.15"/>
+          <rect x="0" y="80" width="140" height="60" style="fill:var(--accent);opacity:.3"/>
+          <rect x="0" y="80" width="140" height="60" style="fill:var(--blue);opacity:.14"/>
+          <rect x="0" y="140" width="140" height="100" style="fill:var(--accent);opacity:.3"/>
+          <rect x="0" y="140" width="140" height="100" style="fill:var(--blue);opacity:.22"/>
+          <line x1="0" y1="140" x2="140" y2="140" style="stroke:var(--blue);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <path d="M140 132 l8 0 l-4 7z" style="fill:var(--blue)"/>
+          <text x="70" y="44" text-anchor="middle" class="t-mono">불포화</text><text x="70" y="114" text-anchor="middle" class="t-mono">모관대(포화)</text><text x="70" y="194" text-anchor="middle" class="t-mono">지하수위 아래</text>
+          <line x1="230" y1="0" x2="230" y2="240" class="s-axis"/>
+          <polyline points="230,80 190,80 230,140 300,240" style="fill:none;stroke:var(--blue);stroke-width:2.4"/>
+          <text x="186" y="74" text-anchor="middle" class="t-mono" style="fill:var(--blue)">−γw h_c</text>
+          <text x="300" y="230" text-anchor="end" class="t-mono" style="fill:var(--blue)">u +</text>
+          <text x="236" y="16" class="t-mono">u = 0</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-4.</b> 모관 상승(개념도). 관이 가늘수록 물이 높이 오른다(왼쪽). 흙에서는 지하수위 위에 포화된 모관대가 생기고, 그 안의 간극수압은 위로 갈수록 더 음수가 된다(오른쪽). 모관대 위는 공기와 물이 함께 있는 불포화 상태다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 4.5 (G-10 매립층의 모관대)</strong> 매립층(모래질) \(D_{10} \approx 0.11\) mm = 0.011 cm, \(e \approx 0.70\), \(C = 0.3\) cm²(교육용 가정).
+      <ol style="margin:6px 0 0">
+        <li><b>모관 상승.</b> \(h_c = 0.3/(0.70 \times 0.011) \approx 39\) cm. 범위로는 \(C\) = 0.1–0.5에서 약 13–65 cm.</li>
+        <li><b>간극수압.</b> 수위 위 0.39 m(깊이 1.61 m): \(u = -9.81 \times 0.39 = -3.8\) kPa.</li>
+        <li><b>유효응력.</b> 그 점의 전응력을 포화(γ 19)로 근사하면 \(\sigma_v \approx 18 \times 1.22 + 19 \times 0.39 = 29.4\) kPa, \(\sigma'_v = 29.4 + 3.8 = 33.2\) kPa(모관을 무시하면 29.0). 차이는 10 % 남짓이다.</li>
+        <li><b>가는 흙.</b> G-10 실트질 모래(\(D_{10} \approx 0.029\) mm)는 같은 식으로 약 1.3 m, 점토는 수 m 이상이다. 다만 점토는 공기가 들어가기 어려워 "수위 위인데도 포화된" 상태가 흔하다.</li>
+      </ol></div>
+    <div class="sim" id="sim-es-cap">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>모관 상승관과 흙 속 부(−)의 간극수압</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-cap" aria-label="모세관 상승과 지표 부근 유효응력 단면의 비교"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>관 지름 d <output id="es-cp-d-out"></output></span><input type="range" id="es-cp-d" min="-2" max="0.5" step="0.01" value="-1"></label>
+          <div class="ctrl"><span>지하수위 위의 흙</span><div class="seg" id="es-cp-soil"><button data-value="fill" class="on">매립층 D₁₀ 0.11</button><button data-value="sm">실트질 모래 D₁₀ 0.029</button><button data-value="silt">실트 D₁₀ 0.006</button></div></div>
+          <label class="ctrl"><span>하젠 상수 C <output id="es-cp-c-out"></output></span><input type="range" id="es-cp-c" min="0.1" max="0.5" step="0.01" value="0.3"></label>
+          <label class="ctrl"><span><span>지하수위 z<sub>w</sub></span> <output id="es-cp-zw-out"></output></span><input type="range" id="es-cp-zw" min="0.5" max="4" step="0.05" value="2"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">관의 상승 h<sub>c</sub></span><span class="v" id="es-cp-hct">—</span></div>
+        <div class="stat"><span class="k">흙의 모관대 h<sub>c</sub></span><span class="v" id="es-cp-hcs">—</span></div>
+        <div class="stat"><span class="k">모관대 꼭대기 u</span><span class="v" id="es-cp-u">—</span></div>
+        <div class="stat"><span class="k">모관대 꼭대기 σ′ 증가</span><span class="v" id="es-cp-ds">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 관 지름을 1 mm에서 0.01 mm로 줄이면 높이가 100배 · 흙을 실트로 바꾸면 모관대가 지표까지 닿아 지표 부근 전체가 음의 간극수압을 갖습니다 · 오른쪽 그래프의 실선(모관 고려)과 점선(무시)을 비교하세요 · 모델: 정의 4.5, T = 0.073 N/m, α = 0, 흙은 h<sub>c</sub> = C/(eD₁₀)(e = 매립층 0.70, 실트질 모래 0.80, 실트 0.90, 교육용). 모관대는 포화(γ<sub>sat</sub> 19)로, 그 위는 γ<sub>t</sub> 18로 계산. 층 구분 없이 위 4 m를 한 흙으로 단순화했습니다.</div>
+    </div>
+    <div class="callout deep"><strong>불포화 흙의 유효응력 맛보기</strong> 모관대 위처럼 간극에 공기와 물이 함께 있는 <span class="term">불포화 흙</span><span class="en">(unsaturated soil)</span>에서는 공기압 \(u_a\)와 수압 \(u_w\)가 다르다. 비숍(A. W. Bishop, 1959)은 \(\sigma' = (\sigma - u_a) + \chi\,(u_a - u_w)\)를 제안했다. \(u_a - u_w\)는 흡입력, \(\chi\)는 포화도에 따라 0(건조)–1(포화) 사이의 값이다. 흡입력은 마른 흙이 가파른 비탈을 유지하게 하지만, 비가 와서 포화되면 사라진다. 집중 호우 때 풍화토 비탈(S-10, 12장)이 갑자기 무너지는 한 가지 이유다. 불포화 토질역학은 이 책의 범위 밖이며, \(\chi\)를 정하는 방법은 아직 연구가 이어지는 주제다.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="seepage">
+    <h2>물이 흐를 때: 침투력과 분사 현상</h2>
+    <div class="problem"><strong>모래가 끓어오른다</strong>
+      <p>굴착 바닥 아래에서 물이 위로 솟으면, 바닥의 모래가 끓는 물처럼 들썩이다가 액체처럼 흘러 버리는 일이 있습니다. 모래가 갑자기 무거워진 것도, 가벼워진 것도 아닙니다. 위로 흐르는 물이 알갱이를 <b>들어 올리는 힘</b>이 무게와 같아졌을 뿐입니다.</p></div>
+    <p>물이 흙 속을 흐르면 간극수압은 더 이상 정수압이 아닙니다. 두 점 사이 전수두의 차를 흐르는 거리로 나눈 값이 <span class="term">동수경사</span><span class="en">(hydraulic gradient)</span> \(i\)이고(5장 다르시 법칙), 흐르는 물은 알갱이에 마찰로 힘을 전합니다. 흙 단위 부피당 이 힘을 <span class="term">침투력</span><span class="en">(seepage force)</span>이라 하며 크기는 \(i\gamma_w\), 방향은 흐름 방향입니다.</p>
+    <div class="callout def"><strong>원리 4.6 (침투가 있을 때의 유효응력과 한계 동수경사)</strong> 두께 \(L\)인 흙층을 수두 차 \(h\)로 물이 연직으로 흐를 때(\(i = h/L\)), 층 윗면에서 깊이 \(z\)의 유효응력은
+      <div class="formula">$$\text{하향: } \sigma'_v = \gamma' z + i\gamma_w z, \qquad \text{상향: } \sigma'_v = \gamma' z - i\gamma_w z$$
+      $$\sigma'_v = 0 \;\Longrightarrow\; i_c = \frac{\gamma'}{\gamma_w} = \frac{G_s - 1}{1 + e}$$<div class="where">하향 침투는 유효응력을 키우고(배수 공사 때 흙이 단단해지는 이유), 상향 침투는 줄인다. 상향 동수경사가 <span class="term">한계 동수경사</span><span class="en">(critical hydraulic gradient)</span> \(i_c\)에 이르면 유효응력이 0이 되어 모래가 강도를 잃는다. 이것이 <span class="term">분사 현상</span><span class="en">(quick condition)</span>이다. 대부분의 흙에서 \(i_c\)는 약 0.9–1.1이다. 굴착 바닥에서 국부적으로 일어나 바닥이 부풀고 모래가 뿜어 나오는 현상을 <span class="term">보일링</span><span class="en">(boiling)</span>이라 하고, 흙 속으로 관 모양의 물길이 뒤로 자라 가는 것을 파이핑(5장)이라 한다.</div></div></div>
+    <figure class="diagram" id="fig-es-seep">
+      <svg viewBox="0 0 860 320" role="img" aria-label="상향 침투 시험 장치와 깊이별 응력 분포, 하향 침투와 비교">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(50,30)">
+          <rect x="60" y="60" width="140" height="200" style="fill:none;stroke:var(--text);stroke-width:1.6"/>
+          <rect x="61" y="60" width="138" height="50" style="fill:var(--blue);opacity:.18"/>
+          <rect x="61" y="110" width="138" height="130" style="fill:var(--accent);opacity:.4"/>
+          <rect x="61" y="240" width="138" height="20" style="fill:var(--surface-2)"/>
+          <line x1="61" y1="240" x2="199" y2="240" style="stroke:var(--text-dim);stroke-dasharray:3 2"/>
+          <path d="M0 10 L0 250 L60 250" style="fill:none;stroke:var(--text);stroke-width:1.6"/>
+          <rect x="-12" y="10" width="24" height="40" style="fill:var(--blue);opacity:.3;stroke:var(--text)"/>
+          <line x1="-20" y1="20" x2="40" y2="20" style="stroke:var(--blue);stroke-dasharray:5 3"/>
+          <line x1="40" y1="60" x2="220" y2="60" style="stroke:var(--blue);stroke-dasharray:5 3"/>
+          <path d="M230 20 L230 60" style="stroke:var(--accent-2);stroke-width:1.8" marker-start="url(#es-ah)" marker-end="url(#es-ah)"/>
+          <text x="236" y="44" class="t-mono" style="fill:var(--accent-2)">h</text>
+          <path d="M240 110 L240 240" style="stroke:var(--text-dim);stroke-width:1.4" marker-start="url(#es-ah)" marker-end="url(#es-ah)"/>
+          <text x="246" y="180" class="t-mono">L</text>
+          <g style="stroke:var(--blue);stroke-width:2" marker-end="url(#es-ah-w)"><line x1="100" y1="230" x2="100" y2="190"/><line x1="160" y1="230" x2="160" y2="190"/><line x1="130" y1="180" x2="130" y2="140"/></g>
+          <text x="130" y="290" text-anchor="middle" class="t" style="font-weight:700">상향 침투 i = h / L</text>
+        </g>
+        <g transform="translate(400,40)">
+          <line x1="0" y1="0" x2="0" y2="240" class="s-axis"/><line x1="0" y1="0" x2="400" y2="0" class="s-axis"/>
+          <text x="400" y="-6" text-anchor="end" class="t-mono">σ′ (kPa)</text><text x="-8" y="240" text-anchor="end" class="t-mono">z</text>
+          <line x1="0" y1="0" x2="250" y2="240" style="stroke:var(--text-dim);stroke-width:2;stroke-dasharray:6 4"/>
+          <line x1="0" y1="0" x2="380" y2="240" style="stroke:var(--accent);stroke-width:2.4"/>
+          <line x1="0" y1="0" x2="110" y2="240" style="stroke:var(--accent-2);stroke-width:2.4"/>
+          <line x1="0" y1="0" x2="0" y2="240" style="stroke:var(--bad);stroke-width:4"/>
+          <text x="256" y="230" class="t-mono" style="fill:var(--text-dim)">정수압 γ′z</text>
+          <text x="300" y="196" class="t-mono" style="fill:var(--accent)">하향 (γ′ + iγw) z</text>
+          <text x="118" y="230" class="t-mono" style="fill:var(--accent-2)">상향 (γ′ − iγw) z</text>
+          <text x="10" y="130" class="t-mono" style="fill:var(--bad)">i = i_c : σ′ = 0</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-5.</b> 상향 침투 장치(왼쪽)와 흐름 방향에 따른 유효응력 분포(오른쪽, 개념도). 아래 물통을 \(h\)만큼 올리면 물이 시료를 아래에서 위로 지나고, 유효응력의 기울기가 \(i\gamma_w\)만큼 줄어든다. \(i = i_c\)에서 기울기가 0이 되어 모든 깊이의 유효응력이 0이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 4.6 (G-10 실트질 모래의 한계 동수경사)</strong> \(\gamma_{sat} = 19.0\) kN/m³.
+      <ol style="margin:6px 0 0">
+        <li><b>한계 동수경사.</b> \(i_c = (19.0 - 9.81)/9.81 = 0.937\)(<code>CB.soil.ic(19)</code>).</li>
+        <li><b>상향 침투 시험.</b> 시료 두께 \(L = 0.50\) m에서 수두 차 \(h = 0.30\) m이면 \(i = 0.60\), 바닥(\(z = 0.5\) m)의 \(\sigma'_v = (9.19 - 0.60 \times 9.81) \times 0.5 = 1.65\) kPa. 정수압일 때(4.60 kPa)의 약 36 %.</li>
+        <li><b>분사.</b> \(h = i_c L = 0.47\) m에서 유효응력 0. 안전율 \(F = i_c/i\)로 나타내며 굴착 바닥의 보일링 검토에서는 대개 1.5–2 이상의 값을 요구하는 기준이 많다(현행 KDS 21 30 00 확인).</li>
+      </ol></div>
+    <div class="sim" id="sim-es-quick">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>상향 침투 탱크: 분사 현상 만들기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-quick" aria-label="침투 탱크의 모래와 깊이별 유효응력, 분사 애니메이션"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>흐름 방향</span><div class="seg" id="es-qk-dir"><button data-value="up" class="on">상향</button><button data-value="down">하향</button></div></div>
+          <label class="ctrl"><span>수두 차 h <output id="es-qk-h-out"></output></span><input type="range" id="es-qk-h" min="0" max="0.8" step="0.005" value="0.3"></label>
+          <label class="ctrl"><span>시료 두께 L <output id="es-qk-l-out"></output></span><input type="range" id="es-qk-l" min="0.2" max="0.8" step="0.01" value="0.5"></label>
+          <label class="ctrl"><span><span>포화 단위중량 γ<sub>sat</sub></span> <output id="es-qk-g-out"></output></span><input type="range" id="es-qk-g" min="17" max="22" step="0.1" value="19"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">동수경사 i = h/L</span><span class="v" id="es-qk-i">—</span></div>
+        <div class="stat"><span class="k">한계 i<sub>c</sub> = γ′/γ<sub>w</sub></span><span class="v" id="es-qk-ic">—</span></div>
+        <div class="stat"><span class="k">안전율 i<sub>c</sub>/i</span><span class="v" id="es-qk-fs">—</span></div>
+        <div class="stat"><span class="k">바닥 σ′</span><span class="v" id="es-qk-s">—</span></div>
+      </div>
+      <div class="es-msg" id="es-qk-msg"></div>
+      <div class="sim-note">해볼 것: 상향에서 h를 천천히 올려 i가 i<sub>c</sub>에 닿는 순간 모래가 끓어오르는 것을 보세요 · 하향으로 바꾸면 같은 h가 유효응력을 키웁니다 · 시료를 두껍게 하면 같은 h에서 i가 작아집니다 · 모델: 원리 4.6, 시료 위 물 깊이 0.10 m, u(z) = γ<sub>w</sub>[0.10 + z ± (h/L)z], <code>CB.soil.ic(γ<sub>sat</sub>)</code>. 유효응력이 음수가 될 수는 없으므로 i &gt; i<sub>c</sub>이면 0으로 표시하고 모래가 흐르는 상태로 봅니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="loading">
+    <h2>하중 직후의 간극수압: B 계수</h2>
+    <p>포화된 점토 위에 E-4 성토(76 kPa)를 쌓는 순간을 생각해 봅시다. 물은 거의 압축되지 않고, 점토의 투수 계수는 \(2 \times 10^{-9}\) m/s로 작아 물이 곧바로 빠지지 못합니다. 이런 조건을 <span class="term">비배수</span><span class="en">(undrained)</span> 조건이라 합니다. 그래서 하중 직후에는 늘어난 전응력을 <b>간극수가 거의 모두</b> 받고, 유효응력은 거의 그대로입니다. 이 늘어난 간극수압을 <span class="term">과잉간극수압</span><span class="en">(excess pore water pressure)</span>이라 하고, 그것이 시간에 따라 빠지며 유효응력이 늘어나는 과정이 7장의 압밀입니다.</p>
+    <div class="callout def"><strong>정의 4.7 (간극수압 계수 B)</strong> 비배수 상태에서 등방 전응력 증가 \(\Delta\sigma_3\)에 대한 간극수압 증가의 비, 곧 <span class="term">간극수압 계수 B</span><span class="en">(pore pressure coefficient B)</span>는
+      <div class="formula">$$B = \frac{\Delta u}{\Delta \sigma_3} = \frac{1}{1 + n\,C_v/C_s}$$<div class="where">\(n\): 간극률, \(C_v\): 간극 유체의 압축률, \(C_s\): 흙 골격의 압축률(스켐턴, 1954). 물은 골격보다 훨씬 덜 압축되므로 포화 연약 점토에서 \(B \approx 1\)이다. 공기가 조금만 섞여도 \(C_v\)가 크게 늘어 \(B\)가 빠르게 떨어진다. 삼축 시험에서는 \(B \ge\) 약 0.95를 포화의 확인 기준으로 흔히 쓴다(9장). 전단 응력이 함께 변할 때의 계수 A는 9장에서 다룬다.</div></div></div>
+    <div class="sim" id="sim-es-b">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>하중 직후 간극수압: 포화도와 B 계수</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-b" aria-label="포화도에 따른 B 계수 곡선과 하중 분담 막대"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>흙 골격</span><div class="seg" id="es-b-soil"><button data-value="soft" class="on">연약 점토</button><button data-value="stiff">굳은 점토</button><button data-value="sand">조밀한 모래</button><button data-value="rock">연암</button></div></div>
+          <label class="ctrl"><span>포화도 S <output id="es-b-s-out"></output></span><input type="range" id="es-b-s" min="0.9" max="1" step="0.001" value="1"></label>
+          <label class="ctrl"><span>하중 증가 Δσ <output id="es-b-ds-out"></output></span><input type="range" id="es-b-ds" min="0" max="200" step="1" value="76"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">B</span><span class="v" id="es-b-b">—</span></div>
+        <div class="stat"><span class="k">Δu (물이 받는 몫)</span><span class="v" id="es-b-du">—</span></div>
+        <div class="stat"><span class="k">Δσ′ (골격이 받는 몫)</span><span class="v" id="es-b-dsp">—</span></div>
+        <div class="stat"><span class="k">n·C<sub>v</sub>/C<sub>s</sub></span><span class="v" id="es-b-r">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 연약 점토에서 S = 1이면 E-4 하중 76 kPa를 거의 모두 물이 받습니다(→ 7장 압밀) · S를 0.99로 조금만 낮춰도 B가 얼마나 떨어지나요? · 연암처럼 골격이 단단하면 포화되어도 B &lt; 1 · 모델: 정의 4.7, C<sub>v</sub> = S/K<sub>w</sub> + (1 − S)/p<sub>a</sub>(물 K<sub>w</sub> = 2.2 × 10⁶ kPa, 공기는 보일 법칙으로 절대 압력 p<sub>a</sub> = 200 kPa), 골격 압축률 C<sub>s</sub>와 간극률 n은 교육용 대표값(연약 점토 1 × 10⁻³ kPa⁻¹·0.60, 굳은 점토 1 × 10⁻⁴·0.40, 조밀한 모래 1 × 10⁻⁵·0.35, 연암 1 × 10⁻⁶·0.10). 공기가 물에 녹는 효과는 무시했습니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="uplift">
+    <h2>굴착 바닥의 양압력: B-10</h2>
+    <div class="problem"><strong>지하 2층 건물이 물에 뜬다?</strong>
+      <p>B-10의 기초 매트 바닥은 GL −11.0 m, 지하수위는 GL −2.0 m입니다. 굴착 중에는 펌프로 물을 퍼내 바닥을 말려 두지만, 매트를 치고 배수를 멈추면 바닥에는 9 m 물기둥의 압력이 위로 작용합니다. 건물이 다 올라가기 전에 배수를 멈추면 어떻게 될까요?</p></div>
+    <p>물이 흐르지 않는 상태에서 깊이 \(z\)에 놓인 수평면에는 \(u = \gamma_w(z - z_w)\)의 수압이 모든 방향으로 작용합니다. 그 면이 구조물의 바닥이면 이 압력은 구조물을 들어 올리는 <span class="term">양압력</span><span class="en">(uplift pressure)</span>이 됩니다. 굴착 중에는 또 다른 들림이 있습니다. 굴착 바닥 아래 남은 흙층 밑에 수압이 큰 <span class="term">피압 대수층</span><span class="en">(confined aquifer)</span>이 있으면, 그 수압이 남은 흙의 무게를 이기고 바닥을 밀어 올릴 수 있습니다.</p>
+    <div class="callout def"><strong>원리 4.8 (양압력과 들림 안전율)</strong>
+      <span class="term">들림 안전율</span><span class="en">(factor of safety against uplift)</span>은
+      <div class="formula">$$F_{uplift} = \frac{\text{아래로 누르는 무게(구조물 + 흙)}}{\text{위로 미는 수압}} = \frac{W}{u\,A}, \qquad \text{굴착 바닥: } F = \frac{\sum \gamma_{sat}\,h}{u_{\text{대수층 윗면}}}$$<div class="where">굴착 바닥 들림은 바닥에서 대수층 윗면까지 남은 흙의 전응력과 대수층 윗면의 간극수압을 비교한다(흙의 전단 저항은 보수적으로 무시). 기준과 조건에 따라 대략 1.1–1.5의 안전율을 요구한다(현행 KDS 21 30 00·KDS 41 20 확인). 이 책은 교육용으로 1.2를 쓴다. 모자라면 <span class="term">감압정</span><span class="en">(relief well)</span>으로 대수층 수두를 낮추거나, 차수벽을 불투수층까지 넣거나, 바닥을 지반 개량으로 무겁게(또는 강하게) 한다.</div></div></div>
+    <figure class="diagram" id="fig-es-uplift">
+      <svg viewBox="0 0 860 400" role="img" aria-label="B-10 굴착 단면, 지하연속벽, 모래 자갈 피압 대수층과 굴착 바닥 들림">
+        <rect x="10" y="10" width="840" height="380" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <rect x="0" y="0" width="720" height="20" style="fill:var(--accent);opacity:.26"/>
+          <rect x="0" y="20" width="720" height="40" style="fill:var(--accent);opacity:.16"/>
+          <rect x="0" y="60" width="720" height="80" style="fill:var(--accent);opacity:.44"/>
+          <rect x="0" y="140" width="720" height="50" style="fill:var(--accent);opacity:.12"/>
+          <rect x="0" y="140" width="720" height="50" style="fill:var(--blue);opacity:.12"/>
+          <rect x="0" y="190" width="720" height="40" style="fill:var(--accent);opacity:.32"/>
+          <rect x="230" y="0" width="260" height="110" style="fill:var(--bg-elev)"/>
+          <rect x="222" y="0" width="8" height="180" style="fill:var(--text-dim)"/><rect x="490" y="0" width="8" height="180" style="fill:var(--text-dim)"/>
+          <g style="stroke:var(--text);stroke-width:2"><line x1="230" y1="15" x2="490" y2="15"/><line x1="230" y1="50" x2="490" y2="50"/><line x1="230" y1="85" x2="490" y2="85"/></g>
+          <line x1="0" y1="20" x2="222" y2="20" style="stroke:var(--blue);stroke-width:1.6;stroke-dasharray:6 4"/><line x1="498" y1="20" x2="720" y2="20" style="stroke:var(--blue);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <path d="M600 12 l10 0 l-5 8z" style="fill:var(--blue)"/><text x="614" y="16" class="t-mono" style="fill:var(--blue)">GL −2</text>
+          <g class="t-mono"><text x="8" y="14">매립</text><text x="8" y="44">실트질 모래</text><text x="8" y="104">연약 점토</text><text x="8" y="170">모래 자갈(피압)</text><text x="8" y="214">풍화토</text></g>
+          <line x1="230" y1="110" x2="490" y2="110" style="stroke:var(--accent-2);stroke-width:2"/>
+          <text x="360" y="104" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">굴착 바닥 GL −11</text>
+          <rect x="300" y="110" width="120" height="30" style="fill:none;stroke:var(--ok);stroke-width:1.6;stroke-dasharray:4 3"/>
+          <path d="M360 112 L360 136" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#es-ah-ok)"/>
+          <text x="508" y="128" class="t-mono" style="fill:var(--ok)">남은 점토 3 m: W = 49.5 kPa</text>
+          <g style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#es-ah-load)"><line x1="320" y1="170" x2="320" y2="144"/><line x1="360" y1="170" x2="360" y2="144"/><line x1="400" y1="170" x2="400" y2="144"/></g>
+          <text x="360" y="186" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">u(14 m) = 9.81 × 12 = 117.7 kPa</text>
+          <rect x="696" y="-10" width="8" height="160" style="fill:var(--surface);stroke:var(--text)"/>
+          <rect x="697" y="20" width="6" height="130" style="fill:var(--blue);opacity:.6"/>
+          <text x="690" y="74" text-anchor="end" class="t-mono" style="fill:var(--blue)">피압 수두(관측정)</text>
+          <text x="220" y="196" text-anchor="end" class="t-mono">벽 끝 GL −18</text>
+          <text x="360" y="300" text-anchor="middle" class="t" style="font-weight:700">F = 49.5 / 117.7 = 0.42 &lt; 1.2 → 감압이 필요하다</text>
+          <text x="360" y="322" text-anchor="middle" class="t-dim">(벽 끝 −18 m 아래에 모래 자갈 1 m가 남아 대수층이 벽 안팎으로 이어져 있다)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-6.</b> B-10 굴착과 바닥 들림(교육용 단면, 축척 아님). 지하연속벽은 모래 자갈층에 4 m 근입했지만 벽 끝(−18 m) 아래로 모래 자갈 1 m가 이어져 있어, 대수층의 수압이 굴착 안쪽 바닥 밑까지 그대로 전달된다고 본다. 굴착 바닥에서 대수층 윗면까지 남은 점토는 3 m뿐이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 4.7 (B-10 굴착 바닥 들림)</strong> 모래 자갈층의 피압 수두가 지하수위와 같은 GL −2.0 m라고 하자(교육용 가정).
+      <ol style="margin:6px 0 0">
+        <li><b>위로 미는 수압.</b> 대수층 윗면(GL −14): \(u = 9.81 \times (14 - 2) = 117.7\) kPa.</li>
+        <li><b>누르는 흙.</b> 굴착 바닥(−11)에서 −14까지 점토 3 m: \(W = 16.5 \times 3 = 49.5\) kPa.</li>
+        <li><b>안전율.</b> \(F = 49.5/117.7 = 0.42\). 1보다 훨씬 작다 — 감압 없이 −11 m까지 파면 바닥이 들려 깨지고 물과 모래가 솟는다.</li>
+        <li><b>언제부터 위험한가.</b> \(F = 1.2\)가 되는 굴착 깊이 \(d\): 남은 흙 무게 \(19(6 - d) + 16.5 \times 8 = 1.2 \times 117.7 = 141.2\) → \(d \approx 5.5\) m. 실트질 모래층을 다 파기도 전에 대수층 감압을 시작해야 한다.</li>
+        <li><b>필요한 감압.</b> −11 m에서 \(F = 1.2\)이려면 \(u \le 49.5/1.2 = 41.3\) kPa, 곧 대수층 수두가 윗면 위 4.2 m(GL −9.8 m) 이하. 피압 수두를 약 7.8 m 낮추는 감압정이 필요하다.</li>
+      </ol></div>
+    <div class="callout"><strong>예제 4.8 (기초 매트의 부상)</strong> 매트를 친 뒤 감압·배수를 멈추면 매트 바닥(−11)의 양압력은 \(u = 9.81 \times 9 = 88.3\) kPa. 매트 자중은 \(2.5 \times 24 = 60\) kPa이므로 매트만으로는 \(F = 60/88.3 = 0.68\)로 떠오른다. 층마다 약 10.5 kPa가 더해진다면 \(F = 1.2\)에 \((1.2 \times 88.3 - 60)/10.5 = 4.4\), 곧 다섯 층 정도가 올라가야 한다(교육용). 그 전까지는 배수를 계속하거나, 말뚝의 인발 저항(14장)·부력 앵커로 버틴다. 완공 후 평균 접지압 186 kPa는 양압력보다 충분히 크다.</div>
+    <div class="sim" id="sim-es-uplift">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>굴착 바닥 양압력과 들림 안전율 (B-10)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-uplift" aria-label="B-10 굴착 단면과 누르는 무게, 위로 미는 수압의 화살표"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>검토 상황</span><div class="seg" id="es-up-mode"><button data-value="exc" class="on">굴착 중 바닥 들림</button><button data-value="mat">매트 부상</button></div></div>
+          <label class="ctrl"><span>굴착 깊이 d <output id="es-up-d-out"></output></span><input type="range" id="es-up-d" min="0" max="11" step="0.1" value="11"></label>
+          <label class="ctrl"><span>대수층 수두(GL −) <output id="es-up-h-out"></output></span><input type="range" id="es-up-h" min="0" max="13.5" step="0.1" value="2"></label>
+          <label class="ctrl"><span>올라간 층 수 n(매트 위) <output id="es-up-n-out"></output></span><input type="range" id="es-up-n" min="0" max="12" step="1" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">누르는 무게 W</span><span class="v" id="es-up-w">—</span></div>
+        <div class="stat"><span class="k">위로 미는 수압 u</span><span class="v" id="es-up-u">—</span></div>
+        <div class="stat"><span class="k">들림 안전율 F</span><span class="v" id="es-up-f">—</span></div>
+        <div class="stat"><span class="k">F = 1.2에 필요한 수두</span><span class="v" id="es-up-req">—</span></div>
+      </div>
+      <div class="es-msg" id="es-up-msg"></div>
+      <div class="sim-note">해볼 것: 굴착 깊이를 0에서 11 m까지 늘리며 F가 1.2 아래로 떨어지는 깊이(약 5.5 m)를 찾으세요 · 대수층 수두를 GL −9.8 m 아래로 낮추면(감압정) −11 m에서도 F ≥ 1.2 · '매트 부상'에서는 수두가 바깥 지하수위가 되고, 층 수를 올려 F ≥ 1.2가 되는 층 수를 찾으세요 · 모델: 원리 4.8. 굴착 모드: W = 굴착 바닥에서 GL −14 m까지 흙의 Σγ<sub>sat</sub>h(G-10, 매립층 19), u = γ<sub>w</sub>(14 − 수두 깊이). 매트 모드: W = 매트 60 kPa + 10.5n kPa, u = γ<sub>w</sub>(11 − 수두 깊이). 흙의 전단 저항·벽 마찰·말뚝 인발은 무시(보수적). 안전율 기준은 교육용 1.2 — 현행 기준 확인.</div>
+    </div>
+    <div class="callout site"><strong>B-10 매트의 양압력 88.3 kPa</strong> <code>CB.soil.site().at(11).u</code> = 88.3 kPa가 매트 바닥에 걸리는 양압력이다. 굴착으로 없어지는 전응력 194.5 kPa는 평균 접지압 186 kPa와 거의 같아 B-10은 거의 완전 보상 기초가 된다(13장). 그런데 그 186 kPa 가운데 88.3 kPa는 물이 받쳐 주는 몫이고, 점토 골격이 받는 순 유효응력 변화는 \(\Delta\sigma' = 186 - 194.5 \approx -8.5\) kPa(약간 줄어듦)이다 — 그래서 매트 아래 점토의 압밀 침하가 거의 없다. 반대로 시공 중에는 이 88.3 kPa와 모래 자갈층의 피압(−11 m 굴착에서 F = 0.42)이 가장 위험한 하중이다. 11장에서 감압정과 보일링·히빙 검토로 이어진다.</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="sign-convention">
+    <h2>부호 규약: 압축이 + 인 이유</h2>
+    <p>MechanicsBook은 재료역학의 관습대로 <b>인장 응력을 +</b>로 썼습니다. 강재와 콘크리트 부재는 인장과 압축을 모두 받고, 인장이 위험한 경우가 많기 때문입니다. 흙은 인장을 거의 견디지 못하고 거의 언제나 압축 상태에 있으므로, 지반공학은 <b>압축 응력을 +</b>로 씁니다. 간극수압도 대기압보다 크면 +입니다.</p>
+    <div class="callout def"><strong>정의 4.9 (이 책의 부호 규약)</strong> <span class="term">부호 규약</span><span class="en">(sign convention)</span>: 연직·수평 응력 \(\sigma\), 유효응력 \(\sigma'\), 간극수압 \(u\)는 <b>압축(누름)이 +</b>. 깊이 \(z\)는 지표에서 아래로 +. 모어 원은 \(\sigma\)를 오른쪽 +(압축), \(\tau\)를 위 +로 그린다. MechanicsBook의 응력 \(\sigma_{MB}\)와는 \(\sigma = -\sigma_{MB}\)의 관계다. 그래서 MechanicsBook의 "최대 주응력(가장 큰 인장)"은 이 책에서 가장 작은 압축이 되고, 이 책의 \(\sigma_1\)은 가장 큰 압축 주응력이다. 전단 응력의 부호 약속도 반대가 되지만, 모어–쿨롱 파괴 기준은 \(|\tau|\)로 쓰므로 결과는 같다(9장).</div>
+    <figure class="diagram" id="fig-es-sign">
+      <svg viewBox="0 0 860 280" role="img" aria-label="MechanicsBook의 인장 + 규약과 GeotechBook의 압축 + 규약 비교, 요소와 모어 원">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">MechanicsBook: 인장 +</text>
+          <rect x="40" y="50" width="60" height="60" class="f-elev" style="stroke:var(--text)"/>
+          <g style="stroke:var(--blue);stroke-width:2.4" marker-end="url(#es-ah-w)"><line x1="70" y1="50" x2="70" y2="22"/><line x1="70" y1="110" x2="70" y2="138"/></g>
+          <text x="80" y="30" class="t-mono" style="fill:var(--blue)">σ &gt; 0</text>
+          <line x1="140" y1="80" x2="300" y2="80" class="s-axis" marker-end="url(#es-ah)"/><text x="300" y="98" text-anchor="end" class="t-mono">σ (인장 +)</text>
+          <circle cx="190" cy="80" r="40" style="fill:none;stroke:var(--text-dim);stroke-width:2"/>
+          <text x="150" y="146" class="t-dim">흙의 상태는 거의 다 왼쪽(−)</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">GeotechBook: 압축 +</text>
+          <rect x="40" y="50" width="60" height="60" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <g style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#es-ah-load)"><line x1="70" y1="20" x2="70" y2="48"/><line x1="70" y1="140" x2="70" y2="112"/></g>
+          <text x="80" y="28" class="t-mono" style="fill:var(--accent-2)">σ′ &gt; 0</text>
+          <line x1="140" y1="80" x2="320" y2="80" class="s-axis" marker-end="url(#es-ah)"/><text x="320" y="98" text-anchor="end" class="t-mono">σ′ (압축 +)</text>
+          <circle cx="250" cy="80" r="40" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+          <text x="210" y="134" text-anchor="middle" class="t-mono">σ′₃</text><text x="290" y="134" text-anchor="middle" class="t-mono">σ′₁</text>
+          <text x="150" y="160" class="t-dim">흙의 상태가 오른쪽(+)에 놓인다</text>
+        </g>
+        <text x="430" y="240" text-anchor="middle" class="t-dim">σ(이 책) = −σ(MechanicsBook) · 간극수압 u도 압축 + · 깊이 z는 아래로 +</text>
+      </svg>
+      <figcaption><b>그림 4-7.</b> 두 책의 부호 규약. 같은 압축 상태가 MechanicsBook에서는 모어 원의 왼쪽(음수)에, 이 책에서는 오른쪽(양수)에 그려진다. 9장 전단강도에서 모어 원과 파괴 포락선을 다시 그릴 때 이 약속을 쓴다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="practice">
+    <h2>연습: 층을 쌓고 유효응력 맞히기</h2>
+    <p>유효응력 계산은 손에 익어야 합니다. 아래 시뮬레이터는 층 두께·단위중량·지하수위를 무작위로 바꾼 지반을 만들고, 정해진 깊이의 \(\sigma'_v\)를 묻습니다. 계산 순서는 늘 같습니다: ① 위에서부터 층마다 \(\gamma h\)를 더해 \(\sigma_v\), ② 지하수위에서부터 \(u = \gamma_w(z - z_w)\), ③ \(\sigma'_v = \sigma_v - u\), ④ \(\gamma'\)로 검산.</p>
+    <div class="sim" id="sim-es-build">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>수압·유효응력 퀴즈형 단면</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-build" aria-label="무작위 지층 단면과 질문 깊이, 정답 공개 시 응력 분포"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>층 수</span><div class="seg" id="es-bd-n"><button data-value="2">2층</button><button data-value="3" class="on">3층</button><button data-value="4">4층</button></div></div>
+          <div class="ctrl"><span>지표 하중</span><div class="seg" id="es-bd-q"><button data-value="0" class="on">없음</button><button data-value="1">있음(장기)</button></div></div>
+          <div class="btn-row"><button class="btn primary" id="es-bd-new">새 문제</button><button class="btn" id="es-bd-show">풀이 보기</button></div>
+        </div>
+      </div>
+      <div class="es-ask"><label for="es-bd-ans">깊이 <b id="es-bd-zq">—</b> m의 σ′<sub>v</sub> =</label><input type="number" id="es-bd-ans" step="0.1" inputmode="decimal" placeholder="kPa"><span>kPa</span><button class="btn" id="es-bd-check">채점</button></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">맞힌 수 / 푼 수</span><span class="v" id="es-bd-score">0 / 0</span></div>
+        <div class="stat"><span class="k">σ<sub>v</sub></span><span class="v" id="es-bd-s">?</span></div>
+        <div class="stat"><span class="k">u</span><span class="v" id="es-bd-u">?</span></div>
+        <div class="stat"><span class="k">σ′<sub>v</sub></span><span class="v" id="es-bd-e">?</span></div>
+      </div>
+      <div class="es-msg" id="es-bd-msg">답을 kPa로 넣고 채점하세요(±1 kPa 허용).</div>
+      <div class="sim-note">해볼 것: 지하수위가 층 경계 중간에 있는 문제가 함정입니다 — 그 층은 수위 위와 아래를 나눠 계산합니다 · 지표 하중이 있으면 모든 깊이의 σ와 σ′에 q를 더합니다(장기, 배수 완료) · 모델: 정의 4.2, <code>CB.soil.profile</code>로 채점. 층의 단위중량은 수위 위 γ<sub>t</sub>, 아래 γ<sub>sat</sub>(문제마다 무작위, 교육용).</div>
+    </div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="consolidation.html"><small>CH.07 · 압밀</small>σ′<sub>v0</sub>에서 시작한다<br><span>E-4 점토 중앙 99.5 kPa, 과잉간극수압이 빠지며 σ′이 는다.</span></a>
+      <a href="seepage.html"><small>CH.05 · 투수와 침투</small>흐르는 물의 수두<br><span>유선망으로 구한 간극수압으로 유효응력과 출구 경사를 본다.</span></a>
+      <a href="shear-strength.html"><small>CH.09 · 흙의 전단강도</small>강도는 σ′이 정한다<br><span>τ<sub>f</sub> = c′ + σ′ tanφ′, 압축 + 모어 원.</span></a>
+      <a href="retaining.html"><small>CH.11 · 옹벽과 흙막이</small>B-10 굴착 바닥<br><span>히빙·보일링·피압 검토와 감압정.</span></a>
+      <a href="bearing.html"><small>CH.13 · 얕은 기초와 지지력</small>보상 기초와 지하수위<br><span>194.5 kPa 제거와 186 kPa 접지압, 수위에 따른 지지력 감소.</span></a>
+      <a href="dynamics.html"><small>CH.15 · 지반 동역학과 액상화</small>u가 σ를 따라잡을 때<br><span>반복 하중으로 σ′ → 0, G-10 느슨한 모래층.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>유효응력의 원리 σ′ = σ − u: 흙의 압축과 전단 강도는 유효응력으로만 정해진다. σ′은 접촉력의 합을 전체 면적으로 나눈 평균이다. 물은 전단을 받지 못한다.</li>
+      <li>σ<sub>v</sub> = q + Σγh(수위 위 γ<sub>t</sub>, 아래 γ<sub>sat</sub>), u = γ<sub>w</sub>(z − z<sub>w</sub>). G-10의 11 m: 194.5 − 88.3 = 106.2 kPa, 점토 중앙 10 m: 99.5 kPa.</li>
+      <li>정수압에서는 수중 단위중량 γ′ = γ<sub>sat</sub> − γ<sub>w</sub>로 σ′을 바로 더할 수 있다. 고인 물은 σ′을 바꾸지 않는다.</li>
+      <li>지하수위를 낮추면 u가 줄어 σ′이 늘고(실트질 모래에서 약 8.8 kPa/m), 점토는 압밀로 침하한다. G-10 위 모래 수위 4 m 저하 → 최종 약 0.23 m. 수위가 오르면 σ′이 줄어 지지력·안정이 떨어진다.</li>
+      <li>모관 상승 h<sub>c</sub> ≈ 0.03/d(mm) m, 흙은 C/(eD₁₀). 모관대의 u = −γ<sub>w</sub>h로 σ′이 커진다. 불포화 흙은 비숍 식 맛보기.</li>
+      <li>침투가 있으면 σ′ = γ′z ± iγ<sub>w</sub>z(하향 +, 상향 −). i<sub>c</sub> = γ′/γ<sub>w</sub> ≈ 1에서 σ′ = 0인 분사 현상. G-10 실트질 모래 i<sub>c</sub> = 0.94.</li>
+      <li>하중 직후 포화 점토는 Δu = BΔσ ≈ Δσ(B ≈ 1): 하중을 물이 먼저 받고, 압밀로 골격에 넘긴다.</li>
+      <li>B-10: 매트 양압력 88.3 kPa(매트 자중 60 kPa만으로 F = 0.68), 모래 자갈 피압으로 −11 m 굴착 바닥 F = 0.42 → 감압정으로 수두를 GL −9.8 m 아래로. 이 책은 압축을 +로 쓴다(MechanicsBook과 반대).</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 지하수위가 지표에 있고 γ<sub>sat</sub> = 20 kN/m³인 균질한 흙에서 깊이 5 m의 연직 유효응력은? (γ<sub>w</sub> = 9.81)</p><div class="opts">
+        <button class="opt">100 kPa</button><button class="opt">49.1 kPa</button><button class="opt" data-correct>51.0 kPa</button><button class="opt">0 kPa</button>
+      </div><div class="quiz-exp">\(\sigma = 20 \times 5 = 100\), \(u = 9.81 \times 5 = 49.05\), \(\sigma' = 50.95 \approx 51.0\) kPa. 또는 \(\gamma' = 10.19\)로 \(10.19 \times 5\).</div></div>
+      <div class="quiz-q"><p>2. 호수 바닥의 흙 위에 물이 10 m 더 차올랐다. 호수 바닥 아래 3 m 지점의 유효응력은?</p><div class="opts">
+        <button class="opt">98 kPa 증가한다</button><button class="opt">98 kPa 감소한다</button><button class="opt" data-correct>변하지 않는다</button><button class="opt">0이 된다</button>
+      </div><div class="quiz-exp">고인 물의 무게만큼 전응력과 간극수압이 똑같이 \(9.81 \times 10 = 98.1\) kPa 늘어 유효응력은 그대로다(예제 4.1의 3단계).</div></div>
+      <div class="quiz-q"><p>3. G-10에서 지하수위가 GL −2 m에서 지표(GL 0 m)로 올라오면 깊이 11 m의 유효응력은? (매립층 γ<sub>t</sub> 18 → γ<sub>sat</sub> 19)</p><div class="opts">
+        <button class="opt">106.2 kPa 그대로</button><button class="opt" data-correct>약 17.6 kPa 줄어든다</button><button class="opt">약 19.6 kPa 늘어난다</button><button class="opt">0이 된다</button>
+      </div><div class="quiz-exp">\(u\)가 \(9.81 \times 2 = 19.6\) kPa 늘고, 매립층이 포화되어 \(\sigma\)가 \((19 - 18) \times 2 = 2\) kPa 는다. \(\Delta\sigma' = 2 - 19.6 = -17.6\) kPa → 약 88.6 kPa. 시뮬레이터에서 확인해 보자.</div></div>
+      <div class="quiz-q"><p>4. γ<sub>sat</sub> = 20.5 kN/m³인 모래의 한계 동수경사 i<sub>c</sub>는?</p><div class="opts">
+        <button class="opt">0.52</button><button class="opt">0.94</button><button class="opt" data-correct>1.09</button><button class="opt">2.09</button>
+      </div><div class="quiz-exp">\(i_c = (20.5 - 9.81)/9.81 = 1.09\). G-10 모래 자갈층의 값이다. 대부분의 흙에서 약 1이다.</div></div>
+      <div class="quiz-q"><p>5. 상향 침투가 있는 모래층에서 동수경사를 높이면 일어나는 일은?</p><div class="opts">
+        <button class="opt">전응력이 줄어든다</button><button class="opt" data-correct>간극수압이 늘어 유효응력이 줄어든다</button><button class="opt">유효응력이 늘어 단단해진다</button><button class="opt">아무 변화도 없다</button>
+      </div><div class="quiz-exp">흙의 무게(전응력)는 그대로지만 아래에서 밀어 올리는 수압이 커져 \(\sigma' = (\gamma' - i\gamma_w)z\)로 준다. \(i = i_c\)에서 0이 되어 분사 현상이 일어난다.</div></div>
+      <div class="quiz-q"><p>6. 지름 0.05 mm의 깨끗한 유리관에서 물의 모관 상승 높이는 약 얼마인가? (T = 0.073 N/m, α = 0)</p><div class="opts">
+        <button class="opt">약 6 cm</button><button class="opt" data-correct>약 0.6 m</button><button class="opt">약 6 m</button><button class="opt">약 60 m</button>
+      </div><div class="quiz-exp">\(h_c = 4 \times 0.073/(9810 \times 5 \times 10^{-5}) \approx 0.60\) m. 대략 \(0.030/d\)(mm) m로 기억하면 편하다.</div></div>
+      <div class="quiz-q"><p>7. 포화된 연약 점토 위에 76 kPa의 넓은 성토를 순간적으로 쌓았다. 직후 점토의 변화로 가장 알맞은 것은?</p><div class="opts">
+        <button class="opt">유효응력이 76 kPa 늘고 간극수압은 그대로</button><button class="opt" data-correct>간극수압이 약 76 kPa 늘고 유효응력은 거의 그대로</button><button class="opt">전응력이 그대로이다</button><button class="opt">간극수압이 76 kPa 줄어든다</button>
+      </div><div class="quiz-exp">포화 연약 점토는 \(B \approx 1\)이라 하중을 먼저 물이 받는다(과잉간극수압). 물이 빠지며 유효응력이 늘어나는 과정이 압밀이다(7장).</div></div>
+      <div class="quiz-q"><p>8. B-10 매트(바닥 GL −11 m, 자중 60 kPa)에서 지하수위 GL −2 m일 때 매트만의 부상 안전율은?</p><div class="opts">
+        <button class="opt" data-correct>약 0.68</button><button class="opt">약 1.47</button><button class="opt">약 2.2</button><button class="opt">약 3.1</button>
+      </div><div class="quiz-exp">양압력 \(9.81 \times 9 = 88.3\) kPa, \(F = 60/88.3 = 0.68 \lt 1\). 상부 층이 충분히 올라갈 때까지 배수를 계속하거나 인발 저항을 확보해야 한다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const ESX = {
+  gw: CB.soil.gw,
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = o.stroke || CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.7, y1 - uy * hd * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45); ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  alpha(c, a) { const ctx = ESX._c || (ESX._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  /* 지하수위 ▽ 기호와 수평 점선 */
+  wt(ctx, x0, x1, y, color, label) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.restore();
+    const tx = x1 - 14; ctx.beginPath(); ctx.moveTo(tx - 6, y - 11); ctx.lineTo(tx + 6, y - 11); ctx.lineTo(tx, y - 1); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+    if (label) ESX.text(ctx, label, tx - 10, y - 8, color, { size: 10.5, align: "right" });
+  },
+  /* 깊이가 아래로 + 인 응력 그래프: series [{ data: [[x, z]], color, width, dash }] */
+  depthChart(ctx, box, xr, zr, series, o = {}) {
+    return CB.chart(ctx, box, { x: xr, y: [-zr[1], -zr[0]], xLabel: o.xLabel || "응력 (kPa)", yLabel: o.yLabel === undefined ? "깊이 z (m)" : o.yLabel, yFmt: (v) => String(Number((-v).toPrecision(4))), xFmt: o.xFmt, xTicks: o.xTicks, yTicks: o.yTicks,
+      series: series.map((s) => ({ ...s, data: s.data.map(([x, z]) => [x, -z]) })), hlines: (o.hlines || []).map((h) => ({ ...h, y: -h.z })), points: (o.points || []).map((p) => ({ ...p, y: -p.z })) });
+  },
+  kpa: (v, d = 1) => CB.num(v, d) + " kPa",
+};
+
+/* ---------- 1. 입자 접촉력 모형 ---------- */
+(function () {
+  const SOIL = { loose: [15, 19], dense: [16, 20] }, gw = ESX.gw, Hs = 1.0;
+  const ghw = CB.range("es-ct-hw", (v) => v.toFixed(2) + " m", go), gq = CB.range("es-ct-q", (v) => v + " kPa", go), soil = CB.seg("es-ct-soil", go);
+  function st(z) { // z: 모래 윗면에서 아래로(m), 음수는 고인 물 속
+    const [gd, gs] = SOIL[soil()], zw = Hs - ghw(), q = gq();
+    if (z < 0) { const u = Math.max(0, z - zw) * gw; return { s: u, u, e: 0 }; }
+    const pond = Math.max(0, -zw) * gw, top = Math.max(0, zw);
+    const s = q + pond + gd * Math.min(z, top) + gs * Math.max(0, z - top), u = Math.max(0, z - zw) * gw;
+    return { s, u, e: s - u };
+  }
+  const rng = CB.rng(7), GR = []; for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) GR.push([(c + 0.5 + (r % 2 ? 0.5 : 0)) / 7.5, (r + 0.5) / 6, 0.85 + rng() * 0.25]);
+  const cv = CB.canvas("#es-cv-contact", (ctx, W, H) => {
+    const pal = CB.palette(), narrow = W < 520, bw = narrow ? W * 0.42 : Math.min(260, W * 0.36), bx = 22, top = 30, bh = H - 70, sc = bh / 2, ySoil = top + sc * 1.0, yBot = top + sc * 2.0;
+    const Yz = (z) => ySoil + z * sc;
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(bx, top); ctx.lineTo(bx, yBot); ctx.lineTo(bx + bw, yBot); ctx.lineTo(bx + bw, top); ctx.stroke();
+    const zw = Hs - ghw(); if (ghw() > 0) { ctx.fillStyle = ESX.alpha(pal.blue, 0.2); ctx.fillRect(bx + 1, Yz(zw), bw - 2, yBot - Yz(zw)); ESX.wt(ctx, bx, bx + bw + 8, Yz(zw), pal.blue, ""); }
+    const r0 = Math.min(bw / 7.5, sc / 6) * 0.5;
+    GR.forEach(([gx, gz, f]) => { ctx.beginPath(); ctx.arc(bx + gx * bw, Yz(gz), r0 * f * 0.95, 0, Math.PI * 2); ctx.fillStyle = ESX.alpha(pal.accent, 0.55); ctx.fill(); ctx.strokeStyle = pal.accent; ctx.lineWidth = 1; ctx.stroke(); });
+    const emax = 100;
+    for (let r = 1; r < 6; r++) { const z = r / 6, e = st(z).e, w = 1 + 7 * Math.max(0, e) / emax; for (let c = 0; c < 7; c++) { const x = bx + ((c + 0.5 + (r % 2 ? 0.25 : 0.25)) / 7.5) * bw; ESX.arrow(ctx, x, Yz(z) - r0 * 0.6, x, Yz(z) + r0 * 0.25, pal.text, w, 6 + w); } }
+    if (gq() > 0) { ctx.fillStyle = pal.dim; ctx.fillRect(bx + 4, ySoil - 8, bw - 8, 7); for (let k = 0; k < 5; k++) ESX.arrow(ctx, bx + bw * (0.15 + 0.175 * k), ySoil - 30, bx + bw * (0.15 + 0.175 * k), ySoil - 10, pal.accent2, 2, 8); ESX.text(ctx, "q", bx + bw + 10, ySoil - 20, pal.accent2, { size: 12, align: "left" }); }
+    ESX.text(ctx, "모래 1.0 m", bx + bw / 2, yBot + 14, pal.dim, { size: 10.5, mono: false });
+    const cx = bx + bw + (narrow ? 50 : 70), box = { x: cx, y: top, w: W - cx - 16, h: yBot - top };
+    const S = [], U = [], E = []; for (let k = 0; k <= 100; k++) { const z = -1 + 2 * k / 100, v = st(z); if (z < 0 && z < zw) continue; S.push([v.s, z]); U.push([v.u, z]); E.push([v.e, z]); }
+    const xm = Math.max(30, Math.ceil((st(1).s + 5) / 10) * 10);
+    ESX.depthChart(ctx, box, [0, xm], [-1, 1], [{ data: S, color: pal.dim, width: 2.2 }, { data: U, color: pal.blue, width: 2, dash: [6, 4] }, { data: E, color: pal.accent, width: 3 }], { yLabel: "", xLabel: "kPa", hlines: [{ z: 0, color: pal.faint, label: "모래 윗면" }] });
+    [["σ", pal.dim], ["u", pal.blue], ["σ′", pal.accent]].forEach(([t, c], i) => ESX.text(ctx, t, box.x + box.w - 8, box.y + 12 + i * 16, c, { size: 11, align: "right" }));
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 280, maxHeight: 400 });
+  function go() {
+    cv.redraw();
+    const b = st(1), [gd] = SOIL[soil()], dry = gq() + gd * Hs;
+    CB.stat("es-ct-s", ESX.kpa(b.s)); CB.stat("es-ct-u", ESX.kpa(b.u)); CB.stat("es-ct-e", ESX.kpa(b.e));
+    CB.stat("es-ct-r", CB.num((b.e / dry) * 100, 0) + " %");
+  }
+  go();
+})();
+
+/* ---------- 2. G-10 응력 단면 ---------- */
+(function () {
+  const L = CB.soil.SITE.layers, ZM = 25;
+  const ggw = CB.range("es-pf-gw", (v) => "GL −" + v.toFixed(1) + " m", go), gz = CB.range("es-pf-z", (v) => v.toFixed(1) + " m", go), gq = CB.range("es-pf-q", (v) => v + " kPa", go);
+  document.getElementById("es-pf-reset").addEventListener("click", () => { ggw.set(2, false); gz.set(11, false); gq.set(0, false); go(); });
+  document.getElementById("es-pf-e4").addEventListener("click", () => { gq.set(76, false); gz.set(10, false); go(); });
+  const prof = () => CB.soil.profile(L, ggw(), { q: gq() });
+  let geo = null;
+  const SHORT = { "매립층": "매립", "느슨한 실트질 모래": "실트질 모래", "연약 점토": "연약 점토", "모래 자갈": "모래 자갈", "풍화토·풍화암": "풍화토", "연암": "연암" };
+  const cv = CB.canvas("#es-cv-profile", (ctx, W, H) => {
+    const pal = CB.palette(), p = prof(), narrow = W < 520, colW = narrow ? Math.max(84, W * 0.28) : Math.min(170, W * 0.26), cx0 = 34, y0 = 26, y1 = H - 46, Y = (z) => y0 + (z / ZM) * (y1 - y0);
+    geo = { cx0, colW, Y, y0, y1 };
+    L.forEach((l, i) => { const a = Y(l.top), b = Y(Math.min(ZM, l.bottom)); ctx.fillStyle = ESX.alpha(pal.accent, [0.26, 0.16, 0.46, 0.12, 0.32, 0.55][i]); ctx.fillRect(cx0, a, colW, b - a); ctx.strokeStyle = pal.border; ctx.beginPath(); ctx.moveTo(cx0, b); ctx.lineTo(cx0 + colW, b); ctx.stroke(); if (b - a > 14) ESX.text(ctx, SHORT[l.name] || l.name, cx0 + colW / 2, (a + b) / 2, pal.text, { size: narrow ? 10 : 11, mono: false }); });
+    ctx.strokeStyle = pal.dim; ctx.strokeRect(cx0, y0, colW, y1 - y0);
+    ctx.fillStyle = pal.dim; ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    [0, 2, 6, 14, 19, 23].forEach((z) => ctx.fillText(String(z), cx0 - 5, Y(z)));
+    const gwY = Y(ggw()); ctx.fillStyle = ESX.alpha(pal.blue, 0.12); ctx.fillRect(cx0, gwY, colW, y1 - gwY);
+    const bx = cx0 + colW + (narrow ? 44 : 60), box = { x: bx, y: y0, w: W - bx - 14, h: y1 - y0 };
+    const S = [], U = [], E = []; for (let k = 0; k <= 250; k++) { const z = (k / 250) * ZM, v = p.at(z); S.push([v.sv, z]); U.push([v.u, z]); E.push([v.s, z]); }
+    const xm = Math.ceil(p.at(ZM).sv / 100) * 100, z = gz(), v = p.at(z);
+    ESX.depthChart(ctx, box, [0, xm], [0, ZM], [{ data: S, color: pal.dim, width: 2.2 }, { data: U, color: pal.blue, width: 2, dash: [6, 4] }, { data: E, color: pal.accent, width: 3 }], { yLabel: "", xLabel: "응력 (kPa)", hlines: [{ z, color: pal.accent2 }], points: [{ x: v.sv, z, color: pal.dim, r: 5 }, { x: v.u, z, color: pal.blue, r: 5 }, { x: v.s, z, color: pal.accent, r: 6 }] });
+    ESX.wt(ctx, cx0 - 6, cx0 + colW + 14, gwY, pal.blue, "");
+    ctx.save(); ctx.strokeStyle = ESX.alpha(pal.blue, 0.6); ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(bx, gwY); ctx.lineTo(bx + box.w, gwY); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.strokeStyle = pal.accent2; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(cx0, Y(z)); ctx.lineTo(cx0 + colW, Y(z)); ctx.stroke(); ctx.restore();
+    ESX.text(ctx, "▽ 끌기", cx0 + 4, gwY + 11, pal.blue, { size: 10, mono: false, align: "left" });
+    const lx = box.x + box.w - 6, ly = box.y + 12;
+    [["σ 전응력", pal.dim], ["u 간극수압", pal.blue], ["σ′ 유효응력", pal.accent]].forEach(([t, c], i) => ESX.text(ctx, t, lx, ly + i * 16, c, { size: 10.5, align: "right", mono: false }));
+    ESX.text(ctx, "깊이 z (m)", 10, y0 - 12, pal.dim, { size: 10, align: "left", mono: false });
+  }, { aspect: (W) => (W < 520 ? 1.15 : 0.66), minHeight: 360, maxHeight: 560 });
+  const el = cv.canvas; let drag = false;
+  const setFrom = (e) => { if (!geo) return; const r = el.getBoundingClientRect(), y = e.clientY - r.top; ggw.set(Math.round(CB.clamp(((y - geo.y0) / (geo.y1 - geo.y0)) * ZM, 0, 14) * 10) / 10); };
+  el.addEventListener("pointerdown", (e) => { if (!geo) return; const r = el.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; if (x < geo.cx0 + geo.colW + 16 && Math.abs(y - geo.Y(ggw())) < 30) { drag = true; el.setPointerCapture(e.pointerId); e.preventDefault(); setFrom(e); } });
+  el.addEventListener("pointermove", (e) => { if (drag) setFrom(e); });
+  el.addEventListener("pointerup", () => { drag = false; }); el.addEventListener("pointercancel", () => { drag = false; });
+  function go() {
+    cv.redraw();
+    const p = prof(), z = gz(), v = p.at(z), base = CB.soil.site().at(z);
+    CB.stat("es-pf-layer", p.layerAt(z).name);
+    CB.stat("es-pf-s", ESX.kpa(v.sv)); CB.stat("es-pf-u", ESX.kpa(v.u)); CB.stat("es-pf-e", ESX.kpa(v.s));
+    const d = v.s - base.s, msg = document.getElementById("es-pf-msg");
+    msg.className = "es-msg";
+    msg.innerHTML = `σ′ = ${CB.num(v.sv, 1)} − ${CB.num(v.u, 1)} = <b>${CB.num(v.s, 1)} kPa</b>` + (Math.abs(d) > 0.05 ? ` · G-10 기본 상태(수위 GL −2, q = 0)의 ${CB.num(base.s, 1)} kPa보다 <b>${d > 0 ? "+" : "−"}${CB.num(Math.abs(d), 1)} kPa</b>` : " · G-10 기본 상태와 같습니다.") + (ggw() < 2 ? " — 수위가 오르면 σ′이 줄어 강도와 지지력이 떨어집니다." : ggw() > 2 ? " — 수위가 내려가면 σ′이 늘어 점토가 압밀 침하합니다(4.4절)." : "");
+  }
+  go();
+})();
+
+/* ---------- 3. 양수와 침하 ---------- */
+(function () {
+  const L = CB.soil.SITE.layers, gw = ESX.gw, ZM = 20;
+  const mode = CB.seg("es-dd-mode", go), gd = CB.range("es-dd-d", (v) => v.toFixed(1) + " m", go), gcc = CB.range("es-dd-cc", (v) => v.toFixed(2), go);
+  const p0 = CB.soil.site();
+  function calc() {
+    const top = mode() === "top", D = top ? Math.min(gd(), 4) : gd(), p1 = top ? CB.soil.profile(L, 2 + D) : null;
+    const s1 = (z) => (top ? p1.at(z).s : p0.at(z).s + (z <= 6 ? 0 : z >= 14 ? gw * D : gw * D * (z - 6) / 8));
+    let S = 0; for (let i = 0; i < 8; i++) { const z = 6.5 + i; S += CB.soil.settlement({ H: 1, e0: 1.5, Cc: gcc(), Cr: 0.08, s0: p0.at(z).s, ds: s1(z) - p0.at(z).s }); }
+    return { top, D, s1, S };
+  }
+  const cv = CB.canvas("#es-cv-dd", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), narrow = W < 520, colW = narrow ? 76 : 130, cx0 = 30, y0 = 24, y1 = H - 46, Y = (z) => y0 + (z / ZM) * (y1 - y0);
+    L.forEach((l, i) => { if (l.top >= ZM) return; const a = Y(l.top), b = Y(Math.min(ZM, l.bottom)); ctx.fillStyle = ESX.alpha(pal.accent, [0.26, 0.16, 0.46, 0.12, 0.32, 0.55][i]); ctx.fillRect(cx0, a, colW, b - a); });
+    ctx.strokeStyle = pal.dim; ctx.strokeRect(cx0, y0, colW, y1 - y0);
+    ctx.fillStyle = pal.dim; ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "right"; ctx.textBaseline = "middle"; [0, 2, 6, 14, 19].forEach((z) => ctx.fillText(String(z), cx0 - 5, Y(z)));
+    ESX.text(ctx, "점토", cx0 + colW / 2, Y(10), pal.text, { size: 11, mono: false });
+    ESX.wt(ctx, cx0, cx0 + colW + 10, Y(2), ESX.alpha(pal.blue, 0.5), "");
+    if (r.top) { ESX.wt(ctx, cx0, cx0 + colW + 10, Y(2 + r.D), pal.blue, ""); if (r.D > 0.3) ESX.arrow(ctx, cx0 + colW * 0.3, Y(2) + 2, cx0 + colW * 0.3, Y(2 + r.D) - 2, pal.blue, 2, 8); }
+    else { const px = cx0 + colW - 16; ctx.fillStyle = pal.surface; ctx.fillRect(px - 4, Y(0), 8, Y(16) - Y(0)); ctx.strokeStyle = pal.text; ctx.strokeRect(px - 4, Y(0), 8, Y(16) - Y(0)); ctx.fillStyle = ESX.alpha(pal.blue, 0.7); ctx.fillRect(px - 3, Y(2 + r.D), 6, Y(16) - Y(2 + r.D)); ESX.text(ctx, "피압 수두", px - 8, Y(2 + r.D) - 8, pal.blue, { size: 9.5, align: "right", mono: false }); }
+    const bx = cx0 + colW + (narrow ? 40 : 56), box = { x: bx, y: y0, w: W - bx - 14, h: y1 - y0 };
+    const A = [], B = []; for (let k = 0; k <= 200; k++) { const z = (k / 200) * ZM; A.push([p0.at(z).s, z]); B.push([r.s1(z), z]); }
+    const zm = 10, ds = r.s1(zm) - p0.at(zm).s;
+    const c = ESX.depthChart(ctx, box, [0, 300], [0, ZM], [{ data: A, color: pal.dim, width: 2, dash: [6, 4] }, { data: B, color: pal.accent, width: 3 }], { yLabel: "", xLabel: "연직 유효응력 σ′ (kPa)", points: [{ x: r.s1(zm), z: zm, color: pal.accent, r: 5 }] });
+    ctx.fillStyle = ESX.alpha(pal.accent, 0.18); ctx.beginPath(); A.forEach(([x, z], i) => (i ? ctx.lineTo(c.X(x), c.Y(-z)) : ctx.moveTo(c.X(x), c.Y(-z)))); for (let i = B.length - 1; i >= 0; i--) ctx.lineTo(c.X(B[i][0]), c.Y(-B[i][1])); ctx.closePath(); ctx.fill();
+    ESX.text(ctx, `Δσ′ = ${CB.num(ds, 1)} kPa`, c.X(r.s1(zm)) + 8, c.Y(-zm) - 12, pal.accent, { size: 11, align: "left" });
+    ESX.text(ctx, "점선: 양수 전", box.x + box.w - 4, box.y + box.h - 14, pal.dim, { size: 10, align: "right", mono: false });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.56), minHeight: 320, maxHeight: 460 });
+  function go() {
+    cv.redraw();
+    const r = calc(), zm = 10, a = p0.at(zm).s, b = r.s1(zm), t90 = (CB.soil.Tv(0.9) * 16) / 1.5;
+    CB.stat("es-dd-ds", ESX.kpa(b - a)); CB.stat("es-dd-s01", `${CB.num(a, 1)} → ${CB.num(b, 1)}`);
+    CB.stat("es-dd-S", CB.num(r.S * 100, 1) + " cm"); CB.stat("es-dd-t", r.D > 0 ? "약 " + CB.num(t90, 1) + "년" : "—");
+    const msg = document.getElementById("es-dd-msg");
+    msg.className = r.S > 0.1 ? "es-msg bad" : "es-msg";
+    msg.innerHTML = (r.top && gd() > 4 ? "위 실트질 모래층은 바닥이 6 m라 수위를 4 m보다 더 낮출 수 없습니다(4 m로 계산). " : "") + (r.top ? `자유면 수위 ${CB.num(r.D, 1)} m 저하: 점토층 전체에 Δσ′ ≈ 8.81 × ${CB.num(r.D, 1)} = ${CB.num(8.81 * r.D, 1)} kPa가 고르게 더해집니다.` : `피압 수두 ${CB.num(r.D, 1)} m 저하: 점토 아래쪽(14 m)에서 γ<sub>w</sub>Δ = ${CB.num(gw * r.D, 1)} kPa, 위쪽(6 m)에서 0인 삼각형 분포입니다.`) + ` 최종 침하 ${CB.num(r.S * 100, 1)} cm.`;
+  }
+  go();
+})();
+
+/* ---------- 4. 모관 상승 ---------- */
+(function () {
+  const gw = ESX.gw, SOIL = { fill: { D10: 0.011, e: 0.70 }, sm: { D10: 0.0029, e: 0.80 }, silt: { D10: 0.0006, e: 0.90 } }, gt = 18, gs = 19, ZM = 4;
+  const gdia = CB.range("es-cp-d", (v) => CB.sig(Math.pow(10, v), 2) + " mm", go), soil = CB.seg("es-cp-soil", go), gc = CB.range("es-cp-c", (v) => v.toFixed(2) + " cm²", go), gzw = CB.range("es-cp-zw", (v) => "GL −" + v.toFixed(2) + " m", go);
+  const hcTube = () => (4 * 0.073) / (gw * 1000 * (Math.pow(10, gdia()) / 1000));
+  const hcSoil = () => { const s = SOIL[soil()]; return gc() / (s.e * s.D10) / 100; };
+  function st(z, cap) {
+    const zw = gzw(), zc = cap ? Math.max(0, zw - hcSoil()) : zw;
+    const s = gt * Math.min(z, zc) + gs * Math.max(0, z - zc), u = z >= zc ? gw * (z - zw) : 0;
+    return { s, u, e: s - u };
+  }
+  const cv = CB.canvas("#es-cv-cap", (ctx, W, H) => {
+    const pal = CB.palette(), narrow = W < 520, tw = narrow ? W * 0.36 : Math.min(230, W * 0.34), y0 = 26, yb = H - 60, base = yb - 20, sc = (base - y0 - 10) / 3;
+    ctx.fillStyle = ESX.alpha(pal.blue, 0.25); ctx.fillRect(14, base, tw, yb - base + 14); ctx.strokeStyle = pal.dim; ctx.strokeRect(14, base, tw, yb - base + 14);
+    const hc = hcTube(), refs = [[1, 0.22], [0.1, 0.5]], d = Math.pow(10, gdia());
+    refs.forEach(([dd, fx]) => { const h = Math.min(3.05, 0.0298 / dd), x = 14 + tw * fx; ctx.strokeStyle = pal.faint; ctx.strokeRect(x - 4, y0, 8, base + 10 - y0); ctx.fillStyle = ESX.alpha(pal.blue, 0.3); ctx.fillRect(x - 3, base - h * sc, 6, h * sc + 10); ESX.text(ctx, dd + " mm", x, yb + 22, pal.faint, { size: 9.5 }); });
+    const x = 14 + tw * 0.8, h = Math.min(3.05, hc), ww = Math.max(3, Math.min(14, 3 + Math.log10(d * 100) * 4));
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 1.4; ctx.strokeRect(x - ww / 2 - 1, y0, ww + 2, base + 10 - y0); ctx.fillStyle = ESX.alpha(pal.blue, 0.7); ctx.fillRect(x - ww / 2, base - h * sc, ww, h * sc + 10);
+    if (hc > 3.05) ESX.text(ctx, "↑ " + CB.sig(hc, 2) + " m", x, y0 - 10, pal.blue, { size: 10.5 });
+    ESX.text(ctx, CB.sig(d, 2) + " mm", x, yb + 22, pal.text, { size: 10 });
+    ctx.fillStyle = pal.dim; ctx.font = "10px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "left"; ctx.textBaseline = "middle"; [1, 2, 3].forEach((m) => { ctx.fillText(m + " m", 14 + tw + 4, base - m * sc); });
+    const bx = 14 + tw + (narrow ? 44 : 60), box = { x: bx, y: y0, w: W - bx - 14, h: yb - y0 };
+    const A = [], B = [], U = []; for (let k = 0; k <= 200; k++) { const z = (k / 200) * ZM, a = st(z, true), b = st(z, false); A.push([a.e, z]); B.push([b.e, z]); U.push([a.u, z]); }
+    const zw = gzw(), zc = Math.max(0, zw - hcSoil());
+    const c = ESX.depthChart(ctx, box, [-40, 80], [0, ZM], [{ data: B, color: pal.dim, width: 2, dash: [6, 4] }, { data: U, color: pal.blue, width: 2 }, { data: A, color: pal.accent, width: 3 }], { yLabel: "", xLabel: "kPa", hlines: [{ z: zc, color: pal.accent2, label: "모관대 꼭대기" }] });
+    ctx.fillStyle = ESX.alpha(pal.blue, 0.1); ctx.fillRect(c.box.x, c.Y(-zc), c.box.w, c.Y(-zw) - c.Y(-zc));
+    ESX.wt(ctx, c.box.x, c.box.x + c.box.w, c.Y(-zw), pal.blue, "");
+    ctx.strokeStyle = pal.axis; ctx.beginPath(); ctx.moveTo(c.X(0), c.box.y); ctx.lineTo(c.X(0), c.box.y + c.box.h); ctx.stroke();
+    ESX.text(ctx, "u", c.X(-10), c.Y(-zw) + 16, pal.blue, { size: 11 }); ESX.text(ctx, "σ′", c.X(60), c.Y(-ZM * 0.92), pal.accent, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.56), minHeight: 300, maxHeight: 440 });
+  function go() {
+    cv.redraw();
+    const ht = hcTube(), hs = hcSoil(), zw = gzw(), he = Math.min(hs, zw), zc = zw - he;
+    CB.stat("es-cp-hct", CB.sig(ht, 3) + " m");
+    CB.stat("es-cp-hcs", CB.sig(hs, 2) + " m" + (hs > zw ? " (지표까지)" : ""));
+    CB.stat("es-cp-u", ESX.kpa(-ESX.gw * he));
+    CB.stat("es-cp-ds", "+" + ESX.kpa(st(zc, true).e - st(zc, false).e));
+  }
+  go();
+})();
+
+/* ---------- 5. 상향 침투 탱크 ---------- */
+(function () {
+  const gw = ESX.gw, HW = 0.10;
+  const dir = CB.seg("es-qk-dir", go), gh = CB.range("es-qk-h", (v) => v.toFixed(3) + " m", go), gl = CB.range("es-qk-l", (v) => v.toFixed(2) + " m", go), gg = CB.range("es-qk-g", (v) => v.toFixed(1) + " kN/m³", go);
+  const i = () => gh() / gl(), ic = () => CB.soil.ic(gg()), up = () => dir() === "up";
+  const st = (z) => { const s = gw * HW + gg() * z, u = gw * (HW + z + (up() ? 1 : -1) * i() * z); return { s, u, e: Math.max(0, s - u) }; };
+  const rng = CB.rng(23), P = []; for (let k = 0; k < 90; k++) P.push([rng(), rng(), rng() * 6.28]);
+  let tt = 0;
+  const cv = CB.canvas("#es-cv-quick", (ctx, W, H) => {
+    const pal = CB.palette(), narrow = W < 520, tw = narrow ? W * 0.4 : Math.min(240, W * 0.34), x0 = 40, y0 = 40, yb = H - 40, Lm = gl(), sc = (yb - y0) / 1.2, ys = yb - 20 - Lm * sc, yw = ys - HW * sc, ratio = up() ? i() / ic() : 0, boil = up() && ratio >= 1;
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 1.6; ctx.strokeRect(x0, yw - 16, tw, yb - yw + 16);
+    ctx.fillStyle = ESX.alpha(pal.blue, 0.2); ctx.fillRect(x0 + 1, yw, tw - 2, yb - yw);
+    ctx.fillStyle = pal.surface; ctx.fillRect(x0 + 1, yb - 20, tw - 2, 19); ctx.strokeStyle = pal.dim; ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.moveTo(x0, yb - 20); ctx.lineTo(x0 + tw, yb - 20); ctx.stroke(); ctx.setLineDash([]);
+    const amp = boil ? 1 : Math.max(0, (ratio - 0.8) / 0.2) * 0.25, rise = boil ? 0.12 * Lm * sc : 0;
+    ctx.fillStyle = ESX.alpha(pal.accent, 0.35); ctx.beginPath(); ctx.moveTo(x0 + 1, yb - 20);
+    for (let k = 0; k <= 20; k++) { const xx = x0 + 1 + (k / 20) * (tw - 2), bump = boil ? Math.sin(k * 1.3 + tt * 5) * 5 + rise * Math.sin((k / 20) * Math.PI) : 0; ctx.lineTo(xx, ys - bump); }
+    ctx.lineTo(x0 + tw - 1, yb - 20); ctx.closePath(); ctx.fill();
+    P.forEach(([px, pz, ph]) => { const jx = amp * 6 * Math.sin(tt * 9 + ph), jz = amp * (boil ? 18 * Math.abs(Math.sin(tt * 3 + ph)) : 4 * Math.sin(tt * 7 + ph)); ctx.beginPath(); ctx.arc(x0 + 6 + px * (tw - 12) + jx, ys + 4 + pz * (yb - 26 - ys) - jz, 3, 0, Math.PI * 2); ctx.fillStyle = pal.accent; ctx.fill(); });
+    const hpx = gh() * sc, sx = x0 - 22;
+    ctx.fillStyle = pal.surface; ctx.fillRect(sx - 7, 14, 14, yb - 14); ctx.strokeStyle = pal.text; ctx.strokeRect(sx - 7, 14, 14, yb - 14);
+    const yh = up() ? yw - hpx : yw + hpx; ctx.fillStyle = ESX.alpha(pal.blue, 0.6); ctx.fillRect(sx - 6, Math.max(15, yh), 12, yb - Math.max(15, yh));
+    ctx.strokeStyle = pal.text; ctx.beginPath(); ctx.moveTo(sx + 7, yb - 8); ctx.lineTo(x0, yb - 8); ctx.stroke();
+    ESX.text(ctx, up() ? "h ↑" : "h ↓", sx, Math.max(10, yh - 8), pal.accent2, { size: 10.5 });
+    for (let k = 0; k < 3; k++) { const ax = x0 + tw * (0.25 + 0.25 * k); if (up()) ESX.arrow(ctx, ax, yb - 24, ax, yb - 24 - 26, pal.blue, 2, 8); else ESX.arrow(ctx, ax, ys + 6, ax, ys + 32, pal.blue, 2, 8); }
+    if (boil) ESX.text(ctx, "분사 현상!", x0 + tw / 2, yw - 28, pal.bad, { size: 13, mono: false });
+    const bx = x0 + tw + (narrow ? 44 : 60), box = { x: bx, y: ys, w: W - bx - 14, h: yb - 20 - ys };
+    const S = [], U = [], E = []; for (let k = 0; k <= 40; k++) { const z = (k / 40) * Lm, v = st(z); S.push([v.s, z]); U.push([v.u, z]); E.push([v.e, z]); }
+    const xm = Math.max(10, Math.ceil(Math.max(st(Lm).s, st(Lm).u) / 5) * 5 + 2);
+    ESX.depthChart(ctx, box, [0, xm], [0, Lm], [{ data: S, color: pal.dim, width: 2 }, { data: U, color: pal.blue, width: 2, dash: [6, 4] }, { data: E, color: boil ? pal.bad : pal.accent, width: 3 }], { yLabel: "", xLabel: "kPa", yTicks: [0, -Lm / 2, -Lm] });
+    ESX.text(ctx, "시료 속 깊이", bx - 4, ys - 12, pal.dim, { size: 10, align: "right", mono: false });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.56), minHeight: 300, maxHeight: 440 });
+  const loop = CB.loop(document.getElementById("sim-es-quick"), (dt) => { if (!(up() && i() / ic() > 0.8)) return; tt += dt; cv.redraw(); });
+  function go() {
+    cv.redraw();
+    const ii = i(), icc = ic(), L = gl(), e = st(L).e;
+    CB.stat("es-qk-i", CB.num(ii, 3)); CB.stat("es-qk-ic", CB.num(icc, 3));
+    CB.stat("es-qk-fs", up() ? (ii > 0 ? CB.num(icc / ii, 2) : "∞") : "— (하향)");
+    CB.stat("es-qk-s", ESX.kpa(e, 2));
+    const msg = document.getElementById("es-qk-msg"), e0 = (gg() - ESX.gw) * L;
+    if (!up()) { msg.className = "es-msg ok"; msg.innerHTML = `하향 침투: σ′ = (γ′ + iγ<sub>w</sub>)z → 바닥 ${CB.num(e, 2)} kPa(정수압 ${CB.num(e0, 2)} kPa보다 큼). 물이 알갱이를 아래로 눌러 흙이 단단해집니다.`; }
+    else if (ii >= icc) { msg.className = "es-msg bad"; msg.innerHTML = `i = ${CB.num(ii, 3)} ≥ i<sub>c</sub> = ${CB.num(icc, 3)}: 유효응력 0 — 모래가 강도를 잃고 끓어오르는 <b>분사 현상</b>입니다.`; }
+    else { msg.className = icc / ii < 1.5 ? "es-msg bad" : "es-msg"; msg.innerHTML = `상향 침투: 바닥 σ′ = (${CB.num(gg() - ESX.gw, 2)} − ${CB.num(ii, 3)} × 9.81) × ${CB.num(L, 2)} = ${CB.num(e, 2)} kPa(정수압의 ${CB.num((e / e0) * 100, 0)} %). 분사까지 수두 ${CB.num(icc * L - gh(), 3)} m 남음.`; }
+  }
+  go();
+})();
+
+/* ---------- 6. B 계수 ---------- */
+(function () {
+  const SK = { soft: [1e-3, 0.6, "연약 점토"], stiff: [1e-4, 0.4, "굳은 점토"], sand: [1e-5, 0.35, "조밀한 모래"], rock: [1e-6, 0.1, "연암"] }, KW = 2.2e6, PA = 200;
+  const soil = CB.seg("es-b-soil", go), gs = CB.range("es-b-s", (v) => (v * 100).toFixed(1) + " %", go), gds = CB.range("es-b-ds", (v) => v + " kPa", go);
+  const ratio = (k, S) => { const [Cs, n] = SK[k], Cv = S / KW + (1 - S) / PA; return (n * Cv) / Cs; };
+  const B = (k, S) => 1 / (1 + ratio(k, S));
+  const cv = CB.canvas("#es-cv-b", (ctx, W, H) => {
+    const pal = CB.palette(), k = soil(), S = gs(), ser = [];
+    Object.keys(SK).forEach((kk) => { const d = []; for (let j = 0; j <= 100; j++) { const s = 0.9 + 0.1 * j / 100; d.push([s * 100, B(kk, s)]); } ser.push({ data: d, color: kk === k ? pal.accent : pal.faint, width: kk === k ? 3 : 1.3 }); });
+    const box = { x: 58, y: 16, w: W - 76, h: H - 16 - 120 };
+    const c = CB.chart(ctx, box, { x: [90, 100], y: [0, 1.05], xLabel: "포화도 S (%)", yLabel: "B", series: ser, hlines: [{ y: 0.95, color: pal.ok, label: "B = 0.95" }], points: [{ x: S * 100, y: B(k, S), color: pal.accent2, r: 6 }] });
+    Object.keys(SK).forEach((kk) => { if (kk === k) return; const y = B(kk, 0.97); ESX.text(ctx, SK[kk][2], c.X(97), c.Y(y) - 9, pal.faint, { size: 9.5, mono: false }); });
+    const b = B(k, S), ds = gds(), y = H - 50, x0 = 58, w = W - 76, wu = w * b;
+    ctx.fillStyle = ESX.alpha(pal.blue, 0.55); ctx.fillRect(x0, y, wu, 24); ctx.fillStyle = ESX.alpha(pal.accent, 0.6); ctx.fillRect(x0 + wu, y, w - wu, 24);
+    ESX.text(ctx, `Δσ = ${ds} kPa 를 나눠 받기`, x0, y - 12, pal.dim, { size: 10.5, align: "left", mono: false });
+    if (wu > 70) ESX.text(ctx, `물 Δu ${CB.num(b * ds, 1)}`, x0 + wu / 2, y + 12, pal.text, { size: 10.5 });
+    if (w - wu > 70) ESX.text(ctx, `골격 Δσ′ ${CB.num((1 - b) * ds, 1)}`, x0 + wu + (w - wu) / 2, y + 12, pal.text, { size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 300, maxHeight: 400 });
+  function go() {
+    cv.redraw();
+    const k = soil(), S = gs(), b = B(k, S), ds = gds();
+    CB.stat("es-b-b", CB.num(b, 3)); CB.stat("es-b-du", ESX.kpa(b * ds)); CB.stat("es-b-dsp", ESX.kpa((1 - b) * ds));
+    const r = ratio(k, S); CB.stat("es-b-r", r < 0.01 ? r.toExponential(1) : CB.sig(r, 2));
+  }
+  go();
+})();
+
+/* ---------- 7. 굴착 바닥 양압력 ---------- */
+(function () {
+  const L = CB.soil.SITE.layers, gw = ESX.gw, FSR = 1.2, ZT = -6, ZB = 22;
+  const mode = CB.seg("es-up-mode", go), gd = CB.range("es-up-d", (v) => v.toFixed(1) + " m", go), gh = CB.range("es-up-h", (v) => "GL −" + v.toFixed(1) + " m", go), gn = CB.range("es-up-n", (v) => v + "층", go);
+  const plugW = (d) => { let w = 0; for (const l of L) { const a = Math.max(d, l.top), b = Math.min(14, l.bottom); if (b > a) w += (l.gsat || l.g) * (b - a); } return w; };
+  function calc() {
+    const h = gh();
+    if (mode() === "exc") { const d = gd(), W = plugW(d), u = gw * Math.max(0, 14 - h), F = u > 0 ? W / u : Infinity, hreq = 14 - W / FSR / gw; return { d, W, u, F, req: hreq <= 0 ? "수두 GL 0 m에서도 만족" : "수두 GL −" + CB.num(hreq, 1) + " m 이하" }; }
+    const n = gn(), W = 60 + 10.5 * n, u = gw * Math.max(0, 11 - h), F = u > 0 ? W / u : Infinity, nreq = Math.max(0, Math.ceil((FSR * u - 60) / 10.5));
+    return { d: 11, W, u, F, req: nreq + "층 이상 (또는 배수 유지)" };
+  }
+  const cv = CB.canvas("#es-cv-uplift", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), y0 = 14, y1 = H - 20, Y = (z) => y0 + ((z - ZT) / (ZB - ZT)) * (y1 - y0), x0 = 14, x1 = W - 14, ex0 = x0 + (x1 - x0) * 0.3, ex1 = x0 + (x1 - x0) * 0.66, mat = mode() === "mat";
+    L.forEach((l, i) => { if (l.top >= ZB) return; ctx.fillStyle = ESX.alpha(pal.accent, [0.26, 0.16, 0.46, 0.12, 0.32, 0.55][i]); ctx.fillRect(x0, Y(l.top), x1 - x0, Y(Math.min(ZB, l.bottom)) - Y(l.top)); });
+    ctx.fillStyle = ESX.alpha(pal.blue, 0.14); ctx.fillRect(x0, Y(14), x1 - x0, Y(19) - Y(14));
+    ctx.fillStyle = pal.bg; ctx.fillRect(ex0, Y(ZT), ex1 - ex0, Y(r.d) - Y(ZT));
+    ctx.fillStyle = pal.dim; ctx.fillRect(ex0 - 6, Y(0), 6, Y(18) - Y(0)); ctx.fillRect(ex1, Y(0), 6, Y(18) - Y(0));
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x0, Y(0)); ctx.lineTo(x1, Y(0)); ctx.stroke();
+    ESX.wt(ctx, x0, ex0 - 8, Y(2), pal.blue, ""); ESX.wt(ctx, ex1 + 8, x1, Y(2), pal.blue, "GL −2");
+    const nm = { "매립층": "매립", "느슨한 실트질 모래": "실트질 모래", "연약 점토": "연약 점토", "모래 자갈": "모래 자갈(피압)", "풍화토·풍화암": "풍화토" };
+    L.slice(0, 5).forEach((l) => ESX.text(ctx, nm[l.name], x0 + 6, (Y(l.top) + Y(Math.min(ZB, l.bottom))) / 2, pal.text, { size: W < 520 ? 9.5 : 10.5, align: "left", mono: false }));
+    if (mat) {
+      ctx.fillStyle = ESX.alpha(pal.text, 0.5); ctx.fillRect(ex0, Y(8.5), ex1 - ex0, Y(11) - Y(8.5)); ESX.text(ctx, "매트 60 kPa", (ex0 + ex1) / 2, (Y(8.5) + Y(11)) / 2, "#fff", { size: 10.5, stroke: "rgba(0,0,0,0)", mono: false });
+      const fh = (Y(8.5) - Y(-6)) / 14; for (let k = 0; k < gn(); k++) { const yb = Y(8.5) - k * fh; ctx.strokeStyle = pal.text; ctx.lineWidth = 1; ctx.strokeRect(ex0 + 6, yb - fh + 1, ex1 - ex0 - 12, fh - 2); }
+    } else { ctx.strokeStyle = pal.accent2; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ex0, Y(r.d)); ctx.lineTo(ex1, Y(r.d)); ctx.stroke(); }
+    const zb = mat ? 11 : 14, cxm = (ex0 + ex1) / 2, sw = r.u > 0 ? Math.max(1.5, Math.min(7, r.u / 20)) : 0, ww = Math.max(1.5, Math.min(7, r.W / 20));
+    for (let k = -1; k <= 1; k++) { const ax = cxm + k * (ex1 - ex0) * 0.28; if (sw) ESX.arrow(ctx, ax + 8, Y(zb) + 30, ax + 8, Y(zb) + 2, pal.accent2, sw, 9 + sw); ESX.arrow(ctx, ax - 8, Y(mat ? 8.5 : r.d) + 2, ax - 8, Y(mat ? 8.5 : r.d) + 28, pal.ok, ww, 9 + ww); }
+    ESX.text(ctx, `W ${CB.num(r.W, 1)}`, ex1 + 14, Y(mat ? 9.5 : (r.d + 14) / 2), pal.ok, { size: 11, align: "left" });
+    ESX.text(ctx, `u ${CB.num(r.u, 1)}`, ex1 + 14, Y(zb) + 16, pal.accent2, { size: 11, align: "left" });
+    const px = x1 - 26; ctx.fillStyle = pal.surface; ctx.fillRect(px - 5, Y(-3), 10, Y(zb + 1) - Y(-3)); ctx.strokeStyle = pal.text; ctx.strokeRect(px - 5, Y(-3), 10, Y(zb + 1) - Y(-3));
+    ctx.fillStyle = ESX.alpha(pal.blue, 0.7); ctx.fillRect(px - 4, Y(gh()), 8, Y(zb + 1) - Y(gh()));
+    ESX.text(ctx, "수두", px, Y(-3) - 8, pal.blue, { size: 10, mono: false });
+    const F = r.F, col = F >= FSR ? pal.ok : pal.bad;
+    ESX.text(ctx, "F = " + (isFinite(F) ? CB.num(F, 2) : "∞"), (ex0 + ex1) / 2, Y(-3.5), col, { size: 16 });
+  }, { aspect: (W) => (W < 520 ? 1.15 : 0.62), minHeight: 340, maxHeight: 500 });
+  function go() {
+    cv.redraw();
+    const r = calc(), mat = mode() === "mat";
+    CB.stat("es-up-w", ESX.kpa(r.W)); CB.stat("es-up-u", ESX.kpa(r.u)); CB.stat("es-up-f", isFinite(r.F) ? CB.num(r.F, 2) : "∞"); CB.stat("es-up-req", r.req);
+    const msg = document.getElementById("es-up-msg");
+    msg.className = r.F >= FSR ? "es-msg ok" : "es-msg bad";
+    msg.innerHTML = (mat ? `매트 부상: W = 60 + 10.5 × ${gn()} = ${CB.num(r.W, 1)} kPa, 양압력 u = 9.81 × (11 − ${CB.num(gh(), 1)}) = ${CB.num(r.u, 1)} kPa. (굴착 깊이 슬라이더는 쓰지 않습니다.)` : `굴착 ${CB.num(r.d, 1)} m: 바닥에서 GL −14 m까지 남은 흙 ${CB.num(r.W, 1)} kPa vs 대수층 윗면 수압 ${CB.num(r.u, 1)} kPa.`) + (r.F >= FSR ? ` F = ${isFinite(r.F) ? CB.num(r.F, 2) : "∞"} ≥ 1.2 (교육용 기준) 만족.` : ` F = ${CB.num(r.F, 2)} &lt; 1.2 → ${mat ? "배수를 계속하거나 인발 저항(말뚝·앵커)이 필요합니다." : "감압정으로 대수층 수두를 낮춰야 합니다."}`);
+  }
+  go();
+})();
+
+/* ---------- 8. 퀴즈형 단면 ---------- */
+(function () {
+  const gn = CB.seg("es-bd-n", () => make()), gqs = CB.seg("es-bd-q", () => make());
+  const rng = CB.rng((Date.now() % 9973) + 1), R = (a, b, s) => Math.round((a + rng() * (b - a)) / s) * s;
+  let prob = null, shown = false, right = 0, total = 0, done = false;
+  function make() {
+    const n = +gn(), layers = []; let top = 0;
+    for (let k = 0; k < n; k++) { const h = R(1.5, 5, 0.5), g = R(16, 19, 0.5), gsat = g + R(1, 2.5, 0.5); layers.push({ name: "층 " + (k + 1), top, bottom: top + h, g, gsat }); top += h; }
+    const Ht = top, gwl = R(0, Math.min(Ht - 1, 6), 0.5), q = gqs() === "1" ? R(10, 60, 5) : 0;
+    let zq = R(Math.max(gwl + 0.5, Ht * 0.45), Ht - 0.5, 0.5); if (layers.some((l) => Math.abs(l.bottom - zq) < 1e-6)) zq = Math.min(Ht - 0.25, zq + 0.25);
+    const p = CB.soil.profile(layers, gwl, { q });
+    prob = { layers, Ht, gwl, q, zq, p }; shown = false; done = false;
+    document.getElementById("es-bd-zq").textContent = CB.num(zq, 2);
+    document.getElementById("es-bd-ans").value = "";
+    ["es-bd-s", "es-bd-u", "es-bd-e"].forEach((id) => CB.stat(id, "?"));
+    const msg = document.getElementById("es-bd-msg"); msg.className = "es-msg"; msg.innerHTML = "답을 kPa로 넣고 채점하세요(±1 kPa 허용).";
+    cv.redraw();
+  }
+  const cv = CB.canvas("#es-cv-build", (ctx, W, H) => {
+    if (!prob) return;
+    const pal = CB.palette(), P = prob, narrow = W < 520, colW = shown ? (narrow ? W * 0.44 : Math.min(300, W * 0.42)) : Math.min(W - 70, 420), cx0 = 40, y0 = 34, y1 = H - 40, Y = (z) => y0 + (z / P.Ht) * (y1 - y0);
+    P.layers.forEach((l, i) => { ctx.fillStyle = ESX.alpha(pal.accent, [0.18, 0.4, 0.26, 0.5][i]); ctx.fillRect(cx0, Y(l.top), colW, Y(l.bottom) - Y(l.top)); ctx.strokeStyle = pal.border; ctx.strokeRect(cx0, Y(l.top), colW, Y(l.bottom) - Y(l.top)); ESX.text(ctx, `${CB.num(l.bottom - l.top, 1)} m · γt ${CB.num(l.g, 1)} / γsat ${CB.num(l.gsat, 1)}`, cx0 + colW / 2, (Y(l.top) + Y(l.bottom)) / 2, pal.text, { size: narrow ? 9.5 : 11 }); });
+    ctx.fillStyle = pal.dim; ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    [0].concat(P.layers.map((l) => l.bottom)).forEach((z) => ctx.fillText(CB.num(z, 1), cx0 - 5, Y(z)));
+    ESX.wt(ctx, cx0 - 4, cx0 + colW + 4, Y(P.gwl), pal.blue, "z_w = " + CB.num(P.gwl, 1));
+    if (P.q > 0) { for (let k = 0; k < 6; k++) ESX.arrow(ctx, cx0 + colW * (0.08 + 0.17 * k), y0 - 24, cx0 + colW * (0.08 + 0.17 * k), y0 - 2, pal.accent2, 2, 8); ESX.text(ctx, "q = " + P.q + " kPa", cx0 + colW + 6, y0 - 14, pal.accent2, { size: 11, align: "left" }); }
+    ctx.save(); ctx.strokeStyle = pal.accent2; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(cx0, Y(P.zq)); ctx.lineTo(cx0 + colW, Y(P.zq)); ctx.stroke(); ctx.restore();
+    ESX.text(ctx, "● z = " + CB.num(P.zq, 2) + " m", cx0 + colW - 4, Y(P.zq) + 11, pal.accent2, { size: 10.5, align: "right" });
+    if (shown) {
+      const bx = cx0 + colW + (narrow ? 40 : 56), box = { x: bx, y: y0, w: W - bx - 14, h: y1 - y0 }, S = [], U = [], E = [];
+      for (let k = 0; k <= 160; k++) { const z = (k / 160) * P.Ht, v = P.p.at(z); S.push([v.sv, z]); U.push([v.u, z]); E.push([v.s, z]); }
+      const v = P.p.at(P.zq);
+      ESX.depthChart(ctx, box, [0, Math.ceil(P.p.at(P.Ht).sv / 20) * 20], [0, P.Ht], [{ data: S, color: pal.dim, width: 2 }, { data: U, color: pal.blue, width: 2, dash: [6, 4] }, { data: E, color: pal.accent, width: 3 }], { yLabel: "", xLabel: "kPa", hlines: [{ z: P.zq, color: pal.accent2 }], points: [{ x: v.s, z: P.zq, color: pal.accent, r: 6 }] });
+    }
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 280, maxHeight: 420 });
+  function reveal() {
+    shown = true; cv.redraw();
+    const v = prob.p.at(prob.zq);
+    CB.stat("es-bd-s", ESX.kpa(v.sv)); CB.stat("es-bd-u", ESX.kpa(v.u)); CB.stat("es-bd-e", ESX.kpa(v.s));
+  }
+  document.getElementById("es-bd-new").addEventListener("click", make);
+  document.getElementById("es-bd-show").addEventListener("click", () => { reveal(); const v = prob.p.at(prob.zq), msg = document.getElementById("es-bd-msg"); msg.className = "es-msg"; msg.innerHTML = `풀이: σ<sub>v</sub> = ${prob.q ? prob.q + " + " : ""}Σγh = ${CB.num(v.sv, 1)}, u = 9.81 × (${CB.num(prob.zq, 2)} − ${CB.num(prob.gwl, 1)}) = ${CB.num(v.u, 1)}, σ′ = <b>${CB.num(v.s, 1)} kPa</b>`; });
+  document.getElementById("es-bd-check").addEventListener("click", () => {
+    const a = parseFloat(document.getElementById("es-bd-ans").value), v = prob.p.at(prob.zq), msg = document.getElementById("es-bd-msg");
+    if (!isFinite(a)) { msg.className = "es-msg"; msg.textContent = "숫자를 넣어 주세요."; return; }
+    if (!done) { total++; done = true; if (Math.abs(a - v.s) <= 1) right++; }
+    CB.stat("es-bd-score", `${right} / ${total}`);
+    if (Math.abs(a - v.s) <= 1) { msg.className = "es-msg ok"; msg.innerHTML = `정답! σ′ = ${CB.num(v.s, 1)} kPa`; reveal(); }
+    else { msg.className = "es-msg bad"; msg.innerHTML = Math.abs(a - v.sv) <= 1 ? "그 값은 전응력입니다. 간극수압을 빼야 합니다." : Math.abs(a - (v.s + v.u * 0)) > 1 && Math.abs(a - (v.sv - ESX.gw * prob.zq)) <= 1 ? "지하수위가 지표에 있는 것처럼 계산했습니다. u = γ<sub>w</sub>(z − z<sub>w</sub>)." : "다시 계산해 보세요. 수위가 걸친 층은 위·아래를 나눠야 합니다."; }
+  });
+  make();
+})();
+</script>
+</body>
+</html>

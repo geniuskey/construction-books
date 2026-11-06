@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>지중 응력 · GeotechBook</title>
+<meta name="description" content="기초와 성토의 하중은 땅속에서 어떻게 퍼지나. 부시네스크의 집중·선·띠·원형·직사각형 하중 해, 모서리 공식과 중첩, 영향계수와 압력 구근, 2:1 분포법의 오차, 뉴마크 영향원, 웨스터가드 해, 접지압 분포, 이웃한 기초, E-4 성토의 사다리꼴 하중을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .sd-stack { display: grid; grid-template-columns: 1fr; }
+  .sd-stack > div { position: relative; min-width: 0; }
+  .sd-stack > div + div { border-top: 1px solid var(--border); }
+  .sd-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .sd-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .sd-msg b { color: var(--text); }
+  .sd-msg.ok { color: var(--ok); font-weight: 600; }
+  .sd-msg.bad { color: var(--bad); font-weight: 600; }
+  .sd-tbl td, .sd-tbl th { font-variant-numeric: tabular-nums; text-align: center; }
+  .sd-tbl td:first-child, .sd-tbl th:first-child { text-align: left; }
+  .sd-tbl td.hl { color: var(--accent); font-weight: 700; }
+  #sd-cv-point, #sd-cv-rect, #sd-cv-adj, #sd-cv-emb, #sd-cv-nm { touch-action: none; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="geotech"></script>
+</head>
+<body data-chapter="stress-distribution">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="sd-ah-o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="sd-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="sd-ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <pattern id="sd-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" style="stroke:var(--text-dim);stroke-width:1.2"/></pattern>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 06</div>
+    <h1 data-no-glossary>지중 응력</h1>
+    <p class="lead">4장에서 계산한 연직 유효응력은 흙이 제 무게로 받는 응력이었습니다. 이제 그 위에 기초를 놓고 성토를 쌓습니다. 기둥 하나의 수천 kN은 기초판을 거쳐 땅속으로 내려가며 점점 넓은 면적으로 퍼지고, 깊어질수록 옅어집니다. 이 장은 그 "퍼짐"을 계산하는 장입니다. 1885년 부시네스크가 반무한 탄성체 위의 집중 하중에 대해 얻은 해를 출발점으로 선·띠·원·직사각형 하중의 해를 만들고, 중첩으로 어떤 모양의 하중이든 다룹니다. 그리고 실무에서 자주 쓰는 2:1 분포법이 얼마나 틀리는지, 기초 바닥의 접지압이 왜 고르지 않은지, 이웃한 기초가 서로의 땅속 응력을 얼마나 키우는지, 진입 도로 성토 E-4 아래 연약 점토가 실제로 받는 응력이 7장에서 쓸 76 kPa보다 얼마나 작은지 숫자로 확인합니다. 여기서 구한 증가 응력 \(\Delta\sigma_z\)가 7–8장 침하 계산의 입력입니다.</p>
+    <ul class="objectives">
+      <li>반무한 탄성체 가정과 그 한계를 설명하고, 부시네스크 집중 하중 해 \(\Delta\sigma_z = 3Pz^3/(2\pi R^5)\)로 증가 응력을 계산한다.</li>
+      <li>선 하중·띠 하중·원형 하중의 해를 쓰고, 직사각형 모서리 공식과 중첩(더하기·빼기)으로 임의 점 아래의 응력을 구한다.</li>
+      <li>영향계수 표와 압력 구근을 읽고, 0.1q 등압선의 깊이(정사각형 약 2B, 띠 약 6B)로 조사 깊이와 영향 범위를 판단한다.</li>
+      <li>2:1 분포법의 오차를 깊이에 따라 평가하고, 뉴마크 영향원과 웨스터가드 해의 쓰임을 안다.</li>
+      <li>강성·연성 기초의 접지압 분포와 침하 모양이 지반에 따라 어떻게 다른지 설명한다.</li>
+      <li>이웃한 기초와 사다리꼴 성토 하중(오스터버그 식)의 증가 응력을 계산하고, E-4·B-10의 기준 구조물에 적용한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>무거운 건물 옆의 땅은 왜 기울까</b></div>
+      <div class="o-body"><p>침하를 계산하려면 "땅속 각 깊이에서 응력이 얼마나 늘었는가"를 알아야 합니다. 프랑스의 수리학자이자 역학자 조제프 부시네스크(Joseph Boussinesq)는 1885년, 무한히 넓고 깊은 균질 탄성체의 표면에 점 하중이 작용할 때 내부 응력의 닫힌 해를 발표했습니다. 이 해는 재료 상수와 거의 무관하게 연직 응력을 주기 때문에 흙처럼 탄성 상수가 불확실한 재료에도 쓸모가 컸습니다. 20세기 초·중반 뉴마크(N. M. Newmark)는 이를 적분해 직사각형·원형 하중의 영향계수와 도표를 만들었고, 엔지니어들은 이 표 한 장으로 기초 아래의 응력을 손으로 구했습니다.</p>
+        <p>이 계산을 소홀히 하면 이웃한 건물이 서로의 땅을 눌러 마주 보며 기울고, 넓은 성토 가장자리의 구조물이 성토 쪽으로 끌려 내려갑니다. 땅속 응력은 기초 바로 아래에서 끝나지 않습니다.</p>
+        <div class="o-chain"><span>기초·성토 하중</span><i>→</i><span class="tool">부시네스크 해 · 중첩 · 영향계수</span><i>→</i><span>깊이별 Δσ<sub>z</sub> → 침하(7–8장)</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="spread">
+    <h2>하중은 깊어질수록 퍼진다</h2>
+    <div class="problem"><strong>기초 아래 6 m의 점토는 얼마를 더 받나</strong>
+      <p>폭 2 m 정사각형 기초가 지반에 150 kPa를 준다고 합시다. 기초 바로 아래의 흙은 150 kPa를 그대로 받지만, 6 m 아래의 흙은 그렇지 않습니다. 같은 힘(600 kN)이 훨씬 넓은 면적으로 퍼져 있기 때문입니다. 얼마나 넓게, 어떤 모양으로 퍼질까요?</p></div>
+    <figure class="diagram" id="fig-sd-spread">
+      <svg viewBox="0 0 820 320" role="img" aria-label="기초 하중이 깊이에 따라 퍼지며 증가 응력이 줄어드는 모습">
+        <rect x="10" y="10" width="800" height="300" rx="10" class="f-surface"/>
+        <rect x="30" y="70" width="460" height="230" class="f-acc-soft" style="stroke:none"/>
+        <line x1="30" y1="70" x2="490" y2="70" style="stroke:var(--text)"/>
+        <rect x="220" y="56" width="80" height="14" style="fill:var(--text-dim);opacity:.6;stroke:var(--text)"/>
+        <g style="stroke:var(--accent-2);stroke-width:2.2"><line x1="230" y1="26" x2="230" y2="52" marker-end="url(#sd-ah-o)"/><line x1="250" y1="26" x2="250" y2="52" marker-end="url(#sd-ah-o)"/><line x1="270" y1="26" x2="270" y2="52" marker-end="url(#sd-ah-o)"/><line x1="290" y1="26" x2="290" y2="52" marker-end="url(#sd-ah-o)"/></g>
+        <text x="306" y="40" class="t-mono" style="fill:var(--accent-2)">q = 150 kPa (B = 2 m)</text>
+        <path d="M200 70C150 120 150 200 260 268C370 200 370 120 320 70" style="fill:none;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 4"/>
+        <path d="M212 70C180 100 186 150 260 182C334 150 340 100 308 70" style="fill:none;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 4"/>
+        <text x="352" y="252" class="t-mono" style="fill:var(--accent)">0.1q 등압선</text>
+        <text x="330" y="168" class="t-mono" style="fill:var(--accent)">0.5q</text>
+        <line x1="220" y1="70" x2="120" y2="270" style="stroke:var(--text-dim);stroke-dasharray:3 3"/><line x1="300" y1="70" x2="400" y2="270" style="stroke:var(--text-dim);stroke-dasharray:3 3"/>
+        <text x="60" y="270" class="t-mono">2:1 경사</text>
+        <line x1="520" y1="70" x2="790" y2="70" class="s-axis"/><line x1="520" y1="60" x2="520" y2="296" class="s-axis"/>
+        <text x="528" y="60" class="t-mono">Δσz (kPa) →</text>
+        <text x="514" y="296" text-anchor="end" class="t-mono">z ↓</text>
+        <path d="M720 70L706 88L660 106L587 142L556 178L542 214L530 286" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+        <g style="fill:var(--accent)"><circle cx="720" cy="70" r="3"/><circle cx="706" cy="88" r="3"/><circle cx="660" cy="106" r="3"/><circle cx="587" cy="142" r="3"/><circle cx="556" cy="178" r="3"/><circle cx="542" cy="214" r="3"/><circle cx="530" cy="286" r="3"/></g>
+        <g class="t-mono"><text x="726" y="84">150 (0 m)</text><text x="712" y="100">139.5 (0.5 m)</text><text x="666" y="118">105 (1 m)</text><text x="593" y="146">50 (2 m)</text><text x="562" y="182">27 (3 m)</text><text x="548" y="218">16 (4 m)</text><text x="536" y="282">7.6 (6 m)</text></g>
+      </svg>
+      <figcaption><b>그림 6-1.</b> 정사각형 기초(B = 2 m, q = 150 kPa) 중심 아래의 증가 응력. 깊이 B(2 m)에서 이미 q의 1/3로, 3B(6 m)에서 약 5 %로 준다(부시네스크 해, 이 장의 시뮬레이터 값). 같은 크기의 응력을 잇는 등압선은 전구 모양의 '압력 구근'을 이룬다.</figcaption>
+    </figure>
+    <p>지반공학의 지중 응력 계산은 대부분 땅을 <span class="term">반무한 탄성체</span><span class="en">(elastic half-space)</span>로 봅니다. 위가 평평한 표면이고 옆과 아래로 끝없이 이어지며, 균질·등방·선형 탄성인 물체입니다. 흙은 이 가운데 어느 것도 정확히 만족하지 않지만, 연직 하중에 의한 연직 응력 증가량은 탄성 상수에 거의 무관하게 정해져(힘의 평형이 지배한다) 실무에서 꽤 잘 맞습니다. 반면 수평 응력과 변위는 탄성 상수에 민감하므로 이 방법으로 정확히 얻기 어렵습니다.</p>
+    <div class="callout def"><strong>정의 6.1 (증가 응력과 부호)</strong> 하중 때문에 생긴 연직 응력의 증가분을 <span class="term">지중 응력</span><span class="en">(stress increase in soil)</span> \(\Delta\sigma_z\)라 한다. 이 책의 지반 부호 규약대로 <b>압축이 +</b>이고 깊이 \(z\)는 아래로 +다. 기존 응력에 더해 쓴다.
+      <div class="formula">$$\sigma_z = \sigma_{v0} + \Delta\sigma_z, \qquad \sigma'_z = \sigma'_{v0} + \Delta\sigma_z - \Delta u$$<div class="where">\(\sigma_{v0}\), \(\sigma'_{v0}\): 하중 전 연직 전응력·유효응력(4장). 하중 직후 포화 점토에서는 \(\Delta\sigma_z\)를 처음에 간극수압 \(\Delta u\)가 받고(7장), 시간이 지나며 유효응력으로 넘어간다. 이 장은 전응력 증가 \(\Delta\sigma_z\)를 구한다.</div></div></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="boussinesq">
+    <h2>부시네스크 해: 집중 하중</h2>
+    <div class="problem"><strong>기둥 하나가 땅에 꽂히면</strong>
+      <p>기초판이 작고 깊이가 크면 기초는 한 점처럼 보입니다. 1,000 kN의 기둥 하중을 점으로 보면, 바로 아래 3 m와 옆으로 2 m 떨어진 곳 아래 3 m의 응력은 얼마나 다를까요?</p></div>
+    <figure class="diagram" id="fig-sd-point">
+      <svg viewBox="0 0 820 290" role="img" aria-label="집중 하중 P와 깊이 z, 수평 거리 r, 거리 R인 점의 연직 응력">
+        <rect x="10" y="10" width="800" height="270" rx="10" class="f-surface"/>
+        <rect x="30" y="70" width="460" height="200" class="f-acc-soft" style="stroke:none"/>
+        <line x1="30" y1="70" x2="490" y2="70" style="stroke:var(--text)"/>
+        <line x1="160" y1="22" x2="160" y2="66" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#sd-ah-o)"/>
+        <text x="170" y="34" class="t" style="fill:var(--accent-2);font-weight:700">P</text>
+        <line x1="160" y1="70" x2="160" y2="240" style="stroke:var(--text-dim);stroke-dasharray:4 4"/>
+        <line x1="160" y1="70" x2="340" y2="220" style="stroke:var(--text-dim)"/>
+        <text x="260" y="134" class="t-mono">R = √(r² + z²)</text>
+        <line x1="160" y1="232" x2="336" y2="232" style="stroke:var(--text-dim)" marker-end="url(#sd-ah-t)"/><text x="244" y="250" class="t-mono">r</text>
+        <line x1="120" y1="70" x2="120" y2="216" style="stroke:var(--text-dim)" marker-end="url(#sd-ah-t)"/><text x="104" y="150" class="t-mono">z</text>
+        <rect x="330" y="210" width="20" height="20" style="fill:var(--surface);stroke:var(--text)"/>
+        <line x1="340" y1="186" x2="340" y2="206" style="stroke:var(--accent);stroke-width:2" marker-end="url(#sd-ah-a)"/>
+        <line x1="340" y1="254" x2="340" y2="234" style="stroke:var(--accent);stroke-width:2" marker-end="url(#sd-ah-a)"/>
+        <text x="356" y="196" class="t-mono" style="fill:var(--accent)">Δσz</text>
+        <path d="M160 90A20 20 0 0 1 172 86" style="fill:none;stroke:var(--text-dim)"/>
+        <text x="520" y="80" class="t">가정</text>
+        <text x="520" y="104" class="t-dim">· 반무한(표면 평평, 옆·아래로 무한)</text>
+        <text x="520" y="126" class="t-dim">· 균질·등방·선형 탄성, 자중 무시</text>
+        <text x="520" y="148" class="t-dim">· 표면에 연직 집중 하중 P (kN)</text>
+        <text x="520" y="182" class="t">결과</text>
+        <text x="520" y="206" class="t-dim">· Δσz는 E, ν와 무관</text>
+        <text x="520" y="228" class="t-dim">· r = 0에서 Δσz = 0.4775 P/z²</text>
+        <text x="520" y="250" class="t-dim">· 어느 깊이에서든 Δσz의 합 = P</text>
+      </svg>
+      <figcaption><b>그림 6-2.</b> 부시네스크 집중 하중 문제. 표면의 점 하중 \(P\)에서 깊이 \(z\), 수평 거리 \(r\)인 점의 연직 응력 증가. 하중점 바로 아래(\(z \to 0\))에서는 무한대가 되는 특이점이 있어, 실제 기초에는 면적 하중 해를 쓴다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.2 (부시네스크 집중 하중 해)</strong> 반무한 탄성체 표면의 연직 <span class="term">집중 하중</span><span class="en">(point load)</span> \(P\)에 의한 <span class="term">부시네스크 해</span><span class="en">(Boussinesq solution)</span>는
+      <div class="formula">$$\Delta\sigma_z = \frac{3P}{2\pi}\,\frac{z^3}{R^5} = \frac{P}{z^2}\,I_B, \qquad I_B = \frac{3}{2\pi}\left[\frac{1}{1 + (r/z)^2}\right]^{5/2}$$<div class="where">\(R = \sqrt{r^2 + z^2}\). \(I_B\)는 \(r/z\)만의 함수인 <span class="term">영향계수</span><span class="en">(influence factor)</span>로, \(r/z = 0\)에서 0.4775, 0.5에서 0.2733, 1에서 0.0844, 2에서 0.0085. 같은 깊이에서 하중점 바로 아래가 가장 크고, 깊이가 두 배면 응력은 1/4이다. 엔진 함수 <code>CB.soil.point(P, r, z)</code>.</div></div></div>
+    <div class="sim" id="sim-sd-point">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>집중 하중 아래 응력 등고선: 하중과 측점 끌기</h3></div>
+      <div class="sim-body">
+        <div class="sim-view"><canvas id="sd-cv-point" aria-label="집중 하중 아래 증가 응력의 색 지도와 등압선. 하중 화살표와 측점을 끌 수 있다"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>하중 수</span><div class="seg" id="sd-pt-n"><button data-value="1" class="on">하나</button><button data-value="2">둘(중첩)</button></div></div>
+          <div class="ctrl"><span>해</span><div class="seg" id="sd-pt-th"><button data-value="b" class="on">부시네스크</button><button data-value="w">웨스터가드(ν = 0)</button></div></div>
+          <label class="ctrl"><span>하중 P₁ <output id="sd-pt-P1-out"></output></span><input type="range" id="sd-pt-P1" min="100" max="5000" step="50" value="1000"></label>
+          <label class="ctrl"><span>하중 P₂ <output id="sd-pt-P2-out"></output></span><input type="range" id="sd-pt-P2" min="100" max="5000" step="50" value="1000"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">측점 (r, z)</span><span class="v" id="sd-pt-pos">—</span></div>
+        <div class="stat"><span class="k">Δσ<sub>z</sub> (kPa)</span><span class="v" id="sd-pt-s">—</span></div>
+        <div class="stat"><span class="k">P₁ 바로 아래 같은 깊이</span><span class="v" id="sd-pt-s0">—</span></div>
+        <div class="stat"><span class="k">영향계수 I (P₁)</span><span class="v" id="sd-pt-I">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 측점(검은 점)을 끌어 깊이를 두 배로 하면 하중 바로 아래 응력이 1/4이 되는지 보세요 · 하중을 둘로 하고 서로 가깝게 끌면 등압선이 합쳐져 깊은 곳까지 커집니다(중첩) · 웨스터가드 해는 같은 점에서 부시네스크의 약 2/3입니다 · 모델: <code>CB.soil.point</code>의 중첩, 웨스터가드(ν = 0) Δσ<sub>z</sub> = (P/πz²)[1 + 2(r/z)²]<sup>−3/2</sup>(이 장 페이지 내 식). 등압선 1, 2, 5, 10, 20, 50, 100, 200 kPa. 표면 바로 아래(z &lt; 0.2 m)는 특이점이라 칠하지 않는다.</div>
+    </div>
+    <div class="callout"><strong>예제 6.1 (기둥 하중을 점으로 보기)</strong> \(P = 1{,}000\) kN.
+      <ol style="margin:6px 0 0">
+        <li><b>바로 아래 3 m.</b> \(r/z = 0\), \(I_B = 0.4775\): \(\Delta\sigma_z = 1000/3^2 \times 0.4775 = 53.1\) kPa.</li>
+        <li><b>옆 2 m, 아래 3 m.</b> \(r/z = 0.667\), \(I_B = 0.4775 \times (1/1.444)^{2.5} = 0.190\): \(\Delta\sigma_z = 111.1 \times 0.190 = 21.2\) kPa. 2 m 옆으로 비켜 서면 60 % 줄어든다.</li>
+        <li><b>바로 아래 5 m.</b> \(1000/25 \times 0.4775 = 19.1\) kPa. 깊이 비 \((3/5)^2 = 0.36\)배.</li>
+        <li><b>판단.</b> 실제 기초판 폭이 2–3 m라면 깊이 3 m에서 점 하중 근사는 바로 아래 응력을 크게 과대평가한다(예제 6.3의 면적 하중과 비교). 점 하중 해는 깊이가 기초 폭의 약 3배 이상일 때 쓴다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="line-strip">
+    <h2>선 하중과 띠 하중</h2>
+    <div class="problem"><strong>옹벽과 줄기초는 길다</strong>
+      <p>담장 기초, 옹벽, 도로 성토처럼 한 방향으로 긴 하중은 길이 방향의 변화가 없는 <span class="term">평면 변형률</span><span class="en">(plane strain)</span> 문제로 봅니다. 집중 하중을 길이 방향으로 적분하면 선 하중, 선 하중을 폭 방향으로 적분하면 띠 하중의 해가 나옵니다.</p></div>
+    <div class="callout def"><strong>원리 6.3 (선 하중과 띠 하중)</strong> 단위 길이당 \(q\) (kN/m)의 <span class="term">선 하중</span><span class="en">(line load)</span>과 폭 \(B\), 등분포 \(q\) (kPa)의 <span class="term">띠 하중</span><span class="en">(strip load)</span>에 대해
+      <div class="formula">$$\Delta\sigma_z^{\text{선}} = \frac{2q\,z^3}{\pi\,(x^2 + z^2)^2}, \qquad \Delta\sigma_z^{\text{띠}} = \frac{q}{\pi}\left[\alpha + \sin\alpha\,\cos(\alpha + 2\delta)\right]$$<div class="where">\(x\): 하중선(띠 중심)에서 수평 거리. 띠에서 \(\alpha\)는 점에서 띠의 양 끝을 본 각, \(\delta\)는 연직선에서 가까운 끝까지의 각(그림 6-3). 띠 중심 아래(\(\delta = -\alpha/2\))에서는 \(\Delta\sigma_z = (q/\pi)(\alpha + \sin\alpha)\). 엔진 함수 <code>CB.soil.line(q, x, z)</code>, <code>CB.soil.strip(q, B, x, z)</code>.</div></div></div>
+    <figure class="diagram" id="fig-sd-strip">
+      <svg viewBox="0 0 820 280" role="img" aria-label="띠 하중의 각 알파와 델타">
+        <rect x="10" y="10" width="800" height="260" rx="10" class="f-surface"/>
+        <rect x="30" y="80" width="500" height="180" class="f-acc-soft" style="stroke:none"/>
+        <line x1="30" y1="80" x2="530" y2="80" style="stroke:var(--text)"/>
+        <rect x="200" y="52" width="160" height="28" style="fill:var(--accent-2);opacity:.2;stroke:var(--accent-2)"/>
+        <g style="stroke:var(--accent-2);stroke-width:2"><line x1="215" y1="30" x2="215" y2="50" marker-end="url(#sd-ah-o)"/><line x1="255" y1="30" x2="255" y2="50" marker-end="url(#sd-ah-o)"/><line x1="295" y1="30" x2="295" y2="50" marker-end="url(#sd-ah-o)"/><line x1="335" y1="30" x2="335" y2="50" marker-end="url(#sd-ah-o)"/></g>
+        <text x="370" y="46" class="t-mono" style="fill:var(--accent-2)">q (kPa), 폭 B</text>
+        <circle cx="420" cy="220" r="4" style="fill:var(--text)"/><text x="430" y="224" class="t-mono">점 (x, z)</text>
+        <line x1="420" y1="220" x2="200" y2="80" style="stroke:var(--text-dim)"/><line x1="420" y1="220" x2="360" y2="80" style="stroke:var(--text-dim)"/>
+        <line x1="420" y1="220" x2="420" y2="80" style="stroke:var(--text-dim);stroke-dasharray:4 4"/>
+        <path d="M380 192A48 48 0 0 1 394 175" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+        <text x="368" y="178" class="t-mono" style="fill:var(--accent)">α</text>
+        <path d="M402 178A45 45 0 0 1 420 175" style="fill:none;stroke:var(--accent-2);stroke-width:2"/>
+        <text x="404" y="166" class="t-mono" style="fill:var(--accent-2)">δ</text>
+        <text x="560" y="96" class="t">띠 중심 아래, z/B에 따른 Δσz/q</text>
+        <g class="t-mono"><text x="560" y="122">z/B = 0.5 → 0.818</text><text x="560" y="144">z/B = 1   → 0.550</text><text x="560" y="166">z/B = 2   → 0.306</text><text x="560" y="188">z/B = 3   → 0.208</text><text x="560" y="210">z/B = 6.3 → 0.10</text></g>
+      </svg>
+      <figcaption><b>그림 6-3.</b> 띠 하중의 각. \(\alpha\)는 점에서 띠 양 끝을 잇는 두 선 사이의 각, \(\delta\)는 연직선과 가까운 끝 쪽 선 사이의 각(띠 바깥 쪽으로 재면 +). 띠는 길이 방향으로 무한하므로 같은 폭의 정사각형보다 응력이 훨씬 깊이까지 남는다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 6.2 (줄기초 아래)</strong> 폭 \(B = 2\) m, \(q = 150\) kPa인 줄기초. 깊이 2 m.
+      <ol style="margin:6px 0 0">
+        <li><b>중심 아래.</b> 양 끝을 보는 각: \(\tan(\alpha/2) = 1/2\), \(\alpha = 0.927\) rad. \(\Delta\sigma_z = (150/\pi)(0.927 + \sin 0.927) = 47.7 \times 1.727 = 82.5\) kPa.</li>
+        <li><b>가장자리 아래</b>(\(x = 1\) m). \(\alpha = \arctan(2/2) = 0.785\), \(\delta = 0\): \(\Delta\sigma_z = (150/\pi)(0.785 + 0.707 \times \cos 0.785) = 47.7 \times 1.285 = 61.4\) kPa.</li>
+        <li><b>정사각형과 비교.</b> 같은 폭의 2 × 2 m 정사각형 기초는 중심 아래 2 m에서 50.4 kPa(예제 6.3). 줄기초가 64 % 더 크다. 길이 방향으로 퍼질 수 없기 때문이다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="rectangle">
+    <h2>원형·직사각형 하중과 모서리 공식</h2>
+    <div class="problem"><strong>기초판 가장자리 바깥의 점은?</strong>
+      <p>독립 기초·전면 기초·물탱크는 넓이를 가진 하중입니다. 집중 하중 해를 면적에 대해 적분하면 됩니다. 원형 중심과 직사각형 모서리 아래의 적분은 닫힌 식이 있고, 나머지 점은 이 식을 <b>더하고 빼서</b> 얻습니다.</p></div>
+    <div class="callout def"><strong>원리 6.4 (원형 하중 중심 아래)</strong> 반지름 \(a\), 등분포 \(q\)인 <span class="term">원형 하중</span><span class="en">(circular load)</span> 중심 아래 깊이 \(z\)에서
+      <div class="formula">$$\Delta\sigma_z = q\left[1 - \left(\frac{1}{1 + (a/z)^2}\right)^{3/2}\right]$$<div class="where">엔진 함수 <code>CB.soil.circle(q, a, z)</code>. 물탱크·사일로·원형 기초에 쓴다. 중심이 아닌 점은 수치 적분하거나 뉴마크 영향원(뒤)을 쓴다.</div></div></div>
+    <div class="callout def"><strong>원리 6.5 (직사각형 모서리 공식과 중첩)</strong> \(B \times L\) 직사각형 등분포 하중 \(q\)의 <b>한 모서리 아래</b> 깊이 \(z\)에서 \(\Delta\sigma_z = q\,I\)이고, \(m = B/z\), \(n = L/z\), \(V = m^2 + n^2 + 1\)일 때 <span class="term">모서리 공식</span><span class="en">(corner formula)</span>
+      <div class="formula">$$I = \frac{1}{4\pi}\left[\frac{2mn\sqrt{V}}{V + m^2n^2}\cdot\frac{V + 1}{V} + \tan^{-1}\frac{2mn\sqrt{V}}{V - m^2n^2}\right]$$<div class="where">\(V \lt m^2 n^2\)이면 아크탄젠트에 \(\pi\)를 더한다. \(I\)는 \(m\), \(n\)에 대칭이고 최대 0.25(\(z \to 0\)). 임의 점 아래는 그 점을 공통 모서리로 하는 직사각형들의 \(I\)를 더하거나 뺀다(<span class="term">중첩의 원리</span><span class="en">(superposition)</span>: 선형 탄성이므로 하중의 합에 대한 응력은 응력의 합). 엔진 함수 <code>CB.soil.cornerI(B, L, z)</code>, <code>CB.soil.rect(q, B, L, x, y, z)</code>.</div></div></div>
+    <figure class="diagram" id="fig-sd-corner">
+      <svg viewBox="0 0 820 260" role="img" aria-label="직사각형 안쪽 점과 바깥쪽 점에서 모서리 공식의 중첩">
+        <rect x="10" y="10" width="800" height="240" rx="10" class="f-surface"/>
+        <text x="200" y="36" text-anchor="middle" class="t" style="font-weight:700">(가) 안쪽 점: 네 개를 더한다</text>
+        <rect x="70" y="60" width="260" height="150" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+        <line x1="170" y1="60" x2="170" y2="210" style="stroke:var(--accent);stroke-dasharray:4 3"/><line x1="70" y1="120" x2="330" y2="120" style="stroke:var(--accent);stroke-dasharray:4 3"/>
+        <circle cx="170" cy="120" r="5" style="fill:var(--text)"/>
+        <g class="t-mono" text-anchor="middle"><text x="120" y="94">I₁</text><text x="250" y="94">I₂</text><text x="120" y="170">I₃</text><text x="250" y="170">I₄</text></g>
+        <text x="200" y="234" text-anchor="middle" class="t-mono">Δσz = q (I₁ + I₂ + I₃ + I₄)</text>
+        <text x="610" y="36" text-anchor="middle" class="t" style="font-weight:700">(나) 바깥 점: 큰 것에서 작은 것을 뺀다</text>
+        <rect x="480" y="80" width="200" height="110" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+        <rect x="480" y="80" width="300" height="55" style="fill:none;stroke:var(--ok);stroke-width:1.6;stroke-dasharray:5 3"/>
+        <rect x="480" y="135" width="300" height="55" style="fill:none;stroke:var(--ok);stroke-width:1.6;stroke-dasharray:5 3"/>
+        <rect x="680" y="80" width="100" height="110" style="fill:var(--bad);opacity:.12;stroke:var(--bad);stroke-width:1.6"/>
+        <circle cx="780" cy="135" r="5" style="fill:var(--text)"/>
+        <text x="560" y="112" class="t-mono" style="fill:var(--ok)">+ (3 × 1)</text><text x="560" y="168" class="t-mono" style="fill:var(--ok)">+ (3 × 1)</text>
+        <text x="700" y="112" class="t-mono" style="fill:var(--bad)">− (1 × 1)</text><text x="700" y="168" class="t-mono" style="fill:var(--bad)">− (1 × 1)</text>
+        <text x="610" y="220" text-anchor="middle" class="t-mono">점에서 먼 쪽 끝까지 큰 사각형 2개 − 하중 없는 작은 사각형 2개</text>
+      </svg>
+      <figcaption><b>그림 6-4.</b> 모서리 공식의 중첩. (가) 하중 안쪽 점은 그 점에서 나눈 네 직사각형의 모서리 값을 더한다. (나) 하중 바깥의 점(예제 6.3의 2 × 2 m 기초 가장자리에서 1 m 바깥)은 점까지 늘린 큰 직사각형(3 × 1 m 두 개)에서 하중이 없는 부분(1 × 1 m 두 개)을 뺀다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-sd-rect">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>직사각형 중첩 계산기: 점을 끌어 모서리 네 개의 합·차 보기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sd-stack">
+          <div><canvas id="sd-cv-rect" aria-label="직사각형 기초 평면과 측점, 모서리 공식 분할. 측점을 끌 수 있다"></canvas><span class="sd-cap">평면도</span></div>
+          <div><canvas id="sd-cv-rect2" aria-label="측점 아래 깊이별 증가 응력"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>폭 B <output id="sd-rc-B-out"></output></span><input type="range" id="sd-rc-B" min="1" max="10" step="0.5" value="2"></label>
+          <label class="ctrl"><span>길이 L <output id="sd-rc-L-out"></output></span><input type="range" id="sd-rc-L" min="1" max="20" step="0.5" value="2"></label>
+          <label class="ctrl"><span>접지압 q <output id="sd-rc-q-out"></output></span><input type="range" id="sd-rc-q" min="20" max="400" step="5" value="150"></label>
+          <label class="ctrl"><span>깊이 z <output id="sd-rc-z-out"></output></span><input type="range" id="sd-rc-z" min="0.2" max="20" step="0.1" value="2"></label>
+          <div class="ctrl"><span>측점 바로 놓기</span><div class="seg" id="sd-rc-snap"><button data-value="c" class="on">중심</button><button data-value="k">모서리</button><button data-value="e">변 중앙</button><button data-value="o">바깥 1 m</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">측점 (x, y)</span><span class="v" id="sd-rc-p">—</span></div>
+        <div class="stat"><span class="k">I₁ + I₂ + I₃ + I₄</span><span class="v" id="sd-rc-I">—</span></div>
+        <div class="stat"><span class="k">Δσ<sub>z</sub> (kPa)</span><span class="v" id="sd-rc-s">—</span></div>
+        <div class="stat"><span class="k">Δσ<sub>z</sub>/q</span><span class="v" id="sd-rc-r">—</span></div>
+      </div>
+      <div class="sd-msg" id="sd-rc-msg"></div>
+      <div class="sim-note">해볼 것: 측점을 기초 바깥으로 끌면 초록(더하기)과 빨강(빼기) 직사각형이 나타납니다 · B = L = 2, z = 2에서 중심(0.336)과 모서리(0.175)를 비교하세요. 모서리 값의 4배가 중심 값이 아닌 이유는 모서리 공식이 '그 크기의 사각형 모서리'이기 때문입니다 · 모델: 원리 6.5, <code>CB.soil.cornerI</code>·<code>CB.soil.rect</code>. 아래 그래프의 회색 선은 같은 기초 중심 아래 값.</div>
+    </div>
+    <div class="callout"><strong>예제 6.3 (2 × 2 m 기초, q = 150 kPa, z = 2 m)</strong>
+      <ol style="margin:6px 0 0">
+        <li><b>중심.</b> 1 × 1 m 사각형 네 개: \(m = n = 1/2 = 0.5\), \(I = 0.0840\). \(\Delta\sigma_z = 150 \times 4 \times 0.0840 = 50.4\) kPa. 점 하중으로 본 값(600 kN을 점으로: \(600/4 \times 0.4775 = 71.6\) kPa)보다 30 % 작다.</li>
+        <li><b>모서리.</b> 2 × 2 m 사각형 하나: \(m = n = 1\), \(I = 0.1752\). \(\Delta\sigma_z = 26.3\) kPa.</li>
+        <li><b>가장자리에서 1 m 바깥</b>(변의 중앙에서 수직으로). 그림 6-4(나): 3 × 1 m 두 개(\(m = 1.5, n = 0.5\), \(I = 0.1314\)) − 1 × 1 m 두 개(\(I = 0.0840\)). \(I = 2(0.1314 - 0.0840) = 0.0948\), \(\Delta\sigma_z = 14.2\) kPa.</li>
+        <li><b>원형과 비교.</b> 같은 면적의 원(\(a = 1.128\) m)이면 중심 아래 2 m에서 \(150[1 - (1/(1 + 0.318))^{1.5}] = 150 \times 0.339 = 50.9\) kPa. 같은 면적이면 형상의 영향은 작다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="bulb">
+    <h2>영향계수 표와 압력 구근</h2>
+    <div class="problem"><strong>시추는 얼마나 깊이 해야 하나</strong>
+      <p>기초가 응력을 의미 있게 더하는 깊이까지는 흙의 성질을 알아야 합니다. 그 깊이를 가늠하는 도구가 압력 구근입니다. 흔히 증가 응력이 접지압의 10 %가 되는 깊이를 영향 범위로 봅니다.</p></div>
+    <p>같은 증가 응력을 잇는 선을 <span class="term">등압선</span><span class="en">(isobar)</span>이라 하고, 등압선이 감싸는 전구 모양의 영역을 <span class="term">압력 구근</span><span class="en">(pressure bulb)</span>이라 합니다. 무차원 깊이 \(z/B\)로 정리한 영향계수 \(\Delta\sigma_z/q\)는 기초 크기와 무관하므로 표 하나로 모든 크기의 기초를 다룰 수 있습니다.</p>
+    <div class="table-wrap"><table class="sd-tbl">
+      <thead><tr><th>z/B</th><th>정사각형 중심</th><th>정사각형 모서리</th><th>원형 중심(지름 B)</th><th>띠 중심</th><th>2:1법(정사각형)</th></tr></thead>
+      <tbody>
+        <tr><td>0.25</td><td>0.930</td><td>0.247</td><td>0.911</td><td>0.959</td><td>0.640</td></tr>
+        <tr><td>0.5</td><td>0.701</td><td>0.232</td><td>0.646</td><td>0.818</td><td>0.444</td></tr>
+        <tr><td>1</td><td>0.336</td><td>0.175</td><td>0.284</td><td>0.550</td><td>0.250</td></tr>
+        <tr><td>1.5</td><td>0.179</td><td>0.121</td><td>0.146</td><td>0.396</td><td>0.160</td></tr>
+        <tr><td>2</td><td class="hl">0.108</td><td>0.084</td><td>0.087</td><td>0.306</td><td>0.111</td></tr>
+        <tr><td>3</td><td>0.051</td><td>0.045</td><td>0.040</td><td>0.208</td><td>0.063</td></tr>
+        <tr><td>4</td><td>0.029</td><td>0.027</td><td>0.023</td><td>0.158</td><td>0.040</td></tr>
+      </tbody></table></div>
+    <p>표의 값은 이 책의 엔진 함수로 계산했습니다(정사각형 모서리는 B × B 사각형 하나의 모서리). 0.1q 등압선은 정사각형 중심 아래 약 2.1B, 원형 약 1.9B, 띠는 약 6.3B까지 내려갑니다. 그래서 줄기초·성토처럼 긴 하중은 같은 폭의 독립 기초보다 훨씬 깊이 조사해야 합니다.</p>
+    <div class="sim" id="sim-sd-bulb">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>압력 구근 비교: 띠·정사각형·원형</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sd-cv-bulb" aria-label="기초 중심을 지나는 단면의 등압선(0.1q–0.9q)"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>기초 형상</span><div class="seg" id="sd-bb-shape"><button data-value="strip">띠</button><button data-value="sq" class="on">정사각형</button><button data-value="circ">원형</button></div></div>
+          <label class="ctrl"><span>폭(지름) B <output id="sd-bb-B-out"></output></span><input type="range" id="sd-bb-B" min="1" max="6" step="0.1" value="2"></label>
+          <label class="ctrl"><span>접지압 q <output id="sd-bb-q-out"></output></span><input type="range" id="sd-bb-q" min="50" max="400" step="10" value="150"></label>
+          <label class="check"><input type="checkbox" id="sd-bb-cmp" checked> 다른 형상의 0.1q 선 겹쳐 보기</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">0.5q 깊이</span><span class="v" id="sd-bb-z5">—</span></div>
+        <div class="stat"><span class="k">0.2q 깊이</span><span class="v" id="sd-bb-z2">—</span></div>
+        <div class="stat"><span class="k">0.1q 깊이</span><span class="v" id="sd-bb-z1">—</span></div>
+        <div class="stat"><span class="k">0.1q 깊이 / B</span><span class="v" id="sd-bb-zr">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 형상을 띠로 바꾸면 0.1q 구근이 세 배 깊어집니다 · B를 두 배로 하면 구근 전체가 두 배로 커질 뿐 모양은 같습니다(z/B로 정리되는 이유) · 모델: 띠 <code>CB.soil.strip</code>, 정사각형 <code>CB.soil.rect</code>(중심을 지나는 단면), 원형은 중심 밖의 닫힌 식이 없어 이 장에서 부시네스크 점 하중을 원판 위에서 수치 적분(반지름 16 × 각도 48 점, 교육용). 깊이는 중심 아래에서 이분법으로 찾는다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="two-to-one">
+    <h2>2:1 분포법과 그 오차</h2>
+    <div class="problem"><strong>손계산 한 줄로 끝내고 싶다</strong>
+      <p>현장에서는 "하중이 깊이 1 m 내려갈 때마다 양옆으로 0.5 m씩 퍼진다"는 간단한 가정을 자주 씁니다. 계산은 쉽지만, 기초 바로 아래와 깊은 곳에서 얼마나 틀릴까요?</p></div>
+    <figure class="diagram" id="fig-sd-21">
+      <svg viewBox="0 0 820 250" role="img" aria-label="2:1 분포법의 기하">
+        <rect x="10" y="10" width="800" height="230" rx="10" class="f-surface"/>
+        <rect x="30" y="70" width="520" height="160" class="f-acc-soft" style="stroke:none"/>
+        <line x1="30" y1="70" x2="550" y2="70" style="stroke:var(--text)"/>
+        <rect x="230" y="56" width="120" height="14" style="fill:var(--text-dim);opacity:.6;stroke:var(--text)"/>
+        <text x="290" y="46" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">Q = q B L</text>
+        <path d="M230 70L150 230M350 70L430 230" style="stroke:var(--accent);stroke-width:2;fill:none"/>
+        <line x1="150" y1="200" x2="430" y2="200" style="stroke:var(--accent-2);stroke-width:5;opacity:.5"/>
+        <line x1="190" y1="70" x2="190" y2="198" style="stroke:var(--text-dim)" marker-end="url(#sd-ah-t)"/><text x="174" y="140" class="t-mono">z</text>
+        <text x="290" y="222" text-anchor="middle" class="t-mono">B + z</text>
+        <text x="250" y="130" class="t-mono" style="fill:var(--accent)">연직 2 : 수평 1</text>
+        <text x="580" y="90" class="t">Δσz = q B L / ((B + z)(L + z))</text>
+        <text x="580" y="116" class="t-dim">· 힘 Q를 넓어진 면적에 고르게</text>
+        <text x="580" y="138" class="t-dim">· 평균값이다(중심값이 아니다)</text>
+        <text x="580" y="160" class="t-dim">· 띠 하중이면 Δσz = q B /(B + z)</text>
+      </svg>
+      <figcaption><b>그림 6-5.</b> 2:1 분포법. 기초 하중 \(Q\)가 깊이 \(z\)에서 \((B + z)(L + z)\) 면적에 고르게 퍼진다고 가정한다. 힘의 평형은 지키지만 분포 모양(가운데가 크고 가장자리가 작은)은 무시한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.6 (2:1 분포법)</strong> <span class="term">2:1 분포법</span><span class="en">(2:1 method)</span>의 평균 증가 응력은
+      <div class="formula">$$\Delta\sigma_z \approx \frac{q\,B\,L}{(B + z)(L + z)}$$<div class="where">엔진 함수 <code>CB.soil.twoToOne(q, B, L, z)</code>. 부시네스크 중심값과 비교하면 \(z \lt B\)에서 크게 작고(정사각형 \(z = B/2\)에서 약 −37 %), \(z \approx 1.5\)–\(2B\)에서 거의 같으며, 그보다 깊으면 오히려 크다. 기초 아래 평균 응력과 비교하면 오차가 줄어든다. 예비 설계·깊은 층의 어림에 쓴다.</div></div></div>
+    <div class="sim" id="sim-sd-21">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>2:1법 vs 부시네스크: 깊이별 오차 곡선</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sd-stack">
+          <div><canvas id="sd-cv-21" aria-label="깊이별 증가 응력: 부시네스크 중심, 기초 아래 평균, 2:1법"></canvas></div>
+          <div><canvas id="sd-cv-21e" aria-label="2:1법의 상대 오차"></canvas><span class="sd-cap">2:1법의 상대 오차 (%)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>폭 B <output id="sd-21-B-out"></output></span><input type="range" id="sd-21-B" min="1" max="10" step="0.5" value="2"></label>
+          <label class="ctrl"><span>L / B <output id="sd-21-r-out"></output></span><input type="range" id="sd-21-r" min="1" max="10" step="0.5" value="1"></label>
+          <label class="ctrl"><span>접지압 q <output id="sd-21-q-out"></output></span><input type="range" id="sd-21-q" min="50" max="400" step="10" value="150"></label>
+          <label class="ctrl"><span>읽을 깊이 z <output id="sd-21-z-out"></output></span><input type="range" id="sd-21-z" min="0.1" max="20" step="0.1" value="2"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">부시네스크 중심</span><span class="v" id="sd-21-c">—</span></div>
+        <div class="stat"><span class="k">기초 아래 평균</span><span class="v" id="sd-21-a">—</span></div>
+        <div class="stat"><span class="k">2:1법</span><span class="v" id="sd-21-t">—</span></div>
+        <div class="stat"><span class="k">오차(중심 / 평균 대비)</span><span class="v" id="sd-21-e">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: z를 0.5B 근처로 두면 2:1법이 중심값을 크게 깎습니다 · L/B를 키워 띠에 가까워지게 해 보세요 · 모델: 중심 <code>CB.soil.rect</code>, 평균은 기초 면적 위 12 × 12 점의 <code>CB.soil.rect</code> 평균, 2:1법 <code>CB.soil.twoToOne</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 6.4 (2 × 2 m, q = 150 kPa의 2:1법)</strong>
+      <ol style="margin:6px 0 0">
+        <li><b>z = 1 m.</b> \(150 \times 4/(3 \times 3) = 66.7\) kPa. 부시네스크 중심 105.1, 기초 아래 평균 77.3 kPa. 중심 대비 −37 %.</li>
+        <li><b>z = 2 m.</b> \(150 \times 4/16 = 37.5\) kPa. 중심 50.4(−26 %), 평균 40.8 kPa(−8 %).</li>
+        <li><b>z = 4 m.</b> \(150 \times 4/36 = 16.7\) kPa. 중심 16.2 kPa(+3 %).</li>
+        <li><b>판단.</b> 얕은 곳의 압축성 층에 2:1법을 쓰면 침하를 과소평가한다. 깊은 곳(\(z \gt 2B\))은 보수적이다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="newmark">
+    <h2>뉴마크 영향원</h2>
+    <div class="problem"><strong>모양이 불규칙한 하중</strong>
+      <p>ㄱ자 건물, 원형과 사각형이 섞인 탱크 기초처럼 모양이 복잡하면 사각형으로 나누기도 번거롭습니다. 컴퓨터 이전에는 그림 위에 하중 평면을 그려 칸을 세는 도표를 썼습니다.</p></div>
+    <p>원리 6.4의 원형 하중 식을 거꾸로 풀면, 영향계수가 0.1, 0.2, …, 0.9가 되는 원의 반지름 \(a/z\)를 얻습니다: 0.270, 0.400, 0.518, 0.637, 0.766, 0.918, 1.110, 1.387, 1.908(그리고 1.0은 무한대). 이 동심원 열 개의 고리를 반지름 선 20개로 나누면 각 칸이 같은 영향 \(0.1/20 = 0.005\)을 가집니다. 이것이 <span class="term">뉴마크 영향원</span><span class="en">(Newmark influence chart)</span>입니다.</p>
+    <figure class="diagram" id="fig-sd-newmark">
+      <svg viewBox="0 0 820 330" role="img" aria-label="뉴마크 영향원과 그 위에 축척에 맞춰 그린 정사각형 기초">
+        <rect x="10" y="10" width="800" height="310" rx="10" class="f-surface"/>
+        <g style="fill:none;stroke:var(--text-dim);stroke-width:1"><circle cx="190" cy="160" r="16.2"/><circle cx="190" cy="160" r="24.0"/><circle cx="190" cy="160" r="31.1"/><circle cx="190" cy="160" r="38.2"/><circle cx="190" cy="160" r="46.0"/><circle cx="190" cy="160" r="55.1"/><circle cx="190" cy="160" r="66.6"/><circle cx="190" cy="160" r="83.2"/><circle cx="190" cy="160" r="114.5"/></g>
+        <g style="stroke:var(--text-dim);stroke-width:.8"><line x1="190" y1="160" x2="325.0" y2="160.0"/><line x1="190" y1="160" x2="318.4" y2="201.7"/><line x1="190" y1="160" x2="299.2" y2="239.4"/><line x1="190" y1="160" x2="269.4" y2="269.2"/><line x1="190" y1="160" x2="231.7" y2="288.4"/><line x1="190" y1="160" x2="190.0" y2="295.0"/><line x1="190" y1="160" x2="148.3" y2="288.4"/><line x1="190" y1="160" x2="110.6" y2="269.2"/><line x1="190" y1="160" x2="80.8" y2="239.4"/><line x1="190" y1="160" x2="61.6" y2="201.7"/><line x1="190" y1="160" x2="55.0" y2="160.0"/><line x1="190" y1="160" x2="61.6" y2="118.3"/><line x1="190" y1="160" x2="80.8" y2="80.6"/><line x1="190" y1="160" x2="110.6" y2="50.8"/><line x1="190" y1="160" x2="148.3" y2="31.6"/><line x1="190" y1="160" x2="190.0" y2="25.0"/><line x1="190" y1="160" x2="231.7" y2="31.6"/><line x1="190" y1="160" x2="269.4" y2="50.8"/><line x1="190" y1="160" x2="299.2" y2="80.6"/><line x1="190" y1="160" x2="318.4" y2="118.3"/></g>
+        <rect x="160" y="130" width="60" height="60" style="fill:var(--accent-2);opacity:.25;stroke:var(--accent-2);stroke-width:2"/>
+        <circle cx="190" cy="160" r="3" style="fill:var(--text)"/>
+        <line x1="40" y1="306" x2="100" y2="306" style="stroke:var(--text);stroke-width:2"/><text x="106" y="310" class="t-mono">축척 선분 = 깊이 z</text>
+        <text x="360" y="60" class="t">사용법</text>
+        <text x="360" y="86" class="t-dim">1. 구할 깊이 z를 그림의 축척 선분 길이로 잡는다.</text>
+        <text x="360" y="108" class="t-dim">2. 기초 평면을 그 축척으로 그리고, 구할 점을 원의 중심에 놓는다.</text>
+        <text x="360" y="130" class="t-dim">3. 기초가 덮는 칸 수 N을 센다(부분 칸은 어림).</text>
+        <text x="360" y="152" class="t-mono">4. Δσz = 0.005 · N · q</text>
+        <text x="360" y="186" class="t">예: 2 × 2 m 기초 중심, z = 2 m</text>
+        <text x="360" y="208" class="t-dim">축척 선분 = 2 m → 기초 한 변 = 선분 길이</text>
+        <text x="360" y="230" class="t-dim">덮인 칸 약 67개 → 0.005 × 67 × 150 ≈ 50 kPa</text>
+        <text x="360" y="252" class="t-dim">(모서리 공식 50.4 kPa)</text>
+      </svg>
+      <figcaption><b>그림 6-6.</b> 뉴마크 영향원(반지름 = \(a_i/z\) × 축척 선분, 칸 하나의 영향 0.005). 가운데 주황 사각형은 깊이 \(z = 2\) m에서 본 2 × 2 m 기초. 바깥 고리(0.9–1.0)는 무한대까지 이어진다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.7 (뉴마크 영향원)</strong> 깊이 \(z\)를 축척으로 그린 하중 평면이 영향원의 칸 \(N\)개를 덮으면
+      <div class="formula">$$\Delta\sigma_z = I_N\,N\,q, \qquad I_N = \frac{1}{(\text{고리 수})(\text{부채꼴 수})} = \frac{1}{10 \times 20} = 0.005$$<div class="where">구할 점마다, 깊이마다 평면을 다시 그려야 하지만 어떤 모양의 등분포 하중에도 쓸 수 있다. 오늘날은 같은 원리를 컴퓨터가 수치 적분으로 한다.</div></div></div>
+    <div class="sim" id="sim-sd-nm">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>뉴마크 칸 세기: 기초를 끌어 덮인 칸 수와 정답 비교</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sd-cv-nm" aria-label="뉴마크 영향원 위의 직사각형 기초. 기초를 끌어 옮길 수 있다"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>깊이 z <output id="sd-nm-z-out"></output></span><input type="range" id="sd-nm-z" min="1" max="8" step="0.1" value="2"></label>
+          <label class="ctrl"><span>폭 B <output id="sd-nm-B-out"></output></span><input type="range" id="sd-nm-B" min="0.5" max="8" step="0.1" value="2"></label>
+          <label class="ctrl"><span>길이 L <output id="sd-nm-L-out"></output></span><input type="range" id="sd-nm-L" min="0.5" max="12" step="0.1" value="2"></label>
+          <label class="ctrl"><span>접지압 q <output id="sd-nm-q-out"></output></span><input type="range" id="sd-nm-q" min="50" max="400" step="10" value="150"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">덮인 칸 N</span><span class="v" id="sd-nm-N">—</span></div>
+        <div class="stat"><span class="k">0.005 N q</span><span class="v" id="sd-nm-s">—</span></div>
+        <div class="stat"><span class="k">모서리 공식(정답)</span><span class="v" id="sd-nm-x">—</span></div>
+        <div class="stat"><span class="k">차이</span><span class="v" id="sd-nm-e">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기초를 원 중심에서 비켜 끌어 보세요. 바깥 칸은 크지만 영향은 같은 0.005입니다 · z를 키우면 같은 기초가 그림에서 작아집니다 · 모델: 칸마다 영향이 같은 간격(반지름 방향)과 같은 각도 간격으로 6 × 6 점을 찍어, 기초 안에 든 비율로 부분 칸을 센다(사람이 눈으로 어림하는 것을 흉내). 바깥 고리는 무한대까지 이어진다. 정답은 <code>CB.soil.rect</code>.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="layered">
+    <h2>성층 지반과 웨스터가드 해</h2>
+    <div class="problem"><strong>땅은 균질하지 않다</strong>
+      <p>G-10처럼 단단한 매립층 아래 연약 점토, 그 아래 모래 자갈이 있으면 응력은 균질한 반무한체처럼 퍼지지 않습니다. 단단한 층은 하중을 넓게 펼치는 판처럼 행동하고, 아래의 단단한 기반은 응력을 모읍니다.</p></div>
+    <p>층을 이룬 지반의 탄성 해는 버미스터(Burmister) 등이 2층·3층 계에 대해 구했습니다. 정성적으로는 (1) 단단한 층이 무른 층 위에 있으면 무른 층의 응력이 균질 해보다 작고(포장의 원리), (2) 무른 층 아래 가까이 단단한 기반이 있으면 기반 위의 응력이 균질 해보다 커집니다. 수평으로 얇은 단단한 띠가 촘촘히 끼어 옆으로 거의 변형하지 못하는 극단적인 경우에 대해 웨스터가드가 구한 해가 있습니다.</p>
+    <div class="callout def"><strong>원리 6.8 (웨스터가드 해)</strong> 수평 변형이 막힌 층상 탄성체(\(\nu = 0\))의 집중 하중 해, <span class="term">웨스터가드 해</span><span class="en">(Westergaard solution)</span>
+      <div class="formula">$$\Delta\sigma_z = \frac{P}{\pi z^2}\left[1 + 2\left(\frac{r}{z}\right)^2\right]^{-3/2}$$<div class="where">바로 아래(\(r = 0\))에서 \(0.318P/z^2\)로 부시네스크(\(0.4775P/z^2\))의 2/3. \(r/z \approx 1.5\) 근처에서 두 해가 비슷해지고 그보다 멀면 웨스터가드가 크다. 얇은 모래·실트 띠가 반복되는 점토(호성·해성 퇴적층)에 쓰인다고 소개되지만, 어느 해가 맞는지는 지반에 따라 다르다.</div></div></div>
+    <div class="table-wrap"><table class="sd-tbl">
+      <thead><tr><th>r/z</th><th>0</th><th>0.25</th><th>0.5</th><th>1.0</th><th>1.5</th><th>2.0</th></tr></thead>
+      <tbody>
+        <tr><td>부시네스크 I<sub>B</sub></td><td>0.4775</td><td>0.4103</td><td>0.2733</td><td>0.0844</td><td>0.0251</td><td>0.0085</td></tr>
+        <tr><td>웨스터가드 I<sub>W</sub></td><td>0.3183</td><td>0.2668</td><td>0.1733</td><td>0.0613</td><td>0.0247</td><td>0.0118</td></tr>
+      </tbody></table></div>
+    <div class="callout warn"><strong>탄성 해를 쓸 때의 판단</strong> 지중 응력 해는 모두 "흙이 선형 탄성"이라는 가정에서 나왔습니다. 기초 가장자리 아래처럼 응력이 집중하는 곳은 흙이 먼저 항복해 응력이 재분배되고, 층이 기울어 있거나 지하수위가 하중으로 바뀌면 또 달라집니다. 그래도 연직 증가 응력은 평형이 지배하므로 대개 ±20 % 정도의 정확도로 쓸 만하다고 보지만(교육용 어림), 같은 층에서도 흩어지는 압축 지수(7장)보다 이 오차가 크지 않다는 점이 실무에서 이 해를 계속 쓰는 이유입니다.</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="contact">
+    <h2>기초의 접지압 분포</h2>
+    <div class="problem"><strong>기초판 밑면을 누르는 압력은 고를까</strong>
+      <p>지금까지는 "접지압 q가 고르게 분포한다"고 가정했습니다. 물탱크 바닥처럼 휘기 쉬운 기초라면 맞는 말입니다. 그러나 두꺼운 콘크리트 기초판은 휘지 않고 통째로 내려가므로, 땅이 기초를 되미는 압력은 고르지 않습니다.</p></div>
+    <p>기초판과 지반의 접촉면에 작용하는 압력을 <span class="term">접지압</span><span class="en">(contact pressure)</span>이라 합니다. 접지압 분포는 기초의 강성과 지반의 종류에 따라 다릅니다. 하중을 고르게 전달하지만 침하가 고르지 않은 <span class="term">연성 기초</span><span class="en">(flexible foundation)</span>와, 침하는 고르지만 접지압이 고르지 않은 <span class="term">강성 기초</span><span class="en">(rigid foundation)</span>의 두 극단을 생각합니다.</p>
+    <figure class="diagram" id="fig-sd-contact">
+      <svg viewBox="0 0 820 300" role="img" aria-label="점토와 모래 위 강성·연성 기초의 접지압과 침하 모양">
+        <rect x="10" y="10" width="800" height="280" rx="10" class="f-surface"/>
+        <text x="220" y="34" text-anchor="middle" class="t" style="font-weight:700">점토(탄성에 가까움)</text>
+        <text x="620" y="34" text-anchor="middle" class="t" style="font-weight:700">모래(구속압에 따라 강성 변화)</text>
+        <line x1="410" y1="24" x2="410" y2="280" style="stroke:var(--border)"/>
+        <g transform="translate(40,50)">
+          <text x="0" y="12" class="t-dim">강성 기초</text>
+          <rect x="60" y="20" width="140" height="14" style="fill:var(--text-dim);opacity:.6"/>
+          <path d="M60 34L60 96Q70 62 90 56L170 56Q190 62 200 96L200 34Z" style="fill:var(--accent-2);opacity:.3;stroke:var(--accent-2)"/>
+          <text x="210" y="80" class="t-mono" style="fill:var(--accent-2)">가장자리 큼</text>
+          <text x="0" y="132" class="t-dim">연성 기초</text>
+          <rect x="60" y="140" width="140" height="22" style="fill:var(--accent-2);opacity:.3;stroke:var(--accent-2)"/>
+          <path d="M30 186Q130 222 230 186" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+          <text x="210" y="160" class="t-mono" style="fill:var(--accent-2)">고른 압력</text>
+          <text x="120" y="226" text-anchor="middle" class="t-mono" style="fill:var(--accent)">침하: 가운데 큼(접시 모양)</text>
+        </g>
+        <g transform="translate(440,50)">
+          <text x="0" y="12" class="t-dim">강성 기초</text>
+          <rect x="60" y="20" width="140" height="14" style="fill:var(--text-dim);opacity:.6"/>
+          <path d="M60 34Q130 120 200 34Z" style="fill:var(--accent-2);opacity:.3;stroke:var(--accent-2)"/>
+          <text x="210" y="80" class="t-mono" style="fill:var(--accent-2)">가운데 큼</text>
+          <text x="0" y="132" class="t-dim">연성 기초</text>
+          <rect x="60" y="140" width="140" height="22" style="fill:var(--accent-2);opacity:.3;stroke:var(--accent-2)"/>
+          <path d="M30 180Q60 204 80 200Q130 192 180 200Q200 204 230 180" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+          <text x="210" y="160" class="t-mono" style="fill:var(--accent-2)">고른 압력</text>
+          <text x="130" y="226" text-anchor="middle" class="t-mono" style="fill:var(--accent)">침하: 가장자리가 더 큼</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-7.</b> 접지압과 침하 모양(정성적). 점토 위 강성 기초는 탄성 해에서 가장자리 압력이 무한대가 되지만 실제로는 가장자리 흙이 항복해 잘린다. 모래 위 지표 강성 기초는 가장자리의 구속압이 작아 흙이 옆으로 밀려나므로 가운데가 크다. 연성 기초의 침하는 그 반대 모양이다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.9 (탄성 지반 위 강성 띠 기초)</strong> 반무한 탄성체 위에 놓인 폭 \(B\)의 강성 띠 기초에 평균 압력 \(q\)가 걸리면
+      <div class="formula">$$p(x) = \frac{2q}{\pi\sqrt{1 - (2x/B)^2}}$$<div class="where">\(x\): 중심에서 거리. 중심에서 \(p = 0.64q\), 가장자리(\(x \to B/2\))에서 무한대. 실제로는 가장자리 흙이 항복해 압력이 상한에 잘리고, 하중이 극한에 가까워질수록 분포가 고르게, 이어 가운데가 커지는 쪽으로 바뀐다. 기초판 설계에서는 흔히 고른 분포(또는 편심이면 직선 분포, 13장)를 가정한다.</div></div></div>
+    <div class="sim" id="sim-sd-contact">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>접지압 분포: 강성·연성, 점토·모래</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sd-cv-contact" aria-label="기초 아래 접지압 분포와 침하 모양"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>기초</span><div class="seg" id="sd-ct-rig"><button data-value="rigid" class="on">강성</button><button data-value="flex">연성</button></div></div>
+          <div class="ctrl"><span>지반</span><div class="seg" id="sd-ct-soil"><button data-value="clay" class="on">점토</button><button data-value="sand">모래</button></div></div>
+          <label class="ctrl"><span><span>하중 수준 q/q<sub>u</sub>(점토)</span> <output id="sd-ct-lv-out"></output></span><input type="range" id="sd-ct-lv" min="0.1" max="0.95" step="0.01" value="0.33"></label>
+          <label class="ctrl"><span><span>근입 깊이 D<sub>f</sub>/B(모래)</span> <output id="sd-ct-df-out"></output></span><input type="range" id="sd-ct-df" min="0" max="1.5" step="0.05" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">가운데 p/q</span><span class="v" id="sd-ct-c">—</span></div>
+        <div class="stat"><span class="k">가장자리 p/q</span><span class="v" id="sd-ct-e">—</span></div>
+        <div class="stat"><span class="k">침하 가운데/가장자리</span><span class="v" id="sd-ct-s">—</span></div>
+      </div>
+      <div class="sd-msg" id="sd-ct-msg"></div>
+      <div class="sim-note">해볼 것: 점토·강성에서 하중 수준을 올리면 가장자리 압력이 잘리고 분포가 고르게 됩니다 · 모래·강성에서 근입을 깊게 하면 가장자리 구속이 커져 분포가 고르게 됩니다 · 모델(교육용): 점토·강성은 원리 6.9를 상한 p ≤ q/(q/q<sub>u</sub>)·0.95로 자르고 나머지를 비례 배분해 합력을 qB로 맞춘다. 모래·강성은 p = q[(1 − w)·1.5(1 − (2x/B)²) + w], w = min(1, D<sub>f</sub>/B). 연성 기초의 점토 침하는 띠 하중 <code>CB.soil.strip</code>을 깊이 3B까지 적분한 Σ Δσ<sub>z</sub> Δz(일정 탄성계수), 모래 연성의 침하 모양은 관찰 경향을 보이는 정성 곡선.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="adjacent">
+    <h2>이웃한 기초의 영향</h2>
+    <div class="problem"><strong>새 건물이 옆 건물을 기울인다</strong>
+      <p>기존 건물 바로 옆에 새 건물을 세우면 새 기초의 응력 구근이 기존 기초 아래까지 들어가 기존 건물 쪽 지반에도 침하를 더합니다. 기존 건물은 새 건물 쪽으로 기울어집니다. 두 기초가 가까운 같은 건물 안에서도 마찬가지입니다.</p></div>
+    <p>탄성 해는 선형이므로 이웃한 기초의 응력은 그냥 더하면 됩니다(중첩의 원리). 기초 A 중심 아래의 응력은 A 자신의 응력에 B가 A 아래에 만드는 응력을 더한 값입니다. B의 영향은 얕은 곳에서는 작다가(구근이 아직 넓지 않다) 기초 간격 정도의 깊이에서 가장 크고, 더 깊어지면 두 기초가 하나의 큰 기초처럼 행동합니다.</p>
+    <div class="sim" id="sim-sd-adj">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>이웃한 기초 두 개의 중첩: 간격 끌기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sd-stack">
+          <div><canvas id="sd-cv-adj" aria-label="두 기초 단면의 합친 등압선. 기초 B를 좌우로 끌 수 있다"></canvas></div>
+          <div><canvas id="sd-cv-adj2" aria-label="기초 A 중심 아래 깊이별 응력: 혼자일 때와 함께일 때"></canvas><span class="sd-cap">기초 A 중심 아래</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>중심 간격 s <output id="sd-aj-s-out"></output></span><input type="range" id="sd-aj-s" min="2" max="12" step="0.1" value="3"></label>
+          <label class="ctrl"><span>기초 A 폭(정사각형) <output id="sd-aj-BA-out"></output></span><input type="range" id="sd-aj-BA" min="1" max="4" step="0.1" value="2"></label>
+          <label class="ctrl"><span>기초 B 폭(정사각형) <output id="sd-aj-BB-out"></output></span><input type="range" id="sd-aj-BB" min="1" max="6" step="0.1" value="2"></label>
+          <label class="ctrl"><span>접지압 q (두 기초 같음) <output id="sd-aj-q-out"></output></span><input type="range" id="sd-aj-q" min="50" max="400" step="10" value="200"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">z = B<sub>A</sub>: A만 / 함께</span><span class="v" id="sd-aj-1">—</span></div>
+        <div class="stat"><span class="k">z = 2B<sub>A</sub>: A만 / 함께</span><span class="v" id="sd-aj-2">—</span></div>
+        <div class="stat"><span class="k">B의 기여가 최대인 깊이</span><span class="v" id="sd-aj-zm">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 간격을 좁혀 두 구근이 합쳐지는 것을 보세요 · 기초 B를 크게 하면 A 아래 깊은 곳의 응력이 A 자신의 응력보다 커질 수 있습니다 · 모델: <code>CB.soil.rect</code>의 합(두 기초 중심을 지나는 단면). 기초는 서로 겹치지 않게 간격을 묶는다.</div>
+    </div>
+    <div class="callout"><strong>예제 6.5 (2 × 2 m 기초 둘, q = 200 kPa, 중심 간격 3 m)</strong>
+      <ol style="margin:6px 0 0">
+        <li><b>z = 2 m.</b> A 자신 \(200 \times 0.336 = 67.2\) kPa. B가 A 중심 아래에 주는 값: B 중심에서 3 m 떨어진 점 → 모서리 공식 중첩으로 5.9 kPa. 합 73.1 kPa(+9 %).</li>
+        <li><b>z = 3 m.</b> A 35.8, B 8.0 kPa → 43.8 kPa(+22 %).</li>
+        <li><b>z = 4 m.</b> A 21.6, B 7.9 kPa → 29.5 kPa(+37 %). 깊어질수록 이웃의 비중이 커진다.</li>
+        <li><b>판단.</b> 압축성 점토가 기초 아래 3–6 m에 있다면 이웃 기초의 영향을 무시하면 침하를 20–40 % 과소평가한다. 기초 사이가 가까우면 처음부터 연속 기초·전면 기초로 보는 편이 낫다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="embankment">
+    <h2>성토 하중과 E-4 아래 응력</h2>
+    <div class="problem"><strong>성토의 76 kPa는 점토 바닥까지 그대로 내려갈까</strong>
+      <p>E-4 진입 도로 성토는 높이 4 m(\(\gamma\) = 19 kN/m³), 마루 폭 10 m, 비탈 1:1.5입니다. 성토 중심의 하중은 \(19 \times 4 = 76\) kPa입니다. 7장은 이 값을 연약 점토층 전체에 그대로 쓸 예정입니다. 그런데 바닥 폭 22 m인 성토는 6–14 m 깊이의 점토에 대해 "넓은 하중"일까요?</p></div>
+    <figure class="diagram" id="fig-sd-emb">
+      <svg viewBox="0 0 820 270" role="img" aria-label="사다리꼴 성토 하중의 반쪽과 오스터버그 식의 기호">
+        <rect x="10" y="10" width="800" height="250" rx="10" class="f-surface"/>
+        <rect x="30" y="120" width="760" height="130" class="f-acc-soft" style="stroke:none"/>
+        <path d="M130 120L260 60H540L670 120Z" style="fill:var(--accent-2);opacity:.2;stroke:var(--accent-2);stroke-width:1.6"/>
+        <line x1="30" y1="120" x2="790" y2="120" style="stroke:var(--text)"/>
+        <text x="400" y="88" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">q = γ H = 19 × 4 = 76 kPa</text>
+        <line x1="400" y1="50" x2="400" y2="230" style="stroke:var(--text-dim);stroke-dasharray:4 4"/>
+        <circle cx="400" cy="220" r="4" style="fill:var(--text)"/><text x="410" y="236" class="t-mono">중심 아래 깊이 z</text>
+        <line x1="400" y1="220" x2="540" y2="120" style="stroke:var(--accent)"/><line x1="400" y1="220" x2="670" y2="120" style="stroke:var(--accent)"/>
+        <path d="M424 196A34 34 0 0 1 430 194" style="fill:none;stroke:var(--accent)"/>
+        <text x="452" y="182" class="t-mono" style="fill:var(--accent)">α₂</text><text x="520" y="178" class="t-mono" style="fill:var(--accent)">α₁</text>
+        <line x1="400" y1="54" x2="540" y2="54" style="stroke:var(--text-dim)" marker-start="url(#sd-ah-t)" marker-end="url(#sd-ah-t)"/><text x="466" y="48" class="t-mono">b = 5 m</text>
+        <line x1="540" y1="134" x2="670" y2="134" style="stroke:var(--text-dim)" marker-start="url(#sd-ah-t)" marker-end="url(#sd-ah-t)"/><text x="590" y="150" class="t-mono">a = 6 m</text>
+        <text x="40" y="146" class="t-dim">원지반</text>
+      </svg>
+      <figcaption><b>그림 6-8.</b> 사다리꼴 성토 하중(반쪽). 마루 반폭 \(b\), 비탈의 수평 길이 \(a\)(높이 × 비탈 비). 중심 아래의 응력은 오른쪽 반쪽의 값을 두 배로 한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.10 (사다리꼴 하중: 오스터버그 식)</strong> 길이 방향으로 긴 <span class="term">사다리꼴 하중</span><span class="en">(embankment load)</span>의 반쪽(마루 반폭 \(b\), 비탈 수평 길이 \(a\), 높이 하중 \(q = \gamma H\))이 그 안쪽 끝 아래 깊이 \(z\)에 주는 응력은
+      <div class="formula">$$\Delta\sigma_z = \frac{q}{\pi}\left[\frac{a + b}{a}\,(\alpha_1 + \alpha_2) - \frac{b}{a}\,\alpha_2\right], \qquad \alpha_2 = \tan^{-1}\frac{b}{z},\;\; \alpha_1 = \tan^{-1}\frac{a + b}{z} - \alpha_2$$<div class="where">이 형태는 오스터버그(1957)의 영향계수 도표로 널리 알려져 있다. 대칭 성토 중심 아래는 이 값의 두 배. 이 장의 시뮬레이터는 임의의 점에서 계산하려고 단면의 하중 분포 \(p(\xi)\)에 선 하중 해(<code>CB.soil.line</code>)를 곱해 적분하고(심프슨 공식), 중심 아래에서 이 식과 맞는지 확인한다.</div></div></div>
+    <div class="sim" id="sim-sd-emb">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>성토(사다리꼴) 하중 아래 응력: E-4</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sd-stack">
+          <div><canvas id="sd-cv-emb" aria-label="성토 단면과 지반 속 증가 응력 색 지도. 측선을 좌우로 끌 수 있다"></canvas></div>
+          <div><canvas id="sd-cv-emb2" aria-label="측선 아래 깊이별 증가 응력과 γH"></canvas><span class="sd-cap">측선 아래 Δσz(z)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>성토 높이 H <output id="sd-em-H-out"></output></span><input type="range" id="sd-em-H" min="1" max="10" step="0.1" value="4"></label>
+          <label class="ctrl"><span>단위중량 γ <output id="sd-em-g-out"></output></span><input type="range" id="sd-em-g" min="16" max="22" step="0.5" value="19"></label>
+          <label class="ctrl"><span>마루 폭 <output id="sd-em-c-out"></output></span><input type="range" id="sd-em-c" min="0" max="40" step="0.5" value="10"></label>
+          <label class="ctrl"><span>비탈 1 : m <output id="sd-em-m-out"></output></span><input type="range" id="sd-em-m" min="1" max="4" step="0.1" value="1.5"></label>
+          <label class="ctrl"><span>측선 위치 x(중심에서) <output id="sd-em-x-out"></output></span><input type="range" id="sd-em-x" min="0" max="30" step="0.5" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">점토 중앙(10 m) Δσ<sub>z</sub></span><span class="v" id="sd-em-s">—</span></div>
+        <div class="stat"><span class="k">Δσ<sub>z</sub>/γH</span><span class="v" id="sd-em-r">—</span></div>
+        <div class="stat"><span class="k">오스터버그(중심 확인)</span><span class="v" id="sd-em-o">—</span></div>
+        <div class="stat"><span class="k">1차 압밀 침하(한 층)</span><span class="v" id="sd-em-S">—</span></div>
+      </div>
+      <div class="sd-msg" id="sd-em-msg"></div>
+      <div class="sim-note">해볼 것: 마루 폭을 40 m로 넓히면 점토 중앙의 응력이 γH에 가까워집니다(넓은 하중) · 측선을 비탈 끝(x = 11 m) 밖으로 끌면 성토 바깥 땅도 응력을 받는 것을 보세요 · 모델: 단면 하중 분포에 <code>CB.soil.line</code>을 곱해 심프슨 적분(400 구간), 중심 아래는 원리 6.10과 비교. 침하는 G-10 연약 점토(6–14 m, H = 8 m, e₀ 1.5, C<sub>c</sub> 0.55, σ′<sub>v0</sub> = 99.5 kPa는 <code>CB.soil.site()</code>)를 한 층으로 <code>CB.soil.settlement</code>, 측선 위치의 10 m 깊이 Δσ<sub>z</sub>를 쓴다.</div>
+    </div>
+    <div class="callout"><strong>예제 6.6 (E-4 중심 아래, 점토 중앙 z = 10 m)</strong> \(q = 76\) kPa, \(b = 5\) m, \(a = 4 \times 1.5 = 6\) m.
+      <ol style="margin:6px 0 0">
+        <li><b>각.</b> \(\alpha_2 = \tan^{-1}(5/10) = 0.4636\), \(\tan^{-1}(11/10) = 0.8330\), \(\alpha_1 = 0.3694\) rad.</li>
+        <li><b>반쪽.</b> \((76/\pi)[(11/6)(0.8330) - (5/6)(0.4636)] = 24.19 \times (1.5272 - 0.3863) = 27.6\) kPa.</li>
+        <li><b>중심.</b> \(\Delta\sigma_z = 2 \times 27.6 = 55.2\) kPa \(= 0.73\,\gamma H\).</li>
+        <li><b>깊이별.</b> 점토 윗면(6 m) 67.0, 바닥(14 m) 45.2 kPa. 성토 비탈 끝 아래(\(x = 11\) m)는 10 m에서 23.1 kPa — 성토 밖 땅도 눌린다.</li>
+      </ol></div>
+    <div class="callout site"><strong>E-4 성토: 76 kPa와 55 kPa</strong> CONTRIBUTING의 기준값과 7장은 E-4를 "넓은 하중"으로 보아 점토층 전체에 \(\Delta\sigma = 76\) kPa를 주고, 한 층 계산으로 1차 압밀 침하 0.43 m를 얻습니다. 이 장의 부시네스크 계산으로는 점토 중앙에서 55.2 kPa이므로 같은 식(\(S = 0.55 \times 8/2.5 \times \log((99.5 + 55.2)/99.5)\))의 침하는 <b>약 0.34 m</b>로 약 20 % 작습니다. 점토를 2 m씩 네 층으로 나눠 층마다 응력을 쓰면 약 0.35 m(76 kPa로 나누면 0.44 m)입니다. 성토 바닥 폭(22 m)이 점토 깊이(6–14 m)에 비해 아주 넓지는 않기 때문입니다. 7장의 0.43 m는 성토 중심에 대한 <b>안전 측 상한</b>으로 읽고, 성토 비탈 쪽(Δσ가 더 작다)과 중심의 침하 차이가 포장 P-13의 부등 침하가 됩니다. 성토 바깥 땅도 비탈 끝 아래 10 m에서 약 23 kPa를 받아 침하하므로, 성토 옆의 매설관·구조물은 이 범위를 피하거나 대책을 세웁니다.</div>
+    <div class="callout site"><strong>B-10 전면 기초와 T-36 교대 아래</strong> B-10의 매트(32 × 24 m, 바닥 GL −11.0 m)는 평균 접지압 약 186 kPa로, 굴착으로 없어진 전응력 194.5 kPa보다 오히려 약 8.5 kPa 작습니다. 그래서 매트 아래 점토(11–14 m)가 받는 <b>순 증가 응력은 거의 0</b>(약간의 제하)입니다. 만약 순 압력 186 kPa가 고스란히 더해졌다면, 매트 바닥 아래 3 m(모래 자갈 윗면)의 중심 응력은 \(186 \times\) <code>rect</code>\(\,= 184.5\) kPa로 거의 그대로 전달됩니다(폭 24 m에 비해 3 m는 아주 얕다). 모서리 아래는 약 46.5 kPa(1/4)입니다. 같은 매트의 중심과 모서리가 이렇게 다르므로, 넓은 기초는 중심이 더 가라앉는 접시 모양 침하를 보이고 기초판은 그만큼 휜다는 뜻입니다(13–14장 말뚝 지지 전면 기초). T-36 교대(사용 하중 약 2,000 kN)는 강관 말뚝으로 하중을 GL −20 m의 풍화토까지 내리므로, 말뚝 무리의 지중 응력은 말뚝 선단 근처의 '등가 기초'에서 시작해 퍼지는 것으로 보고 14장에서 다룹니다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="consolidation.html"><small>CH.07 · 압밀</small>침하 계산의 입력 Δσ<br><span>층마다 σ′<sub>v0</sub>와 Δσ<sub>z</sub>로 1차 압밀 침하를 계산한다.</span></a>
+      <a href="ground-improvement.html"><small>CH.08 · 침하와 연약지반 개량</small>즉시 침하와 부등 침하<br><span>기초 중심·모서리·이웃 기초의 응력 차가 각변위가 된다.</span></a>
+      <a href="bearing.html"><small>CH.13 · 얕은 기초와 지지력</small>접지압과 보상 기초<br><span>편심 하중의 접지압, B-10 매트의 순 압력.</span></a>
+      <a href="piles.html"><small>CH.14 · 깊은 기초: 말뚝</small>무리 말뚝의 등가 기초<br><span>말뚝 선단 아래 지중 응력과 무리 말뚝 침하.</span></a>
+      <a href="effective-stress.html"><small>CH.04 · 유효응력</small>기존 응력 σ′<sub>v0</sub><br><span>증가 응력은 언제나 초기 유효응력 위에 더한다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>지중 응력 Δσ<sub>z</sub>(압축 +)는 반무한 균질 탄성체 해로 구하며, 연직 하중의 연직 응력은 탄성 상수와 거의 무관하다. 초기 응력 σ′<sub>v0</sub>에 더해 침하 계산에 쓴다.</li>
+      <li>부시네스크 집중 하중: Δσ<sub>z</sub> = 3Pz³/(2πR⁵) = (P/z²) I<sub>B</sub>, 바로 아래 I<sub>B</sub> = 0.4775. 깊이 두 배면 1/4. 점 하중 근사는 z ≳ 3B에서 쓴다.</li>
+      <li>선 하중 2qz³/(π(x² + z²)²), 띠 (q/π)[α + sin α cos(α + 2δ)], 원형 중심 q[1 − (1 + (a/z)²)<sup>−3/2</sup>], 직사각형 모서리 공식 I(m, n). 임의 점은 모서리 값을 더하고 뺀다(중첩).</li>
+      <li>0.1q 압력 구근의 깊이: 정사각형 약 2B, 원형 약 1.9B, 띠 약 6B. 긴 하중일수록 깊이 조사한다.</li>
+      <li>2:1법 qBL/((B + z)(L + z))은 얕은 곳에서 중심값을 크게 과소평가하고(z = B/2에서 약 −37 %), 깊은 곳에서는 약간 크다.</li>
+      <li>뉴마크 영향원은 칸 하나가 0.005q로, 불규칙한 하중에 쓴다. 웨스터가드 해(수평 변형 구속)는 바로 아래에서 부시네스크의 2/3이다.</li>
+      <li>강성 기초의 접지압은 점토에서 가장자리, 모래에서 가운데가 크고, 연성 기초의 침하는 그 반대 모양이다.</li>
+      <li>이웃 기초는 깊은 곳에서 영향이 커진다(예제: 3B/2 간격에서 2B 깊이 +37 %). E-4 중심 아래 점토 중앙은 55 kPa(0.73γH)로, 76 kPa 가정의 침하 0.43 m는 안전 측 상한이다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 집중 하중 P 바로 아래 깊이 2 m에서 Δσ<sub>z</sub> = 60 kPa이다. 같은 연직선의 깊이 4 m에서는?</p><div class="opts">
+        <button class="opt">30 kPa</button><button class="opt" data-correct>15 kPa</button><button class="opt">7.5 kPa</button><button class="opt">60 kPa</button>
+      </div><div class="quiz-exp">\(r = 0\)이면 \(\Delta\sigma_z = 0.4775P/z^2\)이므로 깊이가 두 배면 1/4: 15 kPa.</div></div>
+      <div class="quiz-q"><p>2. 부시네스크 해로 구한 연직 증가 응력에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">탄성계수가 클수록 크다</button><button class="opt">포아송비에 크게 좌우된다</button><button class="opt" data-correct>탄성 상수와 무관하게 하중과 기하로 정해진다</button><button class="opt">지하수위에 따라 달라진다</button>
+      </div><div class="quiz-exp">집중 하중 해의 연직 응력 \(3Pz^3/(2\pi R^5)\)에는 \(E\), \(\nu\)가 없다. 그래서 탄성 상수가 불확실한 흙에도 쓸 만하다. 변위와 수평 응력은 탄성 상수에 좌우된다.</div></div>
+      <div class="quiz-q"><p>3. 4 × 4 m 정사각형 기초(q = 100 kPa) 중심 아래 깊이 4 m의 응력을 모서리 공식으로 구할 때 쓰는 m, n과 계산은?</p><div class="opts">
+        <button class="opt">m = n = 1, Δσ = 100 × I</button><button class="opt" data-correct>m = n = 0.5, Δσ = 4 × 100 × I</button><button class="opt">m = n = 2, Δσ = 4 × 100 × I</button><button class="opt">m = n = 0.5, Δσ = 100 × I</button>
+      </div><div class="quiz-exp">중심을 공통 모서리로 하는 2 × 2 m 사각형 네 개: \(m = n = 2/4 = 0.5\), \(I = 0.0840\). \(\Delta\sigma = 4 \times 100 \times 0.0840 = 33.6\) kPa(표의 z/B = 1, 0.336q와 같다).</div></div>
+      <div class="quiz-q"><p>4. 같은 폭 B의 띠 기초와 정사각형 기초 중 0.1q 압력 구근이 더 깊은 것과 그 대략의 깊이는?</p><div class="opts">
+        <button class="opt">정사각형, 약 6B</button><button class="opt" data-correct>띠, 약 6B</button><button class="opt">둘 다 약 2B</button><button class="opt">띠, 약 2B</button>
+      </div><div class="quiz-exp">띠는 길이 방향으로 퍼질 수 없어 응력이 깊이까지 남는다. 0.1q 깊이는 띠 약 6.3B, 정사각형 약 2.1B.</div></div>
+      <div class="quiz-q"><p>5. 2 × 2 m 기초(q = 150 kPa) 아래 깊이 2 m에서 2:1법의 평균 응력은?</p><div class="opts">
+        <button class="opt">75 kPa</button><button class="opt">50.4 kPa</button><button class="opt" data-correct>37.5 kPa</button><button class="opt">16.7 kPa</button>
+      </div><div class="quiz-exp">\(150 \times 2 \times 2/((2 + 2)(2 + 2)) = 37.5\) kPa. 부시네스크 중심값 50.4 kPa보다 26 % 작다.</div></div>
+      <div class="quiz-q"><p>6. 뉴마크 영향원(고리 10개, 부채꼴 20개)에서 기초가 덮은 칸이 80개, q = 120 kPa이다. Δσ<sub>z</sub>는?</p><div class="opts">
+        <button class="opt">24 kPa</button><button class="opt" data-correct>48 kPa</button><button class="opt">96 kPa</button><button class="opt">9.6 kPa</button>
+      </div><div class="quiz-exp">칸 하나의 영향은 \(1/(10 \times 20) = 0.005\). \(\Delta\sigma = 0.005 \times 80 \times 120 = 48\) kPa.</div></div>
+      <div class="quiz-q"><p>7. 포화 점토 위에 놓인 두꺼운 강성 기초의 접지압 분포로 탄성 이론이 예측하는 것은?</p><div class="opts">
+        <button class="opt">고르다</button><button class="opt">가운데가 가장 크다</button><button class="opt" data-correct>가장자리가 가장 크다</button><button class="opt">가장자리가 0이다</button>
+      </div><div class="quiz-exp">강성 기초는 고르게 가라앉아야 하므로, 탄성 지반이 가장자리에서 더 큰 압력으로 되밀어야 한다(이론상 무한대, 실제로는 항복으로 잘림). 지표의 모래에서는 반대로 가운데가 크다.</div></div>
+      <div class="quiz-q"><p>8. E-4 성토(76 kPa) 아래 점토 중앙(10 m)의 부시네스크 응력이 55 kPa라는 결과의 뜻으로 알맞은 것은?</p><div class="opts">
+        <button class="opt">성토 하중이 76 kPa보다 작다</button><button class="opt" data-correct>바닥 폭 22 m인 성토는 10 m 깊이에서 '아주 넓은 하중'이 아니어서 응력이 퍼졌다</button><button class="opt">2:1법이 더 정확하다</button><button class="opt">점토가 응력을 흡수했다</button>
+      </div><div class="quiz-exp">하중은 그대로 76 kPa지만 깊이가 성토 폭에 비해 무시할 만큼 작지 않아 응력이 옆으로 퍼진다(0.73γH). 76 kPa를 쓴 침하 0.43 m는 안전 측 상한이다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const SDX = {
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    if (o.halo !== false) { ctx.lineWidth = 3; ctx.strokeStyle = o.stroke || CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); }
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L; head = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  alpha(c, a) { const ctx = SDX._c || (SDX._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  /** 마칭 스퀘어: val(i, j) 격자 ni × nj → 선분 [i1, j1, i2, j2] */
+  iso(ni, nj, val, lev) {
+    const out = [];
+    for (let i = 0; i < ni - 1; i++) for (let j = 0; j < nj - 1; j++) {
+      const a = val(i, j), b = val(i + 1, j), c = val(i + 1, j + 1), d = val(i, j + 1);
+      if (!(isFinite(a) && isFinite(b) && isFinite(c) && isFinite(d))) continue;
+      const k = (a > lev ? 1 : 0) | (b > lev ? 2 : 0) | (c > lev ? 4 : 0) | (d > lev ? 8 : 0);
+      if (k === 0 || k === 15) continue;
+      const t = (p, q) => (Math.abs(q - p) < 1e-14 ? 0.5 : (lev - p) / (q - p));
+      const E0 = [i + t(a, b), j], E1 = [i + 1, j + t(b, c)], E2 = [i + t(d, c), j + 1], E3 = [i, j + t(a, d)];
+      const P = { 1: [E3, E0], 2: [E0, E1], 3: [E3, E1], 4: [E1, E2], 6: [E0, E2], 7: [E3, E2], 8: [E2, E3], 9: [E0, E2], 11: [E1, E2], 12: [E1, E3], 13: [E0, E1], 14: [E3, E0] };
+      if (k === 5) { out.push([...E3, ...E0], [...E1, ...E2]); continue; }
+      if (k === 10) { out.push([...E0, ...E1], [...E2, ...E3]); continue; }
+      const [f, g] = P[k]; out.push([...f, ...g]);
+    }
+    return out;
+  },
+  /** 격자 G = { ni, nj, v: Float64Array, X(i), Y(j) }에 등고선을 그린다 */
+  contour(ctx, G, lev, o = {}) {
+    ctx.save(); ctx.strokeStyle = o.color; ctx.lineWidth = o.width || 1.6; ctx.setLineDash(o.dash || []);
+    ctx.beginPath();
+    for (const s of SDX.iso(G.ni, G.nj, (i, j) => G.v[i * G.nj + j], lev)) { ctx.moveTo(G.X(s[0]), G.Y(s[1])); ctx.lineTo(G.X(s[2]), G.Y(s[3])); }
+    ctx.stroke(); ctx.restore();
+  },
+  /** 색 지도: 값 → t(0–1) */
+  heat(ctx, G, tf, alpha = 0.7) {
+    for (let i = 0; i < G.ni - 1; i++) for (let j = 0; j < G.nj - 1; j++) {
+      const v = (G.v[i * G.nj + j] + G.v[(i + 1) * G.nj + j] + G.v[i * G.nj + j + 1] + G.v[(i + 1) * G.nj + j + 1]) / 4;
+      if (!isFinite(v)) continue;
+      const c = CB.colormap(CB.clamp(tf(v), 0, 1));
+      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+      const x0 = Math.round(G.X(i)), x1 = Math.round(G.X(i + 1)), y0 = Math.round(G.Y(j)), y1 = Math.round(G.Y(j + 1));
+      ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+    }
+  },
+  drag(canvas, handles, onMove) {
+    let cur = null;
+    const pos = (e) => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    canvas.addEventListener("pointerdown", (e) => {
+      const [mx, my] = pos(e); let best = null, bd = e.pointerType === "touch" ? 30 : 18;
+      handles().forEach((hd) => { const d = hd.rect ? (mx >= hd.rect[0] && mx <= hd.rect[2] && my >= hd.rect[1] && my <= hd.rect[3] ? 0 : 1e9) : Math.hypot(hd.x - mx, hd.y - my); if (d < bd) { bd = d; best = hd.id; } });
+      if (best == null) return;
+      cur = best; canvas.setPointerCapture(e.pointerId); canvas.classList.add("dragging"); e.preventDefault(); onMove(cur, mx, my, "down");
+    });
+    canvas.addEventListener("pointermove", (e) => { if (cur == null) return; const [mx, my] = pos(e); onMove(cur, mx, my, "move"); });
+    const up = () => { cur = null; canvas.classList.remove("dragging"); };
+    canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
+  },
+  handle(ctx, x, y, color) { const pal = CB.palette(); ctx.save(); ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = pal.bg; ctx.stroke(); ctx.restore(); },
+  kpa(v) { return v >= 100 ? CB.num(v, 0) : v >= 10 ? CB.num(v, 1) : CB.num(v, 2); },
+  /** 깊이가 아래로 가는 차트: x = 값, y = 깊이 */
+  depthChart(ctx, W, Hh, o) {
+    const zt = o.zTicks || (() => { const n = 5, st = [0.5, 1, 2, 2.5, 5, 10].find((s) => o.zmax / s <= n) || 10; const a = []; for (let z = 0; z <= o.zmax + 1e-9; z += st) a.push(+z.toFixed(2)); return a; })();
+    return CB.chart(ctx, { x: 58, y: 30, w: W - 58 - 16, h: Hh - 30 - 44 }, { x: o.x, y: [o.zmax, 0], yTicks: zt, xLabel: o.xLabel, yLabel: o.yLabel || "깊이 z (m)", series: o.series, hlines: o.hlines, vlines: o.vlines, points: o.points });
+  },
+};
+
+/* ---------- 1. 집중 하중 등고선 ---------- */
+(function () {
+  const LEV = [1, 2, 5, 10, 20, 50, 100, 200];
+  const n = CB.seg("sd-pt-n", draw), th = CB.seg("sd-pt-th", draw);
+  const gP1 = CB.range("sd-pt-P1", (v) => CB.sig(v, 4) + " kN", draw), gP2 = CB.range("sd-pt-P2", (v) => CB.sig(v, 4) + " kN", draw);
+  const st = { x1: 0, x2: 3, px: 2, pz: 3 };
+  let M = null, handles = [];
+  const ws = (P, r, z) => (P / (Math.PI * z * z)) * Math.pow(1 + 2 * (r / z) ** 2, -1.5);
+  const f = (P, r, z) => (th() === "w" ? ws(P, r, z) : CB.soil.point(P, r, z));
+  const ds = (x, z) => f(gP1(), Math.abs(x - st.x1), z) + (n() === "2" ? f(gP2(), Math.abs(x - st.x2), z) : 0);
+  const cv = CB.canvas("#sd-cv-point", (ctx, W, Hh) => {
+    const pal = CB.palette(), top = 46, s = Math.min((W - 20) / 16, (Hh - top - 10) / 8), ox = W / 2;
+    M = { X: (x) => ox + x * s, Y: (z) => top + z * s, ix: (px) => (px - ox) / s, iz: (py) => (py - top) / s, s };
+    const xa = M.ix(0), xb = M.ix(W), ni = Math.ceil((W) / 5) + 1, nj = Math.ceil((8 * s) / 5) + 1;
+    const G = { ni, nj, v: new Float64Array(ni * nj), X: (i) => M.X(xa + ((xb - xa) * i) / (ni - 1)), Y: (j) => M.Y(0.2 + (7.8 * j) / (nj - 1)) };
+    for (let i = 0; i < ni; i++) for (let j = 0; j < nj; j++) G.v[i * nj + j] = ds(xa + ((xb - xa) * i) / (ni - 1), 0.2 + (7.8 * j) / (nj - 1));
+    ctx.fillStyle = SDX.alpha(pal.accent, 0.08); ctx.fillRect(0, M.Y(0), W, M.Y(8) - M.Y(0));
+    SDX.heat(ctx, G, (v) => Math.log10(Math.max(0.5, v) / 0.5) / Math.log10(400 / 0.5), 0.6);
+    LEV.forEach((L, k) => { SDX.contour(ctx, G, L, { color: k % 2 ? pal.text : pal.accent2, width: 1.4 }); });
+    // 등압선 이름표: 하중 1 아래 연직선과의 교점
+    LEV.forEach((L) => { let lo = 0.2, hi = 8; const g = (z) => ds(st.x1, z) - L; if (g(lo) < 0 || g(hi) > 0) return; for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (g(m) > 0) lo = m; else hi = m; } if (M.Y(lo) < M.Y(7.7)) SDX.text(ctx, String(L), M.X(st.x1) + 4, M.Y(lo) + 1, pal.text, { size: 10, align: "left" }); });
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, M.Y(0)); ctx.lineTo(W, M.Y(0)); ctx.stroke();
+    handles = [];
+    const loads = n() === "2" ? [[st.x1, gP1(), "P₁"], [st.x2, gP2(), "P₂"]] : [[st.x1, gP1(), "P₁"]];
+    loads.forEach(([x, P, lab], k) => { const len = 14 + 22 * Math.sqrt(P / 5000); SDX.arrow(ctx, M.X(x), M.Y(0) - len - 6, M.X(x), M.Y(0) - 1, pal.accent2, 3, 10); SDX.text(ctx, `${lab} ${CB.sig(P, 4)} kN`, M.X(x) + 8, M.Y(0) - len, pal.accent2, { size: 11, align: "left" }); handles.push({ id: "L" + k, x: M.X(x), y: M.Y(0) - len / 2 - 4 }); });
+    ctx.fillStyle = pal.text; ctx.beginPath(); ctx.arc(M.X(st.px), M.Y(st.pz), 6, 0, 7); ctx.fill(); ctx.strokeStyle = pal.bg; ctx.lineWidth = 2; ctx.stroke();
+    handles.push({ id: "P", x: M.X(st.px), y: M.Y(st.pz) });
+    for (let z = 2; z <= 8; z += 2) SDX.text(ctx, z + " m", 6, M.Y(z), pal.dim, { size: 10, align: "left" });
+    SDX.text(ctx, "깊이 z ↓", 6, M.Y(0) + 12, pal.dim, { size: 10, align: "left", mono: false });
+    SDX.text(ctx, "색: Δσz (로그) · 등압선 1–200 kPa", W - 8, Hh - 10, pal.dim, { size: 10, align: "right", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.5), minHeight: 260, maxHeight: 460 });
+  SDX.drag(cv.canvas, () => handles, (id, mx, my) => {
+    if (!M) return;
+    if (id === "P") { st.px = CB.clamp(+M.ix(mx).toFixed(2), -7.8, 7.8); st.pz = CB.clamp(+M.iz(my).toFixed(2), 0.3, 7.8); }
+    else if (id === "L0") st.x1 = CB.clamp(+M.ix(mx).toFixed(1), -7, 7);
+    else st.x2 = CB.clamp(+M.ix(mx).toFixed(1), -7, 7);
+    draw();
+  });
+  function draw() {
+    cv.redraw();
+    const r = Math.abs(st.px - st.x1), z = st.pz, s1 = f(gP1(), r, z);
+    CB.stat("sd-pt-pos", `${CB.num(r, 2)} m, ${CB.num(z, 2)} m`);
+    CB.stat("sd-pt-s", SDX.kpa(ds(st.px, z)));
+    CB.stat("sd-pt-s0", SDX.kpa(f(gP1(), 0, z)) + " kPa");
+    CB.stat("sd-pt-I", (s1 * z * z / gP1()).toFixed(4));
+  }
+  draw();
+})();
+
+/* ---------- 2. 직사각형 중첩 ---------- */
+(function () {
+  const gB = CB.range("sd-rc-B", (v) => v.toFixed(1) + " m", go), gL = CB.range("sd-rc-L", (v) => v.toFixed(1) + " m", go);
+  const gq = CB.range("sd-rc-q", (v) => v + " kPa", go), gz = CB.range("sd-rc-z", (v) => v.toFixed(1) + " m", go);
+  const st = { x: 0, y: 0 };
+  const snap = CB.seg("sd-rc-snap", (v) => { const B = gB(), L = gL(); Object.assign(st, v === "c" ? { x: 0, y: 0 } : v === "k" ? { x: B / 2, y: L / 2 } : v === "e" ? { x: B / 2, y: 0 } : { x: B / 2 + 1, y: 0 }); go(); });
+  let M = null, handles = [];
+  const parts = () => {
+    const B = gB(), L = gL(), z = gz(), xs = [st.x + B / 2, st.x - B / 2], ys = [st.y + L / 2, st.y - L / 2], ex = [-B / 2, B / 2], ey = [-L / 2, L / 2], out = [];
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+      const a = xs[i], b = ys[j], sg = (i === 0 ? 1 : -1) * (j === 0 ? 1 : -1) * Math.sign(a) * Math.sign(b);
+      out.push({ sg, I: sg * CB.soil.cornerI(Math.abs(a), Math.abs(b), z), cx: ex[i], cy: ey[j] });
+    }
+    return out;
+  };
+  const plan = CB.canvas("#sd-cv-rect", (ctx, W, Hh) => {
+    const pal = CB.palette(), B = gB(), L = gL(), ext = Math.max(B, L) / 2 + 2.5, s = Math.min(W / (2 * ext), (Hh - 20) / (2 * ext)), ox = W / 2, oy = Hh / 2 + 6;
+    M = { X: (x) => ox + x * s, Y: (y) => oy - y * s, ix: (px) => (px - ox) / s, iy: (py) => (oy - py) / s };
+    ctx.strokeStyle = pal.grid; ctx.lineWidth = 1; ctx.beginPath(); for (let g = -Math.floor(ext); g <= ext; g++) { ctx.moveTo(M.X(g), 0); ctx.lineTo(M.X(g), Hh); ctx.moveTo(0, M.Y(g)); ctx.lineTo(W, M.Y(g)); } ctx.stroke();
+    ctx.fillStyle = SDX.alpha(pal.accent2, 0.18); ctx.strokeStyle = pal.accent2; ctx.lineWidth = 2;
+    ctx.fillRect(M.X(-B / 2), M.Y(L / 2), B * s, L * s); ctx.strokeRect(M.X(-B / 2), M.Y(L / 2), B * s, L * s);
+    parts().forEach((p) => {
+      if (p.sg === 0) return;
+      const x0 = M.X(Math.min(st.x, p.cx)), x1 = M.X(Math.max(st.x, p.cx)), y0 = M.Y(Math.max(st.y, p.cy)), y1 = M.Y(Math.min(st.y, p.cy));
+      ctx.fillStyle = SDX.alpha(p.sg > 0 ? pal.ok : pal.bad, 0.16); ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.save(); ctx.setLineDash([5, 3]); ctx.strokeStyle = p.sg > 0 ? pal.ok : pal.bad; ctx.lineWidth = 1.5; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); ctx.restore();
+      if (Math.abs(x1 - x0) > 34 && Math.abs(y1 - y0) > 16) SDX.text(ctx, (p.I >= 0 ? "+" : "−") + Math.abs(p.I).toFixed(3), (x0 + x1) / 2, (y0 + y1) / 2, p.sg > 0 ? pal.ok : pal.bad, { size: 10.5 });
+    });
+    SDX.handle(ctx, M.X(st.x), M.Y(st.y), pal.text);
+    handles = [{ id: "p", x: M.X(st.x), y: M.Y(st.y) }];
+    SDX.text(ctx, `B = ${B} m`, M.X(0), M.Y(-L / 2) + 12, pal.accent2, { size: 10.5 });
+    SDX.text(ctx, `L = ${L} m`, M.X(B / 2) + 6, M.Y(0), pal.accent2, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.62), minHeight: 230, maxHeight: 400 });
+  const prof = CB.canvas("#sd-cv-rect2", (ctx, W, Hh) => {
+    const pal = CB.palette(), B = gB(), L = gL(), q = gq(), zmax = Math.max(4, 3 * Math.min(B, L)), d = [], c = [];
+    for (let k = 1; k <= 80; k++) { const z = (zmax * k) / 80; d.push([CB.soil.rect(q, B, L, st.x, st.y, z), z]); c.push([CB.soil.rect(q, B, L, 0, 0, z), z]); }
+    const zz = Math.min(gz(), zmax);
+    SDX.depthChart(ctx, W, Hh, { x: [0, q], zmax, xLabel: "Δσz (kPa)", series: [{ data: c, color: pal.faint, width: 1.6, dash: [5, 4] }, { data: d, color: pal.accent, width: 2.6 }], hlines: [{ y: zz, color: pal.accent2 }], points: [{ x: CB.soil.rect(q, B, L, st.x, st.y, zz), y: zz, color: pal.accent2, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.45), minHeight: 200, maxHeight: 280 });
+  SDX.drag(plan.canvas, () => handles, (id, mx, my) => { if (!M) return; st.x = Math.round(M.ix(mx) * 10) / 10; st.y = Math.round(M.iy(my) * 10) / 10; go(); });
+  function go() {
+    const q = gq(), ps = parts(), I = ps.reduce((a, p) => a + p.I, 0), B = gB(), L = gL();
+    CB.stat("sd-rc-p", `${CB.num(st.x, 1)}, ${CB.num(st.y, 1)} m`);
+    CB.stat("sd-rc-I", I.toFixed(4)); CB.stat("sd-rc-s", SDX.kpa(q * I)); CB.stat("sd-rc-r", I.toFixed(3));
+    const inside = Math.abs(st.x) < B / 2 && Math.abs(st.y) < L / 2, neg = ps.some((p) => p.sg < 0);
+    const msg = document.getElementById("sd-rc-msg");
+    msg.className = "sd-msg";
+    msg.innerHTML = (inside ? "측점이 기초 안에 있어 네 직사각형을 모두 <b>더합니다</b>." : neg ? "측점이 기초 밖에 있어 점까지 늘린 직사각형(초록)에서 하중이 없는 부분(빨강)을 <b>뺍니다</b>." : "측점이 기초의 변·모서리 위에 있어 일부 직사각형의 넓이가 0입니다.") + ` 엔진 <code>CB.soil.rect</code> 결과 ${SDX.kpa(CB.soil.rect(q, B, L, st.x, st.y, gz()))} kPa와 같습니다.`;
+    plan.redraw(); prof.redraw();
+  }
+  go();
+})();
+
+/* ---------- 3. 압력 구근 ---------- */
+(function () {
+  const LV = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1];
+  const shape = CB.seg("sd-bb-shape", go), cmp = CB.check("sd-bb-cmp", go);
+  const gB = CB.range("sd-bb-B", (v) => v.toFixed(1) + " m", go), gq = CB.range("sd-bb-q", (v) => v + " kPa", go);
+  // 원판(지름 1) 아래 임의 점: 부시네스크 점 하중을 수치 적분(이 장 전용, 교육용)
+  const circAt = (x, z) => {
+    if (Math.abs(x) < 1e-9) return CB.soil.circle(1, 0.5, z);
+    const nr = 16, nt = 48, a = 0.5; let s = 0;
+    for (let i = 0; i < nr; i++) { const r = ((i + 0.5) / nr) * a, dr = a / nr; for (let j = 0; j < nt; j++) { const t = ((j + 0.5) / nt) * Math.PI, dt = Math.PI / nt; const d2 = x * x + r * r - 2 * x * r * Math.cos(t); s += (3 * z ** 3) / (2 * Math.PI * Math.pow(d2 + z * z, 2.5)) * r * dr * dt * 2; } }
+    return s;
+  };
+  const F = { strip: (x, z) => CB.soil.strip(1, 1, x, z), sq: (x, z) => CB.soil.rect(1, 1, 1, x, 0, z), circ: circAt };
+  const NAME = { strip: "띠", sq: "정사각형", circ: "원형" };
+  const XM = 2.6, ZM = 7, cache = {};
+  const grid = (k) => {
+    if (cache[k]) return cache[k];
+    const ni = 53, nj = 71, v = new Float64Array(ni * nj);
+    for (let i = 0; i < ni; i++) for (let j = 0; j < nj; j++) { const x = -XM + (2 * XM * i) / (ni - 1), z = 0.04 + ((ZM - 0.04) * j) / (nj - 1); v[i * nj + j] = F[k](x, z); }
+    return (cache[k] = { ni, nj, v });
+  };
+  const depth = (k, r) => { let lo = 0.01, hi = 30; for (let it = 0; it < 60; it++) { const m = (lo + hi) / 2; if (F[k](0, m) > r) lo = m; else hi = m; } return lo; };
+  const cv = CB.canvas("#sd-cv-bulb", (ctx, W, Hh) => {
+    const pal = CB.palette(), k = shape(), top = 30, s = Math.min((W - 60) / (2 * XM), (Hh - top - 16) / ZM), ox = W / 2 + 12, B = gB();
+    const g0 = grid(k), map = (g) => ({ ...g, X: (i) => ox + (-XM + (2 * XM * i) / (g.ni - 1)) * s, Y: (j) => top + (0.04 + ((ZM - 0.04) * j) / (g.nj - 1)) * s });
+    const G = map(g0);
+    ctx.fillStyle = SDX.alpha(pal.accent, 0.08); ctx.fillRect(0, top, W, ZM * s);
+    SDX.heat(ctx, G, (v) => v, 0.45);
+    LV.forEach((L) => SDX.contour(ctx, G, L, { color: L === 0.1 ? pal.accent2 : pal.text, width: L === 0.1 ? 2.6 : 1.2 }));
+    if (cmp()) ["strip", "sq", "circ"].filter((o) => o !== k).forEach((o, idx) => { SDX.contour(ctx, map(grid(o)), 0.1, { color: idx ? pal.blue : pal.dim, width: 1.6, dash: [6, 4] }); const d = depth(o, 0.1); if (d < ZM) SDX.text(ctx, NAME[o], ox + (idx ? 1 : -1) * 0.45 * s, top + d * s - 8, idx ? pal.blue : pal.dim, { size: 10.5, align: idx ? "left" : "right" }); });
+    LV.forEach((L) => { const d = depth(k, L); if (d < ZM - 0.1 && (L === 0.5 || L === 0.1 || L === 0.2)) SDX.text(ctx, L + "q", ox + 4, top + d * s - 7, L === 0.1 ? pal.accent2 : pal.text, { size: 10, align: "left" }); });
+    ctx.fillStyle = pal.accent2; ctx.fillRect(ox - 0.5 * s, top - 8, s, 8);
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, top); ctx.lineTo(W, top); ctx.stroke();
+    for (let z = 1; z <= ZM; z++) SDX.text(ctx, `${z}B = ${CB.num(z * B, 1)} m`, 8, top + z * s, pal.dim, { size: 10, align: "left" });
+    SDX.text(ctx, `${NAME[k]} B = ${B} m, q = ${gq()} kPa`, W - 8, 14, pal.text, { size: 11, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 1.15 : 0.9), minHeight: 300, maxHeight: 560 });
+  function go() {
+    const k = shape(), B = gB(), z1 = depth(k, 0.1);
+    CB.stat("sd-bb-z5", CB.num(depth(k, 0.5) * B, 2) + " m"); CB.stat("sd-bb-z2", CB.num(depth(k, 0.2) * B, 2) + " m");
+    CB.stat("sd-bb-z1", CB.num(z1 * B, 2) + " m"); CB.stat("sd-bb-zr", CB.num(z1, 2));
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 4. 2:1법 vs 부시네스크 ---------- */
+(function () {
+  const gB = CB.range("sd-21-B", (v) => v.toFixed(1) + " m", go), gr = CB.range("sd-21-r", (v) => v.toFixed(1), go);
+  const gq = CB.range("sd-21-q", (v) => v + " kPa", go), gz = CB.range("sd-21-z", (v) => v.toFixed(1) + " m", go);
+  const avg = (q, B, L, z) => { const n = 12; let s = 0; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) s += CB.soil.rect(q, B, L, -B / 2 + ((i + 0.5) * B) / n, -L / 2 + ((j + 0.5) * L) / n, z); return s / (n * n); };
+  let data = null;
+  const compute = () => {
+    const B = gB(), L = B * gr(), q = gq(), zmax = Math.max(4 * B, gz() + 1), c = [], a = [], t = [], ec = [], ea = [];
+    for (let k = 1; k <= 60; k++) { const z = (zmax * k) / 60, vc = CB.soil.rect(q, B, L, 0, 0, z), va = avg(q, B, L, z), vt = CB.soil.twoToOne(q, B, L, z); c.push([vc, z]); a.push([va, z]); t.push([vt, z]); ec.push([100 * (vt / vc - 1), z]); ea.push([100 * (vt / va - 1), z]); }
+    data = { B, L, q, zmax, c, a, t, ec, ea };
+  };
+  const c1 = CB.canvas("#sd-cv-21", (ctx, W, Hh) => {
+    if (!data) return; const pal = CB.palette(), z = Math.min(gz(), data.zmax);
+    SDX.depthChart(ctx, W, Hh, { x: [0, data.q], zmax: data.zmax, xLabel: "Δσz (kPa)", series: [{ data: data.c, color: pal.accent, width: 2.6 }, { data: data.a, color: pal.blue, width: 2.2, dash: [6, 4] }, { data: data.t, color: pal.ok, width: 2.4 }], hlines: [{ y: z, color: pal.faint }] });
+    SDX.text(ctx, "─ 중심", W - 24, Hh - 110, pal.accent, { size: 11, align: "right" }); SDX.text(ctx, "-- 기초 아래 평균", W - 24, Hh - 94, pal.blue, { size: 11, align: "right" }); SDX.text(ctx, "─ 2:1법", W - 24, Hh - 78, pal.ok, { size: 11, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.55), minHeight: 240, maxHeight: 360 });
+  const c2 = CB.canvas("#sd-cv-21e", (ctx, W, Hh) => {
+    if (!data) return; const pal = CB.palette(), z = Math.min(gz(), data.zmax);
+    SDX.depthChart(ctx, W, Hh, { x: [-60, 60], zmax: data.zmax, xLabel: "2:1법 오차 (%)", series: [{ data: data.ec, color: pal.accent, width: 2.4 }, { data: data.ea, color: pal.blue, width: 2, dash: [6, 4] }], vlines: [{ x: 0, color: pal.dim, dash: [] }], hlines: [{ y: z, color: pal.faint }] });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.4), minHeight: 200, maxHeight: 280 });
+  function go() {
+    compute(); c1.redraw(); c2.redraw();
+    const { B, L, q } = data, z = gz(), vc = CB.soil.rect(q, B, L, 0, 0, z), va = avg(q, B, L, z), vt = CB.soil.twoToOne(q, B, L, z);
+    CB.stat("sd-21-c", SDX.kpa(vc) + " kPa"); CB.stat("sd-21-a", SDX.kpa(va) + " kPa"); CB.stat("sd-21-t", SDX.kpa(vt) + " kPa");
+    CB.stat("sd-21-e", `${CB.signed(100 * (vt / vc - 1), 0)} % / ${CB.signed(100 * (vt / va - 1), 0)} %`);
+  }
+  go();
+})();
+
+/* ---------- 5. 뉴마크 칸 세기 ---------- */
+(function () {
+  const A = [0, 0.27, 0.4, 0.518, 0.637, 0.766, 0.918, 1.11, 1.387, 1.908];
+  const gz = CB.range("sd-nm-z", (v) => v.toFixed(1) + " m", go), gB = CB.range("sd-nm-B", (v) => v.toFixed(1) + " m", go);
+  const gL = CB.range("sd-nm-L", (v) => v.toFixed(1) + " m", go), gq = CB.range("sd-nm-q", (v) => v + " kPa", go);
+  const st = { fx: 0, fy: 0 };
+  let M = null, handles = [], cells = [];
+  const rOfI = (I, z) => (I >= 1 ? Infinity : z * Math.sqrt(Math.pow(1 - I, -2 / 3) - 1));
+  const count = () => {
+    const z = gz(), B = gB(), L = gL(), ns = 6; let N = 0; cells = [];
+    for (let k = 0; k < 10; k++) for (let j = 0; j < 20; j++) {
+      let inC = 0;
+      for (let a = 0; a < ns; a++) for (let b = 0; b < ns; b++) {
+        const I = (k + (a + 0.5) / ns) / 10, r = rOfI(I, z), t = ((j + (b + 0.5) / ns) / 20) * 2 * Math.PI;
+        const x = r * Math.cos(t), y = r * Math.sin(t);
+        if (Math.abs(x - st.fx) <= B / 2 && Math.abs(y - st.fy) <= L / 2) inC++;
+      }
+      const fr = inC / (ns * ns); if (fr > 0) cells.push([k, j, fr]); N += fr;
+    }
+    return N;
+  };
+  const cv = CB.canvas("#sd-cv-nm", (ctx, W, Hh) => {
+    const pal = CB.palette(), z = gz(), cx = W / 2, cy = Hh / 2, R9 = 0.46 * Math.min(W, Hh), ab = R9 / 1.908, s = ab / z;
+    M = { X: (x) => cx + x * s, Y: (y) => cy - y * s, ix: (px) => (px - cx) / s, iy: (py) => (cy - py) / s };
+    const big = Math.hypot(W, Hh);
+    cells.forEach(([k, j, fr]) => {
+      const r0 = A[k] * ab, r1 = k === 9 ? big : A[k + 1] * ab, t0 = (j / 20) * 2 * Math.PI, t1 = ((j + 1) / 20) * 2 * Math.PI;
+      ctx.beginPath(); ctx.arc(cx, cy, r1, -t0, -t1, true); ctx.arc(cx, cy, r0, -t1, -t0, false); ctx.closePath();
+      ctx.fillStyle = SDX.alpha(pal.accent2, 0.12 + 0.45 * fr); ctx.fill();
+    });
+    ctx.strokeStyle = pal.dim; ctx.lineWidth = 1;
+    for (let k = 1; k < 10; k++) { ctx.beginPath(); ctx.arc(cx, cy, A[k] * ab, 0, 2 * Math.PI); ctx.stroke(); }
+    ctx.beginPath(); for (let j = 0; j < 20; j++) { const t = (j / 20) * 2 * Math.PI; ctx.moveTo(cx, cy); ctx.lineTo(cx + big * Math.cos(t), cy - big * Math.sin(t)); } ctx.lineWidth = 0.8; ctx.stroke();
+    const B = gB(), L = gL(), x0 = M.X(st.fx - B / 2), y0 = M.Y(st.fy + L / 2);
+    ctx.strokeStyle = pal.accent2; ctx.lineWidth = 2.4; ctx.strokeRect(x0, y0, B * s, L * s);
+    handles = [{ id: "f", rect: [x0, y0, x0 + B * s, y0 + L * s] }, { id: "f", x: M.X(st.fx), y: M.Y(st.fy) }];
+    SDX.handle(ctx, M.X(st.fx), M.Y(st.fy), pal.accent2);
+    ctx.fillStyle = pal.text; ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, 7); ctx.fill();
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(12, Hh - 14); ctx.lineTo(12 + ab, Hh - 14); ctx.stroke();
+    SDX.text(ctx, `z = ${z.toFixed(1)} m`, 16 + ab, Hh - 14, pal.text, { size: 11, align: "left" });
+    SDX.text(ctx, "● 구하는 점(원 중심)", W - 8, 14, pal.dim, { size: 10.5, align: "right", mono: false });
+  }, { aspect: (W) => (W < 520 ? 1 : 0.8), minHeight: 300, maxHeight: 520 });
+  let grab = null;
+  SDX.drag(cv.canvas, () => handles, (id, mx, my, ev) => {
+    if (!M) return; const x = M.ix(mx), y = M.iy(my);
+    if (ev === "down") { grab = [x - st.fx, y - st.fy]; return; }
+    st.fx = Math.round((x - grab[0]) * 10) / 10; st.fy = Math.round((y - grab[1]) * 10) / 10; go();
+  });
+  function go() {
+    const N = count(), q = gq(), v = 0.005 * N * q, ex = CB.soil.rect(q, gB(), gL(), -st.fx, -st.fy, gz());
+    CB.stat("sd-nm-N", CB.num(N, 1)); CB.stat("sd-nm-s", SDX.kpa(v) + " kPa"); CB.stat("sd-nm-x", SDX.kpa(ex) + " kPa");
+    CB.stat("sd-nm-e", ex > 0.05 ? CB.signed(100 * (v / ex - 1), 1) + " %" : "—");
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 6. 접지압 분포 ---------- */
+(function () {
+  const rig = CB.seg("sd-ct-rig", go), soil = CB.seg("sd-ct-soil", go);
+  const glv = CB.range("sd-ct-lv", (v) => v.toFixed(2), go), gdf = CB.range("sd-ct-df", (v) => v.toFixed(2), go);
+  const NX = 201, XI = Array.from({ length: NX }, (_, i) => -1 + (2 * (i + 0.5)) / NX);
+  const model = () => {
+    const r = rig(), so = soil(); let p, set, qual = false;
+    if (r === "flex") p = XI.map(() => 1);
+    else if (so === "clay") {
+      const pel = XI.map((x) => 2 / (Math.PI * Math.sqrt(1 - x * x))), cap = 0.95 / glv();
+      let lo = 0.1, hi = 2;
+      const tot = (sc) => pel.reduce((a, v) => a + Math.min(sc * v, cap), 0) / NX;
+      for (let k = 0; k < 60; k++) { const m = (lo + hi) / 2; if (tot(m) < 1) lo = m; else hi = m; }
+      p = pel.map((v) => Math.min(lo * v, cap));
+    } else { const w = Math.min(1, gdf()); p = XI.map((x) => (1 - w) * 1.5 * (1 - x * x) + w); }
+    if (r === "rigid") set = XI.map(() => 1);
+    else if (so === "clay") {
+      // 띠 하중(B = 1)을 깊이 3B까지 적분한 침하 모양(일정 탄성계수)
+      set = XI.map((x) => { let s = 0; for (let k = 0; k < 60; k++) { const z = ((k + 0.5) * 3) / 60; s += CB.soil.strip(1, 1, x / 2, z) * 0.05; } return s; });
+      const m = Math.max(...set); set = set.map((v) => v / m);
+    } else { qual = true; set = XI.map((x) => 0.8 + 0.2 * x * x); }
+    return { p, set, qual };
+  };
+  const cv = CB.canvas("#sd-cv-contact", (ctx, W, Hh) => {
+    const pal = CB.palette(), m = model(), x0 = W * 0.18, x1 = W * 0.82, fy = 54, pS = Math.min(56, (Hh - 150) / 2.2), X = (xi) => (x0 + x1) / 2 + (xi * (x1 - x0)) / 2;
+    ctx.fillStyle = SDX.alpha(pal.accent, 0.1); ctx.fillRect(0, fy + 12, W, Hh - fy - 12);
+    const thick = rig() === "rigid" ? 20 : 6;
+    ctx.fillStyle = SDX.alpha(pal.dim, 0.6); ctx.fillRect(x0, fy + 12 - thick, x1 - x0, thick);
+    for (let k = 0; k < 7; k++) { const x = x0 + ((k + 0.5) * (x1 - x0)) / 7; SDX.arrow(ctx, x, 12, x, fy + 10 - thick, pal.accent2, 2, 8); }
+    SDX.text(ctx, "평균 q", x1 + 6, 22, pal.accent2, { size: 11, align: "left" });
+    // 접지압(지반이 기초를 되미는 압력): 기초 밑면 아래에 그린다
+    const base = fy + 12;
+    ctx.fillStyle = SDX.alpha(pal.blue, 0.22); ctx.strokeStyle = pal.blue; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, base);
+    m.p.forEach((v, i) => ctx.lineTo(X(XI[i]), base + Math.min(v, 3) * pS)); ctx.lineTo(x1, base); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = pal.faint; ctx.beginPath(); ctx.moveTo(x0, base + pS); ctx.lineTo(x1, base + pS); ctx.stroke(); ctx.restore();
+    SDX.text(ctx, "p = q", x0 - 6, base + pS, pal.dim, { size: 10.5, align: "right" });
+    SDX.text(ctx, "접지압 p(x)", x0 - 6, base + 12, pal.blue, { size: 10.5, align: "right" });
+    // 침하 모양
+    const sy = base + 3.2 * pS + 16, sS = 30;
+    ctx.strokeStyle = pal.faint; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0 - 30, sy); ctx.lineTo(x1 + 30, sy); ctx.stroke();
+    ctx.strokeStyle = pal.accent; ctx.lineWidth = 2.6; ctx.setLineDash(m.qual ? [6, 4] : []); ctx.beginPath(); m.set.forEach((v, i) => (i ? ctx.lineTo(X(XI[i]), sy + v * sS) : ctx.moveTo(X(XI[i]), sy + v * sS))); ctx.stroke(); ctx.setLineDash([]);
+    SDX.text(ctx, m.qual ? "침하 모양(관찰 경향, 정성)" : "침하 모양", x0 - 6, sy + 12, pal.accent, { size: 10.5, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.62), minHeight: 300, maxHeight: 420 });
+  function go() {
+    const m = model(), c = m.p[(NX - 1) / 2], e = m.p[NX - 2];
+    CB.stat("sd-ct-c", c.toFixed(2)); CB.stat("sd-ct-e", e > 50 ? "→ ∞" : e.toFixed(2));
+    CB.stat("sd-ct-s", (m.set[(NX - 1) / 2] / m.set[0]).toFixed(2) + (m.qual ? " (정성)" : ""));
+    const msg = document.getElementById("sd-ct-msg"), r = rig(), so = soil();
+    msg.className = "sd-msg";
+    msg.innerHTML = r === "flex" ? (so === "clay" ? "연성 기초: 압력은 고르고, 점토는 가운데가 더 가라앉는 접시 모양으로 침하합니다." : "연성 기초: 압력은 고르고, 모래는 가장자리 흙이 옆으로 밀려 가장자리 침하가 큰 경향이 관찰됩니다(이 모형은 정성 곡선).")
+      : so === "clay" ? `강성 기초·점토: 탄성 해는 가장자리에서 무한대지만 상한 ${CB.num(0.95 / glv(), 2)}q로 잘려 재분배됩니다. 하중 수준이 높을수록 분포가 고르게 됩니다.` : `강성 기초·모래: 가장자리 구속이 작아 가운데가 큽니다. 근입 D<sub>f</sub>/B = ${gdf().toFixed(2)}에서 가장자리 p/q = ${e.toFixed(2)}.`;
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 7. 이웃한 기초 ---------- */
+(function () {
+  const gs = CB.range("sd-aj-s", (v) => v.toFixed(1) + " m", go), gA = CB.range("sd-aj-BA", (v) => v.toFixed(1) + " m", go);
+  const gBB = CB.range("sd-aj-BB", (v) => v.toFixed(1) + " m", go), gq = CB.range("sd-aj-q", (v) => v + " kPa", go);
+  let M = null, handles = [];
+  const sp = () => Math.max(gs(), (gA() + gBB()) / 2 + 0.1);
+  const fA = (x, z) => CB.soil.rect(gq(), gA(), gA(), x, 0, z), fB = (x, z) => CB.soil.rect(gq(), gBB(), gBB(), x - sp(), 0, z);
+  const cv = CB.canvas("#sd-cv-adj", (ctx, W, Hh) => {
+    const pal = CB.palette(), s0 = sp(), xa = -gA() - 1.5, xb = s0 + gBB() + 1.5, zm = 10, top = 30, sc = Math.min((W - 16) / (xb - xa), (Hh - top - 8) / zm), ox = 8 - xa * sc + ((W - 16) - (xb - xa) * sc) / 2;
+    M = { X: (x) => ox + x * sc, Y: (z) => top + z * sc, ix: (px) => (px - ox) / sc };
+    const ni = 90, nj = 60, G = { ni, nj, v: new Float64Array(ni * nj), X: (i) => M.X(xa + ((xb - xa) * i) / (ni - 1)), Y: (j) => M.Y(0.1 + ((Math.min(zm, (Hh - top) / sc) - 0.1) * j) / (nj - 1)) };
+    const zEnd = Math.min(zm, (Hh - top) / sc);
+    for (let i = 0; i < ni; i++) for (let j = 0; j < nj; j++) { const x = xa + ((xb - xa) * i) / (ni - 1), z = 0.1 + ((zEnd - 0.1) * j) / (nj - 1); G.v[i * nj + j] = (fA(x, z) + fB(x, z)) / gq(); }
+    SDX.heat(ctx, G, (v) => Math.sqrt(v), 0.5);
+    [0.05, 0.1, 0.2, 0.5].forEach((L, k) => SDX.contour(ctx, G, L, { color: L === 0.1 ? pal.accent2 : pal.text, width: L === 0.1 ? 2.4 : 1.2 }));
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, top); ctx.lineTo(W, top); ctx.stroke();
+    ctx.fillStyle = pal.accent2; ctx.fillRect(M.X(-gA() / 2), top - 8, gA() * sc, 8); ctx.fillRect(M.X(s0 - gBB() / 2), top - 8, gBB() * sc, 8);
+    SDX.text(ctx, "A", M.X(0), top - 18, pal.accent2, { size: 12 }); SDX.text(ctx, "B", M.X(s0), top - 18, pal.accent2, { size: 12 });
+    ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = pal.dim; ctx.beginPath(); ctx.moveTo(M.X(0), top); ctx.lineTo(M.X(0), Hh); ctx.stroke(); ctx.restore();
+    handles = [{ id: "B", x: M.X(s0), y: top - 4 }]; SDX.handle(ctx, M.X(s0), top - 4, pal.accent);
+    SDX.text(ctx, "등압선 0.05·0.1·0.2·0.5q", W - 8, Hh - 10, pal.dim, { size: 10, align: "right", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.5), minHeight: 220, maxHeight: 360 });
+  const ch = CB.canvas("#sd-cv-adj2", (ctx, W, Hh) => {
+    const pal = CB.palette(), zm = Math.max(6, 4 * gA()), a = [], b = [], c = [];
+    for (let k = 1; k <= 60; k++) { const z = (zm * k) / 60; a.push([fA(0, z), z]); c.push([fA(0, z) + fB(0, z), z]); b.push([fB(0, z), z]); }
+    SDX.depthChart(ctx, W, Hh, { x: [0, gq()], zmax: zm, xLabel: "Δσz (kPa)", series: [{ data: a, color: pal.faint, width: 2, dash: [6, 4] }, { data: c, color: pal.accent, width: 2.6 }, { data: b, color: pal.blue, width: 1.8 }] });
+    SDX.text(ctx, "-- A만", W - 24, Hh - 110, pal.dim, { size: 11, align: "right" }); SDX.text(ctx, "─ A + B", W - 24, Hh - 94, pal.accent, { size: 11, align: "right" }); SDX.text(ctx, "─ B의 기여", W - 24, Hh - 78, pal.blue, { size: 11, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.48), minHeight: 220, maxHeight: 300 });
+  SDX.drag(cv.canvas, () => handles, (id, mx) => { if (!M) return; gs.set(CB.clamp(Math.round(M.ix(mx) * 10) / 10, 2, 12)); });
+  function go() {
+    const BA = gA(), row = (z) => { const a = fA(0, z), t = a + fB(0, z); return `${SDX.kpa(a)} / ${SDX.kpa(t)} <small>(+${CB.num(100 * (t / a - 1), 0)} %)</small>`; };
+    CB.stat("sd-aj-1", row(BA)); CB.stat("sd-aj-2", row(2 * BA));
+    let zb = 0, vb = -1; for (let k = 1; k <= 200; k++) { const z = 0.1 * k, v = fB(0, z); if (v > vb) { vb = v; zb = z; } }
+    CB.stat("sd-aj-zm", `${CB.num(zb, 1)} m (${SDX.kpa(vb)} kPa)`);
+    cv.redraw(); ch.redraw();
+  }
+  go();
+})();
+
+/* ---------- 8. 성토 하중 (E-4) ---------- */
+(function () {
+  const gH = CB.range("sd-em-H", (v) => v.toFixed(1) + " m", go), gg = CB.range("sd-em-g", (v) => v.toFixed(1) + " kN/m³", go);
+  const gc = CB.range("sd-em-c", (v) => v.toFixed(1) + " m", go), gm = CB.range("sd-em-m", (v) => v.toFixed(1), go);
+  const gx = CB.range("sd-em-x", (v) => v.toFixed(1) + " m", go);
+  const s0_10 = CB.soil.site().at(10).s;
+  let M = null, handles = [], key = "", G0 = null;
+  const geo = () => { const H = gH(), q = gg() * H, b = gc() / 2, a = gm() * H; return { H, q, b, a, half: a + b }; };
+  const load = (g, x) => { const u = Math.abs(x); return u <= g.b ? g.q : u <= g.half ? (g.q * (g.half - u)) / g.a : 0; };
+  // 단면 하중 × 선 하중 해를 심프슨 적분(이 장 전용)
+  const ds = (g, x, z) => { const n = 400, h = (2 * g.half) / n; let s = 0; for (let i = 0; i <= n; i++) { const xi = -g.half + i * h, w = i === 0 || i === n ? 1 : i % 2 ? 4 : 2; s += w * load(g, xi) * CB.soil.line(1, x - xi, z); } return (s * h) / 3; };
+  const oster = (g, z) => { if (g.a <= 0) return CB.soil.strip(g.q, 2 * g.b, 0, z); const a2 = Math.atan(g.b / z), a1 = Math.atan((g.a + g.b) / z) - a2; return 2 * (g.q / Math.PI) * (((g.a + g.b) / g.a) * (a1 + a2) - (g.b / g.a) * a2); };
+  const XM = 34, ZM = 20;
+  const cv = CB.canvas("#sd-cv-emb", (ctx, W, Hh) => {
+    const pal = CB.palette(), g = geo(), XV = W < 520 ? 16 : XM, s = Math.min((W - 16) / (2 * XV), (Hh - 16) / (ZM + 12)), oy = Hh - 8 - ZM * s, ox = W / 2;
+    M = { X: (x) => ox + x * s, Y: (z) => oy + z * s, ix: (px) => (px - ox) / s };
+    const k = [g.H, g.q, g.b, g.a].join(",");
+    if (k !== key) { key = k; const ni = 69, nj = 41, v = new Float64Array(ni * nj); for (let i = 0; i < ni; i++) for (let j = 0; j < nj; j++) v[i * nj + j] = ds(g, -XM + (2 * XM * i) / (ni - 1), 0.3 + ((ZM - 0.3) * j) / (nj - 1)); G0 = { ni, nj, v }; }
+    const G = { ...G0, X: (i) => M.X(-XM + (2 * XM * i) / (G0.ni - 1)), Y: (j) => M.Y(0.3 + ((ZM - 0.3) * j) / (G0.nj - 1)) };
+    SDX.heat(ctx, G, (v) => v / Math.max(1, g.q), 0.5);
+    for (let L = 10; L < g.q; L += 10) SDX.contour(ctx, G, L, { color: L % 50 === 0 ? pal.accent2 : pal.text, width: L % 50 === 0 ? 2 : 1 });
+    ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = pal.blue; ctx.lineWidth = 1.4; [6, 14].forEach((z) => { ctx.beginPath(); ctx.moveTo(0, M.Y(z)); ctx.lineTo(W, M.Y(z)); ctx.stroke(); }); ctx.restore();
+    SDX.text(ctx, "G-10 연약 점토 6–14 m", 8, M.Y(6) + 10, pal.blue, { size: 10.5, align: "left", mono: false });
+    // 성토
+    ctx.fillStyle = SDX.alpha(pal.accent2, 0.25); ctx.strokeStyle = pal.accent2; ctx.lineWidth = 1.6; ctx.beginPath();
+    ctx.moveTo(M.X(-g.half), M.Y(0)); ctx.lineTo(M.X(-g.b), M.Y(-g.H)); ctx.lineTo(M.X(g.b), M.Y(-g.H)); ctx.lineTo(M.X(g.half), M.Y(0)); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = pal.text; ctx.beginPath(); ctx.moveTo(0, M.Y(0)); ctx.lineTo(W, M.Y(0)); ctx.stroke();
+    SDX.text(ctx, `γH = ${CB.num(g.q, 0)} kPa`, M.X(0), M.Y(-g.H) - 10, pal.accent2, { size: 11 });
+    const x = gx(); ctx.strokeStyle = pal.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(M.X(x), M.Y(0)); ctx.lineTo(M.X(x), M.Y(ZM)); ctx.stroke();
+    ctx.fillStyle = pal.text; ctx.beginPath(); ctx.arc(M.X(x), M.Y(10), 4.5, 0, 7); ctx.fill();
+    handles = [{ id: "x", x: M.X(x), y: M.Y(3) }]; SDX.handle(ctx, M.X(x), M.Y(3), pal.accent);
+    for (let z = 5; z <= ZM; z += 5) SDX.text(ctx, z + " m", W - 6, M.Y(z), pal.dim, { size: 10, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.52), minHeight: 240, maxHeight: 420 });
+  const ch = CB.canvas("#sd-cv-emb2", (ctx, W, Hh) => {
+    const pal = CB.palette(), g = geo(), x = gx(), d = [];
+    for (let k = 1; k <= 50; k++) { const z = 0.4 * k; d.push([ds(g, x, z), z]); }
+    SDX.depthChart(ctx, W, Hh, { x: [0, Math.max(10, g.q * 1.05)], zmax: ZM, xLabel: "Δσz (kPa)", series: [{ data: d, color: pal.accent, width: 2.6 }], vlines: [{ x: g.q, color: pal.accent2, label: "γH" }], hlines: [{ y: 6, color: pal.blue }, { y: 14, color: pal.blue }], points: [{ x: ds(g, x, 10), y: 10, color: pal.text, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.5), minHeight: 220, maxHeight: 320 });
+  SDX.drag(cv.canvas, () => handles, (id, mx) => { if (!M) return; gx.set(CB.clamp(Math.round(Math.abs(M.ix(mx)) * 2) / 2, 0, 30)); });
+  function go() {
+    const g = geo(), x = gx(), v = ds(g, x, 10), o = oster(g, 10);
+    CB.stat("sd-em-s", SDX.kpa(v) + " kPa"); CB.stat("sd-em-r", (v / g.q).toFixed(3));
+    CB.stat("sd-em-o", `${SDX.kpa(o)} kPa <small>(수치 ${SDX.kpa(ds(g, 0, 10))})</small>`);
+    const S = CB.soil.settlement({ H: 8, e0: 1.5, Cc: 0.55, Cr: 0.08, s0: s0_10, ds: v }), S76 = CB.soil.settlement({ H: 8, e0: 1.5, Cc: 0.55, Cr: 0.08, s0: s0_10, ds: g.q });
+    CB.stat("sd-em-S", `${CB.num(S, 2)} m <small>(γH로 ${CB.num(S76, 2)} m)</small>`);
+    const msg = document.getElementById("sd-em-msg");
+    msg.className = "sd-msg";
+    msg.innerHTML = x <= g.b ? `성토 마루 아래: 점토 중앙 응력이 γH의 ${CB.num(100 * v / g.q, 0)} %입니다. 넓은 하중(γH) 가정은 ${CB.num(100 * (S76 / Math.max(1e-6, S) - 1), 0)} % 큰 침하를 줍니다(안전 측).` : x <= g.half ? "비탈 아래: 하중이 줄어드는 구간입니다. 마루 아래와의 침하 차이가 포장의 부등 침하가 됩니다." : `성토 바깥(비탈 끝에서 ${CB.num(x - g.half, 1)} m): 하중이 없는 땅도 깊은 곳에서 ${SDX.kpa(v)} kPa를 받아 침하합니다.`;
+    cv.redraw(); ch.redraw();
+  }
+  go();
+})();
+</script>
+</body>
+</html>

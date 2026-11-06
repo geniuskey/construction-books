@@ -1,0 +1,1153 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>지반 동역학과 액상화 · GeotechBook</title>
+<meta name="description" content="땅이 흔들릴 때. 지진파와 전단파 속도, Gmax = ρVs², 변형률에 따른 G/Gmax와 감쇠, 1차원 지반 응답과 고유 주기 T = 4H/Vs, Vs30과 지반 분류, 액상화의 메커니즘과 간편 판정법(CSR·CRR·안전율), 반복 삼축 시험, 대책과 기계 기초 진동을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .dy-stack { display: grid; grid-template-columns: 1fr; }
+  .dy-stack > div { position: relative; min-width: 0; }
+  .dy-stack > div + div { border-top: 1px solid var(--border); }
+  .dy-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .dy-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .dy-msg b { color: var(--text); }
+  .dy-msg.ok { color: var(--ok); font-weight: 600; }
+  .dy-msg.bad { color: var(--bad); font-weight: 600; }
+  .dy-tbl td, .dy-tbl th { font-variant-numeric: tabular-nums; }
+  .dy-tbl td.hl { color: var(--accent); font-weight: 700; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="geotech"></script>
+</head>
+<body data-chapter="dynamics">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="dy-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="dy-ah-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+      <marker id="dy-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="dy-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 15</div>
+    <h1 data-no-glossary>지반 동역학과 액상화</h1>
+    <p class="lead">지금까지 이 책의 흙은 천천히 실린 하중을 받았습니다. 성토는 몇 주에 걸쳐 쌓았고, 압밀은 몇 년에 걸쳐 일어났지요. 지진은 다릅니다. 기반암에서 올라온 전단파가 1초에 몇 번씩 흙을 좌우로 비틀고, 그 짧은 수십 초 동안 흙은 "물이 빠질 시간"이 없습니다. 같은 G-10 지반이 지진 때는 <b>증폭기</b>가 되어 흔들림을 몇 배로 키우고, 느슨한 모래층은 간극수압이 치솟아 잠깐 동안 <b>액체처럼</b> 됩니다. 이 장은 흙의 동적 강성 \(G_{max} = \rho V_s^2\)과 그것이 변형률에 따라 줄어드는 모양, 지반의 고유 주기 \(T = 4H/V_s\)와 공진, 그리고 B-10 부지 GL −4 m의 느슨한 모래가 설계 지진 0.22g에서 액상화 안전율 <b>약 0.65</b>를 갖는다는 판정을 손으로, 그리고 시뮬레이터로 따라갑니다.</p>
+    <ul class="objectives">
+      <li>P파·S파·표면파와 지진동의 가속도·주기를 구분하고, 전단파 속도 \(V_s\)에서 최대 전단 탄성계수 \(G_{max} = \rho V_s^2\)를 계산한다.</li>
+      <li>변형률에 따른 강성 저하(G/G<sub>max</sub>)와 감쇠의 증가를 이력 곡선으로 설명하고, 등가 선형 해석이 왜 필요한지 안다.</li>
+      <li>감쇠가 있는 균질 지반의 전달 함수로 고유 진동수 \(f_n = (2n-1)V_s/4H\)와 공진 증폭을 계산하고, G-10의 고유 주기와 V<sub>s30</sub>을 구한다.</li>
+      <li>KDS 17 10 00의 지반 분류 방식(기반암 깊이와 토층 평균 전단파 속도)을 설명하고 G-10을 분류해 본다(현행 기준 확인).</li>
+      <li>액상화의 메커니즘을 유효응력으로 설명하고, 간편 판정법(CSR, (N<sub>1</sub>)<sub>60cs</sub>, CRR, 규모 보정, 안전율)으로 깊이별 판정을 한다.</li>
+      <li>액상화의 피해 양상과 대책(다짐·배수·고결·지하수위 저하)을 판정식의 어느 항을 바꾸는지로 정리하고, 기계 기초 진동의 공진 회피를 계산한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>1964년, 니가타의 넘어진 아파트</b></div>
+      <div class="o-body"><p>1964년 6월 일본 니가타 지진(규모 약 7.5)에서 강변 매립지의 철근콘크리트 아파트 몇 동이 거의 부서지지 않은 채 통째로 기울고 넘어졌습니다. 건물이 약해서가 아니라 그 아래의 느슨하고 포화된 모래가 <b>지지력을 잃었기</b> 때문입니다. 같은 해 3월 미국 알래스카 지진에서도 앵커리지 일대에서 큰 지반 활동과 액상화 피해가 났습니다. 두 지진은 "흙이 흔들리면 강도를 잃을 수 있다"는 사실을 공학의 중심 문제로 만들었습니다.</p>
+        <p>그 뒤 시드(H. B. Seed)와 이드리스(I. M. Idriss)는 1971년, 지진이 흙에 주는 반복 전단응력과 흙이 견디는 반복 전단응력을 같은 응력비로 비교하는 <b>간편 판정법</b>을 내놓았고, 과거 지진 현장의 표준관입시험 N값과 액상화 여부를 모아 저항 곡선을 만들었습니다. 2001년 유드(T. L. Youd) 등 여러 연구자가 이 방법을 정리한 합의 보고서가 오늘날 실무의 기본 틀이며, 국내 내진설계 일반(KDS 17 10 00)과 관련 기준도 같은 꼴의 판정 절차를 쓴다.</p>
+        <div class="o-chain"><span>지진파 · V<sub>s</sub></span><i>→</i><span class="tool">G<sub>max</sub> · T = 4H/V<sub>s</sub> · CSR vs CRR</span><i>→</i><span>지반 분류 · 액상화 판정 · 대책</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="earthquake">
+    <h2>지진과 지반: 지진파, 가속도, 주기</h2>
+    <div class="problem"><strong>같은 지진, 다른 흔들림</strong>
+      <p>B-10에서 몇 km 떨어진 산자락 암반 위의 관측소와 매립지 위의 B-10 부지는 같은 지진파를 받습니다. 그런데 지진이 끝나고 기록을 비교하면 매립지의 흔들림이 훨씬 크고, 더 느리게(주기가 길게) 흔들린 경우가 많습니다. 기반암에서 지표까지 올라오는 20여 m의 흙이 무엇을 하는 걸까요?</p></div>
+    <p>단층이 미끄러지면 두 종류의 <span class="term">실체파</span><span class="en">(body wave)</span>가 퍼져 나갑니다. 입자가 파의 진행 방향으로 밀고 당기는 <span class="term">P파</span><span class="en">(primary wave)</span>는 빠르고, 입자가 진행 방향에 직각으로 흔들리는 <span class="term">S파</span><span class="en">(shear wave)</span>는 그보다 느리지만 흔들림이 큽니다. 지표에 닿은 뒤에는 레일리파·러브파 같은 <span class="term">표면파</span><span class="en">(surface wave)</span>가 생깁니다. 땅속의 파는 깊이 갈수록 빠른 층을 만나 꺾이므로(스넬 법칙), 기반암에서 연약한 지표층으로 올라올 때 거의 <b>연직으로</b> 올라옵니다. 그래서 지반 응답은 대개 "연직으로 올라오는 S파가 수평으로 흔드는" 1차원 문제로 다룹니다.</p>
+    <figure class="diagram" id="fig-dy-waves">
+      <svg viewBox="0 0 860 330" role="img" aria-label="진원에서 기반암을 지나 연약 지반 지표로 올라오는 지진파 경로와 P파, S파의 입자 운동">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <rect x="30" y="60" width="520" height="70" style="fill:var(--accent-soft);stroke:none"/>
+        <rect x="30" y="130" width="520" height="170" style="fill:var(--surface-2,var(--bg-elev));stroke:none"/>
+        <line x1="30" y1="60" x2="550" y2="60" class="s-axis"/>
+        <line x1="30" y1="130" x2="550" y2="130" style="stroke:var(--accent);stroke-width:1.6"/>
+        <text x="40" y="52" class="t-dim">지표</text>
+        <text x="40" y="100" class="t-acc">연약 지반(흙)  V<tspan baseline-shift="sub" font-size="9">s</tspan> 100–300 m/s</text>
+        <text x="40" y="150" class="t-dim">기반암  V<tspan baseline-shift="sub" font-size="9">s</tspan> 760 m/s 이상</text>
+        <line x1="120" y1="280" x2="130" y2="300" style="stroke:var(--bad);stroke-width:3"/>
+        <line x1="100" y1="300" x2="160" y2="250" style="stroke:var(--bad);stroke-width:2.2;stroke-dasharray:5 3"/>
+        <text x="168" y="262" class="t-mono" style="fill:var(--bad)">진원(단층 미끄러짐)</text>
+        <path d="M130 270 Q250 200 330 160 T420 131" style="fill:none;stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#dy-ah-ld)"/>
+        <path d="M130 270 Q260 220 380 175 T490 131" style="fill:none;stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#dy-ah-ld)"/>
+        <line x1="420" y1="131" x2="428" y2="64" style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#dy-ah-ld)"/>
+        <line x1="490" y1="131" x2="494" y2="64" style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#dy-ah-ld)"/>
+        <text x="300" y="246" class="t-mono" style="fill:var(--accent-2)">파선이 꺾여</text>
+        <text x="300" y="262" class="t-mono" style="fill:var(--accent-2)">거의 연직으로 올라온다</text>
+        <rect x="455" y="40" width="40" height="18" style="fill:var(--bg-elev);stroke:var(--text-dim)"/>
+        <text x="475" y="36" text-anchor="middle" class="t-mono">B-10</text>
+        <g transform="translate(590,40)">
+          <text x="0" y="12" class="t" style="font-weight:700">P파(압축파)</text>
+          <g style="fill:var(--text-dim)">
+            <circle cx="10" cy="40" r="4"/><circle cx="22" cy="40" r="4"/><circle cx="30" cy="40" r="4"/><circle cx="37" cy="40" r="4"/><circle cx="52" cy="40" r="4"/><circle cx="70" cy="40" r="4"/><circle cx="85" cy="40" r="4"/><circle cx="93" cy="40" r="4"/><circle cx="100" cy="40" r="4"/><circle cx="115" cy="40" r="4"/><circle cx="133" cy="40" r="4"/><circle cx="150" cy="40" r="4"/><circle cx="160" cy="40" r="4"/><circle cx="168" cy="40" r="4"/><circle cx="182" cy="40" r="4"/><circle cx="200" cy="40" r="4"/>
+          </g>
+          <line x1="0" y1="62" x2="220" y2="62" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#dy-ah-ld)"/>
+          <text x="0" y="80" class="t-mono">입자: 진행 방향으로 밀고 당김(체적 변화)</text>
+          <text x="0" y="120" class="t" style="font-weight:700">S파(전단파)</text>
+          <path d="M0 150 Q 27 125 55 150 T 110 150 T 165 150 T 220 150" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <line x1="55" y1="134" x2="55" y2="166" style="stroke:var(--text-dim);stroke-width:1.4" marker-start="url(#dy-ah-t)" marker-end="url(#dy-ah-t)"/>
+          <line x1="0" y1="186" x2="220" y2="186" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#dy-ah-ld)"/>
+          <text x="0" y="204" class="t-mono">입자: 진행 방향에 직각(모양만 변함)</text>
+          <text x="0" y="236" class="t-mono">V<tspan baseline-shift="sub" font-size="8">p</tspan> &gt; V<tspan baseline-shift="sub" font-size="8">s</tspan>, 물은 전단 강성이 없어</text>
+          <text x="0" y="252" class="t-mono">S파는 흙 뼈대로만 전달된다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-1.</b> 진원에서 부지까지의 지진파 경로(개념도). 지층은 아래로 갈수록 빠르므로 파선은 지표에 가까워질수록 연직에 가깝게 꺾인다. 수평으로 흔드는 S파가 지반 응답과 액상화를 주로 일으킨다. 포화된 흙의 P파 속도는 물(약 1,500 m/s)에 지배되지만, S파 속도는 흙 뼈대의 강성만 나타낸다.</figcaption>
+    </figure>
+    <p>지진동은 보통 지표의 <span class="term">최대 지반 가속도</span><span class="en">(peak ground acceleration, PGA)</span>(\(a_{max}\))를 중력 가속도 \(g\)의 배수로 나타냅니다. 이 책의 설계 지진 0.22g는 지반이 한순간 수평으로 자기 무게의 22 %에 해당하는 관성력을 받는다는 뜻입니다. 그러나 피해는 가속도의 크기만으로 정해지지 않습니다. 흔들림의 <b>주기</b>(또는 진동수)와 <b>지속 시간</b>(반복 횟수)이 함께 중요합니다. <span class="term">지진 규모</span><span class="en">(magnitude)</span> \(M\)이 클수록 긴 주기 성분이 많고 지속 시간이 깁니다. 규모는 지진이 낸 에너지의 크기(하나의 값), 진도는 장소마다 다른 흔들림의 정도입니다.</p>
+    <div class="callout def"><strong>정의 15.1 (전단파 속도와 최대 전단 탄성계수)</strong> 흙 기둥을 연직으로 지나는 <span class="term">전단파 속도</span><span class="en">(shear wave velocity)</span> \(V_s\)와  아주 작은 변형률(약 \(10^{-4}\) % 이하)에서의 전단 탄성계수, 곧 <span class="term">최대 전단 탄성계수</span><span class="en">(small-strain shear modulus)</span> \(G_{max}\)는
+      <div class="formula">$$V_s = \sqrt{\frac{G_{max}}{\rho}} \quad\Longleftrightarrow\quad G_{max} = \rho\,V_s^2 = \frac{\gamma_t}{g}\,V_s^2$$<div class="where">\(\rho\): 흙의 전체 밀도(t/m³ = 포화 흙은 \(\gamma_{sat}/g\)), \(V_s\): m/s. t/m³ × (m/s)² = kPa이므로 \(G_{max}\)는 kPa로 나온다. \(V_s\)는 시추공 탄성파 탐사(다운홀·크로스홀), 표면파 탐사, 탄성파 콘(SCPT)으로 현장에서 직접 잰다(1장).</div></div></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="dynamic-properties">
+    <h2>흙의 동적 성질: V<sub>s</sub>와 G<sub>max</sub></h2>
+    <div class="problem"><strong>G-10의 층마다 얼마나 단단한가</strong>
+      <p>4장과 9장에서 흙의 강성과 강도는 유효응력에 달려 있다고 배웠습니다. 동적 강성도 같습니다. 같은 모래라도 깊을수록, 조밀할수록, 오래될수록 전단파가 빨리 지나갑니다. G-10의 층별 V<sub>s</sub>로 \(G_{max}\)를 계산하면 어떤 층이 지진의 "약한 고리"인지 보입니다.</p></div>
+    <p>\(G_{max}\)는 흙이 거의 탄성으로 행동하는 아주 작은 변형률의 강성입니다. 모래의 \(G_{max}\)는 대략 평균 유효응력 \(\sigma'_m\)의 0.5제곱에 비례하고 간극비가 클수록 작으며, 점토는 여기에 과압밀비와 소성 지수의 영향이 더해집니다(하딘 형태의 경험식). 그래서 같은 층 안에서도 \(V_s\)는 깊이에 따라 조금씩 커집니다. 이 장에서는 층마다 대표값 하나를 씁니다.</p>
+    <div class="table-wrap"><table class="dy-tbl">
+      <thead><tr><th>깊이(m)</th><th>지층</th><th>γ(kN/m³)</th><th>ρ(t/m³)</th><th>V<sub>s</sub>(m/s, 약)</th><th>G<sub>max</sub> = ρV<sub>s</sub>²(MPa)</th><th>통과 시간 h/V<sub>s</sub>(s)</th></tr></thead>
+      <tbody>
+        <tr><td>0–2</td><td>매립층</td><td>18.0</td><td>1.835</td><td>150</td><td>41.3</td><td>0.0133</td></tr>
+        <tr><td>2–6</td><td>느슨한 실트질 모래</td><td>19.0</td><td>1.937</td><td>140</td><td>38.0</td><td>0.0286</td></tr>
+        <tr><td>6–14</td><td>연약 점토</td><td>16.5</td><td>1.682</td><td>110</td><td class="hl">20.4</td><td class="hl">0.0727</td></tr>
+        <tr><td>14–19</td><td>모래 자갈</td><td>20.5</td><td>2.090</td><td>320</td><td>214</td><td>0.0156</td></tr>
+        <tr><td>19–23</td><td>풍화토·풍화암</td><td>21.0</td><td>2.141</td><td>450</td><td>434</td><td>0.0089</td></tr>
+        <tr><td>23 이하</td><td>연암(기반암)</td><td>24.0</td><td>2.446</td><td>900</td><td>1,982</td><td>—</td></tr>
+      </tbody></table></div>
+    <div class="callout"><strong>예제 15.1 (G-10 연약 점토의 G<sub>max</sub>와 평균 V<sub>s</sub>)</strong>
+      <ol style="margin:6px 0 0">
+        <li><b>밀도.</b> \(\rho = \gamma_{sat}/g = 16.5/9.81 = 1.682\) t/m³.</li>
+        <li><b>강성.</b> \(G_{max} = 1.682 \times 110^2 = 20{,}350\) kPa \(\approx 20.4\) MPa. 매립층(41 MPa)의 절반, 연암(약 1,980 MPa)의 1 %에 불과하다.</li>
+        <li><b>통과 시간.</b> 전단파가 0–23 m를 지나는 시간은 층별 \(h/V_s\)의 합 \(= 0.0133 + 0.0286 + 0.0727 + 0.0156 + 0.0089 = 0.139\) s. 이 중 절반 이상(0.073 s)을 연약 점토 8 m에서 쓴다.</li>
+        <li><b>평균 속도.</b> 토층 평균 \(\bar V_s = \sum h / \sum (h/V_s) = 23/0.139 = 165\) m/s. 산술 평균(약 234 m/s)이 아니라 <b>통과 시간으로 평균</b>한다. 느린 층이 평균을 끌어내린다.</li>
+      </ol></div>
+    <div class="sim" id="sim-dy-wave">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>전단파가 G-10을 올라오는 모습</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dy-cv-wave" aria-label="지층 기둥을 연직으로 올라오는 전단파 펄스와 도달 시간 곡선"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>지반</span><div class="seg" id="dy-wv-site"><button data-value="g10" class="on">G-10</button><button data-value="stiff">단단한 균질 지반(V<sub>s</sub> 400)</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">펄스 주기 T<sub>p</sub></i> <output id="dy-wv-tp-out"></output></span><input type="range" id="dy-wv-tp" min="0.05" max="0.5" step="0.01" value="0.15"></label>
+          <label class="ctrl"><span>재생 속도 <output id="dy-wv-sp-out"></output></span><input type="range" id="dy-wv-sp" min="0.05" max="0.5" step="0.01" value="0.15"></label>
+          <label class="ctrl"><span>시각 t <output id="dy-wv-t-out"></output></span><input type="range" id="dy-wv-t" min="0" max="0.6" step="0.002" value="0.1"></label>
+          <div class="btn-row"><button class="btn primary" id="dy-wv-play">▶ 파 보내기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">30 m → 지표 도달 시간</span><span class="v" id="dy-wv-tt">—</span></div>
+        <div class="stat"><span class="k">지금 파면의 층 · V<sub>s</sub></span><span class="v" id="dy-wv-lay">—</span></div>
+        <div class="stat"><span class="k">파장 λ = V<sub>s</sub>T<sub>p</sub></span><span class="v" id="dy-wv-lam">—</span></div>
+        <div class="stat"><span class="k">지표/기반암 진폭비</span><span class="v" id="dy-wv-amp">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 펄스가 연약 점토층(6–14 m)에 들어서며 느려지고(곡선 기울기가 완만해짐) 파장이 짧아지며 진폭이 커지는 것을 보세요 · 지표에서 반사되어 내려가는 파와 겹치는 순간 지표 진폭이 두 배가 됩니다 · 모델: 연직 입사 SH파, 층 경계의 부분 반사와 감쇠는 무시하고 에너지 흐름 보존으로 진폭 ∝ 1/√(ρV<sub>s</sub>)(교육용), 지표는 완전 반사(자유면). 펄스는 리커 파형.</div>
+    </div>
+    <p>시뮬레이터에서 보듯 파가 느린 층으로 들어가면 두 가지가 일어납니다. 같은 에너지를 실어 나르려면 흔들림이 커져야 하므로 진폭이 \(1/\sqrt{\rho V_s}\)에 비례해 커지고, 파장이 짧아져 같은 깊이 안에 더 많은 변형이 몰립니다. 지반의 <span class="term">임피던스</span><span class="en">(impedance)</span> \(\rho V_s\)가 작을수록 흔들림이 커지는 이유이며, 기반암과 토층의 임피던스 비가 지반 증폭의 첫째 원인입니다.</p>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="modulus-reduction">
+    <h2>변형률에 따른 강성 저하와 감쇠</h2>
+    <div class="problem"><strong>작게 흔들 때와 크게 흔들 때 흙은 다른 재료다</strong>
+      <p>미소 진동(교통 진동, 탄성파 탐사)에서 매립층의 G는 41 MPa입니다. 그런데 큰 지진에서 흙이 0.1 % 넘게 비틀리면 같은 흙의 할선 강성은 그 절반 이하로 떨어지고, 한 번 흔들 때마다 잃는 에너지(감쇠)는 몇 배로 늘어납니다. 지반 응답 해석이 이 변화를 무시하면 증폭도, 고유 주기도 틀립니다.</p></div>
+    <p>반복 전단을 받은 흙의 응력–변형률 관계는 직선이 아니라 닫힌 고리, 곧 <span class="term">이력 곡선</span><span class="en">(hysteresis loop)</span>을 그립니다. 고리의 꼭짓점을 이은 선의 기울기가 <span class="term">할선 전단 탄성계수</span><span class="en">(secant shear modulus)</span> \(G_{sec}\)이고, 고리가 감싼 넓이가 한 주기에 열로 잃는 에너지이며, 이를 정규화한 값이 <span class="term">감쇠비</span><span class="en">(damping ratio)</span>입니다.</p>
+    <figure class="diagram" id="fig-dy-loop">
+      <svg viewBox="0 0 860 320" role="img" aria-label="반복 전단의 이력 곡선, 할선 탄성계수와 감쇠비의 정의, G/Gmax 곡선과 변형률 범위">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <line x1="0" y1="130" x2="340" y2="130" class="s-axis"/><line x1="170" y1="0" x2="170" y2="260" class="s-axis"/>
+          <text x="336" y="148" text-anchor="end" class="t-mono">γ</text><text x="178" y="12" class="t-mono">τ</text>
+          <path d="M30 230 C 120 230, 150 180, 310 30 C 220 30, 190 80, 30 230 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.4"/>
+          <line x1="30" y1="230" x2="310" y2="30" style="stroke:var(--accent-2);stroke-width:2;stroke-dasharray:6 4"/>
+          <line x1="125" y1="162" x2="215" y2="98" style="stroke:var(--text);stroke-width:2.4"/>
+          <text x="248" y="96" class="t-mono" style="fill:var(--accent-2)">G<tspan baseline-shift="sub" font-size="8">sec</tspan> = τ<tspan baseline-shift="sub" font-size="8">c</tspan>/γ<tspan baseline-shift="sub" font-size="8">c</tspan></text>
+          <text x="64" y="112" class="t-mono">G<tspan baseline-shift="sub" font-size="8">max</tspan>(처음 기울기)</text>
+          <path d="M310 30 L310 130 L170 130 Z" style="fill:var(--blue);opacity:.14;stroke:none"/>
+          <text x="262" y="122" text-anchor="middle" class="t-mono" style="fill:var(--blue)">W</text>
+          <text x="196" y="190" class="t-mono" style="fill:var(--accent)">ΔW = 고리 넓이</text>
+          <circle cx="310" cy="30" r="4" style="fill:var(--text)"/><text x="300" y="22" text-anchor="end" class="t-mono">(γ<tspan baseline-shift="sub" font-size="8">c</tspan>, τ<tspan baseline-shift="sub" font-size="8">c</tspan>)</text>
+          <text x="170" y="282" text-anchor="middle" class="t-dim">감쇠비 D = ΔW / (4π W)</text>
+        </g>
+        <g transform="translate(470,40)">
+          <line x1="0" y1="200" x2="350" y2="200" class="s-axis"/><line x1="0" y1="0" x2="0" y2="200" class="s-axis"/>
+          <text x="350" y="-8" text-anchor="end" class="t-mono">전단 변형률 γ (%, 로그) →</text>
+          <text x="6" y="10" class="t-mono">G/G<tspan baseline-shift="sub" font-size="8">max</tspan></text>
+          <path d="M0 20 L70 22 C 130 30, 170 90, 220 160 C 260 188, 300 195, 350 197" style="fill:none;stroke:var(--accent);stroke-width:2.8"/>
+          <path d="M0 192 L70 190 C 130 182, 170 130, 220 70 C 260 46, 300 40, 350 38" style="fill:none;stroke:var(--accent-2);stroke-width:2.2;stroke-dasharray:6 4"/>
+          <text x="300" y="30" class="t-mono" style="fill:var(--accent-2)">D</text>
+          <line x1="70" y1="0" x2="70" y2="200" style="stroke:var(--text-faint);stroke-dasharray:3 3"/><line x1="220" y1="0" x2="220" y2="200" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="35" y="216" text-anchor="middle" class="t-mono">10⁻⁴</text><text x="145" y="216" text-anchor="middle" class="t-mono">10⁻²</text><text x="290" y="216" text-anchor="middle" class="t-mono">1</text>
+          <text x="35" y="240" text-anchor="middle" class="t-dim">탄성</text><text x="145" y="240" text-anchor="middle" class="t-dim">탄소성(강성 저하)</text><text x="290" y="240" text-anchor="middle" class="t-dim">파괴·액상화</text>
+          <text x="35" y="258" text-anchor="middle" class="t-mono">탐사·교통 진동</text><text x="145" y="258" text-anchor="middle" class="t-mono">중·대지진</text><text x="290" y="258" text-anchor="middle" class="t-mono">큰 지진 + 느슨한 흙</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-2.</b> 왼쪽: 한 주기의 이력 곡선. 꼭짓점까지의 할선 기울기가 G<sub>sec</sub>, 고리 넓이 ΔW와 꼭짓점까지 저장된 변형 에너지 W(파란 삼각형)의 비가 감쇠비 D다. 오른쪽: 변형률이 커질수록 G/G<sub>max</sub>는 1에서 0 쪽으로 떨어지고 감쇠비는 커진다(개념도).</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.2 (강성 저하 곡선과 감쇠비, 쌍곡선 모델)</strong> 반복 전단 변형률 진폭 \(\gamma\)에서 할선 강성과 감쇠비는
+      <div class="formula">$$\frac{G}{G_{max}} = \frac{1}{1 + (\gamma/\gamma_r)^{a}}, \qquad D = \frac{\Delta W}{4\pi W}$$<div class="where">\(\gamma_r\): <span class="term">기준 변형률</span><span class="en">(reference strain)</span>(\(G = G_{max}/2\)이 되는 변형률), \(a\): 곡률 계수(\(a = 1\)이면 하딘–드르네비치 쌍곡선, 다렌델리(2001)는 약 0.92). \(\gamma_r\)은 구속 응력과 소성 지수가 클수록 커져, 점토와 깊은 흙일수록 강성이 늦게 떨어진다. 이 장의 시뮬레이터는 다렌델리 형태 \(\gamma_r(\%) = (0.0352 + 0.0010\,PI\cdot OCR^{0.3246})(\sigma'_m/p_a)^{0.3483}\)을 교육용으로 쓴다.</div></div></div>
+    <p>감쇠비는 하중을 뺄 때의 곡선을 이력 법칙(<span class="term">마싱 규칙</span><span class="en">(Masing rule)</span>: 하중 반전 뒤의 곡선은 처음 곡선을 두 배로 키워 뒤집은 모양)으로 그려 넓이를 재서 구합니다. 마싱 규칙은 큰 변형률에서 감쇠를 실제보다 크게 주므로, 실무 모델은 보정 계수를 곱하고 아주 작은 변형률에서도 남는 최소 감쇠 \(D_{min}\)(약 1 %)을 더합니다.</p>
+    <div class="sim" id="sim-dy-ggmax">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>이력 곡선, G/G<sub>max</sub>, 감쇠 곡선</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dy-stack">
+          <div><canvas id="dy-cv-loop" aria-label="선택한 변형률 진폭의 이력 곡선"></canvas><span class="dy-cap">한 주기 이력 곡선 τ–γ</span></div>
+          <div><canvas id="dy-cv-gg" aria-label="G/Gmax와 감쇠비 곡선"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>흙</span><div class="seg" id="dy-gg-soil"><button data-value="sand" class="on">느슨한 모래(4 m)</button><button data-value="clay">연약 점토(10 m)</button><button data-value="fill">매립층(1 m)</button></div></div>
+          <label class="ctrl"><span>변형률 진폭 γ <output id="dy-gg-g-out"></output></span><input type="range" id="dy-gg-g" min="-4" max="0" step="0.02" value="-1.5"></label>
+          <label class="ctrl"><span>소성 지수 PI <output id="dy-gg-pi-out"></output></span><input type="range" id="dy-gg-pi" min="0" max="60" step="1" value="0"></label>
+          <label class="ctrl"><span><i style="font-style:normal">평균 유효응력 σ′<sub>m</sub></i> <output id="dy-gg-s-out"></output></span><input type="range" id="dy-gg-s" min="10" max="400" step="1" value="40"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기준 변형률 γ<sub>r</sub></span><span class="v" id="dy-gg-gr">—</span></div>
+        <div class="stat"><span class="k">G/G<sub>max</sub></span><span class="v" id="dy-gg-r">—</span></div>
+        <div class="stat"><span class="k">할선 G</span><span class="v" id="dy-gg-G">—</span></div>
+        <div class="stat"><span class="k">감쇠비 D</span><span class="v" id="dy-gg-D">—</span></div>
+      </div>
+      <div class="dy-msg" id="dy-gg-msg"></div>
+      <div class="sim-note">해볼 것: 변형률을 10⁻⁴ %에서 0.1 %로 키우면 고리가 눕고(G 감소) 뚱뚱해지는(D 증가) 것을 보세요 · 같은 변형률에서 PI를 30 이상으로 올리면 강성이 덜 떨어집니다(점토가 모래보다 "선형적") · 모델: 원리 15.2, G<sub>max</sub> = ρV<sub>s</sub>²(G-10 층 값), 곡률 a = 0.919, OCR = 1, 감쇠 D = D<sub>min</sub> + 0.63(G/G<sub>max</sub>)<sup>0.1</sup>D<sub>Masing</sub>(D<sub>min</sub> 1 %), D<sub>Masing</sub>는 그린 고리의 넓이를 수치 적분(다렌델리 형태, 교육용).</div>
+    </div>
+    <div class="callout deep"><strong>등가 선형 해석</strong> 실무의 <span class="term">등가 선형 해석</span><span class="en">(equivalent linear analysis)</span>, 곧 1차원 지반 응답 해석(SHAKE 계열)은 비선형 흙을 직접 풀지 않고, ① 처음에 \(G_{max}\)와 \(D_{min}\)으로 선형 해석을 하고 ② 각 층의 유효 변형률(최대 변형률의 약 0.65배)을 구해 ③ 그 변형률의 G와 D를 곡선에서 다시 읽고 ④ 값이 수렴할 때까지 되풀이한다. 강한 지진일수록 G가 작아져 고유 주기가 길어지고, 감쇠가 커져 증폭 봉우리가 낮아진다. 변형률이 1 %를 넘는 아주 큰 흔들림이나 간극수압 상승을 다루려면 시간 영역의 비선형 유효응력 해석이 필요하다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="site-response">
+    <h2>1차원 지반 응답: 고유 주기와 공진</h2>
+    <div class="problem"><strong>23 m의 흙은 몇 초에 한 번 흔들리고 싶어 하나</strong>
+      <p>기타 줄은 길이와 장력이 정하는 음으로 울립니다. 기반암 위에 놓인 흙층도 두께 H와 전단파 속도 V<sub>s</sub>가 정하는 주기로 "울립니다". 지진동에 그 주기 성분이 많으면 흙층은 <span class="term">공진</span><span class="en">(resonance)</span>하며 흔들림을 몇 배로 키우고, 같은 주기로 흔들리는 건물(대략 층수 × 0.1초)은 가장 큰 피해를 입습니다.</p></div>
+    <figure class="diagram" id="fig-dy-column">
+      <svg viewBox="0 0 860 350" role="img" aria-label="기반암 위 균질 흙층의 1차 모드 형상과 G-10 층별 전단파 속도 기둥">
+        <rect x="10" y="10" width="840" height="330" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="-12" class="t" style="font-weight:700">기반암 위 균질 흙층</text>
+          <rect x="0" y="10" width="200" height="200" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <rect x="0" y="210" width="200" height="40" style="fill:var(--bg-elev);stroke:var(--text-dim)"/>
+          <text x="100" y="236" text-anchor="middle" class="t-mono">기반암 ρ<tspan baseline-shift="sub" font-size="8">r</tspan>, V<tspan baseline-shift="sub" font-size="8">r</tspan></text>
+          <path d="M60 210 Q 62 120 130 10" style="fill:none;stroke:var(--accent-2);stroke-width:2.6"/>
+          <line x1="60" y1="210" x2="60" y2="10" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="136" y="24" class="t-mono" style="fill:var(--accent-2)">1차 모드</text>
+          <text x="136" y="40" class="t-mono" style="fill:var(--accent-2)">cos(πz/2H)</text>
+          <line x1="220" y1="10" x2="220" y2="210" style="stroke:var(--text-dim)" marker-start="url(#dy-ah-t)" marker-end="url(#dy-ah-t)"/>
+          <text x="228" y="114" class="t-mono">H</text>
+          <text x="100" y="120" text-anchor="middle" class="t-mono">ρ, V<tspan baseline-shift="sub" font-size="8">s</tspan>, D</text>
+          <text x="0" y="276" class="t-dim">1차 모드: H가 파장의 1/4</text>
+          <text x="0" y="292" class="t-mono">λ = 4H  →  T = 4H/V<tspan baseline-shift="sub" font-size="8">s</tspan></text>
+        </g>
+        <g transform="translate(360,30)">
+          <text x="0" y="-2" class="t" style="font-weight:700">G-10의 V<tspan baseline-shift="sub" font-size="9">s</tspan> 기둥(깊이 0–30 m)</text>
+          <rect x="0" y="10" width="110" height="16.8" style="fill:var(--accent);opacity:.18"/>
+          <rect x="0" y="26.8" width="110" height="33.6" style="fill:var(--accent);opacity:.3"/>
+          <rect x="0" y="60.4" width="110" height="67.2" style="fill:var(--accent);opacity:.5"/>
+          <rect x="0" y="127.6" width="110" height="42" style="fill:var(--accent);opacity:.22"/>
+          <rect x="0" y="169.6" width="110" height="33.6" style="fill:var(--accent);opacity:.38"/>
+          <rect x="0" y="203.2" width="110" height="58.8" style="fill:var(--text-dim);opacity:.35"/>
+          <rect x="0" y="10" width="110" height="252" style="fill:none;stroke:var(--text-dim)"/>
+          <line x1="-8" y1="26.8" x2="118" y2="26.8" style="stroke:var(--blue);stroke-dasharray:5 3"/>
+          <path d="M120 22 l6 8 l6 -8 z" style="fill:var(--blue)"/>
+          <text x="140" y="21" class="t-mono">매립층 150</text>
+          <text x="140" y="46" class="t-mono">느슨한 모래 140</text>
+          <text x="140" y="97" class="t-mono" style="fill:var(--accent)">연약 점토 110</text>
+          <text x="140" y="152" class="t-mono">모래 자갈 320</text>
+          <text x="140" y="190" class="t-mono">풍화토·풍화암 450</text>
+          <text x="140" y="236" class="t-mono">연암 900(기반암)</text>
+          <line x1="-14" y1="203.2" x2="300" y2="203.2" style="stroke:var(--bad);stroke-width:1.6;stroke-dasharray:6 3"/>
+          <text x="300" y="198" text-anchor="end" class="t-mono" style="fill:var(--bad)">기반암 상단 23 m</text>
+          <text x="-6" y="14" text-anchor="end" class="t-mono">0</text><text x="-6" y="207" text-anchor="end" class="t-mono">23</text><text x="-6" y="265" text-anchor="end" class="t-mono">30</text>
+          <text x="320" y="60" class="t-mono">토층 평균 V<tspan baseline-shift="sub" font-size="8">s</tspan> = 165 m/s</text>
+          <text x="320" y="80" class="t-mono">T = 4 × 0.139 = 0.56 s</text>
+          <text x="320" y="100" class="t-mono">V<tspan baseline-shift="sub" font-size="8">s30</tspan> = 204 m/s</text>
+          <text x="320" y="130" class="t-dim">임피던스 비</text>
+          <text x="320" y="148" class="t-mono">α ≈ 0.14</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-3.</b> 왼쪽: 강성 기반암 위 균질 흙층의 1차 진동 모드. 지표가 가장 크게 움직이고 바닥은 거의 고정되므로 흙층 두께가 파장의 1/4이다. 오른쪽: G-10의 층별 V<sub>s</sub>(m/s). 느린 연약 점토층이 통과 시간의 절반 이상을 차지한다. 숫자는 예제 15.1과 15.2.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.3 (감쇠가 있는 균질 흙층의 전달 함수)</strong> 탄성 <span class="term">기반암</span><span class="en">(bedrock)</span> 위에 두께 \(H\), 속도 \(V_s\), 감쇠비 \(D\)인 균질 흙층이 있을 때, 기반암 노두(露頭) 운동에 대한 지표 운동의 진폭비, 곧 <span class="term">전달 함수</span><span class="en">(transfer function)</span>의 크기는
+      <div class="formula">$$|F(\omega)| = \frac{1}{\left|\cos(k^* H) + i\,\alpha^*\sin(k^* H)\right|}, \qquad k^* = \frac{\omega}{V_s^*},\; V_s^* = V_s(1 + iD),\; \alpha^* = \frac{\rho_s V_s^*}{\rho_r V_r}$$<div class="where">\(\omega = 2\pi f\). 봉우리는 \(k H \approx (2n-1)\pi/2\)에서 생기므로 고유 진동수와 1차 <span class="term">고유 주기</span><span class="en">(natural period)</span>는
+      $$f_n = \frac{(2n-1)\,V_s}{4H}, \qquad T_1 = \frac{4H}{V_s}$$
+      1차 봉우리 높이는 대략 \(1/(\alpha + \pi D/2)\). 기반암이 단단할수록(\(\alpha\) 작음), 감쇠가 작을수록 공진 증폭이 크다. 기반암이 완전 강체이고 \(D = 0\)이면 무한대가 된다.</div></div></div>
+    <div class="callout"><strong>예제 15.2 (G-10의 고유 주기와 공진 증폭)</strong> 토층(0–23 m)을 통과 시간이 같은 등가 균질층 \(H = 23\) m, \(V_s = 165\) m/s로 바꾼다.
+      <ol style="margin:6px 0 0">
+        <li><b>고유 주기.</b> <code>CB.soil.period(23, 165)</code> \(= 4 \times 23/165 = 0.557\) s, \(f_1 = 1.79\) Hz. 2차는 \(3f_1 = 5.4\) Hz.</li>
+        <li><b>임피던스 비.</b> \(\rho_s \approx 1.9\), \(\rho_r = 2.45\) t/m³: \(\alpha = (1.9 \times 165)/(2.45 \times 900) = 0.142\).</li>
+        <li><b>공진 증폭.</b> 소변형 감쇠 \(D = 5\) %: \(1/(0.142 + 0.0785) \approx 4.5\)배. 강한 지진으로 \(D = 10\) %가 되면 약 3.6배, 그러나 G가 줄어 \(V_s\)가 예컨대 130 m/s로 떨어지면 주기는 0.71 s로 길어진다.</li>
+        <li><b>건물과의 관계.</b> 고유 주기 0.5–0.7 s는 대략 5–7층 건물의 주기와 겹친다(교육용 경험칙 T ≈ 0.1 × 층수). 지상 10층 B-10의 주기(약 1 s 안팎)는 지반 주기보다 조금 길다.</li>
+      </ol></div>
+    <div class="sim" id="sim-dy-tf">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>흙층의 증폭 곡선과 공진</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dy-stack">
+          <div><canvas id="dy-cv-tf" aria-label="진동수에 따른 지표 증폭비 곡선"></canvas></div>
+          <div><canvas id="dy-cv-mode" aria-label="입력 진동수에서 깊이별 흔들림 진폭"></canvas><span class="dy-cap">입력 진동수에서 깊이별 진폭 |u(z)/u<sub>암반 노두</sub>|</span></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>프리셋</span><div class="seg" id="dy-tf-pre"><button data-value="g10" class="on">G-10 등가층</button><button data-value="shallow">얕고 단단한 지반</button><button data-value="deep">깊은 연약 지반</button></div></div>
+          <label class="ctrl"><span>흙층 두께 H <output id="dy-tf-H-out"></output></span><input type="range" id="dy-tf-H" min="3" max="80" step="1" value="23"></label>
+          <label class="ctrl"><span><i style="font-style:normal">흙층 V<sub>s</sub></i> <output id="dy-tf-vs-out"></output></span><input type="range" id="dy-tf-vs" min="80" max="700" step="5" value="165"></label>
+          <label class="ctrl"><span>감쇠비 D <output id="dy-tf-d-out"></output></span><input type="range" id="dy-tf-d" min="0.5" max="20" step="0.5" value="5"></label>
+          <label class="ctrl"><span><i style="font-style:normal">기반암 V<sub>r</sub></i> <output id="dy-tf-vr-out"></output></span><input type="range" id="dy-tf-vr" min="400" max="3000" step="50" value="900"></label>
+          <label class="ctrl"><span>입력 진동수 f <output id="dy-tf-f-out"></output></span><input type="range" id="dy-tf-f" min="0.2" max="12" step="0.05" value="1.8"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">T<sub>1</sub> = 4H/V<sub>s</sub></span><span class="v" id="dy-tf-T">—</span></div>
+        <div class="stat"><span class="k">f<sub>1</sub> · f<sub>2</sub></span><span class="v" id="dy-tf-fn">—</span></div>
+        <div class="stat"><span class="k">1차 봉우리 증폭</span><span class="v" id="dy-tf-pk">—</span></div>
+        <div class="stat"><span class="k">입력 f에서 증폭</span><span class="v" id="dy-tf-af">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 입력 진동수를 f<sub>1</sub>에 맞추면 깊이별 진폭이 1/4 파장(cos) 모양이 되고, 3f<sub>1</sub>에서는 중간에 마디가 생깁니다 · 기반암 V<sub>r</sub>을 키우면 봉우리가 높아지고, 감쇠를 키우면 높은 차수의 봉우리부터 사라집니다 · 모델: 원리 15.3(복소 속도 V<sub>s</sub>(1 + iD)), ρ<sub>s</sub> = 1.9, ρ<sub>r</sub> = 2.45 t/m³ 고정, 연직 입사 SH파, 선형 탄성(등가 선형의 한 단계). CB.soil.period로 T<sub>1</sub> 계산.</div>
+    </div>
+    <div class="callout warn"><strong>"증폭 = 나쁨"만은 아니다</strong> 연약 지반은 단주기(높은 진동수) 성분은 오히려 줄이고(감쇠·비선형), 지반 주기 부근의 장주기 성분을 키운다. 그래서 연약 지반에서는 저층 강성 건물보다 고층·장대 구조물이 불리할 수 있고, 아주 강한 지진에서는 흙이 항복해 지표 가속도가 기반암보다 작아지기도 한다. 설계 응답 스펙트럼의 지반 증폭 계수가 지반 종류와 주기 구간에 따라 다른 이유다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="site-class">
+    <h2>지반 분류: 기반암 깊이와 평균 전단파 속도</h2>
+    <div class="problem"><strong>설계자는 지반 응답 해석 없이 어떻게 증폭을 넣나</strong>
+      <p>모든 건물에 지반 응답 해석을 할 수는 없습니다. 그래서 내진 기준은 지반을 몇 종류로 나누고, 종류마다 설계 스펙트럼을 키우는 <span class="term">지반 증폭 계수</span><span class="en">(site amplification factor)</span>를 줍니다. 분류의 잣대는 "얼마나 깊이까지 흙인가"와 "그 흙이 평균적으로 얼마나 단단한가"입니다.</p></div>
+    <p>미국 기준(NEHRP, ASCE 7)은 지표에서 30 m까지의 통과 시간 평균 속도 <span class="term">Vs30</span><span class="en">(time-averaged shear wave velocity to 30 m)</span> \(V_{s30}\)으로 지반을 A–F로 나눕니다(예: D 180–360 m/s, E 180 m/s 미만, 액상화 가능 지반은 부지 고유 평가가 필요한 F). 우리나라 내진설계 일반(KDS 17 10 00)은 국내 지반에 기반암이 얕은 곳이 많다는 점을 반영해 <b>기반암 깊이 H</b>(전단파 속도 약 760 m/s 이상인 층의 상단)와 <b>토층 평균 전단파 속도 V<sub>s,soil</sub></b>로 S1(암반)–S5와 부지 고유 평가 대상 S6을 나눈다. 기반암이 아주 얕으면 S1, 기반암이 20 m 안쪽이면 토층 속도에 따라 S2·S3(얕은 지반), 20 m보다 깊으면 S4·S5(깊은 지반)로 나누는 꼴이다. 경계값은 현행 기준을 확인할 것.</p>
+    <div class="callout def"><strong>정의 15.4 (통과 시간 평균 전단파 속도)</strong>
+      <div class="formula">$$V_{s30} = \frac{30}{\sum_{i} h_i / V_{s,i}} \quad(\textstyle\sum h_i = 30\ \text{m}), \qquad V_{s,soil} = \frac{H}{\sum_{\text{토층}} h_i / V_{s,i}}$$<div class="where">산술 평균이 아니라 전단파가 지나가는 시간으로 평균한다(조화 평균). 얇아도 느린 층의 영향이 크다. \(H\): 기반암 상단 깊이.</div></div></div>
+    <div class="sim" id="sim-dy-vs30">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>V<sub>s30</sub>과 지반 분류 계산기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dy-cv-vs30" aria-label="층별 전단파 속도와 누적 통과 시간"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>매립층(0–2 m) <output id="dy-vs-1-out"></output></span><input type="range" id="dy-vs-1" min="80" max="400" step="5" value="150"></label>
+          <label class="ctrl"><span>느슨한 모래(2–6 m) <output id="dy-vs-2-out"></output></span><input type="range" id="dy-vs-2" min="80" max="400" step="5" value="140"></label>
+          <label class="ctrl"><span>연약 점토(6–14 m) <output id="dy-vs-3-out"></output></span><input type="range" id="dy-vs-3" min="60" max="400" step="5" value="110"></label>
+          <label class="ctrl"><span>모래 자갈(14–19 m) <output id="dy-vs-4-out"></output></span><input type="range" id="dy-vs-4" min="150" max="700" step="10" value="320"></label>
+          <label class="ctrl"><span>풍화토·풍화암(19–23 m) <output id="dy-vs-5-out"></output></span><input type="range" id="dy-vs-5" min="200" max="900" step="10" value="450"></label>
+          <label class="ctrl"><span>연암(23 m 이하) <output id="dy-vs-6-out"></output></span><input type="range" id="dy-vs-6" min="400" max="2000" step="20" value="900"></label>
+          <div class="btn-row"><button class="btn" id="dy-vs-reset">G-10 값으로</button><button class="btn" id="dy-vs-imp">점토층을 SCP로 개량(V<sub>s</sub> 200)</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">V<sub>s30</sub></span><span class="v" id="dy-vs-30">—</span></div>
+        <div class="stat"><span class="k">기반암 깊이 H · V<sub>s,soil</sub></span><span class="v" id="dy-vs-soil">—</span></div>
+        <div class="stat"><span class="k">T = 4H/V<sub>s,soil</sub></span><span class="v" id="dy-vs-T">—</span></div>
+        <div class="stat"><span class="k">분류(교육용 판정)</span><span class="v" id="dy-vs-cls">—</span></div>
+      </div>
+      <div class="dy-msg" id="dy-vs-msg"></div>
+      <div class="sim-note">해볼 것: 연약 점토의 V<sub>s</sub>만 바꿔도 V<sub>s30</sub>이 크게 움직이는 것을 보세요 · 연암의 V<sub>s</sub>를 760 m/s 아래로 내리면 30 m 안에 기반암이 없게 됩니다 · 모델: 정의 15.4, 기반암 = V<sub>s</sub> ≥ 760 m/s인 첫 층. 국내 분류는 KDS 17 10 00 형태(H ≤ 1 m S1, 1–20 m는 V<sub>s,soil</sub> 260 m/s 기준으로 S2/S3, 20 m 초과는 180 m/s 기준으로 S4/S5)를 교육용으로 옮긴 것이며, 경계값과 S6 조건은 현행 기준을 확인할 것. NEHRP는 V<sub>s30</sub>(A &gt; 1,500, B 760–1,500, C 360–760, D 180–360, E &lt; 180 m/s).</div>
+    </div>
+    <div class="callout site"><strong>G-10의 V<sub>s30</sub>과 지반 종류</strong> 층별 통과 시간 0.0133 + 0.0286 + 0.0727 + 0.0156 + 0.0089 = 0.1391 s(0–23 m), 여기에 연암 7 m가 7/900 = 0.0078 s. \(V_{s30} = 30/0.1469 = 204\) m/s → NEHRP D(180–360). 국내 분류 방식으로는 기반암 깊이 23 m(20 m 초과), \(V_{s,soil} = 165\) m/s로 "깊고 연약한 지반" 쪽에 든다(교육용 판정 S5, 현행 KDS 17 10 00 확인). 다만 GL −2 ~ −6 m의 느슨한 모래가 액상화 가능 층이므로(15.6절), 기준에 따라 부지 고유의 지반 응답 해석이 요구될 수 있다. 지반 주기 \(T = 4 \times 23/165 = 0.56\) s.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="liquefaction">
+    <h2>액상화의 메커니즘</h2>
+    <div class="problem"><strong>모래가 왜 물처럼 되나</strong>
+      <p>9장에서 느슨한 모래는 전단을 받으면 부피가 줄어든다(수축 다일러턴시)고 배웠습니다. 천천히 전단하면 물이 빠져나가며 조금 조밀해질 뿐입니다. 그런데 지진은 1초에 1–2번씩 수십 번 흔듭니다. 투수 계수 2 × 10⁻⁵ m/s의 실트질 모래 4 m 층에서 물이 빠지려면 그보다 훨씬 오래 걸립니다. 줄어들고 싶은데 줄어들 수 없는 흙에서는 무슨 일이 생길까요?</p></div>
+    <p>물이 빠지지 못하면(비배수) 부피는 그대로이므로, 수축하려는 경향은 흙 뼈대 대신 <b>간극수가 하중을 넘겨받는</b> 꼴로 나타납니다. 반복할 때마다 과잉 간극수압 \(\Delta u\)가 쌓이고, 전응력은 그대로이므로 유효응력 \(\sigma' = \sigma - u\)가 줄어듭니다(4장). \(\Delta u\)가 처음 유효응력 \(\sigma'_{v0}\)에 이르면 입자 사이 접촉력이 거의 0이 되어 흙은 전단 강도와 강성을 잃습니다. 이것이 <span class="term">액상화</span><span class="en">(liquefaction)</span>입니다.</p>
+    <figure class="diagram" id="fig-dy-mech">
+      <svg viewBox="0 0 860 300" role="img" aria-label="액상화 전, 중, 후의 입자 배열과 간극수압 비">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="0" y="0" width="220" height="150" style="fill:var(--blue);opacity:.12;stroke:var(--blue)"/>
+          <g style="fill:var(--accent);opacity:.85;stroke:var(--text);stroke-width:.8">
+            <circle cx="30" cy="30" r="17"/><circle cx="72" cy="26" r="17"/><circle cx="116" cy="34" r="17"/><circle cx="160" cy="28" r="17"/><circle cx="198" cy="40" r="15"/>
+            <circle cx="46" cy="72" r="17"/><circle cx="96" cy="74" r="17"/><circle cx="142" cy="72" r="17"/><circle cx="188" cy="82" r="17"/>
+            <circle cx="26" cy="118" r="17"/><circle cx="70" cy="116" r="17"/><circle cx="118" cy="120" r="17"/><circle cx="162" cy="122" r="17"/><circle cx="202" cy="126" r="14"/>
+          </g>
+          <text x="110" y="176" text-anchor="middle" class="t" style="font-weight:700">① 지진 전: 느슨한 배열</text>
+          <text x="110" y="196" text-anchor="middle" class="t-dim">접촉점이 유효응력 σ′<tspan baseline-shift="sub" font-size="8">v0</tspan>을 나른다</text>
+          <text x="110" y="214" text-anchor="middle" class="t-mono">r<tspan baseline-shift="sub" font-size="8">u</tspan> = Δu/σ′<tspan baseline-shift="sub" font-size="8">v0</tspan> = 0</text>
+        </g>
+        <g transform="translate(320,40)">
+          <rect x="0" y="0" width="220" height="150" style="fill:var(--blue);opacity:.22;stroke:var(--blue)"/>
+          <g style="fill:var(--accent);opacity:.85;stroke:var(--text);stroke-width:.8">
+            <circle cx="28" cy="24" r="17"/><circle cx="80" cy="36" r="17"/><circle cx="124" cy="22" r="17"/><circle cx="174" cy="40" r="17"/>
+            <circle cx="40" cy="80" r="17"/><circle cx="104" cy="88" r="17"/><circle cx="150" cy="70" r="17"/><circle cx="198" cy="96" r="16"/>
+            <circle cx="22" cy="126" r="16"/><circle cx="72" cy="124" r="17"/><circle cx="130" cy="128" r="17"/><circle cx="178" cy="130" r="15"/>
+          </g>
+          <line x1="-30" y1="75" x2="-6" y2="75" style="stroke:var(--accent-2);stroke-width:2.4" marker-start="url(#dy-ah-ld)" marker-end="url(#dy-ah-ld)"/>
+          <text x="110" y="176" text-anchor="middle" class="t" style="font-weight:700">② 반복 전단 중: 입자가 떠 있다</text>
+          <text x="110" y="196" text-anchor="middle" class="t-dim">수축하려는 만큼 간극수압이 오른다</text>
+          <text x="110" y="214" text-anchor="middle" class="t-mono" style="fill:var(--bad)">r<tspan baseline-shift="sub" font-size="8">u</tspan> → 1, σ′ → 0</text>
+        </g>
+        <g transform="translate(600,40)">
+          <rect x="0" y="20" width="220" height="130" style="fill:var(--blue);opacity:.12;stroke:var(--blue)"/>
+          <line x1="0" y1="0" x2="220" y2="0" style="stroke:var(--text-faint);stroke-dasharray:4 3"/>
+          <text x="216" y="-4" text-anchor="end" class="t-mono">처음 지표</text>
+          <g style="fill:var(--accent);opacity:.85;stroke:var(--text);stroke-width:.8">
+            <circle cx="22" cy="44" r="17"/><circle cx="58" cy="42" r="17"/><circle cx="94" cy="46" r="17"/><circle cx="130" cy="42" r="17"/><circle cx="166" cy="46" r="17"/><circle cx="200" cy="44" r="16"/>
+            <circle cx="40" cy="80" r="17"/><circle cx="76" cy="80" r="17"/><circle cx="112" cy="80" r="17"/><circle cx="148" cy="80" r="17"/><circle cx="184" cy="80" r="17"/>
+            <circle cx="22" cy="116" r="17"/><circle cx="58" cy="116" r="17"/><circle cx="94" cy="116" r="17"/><circle cx="130" cy="116" r="17"/><circle cx="166" cy="116" r="17"/><circle cx="202" cy="118" r="15"/>
+          </g>
+          <line x1="110" y1="20" x2="110" y2="-16" style="stroke:var(--blue);stroke-width:2.2" marker-end="url(#dy-ah-w)"/>
+          <text x="110" y="176" text-anchor="middle" class="t" style="font-weight:700">③ 지진 후: 물이 빠지며 재압밀</text>
+          <text x="110" y="196" text-anchor="middle" class="t-dim">조밀해진 만큼 지표가 가라앉는다</text>
+          <text x="110" y="214" text-anchor="middle" class="t-mono">모래 분출 · 침하</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-4.</b> 액상화의 세 단계(개념도). 반복 전단 동안 비배수 조건이라 수축하지 못한 만큼 간극수압이 오르고, 간극수압비 r<sub>u</sub>가 1에 가까워지면 입자가 물에 뜬 상태가 된다. 지진 뒤 과잉 간극수압이 빠지면서(물이 위로 솟아 모래를 뿜는다) 흙은 조밀해지고 지표가 침하한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 15.5 (간극수압비와 액상화)</strong> 반복 하중 중의 과잉 간극수압 \(\Delta u\)를 처음 연직 유효응력으로 나눈
+      <div class="formula">$$r_u = \frac{\Delta u}{\sigma'_{v0}}$$<div class="where">를 <span class="term">간극수압비</span><span class="en">(excess pore pressure ratio)</span>라 한다. \(r_u = 1\)이면 유효응력이 0인 <b>초기 액상화</b>다. 실내 반복 삼축 시험에서는 \(r_u \approx 1\) 또는 양진폭 축 변형률 5 %에 이른 반복 횟수 \(N_L\)을 액상화 기준으로 쓴다. 조밀한 모래는 \(r_u\)가 1에 닿아도 전단하면 팽창하며 강도를 되찾아 변형이 한정되는데, 이를 <span class="term">반복 유동성</span><span class="en">(cyclic mobility)</span>이라 해 느슨한 모래의 흐름 액상화와 구별한다.</div></div></div>
+    <p>액상화가 잘 일어나는 흙은 ① <b>포화</b>되어 있고(지하수위 아래), ② <b>느슨하며</b>(N값·상대 밀도가 작음), ③ 물이 빨리 빠지지 못할 만큼 고운 <b>모래·실트질 모래</b>이고, ④ 지표에 가까워 구속압이 작은 <b>젊은 퇴적층·매립층</b>입니다. 점토는 입자 사이 점착이 있어 같은 방식으로 액상화하지 않지만(소성 지수가 큰 흙은 대개 판정에서 제외), 저소성 실트는 비슷한 거동을 보일 수 있어 별도 기준으로 판단합니다. 자갈도 배수가 빠르지만 위가 불투수층으로 막히면 액상화한 사례가 있습니다.</p>
+    <div class="sim" id="sim-dy-cyclic">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>반복 삼축 시험: 간극수압이 쌓이는 과정</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dy-stack">
+          <div><canvas id="dy-cv-cyc" aria-label="반복 횟수에 따른 축차 응력, 간극수압비, 축 변형률"></canvas></div>
+          <div><canvas id="dy-cv-path" aria-label="p′–q 평면의 유효응력 경로"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">(N<sub>1</sub>)<sub>60cs</sub> (시료의 조밀함)</i> <output id="dy-cy-n-out"></output></span><input type="range" id="dy-cy-n" min="3" max="28" step="0.1" value="11.1"></label>
+          <label class="ctrl"><span>현장 등가 반복 응력비 CSR <output id="dy-cy-c-out"></output></span><input type="range" id="dy-cy-c" min="0.05" max="0.40" step="0.005" value="0.19"></label>
+          <label class="ctrl"><span><i style="font-style:normal">압밀 압력 p′<sub>0</sub></i> <output id="dy-cy-p-out"></output></span><input type="range" id="dy-cy-p" min="30" max="200" step="1" value="54"></label>
+          <label class="ctrl"><span>반복 횟수 N <output id="dy-cy-N-out"></output></span><input type="range" id="dy-cy-N" min="0" max="40" step="0.05" value="8"></label>
+          <div class="btn-row"><button class="btn primary" id="dy-cy-play">▶ 시험 시작</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">CRR(15회, M7.5)</span><span class="v" id="dy-cy-crr">—</span></div>
+        <div class="stat"><span class="k">액상화 반복 횟수 N<sub>L</sub></span><span class="v" id="dy-cy-nl">—</span></div>
+        <div class="stat"><span class="k">간극수압비 r<sub>u</sub></span><span class="v" id="dy-cy-ru">—</span></div>
+        <div class="stat"><span class="k">양진폭 축 변형률</span><span class="v" id="dy-cy-ea">—</span></div>
+      </div>
+      <div class="dy-msg" id="dy-cy-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(G-10 4 m: (N<sub>1</sub>)<sub>60cs</sub> 11.1, CSR 0.19)에서 몇 번 만에 액상화하는지 보세요 · (N<sub>1</sub>)<sub>60cs</sub>를 20 이상으로 올리면 r<sub>u</sub>가 1에 닿아도 변형이 작게 묶이는 반복 유동성이 됩니다 · 모델: 간극수압 r<sub>u</sub> = (2/π) arcsin[(N/N<sub>L</sub>)<sup>1/(2θ)</sup>], θ = 0.7(시드·부커 형태), N<sub>L</sub> = 15(CRR/CSR)<sup>1/b</sup>, b = 0.34(교육용), CRR = CB.soil.CRR. 삼축 응력비는 현장 CSR/0.6으로 환산(교육용 c<sub>r</sub> = 0.6), φ′ = 30°의 파괴선 안에서 q를 자름. 변형률 곡선은 개념적 모델.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="simplified">
+    <h2>간편 판정법: CSR과 CRR</h2>
+    <div class="problem"><strong>B-10 부지 GL −4 m는 액상화하나</strong>
+      <p>설계 지진 0.22g, 지하수위 GL −2.0 m, 느슨한 실트질 모래의 N값 6, 세립분 15 %. 지반 응답 해석이나 반복 삼축 시험 없이, 표준관입시험 결과만으로 1차 판정을 하는 방법이 간편 판정법입니다. 지진이 주는 응력비(수요)와 흙이 견디는 응력비(능력)를 같은 잣대로 비교합니다.</p></div>
+    <figure class="diagram" id="fig-dy-flow">
+      <svg viewBox="0 0 860 260" role="img" aria-label="간편 판정법의 흐름: 지진 하중 쪽 CSR과 저항 쪽 CRR을 계산해 안전율을 구한다">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g style="font-size:12px">
+          <rect x="30" y="30" width="170" height="54" rx="8" class="f-acc2-soft"/><text x="115" y="52" text-anchor="middle" class="t">a<tspan baseline-shift="sub" font-size="8">max</tspan>, σ<tspan baseline-shift="sub" font-size="8">v</tspan>, σ′<tspan baseline-shift="sub" font-size="8">v</tspan>, r<tspan baseline-shift="sub" font-size="8">d</tspan>(z)</text><text x="115" y="72" text-anchor="middle" class="t-mono">지진·응력 단면</text>
+          <rect x="250" y="30" width="200" height="54" rx="8" class="f-acc2-soft"/><text x="350" y="52" text-anchor="middle" class="t">CSR = 0.65 (a/g)(σ/σ′) r<tspan baseline-shift="sub" font-size="8">d</tspan></text><text x="350" y="72" text-anchor="middle" class="t-mono">수요(하중)</text>
+          <rect x="30" y="160" width="170" height="54" rx="8" class="f-acc-soft"/><text x="115" y="182" text-anchor="middle" class="t">N → N<tspan baseline-shift="sub" font-size="8">60</tspan> → (N<tspan baseline-shift="sub" font-size="8">1</tspan>)<tspan baseline-shift="sub" font-size="8">60</tspan></text><text x="115" y="202" text-anchor="middle" class="t-mono">에너지·상재압 보정 C<tspan baseline-shift="sub" font-size="8">N</tspan></text>
+          <rect x="250" y="160" width="200" height="54" rx="8" class="f-acc-soft"/><text x="350" y="182" text-anchor="middle" class="t">(N<tspan baseline-shift="sub" font-size="8">1</tspan>)<tspan baseline-shift="sub" font-size="8">60cs</tspan> = α + β(N<tspan baseline-shift="sub" font-size="8">1</tspan>)<tspan baseline-shift="sub" font-size="8">60</tspan></text><text x="350" y="202" text-anchor="middle" class="t-mono">세립분 보정</text>
+          <rect x="500" y="160" width="150" height="54" rx="8" class="f-acc-soft"/><text x="575" y="182" text-anchor="middle" class="t">CRR<tspan baseline-shift="sub" font-size="8">7.5</tspan> × MSF</text><text x="575" y="202" text-anchor="middle" class="t-mono">능력(저항)</text>
+          <rect x="690" y="95" width="140" height="60" rx="8" style="fill:var(--bg-elev);stroke:var(--text)"/><text x="760" y="120" text-anchor="middle" class="t" style="font-weight:700">FS = CRR/CSR</text><text x="760" y="140" text-anchor="middle" class="t-mono">&lt; 1 이면 액상화</text>
+          <line x1="200" y1="57" x2="246" y2="57" style="stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#dy-ah-t)"/>
+          <line x1="200" y1="187" x2="246" y2="187" style="stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#dy-ah-t)"/>
+          <line x1="450" y1="187" x2="496" y2="187" style="stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#dy-ah-t)"/>
+          <path d="M450 57 L 640 57 Q 680 57 690 110" style="fill:none;stroke:var(--accent-2);stroke-width:1.8" marker-end="url(#dy-ah-ld)"/>
+          <path d="M650 187 Q 680 187 690 145" style="fill:none;stroke:var(--accent);stroke-width:1.8" marker-end="url(#dy-ah-t)"/>
+          <text x="500" y="110" class="t-mono">규모 M → MSF = 10<tspan baseline-shift="super" font-size="8">2.24</tspan>/M<tspan baseline-shift="super" font-size="8">2.56</tspan></text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-5.</b> 간편 판정법의 흐름. 위쪽은 지진이 주는 반복 전단응력비(CSR), 아래쪽은 N값으로 추정한 흙의 저항(CRR). 규모 7.5 기준으로 만든 CRR을 <span class="term">규모 보정 계수</span><span class="en">(magnitude scaling factor, MSF)</span>로 다른 규모에 맞춘다.</figcaption>
+    </figure>
+    <p>깊이 \(z\)의 흙 기둥이 강체라면 바닥의 전단응력은 \(\tau = (a_{max}/g)\sigma_v\)입니다. 실제 흙은 변형하므로 이보다 작고(<span class="term">응력 감소 계수</span><span class="en">(stress reduction factor)</span> \(r_d\)), 불규칙한 지진 기록의 최대값 대신 그 65 %를 "등가 균일 반복 응력"으로 씁니다. 이를 유효응력으로 나누면 깊이와 무관하게 비교할 수 있는 응력비, 곧 <span class="term">반복 전단응력비</span><span class="en">(cyclic stress ratio, CSR)</span>가 됩니다. 흙이 견디는 쪽은 <span class="term">반복 저항 응력비</span><span class="en">(cyclic resistance ratio, CRR)</span>로 같은 꼴로 나타냅니다.</p>
+    <div class="callout def"><strong>원리 15.6 (반복 전단응력비, 시드–이드리스)</strong>
+      <div class="formula">$$CSR = \frac{\tau_{av}}{\sigma'_{v0}} = 0.65\,\frac{a_{max}}{g}\,\frac{\sigma_{v0}}{\sigma'_{v0}}\,r_d, \qquad r_d = \begin{cases}1 - 0.00765\,z & z \le 9.15\ \text{m}\\ 1.174 - 0.0267\,z & 9.15 \lt z \le 23\ \text{m}\end{cases}$$<div class="where">\(a_{max}\): 지표 최대 가속도, \(\sigma_{v0}\), \(\sigma'_{v0}\): 판정 깊이의 전응력·유효응력. \(r_d\)는 리아오–휘트먼 형태(<code>CB.soil.rd</code>, <code>CB.soil.CSR</code>). \(\sigma_{v0}/\sigma'_{v0}\) 때문에 지하수위 바로 아래가 가장 크게 불리하다.</div></div></div>
+    <div class="callout def"><strong>원리 15.7 (N값에 의한 저항 응력비, Youd et al. 2001 형태)</strong>
+      <div class="formula">$$(N_1)_{60} = C_N\,N_{60}, \quad C_N = \left(\frac{p_a}{\sigma'_{v0}}\right)^{0.5} \le 1.7$$
+      $$(N_1)_{60cs} = \alpha + \beta\,(N_1)_{60}, \quad \alpha = e^{\,1.76 - 190/FC^2},\ \ \beta = 0.99 + \frac{FC^{1.5}}{1000}\quad(5 \lt FC \lt 35\ \%)$$
+      $$CRR_{7.5} = \frac{1}{34 - (N_1)_{60cs}} + \frac{(N_1)_{60cs}}{135} + \frac{50}{\left[10\,(N_1)_{60cs} + 45\right]^2} - \frac{1}{200}$$
+      $$FS_L = \frac{CRR_{7.5}\cdot MSF}{CSR}, \qquad MSF = \frac{10^{2.24}}{M^{2.56}}$$<div class="where">\(p_a\) = 101.3 kPa(<code>CB.soil.CN</code>). \(N_{60}\)은 해머 에너지 60 %로 보정한 N값(1장, 로드 길이·시추공 지름·샘플러 보정 포함). 세립분 \(FC \le 5\) %이면 \(\alpha = 0\), \(\beta = 1\), \(FC \ge 35\) %이면 \(\alpha = 5\), \(\beta = 1.2\). CRR 식은 \((N_1)_{60cs} \lt 30\)에서만 쓰고, 30 이상은 "너무 조밀해 액상화하지 않음"으로 본다(<code>CB.soil.CRR</code>). 유효응력이 약 100 kPa보다 크면 구속압 보정 \(K_\sigma\)(1보다 작음)를 더 곱한다.</div></div></div>
+    <div class="callout"><strong>예제 15.3 (G-10, GL −4 m의 액상화 판정)</strong> \(a_{max} = 0.22g\), 지하수위 2.0 m, N = 6(이 책은 G-10의 N값을 이미 에너지·장비 보정을 마친 \(N_{60}\)으로 둔다, 교육용), FC = 15 %, M = 7.5.
+      <ol style="margin:6px 0 0">
+        <li><b>응력.</b> \(\sigma_{v0} = 18.0 \times 2 + 19.0 \times 2 = 74.0\) kPa, \(u = 2 \times 9.81 = 19.6\) kPa, \(\sigma'_{v0} = 54.4\) kPa.</li>
+        <li><b>응력 감소 계수.</b> \(r_d = 1 - 0.00765 \times 4 = 0.969\).</li>
+        <li><b>CSR.</b> \(0.65 \times 0.22 \times (74.0/54.4) \times 0.969 = 0.143 \times 1.361 \times 0.969 = 0.189\).</li>
+        <li><b>상재압 보정.</b> \(C_N = \sqrt{101.3/54.4} = 1.365\), \((N_1)_{60} = 1.365 \times 6 = 8.19\).</li>
+        <li><b>세립분 보정.</b> \(\alpha = e^{1.76 - 190/225} = e^{0.916} = 2.50\), \(\beta = 0.99 + 15^{1.5}/1000 = 1.048\). \((N_1)_{60cs} = 2.50 + 1.048 \times 8.19 = 11.08\).</li>
+        <li><b>CRR.</b> \(1/22.92 + 11.08/135 + 50/155.8^2 - 0.005 = 0.0436 + 0.0821 + 0.0021 - 0.005 = 0.123\).</li>
+        <li><b>안전율.</b> \(FS_L = 0.123/0.189 = 0.65 \lt 1\) → <b>액상화한다</b>. 기준이 요구하는 안전율(대개 1보다 큰 값, 현행 기준 확인)에 크게 못 미친다.</li>
+      </ol></div>
+    <div class="sim" id="sim-dy-profile">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>G-10 액상화 판정 단면</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dy-cv-prof" aria-label="깊이별 CSR, CRR, 액상화 안전율 단면"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">지표 최대 가속도 a<sub>max</sub></i> <output id="dy-pf-a-out"></output></span><input type="range" id="dy-pf-a" min="0.05" max="0.5" step="0.01" value="0.22"></label>
+          <label class="ctrl"><span>지진 규모 M <output id="dy-pf-m-out"></output></span><input type="range" id="dy-pf-m" min="5.5" max="8.5" step="0.1" value="7.5"></label>
+          <label class="ctrl"><span>지하수위 깊이 <output id="dy-pf-w-out"></output></span><input type="range" id="dy-pf-w" min="0" max="6" step="0.1" value="2"></label>
+          <label class="ctrl"><span><i style="font-style:normal">느슨한 모래 N<sub>60</sub></i> <output id="dy-pf-n-out"></output></span><input type="range" id="dy-pf-n" min="2" max="30" step="1" value="6"></label>
+          <label class="ctrl"><span>느슨한 모래 세립분 FC <output id="dy-pf-fc-out"></output></span><input type="range" id="dy-pf-fc" min="0" max="50" step="1" value="15"></label>
+          <label class="ctrl"><span>판정 깊이 z <output id="dy-pf-z-out"></output></span><input type="range" id="dy-pf-z" min="0.5" max="19.5" step="0.25" value="4"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">CSR(z)</span><span class="v" id="dy-pf-csr">—</span></div>
+        <div class="stat"><span class="k">(N<sub>1</sub>)<sub>60</sub> → (N<sub>1</sub>)<sub>60cs</sub></span><span class="v" id="dy-pf-n1">—</span></div>
+        <div class="stat"><span class="k">CRR × MSF</span><span class="v" id="dy-pf-crr">—</span></div>
+        <div class="stat"><span class="k">FS<sub>L</sub>(z)</span><span class="v" id="dy-pf-fs">—</span></div>
+        <div class="stat"><span class="k">액상화 지수 LPI</span><span class="v" id="dy-pf-lpi">—</span></div>
+      </div>
+      <div class="dy-msg" id="dy-pf-msg"></div>
+      <div class="sim-note">해볼 것: 기본값에서 4 m의 FS ≈ 0.65를 확인하세요 · 지하수위를 4 m로 낮추면 위쪽 모래가 불포화가 되어 판정에서 빠지고, 아래쪽도 유효응력이 커져 FS가 오릅니다 · 규모를 6.5로 줄이면 MSF ≈ 1.44 · 모델: 원리 15.6·15.7, CB.soil.site 형태의 응력 단면(CB.soil.profile, 지하수위 바꿈), CB.soil.rd·CSR·CN·CRR. 매립층은 FC 10 %(교육용 가정)로 지하수위 아래만 판정, 연약 점토(PI 34)는 판정 제외, 모래 자갈(N 40)은 (N<sub>1</sub>)<sub>60cs</sub> ≥ 30으로 비액상화. K<sub>σ</sub> = 1. LPI = ∫<sub>0</sub><sup>20</sup> F(z)(10 − 0.5z)dz, F = 1 − FS(FS &lt; 1)(이와사키).</div>
+    </div>
+    <div class="callout warn"><strong>판정은 깊이 하나가 아니라 층 전체로</strong> 같은 층에서도 지하수위 바로 아래(2 m)는 FS ≈ 1.0, 6 m는 약 0.54로 아래로 갈수록 불리하다. 이 층의 대표 N값 6은 여러 시추공의 흩어진 값(예: 4–9)을 대표한 것이므로, 실제 판정은 시추공마다·시험 위치마다 하고, 액상화하는 층의 두께와 깊이를 <span class="term">액상화 지수</span><span class="en">(liquefaction potential index, LPI)</span>나 침하량으로 종합한다. LPI 0–5 낮음, 5–15 높음, 15 초과 매우 높음(이와사키 등의 구분)이 흔히 쓰인다. G-10 기본값의 LPI는 약 10으로 "높음"이다.</div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="consequences">
+    <h2>액상화의 결과: 침하, 분출, 측방 유동, 말뚝 피해</h2>
+    <div class="problem"><strong>FS 0.65가 실제로 뜻하는 것</strong>
+      <p>"액상화한다"는 판정은 건물이 반드시 무너진다는 뜻이 아닙니다. 피해는 액상화 층의 두께와 깊이, 그 위 비액상화 층의 두께, 지표가 기울었는지, 구조물의 기초 형식에 따라 크게 다릅니다.</p></div>
+    <figure class="diagram" id="fig-dy-damage">
+      <svg viewBox="0 0 860 300" role="img" aria-label="액상화 피해 양상: 모래 분출, 얕은 기초의 침하와 기울어짐, 매설관 부상, 측방 유동과 말뚝 휨">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <rect x="30" y="80" width="800" height="40" style="fill:var(--accent);opacity:.16"/>
+        <rect x="30" y="120" width="800" height="70" style="fill:var(--blue);opacity:.18"/>
+        <rect x="30" y="190" width="800" height="80" style="fill:var(--accent);opacity:.32"/>
+        <line x1="30" y1="80" x2="830" y2="80" class="s-axis"/>
+        <text x="40" y="110" class="t-mono">비액상화 표층</text><text x="40" y="160" class="t-mono" style="fill:var(--blue)">액상화 층(r<tspan baseline-shift="sub" font-size="8">u</tspan> ≈ 1)</text><text x="40" y="240" class="t-mono">단단한 층</text>
+        <path d="M150 80 q 8 -18 16 0 M146 80 l 4 -6 M170 80 l -4 -6" style="fill:var(--accent);stroke:var(--accent)"/>
+        <line x1="158" y1="160" x2="158" y2="84" style="stroke:var(--blue);stroke-width:2" marker-end="url(#dy-ah-w)"/>
+        <text x="158" y="56" text-anchor="middle" class="t-dim">모래 분출</text>
+        <g transform="rotate(6 290 76)"><rect x="250" y="48" width="80" height="50" style="fill:var(--bg-elev);stroke:var(--text)"/></g>
+        <text x="290" y="28" text-anchor="middle" class="t-dim">얕은 기초: 침하·기울어짐</text>
+        <rect x="400" y="96" width="30" height="20" rx="4" style="fill:var(--bg-elev);stroke:var(--text)"/>
+        <line x1="415" y1="94" x2="415" y2="70" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#dy-ah-ld)"/>
+        <text x="415" y="56" text-anchor="middle" class="t-dim">맨홀·관 부상</text>
+        <path d="M560 80 L 830 92" style="stroke:var(--text);stroke-width:1.5;fill:none"/>
+        <rect x="600" y="40" width="80" height="20" style="fill:var(--bg-elev);stroke:var(--text)"/>
+        <path d="M615 60 C 615 120, 640 150, 640 270" style="fill:none;stroke:var(--text);stroke-width:4"/>
+        <path d="M665 60 C 665 120, 690 150, 690 270" style="fill:none;stroke:var(--text);stroke-width:4"/>
+        <line x1="700" y1="150" x2="780" y2="150" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#dy-ah-ld)"/>
+        <line x1="700" y1="170" x2="760" y2="170" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#dy-ah-ld)"/>
+        <text x="790" y="142" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">측방 유동</text>
+        <circle cx="640" cy="190" r="7" style="fill:none;stroke:var(--bad);stroke-width:2"/><circle cx="690" cy="190" r="7" style="fill:none;stroke:var(--bad);stroke-width:2"/>
+        <text x="640" y="30" text-anchor="middle" class="t-dim">말뚝: 휨 파괴(층 경계)</text>
+        <text x="820" y="76" text-anchor="end" class="t-mono">완만한 경사·호안 쪽으로</text>
+      </svg>
+      <figcaption><b>그림 15-6.</b> 액상화의 대표 피해(개념도). 과잉 간극수압이 빠지며 <span class="term">모래 분출</span><span class="en">(sand boil)</span>이 생기고, 얕은 기초는 지지력을 잃어 침하·기울어지며, 가벼운 매설물(맨홀·관)은 떠오른다. 지표가 조금이라도 기울었거나 호안처럼 자유면이 있으면 액상화 층이 옆으로 흘러(<span class="term">측방 유동</span><span class="en">(lateral spreading)</span>) 말뚝에 큰 수평 하중을 주고, 말뚝은 액상화 층과 단단한 층의 경계(빨간 원)에서 휨 파괴되기 쉽다.</figcaption>
+    </figure>
+    <p>지진 뒤 과잉 간극수압이 빠지면서 일어나는 <span class="term">재압밀 침하</span><span class="en">(post-liquefaction reconsolidation settlement)</span>는 액상화 층 체적 변형률의 합입니다. 느슨한 모래는 액상화 뒤 체적 변형률이 수 %에 이르므로, 4 m 두께의 층이면 지표가 10 cm 넘게 가라앉을 수 있습니다(이시하라–요시미네의 도표가 대표적인 추정법). 액상화 층 위에 비액상화 층이 충분히 두꺼우면 지표 피해(분출, 기초 침하)가 줄어든다는 관찰(이시하라의 경계 곡선)도 판단에 쓰입니다. 말뚝은 지지층에 닿아 있어도 액상화 층에서 수평 지지를 잃고 부주면 마찰력(14장)을 받으므로, 말뚝 기초라고 안전하다고 단정할 수 없습니다.</p>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="countermeasures">
+    <h2>액상화 대책</h2>
+    <div class="problem"><strong>판정식의 어느 항을 바꿀 것인가</strong>
+      <p>FS = CRR × MSF / CSR. 지진(a<sub>max</sub>, M)은 바꿀 수 없습니다. 남은 손잡이는 흙의 저항(조밀하게, 굳게)과 응력 상태(지하수위를 낮춰 σ′를 키우고 포화 영역을 없애기), 그리고 간극수압이 쌓이지 못하게 빨리 빼는 것입니다.</p></div>
+    <figure class="diagram" id="fig-dy-remedy">
+      <svg viewBox="0 0 860 270" role="img" aria-label="액상화 대책의 원리: 다짐, 고결, 배수, 지하수위 저하, 구조적 대책">
+        <rect x="10" y="10" width="840" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(30,30)">
+          <rect x="0" y="40" width="150" height="110" style="fill:var(--accent);opacity:.28"/>
+          <g style="fill:var(--accent);stroke:var(--text);stroke-width:.6"><circle cx="30" cy="70" r="9"/><circle cx="75" cy="72" r="9"/><circle cx="120" cy="70" r="9"/><circle cx="30" cy="120" r="9"/><circle cx="75" cy="120" r="9"/><circle cx="120" cy="120" r="9"/></g>
+          <text x="75" y="22" text-anchor="middle" class="t" style="font-weight:700">① 다짐</text>
+          <text x="75" y="172" text-anchor="middle" class="t-mono">SCP·진동 다짐·동다짐</text>
+          <text x="75" y="190" text-anchor="middle" class="t-dim">N값 ↑ → CRR ↑</text>
+        </g>
+        <g transform="translate(195,30)">
+          <rect x="0" y="40" width="150" height="110" style="fill:var(--accent);opacity:.18"/>
+          <rect x="20" y="40" width="40" height="110" style="fill:var(--text-dim);opacity:.6"/><rect x="90" y="40" width="40" height="110" style="fill:var(--text-dim);opacity:.6"/>
+          <text x="75" y="22" text-anchor="middle" class="t" style="font-weight:700">② 고결</text>
+          <text x="75" y="172" text-anchor="middle" class="t-mono">심층 혼합·약액 주입</text>
+          <text x="75" y="190" text-anchor="middle" class="t-dim">입자를 붙여 버린다</text>
+        </g>
+        <g transform="translate(360,30)">
+          <rect x="0" y="40" width="150" height="110" style="fill:var(--blue);opacity:.15"/>
+          <rect x="35" y="40" width="16" height="110" style="fill:var(--text-faint)"/><rect x="100" y="40" width="16" height="110" style="fill:var(--text-faint)"/>
+          <line x1="15" y1="95" x2="33" y2="95" style="stroke:var(--blue);stroke-width:2" marker-end="url(#dy-ah-w)"/><line x1="72" y1="95" x2="54" y2="95" style="stroke:var(--blue);stroke-width:2" marker-end="url(#dy-ah-w)"/>
+          <line x1="43" y1="60" x2="43" y2="36" style="stroke:var(--blue);stroke-width:2" marker-end="url(#dy-ah-w)"/>
+          <text x="75" y="22" text-anchor="middle" class="t" style="font-weight:700">③ 배수</text>
+          <text x="75" y="172" text-anchor="middle" class="t-mono">쇄석 기둥(그래블 드레인)</text>
+          <text x="75" y="190" text-anchor="middle" class="t-dim">Δu가 쌓이기 전에 뺀다</text>
+        </g>
+        <g transform="translate(525,30)">
+          <rect x="0" y="40" width="150" height="110" style="fill:var(--accent);opacity:.18"/>
+          <rect x="0" y="100" width="150" height="50" style="fill:var(--blue);opacity:.18"/>
+          <line x1="0" y1="60" x2="150" y2="60" style="stroke:var(--blue);stroke-dasharray:4 3;opacity:.5"/>
+          <line x1="0" y1="100" x2="150" y2="100" style="stroke:var(--blue);stroke-dasharray:5 3"/>
+          <line x1="75" y1="62" x2="75" y2="96" style="stroke:var(--blue);stroke-width:2" marker-end="url(#dy-ah-w)"/>
+          <text x="75" y="22" text-anchor="middle" class="t" style="font-weight:700">④ 지하수위 저하</text>
+          <text x="75" y="172" text-anchor="middle" class="t-mono">배수·차수벽 + 양수</text>
+          <text x="75" y="190" text-anchor="middle" class="t-dim">불포화 + σ′ ↑</text>
+        </g>
+        <g transform="translate(690,30)">
+          <rect x="0" y="40" width="140" height="110" style="fill:var(--blue);opacity:.15"/>
+          <rect x="30" y="20" width="80" height="22" style="fill:var(--bg-elev);stroke:var(--text)"/>
+          <line x1="45" y1="42" x2="45" y2="150" style="stroke:var(--text);stroke-width:4"/><line x1="95" y1="42" x2="95" y2="150" style="stroke:var(--text);stroke-width:4"/>
+          <line x1="10" y1="40" x2="10" y2="150" style="stroke:var(--ok);stroke-width:5"/><line x1="130" y1="40" x2="130" y2="150" style="stroke:var(--ok);stroke-width:5"/>
+          <text x="70" y="10" text-anchor="middle" class="t" style="font-weight:700">⑤ 구조적 대책</text>
+          <text x="70" y="172" text-anchor="middle" class="t-mono">말뚝 보강·전단 구속벽</text>
+          <text x="70" y="190" text-anchor="middle" class="t-dim">액상화해도 견딘다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-7.</b> 액상화 대책의 다섯 갈래. ①은 CRR, ④는 CSR(σ/σ′)와 포화 영역, ②는 흙의 성질 자체, ③은 비배수 가정을 바꾼다. ⑤는 액상화를 허용하되 구조물이 견디게 한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-dy-remedy">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>대책 비교: 다짐과 지하수위 저하</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dy-cv-rem" aria-label="개량 전후 깊이별 액상화 안전율과 침하 추정"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>대책</span><div class="seg" id="dy-rm-mode"><button data-value="none">없음</button><button data-value="comp" class="on">다짐(SCP)</button><button data-value="dw">지하수위 저하</button><button data-value="both">둘 다</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">개량 후 N<sub>60</sub>(모래층)</i> <output id="dy-rm-n-out"></output></span><input type="range" id="dy-rm-n" min="6" max="28" step="1" value="15"></label>
+          <label class="ctrl"><span>낮춘 지하수위 깊이 <output id="dy-rm-w-out"></output></span><input type="range" id="dy-rm-w" min="2" max="7" step="0.1" value="4"></label>
+          <label class="ctrl"><span><i style="font-style:normal">a<sub>max</sub></i> <output id="dy-rm-a-out"></output></span><input type="range" id="dy-rm-a" min="0.1" max="0.4" step="0.01" value="0.22"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">GL −4 m FS<sub>L</sub>(전 → 후)</span><span class="v" id="dy-rm-fs4">—</span></div>
+        <div class="stat"><span class="k">모래층 최소 FS<sub>L</sub></span><span class="v" id="dy-rm-fsmin">—</span></div>
+        <div class="stat"><span class="k">LPI(전 → 후)</span><span class="v" id="dy-rm-lpi">—</span></div>
+        <div class="stat"><span class="k">재압밀 침하 추정</span><span class="v" id="dy-rm-s">—</span></div>
+      </div>
+      <div class="dy-msg" id="dy-rm-msg"></div>
+      <div class="sim-note">해볼 것: 다짐으로 N<sub>60</sub>을 몇까지 올려야 모래층 전체의 FS가 1.2를 넘는지 찾아보세요 · 지하수위만 6 m 아래로 낮추면 모래층이 불포화가 됩니다(그러나 연약 점토층 위의 유효응력이 늘어 압밀 침하가 생기는 부작용이 있습니다, 7장) · 모델: 위 판정 단면과 같은 식(M 7.5, FC 15 %, 개량 후에도 FC 같음). 재압밀 체적 변형률 ε<sub>v</sub> ≈ (5.0 − 0.15(N<sub>1</sub>)<sub>60cs</sub>) %(최소 0.5 %)를 FS ≤ 1에서 전부, FS 1–1.3에서 선형으로 줄여 적용 — 이시하라–요시미네 도표의 경향만 흉내 낸 교육용 근사.</div>
+    </div>
+    <div class="callout site"><strong>B-10 부지의 액상화와 대책</strong> B-10 건물 바로 아래는 지하 굴착(GL −11 m)으로 느슨한 모래층이 모두 걷혀 나가고, 매트 기초와 PHC 말뚝(선단 GL −21 m)이 하중을 받으므로 건물 자체의 액상화 침하는 문제가 작다. 대신 ① 굴착 바깥의 지하연속벽 배면(벽에 작용하는 지진 시 토압과 수압 증가), ② 진입 도로 성토 E-4 아래(액상화 시 성토의 침하·측방 유동), ③ 부지 내 매설관과 맨홀, ④ T-36 교대의 강관 말뚝(액상화 층에서 수평 지지 상실)이 검토 대상이다. 교육용 계산으로는 모래층을 N<sub>60</sub> 약 15 이상으로 다지면 GL −4 m의 FS가 1을 넘고, 층 전체를 1.2 이상으로 하려면 더 다져야 한다. 요구 안전율과 판정 절차는 현행 KDS 17 10 00과 관련 기준을 확인할 것.</div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="machine">
+    <h2>기계 기초 진동 맛보기</h2>
+    <div class="problem"><strong>B-10 지하 기계실의 냉각탑 펌프</strong>
+      <p>지진이 아니어도 지반은 흔들립니다. 회전 기계(펌프·압축기·발전기)는 하루 종일 일정한 진동수로 기초를 두드립니다. 기초–지반 계의 고유 진동수가 운전 진동수와 가까우면 공진해 기계가 상하고 이웃 실에 진동이 퍼집니다. 지반의 \(G_{max}\)가 여기서 다시 쓰입니다.</p></div>
+    <p>원형 강성 기초(반지름 \(r_0\), 질량 \(m\))가 탄성 반무한 지반 위에서 연직으로 진동할 때, 지반은 스프링과 감쇠기처럼 행동합니다. 감쇠의 대부분은 재료 감쇠가 아니라 에너지가 파동으로 멀리 퍼져 나가는 <span class="term">방사 감쇠</span><span class="en">(radiation damping)</span>입니다.</p>
+    <div class="callout def"><strong>원리 15.8 (연직 진동의 리스머 유사 모델)</strong>
+      <div class="formula">$$k_z = \frac{4\,G\,r_0}{1-\nu}, \qquad f_n = \frac{1}{2\pi}\sqrt{\frac{k_z}{m}}, \qquad B_z = \frac{1-\nu}{4}\,\frac{m}{\rho\,r_0^3}, \qquad D_z = \frac{0.425}{\sqrt{B_z}}$$<div class="where">\(B_z\): 질량비, \(D_z\): 방사 감쇠비. 일정 진폭의 힘 \(F_0\)에 대한 동적 확대 계수는 \(M = 1/\sqrt{(1-r^2)^2 + (2D_z r)^2}\), \(r = f/f_n\). 무거운 기초(큰 \(B_z\))일수록 감쇠가 작아 공진이 날카롭다. 불평형 회전 질량이 주는 힘은 진동수의 제곱에 비례하므로 응답 곡선의 모양이 다르다.</div></div></div>
+    <div class="sim" id="sim-dy-machine">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>기계 기초의 공진 회피</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dy-cv-mach" aria-label="진동수 비에 따른 동적 확대 계수와 운전 진동수"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>기초+기계 질량 m <output id="dy-mc-m-out"></output></span><input type="range" id="dy-mc-m" min="10" max="400" step="5" value="60"></label>
+          <label class="ctrl"><span><i style="font-style:normal">등가 반지름 r<sub>0</sub></i> <output id="dy-mc-r-out"></output></span><input type="range" id="dy-mc-r" min="0.5" max="5" step="0.1" value="2"></label>
+          <label class="ctrl"><span>지반 G(소변형) <output id="dy-mc-g-out"></output></span><input type="range" id="dy-mc-g" min="10" max="400" step="1" value="41"></label>
+          <label class="ctrl"><span>운전 회전수 <output id="dy-mc-rpm-out"></output></span><input type="range" id="dy-mc-rpm" min="300" max="3600" step="30" value="1500"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">k<sub>z</sub></span><span class="v" id="dy-mc-k">—</span></div>
+        <div class="stat"><span class="k">고유 진동수 f<sub>n</sub></span><span class="v" id="dy-mc-fn">—</span></div>
+        <div class="stat"><span class="k">B<sub>z</sub> · D<sub>z</sub></span><span class="v" id="dy-mc-d">—</span></div>
+        <div class="stat"><span class="k">r = f/f<sub>n</sub> · 확대 계수</span><span class="v" id="dy-mc-M">—</span></div>
+      </div>
+      <div class="dy-msg" id="dy-mc-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(매립층 G 41 MPa 위 60 t 기초, 1,500 rpm = 25 Hz)에서 f<sub>n</sub> ≈ 14 Hz로 운전 진동수가 공진보다 위에 있습니다 · 질량을 크게 하면 f<sub>n</sub>이 내려가고 감쇠도 줄어듭니다 · 모델: 원리 15.8, ν = 0.33, ρ = 1.84 t/m³, 일정 진폭 가진력. 공진 회피 여유 ±20 % 이상은 교육용 경험칙이며 실제 허용 진폭은 기계 제조사 기준과 관련 기준을 따릅니다.</div>
+    </div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="investigation.html"><small>CH.01 · 흙과 지반 조사</small>N값과 V<sub>s</sub>를 재는 곳<br><span>표준관입시험의 에너지 보정, 탄성파 탐사와 SCPT.</span></a>
+      <a href="effective-stress.html"><small>CH.04 · 유효응력</small>σ′ = σ − u가 0이 되는 순간<br><span>액상화는 유효응력 원리의 극단적인 예다.</span></a>
+      <a href="shear-strength.html"><small>CH.09 · 흙의 전단강도</small>다일러턴시와 비배수 전단<br><span>느슨한 모래의 수축 경향이 간극수압을 만든다.</span></a>
+      <a href="earth-pressure.html"><small>CH.10 · 토압</small>지진 시 토압<br><span>모노노베–오카베 식의 수평 지진 계수 k<sub>h</sub>.</span></a>
+      <a href="piles.html"><small>CH.14 · 깊은 기초: 말뚝</small>액상화 층을 지나는 말뚝<br><span>수평 지지 상실, 측방 유동, 부주면 마찰력.</span></a>
+      <a href="rock.html"><small>CH.16 · 암반 공학 입문</small>기반암의 V<sub>s</sub><br><span>지반 분류의 기준면, 연암과 풍화암의 경계.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>지반 응답은 대개 연직으로 올라오는 S파의 1차원 문제다. G<sub>max</sub> = ρV<sub>s</sub>²(G-10 연약 점토 20 MPa, 연암 약 2,000 MPa). 임피던스 ρV<sub>s</sub>가 작은 층에서 흔들림이 커진다.</li>
+      <li>흙의 강성은 변형률이 커지면 떨어지고(G/G<sub>max</sub> = 1/(1 + (γ/γ<sub>r</sub>)<sup>a</sup>)), 감쇠는 커진다(D = ΔW/4πW). 점토·깊은 흙은 γ<sub>r</sub>이 커서 더 선형적이다. 등가 선형 해석은 이 곡선으로 G와 D를 반복 갱신한다.</li>
+      <li>균질 흙층의 고유 주기 T = 4H/V<sub>s</sub>, 고유 진동수 f<sub>n</sub> = (2n − 1)V<sub>s</sub>/4H, 공진 증폭 ≈ 1/(α + πD/2). G-10: 평균 V<sub>s</sub> 165 m/s, T = 0.56 s, 증폭 약 4.5배(D 5 %).</li>
+      <li>V<sub>s30</sub>과 토층 평균 V<sub>s</sub>는 통과 시간으로 평균한다. G-10: V<sub>s30</sub> = 204 m/s(NEHRP D), 기반암 23 m·V<sub>s,soil</sub> 165 m/s(국내 분류 방식으로 깊고 연약한 지반, 현행 KDS 17 10 00 확인).</li>
+      <li>액상화: 포화된 느슨한 모래가 반복 전단으로 비배수 수축하려 해 간극수압이 오르고 σ′ → 0. 반복 유동성(조밀)과 흐름 액상화(느슨)를 구별한다.</li>
+      <li>간편 판정: CSR = 0.65(a<sub>max</sub>/g)(σ<sub>v</sub>/σ′<sub>v</sub>)r<sub>d</sub>, (N<sub>1</sub>)<sub>60</sub> = C<sub>N</sub>N<sub>60</sub>, 세립분 보정 α + β(N<sub>1</sub>)<sub>60</sub>, CRR<sub>7.5</sub>, MSF, FS = CRR·MSF/CSR. G-10 4 m: 0.189, 8.19, 11.08, 0.123 → FS 0.65.</li>
+      <li>피해는 재압밀 침하·분출·기초 침하·관 부상·측방 유동·말뚝 휨. 대책은 다짐(CRR ↑), 고결, 배수(Δu 소산), 지하수위 저하(포화 영역 제거·σ′ ↑), 구조적 보강이다.</li>
+      <li>기계 기초는 k<sub>z</sub> = 4Gr<sub>0</sub>/(1 − ν)와 방사 감쇠로 고유 진동수를 구해 운전 진동수와 충분히 떨어뜨린다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. γ<sub>sat</sub> = 19.0 kN/m³, V<sub>s</sub> = 140 m/s인 모래의 G<sub>max</sub>는 약?</p><div class="opts">
+        <button class="opt">2.7 MPa</button><button class="opt" data-correct>38 MPa</button><button class="opt">266 MPa</button><button class="opt">380 MPa</button>
+      </div><div class="quiz-exp">\(\rho = 19.0/9.81 = 1.937\) t/m³, \(G_{max} = 1.937 \times 140^2 = 37{,}960\) kPa ≈ 38 MPa. t/m³ × (m/s)² = kPa.</div></div>
+      <div class="quiz-q"><p>2. 두께 30 m, V<sub>s</sub> = 200 m/s인 균질 흙층의 1차 고유 주기는?</p><div class="opts">
+        <button class="opt">0.15 s</button><button class="opt">0.3 s</button><button class="opt" data-correct>0.6 s</button><button class="opt">1.67 s</button>
+      </div><div class="quiz-exp">\(T = 4H/V_s = 120/200 = 0.6\) s. 1차 모드에서 흙층 두께는 파장의 1/4이다.</div></div>
+      <div class="quiz-q"><p>3. 반복 변형률 진폭이 커질 때 흙의 할선 전단 탄성계수와 감쇠비의 변화는?</p><div class="opts">
+        <button class="opt">둘 다 커진다</button><button class="opt" data-correct>G는 작아지고 감쇠는 커진다</button><button class="opt">G는 커지고 감쇠는 작아진다</button><button class="opt">둘 다 변하지 않는다</button>
+      </div><div class="quiz-exp">이력 곡선이 눕고(G<sub>sec</sub> 감소) 넓어진다(ΔW 증가). 그래서 강한 지진에서는 지반 주기가 길어지고 증폭 봉우리가 낮아진다.</div></div>
+      <div class="quiz-q"><p>4. 0–10 m가 V<sub>s</sub> 100 m/s, 10–30 m가 V<sub>s</sub> 400 m/s일 때 V<sub>s30</sub>은?</p><div class="opts">
+        <button class="opt" data-correct>200 m/s</button><button class="opt">250 m/s</button><button class="opt">300 m/s</button><button class="opt">325 m/s</button>
+      </div><div class="quiz-exp">통과 시간 = 10/100 + 20/400 = 0.10 + 0.05 = 0.15 s, \(V_{s30} = 30/0.15 = 200\) m/s. 두께 가중 산술 평균(300 m/s)보다 느린 층의 영향이 크다.</div></div>
+      <div class="quiz-q"><p>5. CSR = 0.65(a<sub>max</sub>/g)(σ<sub>v</sub>/σ′<sub>v</sub>)r<sub>d</sub>에서 지하수위가 지표 가까이 올라오면 CSR은?</p><div class="opts">
+        <button class="opt">작아진다</button><button class="opt" data-correct>커진다(σ<sub>v</sub>/σ′<sub>v</sub>가 커진다)</button><button class="opt">변하지 않는다</button><button class="opt">0이 된다</button>
+      </div><div class="quiz-exp">전응력은 거의 같은데 간극수압이 커져 σ′<sub>v</sub>가 줄어든다. 동시에 CN이 커져 (N<sub>1</sub>)<sub>60</sub>도 조금 커지지만, 대개 CSR 증가가 더 커서 FS가 떨어진다.</div></div>
+      <div class="quiz-q"><p>6. 세립분 15 %인 실트질 모래의 (N<sub>1</sub>)<sub>60</sub> = 8.2를 Youd et al.(2001) 형태로 보정하면 (N<sub>1</sub>)<sub>60cs</sub>는 약?</p><div class="opts">
+        <button class="opt">8.2</button><button class="opt">9.0</button><button class="opt" data-correct>11.1</button><button class="opt">16.4</button>
+      </div><div class="quiz-exp">α = e<sup>1.76 − 190/225</sup> = 2.50, β = 0.99 + 15<sup>1.5</sup>/1000 = 1.048 → 2.50 + 1.048 × 8.19 = 11.1. 같은 N값이면 세립분이 있는 모래가 저항이 크다고 본다(사례 자료의 경향).</div></div>
+      <div class="quiz-q"><p>7. 같은 지반에서 지진 규모만 7.5에서 6.5로 줄면 액상화 안전율은?</p><div class="opts">
+        <button class="opt">약 0.7배로 준다</button><button class="opt">변하지 않는다</button><button class="opt" data-correct>약 1.44배로 커진다</button><button class="opt">2배 이상 커진다</button>
+      </div><div class="quiz-exp">MSF = 10<sup>2.24</sup>/6.5<sup>2.56</sup> ≈ 1.44. 규모가 작으면 반복 횟수(지속 시간)가 적어 같은 응력비에서도 액상화하기 어렵다. 가속도가 같다는 가정이다.</div></div>
+      <div class="quiz-q"><p>8. 다음 중 액상화 대책과 그 원리의 짝이 <b>틀린</b> 것은?</p><div class="opts">
+        <button class="opt">모래 다짐 말뚝 — N값을 키워 CRR을 높인다</button><button class="opt">쇄석 배수 기둥 — 과잉 간극수압을 빨리 소산시킨다</button><button class="opt">지하수위 저하 — 포화 영역을 없애고 유효응력을 키운다</button><button class="opt" data-correct>지표에 성토 — 전응력을 늘려 CSR의 σ<sub>v</sub>/σ′<sub>v</sub>를 키운다</button>
+      </div><div class="quiz-exp">성토는 σ<sub>v</sub>와 σ′<sub>v</sub>를 같은 양만큼 늘려 σ<sub>v</sub>/σ′<sub>v</sub>를 오히려 줄이고 비액상화 표층을 두껍게 만든다. "CSR을 키운다"는 설명이 틀렸다. 다만 연약 점토 위에서는 압밀 침하라는 대가가 따른다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const DYX = {
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = o.stroke || CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  alpha(c, a) { const ctx = DYX._c || (DYX._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  /** 깊이가 아래로 가는 패널: box {x,y,w,h}, 가로 [x0,x1], 깊이 [0,zmax] */
+  dpanel(ctx, box, xr, zmax, o = {}) {
+    const pal = CB.palette(), X = (v) => box.x + ((v - xr[0]) / (xr[1] - xr[0])) * box.w, Y = (z) => box.y + (z / zmax) * box.h;
+    ctx.save(); ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.lineWidth = 1;
+    ctx.strokeStyle = pal.grid; ctx.fillStyle = pal.dim;
+    (o.xticks || []).forEach((v) => { const px = X(v); ctx.beginPath(); ctx.moveTo(px, box.y); ctx.lineTo(px, box.y + box.h); ctx.stroke(); ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(o.xfmt ? o.xfmt(v) : String(v), px, box.y - 3); });
+    if (o.zticks !== false) { const step = o.zstep || 5; for (let z = 0; z <= zmax + 1e-9; z += step) { const py = Y(z); ctx.beginPath(); ctx.moveTo(box.x, py); ctx.lineTo(box.x + box.w, py); ctx.stroke(); if (o.zlabels !== false) { ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(String(z), box.x - 4, py); } } }
+    ctx.strokeStyle = pal.axis; ctx.strokeRect(box.x, box.y, box.w, box.h);
+    if (o.label) { ctx.fillStyle = pal.dim; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.font = "11.5px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.fillText(o.label, box.x + box.w / 2, box.y + box.h + 6); }
+    ctx.restore();
+    return { X, Y };
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  gwl(ctx, x0, x1, y, pal) {
+    ctx.save(); ctx.strokeStyle = pal.blue; ctx.lineWidth = 1.4; ctx.setLineDash([5, 3]); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]);
+    const xm = x1 - 12; ctx.fillStyle = pal.blue; ctx.beginPath(); ctx.moveTo(xm - 5, y - 9); ctx.lineTo(xm + 5, y - 9); ctx.lineTo(xm, y - 1); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+};
+/* G-10 층과 V_s(교육용) */
+const DY_LAY = CB.soil.SITE.layers.map((l, i) => ({ ...l, Vs: [150, 140, 110, 320, 450, 900][i], rho: (l.top < CB.soil.SITE.gwl ? l.g : l.gsat) / CB.soil.gw }));
+const DY_SHADE = [0.16, 0.28, 0.48, 0.2, 0.36, 0.22];
+/* 액상화 판정(원리 15.6·15.7): 이 장의 판정 단면·대책 시뮬레이터가 같이 쓴다 */
+const DYL = {
+  fines(FC) { if (FC <= 5) return { a: 0, b: 1 }; if (FC >= 35) return { a: 5, b: 1.2 }; return { a: Math.exp(1.76 - 190 / (FC * FC)), b: 0.99 + Math.pow(FC, 1.5) / 1000 }; },
+  MSF(M) { return Math.pow(10, 2.24) / Math.pow(M, 2.56); },
+  at(z, o) {
+    const gwl = o.gwl, p = CB.soil.profile(CB.soil.SITE.layers, gwl).at(z);
+    let N, FC, name;
+    if (z < 2) { N = 8; FC = 10; name = "매립층"; }
+    else if (z < 6) { N = o.N; FC = o.FC; name = "느슨한 모래"; }
+    else if (z < 14) return { status: "clay", name: "연약 점토", p };
+    else if (z < 19) { N = 40; FC = 5; name = "모래 자갈"; }
+    else { N = 50; FC = 5; name = "풍화토"; }
+    const csr = CB.soil.CSR(o.amax, p.sv, p.s, z);
+    if (z <= gwl) return { status: "unsat", name, p, csr };
+    const CN = CB.soil.CN(p.s), n1 = CN * N, f = DYL.fines(FC), ncs = f.a + f.b * n1, crr7 = CB.soil.CRR(ncs), msf = DYL.MSF(o.M ?? 7.5), crr = crr7 * msf;
+    return { status: "ok", name, p, csr, CN, n1, ncs, crr7, msf, crr, fs: crr / csr, FC, N };
+  },
+  lpi(o) { let s = 0; for (let z = 0.05; z < 20; z += 0.1) { const r = DYL.at(z, o); if (r.status === "ok" && r.fs < 1) s += (1 - r.fs) * (10 - 0.5 * z) * 0.1; } return s; },
+  ev(r) { if (r.status !== "ok" || !isFinite(r.fs)) return 0; const em = Math.max(0.5, 5.0 - 0.15 * r.ncs) / 100; if (r.fs <= 1) return em; if (r.fs < 1.3) return em * (1.3 - r.fs) / 0.3; return 0; },
+  settle(o) { let s = 0; for (let z = 0.05; z < 6; z += 0.1) s += DYL.ev(DYL.at(z, o)) * 0.1; return s; },
+  fsTxt(fs) { return !isFinite(fs) ? "비액상화" : CB.num(fs, 2); },
+};
+
+/* ---------- 1. 전단파 전파 ---------- */
+(function () {
+  const site = CB.seg("dy-wv-site", go), gtp = CB.range("dy-wv-tp", (v) => v.toFixed(2) + " s", go), gsp = CB.range("dy-wv-sp", (v) => v.toFixed(2) + "×", null), gt = CB.range("dy-wv-t", (v) => v.toFixed(3) + " s", go);
+  gt.el.max = 1.2;
+  const ZB = 30;
+  const lay = () => site() === "g10" ? DY_LAY.map((l) => ({ top: l.top, bottom: Math.min(ZB, l.bottom), Vs: l.Vs, rho: l.rho, name: l.name })) : [{ top: 0, bottom: 23, Vs: 400, rho: 2.0, name: "균질 지반" }, { top: 23, bottom: ZB, Vs: 900, rho: 2.446, name: "연암" }];
+  const at = (L, z) => L.find((l) => z >= l.top && z <= l.bottom) || L[L.length - 1];
+  const tau = (L, z) => { let s = 0; for (const l of L) { if (z <= l.top) break; s += (Math.min(z, l.bottom) - l.top) / l.Vs; } return s; };
+  const zOfTau = (L, t) => { let s = 0; for (const l of L) { const dt = (l.bottom - l.top) / l.Vs; if (s + dt >= t) return l.top + (t - s) * l.Vs; s += dt; } return ZB; };
+  const ricker = (t, f) => { const a = Math.PI * Math.PI * f * f * t * t; return (1 - 2 * a) * Math.exp(-a); };
+  let playing = false;
+  const cv = CB.canvas("#dy-cv-wave", (ctx, W, H) => {
+    const pal = CB.palette(), L = lay(), T30 = tau(L, ZB), Tp = gtp(), t = gt(), t0 = Tp, f = 1 / Tp, rb = L[L.length - 1];
+    const narrow = W < 560, cw = narrow ? W * 0.5 : Math.min(300, W * 0.42), bx = 44, by = 24, bh = H - by - 40;
+    const Y = (z) => by + (z / ZB) * bh, xc = bx + cw / 2;
+    L.forEach((l, i) => { ctx.fillStyle = l.Vs >= 760 ? DYX.alpha(pal.dim, 0.3) : DYX.alpha(pal.accent, DY_SHADE[i % 6]); ctx.fillRect(bx, Y(l.top), cw, Y(l.bottom) - Y(l.top)); });
+    ctx.strokeStyle = pal.dim; ctx.lineWidth = 1; ctx.strokeRect(bx, by, cw, bh);
+    ctx.fillStyle = pal.dim; ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let z = 0; z <= ZB; z += 5) ctx.fillText(String(z), bx - 5, Y(z));
+    ctx.save(); ctx.translate(12, by + bh / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText("깊이 z (m)", 0, 0); ctx.restore();
+    if (!narrow) L.forEach((l) => DYX.text(ctx, `${l.name} ${l.Vs}`, bx + cw - 6, (Y(l.top) + Y(l.bottom)) / 2, pal.dim, { size: 10, align: "right", bold: false }));
+    // 변위 곡선
+    const amp = (z) => Math.sqrt((rb.rho * rb.Vs) / (at(L, z).rho * at(L, z).Vs));
+    const Amax = Math.sqrt((rb.rho * rb.Vs) / Math.min(...L.map((l) => l.rho * l.Vs))) * 2, sc = (cw * 0.42) / Amax, pts = [];
+    for (let i = 0; i <= 300; i++) { const z = (ZB * i) / 300, ts = tau(L, z), tup = T30 - ts, tdn = T30 + ts; const u = amp(z) * (ricker(t - t0 - tup, f) + (z < ZB ? ricker(t - t0 - tdn, f) : 0)); pts.push([xc + u * sc, Y(z)]); }
+    ctx.save(); ctx.strokeStyle = pal.faint; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(xc, by); ctx.lineTo(xc, by + bh); ctx.stroke(); ctx.restore();
+    DYX.line(ctx, pts, pal.accent2, 2.6);
+    // 지표 건물
+    const u0 = amp(0) * (ricker(t - t0 - T30, f) * 2);
+    ctx.fillStyle = pal.elev; ctx.strokeStyle = pal.text; ctx.lineWidth = 1.2; ctx.fillRect(xc - 14 + u0 * sc, by - 16, 28, 16); ctx.strokeRect(xc - 14 + u0 * sc, by - 16, 28, 16);
+    // 도달 시간 그림
+    const px = bx + cw + 52, pw = W - px - 16;
+    if (pw > 90) {
+      const tmax = gt.el.max * 1, X = (tt) => px + (tt / tmax) * pw;
+      ctx.strokeStyle = pal.grid; ctx.lineWidth = 1; ctx.fillStyle = pal.dim; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (let tt = 0; tt <= tmax + 1e-9; tt += 0.2) { ctx.beginPath(); ctx.moveTo(X(tt), by); ctx.lineTo(X(tt), by + bh); ctx.stroke(); ctx.fillText(tt.toFixed(1), X(tt), by + bh + 4); }
+      for (let z = 0; z <= ZB; z += 5) { ctx.beginPath(); ctx.moveTo(px, Y(z)); ctx.lineTo(px + pw, Y(z)); ctx.stroke(); }
+      ctx.strokeStyle = pal.axis; ctx.strokeRect(px, by, pw, bh);
+      ctx.font = "11.5px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.fillText("시간 t (s) — 파 중심이 깊이 z를 지나는 시각", px + pw / 2, by + bh + 20);
+      const up = [], dn = [];
+      for (let i = 0; i <= 120; i++) { const z = (ZB * i) / 120, ts = tau(L, z); up.push([X(t0 + T30 - ts), Y(z)]); dn.push([X(t0 + T30 + ts), Y(z)]); }
+      DYX.line(ctx, up, pal.accent2, 2.2); DYX.line(ctx, dn, pal.accent2, 1.6, [5, 4]);
+      ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(X(Math.min(t, tmax)), by); ctx.lineTo(X(Math.min(t, tmax)), by + bh); ctx.stroke(); ctx.restore();
+      DYX.text(ctx, "올라옴", X(t0 + T30 * 0.35) - 6, Y(ZB * 0.75), pal.accent2, { size: 10.5, align: "right" });
+      DYX.text(ctx, "반사(내려감)", X(t0 + T30 * 1.6) + 6, Y(ZB * 0.75), pal.accent2, { size: 10.5, align: "left" });
+    }
+  }, { aspect: (W) => (W < 560 ? 1.05 : 0.6), minHeight: 300, maxHeight: 440 });
+  function go() {
+    cv.redraw();
+    const L = lay(), T30 = tau(L, ZB), Tp = gtp(), t = gt() - Tp;
+    CB.stat("dy-wv-tt", CB.num(T30, 3) + " s");
+    let z = null, dir = "";
+    if (t < 0) { CB.stat("dy-wv-lay", "기반암 아래(아직)"); }
+    else if (t <= T30) { z = zOfTau(L, T30 - t); dir = "↑"; }
+    else if (t <= 2 * T30) { z = zOfTau(L, t - T30); dir = "↓"; }
+    else CB.stat("dy-wv-lay", "기반암으로 빠져나감");
+    const l = z != null ? at(L, Math.min(ZB, Math.max(0, z))) : at(L, ZB);
+    if (z != null) CB.stat("dy-wv-lay", `${dir} ${CB.num(z, 1)} m ${l.name} · ${l.Vs} m/s`);
+    CB.stat("dy-wv-lam", CB.num(l.Vs * Tp, 1) + " m");
+    const rb = L[L.length - 1], s0 = L[0];
+    CB.stat("dy-wv-amp", CB.num(Math.sqrt((rb.rho * rb.Vs) / (s0.rho * s0.Vs)), 2) + " 배");
+  }
+  const loop = CB.loop(document.getElementById("sim-dy-wave"), (dt) => { if (!playing) return; let v = gt() + dt * gsp(); const end = Math.min(1.2, gtp() * 2.2 + 2 * tau(lay(), ZB)); if (v >= end) { v = end; playing = false; btn.set(false); } gt.set(Math.round(v * 1000) / 1000); });
+  const btn = CB.playButton("dy-wv-play", () => { const end = Math.min(1.2, gtp() * 2.2 + 2 * tau(lay(), ZB)); if (gt() >= end - 0.003) gt.set(0); playing = true; loop.start(); }, () => { playing = false; }, ["▶ 파 보내기", "■ 멈추기"]);
+  go();
+})();
+
+/* ---------- 2. 이력 곡선과 G/Gmax ---------- */
+(function () {
+  const PRE = { sand: { Vs: 140, rho: 1.937, PI: 0, s: 36 }, clay: { Vs: 110, rho: 1.682, PI: 34, s: 71 }, fill: { Vs: 150, rho: 1.835, PI: 0, s: 12 } };
+  const soil = CB.seg("dy-gg-soil", (v) => { gpi.set(PRE[v].PI, false); gs.set(PRE[v].s, false); go(); });
+  const gg = CB.range("dy-gg-g", (v) => fmtG(Math.pow(10, v)), go), gpi = CB.range("dy-gg-pi", (v) => String(v), go), gs = CB.range("dy-gg-s", (v) => v + " kPa", go);
+  const A = 0.919, DMIN = 1;
+  function fmtG(g) { return g >= 0.01 ? CB.sig(g, 2) + " %" : g.toExponential(1).replace("e-", " × 10⁻").replace(/⁻(\d)/, (m, d) => "⁻" + "⁰¹²³⁴⁵⁶⁷⁸⁹"[+d]) + " %"; }
+  const gr = () => (0.0352 + 0.0010 * gpi()) * Math.pow(gs() / 101.3, 0.3483);
+  const Gmax = () => { const p = PRE[soil()]; return p.rho * p.Vs * p.Vs; };   // kPa
+  const ratio = (g, r) => 1 / (1 + Math.pow(g / r, A));
+  const back = (g, r, G0) => Math.sign(g) * (G0 * Math.abs(g) / 100) / (1 + Math.pow(Math.abs(g) / r, A));
+  function damping(g, r) {
+    const G0 = 1, tc = back(g, r, G0), n = 80; let area = 0;
+    for (let i = 0; i < n; i++) { const x = -g + (2 * g * (i + 0.5)) / n, up = tc - 2 * back((g - x) / 2, r, G0), lo = -tc + 2 * back((x + g) / 2, r, G0); area += (up - lo) * (2 * g / n); }
+    const W = 0.5 * tc * g, dm = Math.abs(area) / (4 * Math.PI * W);
+    return DMIN + 0.63 * Math.pow(ratio(g, r), 0.1) * dm * 100;
+  }
+  const loop = CB.canvas("#dy-cv-loop", (ctx, W, H) => {
+    const pal = CB.palette(), g = Math.pow(10, gg()), r = gr(), G0 = Gmax(), tc = back(g, r, G0);
+    const x0 = 40, x1 = W - 16, y0 = 30, y1 = H - 26, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, sx = (x1 - x0) / 2 / (g * 1.15), sy = (y1 - y0) / 2 / (Math.max(tc, 1e-9) * 1.25);
+    ctx.strokeStyle = pal.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, cy); ctx.lineTo(x1, cy); ctx.moveTo(cx, y0); ctx.lineTo(cx, y1); ctx.stroke();
+    const P = (gx, t) => [cx + gx * sx, cy - t * sy];
+    const up = [], lo = [], bb = [];
+    for (let i = 0; i <= 120; i++) { const x = g - (2 * g * i) / 120; up.push(P(x, tc - 2 * back((g - x) / 2, r, G0))); }
+    for (let i = 0; i <= 120; i++) { const x = -g + (2 * g * i) / 120; lo.push(P(x, -tc + 2 * back((x + g) / 2, r, G0))); }
+    for (let i = 0; i <= 80; i++) { const x = -g * 1.1 + (2.2 * g * i) / 80; bb.push(P(x, back(x, r, G0))); }
+    ctx.beginPath(); [...up, ...lo].forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fillStyle = DYX.alpha(pal.accent, 0.16); ctx.fill();
+    DYX.line(ctx, up, pal.accent, 2.6); DYX.line(ctx, lo, pal.accent, 2.6); DYX.line(ctx, bb, pal.faint, 1.3, [4, 3]);
+    DYX.line(ctx, [P(-g, -tc), P(g, tc)], pal.accent2, 1.8, [6, 4]);
+    const gm = Math.min(g * 1.1, (tc * 1.2) / (G0 / 100));
+    DYX.line(ctx, [P(-gm, -gm * G0 / 100), P(gm, gm * G0 / 100)], pal.text, 1.2, [2, 3]);
+    DYX.text(ctx, "기울기 Gₘₐₓ", P(-gm, -gm * G0 / 100)[0] + 8, P(-gm, -gm * G0 / 100)[1] - 4, pal.dim, { size: 10.5, align: "left" });
+    DYX.text(ctx, `τc = ${CB.sig(tc, 3)} kPa`, P(g, tc)[0] - 6, P(g, tc)[1] + 14, pal.text, { size: 11, align: "right" });
+    DYX.text(ctx, `γ = ±${fmtG(g)}`, x1 - 4, cy + 12, pal.dim, { size: 10.5, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 200, maxHeight: 290 });
+  const ch = CB.canvas("#dy-cv-gg", (ctx, W, H) => {
+    const pal = CB.palette(), r = gr(), g = Math.pow(10, gg()), gd = [], dd = [];
+    for (let i = 0; i <= 80; i++) { const x = Math.pow(10, -4 + (4 * i) / 80); gd.push([x, ratio(x, r)]); dd.push([x, damping(x, r) / 30]); }
+    const box = { x: 52, y: 14, w: W - 52 - 44, h: H - 14 - 46 };
+    const c = CB.chart(ctx, box, { x: [1e-4, 1], y: [0, 1], logX: true, xLabel: "전단 변형률 γ (%, 로그)", yLabel: "G/Gₘₐₓ", xFmt: (v) => (v >= 1 ? "1" : "10" + "⁻" + "⁰¹²³⁴⁵⁶⁷⁸⁹"[Math.round(-Math.log10(v))]),
+      series: [{ data: gd, color: pal.accent, width: 2.6 }, { data: dd, color: pal.accent2, width: 2.2, dash: [6, 4] }],
+      vlines: [{ x: r, color: pal.faint, label: "γᵣ" }, { x: g, color: pal.text, label: "" }], points: [{ x: g, y: ratio(g, r), color: pal.accent, r: 5 }, { x: g, y: damping(g, r) / 30, color: pal.accent2, r: 5 }] });
+    ctx.save(); ctx.fillStyle = pal.accent2; ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    [0, 10, 20, 30].forEach((d) => ctx.fillText(d + "%", box.x + box.w + 5, c.Y(d / 30))); ctx.fillText("D", box.x + box.w + 5, box.y + 4); ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 0.72 : 0.42), minHeight: 220, maxHeight: 300 });
+  function go() {
+    loop.redraw(); ch.redraw();
+    const g = Math.pow(10, gg()), r = gr(), q = ratio(g, r), D = damping(g, r);
+    CB.stat("dy-gg-gr", CB.sig(r, 3) + " %"); CB.stat("dy-gg-r", CB.num(q, 3));
+    CB.stat("dy-gg-G", CB.sig(q * Gmax() / 1000, 3) + " MPa"); CB.stat("dy-gg-D", CB.num(D, 1) + " %");
+    const m = document.getElementById("dy-gg-msg");
+    if (g < 1e-3) { m.className = "dy-msg"; m.innerHTML = "<b>탄성 영역</b>(γ &lt; 10⁻³ %): 탄성파 탐사·교통 진동 수준. G ≈ G<sub>max</sub>, 감쇠는 D<sub>min</sub> 부근."; }
+    else if (g < 0.1) { m.className = "dy-msg"; m.innerHTML = `<b>탄소성 영역</b>: 중·대지진 시 지반의 흔한 변형률. 강성이 G<sub>max</sub>의 ${CB.num(q * 100, 0)} %로 줄었습니다. 등가 선형 해석은 이 값으로 다시 계산합니다.`; }
+    else { m.className = "dy-msg bad"; m.innerHTML = "<b>큰 변형률</b>(γ ≥ 0.1 %): 느슨한 포화 모래라면 체적 변화 경향이 커져 간극수압이 쌓이기 시작하는 범위(체적 임계 변형률 약 0.01–0.02 % 이상). 등가 선형 해석의 신뢰성도 떨어집니다."; }
+  }
+  go();
+})();
+
+/* ---------- 3. 전달 함수 ---------- */
+(function () {
+  const PRE = { g10: [23, 165, 5, 900], shallow: [8, 300, 3, 1500], deep: [60, 150, 5, 900] };
+  const pre = CB.seg("dy-tf-pre", (v) => { const p = PRE[v]; gH.set(p[0], false); gv.set(p[1], false); gd.set(p[2], false); gr.set(p[3], false); go(); });
+  const gH = CB.range("dy-tf-H", (v) => v + " m", go), gv = CB.range("dy-tf-vs", (v) => v + " m/s", go), gd = CB.range("dy-tf-d", (v) => v.toFixed(1) + " %", go), gr = CB.range("dy-tf-vr", (v) => v + " m/s", go), gf = CB.range("dy-tf-f", (v) => v.toFixed(2) + " Hz", go);
+  const RS = 1.9, RR = 2.45;
+  // 복소수 [re, im]
+  const cmul = (a, b) => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]], cdiv = (a, b) => { const d = b[0] * b[0] + b[1] * b[1]; return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]; };
+  const ccos = (z) => [Math.cos(z[0]) * Math.cosh(z[1]), -Math.sin(z[0]) * Math.sinh(z[1])], csin = (z) => [Math.sin(z[0]) * Math.cosh(z[1]), Math.cos(z[0]) * Math.sinh(z[1])];
+  function parts(f) {
+    const H = gH(), Vs = gv(), D = gd() / 100, Vr = gr(), w = 2 * Math.PI * f, vs = [Vs, Vs * D], k = cdiv([w, 0], vs), al = cdiv(cmul([RS, 0], vs), [RR * Vr, 0]);
+    const kH = [k[0] * H, k[1] * H], den = [ccos(kH)[0] - (cmul(al, csin(kH))[1]), ccos(kH)[1] + cmul(al, csin(kH))[0]];
+    return { k, den, H };
+  }
+  const amp = (f) => { const { den } = parts(f); return 1 / Math.hypot(den[0], den[1]); };
+  const U = (f, z) => { const { k, den } = parts(f); return cdiv(ccos([k[0] * z, k[1] * z]), den); };
+  const ch = CB.canvas("#dy-cv-tf", (ctx, W, H) => {
+    const pal = CB.palette(), f1 = gv() / (4 * gH()), data = []; let mx = 1;
+    for (let i = 0; i <= 600; i++) { const f = 0.02 + (12 * i) / 600, a = amp(f); data.push([f, a]); mx = Math.max(mx, a); }
+    const ytop = Math.min(40, Math.ceil(mx * 1.15)), vl = [];
+    for (let n = 1; n <= 4; n++) { const fn = (2 * n - 1) * f1; if (fn <= 12) vl.push({ x: fn, color: pal.faint, label: "f" + "₁₂₃₄"[n - 1] }); }
+    vl.push({ x: gf(), color: pal.accent2, label: "" });
+    CB.chart(ctx, null, { x: [0, 12], y: [0, ytop], xLabel: "진동수 f (Hz)", yLabel: "지표 / 암반 노두 진폭비", series: [{ data, color: pal.accent, width: 2.6, fill: DYX.alpha(pal.accent, 0.08) }], hlines: [{ y: 1, color: pal.dim, label: "증폭 없음" }], vlines: vl, points: [{ x: gf(), y: amp(gf()), color: pal.accent2, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.4), minHeight: 220, maxHeight: 300 });
+  let ph = 0;
+  const md = CB.canvas("#dy-cv-mode", (ctx, W, H) => {
+    const pal = CB.palette(), Hh = gH(), f = gf(), by = 34, bh = H - by - 22, bx = 60, bw = W - bx - 20, Y = (z) => by + (z / Hh) * bh, n = 60;
+    const mags = [], vals = []; let mx = 1e-9;
+    for (let i = 0; i <= n; i++) { const z = (Hh * i) / n, u = U(f, z); vals.push(u); mags.push(Math.hypot(u[0], u[1])); mx = Math.max(mx, mags[i]); }
+    const xc = bx + bw * 0.18, sc = (bw * 0.78) / mx;
+    ctx.fillStyle = DYX.alpha(pal.accent, 0.12); ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = DYX.alpha(pal.dim, 0.3); ctx.fillRect(bx, by + bh, bw, 10);
+    ctx.strokeStyle = pal.grid; ctx.lineWidth = 1; ctx.fillStyle = pal.dim; ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    const step = Hh > 40 ? 20 : Hh > 15 ? 5 : 2;
+    for (let z = 0; z <= Hh + 1e-9; z += step) { ctx.beginPath(); ctx.moveTo(bx, Y(z)); ctx.lineTo(bx + bw, Y(z)); ctx.stroke(); ctx.fillText(z + " m", bx - 4, Y(z)); }
+    ctx.strokeStyle = pal.faint; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(xc, by); ctx.lineTo(xc, by + bh); ctx.stroke(); ctx.setLineDash([]);
+    DYX.line(ctx, mags.map((m, i) => [xc + m * sc, Y((Hh * i) / n)]), pal.accent, 2.4);
+    DYX.line(ctx, mags.map((m, i) => [xc - m * sc * 0.18, Y((Hh * i) / n)]), pal.accent, 1, [2, 2]);
+    const c = Math.cos(ph), s = Math.sin(ph);
+    DYX.line(ctx, vals.map((u, i) => [xc + (u[0] * c - u[1] * s) * sc, Y((Hh * i) / n)]), pal.accent2, 2.2);
+    DYX.text(ctx, `최대 ${CB.num(mx, 2)}`, xc + mx * sc, by - 10, pal.accent, { size: 10.5, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.65 : 0.34), minHeight: 190, maxHeight: 260 });
+  CB.loop(document.getElementById("sim-dy-tf"), (dt) => { ph += dt * 2 * Math.PI / 1.6; md.redraw(); });
+  function go() {
+    ch.redraw(); md.redraw();
+    const H = gH(), Vs = gv(), T = CB.soil.period(H, Vs), f1 = 1 / T; let pk = 0;
+    for (let i = 0; i <= 300; i++) pk = Math.max(pk, amp(0.02 + (2 * f1 * i) / 300));
+    CB.stat("dy-tf-T", CB.num(T, 3) + " s"); CB.stat("dy-tf-fn", `${CB.num(f1, 2)} · ${CB.num(3 * f1, 2)} Hz`);
+    CB.stat("dy-tf-pk", CB.num(pk, 2) + " 배"); CB.stat("dy-tf-af", CB.num(amp(gf()), 2) + " 배");
+  }
+  go();
+})();
+
+/* ---------- 4. Vs30과 지반 분류 ---------- */
+(function () {
+  const TH = [[0, 2], [2, 6], [6, 14], [14, 19], [19, 23], [23, 30]], NAMES = ["매립층", "느슨한 모래", "연약 점토", "모래 자갈", "풍화토·풍화암", "연암"], DEF = [150, 140, 110, 320, 450, 900];
+  const gs = DEF.map((d, i) => CB.range("dy-vs-" + (i + 1), (v) => v + " m/s", go));
+  document.getElementById("dy-vs-reset").addEventListener("click", () => { gs.forEach((g, i) => g.set(DEF[i], false)); go(); });
+  document.getElementById("dy-vs-imp").addEventListener("click", () => { gs[2].set(200); });
+  function calc() {
+    const v = gs.map((g) => g());
+    let t30 = 0; TH.forEach(([a, b], i) => (t30 += (b - a) / v[i]));
+    const bi = v.findIndex((x) => x >= 760), H = bi < 0 ? Infinity : TH[bi][0];
+    const Hs = Math.min(H, 30); let ts = 0; TH.forEach(([a, b], i) => { if (a < Hs) ts += (Math.min(b, Hs) - a) / v[i]; });
+    const vsoil = Hs > 0 ? Hs / ts : Infinity;
+    let kds; if (H <= 1) kds = "S1 암반"; else if (H <= 20) kds = vsoil >= 260 ? "S2 얕고 단단한" : "S3 얕고 연약한"; else kds = vsoil >= 180 ? "S4 깊고 단단한" : "S5 깊고 연약한";
+    const v30 = 30 / t30, neh = v30 > 1500 ? "A" : v30 > 760 ? "B" : v30 > 360 ? "C" : v30 >= 180 ? "D" : "E";
+    return { v, t30, v30, H, Hs, ts, vsoil, kds, neh };
+  }
+  const cv = CB.canvas("#dy-cv-vs30", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), vmax = Math.max(1000, ...r.v) * 1.05, box = { x: 46, y: 26, w: W - 46 - 18, h: H - 26 - 40 };
+    const P = DYX.dpanel(ctx, box, [0, vmax], 30, { xticks: [0, 200, 400, 600, 800, 1000].filter((x) => x <= vmax), label: "전단파 속도 Vₛ (m/s) · 막대 / 누적 통과 시간(주황)", zstep: 5 });
+    TH.forEach(([a, b], i) => {
+      ctx.fillStyle = r.v[i] >= 760 ? DYX.alpha(pal.dim, 0.35) : DYX.alpha(pal.accent, DY_SHADE[i] + 0.1); ctx.fillRect(P.X(0), P.Y(a), P.X(r.v[i]) - P.X(0), P.Y(b) - P.Y(a));
+      DYX.text(ctx, `${NAMES[i]} ${r.v[i]}`, Math.min(P.X(r.v[i]) + 6, box.x + box.w - 4), (P.Y(a) + P.Y(b)) / 2, pal.text, { size: 10.5, align: P.X(r.v[i]) + 120 > box.x + box.w ? "right" : "left", bold: false });
+    });
+    ctx.save(); ctx.strokeStyle = pal.bad; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(P.X(760), box.y); ctx.lineTo(P.X(760), box.y + box.h); ctx.stroke(); ctx.restore();
+    DYX.text(ctx, "760", P.X(760) + 4, box.y + box.h - 10, pal.bad, { size: 10, align: "left" });
+    if (isFinite(r.H)) { ctx.save(); ctx.strokeStyle = pal.bad; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(box.x, P.Y(r.H)); ctx.lineTo(box.x + box.w, P.Y(r.H)); ctx.stroke(); ctx.restore(); DYX.text(ctx, `기반암 ${r.H} m`, box.x + box.w - 4, P.Y(r.H) - 9, pal.bad, { size: 10.5, align: "right" }); }
+    DYX.gwl(ctx, box.x, box.x + box.w, P.Y(2), pal);
+    // 누적 통과 시간: 0 → t30 을 가로축 전체로
+    const pts = []; let tt = 0; pts.push([box.x, P.Y(0)]);
+    TH.forEach(([a, b], i) => { tt += (b - a) / r.v[i]; pts.push([box.x + (tt / r.t30) * box.w, P.Y(b)]); });
+    DYX.line(ctx, pts, pal.accent2, 2.2);
+    DYX.text(ctx, `${CB.num(r.t30, 4)} s`, box.x + box.w - 4, P.Y(30) - 10, pal.accent2, { size: 10.5, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.56), minHeight: 300, maxHeight: 420 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("dy-vs-30", CB.num(r.v30, 0) + " m/s (NEHRP " + r.neh + ")");
+    CB.stat("dy-vs-soil", (isFinite(r.H) ? r.H + " m" : "30 m 안에 없음") + " · " + CB.num(r.vsoil, 0) + " m/s");
+    CB.stat("dy-vs-T", isFinite(r.H) ? CB.num(CB.soil.period(r.H, r.vsoil), 2) + " s" : "> " + CB.num(4 * r.ts, 2) + " s");
+    CB.stat("dy-vs-cls", r.kds);
+    const m = document.getElementById("dy-vs-msg"), slow = r.v.slice(0, 5).map((v, i) => [(TH[i][1] - TH[i][0]) / v / r.t30, i]).sort((a, b) => b[0] - a[0])[0];
+    m.className = "dy-msg"; m.innerHTML = `가장 느린 몫: <b>${NAMES[slow[1]]}</b>가 30 m 통과 시간의 ${CB.num(slow[0] * 100, 0)} %를 차지합니다. 액상화 가능 층이 있으면 분류와 별도로 부지 고유 평가가 필요할 수 있습니다(현행 기준 확인).`;
+  }
+  go();
+})();
+
+/* ---------- 5. 반복 삼축 시험 ---------- */
+(function () {
+  const gn = CB.range("dy-cy-n", (v) => v.toFixed(1), go), gc = CB.range("dy-cy-c", (v) => v.toFixed(3), go), gp = CB.range("dy-cy-p", (v) => v + " kPa", go), gN = CB.range("dy-cy-N", (v) => v.toFixed(1) + " 회", go);
+  const B = 0.34, TH = 0.7, CR = 0.6, PHI = 30, s = Math.sin(PHI * Math.PI / 180), Mc = 6 * s / (3 - s), Me = 6 * s / (3 + s);
+  let playing = false;
+  const model = () => { const crr = CB.soil.CRR(gn()), csr = gc(), NL = 15 * Math.pow(crr / csr, 1 / B); return { crr, csr, NL, dense: gn() >= 15 }; };
+  const ru = (N, NL) => (2 / Math.PI) * Math.asin(Math.min(1, Math.pow(Math.max(0, N) / NL, 1 / (2 * TH))));
+  const eDA = (N, m) => { if (N <= m.NL) return 0.05 + 4.95 * Math.pow(N / m.NL, 6); return Math.min(m.dense ? 12 : 25, 5 + (m.dense ? 0.8 : 6) * (N - m.NL)); };
+  function state(N, m) {
+    const p0 = gp(), qa = 2 * (m.csr / CR) * p0, r = ru(N, m.NL), sn = Math.sin(2 * Math.PI * N);
+    let p = p0 * (1 - r) + p0 * (m.dense ? 0.35 : 0.08) * Math.pow(r, 4) * sn * sn;
+    let q = qa * sn; if (q > Mc * p) q = Mc * p; if (q < -Me * p) q = -Me * p;
+    return { p, q, r, e: (eDA(N, m) / 2) * sn, qa };
+  }
+  const cyc = CB.canvas("#dy-cv-cyc", (ctx, W, H) => {
+    const pal = CB.palette(), m = model(), Nc = gN(), Nmax = 40, h3 = (H - 30) / 3, x = 56, w = W - 56 - 16;
+    const qd = [], rd = [], ed = [];
+    for (let i = 0; i <= Nc * 24; i++) { const N = i / 24, st = state(N, m); qd.push([N, st.q / gp()]); rd.push([N, st.r]); ed.push([N, st.e]); }
+    const qa = 2 * m.csr / CR;
+    const vl = isFinite(m.NL) && m.NL <= Nmax ? [{ x: m.NL, color: pal.bad, label: "Nʟ" }] : [];
+    CB.chart(ctx, { x, y: 8, w, h: h3 - 16 }, { x: [0, Nmax], y: [-qa * 1.2, qa * 1.2], yLabel: "", xTicks: [], yTicks: [-qa, 0, qa], yFmt: (v) => CB.num(v, 2), series: [{ data: qd, color: pal.accent2, width: 1.4 }], vlines: vl });
+    CB.chart(ctx, { x, y: 8 + h3, w, h: h3 - 16 }, { x: [0, Nmax], y: [0, 1.05], xTicks: [], yTicks: [0, 0.5, 1], series: [{ data: rd, color: pal.blue, width: 2.4 }], hlines: [{ y: 1, color: pal.bad, label: "" }], vlines: vl });
+    const em = m.dense ? 7 : 14;
+    CB.chart(ctx, { x, y: 8 + 2 * h3, w, h: h3 - 16 }, { x: [0, Nmax], y: [-em, em], xTicks: [0, 10, 20, 30, 40], yTicks: [-5, 0, 5], series: [{ data: ed, color: pal.accent, width: 1.4 }], hlines: [{ y: 2.5, color: pal.faint, dash: [3, 3] }, { y: -2.5, color: pal.faint, dash: [3, 3] }], vlines: vl });
+    [["축차 응력 q/p′₀", 8], ["간극수압비 rᵤ", 8 + h3], ["축 변형률 εₐ (%)", 8 + 2 * h3]].forEach(([t, y]) => DYX.text(ctx, t, x + 8, y + 9, pal.dim, { size: 10.5, align: "left", bold: false, mono: false }));
+    DYX.text(ctx, "반복 횟수 N", x + w / 2, H - 8, pal.dim, { size: 11, bold: false, mono: false });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.6), minHeight: 300, maxHeight: 400 });
+  const path = CB.canvas("#dy-cv-path", (ctx, W, H) => {
+    const pal = CB.palette(), m = model(), p0 = gp(), Nc = gN(), qa = 2 * (m.csr / CR) * p0, ymax = Math.max(qa * 1.3, Mc * p0 * 0.4), d = [];
+    for (let i = 0; i <= Nc * 24; i++) { const st = state(i / 24, m); d.push([st.p, st.q]); }
+    const cur = state(Nc, m), xm = p0 * 1.15;
+    CB.chart(ctx, null, { x: [0, xm], y: [-ymax, ymax], xLabel: "평균 유효응력 p′ (kPa) — 유효응력 경로", yLabel: "축차 응력 q (kPa)", series: [{ data: [[0, 0], [xm, Mc * xm]], color: pal.bad, width: 1.4, dash: [6, 4] }, { data: [[0, 0], [xm, -Me * xm]], color: pal.bad, width: 1.4, dash: [6, 4] }, { data: d, color: pal.accent, width: 1.6 }], vlines: [{ x: p0, color: pal.faint, label: "p′₀" }], points: [{ x: cur.p, y: cur.q, color: pal.accent2, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.42), minHeight: 220, maxHeight: 300 });
+  function go() {
+    cyc.redraw(); path.redraw();
+    const m = model(), N = gN(), st = state(N, m), e = eDA(N, m);
+    CB.stat("dy-cy-crr", CB.num(m.crr, 3)); CB.stat("dy-cy-nl", m.NL > 1000 ? "> 1,000 회" : CB.num(m.NL, 1) + " 회");
+    CB.stat("dy-cy-ru", CB.num(st.r, 2)); CB.stat("dy-cy-ea", CB.num(e, 1) + " %");
+    const msg = document.getElementById("dy-cy-msg");
+    if (N >= m.NL) { msg.className = "dy-msg bad"; msg.innerHTML = `${CB.num(m.NL, 1)}회째에 r<sub>u</sub> ≈ 1, 양진폭 변형률 5 %: <b>액상화</b>. ${m.dense ? "조밀한 편이라 전단하면 팽창해 강도를 되찾습니다(반복 유동성): 변형이 한정됩니다." : "느슨해 변형이 걷잡을 수 없이 커집니다(흐름 액상화에 가까운 거동)."}`; }
+    else if (m.NL > 1000) { msg.className = "dy-msg ok"; msg.innerHTML = "가한 응력비가 저항보다 훨씬 작아 실용적인 반복 횟수 안에서는 액상화하지 않습니다."; }
+    else { msg.className = "dy-msg"; msg.innerHTML = `규모 7.5 지진의 등가 반복 횟수는 약 15회. 이 흙은 <b>${CB.num(m.NL, 1)}회</b>에서 액상화합니다 → CSR/CRR = ${CB.num(m.csr / m.crr, 2)}${m.NL < 15 ? " (15회 전에 액상화: FS < 1)" : " (FS > 1)"}.`; }
+  }
+  const loop = CB.loop(document.getElementById("sim-dy-cyclic"), (dt) => { if (!playing) return; let v = gN() + dt * 2; if (v >= 40) { v = 40; playing = false; btn.set(false); } gN.set(Math.round(v * 100) / 100); });
+  const btn = CB.playButton("dy-cy-play", () => { if (gN() >= 39.9) gN.set(0); playing = true; loop.start(); }, () => { playing = false; }, ["▶ 시험 시작", "■ 멈추기"]);
+  go();
+})();
+
+/* ---------- 6. 액상화 판정 단면 ---------- */
+(function () {
+  const ga = CB.range("dy-pf-a", (v) => v.toFixed(2) + " g", go), gm = CB.range("dy-pf-m", (v) => v.toFixed(1), go), gw = CB.range("dy-pf-w", (v) => "GL −" + v.toFixed(1) + " m", go), gn = CB.range("dy-pf-n", (v) => String(v), go), gf = CB.range("dy-pf-fc", (v) => v + " %", go), gz = CB.range("dy-pf-z", (v) => v.toFixed(2) + " m", go);
+  const opt = () => ({ amax: ga(), M: gm(), gwl: gw(), N: gn(), FC: gf() });
+  const ZM = 20;
+  const cv = CB.canvas("#dy-cv-prof", (ctx, W, H) => {
+    const pal = CB.palette(), o = opt(), narrow = W < 560, top = 30, bh = H - top - 30, colW = narrow ? 34 : 120, gap = narrow ? 30 : 46;
+    const x0 = 34, pw = (W - x0 - colW - gap * 2 - 10) / 2;
+    const colBox = { x: x0, y: top, w: colW, h: bh }, b1 = { x: x0 + colW + gap, y: top, w: pw, h: bh }, b2 = { x: b1.x + pw + gap, y: top, w: pw, h: bh };
+    const Yc = (z) => top + (z / ZM) * bh;
+    CB.soil.SITE.layers.forEach((l, i) => { if (l.top >= ZM) return; ctx.fillStyle = DYX.alpha(pal.accent, DY_SHADE[i]); ctx.fillRect(colBox.x, Yc(l.top), colW, Yc(Math.min(ZM, l.bottom)) - Yc(l.top)); if (!narrow) DYX.text(ctx, l.name, colBox.x + colW / 2, (Yc(l.top) + Yc(Math.min(ZM, l.bottom))) / 2, pal.text, { size: 10, bold: false, mono: false }); });
+    ctx.strokeStyle = pal.dim; ctx.strokeRect(colBox.x, colBox.y, colW, bh);
+    ctx.fillStyle = pal.dim; ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let z = 0; z <= ZM; z += 5) ctx.fillText(String(z), x0 - 4, Yc(z));
+    DYX.text(ctx, "z (m)", x0 - 4, top - 14, pal.dim, { size: 10.5, align: "right", bold: false });
+    DYX.gwl(ctx, colBox.x, colBox.x + colW, Yc(o.gwl), pal);
+    const P1 = DYX.dpanel(ctx, b1, [0, 0.6], ZM, { xticks: [0, 0.2, 0.4, 0.6], xfmt: (v) => v.toFixed(1), label: narrow ? "CSR · CRR" : "CSR(주황 점선) · CRR×MSF(갈색)", zlabels: false });
+    const P2 = DYX.dpanel(ctx, b2, [0, 2], ZM, { xticks: [0, 0.5, 1, 1.5, 2], xfmt: (v) => String(v), label: narrow ? "FS" : "액상화 안전율 FS", zlabels: false });
+    ctx.fillStyle = DYX.alpha(pal.bad, 0.1); ctx.fillRect(P2.X(0), b2.y, P2.X(1) - P2.X(0), bh);
+    const cs = [], cr = [], fs = [];
+    for (let z = 0.1; z <= ZM; z += 0.1) {
+      const r = DYL.at(z, o);
+      cs.push([P1.X(Math.min(0.6, r.csr ?? NaN)), P1.Y(z)]);
+      if (r.status === "ok") { cr.push([isFinite(r.crr) ? P1.X(Math.min(0.6, r.crr)) : NaN, P1.Y(z)]); fs.push([isFinite(r.fs) ? P2.X(Math.min(2, r.fs)) : NaN, P2.Y(z)]); }
+      else { cr.push([NaN, 0]); fs.push([NaN, 0]); }
+    }
+    DYX.line(ctx, cs, pal.accent2, 2.2, [6, 3]); DYX.line(ctx, cr, pal.accent, 3);
+    ctx.save(); ctx.strokeStyle = pal.bad; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(P2.X(1), b2.y); ctx.lineTo(P2.X(1), b2.y + bh); ctx.stroke(); ctx.restore();
+    DYX.line(ctx, fs, pal.text, 2.4);
+    // 판정 제외 구간 표시
+    [[6, 14, "점토: 판정 제외"], [14, 19, "N 40: 비액상화"]].forEach(([a, b, t]) => DYX.text(ctx, t, b2.x + b2.w / 2, (P2.Y(a) + P2.Y(b)) / 2, pal.dim, { size: 10, bold: false, mono: false }));
+    if (o.gwl > 0.3) DYX.text(ctx, "불포화", b2.x + b2.w / 2, P2.Y(Math.min(o.gwl, 6) / 2), pal.dim, { size: 10, bold: false, mono: false });
+    const z = gz(), r = DYL.at(z, o);
+    [b1, b2].forEach((b) => { ctx.save(); ctx.strokeStyle = pal.blue; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(colBox.x, P1.Y(z)); ctx.lineTo(b.x + b.w, P1.Y(z)); ctx.stroke(); ctx.restore(); });
+    if (r.status === "ok" && isFinite(r.fs)) { ctx.fillStyle = r.fs < 1 ? pal.bad : pal.ok; ctx.beginPath(); ctx.arc(P2.X(Math.min(2, r.fs)), P2.Y(z), 5, 0, Math.PI * 2); ctx.fill(); }
+  }, { aspect: (W) => (W < 560 ? 1.15 : 0.62), minHeight: 340, maxHeight: 480 });
+  function go() {
+    cv.redraw();
+    const o = opt(), r = DYL.at(gz(), o), lp = DYL.lpi(o);
+    CB.stat("dy-pf-csr", r.csr != null ? CB.num(r.csr, 3) : "—");
+    if (r.status === "ok") {
+      CB.stat("dy-pf-n1", `${CB.num(r.n1, 2)} → ${CB.num(r.ncs, 2)}`); CB.stat("dy-pf-crr", isFinite(r.crr) ? `${CB.num(r.crr7, 3)} × ${CB.num(r.msf, 2)} = ${CB.num(r.crr, 3)}` : "(N₁)₆₀cs ≥ 30");
+      CB.stat("dy-pf-fs", DYL.fsTxt(r.fs));
+    } else { CB.stat("dy-pf-n1", "—"); CB.stat("dy-pf-crr", "—"); CB.stat("dy-pf-fs", r.status === "clay" ? "판정 제외(점토)" : "불포화"); }
+    CB.stat("dy-pf-lpi", CB.num(lp, 1) + (lp === 0 ? " (없음)" : lp <= 5 ? " (낮음)" : lp <= 15 ? " (높음)" : " (매우 높음)"));
+    const m = document.getElementById("dy-pf-msg");
+    if (r.status === "ok" && r.fs < 1) { m.className = "dy-msg bad"; m.innerHTML = `GL −${CB.num(gz(), 2)} m ${r.name}: FS<sub>L</sub> = ${CB.num(r.fs, 2)} &lt; 1 → 액상화. σ<sub>v</sub> = ${CB.num(r.p.sv, 1)}, σ′<sub>v</sub> = ${CB.num(r.p.s, 1)} kPa, r<sub>d</sub> = ${CB.num(CB.soil.rd(gz()), 3)}, C<sub>N</sub> = ${CB.num(r.CN, 3)}.`; }
+    else if (r.status === "ok") { m.className = "dy-msg ok"; m.innerHTML = `GL −${CB.num(gz(), 2)} m ${r.name}: FS<sub>L</sub> = ${DYL.fsTxt(r.fs)}. 요구 안전율(1보다 큰 값, 현행 기준 확인)과 비교합니다.`; }
+    else { m.className = "dy-msg"; m.innerHTML = r.status === "clay" ? "연약 점토(PI 34)는 이 판정법의 대상이 아닙니다. 대신 반복 하중에 따른 강도 저하와 침하를 따로 검토합니다." : "지하수위 위의 불포화 흙은 액상화 판정에서 제외합니다."; }
+  }
+  go();
+})();
+
+/* ---------- 7. 대책 비교 ---------- */
+(function () {
+  const mode = CB.seg("dy-rm-mode", go), gn = CB.range("dy-rm-n", (v) => String(v), go), gw = CB.range("dy-rm-w", (v) => "GL −" + v.toFixed(1) + " m", go), ga = CB.range("dy-rm-a", (v) => v.toFixed(2) + " g", go);
+  const before = () => ({ amax: ga(), M: 7.5, gwl: 2, N: 6, FC: 15 });
+  const after = () => { const m = mode(), o = before(); if (m === "comp" || m === "both") o.N = gn(); if (m === "dw" || m === "both") o.gwl = gw(); return o; };
+  const ZM = 8;
+  const cv = CB.canvas("#dy-cv-rem", (ctx, W, H) => {
+    const pal = CB.palette(), ob = before(), oa = after(), m = mode(), top = 30, bh = H - top - 34, narrow = W < 560;
+    const sw = narrow ? W * 0.38 : W * 0.42, sx = 34, box = { x: sx + sw + 40, y: top, w: W - (sx + sw + 40) - 14, h: bh }, Y = (z) => top + (z / ZM) * bh;
+    // 단면
+    CB.soil.SITE.layers.forEach((l, i) => { if (l.top >= ZM) return; ctx.fillStyle = DYX.alpha(pal.accent, DY_SHADE[i]); ctx.fillRect(sx, Y(l.top), sw, Y(Math.min(ZM, l.bottom)) - Y(l.top)); });
+    if (m === "comp" || m === "both") {
+      ctx.fillStyle = DYX.alpha(pal.ok, 0.12); ctx.fillRect(sx + sw * 0.15, Y(0), sw * 0.7, Y(6) - Y(0));
+      ctx.fillStyle = DYX.alpha(pal.dim, 0.55); for (let i = 0; i < 5; i++) { const x = sx + sw * (0.2 + 0.15 * i); ctx.fillRect(x - 3, Y(0), 6, Y(6) - Y(0)); }
+      DYX.text(ctx, "SCP 개량 구역", sx + sw / 2, Y(6) + 12, pal.ok, { size: 10.5 });
+    }
+    ctx.strokeStyle = pal.dim; ctx.strokeRect(sx, top, sw, bh);
+    ctx.fillStyle = pal.dim; ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let z = 0; z <= ZM; z += 2) ctx.fillText(String(z), sx - 4, Y(z));
+    DYX.gwl(ctx, sx, sx + sw, Y(ob.gwl), pal);
+    if (oa.gwl !== ob.gwl) { ctx.save(); ctx.globalAlpha = 1; DYX.gwl(ctx, sx, sx + sw * 0.55, Y(oa.gwl), pal); ctx.restore(); DYX.text(ctx, "저하 후", sx + sw * 0.55 + 4, Y(oa.gwl) - 8, pal.blue, { size: 10, align: "left" }); }
+    DYX.text(ctx, "연약 점토", sx + sw / 2, Y(7), pal.text, { size: 10.5, bold: false, mono: false });
+    DYX.text(ctx, "느슨한 모래", sx + sw / 2, Y(4.6), pal.text, { size: 10.5, bold: false, mono: false });
+    // FS 곡선
+    const P = DYX.dpanel(ctx, box, [0, 2.5], ZM, { xticks: [0, 1, 2], label: "안전율 FS (점선: 개량 전)", zstep: 2, zlabels: false });
+    ctx.fillStyle = DYX.alpha(pal.bad, 0.1); ctx.fillRect(P.X(0), box.y, P.X(1) - P.X(0), bh);
+    const f = (o) => { const d = []; for (let z = 0.05; z <= 6; z += 0.05) { const r = DYL.at(z, o); d.push([r.status === "ok" && isFinite(r.fs) ? P.X(Math.min(2.5, r.fs)) : NaN, P.Y(z)]); } return d; };
+    DYX.line(ctx, f(ob), pal.faint, 2, [5, 4]); DYX.line(ctx, f(oa), pal.ok, 2.6);
+    ctx.save(); ctx.strokeStyle = pal.bad; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(P.X(1), box.y); ctx.lineTo(P.X(1), box.y + bh); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.strokeStyle = pal.ok; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(P.X(1.2), box.y); ctx.lineTo(P.X(1.2), box.y + bh); ctx.stroke(); ctx.restore();
+    DYX.text(ctx, "1.2", P.X(1.2) + 3, box.y + 10, pal.ok, { size: 10, align: "left" });
+  }, { aspect: (W) => (W < 560 ? 0.95 : 0.5), minHeight: 280, maxHeight: 380 });
+  function minFs(o) { let mn = Infinity, any = false; for (let z = 2.05; z < 6; z += 0.05) { const r = DYL.at(z, o); if (r.status === "ok") { any = true; mn = Math.min(mn, r.fs); } } return any ? mn : null; }
+  function go() {
+    cv.redraw();
+    const ob = before(), oa = after(), r0 = DYL.at(4, ob), r1 = DYL.at(4, oa), mf = minFs(oa), l0 = DYL.lpi(ob), l1 = DYL.lpi(oa), s0 = DYL.settle(ob), s1 = DYL.settle(oa);
+    const f = (r) => (r.status === "ok" ? DYL.fsTxt(r.fs) : "불포화");
+    CB.stat("dy-rm-fs4", `${f(r0)} → ${f(r1)}`);
+    CB.stat("dy-rm-fsmin", mf == null ? "전부 불포화" : DYL.fsTxt(mf));
+    CB.stat("dy-rm-lpi", `${CB.num(l0, 1)} → ${CB.num(l1, 1)}`);
+    CB.stat("dy-rm-s", `${CB.num(s0 * 100, 1)} → ${CB.num(s1 * 100, 1)} cm`);
+    const m = document.getElementById("dy-rm-msg");
+    if (mf == null || mf >= 1.2) { m.className = "dy-msg ok"; m.innerHTML = "모래층 전체가 FS ≥ 1.2(교육용 목표)를 만족합니다."; }
+    else if (mf >= 1) { m.className = "dy-msg"; m.innerHTML = `액상화는 면했지만 모래층의 최소 FS ${CB.num(mf, 2)}로 여유가 작습니다. 부분적인 간극수압 상승과 침하가 남을 수 있습니다.`; }
+    else { m.className = "dy-msg bad"; m.innerHTML = `모래층의 일부가 여전히 FS ${CB.num(mf, 2)} &lt; 1입니다.${mode() === "dw" || mode() === "both" ? " 지하수위를 6 m 아래로 낮추면 층 전체가 불포화가 되지만 유지 비용과 점토층 압밀 침하를 함께 따져야 합니다." : ""}`; }
+  }
+  go();
+})();
+
+/* ---------- 8. 기계 기초 ---------- */
+(function () {
+  const gm = CB.range("dy-mc-m", (v) => v + " t", go), gr = CB.range("dy-mc-r", (v) => v.toFixed(1) + " m", go), gg = CB.range("dy-mc-g", (v) => v + " MPa", go), grpm = CB.range("dy-mc-rpm", (v) => v + " rpm (" + CB.num(v / 60, 1) + " Hz)", go);
+  const NU = 0.33, RHO = 1.84;
+  const calc = () => { const G = gg() * 1000, r0 = gr(), m = gm(), k = (4 * G * r0) / (1 - NU), fn = Math.sqrt(k / m) / (2 * Math.PI), Bz = ((1 - NU) / 4) * m / (RHO * r0 ** 3), Dz = 0.425 / Math.sqrt(Bz), f = grpm() / 60, r = f / fn; return { k, fn, Bz, Dz, f, r, M: 1 / Math.sqrt((1 - r * r) ** 2 + (2 * Dz * r) ** 2) }; };
+  const cv = CB.canvas("#dy-cv-mach", (ctx, W, H) => {
+    const pal = CB.palette(), c = calc(), d = [];
+    for (let i = 0; i <= 300; i++) { const r = (3 * i) / 300; d.push([r, 1 / Math.sqrt((1 - r * r) ** 2 + (2 * c.Dz * r) ** 2)]); }
+    const ymax = Math.min(10, Math.max(2, ...d.map((p) => p[1])) * 1.15), rr = Math.min(3, c.r);
+    CB.chart(ctx, null, { x: [0, 3], y: [0, ymax], xLabel: "진동수 비 r = f / fₙ", yLabel: "동적 확대 계수 M", series: [{ data: d, color: pal.accent, width: 2.6 }], bands: [{ x0: 0.8, x1: 1.2, color: DYX.alpha(pal.bad, 0.12) }], hlines: [{ y: 1, color: pal.faint, label: "정적" }], vlines: [{ x: rr, color: pal.accent2, label: "운전" }], points: [{ x: rr, y: c.M, color: pal.accent2, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 230, maxHeight: 320 });
+  function go() {
+    cv.redraw(); const c = calc();
+    CB.stat("dy-mc-k", CB.sig(c.k / 1000, 3) + " MN/m"); CB.stat("dy-mc-fn", CB.num(c.fn, 1) + " Hz");
+    CB.stat("dy-mc-d", `${CB.num(c.Bz, 2)} · ${CB.num(c.Dz * 100, 0)} %`); CB.stat("dy-mc-M", `${CB.num(c.r, 2)} · ${CB.num(c.M, 2)}`);
+    const m = document.getElementById("dy-mc-msg");
+    if (Math.abs(c.r - 1) < 0.2) { m.className = "dy-msg bad"; m.innerHTML = "운전 진동수가 고유 진동수의 ±20 % 안: <b>공진 영역</b>. 기초 크기·질량을 바꾸거나 지반을 개량해 f<sub>n</sub>을 옮깁니다."; }
+    else if (c.r < 1) { m.className = "dy-msg ok"; m.innerHTML = "운전 진동수가 고유 진동수보다 낮은 <b>고동조</b>(강성) 기초입니다. 시동·정지 때도 공진을 지나지 않습니다."; }
+    else { m.className = "dy-msg ok"; m.innerHTML = "운전 진동수가 고유 진동수보다 높은 <b>저동조</b> 기초입니다. 운전 중 진폭은 작지만 시동·정지 때 공진을 잠깐 지나갑니다."; }
+  }
+  go();
+})();
+</script>
+</body>
+</html>

@@ -20,6 +20,14 @@ LOCAL_BOOKS = [{
     'status': 'published', 'level': '건축·토목 2학년', 'stage': 'foundations', 'slug': 'materials', 'legacyUrl': None,
     'color': '#6b7280', 'colorDark': '#b6bcc6', 'motif': 'concrete',
     'topics': ['시멘트·골재', '배합 설계', '양생·강도', '수축·내구성', '강재·철근', '부식', '아스팔트·목재', '복합재료·탄소'],
+}, {
+    'id': 'geotechbook', 'code': 'GEO', 'title': 'GeotechBook', 'subtitle': '지반공학 교과서',
+    'headline': '모든 구조물은 땅 위에 선다',
+    'description': '흙과 지반 조사, 상 관계와 분류, 유효응력과 침투, 지중 응력, 압밀과 연약지반 개량, 전단강도와 토압, 옹벽과 흙막이, 사면 안정, 얕은 기초와 말뚝, 액상화와 암반까지 — 지층을 쌓고 하중을 올려 보며 기준 지반 G-10과 B-10의 굴착·기초 숫자로 익히는 지반공학 교과서.',
+    'url': 'https://construction.euiyun.com/geotech/', 'repo': 'https://github.com/geniuskey/construction-books', 'field': 'construction',
+    'status': 'published', 'level': '건축·토목 2–3학년', 'stage': 'foundations', 'slug': 'geotech', 'legacyUrl': None,
+    'color': '#8a5a2b', 'colorDark': '#d8a06a', 'motif': 'soil',
+    'topics': ['지반 조사·분류', '유효응력·침투', '압밀·지반 개량', '전단강도·토압', '흙막이·사면', '지지력·말뚝', '액상화·암반'],
 }]
 books = LOCAL_BOOKS
 catalog = []
