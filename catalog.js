@@ -29,28 +29,31 @@ window.CONSTRUCTION_BOOKS = [
   },
   {
     "id": "materialsbook",
-    "code": "MAT",
     "title": "MaterialsBook",
     "subtitle": "건설재료 교과서",
     "headline": "콘크리트는 어떻게 굳고 강재는 어떻게 버티나",
-    "description": "시멘트 수화와 콘크리트 배합, 강도 발현과 내구성, 철근·강재의 성질, 아스팔트·목재·복합재료까지 배합과 시험을 직접 계산하며 배우는 건설재료 교과서.",
+    "description": "시멘트 수화와 골재, 콘크리트 배합 설계, 굳지 않은 콘크리트와 양생, 강도 시험, 수축·크리프와 내구성, 구조용 강재와 철근, 부식과 방식, 아스팔트, 목재, 조적·유리·단열·방수, 복합재료와 지속 가능한 재료까지 — 배합을 바꾸고 시편을 깨뜨려 보며 기준 배합 M-30과 B-10·T-36의 숫자로 익히는 건설재료 교과서.",
     "stage": "foundations",
-    "status": "planned",
+    "status": "published",
     "color": "#6b7280",
     "colorDark": "#b6bcc6",
     "topics": [
-      "시멘트·콘크리트",
+      "시멘트·골재",
       "배합 설계",
-      "강도·내구성",
+      "양생·강도",
+      "수축·내구성",
       "강재·철근",
-      "아스팔트·목재"
+      "부식",
+      "아스팔트·목재",
+      "복합재료·탄소"
     ],
     "motif": "concrete",
-    "slug": "materials",
-    "url": "#",
+    "code": "MAT",
     "legacyUrl": null,
-    "chapters": 0,
-    "simulators": 0
+    "slug": "materials",
+    "url": "materials/",
+    "chapters": 17,
+    "simulators": 124
   },
   {
     "id": "geotechbook",

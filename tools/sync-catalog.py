@@ -12,6 +12,14 @@ LOCAL_BOOKS = [{
     'status': 'published', 'level': '건축·토목 2학년', 'stage': 'foundations', 'slug': 'mechanics', 'legacyUrl': None,
     'color': '#1d5fa8', 'colorDark': '#74b0f0', 'motif': 'beam',
     'topics': ['하중·평형', '트러스', '전단력·휨모멘트', '영향선', '응력·단면', '처짐·좌굴', '부정정·매트릭스'],
+}, {
+    'id': 'materialsbook', 'code': 'MAT', 'title': 'MaterialsBook', 'subtitle': '건설재료 교과서',
+    'headline': '콘크리트는 어떻게 굳고 강재는 어떻게 버티나',
+    'description': '시멘트 수화와 골재, 콘크리트 배합 설계, 굳지 않은 콘크리트와 양생, 강도 시험, 수축·크리프와 내구성, 구조용 강재와 철근, 부식과 방식, 아스팔트, 목재, 조적·유리·단열·방수, 복합재료와 지속 가능한 재료까지 — 배합을 바꾸고 시편을 깨뜨려 보며 기준 배합 M-30과 B-10·T-36의 숫자로 익히는 건설재료 교과서.',
+    'url': 'https://construction.euiyun.com/materials/', 'repo': 'https://github.com/geniuskey/construction-books', 'field': 'construction',
+    'status': 'published', 'level': '건축·토목 2학년', 'stage': 'foundations', 'slug': 'materials', 'legacyUrl': None,
+    'color': '#6b7280', 'colorDark': '#b6bcc6', 'motif': 'concrete',
+    'topics': ['시멘트·골재', '배합 설계', '양생·강도', '수축·내구성', '강재·철근', '부식', '아스팔트·목재', '복합재료·탄소'],
 }]
 books = LOCAL_BOOKS
 catalog = []

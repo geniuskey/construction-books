@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>콘크리트의 내구성 · MaterialsBook</title>
+<meta name="description" content="콘크리트를 100년 버티게 하려면. 공극 구조와 투수성, 탄산화 x = k√t와 페놀프탈레인 시험, 염화물 확산(피크 제2법칙·오차 함수·유한 차분), 투티 부식 모델, 동결융해와 기포 간격 계수, 알칼리–골재 반응, 황산염 침식, 피복 두께와 품질로 정하는 수명을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .du-stack { display: grid; grid-template-columns: 1fr; }
+  .du-stack > div { position: relative; min-width: 0; }
+  .du-stack > div + div { border-top: 1px solid var(--border); }
+  .du-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .du-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .du-msg b { color: var(--text); }
+  .du-msg.ok { color: var(--ok); font-weight: 600; }
+  .du-msg.bad { color: var(--bad); font-weight: 600; }
+  .du-tbl td, .du-tbl th { font-variant-numeric: tabular-nums; }
+  .du-tbl td.hl { color: var(--accent); font-weight: 700; }
+  #du-cv-map { touch-action: none; cursor: crosshair; }
+  .du-ol { text-decoration: overline; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="materials"></script>
+</head>
+<body data-chapter="durability">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="du-ah-atk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="du-ah-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+      <marker id="du-ah-int" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 09</div>
+    <h1 data-no-glossary>콘크리트의 내구성</h1>
+    <p class="lead">4–8장에서 만든 콘크리트는 재령 28일에 30 MPa를 냈고, 수축과 크리프도 계산했습니다. 그런데 건물은 28일이 아니라 50년, 100년을 서 있어야 합니다. 그동안 공기 속 이산화탄소, 겨울철 도로에서 묻어 오는 제빙 염, 얼었다 녹는 물, 골재 속의 반응성 광물, 흙 속의 황산염이 콘크리트의 <b>작은 구멍</b>을 통해 조금씩 들어옵니다. 콘크리트 자체는 좀처럼 썩지 않지만, 그 속 철근은 어느 날 녹이 슬기 시작하고, 녹은 부피가 커져 피복을 밀어냅니다. 이 장은 "얼마나 빨리 들어오는가"를 식으로 쓰고(\(x = k\sqrt{t}\), 피크 제2법칙), 그 식으로 기준 건물 B-10의 보가 131년, 지하 주차장 바닥이 28년을 버틴다는 숫자를 직접 계산합니다. 그리고 그 숫자를 바꾸는 두 손잡이, <b>피복 두께</b>와 <b>콘크리트의 품질</b>을 맞바꾸는 법을 배웁니다.</p>
+    <ul class="objectives">
+      <li>설계 수명과 열화 메커니즘을 정의하고, 공극 구조(모세관 공극의 양과 연결성)가 모든 열화의 공통 입구임을 설명한다.</li>
+      <li>탄산화 반응과 pH 변화, 페놀프탈레인 시험을 설명하고 \(x = k\sqrt{t}\)로 깊이·속도 계수·부식 개시 시간을 계산한다.</li>
+      <li>피크 제2법칙과 오차 함수 해로 염화물 프로파일을 그리고, 임계 염화물량에 닿는 시간을 구한다. 1차원 유한 차분으로 같은 문제를 풀어 안정 조건을 확인한다.</li>
+      <li>투티 모델(잠복기 + 진전기)로 철근 부식 수명을 나누어 계산한다.</li>
+      <li>동결융해의 수압설과 기포 간격 계수 \(\bar{L}\), 내구성 지수를 설명하고, 알칼리–골재 반응·황산염 침식·산 침식의 원인과 대책을 안다.</li>
+      <li>피복 두께와 물–결합재비·혼화재를 맞바꾸는 설계 지도를 읽고, 노출 환경에 맞는 조합을 고른다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>"콘크리트는 영원하다"던 믿음</b></div>
+      <div class="o-body"><p>20세기 중반까지 철근콘크리트는 손볼 일이 없는 재료로 여겨졌습니다. 돌처럼 단단하고, 철근은 알칼리성 콘크리트 속에서 녹슬지 않는다는 것이 상식이었지요. 그러나 1960–70년대부터 겨울에 제빙 염을 뿌리는 도로의 교량 바닥판, 바닷가 구조물, 지하 주차장에서 피복이 들뜨고 떨어져 나가는 일이 흔해졌습니다. 조사해 보니 공통점은 콘크리트가 약해진 것이 아니라 <b>무언가가 공극을 통해 철근까지 들어왔다</b>는 것이었습니다.</p>
+        <p>1982년 스웨덴의 투티(K. Tuutti)는 철근 부식을 "공격 물질이 철근에 닿기까지의 잠복기"와 "녹이 진행해 피해가 드러나기까지의 진전기"로 나누어 보자고 제안했습니다. 그 뒤 탄산화와 염화물 침투를 확산 방정식으로 계산하고, 피복 두께와 콘크리트 품질로 잠복기를 설계 수명보다 길게 만드는 <b>내구성 설계</b>가 기준에 들어왔습니다. 오늘날 국내 콘크리트구조 설계기준에도 노출 범주에 따라 최소 강도·최대 물–결합재비·피복 두께를 정하는 규정이 있습니다.</p>
+        <div class="o-chain"><span>공극 구조</span><i>→</i><span class="tool">x = k√t · 피크 제2법칙 · 투티 모델</span><i>→</i><span>피복 두께 · W/B · 혼화재 · 수명</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="durability">
+    <h2>내구성이란: 설계 수명과 열화 메커니즘</h2>
+    <div class="problem"><strong>같은 콘크리트, 다른 수명</strong>
+      <p>B-10의 지상 골조와 지하 주차장은 같은 레미콘 25-30-150(M-30)으로 쳤습니다. 강도는 똑같이 30 MPa입니다. 그런데 사무실 보는 100년이 지나도 멀쩡할 것으로 보이고, 주차장 바닥은 30년 안에 보수가 필요할 수 있습니다. 강도가 같은데 왜 수명이 다를까요? 수명을 정하는 것은 강도가 아니라 <b>환경</b>과 <b>공격 물질이 들어오는 속도</b>입니다.</p></div>
+    <p>콘크리트의 <span class="term">내구성</span><span class="en">(durability)</span>은 정해진 환경에서 정해진 기간 동안, 큰 보수 없이 요구 성능(안전·사용성·외관)을 유지하는 능력입니다. 강도처럼 공시체 하나를 깨뜨려 재는 값이 아니라 "<b>어떤 환경에서 몇 년</b>"이라는 꼴의 답을 가집니다.</p>
+    <div class="callout def"><strong>정의 9.1 (설계 수명과 한계 상태)</strong> 구조물이 계획된 유지관리만으로 목적대로 쓰일 것으로 기대하는 기간을 <span class="term">설계 수명</span><span class="en">(design service life)</span>이라 한다(일반 건물 약 50년, 중요 시설·교량 약 100년이 흔한 목표다). 내구성 설계에서는 "철근 위치에서 부동태 피막이 깨진다(부식 개시)", "피복에 균열이 생긴다", "피복이 떨어진다" 같은 상태를 한계 상태로 정하고, 열화 모델로 그 상태에 이르는 시간을 계산해 설계 수명과 비교한다.</div>
+    <figure class="diagram" id="fig-du-map">
+      <svg viewBox="0 0 820 330" role="img" aria-label="건물 각 부위를 공격하는 열화 인자와 열화 메커니즘의 지도">
+        <rect x="10" y="10" width="800" height="310" rx="10" class="f-surface"/>
+        <line x1="30" y1="210" x2="790" y2="210" class="s-axis"/>
+        <text x="40" y="226" class="t-dim">지표면</text>
+        <rect x="120" y="70" width="320" height="140" class="f-elev" style="stroke:var(--text)"/>
+        <line x1="120" y1="117" x2="440" y2="117" style="stroke:var(--text-dim)"/><line x1="120" y1="164" x2="440" y2="164" style="stroke:var(--text-dim)"/>
+        <rect x="120" y="210" width="320" height="80" class="f-acc-soft"/>
+        <line x1="120" y1="250" x2="440" y2="250" style="stroke:var(--accent)"/>
+        <text x="280" y="100" text-anchor="middle" class="t">지상 골조(실내)</text>
+        <text x="280" y="240" text-anchor="middle" class="t">지하 주차장</text>
+        <text x="280" y="276" text-anchor="middle" class="t-dim">지하 외벽·기초(흙, 지하수)</text>
+        <line x1="70" y1="90" x2="116" y2="110" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#du-ah-atk)"/>
+        <text x="40" y="78" class="t-mono" style="fill:var(--accent-2)">CO₂</text>
+        <line x1="330" y1="200" x2="330" y2="232" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#du-ah-atk)"/>
+        <text x="342" y="198" class="t-mono" style="fill:var(--accent-2)">Cl⁻ (자동차가 묻혀 온 제빙 염)</text>
+        <line x1="480" y1="262" x2="444" y2="262" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#du-ah-atk)"/>
+        <text x="486" y="266" class="t-mono" style="fill:var(--accent-2)">SO₄²⁻ · 산 · 물</text>
+        <line x1="520" y1="70" x2="444" y2="80" style="stroke:var(--blue);stroke-width:2.2" marker-end="url(#du-ah-w)"/>
+        <text x="526" y="66" class="t-mono" style="fill:var(--blue)">비·눈 + 영하 = 동결융해</text>
+        <g transform="translate(560,100)">
+          <text x="0" y="0" class="t" style="font-weight:700">메커니즘 → 결과</text>
+          <text x="0" y="24" class="t-dim">탄산화 → 철근 부동태 파괴 → 부식</text>
+          <text x="0" y="46" class="t-dim">염해 → 공식(孔蝕) → 단면 손실</text>
+          <text x="0" y="68" class="t-dim">동결융해 → 표면 박리·내부 균열</text>
+          <text x="0" y="90" class="t-dim">알칼리–골재 반응 → 팽창·지도 균열</text>
+          <text x="0" y="112" class="t-dim">황산염·산 → 팽창·연화·용해</text>
+          <text x="0" y="140" class="t-mono">공통 입구: 모세관 공극과 균열</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-1.</b> B-10의 부위별 노출 환경과 열화 메커니즘. 실내 골조는 공기 중 CO₂에 의한 탄산화, 주차장은 염화물, 외기에 젖는 부위는 동결융해, 흙에 묻힌 부위는 황산염과 지하수를 주로 받는다. 어느 것이든 물질이 콘크리트 속으로 이동해야 일어나므로, 공극 구조와 균열이 공통 입구다.</figcaption>
+    </figure>
+    <p>열화 메커니즘은 크게 두 무리로 나뉩니다. 하나는 <b>철근을 공격</b>하는 것(탄산화, 염해)으로, 콘크리트는 멀쩡해도 철근이 녹슬어 피복이 깨집니다. 다른 하나는 <b>콘크리트 자체를 공격</b>하는 것(동결융해, 알칼리–골재 반응, 황산염·산)으로, 시멘트 페이스트나 골재가 부풀거나 녹습니다. 철근 부식은 12장 <a href="corrosion.html">부식과 방식</a>에서 전기화학으로 다시 다루고, 이 장은 "부식이 언제 시작되는가"에 집중합니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="permeability">
+    <h2>투수성과 공극 구조</h2>
+    <div class="problem"><strong>W/B 0.44와 0.60은 무엇이 다른가</strong>
+      <p>물–결합재비를 0.44에서 0.60으로 올리면 강도는 34 MPa에서 약 21 MPa로 떨어집니다(4장 교육용 관계). 그런데 내구성은 그보다 훨씬 크게 나빠집니다. 물이 빠져나간 자리에 남는 구멍이 많아질 뿐 아니라, 그 구멍들이 <b>서로 이어져</b> 물과 이온이 지나가는 길이 되기 때문입니다.</p></div>
+    <p>2장에서 본 파워스 모델에 따르면 시멘트는 수화하며 자기 부피의 약 2배를 차지하는 수화물(C-S-H 겔)을 만들고, 겔이 채우지 못한 물 자리는 <span class="term">모세관 공극</span><span class="en">(capillary pore)</span>으로 남습니다. 겔 속의 아주 작은 겔 공극(수 nm)은 물이 거의 흐르지 못하지만, 모세관 공극(약 10 nm–10 μm)이 이어지면 물·CO₂·Cl⁻가 지나갑니다. 콘크리트가 물질을 통과시키는 성질을 통틀어 <span class="term">투수성</span><span class="en">(permeability)</span>이라 하고, 압력 차로 흐르는 투수, 농도 차로 퍼지는 확산, 모세관 힘으로 빨아들이는 흡수를 구분합니다.</p>
+    <div class="callout def"><strong>원리 9.2 (파워스 모델의 부피 분율)</strong> 물–시멘트비 \(w/c\), 수화도 \(\alpha\)인 시멘트 페이스트 1의 부피는
+      <div class="formula">$$V_{cap} = \frac{w/c - 0.36\,\alpha}{w/c + 0.32}, \qquad V_{gel} = \frac{0.68\,\alpha}{w/c + 0.32}, \qquad V_{un} = \frac{0.32\,(1-\alpha)}{w/c + 0.32}$$<div class="where">\(V_{cap}\): 모세관 공극, \(V_{gel}\): 겔(고체 + 겔 공극), \(V_{un}\): 미수화 시멘트. 세 값의 합은 1이다. \(w/c\)가 크거나 \(\alpha\)가 작을수록(양생 부족) 모세관 공극이 많다. 완전 수화(\(\alpha = 1\))에서도 \(w/c \gt 0.36\)이면 모세관 공극이 남는다(밀폐 조건에서는 약 0.42가 경계로 자주 인용된다).</div></div></div>
+    <figure class="diagram" id="fig-du-pores">
+      <svg viewBox="0 0 820 280" role="img" aria-label="낮은 물-결합재비와 높은 물-결합재비 페이스트의 모세관 공극 연결 비교">
+        <rect x="10" y="10" width="800" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="0" y="0" width="320" height="170" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <g style="fill:var(--blue);opacity:.75">
+            <circle cx="40" cy="30" r="6"/><circle cx="110" cy="70" r="5"/><circle cx="200" cy="40" r="7"/><circle cx="270" cy="110" r="6"/><circle cx="80" cy="140" r="5"/><circle cx="170" cy="120" r="6"/><circle cx="240" cy="160" r="4"/><circle cx="300" cy="30" r="5"/>
+          </g>
+          <g style="fill:var(--text-dim)"><circle cx="60" cy="90" r="9"/><circle cx="150" cy="30" r="8"/><circle cx="230" cy="80" r="9"/><circle cx="130" cy="160" r="7"/></g>
+          <text x="160" y="196" text-anchor="middle" class="t" style="font-weight:700">W/B 0.40, 충분한 양생</text>
+          <text x="160" y="216" text-anchor="middle" class="t-dim">모세관 공극이 겔에 막혀 끊어져 있다</text>
+        </g>
+        <g transform="translate(460,40)">
+          <rect x="0" y="0" width="320" height="170" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <path d="M0 40 Q40 30 70 60 T140 70 T210 50 T320 80" style="fill:none;stroke:var(--blue);stroke-width:9;opacity:.75;stroke-linecap:round"/>
+          <path d="M70 60 Q80 110 120 130 T200 170" style="fill:none;stroke:var(--blue);stroke-width:7;opacity:.75;stroke-linecap:round"/>
+          <path d="M210 50 Q240 110 280 120 T320 150" style="fill:none;stroke:var(--blue);stroke-width:8;opacity:.75;stroke-linecap:round"/>
+          <g style="fill:var(--text-dim)"><circle cx="40" cy="110" r="7"/><circle cx="170" cy="110" r="6"/><circle cx="260" cy="20" r="6"/></g>
+          <line x1="-20" y1="40" x2="0" y2="40" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#du-ah-atk)"/>
+          <text x="160" y="196" text-anchor="middle" class="t" style="font-weight:700">W/B 0.65, 양생 부족</text>
+          <text x="160" y="216" text-anchor="middle" class="t-dim">이어진 모세관 공극이 표면에서 철근까지 길을 낸다</text>
+        </g>
+        <text x="410" y="256" text-anchor="middle" class="t-mono"><tspan style="fill:var(--accent)">■</tspan> C-S-H 겔  <tspan style="fill:var(--blue)">■</tspan> 모세관 공극(물)  <tspan style="fill:var(--text-dim)">■</tspan> 미수화 시멘트</text>
+      </svg>
+      <figcaption><b>그림 9-2.</b> 모세관 공극의 양과 연결성(개념도). 공극의 양이 같아도 이어져 있느냐에 따라 투수성은 몇 자릿수 달라진다. 파워스 등(1959)은 W/C 0.40이면 습윤 양생 약 3일, 0.45면 약 7일, 0.50이면 약 14일, 0.60이면 약 6개월, 0.70이면 약 1년 뒤에 모세관 공극이 끊어지고, 0.70을 넘으면 끊어지지 않는다고 보고했다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 9.1 (M-30 페이스트의 모세관 공극)</strong> M-30은 \(W/B = 0.441\). 습윤 양생 동안 수화도가 \(\alpha = 0.70\)까지 올랐다고 하자.
+      <ol style="margin:6px 0 0">
+        <li><b>분모.</b> \(w/c + 0.32 = 0.761\).</li>
+        <li><b>모세관 공극.</b> \(V_{cap} = (0.441 - 0.36 \times 0.70)/0.761 = 0.189/0.761 \approx 0.248\), 페이스트 부피의 약 25 %.</li>
+        <li><b>비교.</b> 같은 수화도에서 \(w/c = 0.60\)이면 \((0.60 - 0.252)/0.92 \approx 0.378\). 공극이 1.5배로 늘 뿐인데, 그림 9-2처럼 연결성이 바뀌어 투수성은 훨씬 크게 는다.</li>
+        <li><b>양생.</b> 양생을 일찍 끊어 표층의 수화도가 0.50에 머물면 \(w/c = 0.441\)이라도 \(V_{cap} = (0.441 - 0.18)/0.761 \approx 0.343\). 표층 몇 cm의 품질이 철근을 지키므로, <b>양생은 표층의 내구성</b>을 정한다(6장).</li>
+      </ol></div>
+    <div class="sim" id="sim-du-pore">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>물–결합재비와 양생이 만드는 공극</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view du-stack">
+          <div><canvas id="du-cv-pore" aria-label="페이스트 부피 구성 막대"></canvas><span class="du-cap">페이스트 1의 부피(양생 종료 시)</span></div>
+          <div><canvas id="du-cv-pore2" aria-label="재령에 따른 모세관 공극률"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>물–시멘트비 w/c <output id="du-po-wc-out"></output></span><input type="range" id="du-po-wc" min="0.30" max="0.75" step="0.005" value="0.44"></label>
+          <label class="ctrl"><span>습윤 양생 기간 <output id="du-po-t-out"></output></span><input type="range" id="du-po-t" min="1" max="90" step="1" value="7"></label>
+          <div class="ctrl"><span>비교 곡선</span><div class="seg" id="du-po-cmp"><button data-value="on" class="on">W/C 0.40·0.60 함께</button><button data-value="off">끄기</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">수화도 α(양생 끝)</span><span class="v" id="du-po-a">—</span></div>
+        <div class="stat"><span class="k">모세관 공극 V<sub>cap</sub></span><span class="v" id="du-po-v">—</span></div>
+        <div class="stat"><span class="k">상대 투수 계수</span><span class="v" id="du-po-k">—</span></div>
+      </div>
+      <div class="du-msg" id="du-po-msg"></div>
+      <div class="sim-note">해볼 것: w/c 0.44에서 양생을 3일과 28일로 바꿔 보세요 · w/c를 0.70보다 크게 하면 아무리 오래 양생해도 공극이 끊어지지 않습니다 · 모델: 원리 9.2의 파워스 식, 최종 수화도 α<sub>u</sub> = 1.031 w/c/(0.194 + w/c)(밀스 식)와 α(t) = α<sub>u</sub> t/(t + 2)(교육용), 양생을 멈추면 표층의 수화도가 그대로 머문다고 가정. 연결이 끊어지는 양생 일수는 파워스 등(1959)의 값을 로그 보간. 상대 투수 계수는 V<sub>cap</sub>가 0.05 늘 때마다 10배(교육용)로, M-30을 28일 양생한 표층을 1로 둔 값.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="carbonation">
+    <h2>탄산화: 철근을 지키던 알칼리가 사라진다</h2>
+    <div class="problem"><strong>보 속 철근은 언제부터 녹슬 수 있나</strong>
+      <p>B-10의 실내 보 피복은 40 mm, 슬래브는 20 mm입니다. 공기 중 이산화탄소는 0.04 % 정도에 불과하지만 수십 년에 걸쳐 콘크리트 표면에서 안쪽으로 천천히 파고듭니다. 그 전선이 철근에 닿는 날이 철근 부식이 <b>시작될 수 있는</b> 날입니다.</p></div>
+    <p>갓 굳은 콘크리트의 공극 용액은 수산화칼슘 Ca(OH)<sub>2</sub>와 알칼리(Na⁺, K⁺) 덕분에 pH 약 12.5–13.5의 강알칼리입니다. 이 환경에서 철근 표면에는 수 nm 두께의 치밀한 산화막, 곧 <span class="term">부동태 피막</span><span class="en">(passive film)</span>이 생겨 부식을 막습니다. 공기 중 CO<sub>2</sub>가 공극으로 확산해 들어와 물에 녹으면 Ca(OH)<sub>2</sub>와 반응해 탄산칼슘이 됩니다.</p>
+    <div class="formula">$$\mathrm{Ca(OH)_2 + CO_2 \;\longrightarrow\; CaCO_3 + H_2O}$$<div class="where">C-S-H도 결국 탄산화된다. 반응이 끝난 영역의 pH는 약 9 이하로 떨어지고, 이 깊이에 닿은 철근의 부동태 피막은 더 이상 안정하지 않다.</div></div>
+    <p>이 현상이 <span class="term">탄산화</span><span class="en">(carbonation)</span>입니다. 탄산화 자체는 콘크리트를 약하게 만들지 않고 오히려 표층을 약간 단단하게 하지만, 철근의 보호막을 없앱니다. 탄산화된 부분과 안 된 부분은 <span class="term">페놀프탈레인</span><span class="en">(phenolphthalein)</span> 지시약으로 쉽게 구분됩니다. 쪼갠 콘크리트 면에 1 % 페놀프탈레인 용액을 뿌리면 pH 약 9 이상인 부분은 붉은 보라색으로 물들고, 탄산화된 부분은 무색으로 남습니다.</p>
+    <figure class="diagram" id="fig-du-carb">
+      <svg viewBox="0 0 820 300" role="img" aria-label="탄산화 전선과 pH 분포, 페놀프탈레인 발색">
+        <rect x="10" y="10" width="800" height="280" rx="10" class="f-surface"/>
+        <rect x="60" y="50" width="130" height="170" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="190" y="50" width="260" height="170" style="fill:var(--red);opacity:.25;stroke:none"/>
+        <rect x="60" y="50" width="390" height="170" style="fill:none;stroke:var(--text)"/>
+        <circle cx="250" cy="135" r="16" style="fill:var(--text-dim);stroke:var(--text)"/>
+        <text x="250" y="170" text-anchor="middle" class="t-mono">철근</text>
+        <line x1="190" y1="40" x2="190" y2="230" style="stroke:var(--accent-2);stroke-width:2.4;stroke-dasharray:6 4"/>
+        <text x="190" y="246" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">탄산화 전선 x</text>
+        <line x1="20" y1="80" x2="56" y2="80" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#du-ah-atk)"/><line x1="20" y1="135" x2="56" y2="135" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#du-ah-atk)"/><line x1="20" y1="190" x2="56" y2="190" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#du-ah-atk)"/>
+        <text x="22" y="66" class="t-mono" style="fill:var(--accent-2)">CO₂</text>
+        <text x="125" y="138" text-anchor="middle" class="t-dim">무색</text><text x="380" y="138" text-anchor="middle" class="t-dim">붉은 보라</text>
+        <line x1="60" y1="270" x2="450" y2="270" style="stroke:var(--text-dim)"/><text x="60" y="284" class="t-mono">표면</text><text x="250" y="284" text-anchor="middle" class="t-mono">피복 c</text>
+        <g transform="translate(500,40)">
+          <line x1="0" y1="200" x2="280" y2="200" class="s-axis"/><line x1="0" y1="200" x2="0" y2="10" class="s-axis"/>
+          <text x="280" y="218" text-anchor="end" class="t-mono">깊이</text><text x="6" y="14" class="t-mono">pH</text>
+          <path d="M0 150 L70 150 Q86 150 92 100 Q98 50 116 50 L280 50" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <line x1="0" y1="50" x2="280" y2="50" style="stroke:var(--text-faint);stroke-dasharray:3 3"/><text x="-6" y="54" text-anchor="end" class="t-mono">13</text>
+          <line x1="0" y1="150" x2="70" y2="150" style="stroke:var(--text-faint);stroke-dasharray:3 3"/><text x="-6" y="154" text-anchor="end" class="t-mono">9</text>
+          <line x1="0" y1="118" x2="280" y2="118" style="stroke:var(--red);stroke-dasharray:5 3"/><text x="276" y="112" text-anchor="end" class="t-mono" style="fill:var(--red)">발색 경계 약 pH 9</text>
+          <line x1="92" y1="200" x2="92" y2="40" style="stroke:var(--accent-2);stroke-dasharray:6 4"/><text x="96" y="194" class="t-mono" style="fill:var(--accent-2)">x</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-3.</b> 탄산화 전선(개념도). 표면에서 깊이 x까지 Ca(OH)<sub>2</sub>가 CaCO<sub>3</sub>로 바뀌어 pH가 9 이하로 떨어진다. 전선은 실제로는 수 mm 폭의 전이대이며, 페놀프탈레인 발색 경계로 잰 깊이를 탄산화 깊이로 쓴다. 전선이 피복 c를 지나면 철근의 부동태가 깨진다.</figcaption>
+    </figure>
+    <p>CO<sub>2</sub>는 이미 탄산화된 표층을 지나 확산해야 전선에 닿습니다. 표층이 두꺼워질수록 공급이 느려지므로 전선의 속도는 깊이에 반비례하고(\(dx/dt \propto 1/x\)), 적분하면 깊이가 시간의 제곱근에 비례한다는 결과가 나옵니다.</p>
+    <div class="callout def"><strong>원리 9.3 (탄산화의 제곱근 법칙)</strong> 탄산화 깊이 \(x\)(mm)는 시간 \(t\)(년)의 제곱근에 비례한다.
+      <div class="formula">$$x = k\sqrt{t}, \qquad t_{i} = \left(\frac{c}{k}\right)^2$$<div class="where">\(k\): <span class="term">탄산화 속도 계수</span>(mm/√년), \(c\): 피복 두께, \(t_i\): 전선이 철근에 닿는 시간(부식 개시 시간). 깊이가 2배가 되려면 시간은 4배가 걸린다. 거꾸로 피복을 2배로 하면 개시 시간은 4배다.</div></div></div>
+    <p>\(k\)는 콘크리트와 환경에 따라 다릅니다. ① <b>W/B</b>: 공극이 많을수록 CO<sub>2</sub>가 빨리 들어와 \(k\)가 커진다. ② <b>양생</b>: 표층의 수화가 부족하면 커진다. ③ <b>혼화재</b>: 플라이애시·고로슬래그는 포졸란 반응으로 Ca(OH)<sub>2</sub>를 소비해 "중화할 알칼리 저장량"이 줄어들므로 같은 W/B에서 \(k\)가 대개 커진다(반대로 염화물에는 유리하다). ④ <b>습도</b>: 공극이 물로 꽉 차면 기체 CO<sub>2</sub>가 못 들어오고, 너무 마르면 반응할 물이 없다. 상대습도 약 50–70 %에서 가장 빠르다. 그래서 비를 맞는 외벽보다 <b>건조한 실내</b>가 더 빨리 탄산화하는 경우가 많다. ⑤ <b>CO<sub>2</sub> 농도</b>: 사람이 많은 실내·지하 주차장은 바깥 공기보다 높다.</p>
+    <div class="callout"><strong>예제 9.2 (B-10 보와 슬래브의 탄산화)</strong> B-10 실내 골조는 \(k = 3.5\) mm/√년(교육용 가정), 보 피복 40 mm, 슬래브 피복 20 mm.
+      <ol style="margin:6px 0 0">
+        <li><b>보.</b> \(t_i = (40/3.5)^2 = 11.43^2 \approx 131\)년. 설계 수명 100년보다 길다.</li>
+        <li><b>슬래브.</b> \(t_i = (20/3.5)^2 \approx 33\)년. 실내가 건조해 부식 속도는 느리지만(9.6절), 잠복기는 수명보다 짧다.</li>
+        <li><b>50년 뒤의 깊이.</b> \(x = 3.5\sqrt{50} \approx 24.7\) mm. 슬래브 철근은 이미 탄산화 영역 안에 있다.</li>
+        <li><b>역산.</b> 준공 20년 뒤 코어의 페놀프탈레인 깊이가 15 mm였다면 \(k = 15/\sqrt{20} \approx 3.35\) mm/√년. 이 값으로 남은 잠복기를 다시 예측한다(현장 조사의 기본 순서).</li>
+      </ol></div>
+    <div class="sim" id="sim-du-carb">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>탄산화 전선이 철근에 닿기까지</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view du-stack">
+          <div><canvas id="du-cv-carb" aria-label="피복 단면과 탄산화 전선"></canvas><span class="du-cap">보 옆면 단면(페놀프탈레인을 뿌린 모습)</span></div>
+          <div><canvas id="du-cv-carb2" aria-label="탄산화 깊이-시간 곡선"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>W/B <output id="du-ca-wb-out"></output></span><input type="range" id="du-ca-wb" min="0.35" max="0.70" step="0.001" value="0.441"></label>
+          <div class="ctrl"><span>환경</span><div class="seg" id="du-ca-env"><button data-value="1" class="on">실내(건조)</button><button data-value="0.8">실외 비 가림</button><button data-value="0.5">실외 비 맞음</button></div></div>
+          <div class="ctrl"><span>결합재</span><div class="seg" id="du-ca-scm"><button data-value="1" class="on">OPC</button><button data-value="1.2">FA 20 %</button><button data-value="1.3">GGBS 50 %</button></div></div>
+          <div class="ctrl"><span>양생</span><div class="seg" id="du-ca-cure"><button data-value="1" class="on">충분</button><button data-value="1.3">부족</button></div></div>
+          <label class="ctrl"><span>피복 두께 c <output id="du-ca-c-out"></output></span><input type="range" id="du-ca-c" min="10" max="80" step="1" value="40"></label>
+          <label class="ctrl"><span>경과 시간 t <output id="du-ca-t-out"></output></span><input type="range" id="du-ca-t" min="0" max="150" step="1" value="50"></label>
+          <div class="btn-row"><button class="btn primary" id="du-ca-play">▶ 시간 흐르게</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">속도 계수 k</span><span class="v" id="du-ca-k">—</span></div>
+        <div class="stat"><span class="k">깊이 x = k√t</span><span class="v" id="du-ca-x">—</span></div>
+        <div class="stat"><span class="k">개시 시간 (c/k)²</span><span class="v" id="du-ca-ti">—</span></div>
+      </div>
+      <div class="du-msg" id="du-ca-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(B-10 보)에서 개시 시간 약 131년, 피복을 20 mm로 줄이면 약 33년을 확인하세요 · 피복을 2배로 하면 개시 시간이 4배가 됩니다 · 결합재를 FA 20 %로 바꾸면 탄산화는 빨라집니다 · 모델: 원리 9.3, CB.conc.carbonation·carbonationTime. k = 3.5 × (W/B − 0.25)/0.191 × 환경 × 결합재 × 양생 계수(모두 교육용 가정, W/B 0.441·실내·OPC·충분한 양생에서 3.5 mm/√년). 실제 k는 조사·시험으로 정합니다.</div>
+    </div>
+    <div class="sim" id="sim-du-phenol">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>페놀프탈레인 시험: 쪼갠 코어로 k 추정하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="du-cv-ph" aria-label="페놀프탈레인을 뿌린 쪼갠 코어 단면"></canvas><span class="du-cap">쪼갠 코어 단면 100 × 80 mm(위가 노출면)</span></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>재령 t <output id="du-ph-t-out"></output></span><input type="range" id="du-ph-t" min="1" max="60" step="1" value="20"></label>
+          <label class="ctrl"><span>실제 속도 계수 k (모름) <output id="du-ph-k-out"></output></span><input type="range" id="du-ph-k" min="1" max="8" step="0.1" value="3.4"></label>
+          <label class="ctrl"><span>표면 균열 폭 w <output id="du-ph-w-out"></output></span><input type="range" id="du-ph-w" min="0" max="0.4" step="0.01" value="0.15"></label>
+          <div class="ctrl"><span>지시약</span><div class="seg" id="du-ph-spray"><button data-value="on" class="on">뿌림</button><button data-value="off">뿌리기 전</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">측정 평균 깊이 x̄(5점)</span><span class="v" id="du-ph-x">—</span></div>
+        <div class="stat"><span class="k">추정 k = x̄/√t</span><span class="v" id="du-ph-ke">—</span></div>
+        <div class="stat"><span class="k">균열부 깊이</span><span class="v" id="du-ph-xc">—</span></div>
+        <div class="stat"><span class="k">피복 40 mm 도달 예상</span><span class="v" id="du-ph-ti">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 균열 폭을 0.3 mm 이상으로 키워 균열을 따라 탄산화가 깊게 들어가는 모습을 보세요 · 측정점(▼)은 균열과 골재 바로 위를 피해서 잡습니다 · 골재 입자는 발색하지 않으므로 페이스트의 경계를 읽습니다 · 모델: 평균 깊이 k√t에 골재로 인한 ±15 % 요철(고정된 무작위 패턴), 균열부 깊이 = k√t × (1 + 8w)(w mm, 교육용 근사). 실제 측정은 쪼갠 직후의 신선한 면에서 합니다.</div>
+    </div>
+    <div class="callout site"><strong>B-10의 탄산화: 보 131년, 슬래브 33년</strong> 지상 골조는 실내(건조) 환경으로, 교육용 가정 \(k = 3.5\) mm/√년을 쓴다. <code>CB.conc.carbonationTime(40, 3.5)</code> = 130.6년(보·기둥 피복 40 mm), <code>CB.conc.carbonationTime(20, 3.5)</code> = 32.7년(슬래브 피복 20 mm). 슬래브는 잠복기가 설계 수명보다 짧지만, 실내는 습도가 낮아 부식 속도가 매우 느리므로 진전기(9.6절)가 길다. 다만 화장실·주방처럼 젖는 실내 부위, 외기에 면한 슬래브 끝은 따로 피복이나 마감으로 보호한다. 피복 두께의 기준값은 현행 KDS 14 20 50을 확인할 것.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="chloride">
+    <h2>염해: 피크 제2법칙과 오차 함수</h2>
+    <div class="problem"><strong>지하 주차장 바닥에 떨어지는 소금물</strong>
+      <p>겨울철 도로의 제빙 염(염화나트륨·염화칼슘)은 자동차 바퀴와 차체에 묻어 지하 주차장까지 들어옵니다. 녹은 눈이 고인 자리마다 염화물 이온 Cl⁻이 콘크리트 표면에 쌓이고, 농도 차를 따라 안쪽으로 퍼집니다. 탄산화와 달리 염화물은 pH를 크게 낮추지 않고도 부동태 피막을 국부적으로 뚫습니다.</p></div>
+    <p><span class="term">염해</span><span class="en">(chloride attack)</span>는 철근 위치의 염화물 농도가 어떤 값을 넘으면 시작됩니다. 이 값이 <span class="term">임계 염화물량</span><span class="en">(chloride threshold)</span> \(C_{cr}\)이며, 문헌에서는 시멘트 질량의 약 0.2–0.5 %(콘크리트 1 m³당 약 1.2–2.5 kg)가 흔히 인용됩니다. 폭이 넓은 것은 철근 표면 상태, 공극 용액의 pH, 수분 상태에 따라 달라지기 때문입니다. 이 책은 교육용으로 \(C_{cr} = 1.2\) kg/m³(M-30 시멘트 397 kg의 약 0.3 %)를 씁니다. 굳지 않은 콘크리트에 처음부터 들어 있는 염화물도 제한하는데, 레디믹스트 콘크리트(KS F 4009)는 염화물 이온량을 0.30 kg/m³ 이하로 두는 것이 원칙입니다(현행 기준 확인).</p>
+    <p>표면 농도가 일정하고 콘크리트가 균질하면, 염화물 이동은 확산 방정식으로 쓸 수 있습니다.</p>
+    <div class="callout def"><strong>원리 9.4 (피크 제2법칙과 오차 함수 해)</strong> 깊이 \(x\), 시간 \(t\)에서 염화물 농도 \(C(x,t)\)는 <span class="term">피크 제2법칙</span><span class="en">(Fick's second law)</span>을 따른다. 표면 농도 \(C_s\)가 일정하고 처음 농도가 \(C_i\)인 반무한 매질의 해는
+      <div class="formula">$$\frac{\partial C}{\partial t} = D\,\frac{\partial^2 C}{\partial x^2} \quad\Longrightarrow\quad C(x,t) = C_i + (C_s - C_i)\left[1 - \operatorname{erf}\!\left(\frac{x}{2\sqrt{D\,t}}\right)\right]$$<div class="where">\(D\): 겉보기 <span class="term">확산 계수</span>(m²/s), \(\operatorname{erf}(z) = \frac{2}{\sqrt{\pi}}\int_0^z e^{-u^2}du\): <span class="term">오차 함수</span>. 농도는 \(z = x/2\sqrt{Dt}\) 하나로만 정해진다. 그래서 같은 농도에 닿는 시간은 \(t \propto x^2/D\): 피복을 2배로 하면 4배, 확산 계수를 절반으로 하면 2배 길어진다.</div></div></div>
+    <figure class="diagram" id="fig-du-cl">
+      <svg viewBox="0 0 820 300" role="img" aria-label="시간에 따라 깊어지는 염화물 농도 프로파일과 임계값">
+        <rect x="10" y="10" width="800" height="280" rx="10" class="f-surface"/>
+        <line x1="80" y1="240" x2="760" y2="240" class="s-axis"/><line x1="80" y1="240" x2="80" y2="30" class="s-axis"/>
+        <text x="760" y="262" text-anchor="end" class="t-mono">표면에서의 깊이 x (mm)</text><text x="88" y="40" class="t-mono">C (kg/m³)</text>
+        <text x="72" y="64" text-anchor="end" class="t-mono">C_s</text><line x1="80" y1="60" x2="760" y2="60" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+        <path d="M80 60 C110 150 140 220 200 238 L760 240" style="fill:none;stroke:var(--accent-2);stroke-width:1.6;opacity:.5"/>
+        <path d="M80 60 C150 140 210 210 320 236 L760 240" style="fill:none;stroke:var(--accent-2);stroke-width:2;opacity:.75"/>
+        <path d="M80 60 C200 120 300 200 480 234 L760 240" style="fill:none;stroke:var(--accent-2);stroke-width:3"/>
+        <text x="180" y="210" class="t-mono" style="fill:var(--accent-2)">5년</text><text x="270" y="200" class="t-mono" style="fill:var(--accent-2)">15년</text><text x="380" y="190" class="t-mono" style="fill:var(--accent-2)">28년</text>
+        <line x1="80" y1="168" x2="760" y2="168" style="stroke:var(--bad);stroke-width:1.6;stroke-dasharray:6 4"/><text x="756" y="162" text-anchor="end" class="t-mono" style="fill:var(--bad)">임계 염화물량 C_cr</text>
+        <line x1="300" y1="40" x2="300" y2="240" style="stroke:var(--text);stroke-dasharray:4 3"/><text x="304" y="52" class="t-mono">피복 c = 50</text>
+        <circle cx="300" cy="168" r="5" style="fill:var(--bad)"/>
+        <circle cx="300" cy="262" r="10" style="fill:var(--text-dim)"/>
+      </svg>
+      <figcaption><b>그림 9-4.</b> 표면 농도 C<sub>s</sub>가 일정할 때 시간에 따른 염화물 프로파일(개념도). 프로파일은 모양을 유지한 채 √t에 비례해 늘어난다. 철근 깊이에서 농도가 C<sub>cr</sub>에 닿는 순간(●)이 부식 개시다.</figcaption>
+    </figure>
+    <p>확산 계수는 W/B가 낮을수록, 그리고 <b>플라이애시·고로슬래그·실리카퓸</b>을 쓸수록 작아집니다. 혼화재는 포졸란·잠재 수경성 반응으로 공극을 잘게 나누고, 알루미네이트 수화물이 염화물을 화학적으로 붙잡기(고정화) 때문입니다. 탄산화와는 반대 방향의 효과라서, 노출 환경에 따라 결합재를 다르게 고릅니다.</p>
+    <div class="callout"><strong>예제 9.3 (B-10 주차장 바닥: 손으로 푸는 오차 함수)</strong> \(C_s = 3.0\) kg/m³, \(D = 2 \times 10^{-12}\) m²/s(M-30), \(C_{cr} = 1.2\) kg/m³, \(C_i = 0\), 피복 50 mm.
+      <ol style="margin:6px 0 0">
+        <li><b>단위 바꾸기.</b> 1년 = 3.156 × 10⁷ s, 1 m² = 10⁶ mm²이므로 \(D = 2 \times 10^{-12} \times 10^6 \times 3.156 \times 10^7 \approx 63.1\) mm²/년.</li>
+        <li><b>목표 z.</b> \(C/C_s = 1.2/3.0 = 0.4 = 1 - \operatorname{erf}(z)\) → \(\operatorname{erf}(z) = 0.6\) → \(z \approx 0.595\)(표나 계산기).</li>
+        <li><b>시간.</b> \(x/(2\sqrt{Dt}) = z\) → \(t = \dfrac{x^2}{4z^2 D} = \dfrac{50^2}{4 \times 0.595^2 \times 63.1} \approx 28\)년.</li>
+        <li><b>검산.</b> \(t = 28\)년이면 \(\sqrt{Dt} = \sqrt{63.1 \times 28} \approx 42.0\) mm, \(z = 50/84.1 \approx 0.595\), \(C = 3.0 \times (1 - 0.600) = 1.20\) kg/m³.</li>
+        <li><b>M-30F.</b> \(D = 1 \times 10^{-12}\)이면 \(t \propto 1/D\)이므로 약 56년. 피복을 60 mm로 늘리면 M-30에서도 \(28 \times (60/50)^2 \approx 40\)년.</li>
+      </ol></div>
+    <div class="sim" id="sim-du-cl">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>염화물 프로파일과 부식 개시</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="du-cv-cl" aria-label="깊이별 염화물 농도 곡선"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>B-10 주차장 프리셋</span><div class="seg" id="du-cl-pre"><button data-value="m30" class="on">M-30</button><button data-value="m30f">M-30F</button><button data-value="user">직접</button></div></div>
+          <label class="ctrl"><span><span>표면 염화물 C<sub>s</sub></span> <output id="du-cl-cs-out"></output></span><input type="range" id="du-cl-cs" min="0.5" max="6" step="0.1" value="3"></label>
+          <label class="ctrl"><span>확산 계수 D <output id="du-cl-d-out"></output></span><input type="range" id="du-cl-d" min="-12.7" max="-10.7" step="0.001" value="-11.699"></label>
+          <label class="ctrl"><span><span>임계값 C<sub>cr</sub></span> <output id="du-cl-cr-out"></output></span><input type="range" id="du-cl-cr" min="0.6" max="2.4" step="0.05" value="1.2"></label>
+          <label class="ctrl"><span>피복 두께 c <output id="du-cl-c-out"></output></span><input type="range" id="du-cl-c" min="20" max="100" step="1" value="50"></label>
+          <label class="ctrl"><span>경과 시간 t <output id="du-cl-t-out"></output></span><input type="range" id="du-cl-t" min="0" max="100" step="1" value="28"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">철근 위치 C(c, t)</span><span class="v" id="du-cl-cc">—</span></div>
+        <div class="stat"><span class="k">확산 거리 2√(Dt)</span><span class="v" id="du-cl-l">—</span></div>
+        <div class="stat"><span class="k">부식 개시 시간</span><span class="v" id="du-cl-ti">—</span></div>
+      </div>
+      <div class="du-msg" id="du-cl-msg"></div>
+      <div class="sim-note">해볼 것: M-30(28년)과 M-30F(56년)를 번갈아 눌러 보세요 · 피복을 50에서 60 mm로 늘리면 몇 년이 느나요? · C<sub>s</sub>가 C<sub>cr</sub>보다 작으면 아무리 기다려도 부식이 시작되지 않습니다 · 모델: 원리 9.4, CB.conc.chloride·chlorideTime(처음 농도 C<sub>i</sub> = 0). 실제 구조물에서는 표면 농도가 시간에 따라 쌓이고 확산 계수가 재령에 따라 작아지므로(심화 참고) 조사 자료로 보정합니다. 흐린 곡선은 5·10·25·50·100년.</div>
+    </div>
+    <div class="callout deep"><strong>재령에 따라 작아지는 확산 계수</strong> 현장에서 측정한 겉보기 확산 계수는 오래된 구조물일수록 작다. 수화와 포졸란 반응이 계속되어 공극이 막히고, 염화물이 고정되기 때문이다. 그래서 \(D(t) = D_{ref}(t_{ref}/t)^m\)처럼 재령 지수 \(m\)(약 0.2–0.6, 혼화재가 많을수록 큼)을 쓰는 모델이 널리 쓰인다. \(m\)을 무시하면 수명을 보수적으로(짧게) 예측하고, 크게 잡으면 낙관적으로 예측하므로 \(m\)은 근거 있는 값만 쓴다. 이 책의 B-10 숫자는 \(m = 0\)인 단순 모델이다.</div>
+    <div class="callout site"><strong>B-10 지하 주차장: M-30 약 28년, M-30F 약 56년</strong> 교육용 가정 \(C_s = 3.0\) kg/m³, \(C_{cr} = 1.2\) kg/m³, 피복 50 mm. <code>CB.conc.chlorideTime(50, 3.0, 2e-12, 1.2)</code> = 28.0년, <code>CB.conc.chlorideTime(50, 3.0, 1e-12, 1.2)</code> = 55.9년. 골조 전체를 M-30F로 바꾸면 탄산화(실내 보)는 약간 불리해지므로, 주차장 바닥·벽만 플라이애시 배합 또는 피복 증가, 표면 보호재(침투성 발수재·도막), 배수 경사와 정기 세척을 함께 쓰는 것이 일반적인 대책이다. 실제 노출 범주와 최소 피복은 현행 KDS 14 20 40·50을 확인할 것.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="numerical">
+    <h2>확산을 수치로 풀기: 1차원 유한 차분</h2>
+    <p>오차 함수 해는 표면 농도가 일정하고 \(D\)가 변하지 않는 이상적인 경우에만 쓸 수 있습니다. 실제 표면 농도는 겨울마다 조금씩 쌓이고, 표층과 내부의 품질이 다르며, 단면이 두께를 가집니다. 이럴 때는 콘크리트를 얇은 층으로 나누어 시간을 한 걸음씩 진행하는 <span class="term">유한 차분법</span><span class="en">(finite difference method)</span>으로 풉니다. 6장의 매스 콘크리트 온도 해석도 같은 방정식(열전도)을 같은 방법으로 풉니다.</p>
+    <div class="callout def"><strong>원리 9.5 (명시적 유한 차분과 안정 조건)</strong> 깊이를 간격 \(\Delta x\)의 절점 \(i\)로, 시간을 \(\Delta t\)의 걸음 \(n\)으로 나누면 피크 제2법칙은
+      <div class="formula">$$C_i^{n+1} = C_i^n + r\left(C_{i+1}^n - 2C_i^n + C_{i-1}^n\right), \qquad r = \frac{D\,\Delta t}{\Delta x^2}$$<div class="where">표면 절점은 \(C_0 = C_s(t)\), 깊은 쪽 끝은 흐름이 없다(\(\partial C/\partial x = 0\))고 둔다. 이 명시적(FTCS) 방법은 \(r \le 1/2\)일 때만 안정하다. \(r\)이 1/2을 넘으면 오차가 걸음마다 부호를 바꾸며 커져 해가 발산한다. 격자를 촘촘히 하면(Δx를 절반) 같은 r을 지키려고 Δt를 1/4로 줄여야 한다.</div></div></div>
+    <div class="sim" id="sim-du-fd">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>유한 차분 vs 해석해</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="du-cv-fd" aria-label="유한 차분 해와 오차 함수 해석해 비교"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>격자 수 N <output id="du-fd-n-out"></output></span><input type="range" id="du-fd-n" min="6" max="60" step="1" value="20"></label>
+          <label class="ctrl"><span>r = DΔt/Δx² <output id="du-fd-r-out"></output></span><input type="range" id="du-fd-r" min="0.05" max="0.7" step="0.01" value="0.4"></label>
+          <label class="ctrl"><span>시간 t <output id="du-fd-t-out"></output></span><input type="range" id="du-fd-t" min="0" max="100" step="0.5" value="28"></label>
+          <div class="ctrl"><span>표면 농도</span><div class="seg" id="du-fd-bc"><button data-value="const" class="on">일정 3.0</button><button data-value="grow">해마다 쌓임</button></div></div>
+          <div class="btn-row"><button class="btn primary" id="du-fd-play">▶ 0년부터 진행</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">Δx / Δt</span><span class="v" id="du-fd-dx">—</span></div>
+        <div class="stat"><span class="k">걸음 수</span><span class="v" id="du-fd-ns">—</span></div>
+        <div class="stat"><span class="k">50 mm 농도(FD / 해석)</span><span class="v" id="du-fd-c50">—</span></div>
+        <div class="stat"><span class="k">최대 오차</span><span class="v" id="du-fd-err">—</span></div>
+      </div>
+      <div class="du-msg" id="du-fd-msg"></div>
+      <div class="sim-note">해볼 것: r을 0.5보다 조금 크게(0.55) 하면 톱니 모양 오차가 자라는 것을 보세요 · 격자를 6개로 줄이면 안정해도 해석해와 어긋납니다(공간 오차) · '해마다 쌓임'은 C<sub>s</sub>(t) = 3.0(1 − e<sup>−t/10</sup>)로, 해석해(점선, C<sub>s</sub> 일정)보다 늦게 침투합니다 · 모델: 원리 9.5, D = 2 × 10<sup>−12</sup> m²/s, 깊은 끝(150 mm)은 흐름 없음. 마지막 걸음은 시간을 정확히 맞추려고 Δt를 조금 줄입니다. 해석해는 CB.conc.chloride.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="tuutti">
+    <h2>철근 부식의 시작과 진전: 투티 모델</h2>
+    <p>탄산화 전선이나 임계 염화물량이 철근에 닿아도 그날 바로 피복이 깨지지는 않습니다. 부식 전지가 만들어지고(12장), 녹이 조금씩 쌓여 부피가 팽창하고(원래 철의 약 2–6배), 그 압력이 피복의 인장 강도를 넘을 때 비로소 철근을 따라 균열이 나타납니다. <span class="term">투티 모델</span><span class="en">(Tuutti model)</span>은 이 과정을 두 기간으로 나눕니다.</p>
+    <div class="callout def"><strong>정의 9.6 (잠복기와 진전기)</strong> 철근 부식 수명 \(t_L = t_0 + t_1\). <span class="term">잠복기</span> \(t_0\)는 공격 물질이 철근에 닿아 부동태가 깨질 때까지의 시간(탄산화 \((c/k)^2\), 염해 오차 함수 해), <span class="term">진전기</span> \(t_1\)은 부식이 진행해 정해 둔 한계(피복 균열, 박리, 단면 손실)에 이르는 시간이다. 부식 전류 밀도 \(i_{corr} = 1\ \mu\text{A/cm}^2\)는 패러데이 법칙으로 철 표면이 약 11.6 μm/년씩 깎이는 속도에 해당한다.</div>
+    <figure class="diagram" id="fig-du-tuutti">
+      <svg viewBox="0 0 820 290" role="img" aria-label="투티 모델의 잠복기와 진전기">
+        <rect x="10" y="10" width="800" height="270" rx="10" class="f-surface"/>
+        <rect x="80" y="40" width="380" height="190" style="fill:var(--accent-soft)"/>
+        <rect x="460" y="40" width="250" height="190" style="fill:var(--accent-2-soft)"/>
+        <line x1="80" y1="230" x2="770" y2="230" class="s-axis"/><line x1="80" y1="230" x2="80" y2="30" class="s-axis"/>
+        <text x="770" y="252" text-anchor="end" class="t-mono">시간</text><text x="88" y="40" class="t-mono">열화 정도(부식량)</text>
+        <path d="M80 229 L460 229 L710 60" style="fill:none;stroke:var(--bad);stroke-width:3"/>
+        <line x1="80" y1="120" x2="770" y2="120" style="stroke:var(--text-dim);stroke-dasharray:6 4"/><text x="766" y="114" text-anchor="end" class="t-mono">한계(피복 균열)</text>
+        <text x="270" y="140" text-anchor="middle" class="t" style="font-weight:700">잠복기 t₀</text><text x="270" y="162" text-anchor="middle" class="t-dim">CO₂·Cl⁻가 피복을 지나온다</text>
+        <text x="585" y="190" text-anchor="middle" class="t" style="font-weight:700">진전기 t₁</text><text x="585" y="212" text-anchor="middle" class="t-dim">녹이 쌓여 균열·박리</text>
+        <circle cx="460" cy="229" r="5" style="fill:var(--accent-2)"/><text x="460" y="252" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">부식 개시</text>
+        <circle cx="597" cy="120" r="5" style="fill:var(--bad)"/>
+        <text x="300" y="70" text-anchor="middle" class="t-mono">피복 c↑, W/B↓, 혼화재</text><text x="585" y="70" text-anchor="middle" class="t-mono">습도·산소·온도·염화물량</text>
+      </svg>
+      <figcaption><b>그림 9-5.</b> 투티 모델(1982). 잠복기는 물질 이동 속도와 피복 두께가, 진전기는 부식 속도(습도·산소 공급·온도)가 정한다. 대부분의 내구성 설계는 안전 쪽으로 "잠복기 ≥ 설계 수명"을 목표로 한다.</figcaption>
+    </figure>
+    <p>진전기의 길이는 부식 속도에 크게 좌우됩니다. 부식 속도는 \(i_{corr}\)로 약 0.1 μA/cm² 미만이면 무시할 만하고, 0.1–0.5는 낮음, 0.5–1은 보통, 1 이상은 높음으로 흔히 분류합니다. 건조한 실내의 탄산화 부식은 대개 0.1 안팎으로 느리고, 젖은 염해 부위는 1을 넘기도 합니다. 피복 균열이 생기는 부식 깊이는 실험식의 한 예로 \(x_{crit} \approx 7.53 + 9.32\,c/d\) μm(알론소 외, 1998, 교육용)가 있어, 피복이 두껍고 철근이 가늘수록 더 많은 녹을 견딘다고 봅니다.</p>
+    <div class="callout"><strong>예제 9.4 (주차장 바닥의 부식 수명)</strong> 염해, 피복 50 mm, D25(\(d = 25.4\) mm), M-30, \(i_{corr} = 1.0\ \mu\)A/cm².
+      <ol style="margin:6px 0 0">
+        <li><b>잠복기.</b> 예제 9.3에서 \(t_0 \approx 28\)년.</li>
+        <li><b>균열 부식 깊이.</b> \(x_{crit} = 7.53 + 9.32 \times 50/25.4 \approx 25.9\) μm.</li>
+        <li><b>진전기.</b> \(t_1 = 25.9/(11.6 \times 1.0) \approx 2.2\)년. 젖은 염해 부위는 개시 뒤 몇 년 안에 균열이 보인다.</li>
+        <li><b>수명.</b> \(t_L \approx 30\)년. 실내 보(탄산화, \(t_0 \approx 131\)년, \(i_{corr} = 0.1\))라면 \(t_1 = (7.53 + 9.32 \times 40/25.4)/1.16 \approx 19\)년이 더해진다.</li>
+      </ol></div>
+    <div class="sim" id="sim-du-tuutti">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>투티 모델로 부식 수명 나누기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="du-cv-tu" aria-label="잠복기와 진전기로 나눈 부식 깊이-시간 그래프"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>메커니즘(B-10 가정)</span><div class="seg" id="du-tu-mech"><button data-value="cl" class="on">염해(주차장)</button><button data-value="co2">탄산화(실내)</button></div></div>
+          <div class="ctrl"><span>콘크리트</span><div class="seg" id="du-tu-mix"><button data-value="m30" class="on">M-30</button><button data-value="m30f">M-30F</button></div></div>
+          <label class="ctrl"><span>피복 두께 c <output id="du-tu-c-out"></output></span><input type="range" id="du-tu-c" min="20" max="80" step="1" value="50"></label>
+          <div class="ctrl"><span>철근</span><div class="seg" id="du-tu-bar"><button data-value="D13">D13</button><button data-value="D19">D19</button><button data-value="D25" class="on">D25</button></div></div>
+          <label class="ctrl"><span><span>부식 전류 밀도 i<sub>corr</sub></span> <output id="du-tu-i-out"></output></span><input type="range" id="du-tu-i" min="-1.3" max="0.7" step="0.01" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">잠복기 t₀</span><span class="v" id="du-tu-t0">—</span></div>
+        <div class="stat"><span class="k">진전기 t₁</span><span class="v" id="du-tu-t1">—</span></div>
+        <div class="stat"><span class="k">수명 t₀ + t₁</span><span class="v" id="du-tu-tl">—</span></div>
+        <div class="stat"><span class="k">100년 단면 손실</span><span class="v" id="du-tu-loss">—</span></div>
+      </div>
+      <div class="du-msg" id="du-tu-msg"></div>
+      <div class="sim-note">해볼 것: 염해에서 i<sub>corr</sub>를 0.1로 낮추면 진전기가 얼마나 늘어나나요? 실내 탄산화는 잠복기 자체가 길어 대개 수명을 넘습니다 · 굵은 철근일수록 x<sub>crit</sub>가 작아 진전기가 짧아집니다 · 모델: 잠복기는 CB.conc.carbonationTime(c, 3.5 또는 M-30F 4.2) 또는 CB.conc.chlorideTime(c, 3.0, D, 1.2), x<sub>crit</sub> = 7.53 + 9.32c/d μm, 부식 깊이 = 11.6 i<sub>corr</sub>(t − t₀) μm/년(균일 부식, 교육용). 단면 손실률 = 1 − (1 − 2x/d)². 국부 부식(공식)은 평균보다 몇 배 깊을 수 있습니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="freeze-thaw">
+    <h2>동결융해: 얼음이 만드는 압력과 기포</h2>
+    <div class="problem"><strong>겨울을 몇 번 견디는가</strong>
+      <p>물은 얼면서 부피가 약 9 % 늘어납니다. 젖은 콘크리트가 영하로 떨어지면 모세관 공극 속 물이 얼고, 봄이 올 때까지 수십 번 얼었다 녹기를 되풀이합니다. 한 번의 손상은 눈에 보이지 않지만, 수백 번이 쌓이면 표면이 비늘처럼 떨어지고 속까지 금이 갑니다.</p></div>
+    <p>1940년대 파워스(T. C. Powers)의 <b>수압설</b>에 따르면, 공극 속 물이 얼기 시작하면 늘어난 부피만큼 아직 얼지 않은 물이 밀려나야 하고, 그 물이 빠져나갈 빈자리가 멀면 페이스트에 큰 수압이 걸립니다. 해결책은 페이스트 곳곳에 <b>빈 방</b>을 미리 만들어 두는 것입니다. AE제로 만든 지름 약 10–1,000 μm의 독립된 미세 기포, 곧 <span class="term">연행 공기</span><span class="en">(entrained air)</span>가 그 역할을 합니다. 중요한 것은 공기의 총량보다 페이스트의 어느 점에서든 가장 가까운 기포까지의 거리, 곧 <span class="term">기포 간격 계수</span><span class="en">(spacing factor)</span> \(\bar{L}\)입니다.</p>
+    <figure class="diagram" id="fig-du-ft">
+      <svg viewBox="0 0 820 280" role="img" aria-label="동결 시 물이 기포로 밀려나는 수압설과 기포 간격 계수">
+        <rect x="10" y="10" width="800" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="0" y="0" width="330" height="170" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <circle cx="70" cy="60" r="22" style="fill:var(--surface);stroke:var(--text)"/><circle cx="250" cy="70" r="18" style="fill:var(--surface);stroke:var(--text)"/><circle cx="160" cy="135" r="20" style="fill:var(--surface);stroke:var(--text)"/>
+          <path d="M150 60 l10 -8 l10 8 l-10 8z" style="fill:var(--blue)"/><text x="160" y="40" text-anchor="middle" class="t-mono" style="fill:var(--blue)">얼음</text>
+          <line x1="148" y1="62" x2="96" y2="62" style="stroke:var(--blue);stroke-width:2" marker-end="url(#du-ah-w)"/><line x1="172" y1="62" x2="228" y2="66" style="stroke:var(--blue);stroke-width:2" marker-end="url(#du-ah-w)"/><line x1="160" y1="72" x2="160" y2="112" style="stroke:var(--blue);stroke-width:2" marker-end="url(#du-ah-w)"/>
+          <line x1="92" y1="60" x2="148" y2="60" style="stroke:var(--text);stroke-width:1;stroke-dasharray:3 3"/>
+          <text x="120" y="88" text-anchor="middle" class="t-mono">L</text>
+          <text x="165" y="196" text-anchor="middle" class="t" style="font-weight:700">AE 콘크리트: 기포가 가깝다</text>
+          <text x="165" y="216" text-anchor="middle" class="t-dim">밀려난 물이 짧은 거리만 흘러 수압이 작다</text>
+        </g>
+        <g transform="translate(450,40)">
+          <rect x="0" y="0" width="330" height="170" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <circle cx="290" cy="140" r="12" style="fill:var(--surface);stroke:var(--text)"/>
+          <path d="M70 60 l10 -8 l10 8 l-10 8z" style="fill:var(--blue)"/>
+          <line x1="90" y1="66" x2="276" y2="132" style="stroke:var(--blue);stroke-width:2" marker-end="url(#du-ah-w)"/>
+          <path d="M40 100 l20 12 l-8 14 l22 10" style="fill:none;stroke:var(--bad);stroke-width:2"/><path d="M120 30 l10 18 l-12 10" style="fill:none;stroke:var(--bad);stroke-width:2"/>
+          <text x="165" y="196" text-anchor="middle" class="t" style="font-weight:700">AE 없음: 기포가 멀다</text>
+          <text x="165" y="216" text-anchor="middle" class="t-dim">긴 거리 → 큰 수압 → 미세 균열</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-6.</b> 동결융해의 수압설(개념도). 얼음이 생기며 밀려난 물은 가장 가까운 빈 기포로 흘러간다. 흐름 저항으로 생기는 압력은 흐르는 거리에 따라 커지므로, 기포 사이 거리(간격 계수 <span class="du-ol">L</span>)를 약 0.2 mm 이하로 촘촘하게 두면 페이스트가 깨지지 않는다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 9.7 (파워스 간격 계수와 내구성 지수)</strong> 기포의 부피 비율 \(A\)(%), 페이스트 부피 비율 \(p\)(%), 기포의 비표면적 \(\alpha\)(mm⁻¹, 작은 기포일수록 크다)로
+      <div class="formula">$$\bar{L} = \begin{cases} \dfrac{p}{\alpha A}, & p/A \le 4.33 \\[2mm] \dfrac{3}{\alpha}\left[1.4\left(\dfrac{p}{A} + 1\right)^{1/3} - 1\right], & p/A \gt 4.33 \end{cases}$$<div class="where">경화 콘크리트 단면을 현미경으로 세어(선형 횡단법) \(A\)와 \(\alpha\)를 구한다. 동결융해 저항에는 \(\bar{L} \le\) 약 0.20 mm가 흔히 권장된다. 급속 동결융해 시험(KS F 2456 등, 현행 기준 확인)에서는 사이클 \(N\)마다 상대 동탄성계수 \(P\)(%)를 재고 <span class="term">내구성 지수</span> \(DF = PN/M\)(\(M = 300\) 사이클, \(P\)가 60 %로 떨어지면 그때의 \(N\))로 평가한다.</div></div></div>
+    <div class="callout"><strong>예제 9.5 (M-30의 기포 간격)</strong> M-30의 페이스트(물 175 L + 시멘트 126 L)는 \(p \approx 30\) %, 공기량 \(A = 4.5\) %, 좋은 AE제로 \(\alpha = 25\) mm⁻¹.
+      <ol style="margin:6px 0 0">
+        <li><b>비율.</b> \(p/A = 30/4.5 = 6.67 \gt 4.33\)이므로 둘째 식.</li>
+        <li><b>간격 계수.</b> \(\bar{L} = (3/25)[1.4 \times 7.67^{1/3} - 1] = 0.12 \times (1.4 \times 1.972 - 1) \approx 0.211\) mm.</li>
+        <li><b>판단.</b> 0.20 mm를 살짝 넘는다. 공기량을 5.5 %로 올리면 \(p/A = 5.45\), \(\bar{L} \approx 0.193\) mm. 다만 공기 1 %마다 강도가 약 4–5 % 떨어지므로(5장), 동결융해 노출이 심한 부위에만 공기량을 높인다.</li>
+      </ol></div>
+    <div class="sim" id="sim-du-ft">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>기포 간격과 동결융해 사이클</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view du-stack">
+          <div><canvas id="du-cv-ft" aria-label="페이스트 속 기포 배치와 보호 거리"></canvas><span class="du-cap">페이스트 2.0 × 1.0 mm(빨강: 가장 가까운 기포가 0.20 mm보다 먼 곳)</span></div>
+          <div><canvas id="du-cv-ft2" aria-label="사이클에 따른 상대 동탄성계수"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>공기량 A <output id="du-ft-a-out"></output></span><input type="range" id="du-ft-a" min="1" max="9" step="0.1" value="4.5"></label>
+          <div class="ctrl"><span>기포 비표면적 α</span><div class="seg" id="du-ft-al"><button data-value="25" class="on">AE 양호 25</button><button data-value="15">AE 보통 15</button><button data-value="8">갇힌 공기 8</button></div></div>
+          <label class="ctrl"><span>페이스트 비율 p <output id="du-ft-p-out"></output></span><input type="range" id="du-ft-p" min="22" max="36" step="0.5" value="30"></label>
+          <label class="ctrl"><span>사이클 N <output id="du-ft-n-out"></output></span><input type="range" id="du-ft-n" min="0" max="300" step="5" value="300"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">간격 계수 <span class="du-ol">L</span></span><span class="v" id="du-ft-l">—</span></div>
+        <div class="stat"><span class="k">상대 동탄성계수 P(N)</span><span class="v" id="du-ft-rdm">—</span></div>
+        <div class="stat"><span class="k">내구성 지수 DF</span><span class="v" id="du-ft-df">—</span></div>
+        <div class="stat"><span class="k">강도 손실(공기)</span><span class="v" id="du-ft-fs">—</span></div>
+      </div>
+      <div class="du-msg" id="du-ft-msg"></div>
+      <div class="sim-note">해볼 것: 공기량이 같아도 '갇힌 공기 8'(큰 기포)로 바꾸면 빨간 영역이 넓어지고 DF가 무너집니다 · 공기량을 올리면 DF는 좋아지지만 강도 손실이 커집니다 · 모델: <span class="du-ol">L</span>은 원리 9.7(파워스 식). 그림은 평균 지름 6/α의 구형 기포를 부피 비율 A/(A + p)만큼 3차원에 무작위로 놓고 그 단면(원)을 그린 것으로, 빨강은 단면 위 점에서 가장 가까운 기포(단면 밖 포함)까지 0.20 mm를 넘는 곳이다. 무작위 배치는 파워스의 격자 가정보다 불리하게 보인다. 상대 동탄성계수 P(N) = 100 exp[−ln(100/60)(N/N<sub>c</sub>)³], N<sub>c</sub> = 300(0.25/<span class="du-ol">L</span>)³(교육용 손상 모델, 포화 상태 가정). 강도 손실은 공기 1.5 %를 넘는 1 %마다 4.5 %(교육용).</div>
+    </div>
+    <p>제빙 염이 있으면 피해가 더 커집니다. 표면의 염 용액이 얼고 녹으며 얇은 층이 비늘처럼 벗겨지는 <span class="term">스케일링</span><span class="en">(scaling)</span>이 생기고, 같은 곳에 염화물도 침투합니다. 주차장 바닥처럼 염과 동결이 겹치는 곳은 AE, 낮은 W/B, 충분한 양생을 함께 요구합니다. 골재 자체가 흡수율이 크고 약하면 골재가 터지는 팝아웃도 생기므로 골재의 내구성(3장)도 함께 봅니다.</p>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="chemical">
+    <h2>알칼리–골재 반응, 황산염, 산</h2>
+    <p>지금까지는 철근을 노리는 공격이었다면, 이 절의 세 가지는 <b>콘크리트 자체</b>를 망가뜨립니다.</p>
+    <h3>알칼리–골재 반응</h3>
+    <p>1940년 미국 캘리포니아의 스탠턴(T. E. Stanton)은 몇몇 도로 구조물의 팽창 균열이 시멘트의 알칼리와 골재 속 반응성 실리카 사이의 반응 때문임을 밝혔습니다. 이것이 <span class="term">알칼리–실리카 반응</span><span class="en">(alkali–silica reaction, ASR)</span>입니다. 공극 용액의 수산화 알칼리(NaOH, KOH)가 오팔·옥수·크리스토발라이트·변형된 석영 같은 불안정한 실리카를 녹여 <b>알칼리–실리카 겔</b>을 만들고, 겔이 물을 빨아들여 부풀면 골재와 주변 페이스트에 금이 갑니다. 표면에는 거북등이나 지도처럼 그물 모양의 균열이 나타나고, 균열에서 흰 겔이 배어 나오기도 합니다.</p>
+    <figure class="diagram" id="fig-du-asr">
+      <svg viewBox="0 0 820 290" role="img" aria-label="알칼리-실리카 반응의 세 조건과 지도 모양 균열, 황산염에 의한 에트린자이트 팽창">
+        <rect x="10" y="10" width="800" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <circle cx="80" cy="70" r="52" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <circle cx="150" cy="70" r="52" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <circle cx="115" cy="130" r="52" style="fill:color-mix(in srgb, var(--blue) 12%, transparent);stroke:var(--blue)"/>
+          <text x="56" y="56" text-anchor="middle" class="t-mono">반응성</text><text x="56" y="70" text-anchor="middle" class="t-mono">골재</text>
+          <text x="176" y="56" text-anchor="middle" class="t-mono">충분한</text><text x="176" y="70" text-anchor="middle" class="t-mono">알칼리</text>
+          <text x="115" y="160" text-anchor="middle" class="t-mono">수분 (RH 약 80 %↑)</text>
+          <text x="115" y="100" text-anchor="middle" class="t" style="font-weight:700">ASR</text>
+          <text x="115" y="214" text-anchor="middle" class="t-dim">셋 중 하나만 없애도 막힌다</text>
+        </g>
+        <g transform="translate(300,40)">
+          <rect x="0" y="0" width="220" height="170" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M10 30 L60 50 L80 20 L130 45 L170 15 L210 40 M60 50 L50 100 L100 120 L80 160 M100 120 L150 95 L200 130 M150 95 L130 45 M50 100 L5 120 M200 130 L215 90 M150 95 L160 160" style="fill:none;stroke:var(--bad);stroke-width:1.6"/>
+          <text x="110" y="196" text-anchor="middle" class="t" style="font-weight:700">지도 모양 균열</text>
+          <text x="110" y="216" text-anchor="middle" class="t-dim">구속이 없는 면에 그물처럼</text>
+        </g>
+        <g transform="translate(560,40)">
+          <rect x="0" y="0" width="220" height="170" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <g style="stroke:var(--accent-2);stroke-width:2.4"><line x1="40" y1="60" x2="70" y2="40"/><line x1="50" y1="70" x2="82" y2="52"/><line x1="140" y1="110" x2="175" y2="92"/><line x1="150" y1="122" x2="184" y2="104"/><line x1="90" y1="130" x2="118" y2="110"/></g>
+          <line x1="110" y1="-6" x2="110" y2="20" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#du-ah-atk)"/>
+          <text x="118" y="10" class="t-mono" style="fill:var(--accent-2)">SO₄²⁻</text>
+          <text x="110" y="196" text-anchor="middle" class="t" style="font-weight:700">황산염: 에트린자이트</text>
+          <text x="110" y="216" text-anchor="middle" class="t-dim">바늘 결정이 공극을 채우고 밀어낸다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-7.</b> 알칼리–실리카 반응의 세 조건(왼쪽)과 특징적인 지도 모양 균열(가운데), 황산염 침식에서 생기는 에트린자이트(오른쪽, 개념도). ASR은 반응성 골재·알칼리·수분이 모두 있어야 진행한다.</figcaption>
+    </figure>
+    <p>대책은 세 조건 중 하나를 없애는 것입니다. ① 골재의 반응성을 시험(모르타르 봉 방법, 화학법 등)해 무해한 골재를 쓴다. ② 알칼리를 줄인다. 저알칼리 시멘트(등가 알칼리량 Na<sub>2</sub>O<sub>eq</sub> = Na<sub>2</sub>O + 0.658K<sub>2</sub>O가 약 0.6 % 이하)를 쓰거나 콘크리트 1 m³당 총 알칼리량을 약 3.0 kg 이하로 제한하는 방법이 쓰인다(현행 기준 확인). ③ 플라이애시·고로슬래그·실리카퓸으로 알칼리를 묶고 공극 용액의 pH를 낮춘다. ④ 수분 공급을 끊는다(배수, 방수). ASR은 반응성 골재가 어느 비율로 섞였을 때 가장 크게 팽창하는 <span class="term">페시멈 현상</span><span class="en">(pessimum effect)</span>이 있어, 반응성 골재를 "조금만" 섞는 것이 안전하지 않을 수 있습니다.</p>
+    <h3>황산염 침식과 산 침식</h3>
+    <p>흙·지하수·바닷물·하수의 황산 이온 SO<sub>4</sub><sup>2−</sup>은 시멘트 수화물 속 알루미네이트(모노설페이트)와 Ca(OH)<sub>2</sub>와 반응해 <span class="term">에트린자이트</span><span class="en">(ettringite)</span>와 석고를 만듭니다. 이 결정들은 원래보다 큰 부피를 차지해 콘크리트를 팽창·균열시키고, 황산마그네슘은 C-S-H까지 분해해 페이스트를 무르게 만듭니다. 이것이 <span class="term">황산염 침식</span><span class="en">(sulfate attack)</span>입니다. 대책은 C<sub>3</sub>A가 적은 내황산염 포틀랜드 시멘트(KS L 5201의 5종, 2장), 고로슬래그·플라이애시 혼합, 낮은 W/B입니다. 15 °C 이하의 차갑고 습한 흙에서는 C-S-H가 타우마사이트로 바뀌는 다른 형태의 황산염 침식도 보고됩니다. 증기 양생 등으로 초기 온도가 약 70 °C를 넘으면 에트린자이트가 나중에 다시 생기며 팽창하는 <span class="term">지연 에트린자이트 형성</span><span class="en">(delayed ettringite formation, DEF)</span>도 있어, 6장에서 양생 온도의 상한을 둔 이유가 됩니다.</p>
+    <p>산은 알칼리성인 시멘트 수화물을 녹입니다. 대표적인 예는 하수관으로, 하수의 황화수소가 관 윗면에서 세균에 의해 황산이 되어 콘크리트를 갉아먹습니다. 산 침식은 W/B를 낮추는 것만으로는 막기 어려워, 피복을 희생층으로 두껍게 하거나 내산 라이닝·도막을 씁니다.</p>
+    <div class="table-wrap"><table class="du-tbl">
+      <thead><tr><th>메커니즘</th><th>공격 대상</th><th>필요 조건</th><th>주된 대책</th></tr></thead>
+      <tbody>
+        <tr><td>탄산화</td><td>철근(부동태)</td><td>CO₂, 중간 습도</td><td>피복, 낮은 W/B, 양생, 마감</td></tr>
+        <tr><td>염해</td><td>철근(국부 부식)</td><td>Cl⁻, 수분, 산소</td><td>피복, 낮은 W/B, 혼화재, 표면 보호, 방식 철근(12장)</td></tr>
+        <tr><td>동결융해</td><td>페이스트·골재</td><td>포화 + 영하 반복</td><td>AE(<span class="du-ol">L</span> ≤ 약 0.2 mm), 낮은 W/B, 배수</td></tr>
+        <tr><td>알칼리–골재 반응</td><td>골재·페이스트</td><td>반응성 골재 + 알칼리 + 수분</td><td>골재 시험, 저알칼리, 혼화재, 수분 차단</td></tr>
+        <tr><td>황산염</td><td>알루미네이트 수화물, C-S-H</td><td>SO₄²⁻ 함유 흙·물</td><td>내황산염 시멘트, 슬래그·FA, 낮은 W/B</td></tr>
+        <tr><td>산</td><td>시멘트 수화물 전체</td><td>낮은 pH 물</td><td>희생 피복, 라이닝·도막</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="design">
+    <h2>피복 두께와 품질의 맞교환</h2>
+    <div class="problem"><strong>피복을 10 mm 늘릴까, W/B를 0.05 낮출까</strong>
+      <p>주차장 바닥의 잠복기를 28년에서 50년 이상으로 늘리고 싶습니다. 피복을 늘리면 철근이 덜 들어가 단면 효율이 떨어지고 콘크리트가 무거워집니다. W/B를 낮추거나 혼화재를 쓰면 배합비와 시공 관리가 달라집니다. 어느 쪽이 얼마나 효과적일까요?</p></div>
+    <p>원리 9.3과 9.4는 같은 구조를 가집니다. 잠복기는 <b>피복의 제곱</b>에 비례하고 <b>물질 이동 속도</b>(탄산화는 \(k^2\), 염화물은 \(D\))에 반비례합니다. 그래서 피복 두께와 콘크리트 품질은 서로 맞바꿀 수 있습니다. 설계 기준은 이 관계를 <span class="term">노출 범주</span><span class="en">(exposure class)</span>별 표로 정리해, 환경이 가혹할수록 최대 W/B를 낮추고 최소 강도와 최소 피복을 높입니다. 국내 콘크리트구조 내구성 설계기준(KDS 14 20 40)은 탄산화·염화물·동결융해·황산염 노출을 범주와 등급으로 나누어 요구 조건을 둡니다(범주 이름과 수치는 현행 기준 확인).</p>
+    <div class="callout def"><strong>원리 9.8 (피복–품질 맞교환)</strong> 같은 잠복기 \(t_0\)를 얻는 피복은
+      <div class="formula">$$c_{\text{탄산화}} = k\sqrt{t_0}, \qquad c_{\text{염해}} = 2 z^{*} \sqrt{D\,t_0}, \quad \operatorname{erf}(z^{*}) = 1 - \frac{C_{cr} - C_i}{C_s - C_i}$$<div class="where">탄산화에서 \(k\)를 20 % 줄이면 같은 피복으로 잠복기가 \(1/0.8^2 \approx 1.56\)배, 염해에서 \(D\)를 절반으로 하면 2배가 된다. 거꾸로 피복을 10 mm(50 → 60 mm) 늘리면 잠복기가 \((60/50)^2 = 1.44\)배.</div></div></div>
+    <div class="sim" id="sim-du-map">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>피복 두께 × 품질 설계 지도</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="du-cv-map" aria-label="물-결합재비와 피복 두께에 따른 수명 지도, 점을 끌어 고르기"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>노출 환경(B-10)</span><div class="seg" id="du-map-mech"><button data-value="cl" class="on">주차장 염해</button><button data-value="co2">실내 탄산화</button></div></div>
+          <div class="ctrl"><span>결합재</span><div class="seg" id="du-map-scm"><button data-value="opc" class="on">OPC</button><button data-value="fa">FA 20 %</button><button data-value="gg">GGBS 50 %</button></div></div>
+          <div class="ctrl"><span>목표 수명</span><div class="seg" id="du-map-goal"><button data-value="50" class="on">50년</button><button data-value="100">100년</button></div></div>
+          <div class="btn-row"><button class="btn" id="du-map-reset">B-10 배합으로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">선택 (W/B, c)</span><span class="v" id="du-map-pt">—</span></div>
+        <div class="stat"><span class="k">k 또는 D</span><span class="v" id="du-map-q">—</span></div>
+        <div class="stat"><span class="k">잠복기</span><span class="v" id="du-map-t">—</span></div>
+        <div class="stat"><span class="k">목표를 맞추는 최소 피복</span><span class="v" id="du-map-c">—</span></div>
+      </div>
+      <div class="du-msg" id="du-map-msg"></div>
+      <div class="sim-note">해볼 것: 지도 위 점을 끌어 보세요 · 주차장 염해에서 OPC → FA 20 %로 바꾸면 같은 지점의 색이 어떻게 바뀌나요? 실내 탄산화에서는 반대입니다 · 흰 선은 잠복기 25·50·100·200년의 등고선 · 모델: 탄산화 k = 3.5(W/B − 0.25)/0.191 × 결합재 계수(FA 1.2, GGBS 1.3), 염화물 D = 2 × 10<sup>−12</sup> × 10<sup>3(W/B − 0.441)</sup> × 결합재 계수(FA 0.5, GGBS 0.35) m²/s, C<sub>s</sub> = 3.0, C<sub>cr</sub> = 1.2 kg/m³(모두 교육용 가정). 읽은 값은 CB.conc.carbonationTime·chlorideTime으로 계산.</div>
+    </div>
+    <div class="callout warn"><strong>피복은 "설계값"이 아니라 "시공된 값"이다</strong> 수명은 피복의 제곱에 비례하므로, 설계 피복 50 mm가 시공 오차로 40 mm가 되면 잠복기는 \(0.8^2 = 0.64\)배로 줄어든다. 스페이서 간격·철근 고정 상태를 검측하고, 준공 후 철근 탐사기로 실제 피복을 확인하는 이유다. 또 폭이 넓은 균열(대략 0.3 mm 이상)은 피복을 건너뛰는 지름길이므로 균열 제어(8장)도 내구성 설계의 일부다.</div>
+    <div class="callout site"><strong>B-10 주차장 대책 비교</strong> 엔진 값으로 비교하면(\(C_s = 3.0\), \(C_{cr} = 1.2\)): M-30·피복 50 mm 28년 → 피복 60 mm 40년(<code>chlorideTime(60, 3, 2e-12, 1.2)</code>) → M-30F·피복 50 mm 56년 → M-30F·피복 60 mm 약 81년. 피복 증가와 혼화재를 함께 쓰면 효과가 곱해진다. 여기에 표면 보호재로 실효 \(C_s\)를 낮추면 더 늘어난다. 실제 설계는 노출 범주에 따른 기준 요구 조건(현행 KDS 확인)을 먼저 만족시키고, 이 계산은 그 여유를 설명하는 데 쓴다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 재료·시험이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="corrosion.html"><small>CH.12 · 부식과 방식</small>개시 다음은 전기화학<br><span>부식 전지, 녹의 팽창, 음극 방식과 에폭시 도막 철근.</span></a>
+      <a href="mix-design.html"><small>CH.04 · 콘크리트 배합 설계</small>내구성이 W/B의 상한을 정한다<br><span>강도로 구한 W/B와 내구성 상한 중 작은 값을 쓴다.</span></a>
+      <a href="curing.html"><small>CH.06 · 강도 발현과 양생</small>표층의 품질은 양생이 만든다<br><span>같은 배합도 양생 3일과 28일의 투수성은 크게 다르다.</span></a>
+      <a href="shrinkage.html"><small>CH.08 · 수축과 크리프</small>균열은 지름길이다<br><span>수축 균열을 제어해야 피복이 제 역할을 한다.</span></a>
+      <a href="rebar.html"><small>CH.11 · 철근</small>피복을 지키는 배근<br><span>스페이서, 철근 간격, 피복 확보.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>내구성은 "어떤 환경에서 몇 년"이라는 꼴의 성능이다. 열화는 공격 물질이 공극과 균열을 통해 이동해야 일어나므로, 모세관 공극의 양과 연결성(W/B, 양생)이 공통 입구다. 파워스 식 V<sub>cap</sub> = (w/c − 0.36α)/(w/c + 0.32).</li>
+      <li>탄산화(Ca(OH)<sub>2</sub> + CO<sub>2</sub> → CaCO<sub>3</sub>)는 pH를 13에서 9 이하로 낮춰 부동태를 없앤다. 깊이는 x = k√t, 개시 시간은 (c/k)². 페놀프탈레인으로 깊이를 재 k를 역산한다. B-10 보 131년, 슬래브 33년(k = 3.5).</li>
+      <li>염화물은 피크 제2법칙을 따르고 C = C<sub>s</sub>[1 − erf(x/2√(Dt))]. 개시 시간은 x²/D에 비례한다. B-10 주차장 M-30 28년, M-30F 56년. 혼화재는 염해에 유리하고 탄산화에는 대개 불리하다.</li>
+      <li>명시적 유한 차분은 r = DΔt/Δx² ≤ 1/2에서만 안정하며, 시간에 따라 변하는 표면 농도처럼 해석해가 없는 경우를 푼다.</li>
+      <li>투티 모델: 수명 = 잠복기(물질 이동) + 진전기(부식 속도, 1 μA/cm² ≈ 11.6 μm/년). 내구성 설계는 대개 잠복기 ≥ 설계 수명을 목표로 한다.</li>
+      <li>동결융해는 기포 간격 계수 <span class="du-ol">L</span> ≤ 약 0.2 mm의 연행 공기로 막는다. ASR은 반응성 골재·알칼리·수분, 황산염은 에트린자이트 팽창, 산은 용해가 원인이다.</li>
+      <li>피복 두께와 품질은 맞바꿀 수 있다(잠복기 ∝ c²/k², c²/D). 시공된 피복과 균열 제어가 설계만큼 중요하다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 탄산화 속도 계수 k = 4 mm/√년인 콘크리트에서 피복 40 mm 철근의 부식 개시 시간은?</p><div class="opts">
+        <button class="opt">10년</button><button class="opt">40년</button><button class="opt" data-correct>100년</button><button class="opt">160년</button>
+      </div><div class="quiz-exp">\(t = (c/k)^2 = (40/4)^2 = 100\)년. 깊이가 시간의 제곱근에 비례하므로 피복의 제곱에 비례한다.</div></div>
+      <div class="quiz-q"><p>2. 페놀프탈레인을 뿌린 쪼갠 면에서 탄산화된 부분은?</p><div class="opts">
+        <button class="opt">붉은 보라색으로 변한다</button><button class="opt" data-correct>색이 변하지 않는다(무색)</button><button class="opt">파란색이 된다</button><button class="opt">노란색이 된다</button>
+      </div><div class="quiz-exp">페놀프탈레인은 pH 약 9 이상에서 붉은 보라색을 띤다. 탄산화로 pH가 낮아진 부분은 무색으로 남으므로 발색 경계까지의 깊이를 탄산화 깊이로 잰다.</div></div>
+      <div class="quiz-q"><p>3. 염화물 확산에서 확산 계수 D를 절반으로 줄이면, 같은 피복에서 임계 염화물량에 닿는 시간은?</p><div class="opts">
+        <button class="opt">√2배</button><button class="opt" data-correct>2배</button><button class="opt">4배</button><button class="opt">변하지 않는다</button>
+      </div><div class="quiz-exp">농도는 \(x/2\sqrt{Dt}\)로만 정해지므로 같은 농도에 닿는 시간은 \(t \propto x^2/D\). D가 절반이면 2배다. B-10 주차장의 M-30(28년)과 M-30F(56년)가 이 관계다.</div></div>
+      <div class="quiz-q"><p>4. 플라이애시를 20 % 치환한 콘크리트의 내구성 변화로 가장 알맞은 것은?</p><div class="opts">
+        <button class="opt">탄산화와 염해 모두 불리하다</button><button class="opt">탄산화와 염해 모두 유리하다</button><button class="opt" data-correct>염화물 확산은 줄지만 탄산화는 대개 빨라진다</button><button class="opt">아무 영향이 없다</button>
+      </div><div class="quiz-exp">포졸란 반응이 공극을 잘게 나누고 염화물을 고정해 D가 작아진다. 대신 Ca(OH)<sub>2</sub>를 소비해 탄산화로 중화할 알칼리가 줄어 같은 W/B에서 k가 대개 커진다. 환경에 따라 결합재를 고르는 이유다.</div></div>
+      <div class="quiz-q"><p>5. 명시적 유한 차분(FTCS)으로 확산 방정식을 풀 때 해가 발산하지 않으려면?</p><div class="opts">
+        <button class="opt">Δx를 Δt보다 작게</button><button class="opt" data-correct>r = DΔt/Δx² ≤ 1/2</button><button class="opt">격자 수를 10개 이하로</button><button class="opt">r = 1로 맞춘다</button>
+      </div><div class="quiz-exp">\(r \gt 1/2\)이면 고주파 오차가 걸음마다 증폭되어 발산한다. 격자를 촘촘히(Δx 절반) 하면 Δt를 1/4로 줄여야 같은 r을 지킬 수 있다.</div></div>
+      <div class="quiz-q"><p>6. 투티 모델에서 '진전기'의 길이를 주로 정하는 것은?</p><div class="opts">
+        <button class="opt">피복 두께와 확산 계수</button><button class="opt" data-correct>부식 속도(습도·산소·온도)와 피복이 견디는 녹의 양</button><button class="opt">콘크리트의 압축 강도만</button><button class="opt">시멘트의 분말도</button>
+      </div><div class="quiz-exp">잠복기는 물질 이동(피복, k 또는 D)이, 진전기는 부식 속도 \(i_{corr}\)(1 μA/cm² ≈ 11.6 μm/년)와 균열을 일으키는 부식 깊이가 정한다. 건조한 실내의 탄산화 부식은 느리고, 젖은 염해 부위는 빠르다.</div></div>
+      <div class="quiz-q"><p>7. 동결융해 저항에 가장 직접적인 지표는?</p><div class="opts">
+        <button class="opt">압축 강도</button><button class="opt">공기량의 총량만</button><button class="opt" data-correct>기포 간격 계수 <span class="du-ol">L</span>(약 0.2 mm 이하)</button><button class="opt">슬럼프</button>
+      </div><div class="quiz-exp">얼면서 밀려난 물이 가까운 기포로 빠져나가야 수압이 작다. 같은 공기량이라도 기포가 크면(갇힌 공기) 간격이 멀어 효과가 없다. 원리 9.7의 파워스 식으로 계산한다.</div></div>
+      <div class="quiz-q"><p>8. 알칼리–실리카 반응(ASR)을 막는 방법이 <b>아닌</b> 것은?</p><div class="opts">
+        <button class="opt">반응성 시험으로 무해 골재 사용</button><button class="opt">저알칼리 시멘트, 총 알칼리량 제한</button><button class="opt">플라이애시·고로슬래그 혼합</button><button class="opt" data-correct>반응성 골재를 소량만 섞기</button>
+      </div><div class="quiz-exp">ASR에는 반응성 골재가 어떤 비율일 때 팽창이 가장 큰 페시멈 현상이 있어, 소량 혼입이 오히려 위험할 수 있다. 골재·알칼리·수분 중 하나를 확실히 없애는 것이 대책이다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const DUX = {
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = o.stroke || CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  alpha(c, a) { const ctx = DUX._c || (DUX._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  // 교육용 가정: 탄산화 속도 계수와 염화물 확산 계수
+  k(wb, f = 1) { return 3.5 * Math.max(0.05, (wb - 0.25) / 0.191) * f; },
+  D(wb, f = 1) { return 2e-12 * Math.pow(10, 3 * (wb - 0.441)) * f; },
+  DMM: 1e6 * 365.25 * 24 * 3600,  // m²/s → mm²/년
+  years(t, d = 0) { if (!isFinite(t)) return "도달 안 함"; if (t > 1000) return "1,000년 이상"; return CB.num(t, d) + "년"; },
+  sup(n) { return String(n).replace(/[-0-9]/g, (c) => "⁻⁰¹²³⁴⁵⁶⁷⁸⁹"["-0123456789".indexOf(c)]); },
+  sci(v, d = 2) { if (!(v > 0) || !isFinite(v)) return "—"; const e = Math.floor(Math.log10(v)), m = v / Math.pow(10, e); return `${m.toFixed(d)} × 10${DUX.sup(e)}`; },
+  erfinv(y) { let lo = 0, hi = 6; for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (CB.erf(m) < y) lo = m; else hi = m; } return (lo + hi) / 2; },
+};
+
+/* ---------- 1. 파워스 공극 ---------- */
+(function () {
+  const POW = [[0.40, 3], [0.45, 7], [0.50, 14], [0.60, 180], [0.70, 365]];
+  const au = (wc) => Math.min(1, (1.031 * wc) / (0.194 + wc));
+  const alpha = (wc, t) => au(wc) * t / (t + 2);
+  const vcap = (wc, a) => Math.max(0, (wc - 0.36 * a) / (wc + 0.32));
+  const tDisc = (wc) => {
+    if (wc > 0.70 + 1e-9) return Infinity;
+    if (wc <= 0.40) return 3;
+    for (let i = 0; i < POW.length - 1; i++) if (wc <= POW[i + 1][0]) { const u = (wc - POW[i][0]) / (POW[i + 1][0] - POW[i][0]); return Math.exp(Math.log(POW[i][1]) * (1 - u) + Math.log(POW[i + 1][1]) * u); }
+    return 365;
+  };
+  const vref = vcap(0.441, alpha(0.441, 28));
+  const gw = CB.range("du-po-wc", (v) => v.toFixed(3), go), gt = CB.range("du-po-t", (v) => v + "일", go), cmp = CB.seg("du-po-cmp", go);
+  const bar = CB.canvas("#du-cv-pore", (ctx, W, H) => {
+    const pal = CB.palette(), wc = gw(), a = alpha(wc, gt()), d = wc + 0.32;
+    const parts = [[0.32 * (1 - a) / d, "미수화 시멘트", pal.dim], [0.68 * a / d, "C-S-H 겔", pal.accent], [vcap(wc, a), "모세관 공극", pal.blue]];
+    const x0 = 20, x1 = W - 20, y = H * 0.42, h = Math.min(46, H * 0.32); let x = x0;
+    parts.forEach(([v, lab, col], i) => {
+      const w = (x1 - x0) * v; ctx.fillStyle = DUX.alpha(col, i === 2 ? 0.75 : 0.6); ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = pal.bg; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+      if (w > 46) DUX.text(ctx, `${(v * 100).toFixed(1)} %`, x + w / 2, y + h / 2, pal.text, { size: 11.5 });
+      DUX.text(ctx, lab, x + w / 2, i % 2 ? y + h + 16 : y - 12, col, { size: 11, mono: false });
+      x += w;
+    });
+  }, { aspect: (W) => (W < 520 ? 0.36 : 0.2), minHeight: 110, maxHeight: 150 });
+  const ch = CB.canvas("#du-cv-pore2", (ctx, W, H) => {
+    const pal = CB.palette(), wc = gw(), tc = gt(), series = [];
+    const curve = (w, color, width, dash) => { const d = []; for (let k = 0; k <= 160; k++) { const t = Math.pow(10, Math.log10(1) + (k / 160) * Math.log10(365)); d.push([t, 100 * vcap(w, alpha(w, Math.min(t, tc)))]); } series.push({ data: d, color, width, dash }); };
+    if (cmp() === "on") { curve(0.40, pal.faint, 1.4, [4, 4]); curve(0.60, pal.faint, 1.4, [4, 4]); }
+    curve(wc, pal.blue, 2.6);
+    const td = tDisc(wc), near = isFinite(td) && Math.abs(Math.log10(td / tc)) < 0.35, vl = [{ x: tc, color: pal.accent2, label: near && td < tc ? "" : "양생 끝" }];
+    if (isFinite(td)) vl.push({ x: td, color: pal.ok, label: near && td >= tc ? "" : "공극 끊김" });
+    const c = CB.chart(ctx, null, { x: [1, 365], y: [0, 60], logX: true, xLabel: "재령 (일, 로그)", yLabel: "모세관 공극 (%)", xTicks: [1, 3, 7, 14, 28, 90, 180, 365], xFmt: (v) => String(v), series, vlines: vl, points: [{ x: tc, y: 100 * vcap(wc, alpha(wc, tc)), color: pal.text, r: 5 }] });
+    if (cmp() === "on") { DUX.text(ctx, "0.60", c.X(300), c.Y(100 * vcap(0.6, alpha(0.6, Math.min(300, tc)))) - 9, pal.dim, { size: 10 }); DUX.text(ctx, "0.40", c.X(300), c.Y(100 * vcap(0.4, alpha(0.4, Math.min(300, tc)))) + 10, pal.dim, { size: 10 }); }
+  }, { aspect: (W) => (W < 520 ? 0.72 : 0.42), minHeight: 220, maxHeight: 310 });
+  function go() {
+    bar.redraw(); ch.redraw();
+    const wc = gw(), tc = gt(), a = alpha(wc, tc), v = vcap(wc, a), td = tDisc(wc), kr = Math.pow(10, (v - vref) / 0.05);
+    CB.stat("du-po-a", a.toFixed(3));
+    CB.stat("du-po-v", (v * 100).toFixed(1) + " %");
+    CB.stat("du-po-k", kr >= 100 ? CB.sig(kr, 3) + " 배" : CB.sig(kr, 2) + " 배");
+    const msg = document.getElementById("du-po-msg");
+    if (!isFinite(td)) { msg.className = "du-msg bad"; msg.innerHTML = "w/c가 0.70을 넘으면 오래 양생해도 모세관 공극이 이어진 채로 남습니다(파워스 등)."; }
+    else if (tc >= td) { msg.className = "du-msg ok"; msg.innerHTML = `습윤 양생 ${tc}일 ≥ 약 ${CB.num(td, 0)}일: 모세관 공극이 겔로 끊어진 상태로 봅니다.`; }
+    else { msg.className = "du-msg"; msg.innerHTML = `공극이 끊어지려면 습윤 양생이 약 <b>${CB.num(td, 0)}일</b> 필요합니다. 지금(${tc}일)은 이어진 길이 남아 있습니다.`; }
+  }
+  go();
+})();
+
+/* ---------- 2. 탄산화 전선 ---------- */
+(function () {
+  const gwb = CB.range("du-ca-wb", (v) => v.toFixed(3), go), gc = CB.range("du-ca-c", (v) => v + " mm", go), gt = CB.range("du-ca-t", (v) => v + "년", go);
+  const env = CB.seg("du-ca-env", go), scm = CB.seg("du-ca-scm", go), cure = CB.seg("du-ca-cure", go);
+  const k = () => DUX.k(gwb(), +env() * +scm() * +cure());
+  let playing = false;
+  const sec = CB.canvas("#du-cv-carb", (ctx, W, H) => {
+    const pal = CB.palette(), c = gc(), x = CB.conc.carbonation(gt(), k()), D = 100, x0 = 54, x1 = W - 20, y0 = 30, y1 = H - 26, s = (x1 - x0) / D;
+    ctx.fillStyle = DUX.alpha(pal.red, 0.28); ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    const xp = Math.min(x, D) * s;
+    ctx.fillStyle = pal.surface; ctx.fillRect(x0, y0, xp, y1 - y0);
+    const rng = CB.rng(5); ctx.fillStyle = DUX.alpha(pal.dim, 0.28);
+    for (let i = 0; i < 60; i++) { const ax = x0 + rng() * (x1 - x0), ay = y0 + rng() * (y1 - y0), r = 3 + rng() * 7; ctx.beginPath(); ctx.ellipse(ax, ay, r, r * (0.6 + rng() * 0.4), rng() * 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 1.4; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    const rr = Math.min(12.7 * s, (y1 - y0) * 0.3), rc = x0 + c * s + rr, reached = x >= c;
+    ctx.beginPath(); ctx.arc(rc, (y0 + y1) / 2, rr, 0, Math.PI * 2); ctx.fillStyle = reached ? pal.bad : pal.dim; ctx.fill(); ctx.strokeStyle = pal.text; ctx.stroke();
+    DUX.text(ctx, reached ? "부동태 파괴" : "철근(부동태)", rc, (y0 + y1) / 2, pal.text, { size: 10.5, mono: false });
+    ctx.save(); ctx.strokeStyle = pal.accent2; ctx.lineWidth = 2.4; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(x0 + xp, y0 - 6); ctx.lineTo(x0 + xp, y1 + 6); ctx.stroke(); ctx.restore();
+    for (let j = 0; j < 3; j++) DUX.arrow(ctx, 8, y0 + (y1 - y0) * (0.2 + 0.3 * j), x0 - 4, y0 + (y1 - y0) * (0.2 + 0.3 * j), pal.accent2, 2.2, 8);
+    DUX.text(ctx, "CO₂", 24, y0 + 6, pal.accent2, { size: 11 });
+    DUX.text(ctx, `x = ${CB.num(x, 1)} mm`, Math.min(x1 - 50, x0 + xp + 4), y1 + 14, pal.accent2, { size: 11, align: xp > (x1 - x0) * 0.75 ? "right" : "left" });
+    DUX.text(ctx, `피복 ${c} mm`, x0 + c * s, y0 - 12, pal.dim, { size: 11 });
+    ctx.save(); ctx.strokeStyle = pal.dim; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x0 + c * s, y0); ctx.lineTo(x0 + c * s, y1); ctx.stroke(); ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 0.55 : 0.32), minHeight: 150, maxHeight: 220 });
+  const ch = CB.canvas("#du-cv-carb2", (ctx, W, H) => {
+    const pal = CB.palette(), kk = k(), c = gc(), t = gt(), data = [];
+    for (let i = 0; i <= 150; i++) data.push([i, CB.conc.carbonation(i, kk)]);
+    const ti = CB.conc.carbonationTime(c, kk), vl = [{ x: t, color: pal.text, label: "" }];
+    if (ti <= 150) vl.push({ x: ti, color: pal.bad, label: "개시" });
+    CB.chart(ctx, null, { x: [0, 150], y: [0, 100], xLabel: "경과 시간 t (년)", yLabel: "탄산화 깊이 x (mm)", series: [{ data, color: pal.accent2, width: 2.6 }], hlines: [{ y: c, color: pal.dim, label: "피복 c" }], vlines: vl, points: [{ x: t, y: CB.conc.carbonation(t, kk), color: pal.text, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.4), minHeight: 210, maxHeight: 290 });
+  function go() {
+    sec.redraw(); ch.redraw();
+    const kk = k(), c = gc(), t = gt(), x = CB.conc.carbonation(t, kk), ti = CB.conc.carbonationTime(c, kk);
+    CB.stat("du-ca-k", CB.num(kk, 2) + " mm/√년");
+    CB.stat("du-ca-x", CB.num(x, 1) + " mm");
+    CB.stat("du-ca-ti", DUX.years(ti));
+    const msg = document.getElementById("du-ca-msg");
+    if (x >= c) { msg.className = "du-msg bad"; msg.innerHTML = `${t}년: 탄산화 전선이 철근(피복 ${c} mm)을 지났습니다. 부동태가 깨져 수분과 산소가 있으면 부식이 진행할 수 있습니다.`; }
+    else { msg.className = ti >= 100 ? "du-msg ok" : "du-msg"; msg.innerHTML = `철근까지 남은 거리 ${CB.num(c - x, 1)} mm · 개시 시간 ${DUX.years(ti)} ${ti >= 100 ? "(설계 수명 100년보다 깁니다)" : "(설계 수명 100년보다 짧습니다)"}`; }
+  }
+  const loop = CB.loop(document.getElementById("sim-du-carb"), (dt) => { if (!playing) return; let v = gt() + dt * 20; if (v >= 150) { v = 150; playing = false; btn.set(false); } gt.set(Math.round(v * 10) / 10); });
+  const btn = CB.playButton("du-ca-play", () => { if (gt() >= 150) gt.set(0); playing = true; loop.start(); }, () => { playing = false; }, ["▶ 시간 흐르게", "■ 멈추기"]);
+  go();
+})();
+
+/* ---------- 3. 페놀프탈레인 시험 ---------- */
+(function () {
+  const gt = CB.range("du-ph-t", (v) => v + "년", go), gk = CB.range("du-ph-k", (v) => v.toFixed(1) + " mm/√년", go), gw = CB.range("du-ph-w", (v) => v.toFixed(2) + " mm", go), spray = CB.seg("du-ph-spray", go);
+  // 고정된 골재 무늬와 요철
+  const rng = CB.rng(11), AGG = [];
+  for (let i = 0; i < 70; i++) { const cx = rng() * 100, cy = 4 + rng() * 76, r = 2 + rng() * 6, n = 6 + Math.floor(rng() * 3), pts = []; for (let j = 0; j < n; j++) { const a = (j / n) * Math.PI * 2, rr = r * (0.7 + rng() * 0.5); pts.push([cx + rr * Math.cos(a), cy + rr * Math.sin(a) * 0.8]); } AGG.push(pts); }
+  const NOISE = []; { let v = 0; for (let i = 0; i <= 100; i++) { v = 0.75 * v + 0.25 * (rng() * 2 - 1); NOISE.push(v); } const m = Math.max(...NOISE.map(Math.abs)); for (let i = 0; i <= 100; i++) NOISE[i] /= m; }
+  const PTS = [12, 30, 62, 78, 92];
+  const depth = (i, xb, xc) => { const base = xb * (1 + 0.15 * NOISE[i]); const dist = Math.abs(i - 47); return xc > 0 ? Math.max(base, xc - dist * 4) : base; };
+  function calc() {
+    const t = gt(), xb = CB.conc.carbonation(t, gk()), xc = gw() > 0 ? xb * (1 + 8 * gw()) : 0;
+    const meas = PTS.map((i) => Math.min(80, depth(i, xb, xc))), mean = meas.reduce((s, v) => s + v, 0) / meas.length;
+    return { t, xb, xc: Math.min(80, xc), meas, mean, ke: mean / Math.sqrt(t) };
+  }
+  const cv = CB.canvas("#du-cv-ph", (ctx, W, H) => {
+    const pal = CB.palette(), c = calc(), bw = Math.min(W - 40, (H - 50) * 1.25), s = bw / 100, bh = 80 * s, bx = (W - bw) / 2, by = 34;
+    ctx.fillStyle = pal.surface; ctx.fillRect(bx, by, bw, bh);
+    if (spray() === "on") {
+      ctx.fillStyle = DUX.alpha(pal.red, 0.42); ctx.beginPath(); ctx.moveTo(bx, by + bh);
+      for (let i = 0; i <= 100; i++) { const d = Math.min(80, depth(Math.min(i, 100), c.xb, c.xc)); ctx.lineTo(bx + i * s, by + d * s); }
+      ctx.lineTo(bx + bw, by + bh); ctx.closePath(); ctx.fill();
+    }
+    AGG.forEach((pts) => { ctx.beginPath(); pts.forEach(([x, y], j) => { const X = bx + CB.clamp(x, 0, 100) * s, Y = by + CB.clamp(y, 0, 80) * s; j ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.closePath(); ctx.fillStyle = DUX.alpha(pal.dim, 0.42); ctx.fill(); });
+    if (gw() > 0) { const cw = Math.max(1.2, gw() * 6), cd = Math.min(80, 15 + 60 * gw() / 0.4); ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = cw; ctx.beginPath(); ctx.moveTo(bx + 47 * s, by); ctx.lineTo(bx + 46 * s, by + cd * 0.4 * s); ctx.lineTo(bx + 48 * s, by + cd * 0.75 * s); ctx.lineTo(bx + 47.5 * s, by + cd * s); ctx.stroke(); ctx.restore(); }
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 1.4; ctx.strokeRect(bx, by, bw, bh);
+    if (spray() === "on") c.meas.forEach((d, j) => { const X = bx + PTS[j] * s, Y = by + d * s; ctx.fillStyle = pal.text; ctx.beginPath(); ctx.moveTo(X - 5, by - 9); ctx.lineTo(X + 5, by - 9); ctx.lineTo(X, by - 2); ctx.closePath(); ctx.fill(); ctx.save(); ctx.strokeStyle = pal.text; ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(X, by); ctx.lineTo(X, Y); ctx.stroke(); ctx.restore(); DUX.text(ctx, CB.num(d, 0), X, Y + 10, pal.text, { size: 10.5 }); });
+    else DUX.text(ctx, "지시약을 뿌려야 경계가 보입니다", bx + bw / 2, by + bh / 2, pal.dim, { size: 12, mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.62), minHeight: 240, maxHeight: 380 });
+  function go() {
+    cv.redraw();
+    const c = calc(), on = spray() === "on";
+    CB.stat("du-ph-x", on ? CB.num(c.mean, 1) + " mm" : "—");
+    CB.stat("du-ph-ke", on ? CB.num(c.ke, 2) + " mm/√년" : "—");
+    CB.stat("du-ph-xc", on ? (gw() > 0 ? CB.num(c.xc, 1) + " mm" : "균열 없음") : "—");
+    CB.stat("du-ph-ti", on ? DUX.years(CB.conc.carbonationTime(40, c.ke)) : "—");
+  }
+  go();
+})();
+
+/* ---------- 4. 염화물 프로파일 ---------- */
+(function () {
+  const pre = CB.seg("du-cl-pre", (v) => { if (v === "m30") { gd.set(Math.log10(2e-12), false); } else if (v === "m30f") { gd.set(Math.log10(1e-12), false); } if (v !== "user") { gcs.set(3, false); gcr.set(1.2, false); gc.set(50, false); } go(); });
+  const user = () => { pre.set("user", false); go(); };
+  const gcs = CB.range("du-cl-cs", (v) => v.toFixed(1) + " kg/m³", user), gd = CB.range("du-cl-d", (v) => DUX.sci(Math.pow(10, v)) + " m²/s", user);
+  const gcr = CB.range("du-cl-cr", (v) => v.toFixed(2) + " kg/m³", user), gc = CB.range("du-cl-c", (v) => v + " mm", user), gt = CB.range("du-cl-t", (v) => v + "년", go);
+  const cv = CB.canvas("#du-cv-cl", (ctx, W, H) => {
+    const pal = CB.palette(), Cs = gcs(), D = Math.pow(10, gd()), Ccr = gcr(), c = gc(), t = gt(), ser = [];
+    [5, 10, 25, 50, 100].forEach((tt) => { const d = []; for (let x = 0; x <= 120; x += 1) d.push([x, CB.conc.chloride(x, tt, Cs, D)]); ser.push({ data: d, color: pal.faint, width: 1.2 }); });
+    const cur = []; for (let x = 0; x <= 120; x += 0.5) cur.push([x, CB.conc.chloride(x, t, Cs, D)]);
+    ser.push({ data: cur, color: pal.accent2, width: 2.8, fill: DUX.alpha(pal.accent2, 0.1) });
+    const Cc = CB.conc.chloride(c, t, Cs, D);
+    CB.chart(ctx, null, { x: [0, 120], y: [0, Math.max(Cs, Ccr) * 1.12], xLabel: "표면에서의 깊이 x (mm)", yLabel: "염화물 C (kg/m³)", series: ser, hlines: [{ y: Ccr, color: pal.bad, label: "C_cr" }], vlines: [{ x: c, color: pal.text, label: "철근" }], points: [{ x: c, y: Cc, color: Cc >= Ccr ? pal.bad : pal.ok, r: 6 }] });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.52), minHeight: 250, maxHeight: 360 });
+  function go() {
+    cv.redraw();
+    const Cs = gcs(), D = Math.pow(10, gd()), Ccr = gcr(), c = gc(), t = gt(), Cc = CB.conc.chloride(c, t, Cs, D), ti = CB.conc.chlorideTime(c, Cs, D, Ccr);
+    CB.stat("du-cl-cc", CB.num(Cc, 2) + " kg/m³");
+    CB.stat("du-cl-l", CB.num(2 * Math.sqrt(D * DUX.DMM * t), 1) + " mm");
+    CB.stat("du-cl-ti", DUX.years(ti, 1));
+    const msg = document.getElementById("du-cl-msg");
+    if (Ccr >= Cs) { msg.className = "du-msg ok"; msg.textContent = "표면 농도가 임계값 이하라 철근 위치 농도가 임계값에 닿지 않습니다."; }
+    else if (Cc >= Ccr) { msg.className = "du-msg bad"; msg.innerHTML = `${t}년: 철근 위치 농도 ${CB.num(Cc, 2)} ≥ C<sub>cr</sub> ${CB.num(Ccr, 2)} kg/m³ → 부식이 시작된 상태입니다(개시 ${DUX.years(ti, 1)}).`; }
+    else { msg.className = "du-msg"; msg.innerHTML = `D = ${CB.num(D * DUX.DMM, 1)} mm²/년 · z = c/2√(Dt) = ${t > 0 ? CB.num(c / (2 * Math.sqrt(D * DUX.DMM * t)), 3) : "—"} · 개시까지 ${DUX.years(ti - t, 1)} 남음`; }
+  }
+  go();
+})();
+
+/* ---------- 5. 유한 차분 vs 해석해 ---------- */
+(function () {
+  const L = 150, Dm = 2e-12 * DUX.DMM, Cs0 = 3;
+  const gn = CB.range("du-fd-n", (v) => v + "칸", go), gr = CB.range("du-fd-r", (v) => v.toFixed(2), go), gt = CB.range("du-fd-t", (v) => v.toFixed(1) + "년", go), bc = CB.seg("du-fd-bc", go);
+  let playing = false, sol = null;
+  const CsAt = (t) => (bc() === "grow" ? Cs0 * (1 - Math.exp(-t / 10)) : Cs0);
+  function solve() {
+    const N = gn(), dx = L / N, r = gr(), tEnd = gt();
+    const dt0 = (r * dx * dx) / Dm, ns = tEnd > 0 ? Math.ceil(tEnd / dt0) : 0, dt = ns ? tEnd / ns : dt0, ra = (Dm * dt) / (dx * dx);
+    let C = new Float64Array(N + 1), Cn = new Float64Array(N + 1), blow = false;
+    for (let n = 0; n < ns; n++) {
+      const t1 = (n + 1) * dt;
+      for (let i = 1; i < N; i++) Cn[i] = C[i] + ra * (C[i + 1] - 2 * C[i] + C[i - 1]);
+      Cn[0] = CsAt(t1); Cn[N] = Cn[N - 1];
+      for (let i = 0; i <= N; i++) { if (!(Math.abs(Cn[i]) < 1e6)) { Cn[i] = Math.sign(Cn[i]) * 1e6 || 1e6; blow = true; } }
+      const tmp = C; C = Cn; Cn = tmp;
+    }
+    if (ns === 0) C[0] = CsAt(0);
+    sol = { N, dx, dt, ra, ns, C, blow, tEnd };
+  }
+  const cv = CB.canvas("#du-cv-fd", (ctx, W, H) => {
+    const pal = CB.palette(); if (!sol) return;
+    const an = []; for (let x = 0; x <= 100; x += 0.5) an.push([x, CB.conc.chloride(x, sol.tEnd, Cs0, 2e-12)]);
+    const fd = []; for (let i = 0; i <= sol.N; i++) { const x = i * sol.dx; if (x <= 100.0001) fd.push([x, CB.clamp(sol.C[i], -2, 6)]); }
+    const c = CB.chart(ctx, null, { x: [0, 100], y: [-0.5, 3.5], xLabel: "깊이 x (mm)", yLabel: "C (kg/m³)", series: [{ data: an, color: pal.text, width: 1.8, dash: [6, 4] }, { data: fd, color: pal.accent2, width: 2.4 }], hlines: [{ y: 1.2, color: pal.bad, label: "C_cr 1.2" }], vlines: [{ x: 50, color: pal.faint, label: "50 mm" }] });
+    fd.forEach(([x, y]) => { ctx.fillStyle = pal.accent2; ctx.beginPath(); ctx.arc(c.X(x), c.Y(CB.clamp(y, -0.5, 3.5)), 3.5, 0, Math.PI * 2); ctx.fill(); });
+    DUX.text(ctx, "점선: 해석해(C_s 일정) · 점: 유한 차분", c.box.x + c.box.w - 4, c.box.y + 10, pal.dim, { size: 10.5, align: "right", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.52), minHeight: 250, maxHeight: 360 });
+  function go() {
+    solve(); cv.redraw();
+    const s = sol, at50 = (() => { const u = 50 / s.dx, i = Math.floor(u), f = u - i; return i >= s.N ? s.C[s.N] : s.C[i] * (1 - f) + s.C[i + 1] * f; })();
+    const an50 = CB.conc.chloride(50, s.tEnd, Cs0, 2e-12);
+    let err = 0; if (bc() === "const") for (let i = 0; i <= s.N; i++) { const x = i * s.dx; if (x <= 100.0001) err = Math.max(err, Math.abs(s.C[i] - CB.conc.chloride(x, s.tEnd, Cs0, 2e-12))); }
+    const div = s.blow || err > 10 || Math.abs(at50) > 10;
+    CB.stat("du-fd-dx", `${CB.num(s.dx, 1)} mm / ${CB.sig(s.dt, 3)}년`);
+    CB.stat("du-fd-ns", s.ns.toLocaleString("en-US") + "회");
+    CB.stat("du-fd-c50", div ? "발산" : `${CB.num(at50, 3)} / ${CB.num(an50, 3)}`);
+    CB.stat("du-fd-err", bc() === "grow" ? "비교 안 함" : div ? "발산" : CB.num(err, 3) + " kg/m³");
+    const msg = document.getElementById("du-fd-msg");
+    if (s.ra > 0.5 + 1e-9) { msg.className = "du-msg bad"; msg.innerHTML = `r = ${s.ra.toFixed(3)} > 0.5: 불안정합니다. ${div ? "오차가 걸음마다 부호를 바꾸며 커져 해가 무너졌습니다." : "걸음 수가 적어 아직 드러나지 않았지만 시간을 늘리면 톱니 오차가 자랍니다."}`; }
+    else { msg.className = "du-msg ok"; msg.innerHTML = `r = ${s.ra.toFixed(3)} ≤ 0.5: 안정. ${bc() === "grow" ? "표면 농도가 서서히 쌓이므로 같은 시각의 농도가 해석해(일정 C<sub>s</sub>)보다 낮습니다." : "격자를 촘촘히 하면 해석해에 더 가까워집니다."}`; }
+  }
+  const loop = CB.loop(document.getElementById("sim-du-fd"), (dt) => { if (!playing) return; let v = gt() + dt * 12; if (v >= 100) { v = 100; playing = false; btn.set(false); } gt.set(Math.round(v * 2) / 2); });
+  const btn = CB.playButton("du-fd-play", () => { gt.set(0); playing = true; loop.start(); }, () => { playing = false; }, ["▶ 0년부터 진행", "■ 멈추기"]);
+  go();
+})();
+
+/* ---------- 6. 투티 모델 ---------- */
+(function () {
+  const mech = CB.seg("du-tu-mech", (v) => { gi.set(v === "co2" ? -1 : 0, false); go(); }), mix = CB.seg("du-tu-mix", go), bar = CB.seg("du-tu-bar", go);
+  const gc = CB.range("du-tu-c", (v) => v + " mm", go), gi = CB.range("du-tu-i", (v) => CB.sig(Math.pow(10, v), 2) + " μA/cm²", go);
+  function calc() {
+    const c = gc(), d = CB.steel.BARS[bar()].d, i = Math.pow(10, gi()), f = mix() === "m30f";
+    const t0 = mech() === "co2" ? CB.conc.carbonationTime(c, 3.5 * (f ? 1.2 : 1)) : CB.conc.chlorideTime(c, 3.0, f ? 1e-12 : 2e-12, 1.2);
+    const xcrit = 7.53 + 9.32 * c / d, rate = 11.6 * i, t1 = xcrit / rate;
+    const x100 = isFinite(t0) ? Math.max(0, rate * (100 - t0)) : 0, loss = 1 - Math.pow(Math.max(0, 1 - 2 * x100 / 1000 / d), 2);
+    return { c, d, i, t0, xcrit, rate, t1, tL: t0 + t1, x100, loss };
+  }
+  const cv = CB.canvas("#du-cv-tu", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), tmax = 150, ymax = Math.max(60, r.xcrit * 2.5), data = [[0, 0]];
+    if (isFinite(r.t0) && r.t0 < tmax) { data.push([r.t0, 0]); data.push([tmax, r.rate * (tmax - r.t0)]); } else data.push([tmax, 0]);
+    const bands = [{ x0: 0, x1: Math.min(tmax, r.t0), color: DUX.alpha(pal.accent, 0.12) }];
+    if (r.t0 < tmax) bands.push({ x0: r.t0, x1: Math.min(tmax, r.tL), color: DUX.alpha(pal.accent2, 0.14) });
+    const c = CB.chart(ctx, null, { x: [0, tmax], y: [0, ymax], xLabel: "시간 (년)", yLabel: "부식 깊이 (μm)", bands, series: [{ data, color: pal.bad, width: 2.8 }], hlines: [{ y: r.xcrit, color: pal.text, label: "x_crit(피복 균열)" }], vlines: [{ x: 100, color: pal.faint, label: "설계 수명 100년" }], points: r.tL <= tmax ? [{ x: r.tL, y: r.xcrit, color: pal.bad, r: 6 }] : [] });
+    if (r.t0 > 6) DUX.text(ctx, "잠복기", c.X(Math.min(tmax, r.t0) / 2), c.Y(ymax * 0.9), pal.accent, { size: 11.5, mono: false });
+    if (r.t0 < tmax - 8) DUX.text(ctx, "진전기", c.X(Math.min(tmax - 4, r.t0 + Math.min(r.t1, tmax - r.t0) / 2)), c.Y(ymax * 0.8), pal.accent2, { size: 11.5, mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.5), minHeight: 250, maxHeight: 350 });
+  function go() {
+    cv.redraw();
+    const r = calc();
+    CB.stat("du-tu-t0", DUX.years(r.t0, 1));
+    CB.stat("du-tu-t1", DUX.years(r.t1, 1));
+    CB.stat("du-tu-tl", DUX.years(r.tL, 1));
+    CB.stat("du-tu-loss", (r.loss * 100).toFixed(1) + " %");
+    const msg = document.getElementById("du-tu-msg");
+    if (r.t0 >= 100) { msg.className = "du-msg ok"; msg.innerHTML = `잠복기(${DUX.years(r.t0)})가 설계 수명 100년보다 깁니다. 부식이 시작되지 않는 설계입니다.`; }
+    else if (r.tL >= 100) { msg.className = "du-msg"; msg.innerHTML = `잠복기는 100년보다 짧지만 진전기를 더한 수명 ${DUX.years(r.tL)}은 100년을 넘습니다. 다만 부식이 진행 중이므로 점검·보수 계획이 필요합니다.`; }
+    else { msg.className = "du-msg bad"; msg.innerHTML = `수명 ${DUX.years(r.tL)} &lt; 100년: 피복 균열 전에 보수(표면 보호, 단면 복구, 음극 방식 등)가 필요합니다.`; }
+    msg.innerHTML += ` · x<sub>crit</sub> = 7.53 + 9.32 × ${r.c}/${CB.num(r.d, 1)} = ${CB.num(r.xcrit, 1)} μm, 부식 속도 ${CB.num(r.rate, 2)} μm/년`;
+  }
+  go();
+})();
+
+/* ---------- 7. 동결융해 ---------- */
+(function () {
+  const ga = CB.range("du-ft-a", (v) => v.toFixed(1) + " %", go), al = CB.seg("du-ft-al", go), gp = CB.range("du-ft-p", (v) => v.toFixed(1) + " %", go), gn = CB.range("du-ft-n", (v) => v + "회", go);
+  const Lbar = (A, p, a) => (p / A <= 4.33 ? p / (a * A) : (3 / a) * (1.4 * Math.cbrt(p / A + 1) - 1));
+  const Nc = (L) => 300 * Math.pow(0.25 / L, 3);
+  const P = (N, L) => 100 * Math.exp(-Math.log(100 / 60) * Math.pow(N / Nc(L), 3));
+  const DF = (L) => { const n = Nc(L); return n < 300 ? 60 * n / 300 : P(300, L); };
+  let voids = [];
+  function place() {
+    // 3차원 무작위 배치: x −0.3–2.3, y −0.3–1.3, z −0.5–0.5 mm, 반지름 r0(0.5 + u), E[(0.5 + u)³] = 1.25
+    const A = ga(), p = gp(), a = +al(), r0 = 3 / a, frac = A / (A + p), vol = 2.6 * 1.6 * 1.0, rng = CB.rng(29);
+    const n = Math.min(600, Math.round((frac * vol) / ((4 / 3) * Math.PI * r0 ** 3 * 1.25)));
+    voids = []; for (let i = 0; i < n; i++) voids.push([-0.3 + rng() * 2.6, -0.3 + rng() * 1.6, -0.5 + rng(), r0 * (0.5 + rng())]);
+  }
+  const map = CB.canvas("#du-cv-ft", (ctx, W, H) => {
+    const pal = CB.palette(), nx = 120, ny = 60, cw = W / nx, chh = H / ny, sx = W / 2.0, sy = H / 1.0;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      const x = (i + 0.5) * 2.0 / nx, y = (j + 0.5) * 1.0 / ny; let dmin = 9;
+      for (const [vx, vy, vz, r] of voids) { const d = Math.hypot(x - vx, y - vy, vz) - r; if (d < dmin) dmin = d; }
+      ctx.fillStyle = dmin > 0.2 ? DUX.alpha(pal.bad, 0.45) : DUX.alpha(pal.accent, 0.16 + 0.3 * Math.max(0, dmin) / 0.2);
+      const xa = Math.round(i * cw), xb = Math.round((i + 1) * cw), ya = Math.round(j * chh), yb = Math.round((j + 1) * chh);
+      ctx.fillRect(xa, ya, xb - xa, yb - ya);
+    }
+    voids.forEach(([x, y, z, r]) => { if (Math.abs(z) >= r) return; const rc = Math.sqrt(r * r - z * z); ctx.beginPath(); ctx.arc(x * sx, y * sy, Math.max(1.5, rc * sx), 0, Math.PI * 2); ctx.fillStyle = pal.bg; ctx.fill(); ctx.strokeStyle = pal.text; ctx.lineWidth = 1; ctx.stroke(); });
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 2; const y0 = H - 12; ctx.beginPath(); ctx.moveTo(W - 20 - 0.2 * sx, y0); ctx.lineTo(W - 20, y0); ctx.stroke(); ctx.restore();
+    DUX.text(ctx, "0.2 mm", W - 20 - 0.1 * sx, y0 - 10, pal.text, { size: 10.5 });
+  }, { aspect: 0.5, minHeight: 150, maxHeight: 280 });
+  const ch = CB.canvas("#du-cv-ft2", (ctx, W, H) => {
+    const pal = CB.palette(), L = Lbar(ga(), gp(), +al()), N = gn(), data = [], ref = [];
+    for (let n = 0; n <= 300; n += 3) { data.push([n, P(n, L)]); ref.push([n, P(n, 0.2)]); }
+    CB.chart(ctx, null, { x: [0, 300], y: [0, 105], xLabel: "동결융해 사이클 N", yLabel: "상대 동탄성계수 P (%)", series: [{ data: ref, color: pal.faint, width: 1.4, dash: [4, 4] }, { data, color: pal.accent, width: 2.6 }], hlines: [{ y: 60, color: pal.bad, label: "60 % (시험 종료)" }], points: [{ x: N, y: P(N, L), color: pal.text, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.66 : 0.38), minHeight: 200, maxHeight: 270 });
+  function go() {
+    place(); map.redraw(); ch.redraw();
+    const A = ga(), L = Lbar(A, gp(), +al()), N = gn(), df = DF(L);
+    CB.stat("du-ft-l", CB.num(L, 3) + " mm");
+    CB.stat("du-ft-rdm", CB.num(P(N, L), 1) + " %");
+    CB.stat("du-ft-df", CB.num(df, 0));
+    CB.stat("du-ft-fs", "약 " + CB.num(Math.max(0, A - 1.5) * 4.5, 0) + " %");
+    const msg = document.getElementById("du-ft-msg");
+    if (L <= 0.2) { msg.className = "du-msg ok"; msg.innerHTML = `<span class="du-ol">L</span> = ${CB.num(L, 3)} mm ≤ 0.20 mm: 기포가 충분히 촘촘합니다. DF ${CB.num(df, 0)}.`; }
+    else if (L <= 0.3) { msg.className = "du-msg"; msg.innerHTML = `<span class="du-ol">L</span> = ${CB.num(L, 3)} mm: 권장값(약 0.20 mm)보다 조금 큽니다. 공기량을 늘리거나 AE제를 바꿔 기포를 잘게 만드세요.`; }
+    else { msg.className = "du-msg bad"; msg.innerHTML = `<span class="du-ol">L</span> = ${CB.num(L, 3)} mm: 기포가 멀어 포화 상태의 동결융해를 견디기 어렵습니다(DF ${CB.num(df, 0)}).`; }
+  }
+  go();
+})();
+
+/* ---------- 8. 피복 × 품질 설계 지도 ---------- */
+(function () {
+  const mech = CB.seg("du-map-mech", go), scm = CB.seg("du-map-scm", go), goal = CB.seg("du-map-goal", go);
+  const F = { co2: { opc: 1, fa: 1.2, gg: 1.3 }, cl: { opc: 1, fa: 0.5, gg: 0.35 } };
+  const XR = [0.30, 0.70], YR = [10, 100], Cs = 3.0, Ccr = 1.2, zs = DUX.erfinv(1 - Ccr / Cs);
+  let pt = { wb: 0.441, c: 50 }, last = null;
+  const q = (wb) => (mech() === "co2" ? DUX.k(wb, F.co2[scm()]) : DUX.D(wb, F.cl[scm()]));
+  const life = (wb, c) => (mech() === "co2" ? (c / q(wb)) ** 2 : (c / (2 * zs)) ** 2 / (q(wb) * DUX.DMM));
+  const cover = (wb, T) => (mech() === "co2" ? q(wb) * Math.sqrt(T) : 2 * zs * Math.sqrt(q(wb) * DUX.DMM * T));
+  const lifeEngine = (wb, c) => (mech() === "co2" ? CB.conc.carbonationTime(c, q(wb)) : CB.conc.chlorideTime(c, Cs, q(wb), Ccr));
+  const cv = CB.canvas("#du-cv-map", (ctx, W, H) => {
+    const pal = CB.palette();
+    const c = CB.chart(ctx, null, { x: XR, y: YR, xLabel: "물–결합재비 W/B", yLabel: "피복 두께 c (mm)", xFmt: (v) => v.toFixed(2), series: [] });
+    last = c; const b = c.box, nx = 56, ny = 40;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      const wb = XR[0] + ((i + 0.5) / nx) * (XR[1] - XR[0]), cc = YR[0] + ((j + 0.5) / ny) * (YR[1] - YR[0]), t = life(wb, cc);
+      ctx.fillStyle = CB.rgb(CB.colormap(CB.clamp(Math.log10(Math.max(1, t)) / 3, 0, 1)));
+      const xa = Math.round(b.x + (i / nx) * b.w), xb = Math.round(b.x + ((i + 1) / nx) * b.w), ya = Math.round(b.y + b.h - ((j + 1) / ny) * b.h), yb = Math.round(b.y + b.h - (j / ny) * b.h);
+      ctx.fillRect(xa, ya, xb - xa, yb - ya);
+    }
+    ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
+    [25, 50, 100, 200].forEach((T) => {
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = T === +goal() ? 2.6 : 1.2; ctx.setLineDash(T === +goal() ? [] : [5, 4]); ctx.beginPath();
+      for (let k = 0; k <= 80; k++) { const wb = XR[0] + (k / 80) * (XR[1] - XR[0]), y = cover(wb, T); const X = c.X(wb), Y = c.Y(y); k ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+      ctx.stroke();
+      const wl = XR[0] + 0.06; const yl = cover(wl, T); if (yl > YR[0] + 3 && yl < YR[1] - 3) { ctx.setLineDash([]); DUX.text(ctx, T + "년", c.X(wl), c.Y(yl) - 8, "#fff", { size: 10.5, stroke: "rgba(0,0,0,0.55)" }); }
+    });
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(c.X(pt.wb), c.Y(pt.c), 8, 0, Math.PI * 2); ctx.fillStyle = pal.accent2; ctx.fill(); ctx.strokeStyle = pal.bg; ctx.lineWidth = 2.5; ctx.stroke();
+    DUX.text(ctx, "끌기", c.X(pt.wb) + 14, c.Y(pt.c) - 12, pal.text, { size: 10.5, align: "left", mono: false });
+    // 색 막대
+    const lx = b.x + b.w - 120, ly = b.y + 8; for (let i = 0; i < 100; i++) { ctx.fillStyle = CB.rgb(CB.colormap(i / 100)); ctx.fillRect(lx + i, ly, 1.2, 8); }
+    DUX.text(ctx, "1", lx, ly + 18, "#fff", { size: 9.5, stroke: "rgba(0,0,0,0.55)" }); DUX.text(ctx, "1,000년", lx + 100, ly + 18, "#fff", { size: 9.5, align: "right", stroke: "rgba(0,0,0,0.55)" });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.6), minHeight: 280, maxHeight: 420 });
+  const el = cv.canvas; let drag = false;
+  const setFrom = (e) => { if (!last) return; const r = el.getBoundingClientRect(), b = last.box, px = e.clientX - r.left, py = e.clientY - r.top; pt.wb = CB.clamp(XR[0] + ((px - b.x) / b.w) * (XR[1] - XR[0]), XR[0], XR[1]); pt.c = CB.clamp(YR[0] + ((b.y + b.h - py) / b.h) * (YR[1] - YR[0]), YR[0], YR[1]); go(); };
+  el.addEventListener("pointerdown", (e) => { drag = true; el.setPointerCapture(e.pointerId); setFrom(e); e.preventDefault(); });
+  el.addEventListener("pointermove", (e) => { if (drag) setFrom(e); });
+  el.addEventListener("pointerup", () => { drag = false; }); el.addEventListener("pointercancel", () => { drag = false; });
+  document.getElementById("du-map-reset").addEventListener("click", () => { pt = { wb: 0.441, c: mech() === "co2" ? 40 : 50 }; go(); });
+  function go() {
+    cv.redraw();
+    const t = lifeEngine(pt.wb, pt.c), T = +goal(), cn = cover(pt.wb, T);
+    CB.stat("du-map-pt", `${pt.wb.toFixed(3)}, ${CB.num(pt.c, 0)} mm`);
+    CB.stat("du-map-q", mech() === "co2" ? CB.num(q(pt.wb), 2) + " mm/√년" : DUX.sci(q(pt.wb)) + " m²/s");
+    CB.stat("du-map-t", DUX.years(t));
+    CB.stat("du-map-c", CB.num(cn, 0) + " mm");
+    const msg = document.getElementById("du-map-msg");
+    msg.className = "du-msg" + (t >= T ? " ok" : " bad");
+    msg.innerHTML = t >= T ? `잠복기 ${DUX.years(t)} ≥ 목표 ${T}년. 이 W/B에서는 피복 ${CB.num(cn, 0)} mm면 충분합니다.` : `잠복기 ${DUX.years(t)} &lt; 목표 ${T}년. 피복을 ${CB.num(cn, 0)} mm 이상으로 늘리거나, W/B를 낮추거나, 결합재를 바꾸세요.`;
+  }
+  go();
+})();
+</script>
+</body>
+</html>

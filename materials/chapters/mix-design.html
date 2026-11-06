@@ -1,0 +1,1037 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>콘크리트 배합 설계 · MaterialsBook</title>
+<meta name="description" content="콘크리트 1 m³를 무엇으로 얼마나 채울까. 배합강도와 표준편차, 물–결합재비와 아브람스 법칙, 단위수량과 잔골재율, 절대용적법, 현장 배합 보정, 시험 비빔, 레디믹스트 콘크리트 주문까지 기준 배합 M-30을 직접 설계하며 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .mx-stack { display: grid; grid-template-columns: 1fr; }
+  .mx-stack > div { position: relative; min-width: 0; }
+  .mx-stack > div + div { border-top: 1px solid var(--border); }
+  .mx-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .mx-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .mx-msg b { color: var(--text); }
+  .mx-msg.ok { color: var(--ok); font-weight: 600; }
+  .mx-msg.bad { color: var(--bad); font-weight: 600; }
+  .mx-steps { margin: 0; padding: 12px 18px 12px 40px; font-size: 14px; line-height: 1.75; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); overflow-wrap: anywhere; }
+  .mx-steps li { margin: 2px 0; }
+  .mx-steps b { color: var(--text); }
+  .mx-steps .bad { color: var(--bad); font-weight: 600; }
+  .mx-tbl td, .mx-tbl th { font-variant-numeric: tabular-nums; }
+  .mx-tbl td.hl { color: var(--accent); font-weight: 700; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="materials"></script>
+</head>
+<body data-chapter="mix-design">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="mx-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="mx-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="mx-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="mx-ah-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 04</div>
+    <h1 data-no-glossary>콘크리트 배합 설계</h1>
+    <p class="lead">2장에서 시멘트가 물과 만나 굳는 원리를, 3장에서 콘크리트 부피의 70 %를 차지하는 골재와 소량으로 성질을 바꾸는 혼화재료를 배웠습니다. 이제 이 재료들을 <b>얼마씩</b> 섞을지 정할 차례입니다. 레미콘 공장에 "25-30-150"이라고 주문하면, 공장은 물 몇 kg, 시멘트 몇 kg, 모래와 자갈 몇 kg을 1 m³에 넣을지 이미 계산해 두고 있습니다. 그 계산이 <b>배합 설계</b>입니다. 배합 설계는 서로 다투는 요구를 한꺼번에 맞추는 일입니다. 강도를 올리려면 물을 줄여야 하지만, 물이 적으면 거푸집을 채우지 못합니다. 시멘트를 늘리면 강도와 워커빌리티를 함께 얻지만 열·수축·비용·탄소가 늘어납니다. 이 장에서는 기준 건물 B-10의 골조 콘크리트, 기준 배합 <b>M-30</b>을 처음부터 끝까지 손으로 설계하고, 같은 엔진(<code>CB.conc.mix</code>)으로 움직이는 시뮬레이터로 조건을 바꿔 봅니다. 1부(콘크리트를 만든다)의 한가운데에 있는 장입니다.</p>
+    <ul class="objectives">
+      <li>설계기준압축강도 \(f_{ck}\)와 배합강도 \(f_{cr}\)를 구분하고, 표준편차 \(s\)와 정규분포로 \(f_{cr}\)의 두 식(1.34s, 2.33s)이 뜻하는 불합격 확률을 설명한다.</li>
+      <li>시험 기록이 30회보다 적거나 없을 때의 보정 계수와 기록 없는 경우의 배합강도 식을 쓴다.</li>
+      <li>아브람스 법칙과 강도–결합재수비 직선 관계로 물–결합재비 W/B를 정하고, 내구성 상한과 비교해 작은 값을 고른다.</li>
+      <li>단위수량·잔골재율 표와 보정 규칙(슬럼프·공기량·W/B·조립률)을 적용하고, 절대용적법으로 1 m³를 채워 잔골재·굵은 골재량을 구한다.</li>
+      <li>골재의 표면수를 보정해 시방 배합을 현장 배합으로 바꾸고, 시험 비빔 결과로 배합을 조정한다.</li>
+      <li>레디믹스트 콘크리트의 호칭(25-30-150)을 읽고 주문하며, 혼화재 치환이 강도·비용·탄소에 주는 영향을 비교한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>"시멘트 한 포에 모래 두 삽, 자갈 네 삽"</b></div>
+      <div class="o-body"><p>20세기 초까지 콘크리트는 대개 부피 비율로 섞었습니다. 시멘트 1, 모래 2, 자갈 4 같은 비율을 정해 두고, 물은 "비비기 좋을 만큼" 넣었습니다. 같은 1 : 2 : 4라도 현장마다 강도가 크게 달랐던 이유는 바로 그 물이었습니다. 1890년대 프랑스의 페레는 강도가 시멘트·물·공기의 부피 비에 따라 정해진다는 식을 내놓았고, 1918년 미국 루이스 연구소의 더프 아브람스는 수많은 공시체 시험을 정리해 "재료가 같고 충분히 다져 성형할 수 있다면, 콘크리트의 강도는 물–시멘트비로 정해진다"고 발표했습니다. 물이 강도를 정한다는 이 한 문장이 배합을 감에서 계산으로 바꾸었습니다.</p>
+        <p>오늘날의 배합 설계는 아브람스의 법칙 위에 통계(강도의 흩어짐)와 부피의 산수(절대용적법)를 얹은 것입니다. 미국의 ACI 211, 한국의 콘크리트공사 표준시방서(KCS 14 20)가 정한 절차는 세부가 달라도 뼈대가 같습니다. 목표 강도를 정하고, 물–결합재비를 정하고, 필요한 물의 양을 정하고, 남은 부피를 골재로 채운 뒤, 실제로 비벼서 확인합니다.</p>
+        <div class="o-chain"><span>요구 성능 f<sub>ck</sub>·슬럼프·노출</span><i>→</i><span class="tool">f<sub>cr</sub> → W/B → W·S/a → 절대용적 → 시험 비빔</span><i>→</i><span>1 m³ 배합표 · 레미콘 주문</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="what-mix-decides">
+    <h2>배합 설계가 정하는 것</h2>
+    <div class="problem"><strong>같은 재료, 다른 콘크리트</strong>
+      <p>B-10 현장에 들어오는 시멘트·모래·자갈·물은 모두 같습니다. 그런데 이 재료로 바닥 슬래브용 콘크리트를 만들 수도, 슬럼프가 거의 없는 도로 포장용 콘크리트를 만들 수도, 수조처럼 물이 새지 않아야 하는 콘크리트를 만들 수도 있습니다. 무엇이 이 차이를 만들까요? 그리고 "좋은 배합"이란 어떤 기준으로 판단할까요?</p></div>
+    <p>콘크리트에 바라는 성질은 네 가지로 정리됩니다. ① 굳은 뒤 필요한 <b>강도</b>, ② 굳기 전 거푸집 구석구석을 채우고 철근 사이를 지나가는 <b>워커빌리티</b>, ③ 수십 년 동안 탄산화·염해·동결융해를 견디는 <b>내구성</b>, ④ 이 셋을 가장 적은 시멘트로 얻는 <b>경제성</b>(오늘날에는 탄소 배출도 함께)입니다. <span class="term">배합 설계</span><span class="en">(mix design, mix proportioning)</span>는 이 네 요구를 만족하는 재료의 비율을 정하는 일이며, 결과는 콘크리트 1 m³에 들어가는 각 재료의 질량(kg/m³), 곧 배합표입니다.</p>
+    <div class="callout def"><strong>정의 4.1 (시방 배합과 현장 배합)</strong> 골재가 <b>표면건조 포화 상태</b>(3장)이고 잔골재는 5 mm 체를 모두 통과하며 굵은 골재는 5 mm 체에 모두 남는다고 가정해 정한 배합을 <span class="term">시방 배합</span><span class="en">(specified mix)</span>이라 한다. 실제 현장의 골재는 젖어 있거나 말라 있고 입도도 조금씩 섞여 있으므로, 그 상태에 맞춰 계량값을 고친 배합을 <span class="term">현장 배합</span><span class="en">(field mix)</span>이라 한다. 배합표의 질량은 모두 콘크리트 1 m³ 기준이다.</div>
+    <figure class="diagram" id="fig-mx-flow">
+      <svg viewBox="0 0 860 300" role="img" aria-label="배합 설계의 여덟 단계 흐름도">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g>
+          <rect x="30" y="40" width="180" height="70" rx="8" class="f-elev"/><text x="120" y="66" text-anchor="middle" class="t" style="font-weight:700">① 요구 성능</text><text x="120" y="90" text-anchor="middle" class="t-mono">f_ck · 슬럼프 · G_max · 노출</text>
+          <rect x="240" y="40" width="180" height="70" rx="8" class="f-elev"/><text x="330" y="66" text-anchor="middle" class="t" style="font-weight:700">② 배합강도</text><text x="330" y="90" text-anchor="middle" class="t-mono">f_cr = f_ck + 여유(s)</text>
+          <rect x="450" y="40" width="180" height="70" rx="8" class="f-acc-soft"/><text x="540" y="66" text-anchor="middle" class="t" style="font-weight:700">③ 물–결합재비</text><text x="540" y="90" text-anchor="middle" class="t-mono">강도 · 내구성 중 작은 값</text>
+          <rect x="660" y="40" width="170" height="70" rx="8" class="f-elev"/><text x="745" y="66" text-anchor="middle" class="t" style="font-weight:700">④ 단위수량·S/a</text><text x="745" y="90" text-anchor="middle" class="t-mono">표 + 보정</text>
+          <rect x="660" y="190" width="170" height="70" rx="8" class="f-elev"/><text x="745" y="216" text-anchor="middle" class="t" style="font-weight:700">⑤ 결합재량</text><text x="745" y="240" text-anchor="middle" class="t-mono">B = W ÷ (W/B)</text>
+          <rect x="450" y="190" width="180" height="70" rx="8" class="f-elev"/><text x="540" y="216" text-anchor="middle" class="t" style="font-weight:700">⑥ 절대용적</text><text x="540" y="240" text-anchor="middle" class="t-mono">남은 부피 → S · G</text>
+          <rect x="240" y="190" width="180" height="70" rx="8" class="f-acc-soft"/><text x="330" y="216" text-anchor="middle" class="t" style="font-weight:700">⑦ 시험 비빔</text><text x="330" y="240" text-anchor="middle" class="t-mono">슬럼프·공기·강도 확인</text>
+          <rect x="30" y="190" width="180" height="70" rx="8" class="f-elev"/><text x="120" y="216" text-anchor="middle" class="t" style="font-weight:700">⑧ 현장 배합</text><text x="120" y="240" text-anchor="middle" class="t-mono">표면수 보정 → 계량</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.8;fill:none" marker-end="url(#mx-ah)">
+          <line x1="212" y1="75" x2="236" y2="75"/><line x1="422" y1="75" x2="446" y2="75"/><line x1="632" y1="75" x2="656" y2="75"/>
+          <line x1="745" y1="112" x2="745" y2="186"/><line x1="658" y1="225" x2="634" y2="225"/><line x1="448" y1="225" x2="424" y2="225"/><line x1="238" y1="225" x2="214" y2="225"/>
+        </g>
+        <path d="M330 188 Q330 150 500 150 Q540 150 540 114" style="fill:none;stroke:var(--accent);stroke-width:1.8;stroke-dasharray:6 4" marker-end="url(#mx-ah-acc)"/>
+        <text x="420" y="142" text-anchor="middle" class="t-mono" style="fill:var(--accent)">맞지 않으면 W/B·W 조정</text>
+      </svg>
+      <figcaption><b>그림 4-1.</b> 배합 설계의 흐름. ①–⑥은 책상에서 하는 계산이고, ⑦에서 실제로 비벼 슬럼프·공기량·강도를 확인해 ③·④로 되돌아가 고친다. ⑧은 매일 아침 골재의 젖은 정도를 재어 계량값을 고치는 일이다. 이 장의 절은 이 순서를 따른다.</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="mx-tbl">
+      <thead><tr><th>요구</th><th>주로 좌우하는 배합 요소</th><th>늘리면 좋아지는 것</th><th>늘리면 나빠지는 것</th></tr></thead>
+      <tbody>
+        <tr><td>강도</td><td>물–결합재비 W/B(낮을수록)</td><td>강도·내구성</td><td>결합재량·발열·자기 수축·비용</td></tr>
+        <tr><td>워커빌리티</td><td>단위수량 W, 잔골재율 S/a, 혼화제</td><td>채움·다짐·펌프 압송</td><td>물이 늘면 강도·건조 수축·블리딩</td></tr>
+        <tr><td>내구성</td><td>W/B 상한, 공기량, 혼화재, 피복</td><td>탄산화·염해·동결융해 저항</td><td>공기 1 %당 강도 약 4–5 % 손실(5장)</td></tr>
+        <tr><td>경제·탄소</td><td>단위 결합재량, 혼화재 치환</td><td>비용·CO₂ 감소</td><td>초기 강도 발현이 늦어짐(6장)</td></tr>
+      </tbody></table></div>
+    <p>배합 설계의 가장 중요한 원칙은 <b>"필요한 워커빌리티를 얻는 범위에서 단위수량을 가능한 한 적게"</b>입니다. 물은 강도를 정하는 W/B의 분자이고, 같은 W/B라면 물이 적을수록 시멘트도 적게 듭니다. 시멘트가 적으면 수화열과 수축이 줄고 값도 쌉니다. 골재는 시멘트 풀보다 싸고 체적이 안정하므로, 좋은 배합은 <b>골재를 최대로, 풀은 골재 사이를 채우고 감쌀 만큼만</b> 씁니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="required-strength">
+    <h2>설계기준강도와 배합강도</h2>
+    <div class="problem"><strong>30 MPa를 주문하면 30 MPa로 만들어 오는가</strong>
+      <p>설계자는 B-10의 골조에 \(f_{ck} = 30\) MPa를 요구했습니다. 레미콘 공장이 평균이 정확히 30 MPa인 콘크리트를 만든다면, 공시체 강도는 평균을 중심으로 흩어지므로 절반가량이 30 MPa에 못 미칩니다. 공장은 평균을 얼마로 잡아야 할까요? 공장의 품질이 고르면 여유를 덜 두어도 될까요?</p></div>
+    <p>콘크리트 강도는 같은 배합이라도 비빔마다 다릅니다. 시멘트 품질의 미세한 차이, 골재의 함수율 오차, 계량 오차, 공기량, 시험 자체의 오차가 겹치기 때문입니다. 많은 시험 결과를 모으면 그 분포는 정규분포에 가깝습니다. 흩어짐의 크기는 <span class="term">표준편차</span> \(s\)(MPa)로 나타내며, 관리가 잘 되는 공장은 2–3 MPa, 관리가 느슨하면 5 MPa 이상입니다(교육용 대표값). 그래서 배합은 \(f_{ck}\)보다 높은 평균 강도를 목표로 합니다. 이 목표 평균이 <span class="term">배합강도</span><span class="en">(required average strength)</span> \(f_{cr}\)입니다. 구조 설계에 쓰는 <span class="term">설계기준압축강도</span> \(f_{ck}\)는 재령 28일 표준 양생 공시체 강도의 "하한에 가까운 값"이고, 공장이 노리는 것은 \(f_{cr}\)입니다.</p>
+    <div class="callout def"><strong>정의 4.2 (배합강도)</strong> 같은 공장에서 30회 이상의 시험 기록으로 구한 표준편차가 \(s\)일 때, 배합강도는 다음 두 식 중 큰 값이다(콘크리트공사 표준시방서 KCS 14 20 형태, 현행 기준 확인).
+      <div class="formula">$$f_{ck} \le 35\ \text{MPa}:\quad f_{cr} = \max\left(f_{ck} + 1.34\,s,\ \ (f_{ck} - 3.5) + 2.33\,s\right)$$
+      $$f_{ck} \gt 35\ \text{MPa}:\quad f_{cr} = \max\left(f_{ck} + 1.34\,s,\ \ 0.9\,f_{ck} + 2.33\,s\right)$$<div class="where">첫 식은 "연속 3회 시험값의 평균이 \(f_{ck}\)에 못 미칠 확률"을, 둘째 식은 "1회 시험값이 \(f_{ck} - 3.5\)(또는 \(0.9f_{ck}\))에 못 미칠 확률"을 각각 1 %로 묶는다. 시험 기록이 15–29회이면 \(s\)에 보정 계수를 곱해 키우고, 기록이 없거나 14회 이하이면 \(s\) 없이 \(f_{cr} = f_{ck} + 7\)(\(f_{ck} \lt 21\)), \(f_{ck} + 8.5\)(\(21 \le f_{ck} \le 35\)), \(1.1f_{ck} + 5\)(\(f_{ck} \gt 35\))를 쓴다.</div></div></div>
+    <figure class="diagram" id="fig-mx-normal">
+      <svg viewBox="0 0 860 290" role="img" aria-label="강도의 정규분포와 설계기준강도, 배합강도의 관계">
+        <rect x="10" y="10" width="840" height="270" rx="10" class="f-surface"/>
+        <path d="M190 240L210 239.8L230 239.3L250 238.1L270 235.1L290 228.8L310 217L330 197.6L350 170.1L350 240Z" style="fill:var(--bad);opacity:.25"/>
+        <path d="M190 240L210 239.8L230 239.3L250 238.1L270 235.1L290 228.8L310 217L330 197.6L350 170.1L370 136.9L390 103.9L410 79.2L430 70L450 79.2L470 103.9L490 136.9L510 170.1L530 197.6L550 217L570 228.8L590 235.1L610 238.1L630 239.3L650 239.8L670 240" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+        <line x1="170" y1="240" x2="700" y2="240" class="s-axis"/>
+        <line x1="350" y1="44" x2="350" y2="240" style="stroke:var(--bad);stroke-width:1.6;stroke-dasharray:5 4"/>
+        <line x1="430" y1="44" x2="430" y2="240" style="stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 4"/>
+        <line x1="280" y1="200" x2="280" y2="240" style="stroke:var(--text-dim);stroke-width:1.4;stroke-dasharray:3 3"/>
+        <line x1="352" y1="50" x2="428" y2="50" style="stroke:var(--text);stroke-width:1.4" marker-start="url(#mx-ah)" marker-end="url(#mx-ah)"/>
+        <text x="390" y="40" text-anchor="middle" class="t-mono">1.34 s</text>
+        <text x="350" y="258" text-anchor="middle" class="t-mono" style="fill:var(--bad)">f_ck</text>
+        <text x="430" y="258" text-anchor="middle" class="t-mono" style="fill:var(--accent)">f_cr</text>
+        <text x="272" y="258" text-anchor="middle" class="t-mono">f_ck − 3.5</text>
+        <text x="300" y="190" text-anchor="end" class="t-mono" style="fill:var(--bad)">f_ck 미만</text>
+        <text x="700" y="258" text-anchor="end" class="t-mono">압축 강도 →</text>
+        <g transform="translate(690,70)">
+          <text x="0" y="0" class="t" style="font-weight:700">s = 3.0 MPa, f_ck = 30</text>
+          <text x="0" y="26" class="t-mono">f_cr = 34.0 MPa</text>
+          <text x="0" y="50" class="t-mono">1회 &lt; f_ck : 약 9 %</text>
+          <text x="0" y="72" class="t-mono">3회 평균 &lt; f_ck : 1 %</text>
+          <text x="0" y="94" class="t-mono">1회 &lt; 26.5 : 약 0.6 %</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-2.</b> 공장이 평균 \(f_{cr}\)로 만든 콘크리트의 강도 분포. 평균을 \(f_{ck}\)보다 1.34s 높이면 공시체 하나하나는 약 9 %가 \(f_{ck}\)에 못 미치지만, 연속 3회 평균이 \(f_{ck}\)에 못 미칠 확률은 1 %로 줄어든다. 판정은 1회 값이 아니라 3회 평균과 1회 하한(\(f_{ck} - 3.5\))으로 하므로(7장) 이 두 확률을 1 %로 묶는 것이 정의 4.2다.</figcaption>
+    </figure>
+    <div class="callout deep"><strong>1.34와 2.33은 어디서 오는가</strong> 표준 정규분포에서 아래쪽 1 %의 경계는 \(z = -2.326\)이다. 공시체 1회 강도가 \(N(f_{cr}, s^2)\)를 따르면 1회 값이 \(f_{ck} - 3.5\) 미만일 확률이 1 %가 되는 조건은 \(f_{cr} - 2.33s = f_{ck} - 3.5\), 곧 둘째 식이다. 연속 3회 평균은 표준편차가 \(s/\sqrt{3}\)으로 줄어든 분포를 따르므로, 그 평균이 \(f_{ck}\) 미만일 확률이 1 %인 조건은
+      <div class="formula">$$f_{cr} - 2.33\,\frac{s}{\sqrt{3}} = f_{ck} \quad\Longrightarrow\quad f_{cr} = f_{ck} + \frac{2.33}{\sqrt{3}}\,s = f_{ck} + 1.34\,s$$</div>
+      이다. 두 조건을 모두 지키려면 큰 값을 고른다. \(s\)가 작으면 첫 식이, \(s\)가 크면(\(f_{ck} \le 35\)에서 \(s \gt 3.5/0.99 \approx 3.5\) MPa) 둘째 식이 결정한다.</div>
+    <div class="callout"><strong>예제 4.1 (M-30의 배합강도)</strong> \(f_{ck} = 30\) MPa, 같은 공장의 30회 이상 기록에서 \(s = 3.0\) MPa.
+      <ol style="margin:6px 0 0">
+        <li><b>식 ①.</b> \(30 + 1.34 \times 3.0 = 34.02\) MPa.</li>
+        <li><b>식 ②.</b> \((30 - 3.5) + 2.33 \times 3.0 = 26.5 + 6.99 = 33.49\) MPa.</li>
+        <li><b>배합강도.</b> 큰 값 \(f_{cr} = 34.02 \approx 34.0\) MPa. 여유는 4.0 MPa, \(f_{ck}\)의 약 13 %다.</li>
+        <li><b>확인.</b> 1회 값이 \(f_{ck}\) 미만일 확률 \(\Phi\big((30 - 34.02)/3.0\big) = \Phi(-1.34) \approx 9.0\,\%\), 연속 3회 평균이 \(f_{ck}\) 미만일 확률 \(\Phi(-1.34\sqrt{3}) = \Phi(-2.32) \approx 1.0\,\%\).</li>
+      </ol></div>
+    <p>시험 기록이 30회보다 적으면 표준편차를 믿을 만큼 정확히 알 수 없으므로 계산한 \(s\)에 1보다 큰 계수를 곱해 보수적으로 씁니다. 기록이 아예 없으면 \(s\)를 모르므로 정의 4.2 끝의 고정된 여유(예: \(f_{ck} = 30\)이면 +8.5 MPa)를 씁니다. 기록이 없는 공장은 같은 강도를 얻으려고 평균을 4.5 MPa 더 높여야 하므로 시멘트를 더 써야 합니다. 품질 관리가 곧 돈이라는 뜻입니다.</p>
+    <div class="table-wrap"><table class="mx-tbl">
+      <thead><tr><th>시험 횟수</th><th>15회</th><th>20회</th><th>25회</th><th>30회 이상</th><th>14회 이하·기록 없음</th></tr></thead>
+      <tbody><tr><td>표준편차 보정 계수</td><td>1.16</td><td>1.08</td><td>1.03</td><td>1.00</td><td>s를 쓰지 않음(고정 여유)</td></tr></tbody></table></div>
+    <p style="font-size:14px;color:var(--text-dim)">표의 사이 값은 직선 보간한다(<code>CB.conc.sFactor</code>). 계수와 식은 KCS 14 20의 형태를 교육용으로 옮긴 것이므로 실무에서는 현행 기준을 확인한다.</p>
+    <div class="callout"><strong>예제 4.2 (기록이 20회뿐이라면)</strong> 같은 공장이 이 배합으로 20회만 시험해 \(s = 3.0\) MPa를 얻었다.
+      <ol style="margin:6px 0 0">
+        <li><b>보정 표준편차.</b> \(s' = 1.08 \times 3.0 = 3.24\) MPa.</li>
+        <li><b>두 식.</b> \(30 + 1.34 \times 3.24 = 34.34\), \(26.5 + 2.33 \times 3.24 = 34.05\) MPa.</li>
+        <li><b>배합강도.</b> \(f_{cr} = 34.3\) MPa(30회 이상일 때보다 0.3 MPa 높다). 기록이 없으면 \(30 + 8.5 = 38.5\) MPa로 4.5 MPa가 더 높아진다.</li>
+      </ol></div>
+    <div class="sim" id="sim-mx-fcr">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>배합강도와 불합격 확률</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-fcr" aria-label="강도 분포와 설계기준강도, 배합강도"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span><span>설계기준압축강도 f<sub>ck</sub> (MPa)</span></span><div class="seg" id="mx-fcr-fck"><button data-value="24">24</button><button data-value="27">27</button><button data-value="30" class="on">30</button><button data-value="35">35</button><button data-value="40">40</button><button data-value="50">50</button></div></div>
+          <label class="ctrl"><span>공장의 실제 표준편차 s <output id="mx-fcr-s-out"></output></span><input type="range" id="mx-fcr-s" min="1.5" max="7" step="0.1" value="3"></label>
+          <div class="ctrl"><span>시험 기록 횟수</span><div class="seg" id="mx-fcr-n"><button data-value="15">15</button><button data-value="20">20</button><button data-value="25">25</button><button data-value="30" class="on">30+</button><button data-value="none">없음</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">계산에 쓴 s′</span><span class="v" id="mx-fcr-o-s">—</span></div>
+        <div class="stat"><span class="k">배합강도 f<sub>cr</sub></span><span class="v" id="mx-fcr-o-fcr">—</span></div>
+        <div class="stat"><span class="k">1회 &lt; f<sub>ck</sub></span><span class="v" id="mx-fcr-o-p1">—</span></div>
+        <div class="stat"><span class="k">3회 평균 &lt; f<sub>ck</sub></span><span class="v" id="mx-fcr-o-p3">—</span></div>
+        <div class="stat"><span class="k">1회 &lt; 하한</span><span class="v" id="mx-fcr-o-pl">—</span></div>
+      </div>
+      <div class="mx-msg" id="mx-fcr-msg"></div>
+      <div class="sim-note">해볼 것: s를 3.5 MPa보다 키우면 결정 식이 ①에서 ②로 바뀌는 것을 보세요 · 기록 '없음'을 고르면 공장 품질이 좋아도(s 작음) 고정 여유를 써야 하므로 불합격 확률이 지나치게 작아집니다(시멘트 낭비) · 기록 15회에서는 보정 계수 때문에 f<sub>cr</sub>가 올라갑니다 · 모델: 공장이 평균 f<sub>cr</sub>, 실제 표준편차 s인 정규분포로 생산한다고 가정. 실선은 공시체 1회, 점선은 연속 3회 평균(표준편차 s/√3)의 분포, 붉은 면적은 f<sub>ck</sub> 미만. f<sub>cr</sub>는 <code>CB.conc.fcr</code>, 보정 계수는 <code>CB.conc.sFactor</code>.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="water-binder">
+    <h2>물–결합재비: 강도를 정하는 한 숫자</h2>
+    <div class="problem"><strong>물 한 바가지의 값</strong>
+      <p>현장에서 콘크리트가 뻑뻑하다며 트럭에 물을 더 붓는 장면은 오래된 골칫거리입니다. 물을 조금 더 넣었을 뿐인데 왜 강도가 떨어질까요? 시멘트를 조금 더 넣으면 괜찮을까요? 강도를 정하는 것은 물의 양일까, 시멘트의 양일까, 아니면 둘의 비율일까요?</p></div>
+    <p>시멘트가 수화하는 데 화학적으로 필요한 물은 시멘트 질량의 약 25 %뿐이고, 겔 공극에 붙잡히는 물까지 합쳐도 약 40 %입니다(2장의 파워스 모델). 그보다 많이 넣은 물은 비빌 때 흐름을 주는 역할을 하고 나서, 굳은 뒤에는 증발하거나 갇혀 <b>모세관 공극</b>으로 남습니다. 공극은 하중을 받지 못하고 균열이 시작되는 자리이므로, 물이 시멘트에 비해 많을수록 강도는 떨어집니다. 그래서 강도를 정하는 것은 물이나 시멘트의 양이 아니라 둘의 비율입니다. 시멘트와 함께 플라이애시·고로슬래그 미분말 같은 혼화재를 쓰면 이들을 합친 <span class="term">결합재</span>로 비를 잡습니다.</p>
+    <div class="callout def"><strong>정의 4.3 (물–결합재비)</strong> 굳지 않은 콘크리트 속 물의 질량 \(W\)(골재가 표면건조 포화 상태일 때의 물, 곧 골재가 빨아들인 물은 빼고 표면수는 넣은 값)을 결합재 질량 \(B = C + F\)(시멘트 + 혼화재)로 나눈 값을 <span class="term">물–결합재비</span><span class="en">(water–binder ratio)</span> W/B라 한다. 혼화재가 없으면 물–시멘트비 W/C와 같다. 역수 B/W를 <span class="term">결합재–물비</span>라 한다.</div>
+    <div class="callout def"><strong>원리 4.4 (아브람스 법칙과 결합재–물비 직선)</strong> 재료와 양생 조건이 같고 충분히 다져진 콘크리트의 압축 강도는 W/B의 감소 함수다. 아브람스는 이를 지수형으로 썼다.
+      <div class="formula">$$f_c = \frac{K_1}{K_2^{\,W/B}}$$<div class="where">\(K_1, K_2\): 재료·재령·시험 조건에 따른 상수. 같은 자료를 결합재–물비 \(B/W\)로 그리면 실용 범위(W/B 약 0.35–0.70)에서 거의 직선이 된다. 배합 설계에서는 이 직선을 쓴다.</div></div>
+      <div class="formula">$$f_{28} = a + b\,\frac{B}{W}, \qquad a = -13.8\ \text{MPa},\quad b = 21.1\ \text{MPa}$$<div class="where">이 책의 교육용 회귀식(<code>CB.conc.REL</code>).</div></div></div>
+    <figure class="diagram" id="fig-mx-abrams">
+      <svg viewBox="0 0 860 300" role="img" aria-label="물-결합재비와 강도의 곡선, 결합재-물비와 강도의 직선">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <line x1="60" y1="250" x2="390" y2="250" class="s-axis"/><line x1="60" y1="250" x2="60" y2="40" class="s-axis"/>
+        <line x1="480" y1="250" x2="830" y2="250" class="s-axis"/><line x1="480" y1="250" x2="480" y2="40" class="s-axis"/>
+        <path d="M60 61.6L92 95L124 120.2L156 139.7L188 155.3L220 168.1L252 178.8L316 195.5L380 208.1" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+        <line x1="487.7" y1="208" x2="809" y2="61.6" style="stroke:var(--accent);stroke-width:2.6"/>
+        <g style="fill:var(--accent-2)"><circle cx="560" cy="178" r="4.5"/><circle cx="600" cy="152" r="4.5"/><circle cx="650" cy="138" r="4.5"/><circle cx="700" cy="108" r="4.5"/><circle cx="752" cy="92" r="4.5"/></g>
+        <circle cx="150" cy="136.6" r="5.5" style="fill:var(--text)"/><circle cx="644.8" cy="136.6" r="5.5" style="fill:var(--text)"/>
+        <line x1="150" y1="136.6" x2="150" y2="250" style="stroke:var(--text-dim);stroke-dasharray:4 3"/><line x1="60" y1="136.6" x2="150" y2="136.6" style="stroke:var(--text-dim);stroke-dasharray:4 3"/>
+        <line x1="644.8" y1="136.6" x2="644.8" y2="250" style="stroke:var(--text-dim);stroke-dasharray:4 3"/><line x1="480" y1="136.6" x2="644.8" y2="136.6" style="stroke:var(--text-dim);stroke-dasharray:4 3"/>
+        <text x="156" y="128" class="t-mono" style="fill:var(--text)">M-30: 0.441, 34.0 MPa</text>
+        <text x="650" y="128" class="t-mono" style="fill:var(--text)">2.27, 34.0 MPa</text>
+        <text x="225" y="275" text-anchor="middle" class="t-mono">W/B: 0.3 → 0.8</text>
+        <text x="655" y="275" text-anchor="middle" class="t-mono">B/W: 1.2 → 3.4</text>
+        <text x="66" y="34" class="t-mono">f₂₈ (MPa)</text><text x="486" y="34" class="t-mono">f₂₈ (MPa)</text>
+        <text x="250" y="80" class="t-dim">아브람스: 곡선</text><text x="560" y="72" class="t-dim">B/W로 보면 직선</text>
+        <text x="700" y="200" class="t-mono" style="fill:var(--accent-2)">● 시험 비빔 결과(예)</text>
+        <text x="54" y="254" text-anchor="end" class="t-mono">0</text><text x="54" y="54" text-anchor="end" class="t-mono">60</text>
+        <text x="474" y="254" text-anchor="end" class="t-mono">0</text><text x="474" y="54" text-anchor="end" class="t-mono">60</text>
+      </svg>
+      <figcaption><b>그림 4-3.</b> 같은 교육용 관계를 두 가지로 그린 것. 왼쪽: 강도는 W/B가 커지면 곡선을 따라 떨어진다(아브람스 법칙). 오른쪽: 가로축을 역수 B/W로 바꾸면 직선이 되어 시험 비빔 점 몇 개로 회귀하기 쉽다. M-30의 배합강도 34.0 MPa는 B/W 2.27, 곧 W/B 0.441에 대응한다.</figcaption>
+    </figure>
+    <div class="callout warn"><strong>교육용 관계식이라는 점에 주의</strong> 이 책의 \(f_{28} = -13.8 + 21.1\,(B/W)\) MPa는 계산 흐름을 보여 주기 위한 <b>대표 직선</b>이지 어떤 공장·재료의 실제 관계가 아니다. 강도–결합재수비 관계는 시멘트 종류, 골재의 강도와 모양, 혼화재, 공기량, 양생에 따라 크게 다르다. 실무에서는 각 공장이 자기 재료로 W/B를 세 가지 이상 바꿔 <b>시험 비빔</b>을 하고, 그 결과로 직선을 다시 세워 W/B를 정한다(4.7절과 아래 시뮬레이터).</div>
+    <p>강도만 보면 W/B가 클수록 경제적이지만, 모세관 공극이 많은 콘크리트는 CO₂·염화물·물이 쉽게 들어와 내구성이 떨어집니다. 그래서 기준은 노출 환경(탄산화, 염화물, 동결융해, 황산염 등)마다 <b>최대 W/B</b>와 최소 강도를 정해 둡니다(콘크리트구조 내구성 설계기준 KDS 14 20 40 형태, 9장, 현행 기준 확인). 배합에 쓰는 W/B는 <b>강도로 정한 값과 내구성 상한 중 작은 값</b>입니다. 수밀성이 필요한 구조물, 해양 구조물처럼 내구성 상한이 강도보다 엄격하면 \(f_{cr}\)를 넘는 강도가 저절로 따라옵니다.</p>
+    <figure class="diagram" id="fig-mx-powers">
+      <svg viewBox="0 0 860 260" role="img" aria-label="물-결합재비가 낮은 시멘트 풀과 높은 시멘트 풀의 모세관 공극 비교">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <rect x="0" y="0" width="230" height="170" rx="6" style="fill:var(--text-faint);opacity:.35"/>
+          <g style="fill:var(--text-dim)"><circle cx="40" cy="40" r="14"/><circle cx="120" cy="30" r="12"/><circle cx="190" cy="60" r="15"/><circle cx="70" cy="120" r="13"/><circle cx="160" cy="130" r="14"/><circle cx="110" cy="85" r="10"/></g>
+          <g style="fill:var(--blue);opacity:.8"><circle cx="85" cy="55" r="4"/><circle cx="150" cy="95" r="3.5"/><circle cx="30" cy="150" r="3"/><circle cx="205" cy="150" r="4"/></g>
+          <text x="115" y="192" text-anchor="middle" class="t" style="font-weight:700">W/B 0.35</text>
+        </g>
+        <g transform="translate(340,40)">
+          <rect x="0" y="0" width="230" height="170" rx="6" style="fill:var(--text-faint);opacity:.35"/>
+          <g style="fill:var(--text-dim)"><circle cx="50" cy="45" r="11"/><circle cx="150" cy="40" r="10"/><circle cx="90" cy="125" r="11"/><circle cx="185" cy="120" r="10"/></g>
+          <g style="fill:var(--blue);opacity:.8"><circle cx="100" cy="60" r="12"/><circle cx="20" cy="100" r="9"/><circle cx="135" cy="90" r="10"/><circle cx="200" cy="70" r="9"/><circle cx="45" cy="150" r="10"/><circle cx="150" cy="155" r="8"/><circle cx="210" cy="160" r="7"/><circle cx="110" cy="20" r="8"/><path d="M100 60L135 90L185 120" style="stroke:var(--blue);stroke-width:6;opacity:.6"/></g>
+          <text x="115" y="192" text-anchor="middle" class="t" style="font-weight:700">W/B 0.60</text>
+        </g>
+        <g transform="translate(610,60)">
+          <rect x="0" y="0" width="16" height="12" style="fill:var(--text-faint);opacity:.6"/><text x="24" y="10" class="t-dim">수화물(C-S-H 겔 등)</text>
+          <circle cx="8" cy="34" r="7" style="fill:var(--text-dim)"/><text x="24" y="38" class="t-dim">미수화 시멘트</text>
+          <circle cx="8" cy="60" r="7" style="fill:var(--blue)"/><text x="24" y="64" class="t-dim">모세관 공극</text>
+          <text x="0" y="100" class="t-mono">수화도 0.8일 때 모세관 공극률</text>
+          <text x="0" y="122" class="t-mono">0.35 → 약 9 %  ·  0.60 → 약 34 %</text>
+          <text x="0" y="144" class="t-mono">(시멘트 풀 부피 기준, 파워스 식)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-4.</b> 미시 구조에서 본 W/B. 물이 많은 풀(오른쪽)은 수화물이 다 채우지 못한 모세관 공극이 많고 서로 이어져 있다. 파워스 식 \(\phi_{cap} = (w/c - 0.36\alpha)/(w/c + 0.32)\)(\(\alpha\): 수화도)로 구하면 W/B 0.35와 0.60의 공극률은 네 배 가까이 차이 난다. 공극은 강도를 낮추고(하중을 받는 고체가 적다) 투수성을 키운다(이어진 통로). 아브람스 법칙의 미시적 이유다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 4.3 (M-30의 물–결합재비)</strong> 예제 4.1의 \(f_{cr} = 34.02\) MPa, 교육용 관계식, 지상 실내 골조라 내구성 상한이 강도보다 느슨하다고 가정.
+      <ol style="margin:6px 0 0">
+        <li><b>필요한 결합재–물비.</b> \(34.02 = -13.8 + 21.1\,(B/W)\)에서 \(B/W = 47.82/21.1 = 2.266\).</li>
+        <li><b>물–결합재비.</b> \(W/B = 1/2.266 = 0.441\).</li>
+        <li><b>비교.</b> W/B를 0.50으로 하면 \(f_{28} = -13.8 + 21.1/0.50 = 28.4\) MPa로 \(f_{ck}\)에도 못 미친다. W/B 0.06 차이가 강도 5.6 MPa 차이다.</li>
+        <li><b>내구성.</b> 지하 주차장처럼 제빙 화학제의 염화물에 노출되는 부재라면 노출 등급의 최대 W/B를 확인해 그 값이 0.441보다 작으면 그것을 쓴다(9장).</li>
+      </ol></div>
+    <div class="sim" id="sim-mx-abrams">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>시험 비빔 세 점으로 W/B 정하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-ab" aria-label="시험 비빔 강도 점과 회귀선, 필요한 물-결합재비"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>가로축</span><div class="seg" id="mx-ab-mode"><button data-value="bw" class="on">B/W (직선)</button><button data-value="wb">W/B (곡선)</button></div></div>
+          <label class="ctrl"><span><span>목표 배합강도 f<sub>cr</sub></span> <output id="mx-ab-fcr-out"></output></span><input type="range" id="mx-ab-fcr" min="20" max="60" step="0.1" value="34"></label>
+          <div class="btn-row"><button class="btn" id="mx-ab-reset">시험 결과 처음으로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">회귀식 f<sub>28</sub></span><span class="v" id="mx-ab-o-fit">—</span></div>
+        <div class="stat"><span class="k">결정계수 r²</span><span class="v" id="mx-ab-o-r2">—</span></div>
+        <div class="stat"><span class="k">시험 비빔으로 정한 W/B</span><span class="v" id="mx-ab-o-wb">—</span></div>
+        <div class="stat"><span class="k">교육용 식의 W/B</span><span class="v" id="mx-ab-o-wb0">—</span></div>
+      </div>
+      <div class="mx-msg" id="mx-ab-msg"></div>
+      <div class="sim-note">해볼 것: 세 점(W/B 0.40·0.45·0.50로 비빈 공시체의 28일 강도)을 위아래로 끌어 회귀선이 바뀌는 것을 보세요 · 가로축을 W/B로 바꾸면 같은 직선이 곡선(쌍곡선)으로 보입니다 · 목표 강도를 시험 범위(약 28–41 MPa) 밖으로 옮기면 외삽 경고가 뜹니다 · 모델: 세 점에 대한 최소제곱 직선 f = a + b(B/W), 점선은 이 책의 교육용 관계 f = −13.8 + 21.1(B/W)(<code>CB.conc.wbFor</code>). 강도는 표준 양생 28일 값.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="water-content">
+    <h2>단위수량과 잔골재율</h2>
+    <div class="problem"><strong>슬럼프 150 mm를 내려면 물이 얼마나 필요한가</strong>
+      <p>W/B는 비율일 뿐 물을 몇 kg 넣을지는 알려 주지 않습니다. 물 150 kg에 결합재 340 kg이어도, 물 200 kg에 결합재 454 kg이어도 W/B는 0.441입니다. 둘 다 강도는 같겠지만, 앞의 것은 너무 뻑뻑해 타설이 어렵고 뒤의 것은 시멘트를 114 kg이나 더 쓰며 수축도 큽니다. 필요한 흐름을 내는 가장 적은 물은 어떻게 정할까요?</p></div>
+    <p>콘크리트 1 m³에 넣는 물의 질량을 <span class="term">단위수량</span><span class="en">(unit water content)</span> \(W\)(kg/m³)라 합니다. 경험적으로 슬럼프는 W/B나 시멘트량보다 <b>단위수량</b>에 가장 크게 좌우되고, 골재가 같다면 결합재량을 조금 바꿔도 같은 슬럼프에 필요한 물은 거의 변하지 않습니다(일정 단위수량의 법칙). 그래서 단위수량은 W/B와 따로, 요구하는 슬럼프와 골재 조건으로 정합니다. 굵은 골재가 클수록 같은 부피를 채우는 골재의 표면적이 작아 물이 덜 들고, 둥근 강자갈은 각진 부순 돌보다 물이 덜 듭니다.</p>
+    <div class="callout def"><strong>정의 4.5 (잔골재율)</strong> 골재 전체 절대 용적 중 잔골재 절대 용적의 백분율을 <span class="term">잔골재율</span><span class="en">(fine aggregate ratio, sand percentage)</span> S/a라 한다.
+      <div class="formula">$$\frac{S}{a} = \frac{V_S}{V_S + V_G} \times 100\ (\%)$$<div class="where">\(V_S, V_G\): 1 m³ 속 잔골재·굵은 골재의 절대 용적(m³). 질량비가 아니라 <b>부피비</b>다. S/a가 너무 작으면 굵은 골재 사이를 모르타르가 다 채우지 못해 거칠고 분리되기 쉽고, 너무 크면 골재 표면적이 늘어 같은 슬럼프에 물과 시멘트가 더 든다. 워커빌리티를 만족하는 가장 작은 S/a가 경제적이다.</div></div></div>
+    <p>표준시방서는 표준 조건(물–결합재비 0.55, 슬럼프 약 80 mm, 잔골재 조립률 2.8, 공기연행 콘크리트 등)에서 굵은 골재 최대 치수별 단위수량과 잔골재율을 표로 주고, 조건이 다르면 보정하게 합니다. 이 책의 엔진(<code>CB.conc.MIX_TABLE</code>)은 그 방식을 따르되 숫자를 단순화한 <b>교육용 표</b>를 씁니다. 실제 표와 보정값은 KCS 14 20 해설과 공장의 실적 자료를 확인해야 합니다.</p>
+    <div class="table-wrap"><table class="mx-tbl">
+      <thead><tr><th>굵은 골재 최대 치수 (mm)</th><th>13</th><th>20</th><th class="hl">25</th><th>40</th></tr></thead>
+      <tbody>
+        <tr><td>단위수량 W₀ (kg/m³)</td><td>180</td><td>175</td><td class="hl">170</td><td>160</td></tr>
+        <tr><td>잔골재율 S/a₀ (%)</td><td>49</td><td>47</td><td class="hl">45</td><td>41</td></tr>
+      </tbody></table></div>
+    <p style="font-size:14px;color:var(--text-dim)">표 4-1. 표준 조건의 단위수량·잔골재율(이 책의 교육용 값, 공기량 4.5 %, W/B 0.55, 슬럼프 80 mm, 조립률 2.8, 부순 굵은 골재).</p>
+    <div class="table-wrap"><table class="mx-tbl">
+      <thead><tr><th>조건이 표준과 다를 때</th><th>단위수량 W 보정</th><th>잔골재율 S/a 보정</th></tr></thead>
+      <tbody>
+        <tr><td>슬럼프 10 mm 클 때마다</td><td>+1.2 %</td><td>보정 없음</td></tr>
+        <tr><td>공기량 1 %p 클 때마다</td><td>−3 %</td><td>−0.75 %p (기준 표는 0.5–1 범위)</td></tr>
+        <tr><td>W/B 0.05 클 때마다</td><td>보정 없음</td><td>+1 %p</td></tr>
+        <tr><td>잔골재 조립률 0.1 클 때마다</td><td>보정 없음</td><td>+0.5 %p</td></tr>
+        <tr><td>감수제·AE 감수제 사용</td><td>감수율만큼 감소(이 책 기본 5 %)</td><td>—</td></tr>
+        <tr><td>부순 모래, 둥근 강자갈 등</td><td colspan="2">실적 자료로 따로 보정(이 책의 엔진은 다루지 않음)</td></tr>
+      </tbody></table></div>
+    <p style="font-size:14px;color:var(--text-dim)">표 4-2. 보정 규칙(KCS 14 20 해설의 보정 방식을 따른 교육용 값, 현행 기준 확인). 보정은 표준값에 곱하거나 더해 차례로 적용한다.</p>
+    <div class="callout"><strong>예제 4.4 (M-30의 단위수량과 잔골재율)</strong> 굵은 골재 최대 치수 25 mm, 슬럼프 150 mm, 공기량 4.5 %, W/B 0.441, 조립률 2.8, AE 감수제(감수율 5 %).
+      <ol style="margin:6px 0 0">
+        <li><b>표 값.</b> \(W_0 = 170\) kg/m³, \(S/a_0 = 45\,\%\).</li>
+        <li><b>슬럼프 보정.</b> \(150 - 80 = 70\) mm 크므로 \(+7 \times 1.2 = +8.4\,\%\): \(170 \times 1.084 = 184.3\) kg.</li>
+        <li><b>공기량.</b> 표준과 같은 4.5 %라 보정 없음.</li>
+        <li><b>감수제.</b> \(184.3 \times (1 - 0.05) = 175.1 \approx 175\) kg/m³.</li>
+        <li><b>잔골재율.</b> W/B가 0.55보다 0.109 작으므로 \(45 + (0.441 - 0.55)/0.05 \times 1 = 45 - 2.18 = 42.8\,\%\). 조립률은 표준과 같다.</li>
+      </ol>
+      W/B가 작을수록 풀이 진해 굵은 골재를 더 많이 감쌀 수 있으므로 S/a를 줄인다. 반대로 물이 많은 묽은 풀은 굵은 골재를 붙잡지 못해 분리되기 쉬우므로 모래를 늘려 막는다.</div>
+    <p>단위수량은 상한도 있습니다. 표준시방서는 일반 콘크리트의 단위수량을 185 kg/m³ 이하로 두고 그 안에서 가능한 한 적게 쓰도록 합니다(현행 기준 확인). 슬럼프를 크게 하려고 물을 늘리는 대신 감수제나 고성능 감수제(3장)로 흐름을 얻는 이유입니다. 단위수량 175 kg은 상한 안에 있지만, 슬럼프 210 mm를 AE 감수제(감수 5 %)와 물만으로 얻으려 하면 \(170 \times 1.156 \times 0.95 \approx 187\) kg으로 상한을 넘습니다.</p>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="absolute-volume">
+    <h2>절대용적법: 1 m³를 채우는 산수</h2>
+    <div class="problem"><strong>모래와 자갈은 몇 kg일까</strong>
+      <p>물 175 kg, 시멘트 397 kg, 공기 4.5 %를 정했습니다. 이제 남은 공간을 모래와 자갈로 채우면 1 m³가 됩니다. 그런데 모래 1 kg과 자갈 1 kg은 차지하는 부피가 다르고, 골재 더미에는 알갱이 사이 빈틈이 있습니다. 질량을 부피로 어떻게 바꿔야 정확히 1 m³가 될까요?</p></div>
+    <p>콘크리트 속에서 각 재료는 자기 알갱이의 실제 부피, 곧 <b>절대 용적</b>만큼 공간을 차지합니다. 모래 더미의 빈틈은 시멘트 풀이 채우므로 더미의 겉보기 부피로 계산하면 안 됩니다. 각 재료의 질량을 밀도로 나눈 절대 용적을 모두 더하면 1 m³가 되어야 한다는 것이 <span class="term">절대용적법</span><span class="en">(absolute volume method)</span>입니다.</p>
+    <div class="callout def"><strong>원리 4.6 (절대용적법)</strong> 질량(kg)을 밀도(g/cm³)의 1,000배로 나누면 절대 용적(m³)이다. 1 m³ 콘크리트에서
+      <div class="formula">$$\frac{W}{1000} + \frac{C}{1000\,\rho_C} + \frac{F}{1000\,\rho_F} + \frac{A}{100} + V_a = 1, \qquad V_S = V_a\,\frac{S/a}{100},\quad V_G = V_a - V_S$$<div class="where">\(\rho_C, \rho_F\): 시멘트·혼화재 밀도(3.15, 플라이애시 2.2, 고로슬래그 미분말 2.9 g/cm³), \(A\): 공기량(%), \(V_a\): 골재의 절대 용적. 질량은 \(S = 1000\,\rho_S V_S\), \(G = 1000\,\rho_G V_G\)이고 \(\rho_S, \rho_G\)는 표면건조 포화 상태의 밀도(M-30: 2.60, 2.65 g/cm³)다.</div></div></div>
+    <figure class="diagram" id="fig-mx-volume">
+      <svg viewBox="0 0 860 230" role="img" aria-label="M-30 1 세제곱미터를 재료별 절대 용적으로 나눈 띠">
+        <rect x="10" y="10" width="840" height="210" rx="10" class="f-surface"/>
+        <rect x="40" y="80" width="136.5" height="56" style="fill:var(--blue)"/>
+        <rect x="176.5" y="80" width="98.3" height="56" style="fill:var(--text-dim)"/>
+        <rect x="274.8" y="80" width="35.1" height="56" style="fill:var(--text-faint)"/>
+        <rect x="309.9" y="80" width="218.4" height="56" style="fill:var(--warn)"/>
+        <rect x="528.3" y="80" width="291.7" height="56" style="fill:var(--accent)"/>
+        <rect x="40" y="80" width="780" height="56" style="fill:none;stroke:var(--text);stroke-width:1.4"/>
+        <g text-anchor="middle" style="paint-order:stroke;stroke:var(--surface);stroke-width:3px"><text x="108" y="112" class="t-mono" style="fill:var(--text)">물 0.175</text><text x="226" y="112" class="t-mono" style="fill:var(--text)">시멘트 0.126</text><text x="419" y="112" class="t-mono" style="fill:var(--text)">잔골재 0.280</text><text x="674" y="112" class="t-mono" style="fill:var(--text)">굵은 골재 0.374</text></g>
+        <text x="292" y="152" text-anchor="middle" class="t-mono">공기 0.045</text>
+        <g text-anchor="middle"><text x="108" y="176" class="t-mono">175 kg</text><text x="226" y="176" class="t-mono">397 kg</text><text x="419" y="176" class="t-mono">728 kg</text><text x="674" y="176" class="t-mono">991 kg</text></g>
+        <path d="M40 70V60H309.9V70" style="fill:none;stroke:var(--text-dim);stroke-width:1.4"/><text x="175" y="50" text-anchor="middle" class="t-dim">페이스트 0.346 m³ (물 + 시멘트 + 공기)</text>
+        <path d="M309.9 70V60H820V70" style="fill:none;stroke:var(--text-dim);stroke-width:1.4"/><text x="565" y="50" text-anchor="middle" class="t-dim">골재 0.654 m³ (= 1 − 0.346), S/a 42.8 %</text>
+        <text x="430" y="204" text-anchor="middle" class="t-mono">합계 2,291 kg/m³ (AE 감수제 3.2 kg 별도) · 막대 길이 = 절대 용적(m³)</text>
+      </svg>
+      <figcaption><b>그림 4-5.</b> 기준 배합 M-30의 1 m³. 띠의 길이가 절대 용적이다. 질량으로는 굵은 골재가 가장 많지만, 시멘트는 밀도가 커서 397 kg이 0.126 m³밖에 차지하지 않는다. 배합 막대는 이 책 전체에서 물 → 시멘트 → 혼화재 → 공기 → 잔골재 → 굵은 골재 순서와 이 색으로 그린다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 4.5 (M-30을 1 m³로 채우기)</strong> 예제 4.3·4.4의 W/B 0.441, \(W = 175.1\) kg, 공기량 4.5 %, S/a 42.8 %.
+      <ol style="margin:6px 0 0">
+        <li><b>결합재량.</b> \(B = W/(W/B) = 175.1/0.4412 = 396.8 \approx 397\) kg/m³(혼화재 없음, \(C = B\)).</li>
+        <li><b>물·시멘트·공기의 부피.</b> \(V_W = 175.1/1000 = 0.175\), \(V_C = 396.8/3150 = 0.126\), \(V_A = 0.045\) m³. 합 0.346 m³.</li>
+        <li><b>골재 부피.</b> \(V_a = 1 - 0.346 = 0.654\) m³.</li>
+        <li><b>나누기.</b> \(V_S = 0.654 \times 0.428 = 0.280\) m³, \(V_G = 0.654 - 0.280 = 0.374\) m³.</li>
+        <li><b>질량.</b> \(S = 0.280 \times 2600 = 728\) kg, \(G = 0.374 \times 2650 = 991\) kg.</li>
+        <li><b>혼화제와 확인.</b> AE 감수제 결합재의 0.8 % = 3.2 kg. 단위 용적 질량 \(175 + 397 + 728 + 991 = 2{,}291\) kg/m³. 보통 콘크리트의 2,250–2,400 kg/m³ 범위에 든다.</li>
+      </ol>
+      결과: <b>W 175 · C 397 · S 728 · G 991 kg/m³, W/B 0.441, S/a 42.8 %</b>. 이 값이 기준 배합 M-30이며, 아래 두 시뮬레이터와 이 책의 다른 장은 같은 엔진(<code>CB.conc.mix</code>)으로 같은 숫자를 낸다.</div>
+    <div class="sim" id="sim-mx-volume">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>절대용적 블록 쌓기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-vb" aria-label="1 세제곱미터 통에 재료를 차례로 채우는 그림"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>물–결합재비 W/B <output id="mx-vb-wb-out"></output></span><input type="range" id="mx-vb-wb" min="0.35" max="0.65" step="0.001" value="0.441"></label>
+          <label class="ctrl"><span>단위수량 W <output id="mx-vb-w-out"></output></span><input type="range" id="mx-vb-w" min="150" max="195" step="1" value="175"></label>
+          <label class="ctrl"><span>공기량 <output id="mx-vb-air-out"></output></span><input type="range" id="mx-vb-air" min="2" max="7" step="0.5" value="4.5"></label>
+          <label class="ctrl"><span>잔골재율 S/a <output id="mx-vb-sa-out"></output></span><input type="range" id="mx-vb-sa" min="36" max="50" step="0.1" value="42.8"></label>
+          <div class="btn-row"><button class="btn primary" id="mx-vb-next">다음 재료 넣기</button><button class="btn" id="mx-vb-all">한 번에</button><button class="btn" id="mx-vb-reset">비우기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">다음 재료</span><span class="v" id="mx-vb-o-next">—</span></div>
+        <div class="stat"><span class="k">채운 부피</span><span class="v" id="mx-vb-o-used">—</span></div>
+        <div class="stat"><span class="k">남은 부피</span><span class="v" id="mx-vb-o-left">—</span></div>
+        <div class="stat"><span class="k">누적 질량</span><span class="v" id="mx-vb-o-mass">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: '다음 재료 넣기'를 눌러 물 → 시멘트 → 공기를 넣은 뒤 남은 부피가 골재 몫임을 확인하세요 · W/B를 낮추면 시멘트 블록이 커져 골재 자리가 줄어듭니다 · S/a는 남은 부피를 모래와 자갈로 나누는 비율일 뿐 전체 골재 부피를 바꾸지 않습니다 · 모델: 원리 4.6, <code>CB.conc.mix({ wb, W, air, sa, Gmax: 25 })</code>. 밀도는 시멘트 3.15, 잔골재 2.60, 굵은 골재 2.65 g/cm³.</div>
+    </div>
+    <p>이제 지금까지의 단계를 하나로 묶습니다. 아래 마법사는 요구 성능을 넣으면 정의 4.2 → 원리 4.4 → 표 4-1·4-2 → 원리 4.6을 차례로 거쳐 1 m³ 배합을 내고, 각 단계의 계산을 그대로 보여 줍니다. 기본값이 M-30입니다.</p>
+    <div class="sim" id="sim-mx-wizard">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>배합 설계 마법사</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-wz" aria-label="설계된 배합의 부피 막대와 질량 막대"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span><span>설계기준압축강도 f<sub>ck</sub> (MPa)</span></span><div class="seg" id="mx-wz-fck"><button data-value="24">24</button><button data-value="27">27</button><button data-value="30" class="on">30</button><button data-value="35">35</button><button data-value="40">40</button></div></div>
+          <label class="ctrl"><span>표준편차 s <output id="mx-wz-s-out"></output></span><input type="range" id="mx-wz-s" min="2" max="6" step="0.1" value="3"></label>
+          <label class="ctrl"><span>슬럼프 <output id="mx-wz-slump-out"></output></span><input type="range" id="mx-wz-slump" min="80" max="210" step="10" value="150"></label>
+          <div class="ctrl"><span>굵은 골재 최대 치수 (mm)</span><div class="seg" id="mx-wz-gmax"><button data-value="13">13</button><button data-value="20">20</button><button data-value="25" class="on">25</button><button data-value="40">40</button></div></div>
+          <label class="ctrl"><span>공기량 <output id="mx-wz-air-out"></output></span><input type="range" id="mx-wz-air" min="2" max="7" step="0.5" value="4.5"></label>
+          <div class="ctrl"><span>내구성 W/B 상한(교육용 선택지)</span><div class="seg" id="mx-wz-cap"><button data-value="none" class="on">없음</button><button data-value="0.5">0.50</button><button data-value="0.45">0.45</button><button data-value="0.4">0.40</button></div></div>
+          <div class="ctrl"><span>혼화재</span><div class="seg" id="mx-wz-scm"><button data-value="none" class="on">없음</button><button data-value="FA">플라이애시</button><button data-value="GGBS">고로슬래그</button></div></div>
+          <label class="ctrl"><span>혼화재 치환율 <output id="mx-wz-ratio-out"></output></span><input type="range" id="mx-wz-ratio" min="0" max="0.6" step="0.05" value="0.2"></label>
+          <label class="ctrl"><span>감수제 감수율 <output id="mx-wz-red-out"></output></span><input type="range" id="mx-wz-red" min="0" max="15" step="1" value="5"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">f<sub>cr</sub></span><span class="v" id="mx-wz-o-fcr">—</span></div>
+        <div class="stat"><span class="k">W/B</span><span class="v" id="mx-wz-o-wb">—</span></div>
+        <div class="stat"><span class="k">W · B</span><span class="v" id="mx-wz-o-wbm">—</span></div>
+        <div class="stat"><span class="k">S · G</span><span class="v" id="mx-wz-o-sg">—</span></div>
+        <div class="stat"><span class="k">S/a · 단위 용적 질량</span><span class="v" id="mx-wz-o-sa">—</span></div>
+      </div>
+      <ol class="mx-steps" id="mx-wz-steps"></ol>
+      <div class="sim-note">해볼 것: 기본값에서 W 175 · C 397 · S 728 · G 991 kg(M-30)을 확인하세요 · 내구성 상한 0.40을 고르면 강도가 아니라 내구성이 W/B를 정하고 시멘트가 늘어납니다 · 굵은 골재를 40 mm로 키우면 물과 시멘트가 함께 줍니다 · 플라이애시 20 %는 M-30F입니다(같은 W/B라 28일 강도는 낮아질 수 있어 시험 비빔으로 확인) · 감수율을 0으로 하고 슬럼프를 올리면 단위수량 상한 185 kg을 넘습니다 · 모델: <code>CB.conc.mix</code>(정의 4.2, 교육용 강도–결합재수비 직선, 표 4-1·4-2, 원리 4.6). 이 계산은 학습용이며 실제 배합·품질 관리용이 아닙니다.</div>
+    </div>
+    <div class="callout site"><strong>M-30 배합표와 B-10 기준층 물량</strong> 기준 배합 M-30(레디믹스트 콘크리트 25-30-150)의 시방 배합은 물 175, 시멘트 397, 잔골재 728, 굵은 골재 991, AE 감수제 3.2 kg/m³(W/B 0.441, S/a 42.8 %, 공기 4.5 %, 단위 용적 질량 약 2,291 kg/m³)다. B-10 기준층 한 층의 콘크리트 약 290 m³(교육용)에는 시멘트 약 115 t, 물 약 51 t, 잔골재 약 211 t, 굵은 골재 약 287 t이 들어간다. 6 m³ 트럭 약 49대 분량이며, 시멘트 1 t의 CO₂를 0.85 t(교육용)으로 잡으면 한 층의 시멘트에서만 약 98 t이 나온다. 기초 매트는 같은 W/B에서 결합재의 20 %를 플라이애시로 바꾼 M-30F(시멘트 317 + 플라이애시 79, 잔골재 716, 굵은 골재 974 kg/m³)로 수화열을 낮춘다(6장).</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="field-mix">
+    <h2>현장 배합: 젖은 모래를 계량하는 법</h2>
+    <div class="problem"><strong>비 온 다음 날 아침의 모래</strong>
+      <p>배합표는 골재가 표면건조 포화 상태라고 가정했습니다. 그런데 비를 맞은 야적장의 모래는 표면이 축축하게 젖어 있습니다. 모래 728 kg을 그대로 계량하면 그 속에는 모래가 728 kg보다 적게, 물은 표면에 붙은 만큼 더 들어갑니다. 물을 얼마나 덜 넣고, 모래를 얼마나 더 넣어야 할까요?</p></div>
+    <p>3장에서 본 것처럼 골재는 네 가지 함수 상태(절건·기건·표건·습윤)를 오갑니다. 시방 배합의 기준인 <b>표면건조 포화 상태</b>(SSD)는 골재 속 공극은 물로 차 있고 겉은 말라 있는 상태로, 이때 골재는 배합수를 빨아들이지도 내주지도 않습니다. 골재가 그보다 젖어 있으면 겉에 붙은 <b>표면수</b>가 배합수에 더해지고, 말라 있으면 골재가 배합수를 빨아들입니다. 현장 배합은 이 차이를 계량값에서 미리 빼거나 더하는 일입니다.</p>
+    <div class="callout def"><strong>원리 4.7 (표면수 보정)</strong> 골재의 함수율 \(m\)(%)과 흡수율 \(a\)(%)를 알면 표면수율은 \(s \approx (m - a)/100\)이다. 시방 배합의 SSD 질량 \(S, G\)를 현장 계량값으로 바꾸면
+      <div class="formula">$$S_f = S\,(1 + s_S), \qquad G_f = G\,(1 + s_G), \qquad W_f = W - S\,s_S - G\,s_G$$<div class="where">\(s \lt 0\)(골재가 SSD보다 마름)이면 골재가 빨아들일 물만큼 \(W_f\)가 늘고 골재 계량값은 준다. 정밀하게는 SSD 질량 기준 표면수율이 \((m - a)/(100 + a)\)이지만(3장의 <code>CB.agg.moisture</code>), 차이가 작아 이 책의 엔진(<code>CB.conc.fieldMix</code>)은 근사식을 쓴다. 5 mm 체에 남는 잔골재나 통과하는 굵은 골재가 섞여 있으면 입도 보정도 하지만 여기서는 생략한다.</div></div></div>
+    <figure class="diagram" id="fig-mx-field">
+      <svg viewBox="0 0 860 270" role="img" aria-label="표면건조 포화 상태와 습윤 상태 모래의 물 수지, 현장 배합 계산">
+        <rect x="10" y="10" width="840" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(90,120)">
+          <circle r="52" style="fill:var(--warn);opacity:.85"/>
+          <g style="fill:var(--blue)"><circle cx="-18" cy="-12" r="5"/><circle cx="14" cy="-20" r="4"/><circle cx="20" cy="14" r="5"/><circle cx="-14" cy="20" r="4"/><circle cx="0" cy="0" r="4"/></g>
+          <text y="80" text-anchor="middle" class="t" style="font-weight:700">표면건조 포화(SSD)</text>
+          <text y="100" text-anchor="middle" class="t-mono">속은 가득, 겉은 마름</text>
+        </g>
+        <g transform="translate(290,120)">
+          <circle r="60" style="fill:var(--blue);opacity:.3"/>
+          <circle r="52" style="fill:var(--warn);opacity:.85"/>
+          <g style="fill:var(--blue)"><circle cx="-18" cy="-12" r="5"/><circle cx="14" cy="-20" r="4"/><circle cx="20" cy="14" r="5"/><circle cx="-14" cy="20" r="4"/><circle cx="0" cy="0" r="4"/></g>
+          <text y="80" text-anchor="middle" class="t" style="font-weight:700">습윤(현장 모래)</text>
+          <text y="100" text-anchor="middle" class="t-mono">겉에 표면수 막</text>
+          <line x1="60" y1="-40" x2="92" y2="-62" style="stroke:var(--blue);stroke-width:1.4"/><text x="96" y="-64" class="t-mono" style="fill:var(--blue)">표면수 3.5 %</text>
+        </g>
+        <g transform="translate(470,48)">
+          <text x="0" y="0" class="t" style="font-weight:700">M-30, 잔골재 함수율 5.0 %·흡수율 1.5 %</text>
+          <text x="0" y="26" class="t-mono">잔골재 표면수 = 728 × (5.0 − 1.5)/100 = 25.5 kg</text>
+          <text x="0" y="48" class="t-mono">굵은 골재 표면수 = 991 × (1.0 − 0.8)/100 = 2.0 kg</text>
+          <text x="0" y="80" class="t" style="font-weight:700">계량값 (kg/m³)</text>
+          <text x="0" y="104" class="t-mono">물        175 − 25.5 − 2.0 = 148</text>
+          <text x="0" y="126" class="t-mono">잔골재     728 + 25.5      = 754</text>
+          <text x="0" y="148" class="t-mono">굵은 골재  991 + 2.0       = 993</text>
+          <text x="0" y="180" class="t-dim">물–결합재비는 그대로 175/397 = 0.441</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-6.</b> 현장 배합 보정. 젖은 모래를 계량하면 표면수가 함께 들어오므로 그만큼 모래 계량값을 늘리고 물 계량값을 줄인다. 콘크리트 속 실제 물(계량수 + 표면수)은 시방 배합의 175 kg 그대로이므로 W/B와 강도는 바뀌지 않는다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 4.6 (M-30의 현장 배합)</strong> 오늘 아침 잰 잔골재 함수율 5.0 %(흡수율 1.5 %), 굵은 골재 함수율 1.0 %(흡수율 0.8 %).
+      <ol style="margin:6px 0 0">
+        <li><b>표면수율.</b> 잔골재 \(s_S = 5.0 - 1.5 = 3.5\,\%\), 굵은 골재 \(s_G = 1.0 - 0.8 = 0.2\,\%\).</li>
+        <li><b>골재 계량값.</b> \(S_f = 728 \times 1.035 = 753.6 \approx 754\) kg, \(G_f = 991 \times 1.002 = 992.9 \approx 993\) kg.</li>
+        <li><b>물 계량값.</b> \(W_f = 175.1 - 728.2 \times 0.035 - 990.9 \times 0.002 = 175.1 - 25.5 - 2.0 = 147.6 \approx 148\) kg.</li>
+        <li><b>트럭 한 대(6 m³).</b> 물 886, 시멘트 2,381, 잔골재 4,522, 굵은 골재 5,957 kg.</li>
+      </ol>
+      보정을 잊으면 물이 25.5 + 2.0 = 27.5 kg 더 들어가 W/B가 \(202.6/396.8 = 0.511\)이 되고, 교육용 식으로 강도가 약 27.5 MPa로 떨어진다(\(f_{ck}\) 미달). 표면수 보정은 매일, 비가 온 날은 더 자주 한다.</div>
+    <div class="sim" id="sim-mx-field">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>현장 배합 보정기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-fm" aria-label="시방 배합과 현장 배합의 계량값 비교, 물 수지"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>잔골재 함수율 <output id="mx-fm-sm-out"></output></span><input type="range" id="mx-fm-sm" min="0" max="10" step="0.1" value="5"></label>
+          <label class="ctrl"><span>잔골재 흡수율 <output id="mx-fm-sa-out"></output></span><input type="range" id="mx-fm-sa" min="0.5" max="3.5" step="0.1" value="1.5"></label>
+          <label class="ctrl"><span>굵은 골재 함수율 <output id="mx-fm-gm-out"></output></span><input type="range" id="mx-fm-gm" min="0" max="3" step="0.1" value="1"></label>
+          <label class="ctrl"><span>굵은 골재 흡수율 <output id="mx-fm-ga-out"></output></span><input type="range" id="mx-fm-ga" min="0.3" max="2" step="0.1" value="0.8"></label>
+          <div class="ctrl"><span>계량 단위</span><div class="seg" id="mx-fm-vol"><button data-value="1" class="on">1 m³</button><button data-value="6">트럭 6 m³</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">표면수율 잔 / 굵은</span><span class="v" id="mx-fm-o-surf">—</span></div>
+        <div class="stat"><span class="k">계량할 물</span><span class="v" id="mx-fm-o-w">—</span></div>
+        <div class="stat"><span class="k">계량할 잔골재</span><span class="v" id="mx-fm-o-s">—</span></div>
+        <div class="stat"><span class="k">계량할 굵은 골재</span><span class="v" id="mx-fm-o-g">—</span></div>
+      </div>
+      <div class="mx-msg" id="mx-fm-msg"></div>
+      <div class="sim-note">해볼 것: 기본값에서 물 148 · 잔골재 754 · 굵은 골재 993 kg(예제 4.6)을 확인하세요 · 잔골재 함수율을 흡수율보다 낮추면(마른 모래) 표면수가 음수가 되어 오히려 물을 더 넣어야 합니다 · 위 막대는 콘크리트 속 물의 출처(계량수 + 표면수 = 시방 배합 175 kg)입니다 · 모델: <code>CB.conc.fieldMix</code>(원리 4.7, 표면수율 ≈ 함수율 − 흡수율), 시방 배합은 M-30.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="trial-batch">
+    <h2>시험 비빔과 배합 조정</h2>
+    <div class="problem"><strong>계산대로 나오지 않을 때</strong>
+      <p>계산한 배합으로 실험실에서 비볐더니 슬럼프가 120 mm, 공기량이 3.5 %가 나왔습니다. 목표는 150 mm와 4.5 %입니다. 물을 더 넣으면 슬럼프는 맞겠지만 강도가 떨어집니다. 무엇을 얼마나 고쳐야 할까요?</p></div>
+    <p>책상의 계산은 표와 대표 관계식에 기댄 추정이므로 반드시 실제 재료로 비벼 확인합니다. 이것이 <span class="term">시험 비빔</span><span class="en">(trial batch)</span>입니다. 시험 비빔에서는 슬럼프(KS F 2402), 공기량, 단위 용적 질량, 온도를 재고 강도 공시체(KS F 2405)를 만들며, 결과에 따라 아래 규칙으로 배합을 고칩니다.</p>
+    <div class="table-wrap"><table class="mx-tbl">
+      <thead><tr><th>시험 비빔 결과</th><th>고치는 방법(교육용 요약)</th></tr></thead>
+      <tbody>
+        <tr><td>슬럼프가 목표와 다름</td><td>10 mm 차이마다 단위수량 약 1.2 % 조정하고 <b>W/B를 지키도록 결합재도 같은 비율로</b> 조정(또는 감수제 사용량 조정)</td></tr>
+        <tr><td>공기량이 목표와 다름</td><td>AE제 사용량 조정. 공기 1 %p마다 단위수량 약 3 %, S/a 약 0.5–1 %p를 반대로 보정</td></tr>
+        <tr><td>거칠고 분리됨 / 끈적임</td><td>S/a를 키움 / 줄임(같은 슬럼프가 되도록 W도 다시 확인)</td></tr>
+        <tr><td>단위 용적 질량이 계산과 다름</td><td>실제로 나온 부피(수율)가 1 m³와 다르다는 뜻. 측정값으로 1 m³ 기준 질량을 다시 계산</td></tr>
+        <tr><td>강도가 부족 / 넘침</td><td>W/B를 세 가지 이상으로 바꾼 시험 비빔의 강도–B/W 직선으로 W/B를 다시 정함(그림 4-3과 아래 "시험 비빔 세 점" 시뮬레이터)</td></tr>
+      </tbody></table></div>
+    <p>가장 중요한 원칙은 <b>슬럼프를 물만으로 고치지 않는다</b>는 것입니다. 물을 늘리면 W/B가 커져 강도가 떨어지므로 물을 늘린 만큼 결합재도 늘려야 합니다. 현장에서 레미콘 트럭에 몰래 물을 붓는 <span class="term">가수</span><span class="en">(retempering with water)</span>가 금지되는 이유를 아래 시뮬레이터로 확인해 봅시다.</p>
+    <div class="sim" id="sim-mx-water">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>물 10 kg을 더 넣으면</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-wt" aria-label="추가한 물에 따른 28일 강도 변화"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>1 m³에 더 넣은 물 ΔW <output id="mx-wt-dw-out"></output></span><input type="range" id="mx-wt-dw" min="0" max="40" step="1" value="10"></label>
+          <div class="ctrl"><span>어떻게 더하나</span><div class="seg" id="mx-wt-mode"><button data-value="water" class="on">물만(가수)</button><button data-value="keep">결합재도 함께(W/B 유지)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">W/B</span><span class="v" id="mx-wt-o-wb">—</span></div>
+        <div class="stat"><span class="k">28일 강도(교육용 식)</span><span class="v" id="mx-wt-o-f">—</span></div>
+        <div class="stat"><span class="k">슬럼프(추정)</span><span class="v" id="mx-wt-o-sl">—</span></div>
+        <div class="stat"><span class="k">모세관 공극률</span><span class="v" id="mx-wt-o-por">—</span></div>
+        <div class="stat"><span class="k">건조 수축(추정)</span><span class="v" id="mx-wt-o-sh">—</span></div>
+        <div class="stat"><span class="k">추가 시멘트·CO₂</span><span class="v" id="mx-wt-o-c">—</span></div>
+      </div>
+      <div class="mx-msg" id="mx-wt-msg"></div>
+      <div class="sim-note">해볼 것: 물만 10 kg 더하면 슬럼프는 약 50 mm 커지지만 강도는 f<sub>cr</sub> 34.0에서 약 31 MPa로 떨어져 여유가 거의 사라집니다 · 'W/B 유지'로 바꾸면 강도는 지켜지지만 시멘트와 CO₂, 수축이 늘어납니다 — 흐름은 고성능 감수제로 얻는 것이 낫습니다 · 모델(교육용): 강도 <code>CB.conc.strengthFor(W/B)</code>, 슬럼프는 표 4-2의 단위수량 보정(10 mm당 1.2 %)을 거꾸로 쓴 값, 모세관 공극률은 파워스 식(수화도 0.8, 시멘트 풀 부피 기준), 건조 수축은 M-30의 500 × 10⁻⁶에 (W/175)<sup>1.5</sup>를 곱한 근사, 시멘트 CO₂ 0.85 kg/kg. 물을 더해 늘어나는 부피(약 1 %)는 무시.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="ready-mixed">
+    <h2>레디믹스트 콘크리트의 호칭과 주문</h2>
+    <p>오늘날 건축 현장의 콘크리트는 대부분 공장에서 비벼 트럭 믹서로 실어 오는 <span class="term">레디믹스트 콘크리트</span><span class="en">(ready-mixed concrete)</span>, 흔히 레미콘입니다. 레디믹스트 콘크리트(KS F 4009)는 주문할 때 콘크리트의 종류, 굵은 골재 최대 치수, <span class="term">호칭 강도</span>, 슬럼프(또는 슬럼프 플로)를 이 순서로 적게 합니다. "보통 콘크리트 25-30-150"은 보통 콘크리트, 굵은 골재 최대 치수 25 mm, 호칭 강도 30 MPa, 슬럼프 150 mm라는 뜻입니다. 공장은 이 호칭에 맞춰 자기 표준편차로 배합강도를 정하고, 앞에서 한 계산을 자기 재료로 이미 해 둔 표준 배합표를 씁니다.</p>
+    <figure class="diagram" id="fig-mx-rmc">
+      <svg viewBox="0 0 860 220" role="img" aria-label="레디믹스트 콘크리트 호칭 25-30-150의 뜻">
+        <rect x="10" y="10" width="840" height="200" rx="10" class="f-surface"/>
+        <rect x="70" y="40" width="200" height="56" rx="8" class="f-elev"/><text x="170" y="75" text-anchor="middle" class="t" style="font-weight:700;font-size:18px">보통 콘크리트</text>
+        <rect x="300" y="40" width="120" height="56" rx="8" class="f-acc-soft"/><text x="360" y="77" text-anchor="middle" class="t" style="font-weight:700;font-size:24px">25</text>
+        <rect x="450" y="40" width="120" height="56" rx="8" class="f-acc-soft"/><text x="510" y="77" text-anchor="middle" class="t" style="font-weight:700;font-size:24px">30</text>
+        <rect x="600" y="40" width="160" height="56" rx="8" class="f-acc-soft"/><text x="680" y="77" text-anchor="middle" class="t" style="font-weight:700;font-size:24px">150</text>
+        <g style="stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#mx-ah)"><line x1="170" y1="100" x2="170" y2="130"/><line x1="360" y1="100" x2="360" y2="130"/><line x1="510" y1="100" x2="510" y2="130"/><line x1="680" y1="100" x2="680" y2="130"/></g>
+        <text x="170" y="150" text-anchor="middle" class="t">콘크리트의 종류</text><text x="170" y="172" text-anchor="middle" class="t-mono">보통·경량·포장·고강도</text>
+        <text x="360" y="150" text-anchor="middle" class="t">굵은 골재 최대 치수</text><text x="360" y="172" text-anchor="middle" class="t-mono">mm</text>
+        <text x="510" y="150" text-anchor="middle" class="t">호칭 강도</text><text x="510" y="172" text-anchor="middle" class="t-mono">MPa (28일)</text>
+        <text x="680" y="150" text-anchor="middle" class="t">슬럼프</text><text x="680" y="172" text-anchor="middle" class="t-mono">mm (허용차 ±25)</text>
+      </svg>
+      <figcaption><b>그림 4-7.</b> 레디믹스트 콘크리트의 호칭. B-10의 골조 콘크리트는 25-30-150이다. 주문서에는 이 밖에 시멘트 종류, 혼화재, 공기량, 염화물 함량 상한, 타설 일시·장소·수량을 함께 적고, 받아들일 때 슬럼프·공기량·온도·염화물을 검사하며 강도 공시체를 만든다(7장).</figcaption>
+    </figure>
+    <p><b>호칭 강도와 설계기준강도.</b> 호칭 강도는 레디믹스트 콘크리트를 주문할 때 쓰는 강도로, 구조 설계의 \(f_{ck}\)에 기온·보정 등을 반영해 정합니다. 일반 조건에서는 \(f_{ck}\)와 같게 두는 경우가 많지만, 강도 판정 방식과 관계는 현행 표준시방서와 KS F 4009를 확인해야 합니다. 받아들일 때 슬럼프의 허용차는 호칭 슬럼프 80 mm 이상에서 ±25 mm, 공기량은 ±1.5 %p가 일반적입니다(KS F 4009 형태, 현행 기준 확인).</p>
+    <div class="callout site"><strong>B-10 레미콘 주문서</strong> 지상 골조: 보통 콘크리트 25-30-150, 보통 포틀랜드 시멘트, AE 감수제, 공기량 4.5 ± 1.5 %, 염화물 이온량 0.30 kg/m³ 이하(현행 기준 확인). 기준층 한 층 290 m³를 하루에 친다면 6 m³ 트럭 49대가 필요하고, 펌프 한 대가 시간당 약 40–60 m³(교육용)를 보낸다면 타설에만 5–7시간이 걸린다. 운반 시간이 길어지면 슬럼프가 떨어지므로(5장) 공장 위치와 출하 간격을 미리 맞춘다. 기초 매트(약 1,920 m³)는 M-30F로 주문해 수화열 균열을 줄인다(6장).</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="low-carbon">
+    <h2>혼화재로 바꾸면: 비용·강도·탄소</h2>
+    <p>배합 설계의 네 번째 요구인 경제성은 이제 탄소와 함께 따집니다. 콘크리트 1 m³의 내재 탄소는 대부분 시멘트에서 나옵니다(2장: 석회석의 탈탄산과 소성 연료). 시멘트 일부를 산업 부산물인 플라이애시나 고로슬래그 미분말(3장)로 바꾸면 CO₂가 크게 줄지만, 초기 강도 발현이 늦어집니다. 같은 W/B로 바꾸면 28일 강도가 떨어질 수 있으므로, 28일 강도를 지키려면 W/B를 조금 낮춰야 하고 그만큼 결합재가 늘어 감축 효과가 줄어듭니다. 반대로 91일 강도로 판정하는 매스 콘크리트라면 혼화재의 장기 강도 증진을 활용해 더 많이 줄일 수 있습니다. 혼화재 1 kg이 시멘트 몇 kg 몫을 하는지를 <b>효율 계수(k값)</b>로 나타내는 방법이 유럽 기준(EN 206)에 있습니다(플라이애시 0.4, 고로슬래그 미분말 0.6 형태).</p>
+    <div class="sim" id="sim-mx-carbon">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>배합 비용·탄소 비교: OPC · 플라이애시 · 고로슬래그</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-co" aria-label="세 배합의 CO2 막대와 재령별 강도 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>플라이애시 치환율 <output id="mx-co-fa-out"></output></span><input type="range" id="mx-co-fa" min="0" max="0.35" step="0.05" value="0.2"></label>
+          <label class="ctrl"><span>고로슬래그 치환율 <output id="mx-co-gg-out"></output></span><input type="range" id="mx-co-gg" min="0" max="0.6" step="0.05" value="0.4"></label>
+          <div class="ctrl"><span>비교 조건</span><div class="seg" id="mx-co-mode"><button data-value="same" class="on">같은 W/B</button><button data-value="f28">같은 28일 강도</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">CO₂ OPC</span><span class="v" id="mx-co-o-c0">—</span></div>
+        <div class="stat"><span class="k">CO₂ 플라이애시</span><span class="v" id="mx-co-o-c1">—</span></div>
+        <div class="stat"><span class="k">CO₂ 고로슬래그</span><span class="v" id="mx-co-o-c2">—</span></div>
+        <div class="stat"><span class="k">재료비 지수(OPC = 100)</span><span class="v" id="mx-co-o-cost">—</span></div>
+      </div>
+      <div class="mx-msg" id="mx-co-msg"></div>
+      <div class="sim-note">해볼 것: '같은 W/B'에서는 CO₂가 크게 줄지만 28일 강도가 f<sub>cr</sub> 아래로 내려가는 것을 보세요 · '같은 28일 강도'로 바꾸면 W/B가 낮아지고 결합재가 늘어 감축 폭이 줄어듭니다 · 91일 막대는 혼화재 배합이 따라잡는 모습입니다 · 모델(모두 교육용 가정): 배합은 <code>CB.conc.mix</code>(M-30 조건), 강도 f<sub>t</sub> = β<sub>cc</sub>(t) × strengthFor(W/(C + kF)), k = 플라이애시 0.4(28일)·0.8(91일), 고로슬래그 0.6·0.95, β<sub>cc</sub>는 <code>CB.conc.beta</code>(보통 시멘트). CO₂(kgCO₂e/kg): 시멘트 0.85, 플라이애시 0.02, 고로슬래그 미분말 0.07, 골재 0.004, 물·혼화제 무시. 재료비 지수(kg당): 시멘트 1, 플라이애시 0.5, 고로슬래그 0.8, 골재 0.15.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="special-mixes">
+    <h2>고강도·고유동 배합 맛보기</h2>
+    <p>절차는 같아도 목표가 극단으로 가면 배합의 모양이 달라집니다. <span class="term">고강도 콘크리트</span>(표준시방서는 보통 콘크리트에서 설계기준강도 40 MPa 이상을 고강도로 분류, 현행 기준 확인)는 W/B를 0.25–0.35까지 낮춰야 하는데, 이 W/B에서 물만으로는 흐름을 얻을 수 없으므로 <b>고성능 감수제가 필수</b>입니다. 결합재가 500 kg/m³를 넘으면 수화열과 자기 수축이 커지므로 실리카퓸·고로슬래그 미분말을 함께 쓰고, 골재 자체의 강도와 시멘트 풀–골재 계면(3장)이 강도를 제한하기 시작하므로 굵은 골재 최대 치수를 20 mm 이하로 줄이기도 합니다. 이 영역에서는 이 책의 교육용 직선이 맞지 않습니다(직선은 W/B 약 0.35–0.70을 위한 것).</p>
+    <p><span class="term">고유동 콘크리트</span>(자기 충전 콘크리트, SCC)는 다짐 없이 자기 무게로 철근 사이를 흘러 채웁니다. 슬럼프 대신 슬럼프 플로(퍼진 지름, 흔히 500–700 mm)로 관리하고, 흘러도 분리되지 않도록 분체(시멘트 + 혼화재 + 석회석 미분말)를 늘리고 굵은 골재를 줄이며 증점제를 쓰기도 합니다(5장).</p>
+    <div class="table-wrap"><table class="mx-tbl">
+      <thead><tr><th>항목(대표 범위, 교육용)</th><th>M-30 보통</th><th>고강도(약 60 MPa)</th><th>고유동(SCC)</th></tr></thead>
+      <tbody>
+        <tr><td>W/B</td><td>0.441</td><td>약 0.25–0.30</td><td>약 0.30–0.40</td></tr>
+        <tr><td>결합재 (kg/m³)</td><td>397</td><td>약 550–650</td><td>약 450–550(분체 기준)</td></tr>
+        <tr><td>단위수량 (kg/m³)</td><td>175</td><td>약 150–165</td><td>약 165–180</td></tr>
+        <tr><td>굵은 골재 (kg/m³)</td><td>991</td><td>약 900–1,000(G<sub>max</sub> 20 이하)</td><td>약 750–850</td></tr>
+        <tr><td>혼화재료</td><td>AE 감수제</td><td>고성능 감수제 + 실리카퓸 등</td><td>고성능 감수제 + 증점제·석회석 미분말</td></tr>
+        <tr><td>관리 지표</td><td>슬럼프 150 mm</td><td>슬럼프 플로 약 500–650 mm</td><td>슬럼프 플로, L-box, V-funnel</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section id="uses">
+    <h2>이 재료·시험이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="aggregate.html"><small>CH.03 · 골재와 혼화재료</small>밀도·흡수율·조립률<br><span>절대용적과 표면수 보정의 입력값이 3장의 시험에서 나온다.</span></a>
+      <a href="fresh.html"><small>CH.05 · 굳지 않은 콘크리트</small>단위수량이 슬럼프를 정한다<br><span>배합이 만든 흐름을 시험하고, 운반·타설 중 지킨다.</span></a>
+      <a href="curing.html"><small>CH.06 · 강도 발현과 양생</small>28일 강도까지 가는 길<br><span>M-30F의 수화열과 매스 콘크리트의 온도 균열.</span></a>
+      <a href="strength.html"><small>CH.07 · 콘크리트의 강도와 시험</small>f<sub>cr</sub>로 만든 콘크리트를 판정한다<br><span>3회 연속 평균과 1회 하한, 관리도.</span></a>
+      <a href="durability.html"><small>CH.09 · 콘크리트의 내구성</small>W/B의 내구성 상한<br><span>모세관 공극이 탄산화·염해 속도를 정한다.</span></a>
+      <a href="composites.html"><small>CH.16 · 복합재료와 지속 가능한 재료</small>시멘트가 탄소의 대부분<br><span>혼화재 치환과 B-10 골조의 내재 탄소.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>배합 설계는 강도·워커빌리티·내구성·경제(탄소)를 만족하는 1 m³의 재료 질량을 정한다. 원칙은 "필요한 워커빌리티 안에서 단위수량을 최소로, 골재를 최대로".</li>
+      <li>배합강도 f<sub>cr</sub> = max(f<sub>ck</sub> + 1.34s, f<sub>ck</sub> − 3.5 + 2.33s)(f<sub>ck</sub> ≤ 35). 1.34s는 3회 평균, 2.33s는 1회 하한의 불합격 확률을 1 %로 묶는다. 기록 15–29회는 s에 보정 계수(1.16–1.03), 기록이 없으면 고정 여유(+8.5 MPa 등). M-30: 34.0 MPa.</li>
+      <li>강도는 W/B로 정해진다(아브람스 법칙). B/W와 강도는 거의 직선이고, 이 직선은 시험 비빔으로 세운다. 이 책의 f<sub>28</sub> = −13.8 + 21.1(B/W)는 교육용 대표값. 내구성 상한과 비교해 작은 W/B를 쓴다. M-30: 0.441.</li>
+      <li>단위수량과 잔골재율은 굵은 골재 최대 치수별 표에 슬럼프(+1.2 %/10 mm)·공기량·W/B·조립률 보정을 더해 정한다. M-30: W 175 kg, S/a 42.8 %, 결합재 397 kg.</li>
+      <li>절대용적법: 물·결합재·공기의 부피를 1 m³에서 빼고 남은 골재 부피를 S/a로 나눈다. M-30: S 728, G 991 kg, 단위 용적 질량 약 2,291 kg/m³.</li>
+      <li>현장 배합은 표면수(함수율 − 흡수율)만큼 골재를 늘리고 물을 줄인다. M-30(잔골재 5.0/1.5 %, 굵은 1.0/0.8 %): 물 148, 잔골재 754, 굵은 골재 993 kg. 슬럼프는 물만으로 고치지 않는다.</li>
+      <li>레디믹스트 콘크리트는 종류-굵은 골재 최대 치수-호칭 강도-슬럼프(25-30-150)로 주문한다. 혼화재 치환은 CO₂를 크게 줄이지만 초기 강도를 늦추므로 W/B·판정 재령과 함께 설계한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. f<sub>ck</sub> = 30 MPa, 30회 이상의 기록에서 s = 3.0 MPa일 때 배합강도는?</p><div class="opts">
+        <button class="opt">30.0 MPa</button><button class="opt">33.5 MPa</button><button class="opt" data-correct>34.0 MPa</button><button class="opt">38.5 MPa</button>
+      </div><div class="quiz-exp">\(\max(30 + 1.34 \times 3.0,\ 26.5 + 2.33 \times 3.0) = \max(34.02, 33.49) = 34.0\) MPa. 38.5 MPa는 기록이 없을 때의 값이다.</div></div>
+      <div class="quiz-q"><p>2. 배합강도 식의 f<sub>ck</sub> + 1.34s가 보장하는 것은?</p><div class="opts">
+        <button class="opt">공시체 1회 값이 f<sub>ck</sub> 미만일 확률 1 %</button><button class="opt" data-correct>연속 3회 평균이 f<sub>ck</sub> 미만일 확률 1 %</button><button class="opt">모든 공시체가 f<sub>ck</sub> 이상</button><button class="opt">평균이 f<sub>ck</sub>와 같음</button>
+      </div><div class="quiz-exp">3회 평균의 표준편차는 \(s/\sqrt{3}\)이므로 \(2.33/\sqrt{3} = 1.34\)다. 공시체 1회 값만 보면 약 9 %가 f<sub>ck</sub>에 못 미친다.</div></div>
+      <div class="quiz-q"><p>3. 시험 기록이 20회이고 s = 4.0 MPa이면 배합강도 계산에 쓰는 표준편차는?</p><div class="opts">
+        <button class="opt">4.00 MPa</button><button class="opt" data-correct>4.32 MPa</button><button class="opt">4.64 MPa</button><button class="opt">s를 쓰지 않는다</button>
+      </div><div class="quiz-exp">20회의 보정 계수는 1.08이므로 \(4.0 \times 1.08 = 4.32\) MPa. 4.64는 15회(1.16)의 값이다. s를 쓰지 않는 것은 14회 이하·기록 없음일 때다.</div></div>
+      <div class="quiz-q"><p>4. 물–결합재비와 압축 강도의 관계를 직선으로 다루려면 가로축을 무엇으로 두는가?</p><div class="opts">
+        <button class="opt">단위수량 W</button><button class="opt">W/B</button><button class="opt" data-correct>결합재–물비 B/W</button><button class="opt">잔골재율 S/a</button>
+      </div><div class="quiz-exp">강도는 W/B에 대해 곡선(아브람스 법칙)이지만 역수 B/W에 대해서는 실용 범위에서 거의 직선이다. 시험 비빔 세 점으로 직선을 세워 필요한 B/W를 읽는다.</div></div>
+      <div class="quiz-q"><p>5. 표준 조건(슬럼프 80 mm)의 단위수량이 170 kg일 때, 슬럼프 150 mm로 하려면 감수제 없이 단위수량은 약 얼마인가?</p><div class="opts">
+        <button class="opt">170 kg</button><button class="opt">175 kg</button><button class="opt" data-correct>184 kg</button><button class="opt">255 kg</button>
+      </div><div class="quiz-exp">70 mm 크므로 \(7 \times 1.2 = 8.4\,\%\): \(170 \times 1.084 = 184.3\) kg. M-30은 여기에 AE 감수제 5 % 감수를 적용해 175 kg이 된다.</div></div>
+      <div class="quiz-q"><p>6. 1 m³ 속 물 0.175 m³, 시멘트 0.126 m³, 공기 4.5 %이면 골재의 절대 용적은?</p><div class="opts">
+        <button class="opt">0.699 m³</button><button class="opt" data-correct>0.654 m³</button><button class="opt">0.346 m³</button><button class="opt">0.700 m³</button>
+      </div><div class="quiz-exp">\(1 - (0.175 + 0.126 + 0.045) = 0.654\) m³. 이를 S/a 42.8 %로 나누면 잔골재 0.280, 굵은 골재 0.374 m³다.</div></div>
+      <div class="quiz-q"><p>7. 잔골재 728 kg(SSD), 함수율 5.0 %, 흡수율 1.5 %일 때 계량하는 물은 시방 배합보다 얼마나 줄이는가?(굵은 골재는 SSD라고 본다)</p><div class="opts">
+        <button class="opt">약 11 kg</button><button class="opt" data-correct>약 25.5 kg</button><button class="opt">약 36 kg</button><button class="opt">줄이지 않는다</button>
+      </div><div class="quiz-exp">표면수율 \(5.0 - 1.5 = 3.5\,\%\), 표면수 \(728 \times 0.035 = 25.5\) kg. 그만큼 물을 덜 넣고 잔골재를 754 kg으로 늘린다. 36 kg은 흡수된 물까지 표면수로 착각한 값이다.</div></div>
+      <div class="quiz-q"><p>8. 레디믹스트 콘크리트 "25-30-150"에서 30은?</p><div class="opts">
+        <button class="opt">슬럼프 30 mm</button><button class="opt">굵은 골재 최대 치수 30 mm</button><button class="opt" data-correct>호칭 강도 30 MPa</button><button class="opt">공기량 3.0 %</button>
+      </div><div class="quiz-exp">순서는 굵은 골재 최대 치수(mm) - 호칭 강도(MPa) - 슬럼프(mm)다. B-10의 골조 콘크리트는 25 mm 골재, 30 MPa, 슬럼프 150 mm다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const MXX = {
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.7, y1 - uy * hd * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45); ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  col(pal) { return { W: pal.blue, C: pal.dim, SCM: pal.green, air: pal.faint, S: pal.warn, G: pal.accent }; },
+  NAME: { W: "물", C: "시멘트", SCM: "혼화재", air: "공기", S: "잔골재", G: "굵은 골재" },
+  ORDER: ["W", "C", "SCM", "air", "S", "G"],
+  /** 배합 막대: parts = { W, C, SCM, air, S, G } (같은 단위), 책 전체의 색 순서로 그린다 */
+  bar(ctx, x, y, w, h, parts, o = {}) {
+    const pal = CB.palette(), col = MXX.col(pal), tot = MXX.ORDER.reduce((s, k) => s + Math.max(0, parts[k] || 0), 0) || 1;
+    let cx = x; const segs = [];
+    MXX.ORDER.forEach((k) => { const v = Math.max(0, parts[k] || 0); if (v <= 0) return; const sw = (w * v) / tot; ctx.fillStyle = col[k]; ctx.fillRect(cx, y, sw, h); segs.push({ k, x: cx, w: sw, v }); cx += sw; });
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 1.2; ctx.strokeRect(x, y, w, h); ctx.restore();
+    if (o.fmt) segs.forEach((s) => { const t = o.fmt(s.k, s.v); if (t && s.w > (o.minLabel || 50)) MXX.text(ctx, t, s.x + s.w / 2, y + h / 2, pal.text, { size: 11 }); });
+    return segs;
+  },
+  /** 범례(줄바꿈) */
+  legend(ctx, x, y, w, items) {
+    const pal = CB.palette(); ctx.save(); ctx.font = `11px ${getComputedStyle(document.body).getPropertyValue("--font")}`;
+    let cx = x, cy = y;
+    items.forEach(([label, color]) => { const tw = ctx.measureText(label).width + 26; if (cx + tw > x + w && cx > x) { cx = x; cy += 17; } ctx.fillStyle = color; ctx.fillRect(cx, cy - 5, 11, 10); ctx.fillStyle = pal.dim; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(label, cx + 15, cy); cx += tw; });
+    ctx.restore(); return cy - y + 17;
+  },
+  pct(p) { return p < 1e-4 ? "&lt; 0.01 %" : (100 * p).toFixed(p < 0.01 ? 2 : 1) + " %"; },
+  kg(v, d = 0) { return CB.sig(Math.round(v * 10 ** d) / 10 ** d, 5) + " kg"; },
+};
+const M30 = CB.conc.mix({ fck: 30, s: 3.0, slump: 150, Gmax: 25, air: 4.5 });
+
+/* ---------- 1. 배합강도와 불합격 확률 ---------- */
+(function () {
+  const fckSel = CB.seg("mx-fcr-fck", go), nSel = CB.seg("mx-fcr-n", go), gs = CB.range("mx-fcr-s", (v) => v.toFixed(1) + " MPa", go);
+  function calc() {
+    const fck = +fckSel(), s = gs(), n = nSel(), rec = n !== "none";
+    const k = rec ? CB.conc.sFactor(+n) : 1, s2 = rec ? s * k : null;
+    const fcr = CB.conc.fcr(fck, s2);
+    const low = fck <= 35 ? fck - 3.5 : 0.9 * fck;
+    const e1 = rec ? fck + 1.34 * s2 : 0, e2 = rec ? low + 2.33 * s2 : 0;
+    return { fck, s, n, rec, k, s2, fcr, low, e1, e2, p1: CB.normCdf(fck, fcr, s), p3: CB.normCdf(fck, fcr, s / Math.sqrt(3)), pl: CB.normCdf(low, fcr, s) };
+  }
+  const cv = CB.canvas("#mx-cv-fcr", (ctx, W, H) => {
+    const pal = CB.palette(), c = calc(), s = c.s, s3 = s / Math.sqrt(3);
+    const x0 = Math.floor(Math.min(c.low, c.fcr - 4 * s) - 2), x1 = Math.ceil(c.fcr + 4 * s + 2);
+    const pdf = [], pdf3 = [], tail = [], tail3 = [], tailL = [];
+    for (let i = 0; i <= 320; i++) {
+      const x = x0 + ((x1 - x0) * i) / 320, y = CB.normPdf(x, c.fcr, s), y3 = CB.normPdf(x, c.fcr, s3);
+      pdf.push([x, y]); pdf3.push([x, y3]);
+      if (x < c.fck) { tail.push([x, y]); tail3.push([x, y3]); }
+      if (x < c.low) tailL.push([x, y]);
+    }
+    tail.push([c.fck, CB.normPdf(c.fck, c.fcr, s)]); tail3.push([c.fck, CB.normPdf(c.fck, c.fcr, s3)]); tailL.push([c.low, CB.normPdf(c.low, c.fcr, s)]);
+    const ymax = CB.normPdf(c.fcr, c.fcr, s3) * 1.15, clear = "rgba(0,0,0,0)";
+    CB.chart(ctx, null, { x: [x0, x1], y: [0, ymax], xLabel: "압축 강도 (MPa)", yLabel: "확률 밀도", yFmt: () => "",
+      series: [
+        { data: tail, color: clear, width: 0.1, fill: "rgba(224,68,62,0.20)" },
+        { data: tailL, color: clear, width: 0.1, fill: "rgba(224,68,62,0.35)" },
+        { data: tail3, color: clear, width: 0.1, fill: "rgba(224,68,62,0.30)" },
+        { data: pdf, color: pal.accent, width: 2.6 },
+        { data: pdf3, color: pal.accent2, width: 2, dash: [6, 4] },
+      ],
+      vlines: [{ x: c.fck, color: pal.bad, label: "f_ck", dash: [] }, { x: c.low, color: pal.dim, label: c.fck <= 35 ? "f_ck−3.5" : "0.9f_ck" }, { x: c.fcr, color: pal.accent, label: "f_cr" }] });
+  }, { aspect: (W) => (W < 520 ? 0.72 : 0.5), minHeight: 230, maxHeight: 340 });
+  function go() {
+    cv.redraw();
+    const c = calc();
+    CB.stat("mx-fcr-o-s", c.rec ? `${c.s2.toFixed(2)} MPa (× ${c.k.toFixed(2)})` : "쓰지 않음");
+    CB.stat("mx-fcr-o-fcr", c.fcr.toFixed(2) + " MPa");
+    CB.stat("mx-fcr-o-p1", MXX.pct(c.p1));
+    CB.stat("mx-fcr-o-p3", MXX.pct(c.p3));
+    CB.stat("mx-fcr-o-pl", MXX.pct(c.pl));
+    const msg = document.getElementById("mx-fcr-msg");
+    if (c.rec) msg.innerHTML = `식 ① f<sub>ck</sub> + 1.34s′ = <b>${c.e1.toFixed(2)}</b> · 식 ② ${c.fck <= 35 ? "(f<sub>ck</sub> − 3.5)" : "0.9f<sub>ck</sub>"} + 2.33s′ = <b>${c.e2.toFixed(2)}</b> → 큰 값 식 ${c.e1 >= c.e2 ? "①" : "②"}이 결정 · 여유 f<sub>cr</sub> − f<sub>ck</sub> = ${(c.fcr - c.fck).toFixed(2)} MPa`;
+    else msg.innerHTML = `기록 없음: f<sub>cr</sub> = ${c.fck < 21 ? "f<sub>ck</sub> + 7" : c.fck <= 35 ? "f<sub>ck</sub> + 8.5" : "1.1f<sub>ck</sub> + 5"} = <b>${c.fcr.toFixed(2)} MPa</b>. 실제 s가 ${c.s.toFixed(1)} MPa라면 3회 평균 불합격 확률은 ${MXX.pct(c.p3)}로, 기록이 있을 때(1 %)보다 ${c.p3 < 0.01 ? "작아 시멘트를 더 쓰는 셈" : "커서 위험"}입니다.`;
+  }
+  go();
+})();
+
+/* ---------- 2. 시험 비빔 세 점으로 W/B 정하기 ---------- */
+(function () {
+  const REL = CB.conc.REL, WB0 = [0.40, 0.45, 0.50], F0 = [40.4, 32.0, 29.0];
+  const VIEW = { bw: { x: [1.0, 3.75], y: [-14, 74] }, wb: { x: [0.2, 0.88], y: [-14, 74] } };
+  let mode = "bw";
+  const toX = (wb) => (mode === "bw" ? 1 / wb : wb);
+  const pts = WB0.map((wb, i) => ({ x: 1 / wb, y: F0[i], lock: "x", constrain: (p) => { p.y = CB.clamp(p.y, 8, 68); } }));
+  const gf = CB.range("mx-ab-fcr", (v) => v.toFixed(1) + " MPa", go);
+  CB.seg("mx-ab-mode", (m) => { if (m === mode) return; mode = m; pts.forEach((p) => { p.x = 1 / p.x; }); pl.view(VIEW[m]); go(); });
+  function fit() {
+    const xs = pts.map((p) => (mode === "bw" ? p.x : 1 / p.x)), ys = pts.map((p) => p.y), mx = CB.mean(xs), my = CB.mean(ys);
+    let sxx = 0, sxy = 0, syy = 0;
+    xs.forEach((x, i) => { sxx += (x - mx) ** 2; sxy += (x - mx) * (ys[i] - my); syy += (ys[i] - my) ** 2; });
+    const b = sxy / sxx, a = my - b * mx, r2 = syy > 1e-9 ? (sxy * sxy) / (sxx * syy) : 1;
+    const bwReq = b > 1 ? (gf() - a) / b : NaN;
+    return { a, b, r2, bwReq, wbReq: bwReq > 0 ? 1 / bwReq : NaN };
+  }
+  const pl = CB.plane("#mx-cv-ab", { x: VIEW.bw.x, y: VIEW.bw.y, grid: false, axes: false, aspect: (W) => (W < 520 ? 0.85 : 0.55), minHeight: 260, maxHeight: 400, points: pts, onDrag: () => go(),
+    draw(P) {
+      const pal = P.P, v = VIEW[mode], xl = P.ix(48), xr = v.x[1], f = fit(), fcr = gf();
+      for (let y = 0; y <= 70; y += 10) { P.line(xl, y, xr, y, { color: pal.grid, width: 1 }); P.text(String(y), xl, y, { color: pal.dim, align: "right", dx: -6, size: 11 }); }
+      const ticks = mode === "bw" ? [1.5, 2, 2.5, 3, 3.5] : [0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
+      ticks.forEach((t) => { P.line(t, 0, t, 72, { color: pal.grid, width: 1 }); P.text(t.toFixed(1), t, 0, { color: pal.dim, align: "center", baseline: "top", dy: 6, size: 11 }); });
+      P.line(xl, 0, xr, 0, { color: pal.axis, width: 1.2 }); P.line(xl, 0, xl, 72, { color: pal.axis, width: 1.2 });
+      P.text(mode === "bw" ? "결합재–물비 B/W" : "물–결합재비 W/B", xr, 0, { color: pal.dim, align: "right", baseline: "top", dy: 22, dx: -6, size: 12 });
+      P.text("f₂₈ (MPa)", xl, 71, { color: pal.dim, dx: 6, size: 12 });
+      // 교육용 관계(점선)와 회귀선
+      const lo = mode === "bw" ? 1.25 : 0.3, hi = mode === "bw" ? 3.6 : 0.85;
+      const rel = (x) => (mode === "bw" ? REL.A + REL.B * x : REL.A + REL.B / x), reg = (x) => (mode === "bw" ? f.a + f.b * x : f.a + f.b / x);
+      P.curve(rel, { from: lo, to: hi, color: pal.faint, width: 1.6, dash: [6, 4] });
+      P.curve(reg, { from: lo, to: hi, color: pal.accent, width: 2.6 });
+      P.line(xl, fcr, xr, fcr, { color: pal.accent2, width: 1.4, dash: [5, 4] });
+      P.text(`f_cr ${fcr.toFixed(1)}`, xr, fcr, { color: pal.accent2, align: "right", dy: -9, dx: -6, size: 11 });
+      pts.forEach((p, i) => P.text(`W/B ${WB0[i].toFixed(2)}`, p.x, p.y, { color: pal.dim, align: "center", baseline: "top", dy: 11, size: 11 }));
+      if (isFinite(f.bwReq) && f.bwReq > 0) {
+        const xq = toX(1 / f.bwReq);
+        if (xq > xl && xq < xr) { P.line(xq, 0, xq, fcr, { color: pal.accent2, width: 1.4, dash: [3, 3] }); P.dot(xq, fcr, { r: 5, color: pal.text }); P.text(`W/B ${(1 / f.bwReq).toFixed(3)}`, xq, 0, { color: pal.text, align: "center", baseline: "bottom", dy: -4, size: 11, bold: true }); }
+      }
+    } });
+  document.getElementById("mx-ab-reset").addEventListener("click", () => { pts.forEach((p, i) => { p.y = F0[i]; }); go(); });
+  function go() {
+    pl.redraw();
+    const f = fit(), fcr = gf(), wb0 = CB.conc.wbFor(fcr);
+    CB.stat("mx-ab-o-fit", `${CB.num(f.a, 1)} + ${CB.num(f.b, 1)}·(B/W)`);
+    CB.stat("mx-ab-o-r2", f.r2.toFixed(3));
+    CB.stat("mx-ab-o-wb", isFinite(f.wbReq) ? f.wbReq.toFixed(3) : "—");
+    CB.stat("mx-ab-o-wb0", wb0.toFixed(3));
+    const msg = document.getElementById("mx-ab-msg"), fs = pts.map((p) => p.y), fmin = Math.min(...fs), fmax = Math.max(...fs);
+    if (!isFinite(f.wbReq)) { msg.className = "mx-msg bad"; msg.textContent = "B/W가 커져도 강도가 거의 오르지 않습니다. 시험 결과(공시체 제작·양생·재료)를 다시 확인해야 W/B를 정할 수 있습니다."; }
+    else if (fcr < fmin - 0.5 || fcr > fmax + 0.5) { msg.className = "mx-msg bad"; msg.innerHTML = `목표 강도가 시험 범위(${fmin.toFixed(1)}–${fmax.toFixed(1)} MPa) 밖입니다. 직선을 외삽한 W/B ${f.wbReq.toFixed(3)}는 믿기 어려우니 W/B를 넓혀 다시 비비세요.`; }
+    else { msg.className = "mx-msg"; msg.innerHTML = `시험 비빔 직선으로 f<sub>cr</sub> = ${fcr.toFixed(1)} MPa에 필요한 B/W = (${fcr.toFixed(1)} ${f.a < 0 ? "+" : "−"} ${Math.abs(f.a).toFixed(1)}) / ${CB.num(f.b, 2)} = <b>${f.bwReq.toFixed(3)}</b>, 곧 <b>W/B = ${f.wbReq.toFixed(3)}</b>. 교육용 식(${wb0.toFixed(3)})과의 차이는 이 공장 재료의 특성입니다.`; }
+  }
+  go();
+})();
+
+/* ---------- 3. 절대용적 블록 쌓기 ---------- */
+(function () {
+  const gwb = CB.range("mx-vb-wb", (v) => v.toFixed(3), go), gw = CB.range("mx-vb-w", (v) => v + " kg/m³", go), ga = CB.range("mx-vb-air", (v) => v.toFixed(1) + " %", go), gsa = CB.range("mx-vb-sa", (v) => v.toFixed(1) + " %", go);
+  const KEYS = ["W", "C", "air", "S", "G"];
+  let k = 0, anim = 0;
+  const calc = () => CB.conc.mix({ wb: gwb(), W: gw(), air: ga(), sa: gsa(), Gmax: 25 });
+  const massOf = (m, key) => (key === "air" ? 0 : m[key]);
+  const cv = CB.canvas("#mx-cv-vb", (ctx, W, H) => {
+    const pal = CB.palette(), col = MXX.col(pal), m = calc();
+    const bx = 20, bw = Math.min(170, W * 0.3), top = 26, bh = H - 50, by = top + bh;
+    MXX.text(ctx, "1 m³ = 1,000 L", bx + bw / 2, 13, pal.dim, { size: 11 });
+    let y = by; const labels = [];
+    KEYS.forEach((key, i) => {
+      const f = CB.clamp(anim - i, 0, 1); if (f <= 0) return;
+      const hh = m.vol[key] * f * bh;
+      ctx.fillStyle = col[key]; ctx.fillRect(bx, y - hh, bw, hh);
+      labels.push({ key, y: y - hh / 2, f });
+      y -= hh;
+    });
+    // 남은 부피(빗금)
+    if (y > top + 0.5) {
+      ctx.save(); ctx.beginPath(); ctx.rect(bx, top, bw, y - top); ctx.clip(); ctx.strokeStyle = pal.faint; ctx.lineWidth = 1;
+      for (let t = -bh; t < bw + bh; t += 10) { ctx.beginPath(); ctx.moveTo(bx + t, top); ctx.lineTo(bx + t + (y - top), y); ctx.stroke(); }
+      ctx.restore();
+      MXX.text(ctx, `남은 ${CB.num((1000 * (y - top)) / bh, 0)} L`, bx + bw / 2, (top + y) / 2, pal.text, { size: 12 });
+    }
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 2; ctx.strokeRect(bx, top, bw, bh); ctx.restore();
+    // 라벨: 겹치지 않게 펼치기
+    const gap = 30, lx = bx + bw + 14;
+    for (let i = 1; i < labels.length; i++) labels[i].y = Math.min(labels[i].y, labels[i - 1].y - gap);
+    if (labels.length && labels[labels.length - 1].y < top + 10) { labels[labels.length - 1].y = top + 10; for (let i = labels.length - 2; i >= 0; i--) labels[i].y = Math.max(labels[i].y, labels[i + 1].y + gap); }
+    let yy = by;
+    labels.forEach((L, i) => {
+      const key = L.key, vL = 1000 * m.vol[key], mass = massOf(m, key), hh = m.vol[key] * L.f * bh, ymid = yy - hh / 2; yy -= hh;
+      ctx.save(); ctx.strokeStyle = pal.faint; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx + bw, ymid); ctx.lineTo(lx - 4, L.y); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = col[key]; ctx.fillRect(lx, L.y - 12, 10, 10);
+      MXX.text(ctx, `${MXX.NAME[key]} ${CB.num(vL, 0)} L`, lx + 16, L.y - 7, pal.text, { size: 11.5, align: "left" });
+      MXX.text(ctx, key === "air" ? "질량 0" : key === "W" ? `${CB.num(mass, 1)} kg ÷ 1.00` : `${CB.num(mass, 0)} kg ÷ ${(key === "C" ? m.dens.c : key === "S" ? m.dens.s : m.dens.g).toFixed(2)}`, lx + 16, L.y + 8, pal.dim, { size: 10.5, align: "left", bold: false });
+    });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.62), minHeight: 300, maxHeight: 420 });
+  function stats() {
+    const m = calc(), n = Math.min(k, 5);
+    let used = 0, mass = 0; for (let i = 0; i < n; i++) { used += m.vol[KEYS[i]]; mass += massOf(m, KEYS[i]); }
+    CB.stat("mx-vb-o-next", n < 5 ? MXX.NAME[KEYS[n]] + (n >= 3 ? " (남은 부피 × " + (KEYS[n] === "S" ? "S/a" : "(1 − S/a)") + ")" : "") : "완성");
+    CB.stat("mx-vb-o-used", CB.num(1000 * used, 0) + " L");
+    CB.stat("mx-vb-o-left", CB.num(1000 * (1 - used), 0) + " L");
+    CB.stat("mx-vb-o-mass", CB.sig(mass, 4) + " kg" + (n >= 5 ? " (단위 용적 질량)" : ""));
+  }
+  function go() { cv.redraw(); stats(); }
+  const sim = document.getElementById("sim-mx-volume");
+  CB.loop(sim, (dt) => { if (Math.abs(anim - k) > 1e-4) { const d = k - anim; anim += Math.sign(d) * Math.min(Math.abs(d), dt * 2.2); cv.redraw(); } });
+  document.getElementById("mx-vb-next").addEventListener("click", () => { k = Math.min(5, k + 1); stats(); });
+  document.getElementById("mx-vb-all").addEventListener("click", () => { k = 5; stats(); });
+  document.getElementById("mx-vb-reset").addEventListener("click", () => { k = 0; anim = 0; go(); });
+  go();
+})();
+
+/* ---------- 4. 배합 설계 마법사 ---------- */
+(function () {
+  const fckSel = CB.seg("mx-wz-fck", go), gmaxSel = CB.seg("mx-wz-gmax", go), capSel = CB.seg("mx-wz-cap", go), scmSel = CB.seg("mx-wz-scm", go);
+  const gs = CB.range("mx-wz-s", (v) => v.toFixed(1) + " MPa", go), gsl = CB.range("mx-wz-slump", (v) => v + " mm", go), ga = CB.range("mx-wz-air", (v) => v.toFixed(1) + " %", go);
+  const gr = CB.range("mx-wz-ratio", (v) => Math.round(v * 100) + " %", go), gred = CB.range("mx-wz-red", (v) => v + " %", go);
+  function calc() {
+    const o = { fck: +fckSel(), s: gs(), slump: gsl(), Gmax: +gmaxSel(), air: ga(), reduce: gred() };
+    if (capSel() !== "none") o.wbMax = +capSel();
+    const scm = scmSel() !== "none" && gr() > 0 ? { type: scmSel(), ratio: gr() } : null;
+    if (scm) o.scm = scm;
+    return { o, scm, m: CB.conc.mix(o) };
+  }
+  const cv = CB.canvas("#mx-cv-wz", (ctx, W, H) => {
+    const pal = CB.palette(), col = MXX.col(pal), { m } = calc(), x = 16, w = W - 32;
+    MXX.text(ctx, "부피 (L/m³) — 합계 1,000 L", x, 16, pal.dim, { size: 11.5, align: "left" });
+    const vol = { W: m.vol.W, C: m.vol.C, SCM: m.vol.SCM, air: m.vol.air, S: m.vol.S, G: m.vol.G };
+    MXX.bar(ctx, x, 28, w, 38, vol, { fmt: (k, v) => `${Math.round(v * 1000)}`, minLabel: 30 });
+    MXX.text(ctx, `질량 (kg/m³) — 합계 ${CB.sig(m.mass, 4)} kg`, x, 88, pal.dim, { size: 11.5, align: "left" });
+    const mass = { W: m.W, C: m.C, SCM: m.SCM, air: 0, S: m.S, G: m.G };
+    MXX.bar(ctx, x, 100, w, 38, mass, { fmt: (k, v) => `${Math.round(v)}`, minLabel: 30 });
+    const items = MXX.ORDER.filter((k) => k !== "SCM" || m.SCM > 0).map((k) => [MXX.NAME[k] + (k === "SCM" ? `(${{ FA: "플라이애시", GGBS: "고로슬래그" }[calc().scm.type]})` : ""), col[k]]);
+    const lh = MXX.legend(ctx, x, 160, w, items);
+    // W/B를 고르는 그림: 교육용 강도–W/B 곡선, 배합강도, 내구성 상한
+    const { o } = calc(), top = 160 + lh + 30, box = { x: 56, y: top, w: W - 80, h: Math.max(80, H - top - 48) };
+    MXX.text(ctx, "W/B 고르기: 교육용 f₂₈(W/B), 배합강도, 내구성 상한", x, top - 14, pal.dim, { size: 11.5, align: "left" });
+    const curve = []; for (let i = 0; i <= 80; i++) { const wb = 0.3 + (0.4 * i) / 80; curve.push([wb, CB.conc.strengthFor(wb)]); }
+    const vl = [{ x: m.wbStrength, color: pal.faint, label: "강도" }];
+    if (o.wbMax) vl.push({ x: o.wbMax, color: pal.bad, label: "상한" });
+    CB.chart(ctx, box, { x: [0.3, 0.7], y: [10, 60], xLabel: "W/B", yLabel: "f₂₈ (MPa)", xFmt: (v) => v.toFixed(2), series: [{ data: curve, color: pal.accent, width: 2.4 }],
+      hlines: [{ y: m.fcr, color: pal.accent2, label: `f_cr ${m.fcr.toFixed(1)}` }], vlines: vl,
+      points: [{ x: m.wb, y: CB.conc.strengthFor(m.wb), color: pal.text, r: 5.5 }] });
+  }, { aspect: (W) => (W < 520 ? 1.2 : 0.7), minHeight: 420, maxHeight: 600 });
+  function go() {
+    cv.redraw();
+    const { o, scm, m } = calc(), base = CB.conc.MIX_TABLE[m.Gmax];
+    const s1 = 1 + (0.012 * (m.slump - 80)) / 10, s2 = 1 - 0.03 * (m.air - 4.5), s3 = 1 - o.reduce / 100;
+    const sa1 = (m.wb - 0.55) / 0.05, sa2 = -0.75 * (m.air - 4.5);
+    const low = o.fck <= 35 ? `(${o.fck} − 3.5) + 2.33 × ${o.s.toFixed(1)}` : `0.9 × ${o.fck} + 2.33 × ${o.s.toFixed(1)}`;
+    const lowV = o.fck <= 35 ? o.fck - 3.5 + 2.33 * o.s : 0.9 * o.fck + 2.33 * o.s;
+    const capTxt = o.wbMax ? `내구성 상한 ${o.wbMax.toFixed(2)}` : "내구성 상한 없음(교육용)";
+    const gov = o.wbMax && o.wbMax < m.wbStrength ? "내구성이 결정" : "강도가 결정";
+    const steps = [
+      `<b>배합강도</b> f<sub>cr</sub> = max(${o.fck} + 1.34 × ${o.s.toFixed(1)}, ${low}) = max(${(o.fck + 1.34 * o.s).toFixed(2)}, ${lowV.toFixed(2)}) = <b>${m.fcr.toFixed(2)} MPa</b>`,
+      `<b>W/B</b> 강도로 21.1 / (${m.fcr.toFixed(2)} + 13.8) = ${m.wbStrength.toFixed(3)}, ${capTxt} → <b>${m.wb.toFixed(3)}</b> (${gov})`,
+      `<b>단위수량</b> 표 ${base.W} kg × 슬럼프 ${s1.toFixed(3)} × 공기 ${s2.toFixed(3)} × 감수 ${s3.toFixed(2)} = <b>${m.W.toFixed(1)} kg</b>` + (m.W > 185 ? ` <span class="bad">· 185 kg 초과: 감수제를 늘리거나 G<sub>max</sub>를 키우세요</span>` : ""),
+      `<b>잔골재율</b> 표 ${base.sa} % ${sa1 >= 0 ? "+" : "−"} ${Math.abs(sa1).toFixed(2)} (W/B) ${sa2 >= 0 ? "+" : "−"} ${Math.abs(sa2).toFixed(2)} (공기) = <b>${m.sa.toFixed(1)} %</b>`,
+      `<b>결합재</b> B = ${m.W.toFixed(1)} / ${m.wb.toFixed(3)} = <b>${m.B.toFixed(0)} kg</b>` + (scm ? ` → 시멘트 ${m.C.toFixed(0)} + ${scm.type === "FA" ? "플라이애시" : "고로슬래그"} ${m.SCM.toFixed(0)} kg` : "") + (m.B > 550 ? ` <span class="bad">· 결합재가 많아 수화열·수축에 주의</span>` : ""),
+      `<b>절대용적</b> 1 − (${m.vol.W.toFixed(3)} + ${(m.vol.C + m.vol.SCM).toFixed(3)} + ${m.vol.air.toFixed(3)}) = ${m.vol.agg.toFixed(3)} m³ → 잔골재 ${m.vol.S.toFixed(3)} × 2,600 = <b>${m.S.toFixed(0)} kg</b>, 굵은 골재 ${m.vol.G.toFixed(3)} × 2,650 = <b>${m.G.toFixed(0)} kg</b>`,
+      `<b>혼화제·확인</b> AE 감수제 결합재의 0.8 % = ${m.admix.toFixed(1)} kg · 단위 용적 질량 ${CB.sig(m.mass, 4)} kg/m³` + (scm && scm.type === "FA" && scm.ratio > 0.3 ? ` <span class="bad">· 플라이애시 30 % 초과는 초기 강도·탄산화에 주의</span>` : ""),
+    ];
+    document.getElementById("mx-wz-steps").innerHTML = steps.map((s) => `<li>${s}</li>`).join("");
+    CB.stat("mx-wz-o-fcr", m.fcr.toFixed(2) + " MPa");
+    CB.stat("mx-wz-o-wb", m.wb.toFixed(3));
+    CB.stat("mx-wz-o-wbm", `${m.W.toFixed(0)} · ${m.B.toFixed(0)} kg`);
+    CB.stat("mx-wz-o-sg", `${m.S.toFixed(0)} · ${m.G.toFixed(0)} kg`);
+    CB.stat("mx-wz-o-sa", `${m.sa.toFixed(1)} % · ${CB.sig(m.mass, 4)}`);
+  }
+  go();
+})();
+
+/* ---------- 5. 현장 배합 보정기 ---------- */
+(function () {
+  const base = M30;
+  const gsm = CB.range("mx-fm-sm", (v) => v.toFixed(1) + " %", go), gsa = CB.range("mx-fm-sa", (v) => v.toFixed(1) + " %", go);
+  const ggm = CB.range("mx-fm-gm", (v) => v.toFixed(1) + " %", go), gga = CB.range("mx-fm-ga", (v) => v.toFixed(1) + " %", go);
+  const vSel = CB.seg("mx-fm-vol", go);
+  const calc = () => { const o = { sm: gsm(), sa: gsa(), gm: ggm(), ga: gga() }; return { o, f: CB.conc.fieldMix(base, o), n: +vSel() }; };
+  const cv = CB.canvas("#mx-cv-fm", (ctx, W, H) => {
+    const pal = CB.palette(), col = MXX.col(pal), { f } = calc();
+    const x0 = 108, x1 = W - 16;
+    // 물 수지: 계량수 + 잔골재 표면수 + 굵은 골재 표면수 = 시방 배합수
+    const ws = base.S * f.sSurf, wg = base.G * f.gSurf, wmax = Math.max(230, f.W + Math.max(0, ws) + Math.max(0, wg), base.W) * 1.02;
+    const X = (v) => x0 + ((x1 - x0) * v) / wmax;
+    MXX.text(ctx, "콘크리트 속 물의 출처 (kg/m³)", 12, 14, pal.dim, { size: 11.5, align: "left" });
+    let y = 30, cur = 0;
+    ctx.fillStyle = pal.blue; ctx.fillRect(X(0), y, X(f.W) - X(0), 22);
+    MXX.text(ctx, "계량수", x0 - 8, y + 11, pal.text, { size: 11, align: "right" });
+    MXX.text(ctx, CB.num(f.W, 1), X(f.W / 2), y + 11, pal.text, { size: 11 });
+    cur = f.W;
+    [[ws, "잔골재 표면수"], [wg, "굵은 골재 표면수"]].forEach(([v, lab], i) => {
+      y += 28;
+      MXX.text(ctx, lab, x0 - 8, y + 11, pal.text, { size: 11, align: "right" });
+      if (Math.abs(v) < 0.05) { MXX.text(ctx, "0", X(cur) + 10, y + 11, pal.dim, { size: 11, align: "left" }); return; }
+      const a = X(cur), b = X(cur + v);
+      ctx.fillStyle = v > 0 ? "rgba(47,111,224,0.45)" : "rgba(224,68,62,0.35)"; ctx.fillRect(Math.min(a, b), y, Math.abs(b - a), 22);
+      MXX.text(ctx, (v > 0 ? "+" : "") + CB.num(v, 1) + (v < 0 ? " (흡수)" : ""), Math.max(a, b) + 6, y + 11, v > 0 ? pal.blue : pal.bad, { size: 11, align: "left" });
+      cur += v;
+    });
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(X(base.W), 24); ctx.lineTo(X(base.W), y + 28); ctx.stroke(); ctx.restore();
+    MXX.text(ctx, `= 시방 배합 ${CB.num(base.W, 1)}`, X(base.W), y + 38, pal.text, { size: 11 });
+    // 계량값 비교
+    const yb = y + 62, gmax = 1150, Xg = (v) => x0 + ((x1 - x0) * v) / gmax;
+    MXX.text(ctx, "계량값 kg/m³ (흐림: 시방 · 진함: 현장)", 12, yb, pal.dim, { size: 11.5, align: "left" });
+    [["W", "물", base.W, f.W], ["S", "잔골재", base.S, f.S], ["G", "굵은 골재", base.G, f.G]].forEach(([k, lab, a, b], i) => {
+      const yy = yb + 16 + i * 34;
+      MXX.text(ctx, lab, x0 - 8, yy + 12, pal.text, { size: 11, align: "right" });
+      ctx.save(); ctx.globalAlpha = 0.35; ctx.fillStyle = col[k]; ctx.fillRect(Xg(0), yy, Xg(a) - Xg(0), 11); ctx.restore();
+      ctx.fillStyle = col[k]; ctx.fillRect(Xg(0), yy + 13, Xg(b) - Xg(0), 11);
+      MXX.text(ctx, `${CB.num(a, 0)} → ${CB.num(b, 0)}`, Math.min(Xg(Math.max(a, b)) + 6, x1 - 70), yy + 12, pal.text, { size: 11, align: "left" });
+    });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.52), minHeight: 300, maxHeight: 380 });
+  function go() {
+    cv.redraw();
+    const { o, f, n } = calc(), u = n === 1 ? "" : ` (×${n})`;
+    CB.stat("mx-fm-o-surf", `${CB.num(100 * f.sSurf, 1)} / ${CB.num(100 * f.gSurf, 1)} %`);
+    CB.stat("mx-fm-o-w", CB.sig(f.W * n, 4) + " kg" + u);
+    CB.stat("mx-fm-o-s", CB.sig(f.S * n, 4) + " kg" + u);
+    CB.stat("mx-fm-o-g", CB.sig(f.G * n, 4) + " kg" + u);
+    const exS = (base.S * (o.sm - o.sa)) / (100 + o.sa), msg = document.getElementById("mx-fm-msg");
+    msg.className = "mx-msg" + (f.sSurf < 0 ? " bad" : "");
+    msg.innerHTML = (f.sSurf < 0 ? `잔골재가 표면건조 포화 상태보다 말라 있습니다. 골재가 물 ${CB.num(-base.S * f.sSurf, 1)} kg을 빨아들일 것이므로 그만큼 물을 더 넣습니다. ` : "") +
+      `시멘트 ${CB.sig(base.C * n, 4)} kg은 그대로, W/B도 그대로 ${base.wb.toFixed(3)} · 정밀식 (m − a)/(100 + a)로 계산한 잔골재 표면수는 ${CB.num(exS, 1)} kg/m³(근사식과 ${CB.num(base.S * f.sSurf - exS, 2)} kg 차이)`;
+  }
+  go();
+})();
+
+/* ---------- 6. 물 10 kg을 더 넣으면 ---------- */
+(function () {
+  const base = M30, W80 = CB.conc.mix({ fck: 30, s: 3.0, slump: 80, Gmax: 25, air: 4.5 }).W, CO2C = 0.85;
+  const gdw = CB.range("mx-wt-dw", (v) => "+" + v + " kg", go), modeSel = CB.seg("mx-wt-mode", go);
+  const slumpOf = (W) => 80 + (10 * (W / W80 - 1)) / 0.012;
+  const powers = (wc, a = 0.8) => Math.max(0, (wc - 0.36 * a) / (wc + 0.32));
+  function at(dw, mode) {
+    const W = base.W + dw, B = mode === "keep" ? W / base.wb : base.B, wb = W / B;
+    return { W, B, wb, f: Math.max(0, CB.conc.strengthFor(wb)), sl: slumpOf(W), por: powers(wb), sh: 500 * Math.pow(W / base.W, 1.5), dC: B - base.B };
+  }
+  const cv = CB.canvas("#mx-cv-wt", (ctx, W, H) => {
+    const pal = CB.palette(), dw = gdw(), mode = modeSel(), a = [], b = [];
+    for (let d = 0; d <= 40; d += 1) { a.push([d, at(d, "water").f]); b.push([d, at(d, "keep").f]); }
+    const c = at(dw, mode);
+    CB.chart(ctx, null, { x: [0, 40], y: [18, 38], xLabel: "더 넣은 물 ΔW (kg/m³)", yLabel: "28일 강도 (MPa)",
+      series: [{ data: a, color: pal.bad, width: mode === "water" ? 2.8 : 1.6, dash: mode === "water" ? [] : [5, 4] }, { data: b, color: pal.ok, width: mode === "keep" ? 2.8 : 1.6, dash: mode === "keep" ? [] : [5, 4] }],
+      hlines: [{ y: base.fcr, color: pal.accent, label: "f_cr 34.0" }, { y: 30, color: pal.bad, label: "f_ck 30" }],
+      points: [{ x: dw, y: c.f, color: pal.text, r: 5.5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.48), minHeight: 230, maxHeight: 330 });
+  function go() {
+    cv.redraw();
+    const dw = gdw(), mode = modeSel(), c = at(dw, mode), c0 = at(0, mode);
+    CB.stat("mx-wt-o-wb", `${base.wb.toFixed(3)} → ${c.wb.toFixed(3)}`);
+    CB.stat("mx-wt-o-f", `${CB.num(c.f, 1)} MPa (${CB.num((100 * (c.f - c0.f)) / c0.f, 1)} %)`);
+    CB.stat("mx-wt-o-sl", c.sl > 240 ? "240 mm 초과(분리)" : `${CB.num(c.sl, 0)} mm`);
+    CB.stat("mx-wt-o-por", `${CB.num(100 * c0.por, 1)} → ${CB.num(100 * c.por, 1)} %`);
+    CB.stat("mx-wt-o-sh", `${CB.num(c.sh, 0)} × 10⁻⁶`);
+    CB.stat("mx-wt-o-c", mode === "keep" ? `+${CB.num(c.dC, 1)} kg · +${CB.num(c.dC * CO2C, 1)} kgCO₂e` : "0");
+    const msg = document.getElementById("mx-wt-msg");
+    if (mode === "water") { msg.className = "mx-msg" + (c.f < 30 ? " bad" : ""); msg.innerHTML = c.f < 30 ? `W/B ${c.wb.toFixed(3)}에서 28일 강도 약 ${CB.num(c.f, 1)} MPa — 설계기준강도 f<sub>ck</sub> 30 MPa에도 못 미칩니다. 가수 ${dw} kg이 배합강도의 여유 4 MPa를 모두 써 버렸습니다.` : `강도가 배합강도보다 ${CB.num(base.fcr - c.f, 1)} MPa 낮아졌습니다. 불합격 확률(1 %)을 지키려고 둔 여유가 그만큼 줄었습니다.`; }
+    else { msg.className = "mx-msg"; msg.innerHTML = `W/B를 지키려면 물 ${dw} kg마다 결합재 ${CB.num(dw / base.wb, 1)} kg을 함께 넣어야 합니다. 강도는 그대로지만 시멘트·발열·건조 수축(${CB.num(c.sh, 0)} × 10⁻⁶)이 늘어납니다. 같은 흐름은 고성능 감수제로 얻는 편이 낫습니다(3장).`; }
+  }
+  go();
+})();
+
+/* ---------- 7. 비용·탄소 비교 ---------- */
+(function () {
+  const K = { FA: { 28: 0.4, 91: 0.8 }, GGBS: { 28: 0.6, 91: 0.95 } };
+  const CO2 = { C: 0.85, FA: 0.02, GGBS: 0.07, agg: 0.004 }, COST = { C: 1, FA: 0.5, GGBS: 0.8, agg: 0.15 };
+  const gfa = CB.range("mx-co-fa", (v) => Math.round(v * 100) + " %", go), ggg = CB.range("mx-co-gg", (v) => Math.round(v * 100) + " %", go), modeSel = CB.seg("mx-co-mode", go);
+  const BASE = { fck: 30, s: 3.0, slump: 150, Gmax: 25, air: 4.5 };
+  function one(type, r) {
+    const mode = modeSel(), wbEff = CB.conc.wbFor(CB.conc.fcr(30, 3.0));
+    let o = Object.assign({}, BASE);
+    if (type && r > 0) { o.scm = { type, ratio: r }; if (mode === "f28") o.wb = wbEff * (1 - r + K[type][28] * r); }
+    const m = CB.conc.mix(o), kk = (t) => (type && r > 0 ? K[type][t] : 0);
+    const fAt = (t) => CB.conc.beta(t, "N") * Math.max(0, CB.conc.strengthFor(m.W / (m.C + kk(t) * m.SCM)));
+    const co = { C: m.C * CO2.C, SCM: type ? m.SCM * CO2[type] : 0, agg: (m.S + m.G) * CO2.agg };
+    const cost = m.C * COST.C + (type ? m.SCM * COST[type] : 0) + (m.S + m.G) * COST.agg;
+    return { m, f28: fAt(28), f91: fAt(91), co, coT: co.C + co.SCM + co.agg, cost };
+  }
+  const calc = () => [one(null, 0), one("FA", gfa()), one("GGBS", ggg())];
+  const NAMES = ["OPC", "플라이애시", "고로슬래그"];
+  const cv = CB.canvas("#mx-cv-co", (ctx, W, H) => {
+    const pal = CB.palette(), col = MXX.col(pal), R = calc(), narrow = W < 560;
+    const pA = narrow ? { x: 52, y: 26, w: W - 70, h: H / 2 - 62 } : { x: 56, y: 26, w: W / 2 - 80, h: H - 74 };
+    const pB = narrow ? { x: 52, y: H / 2 + 26, w: W - 92, h: H / 2 - 62 } : { x: W / 2 + 40, y: 26, w: W / 2 - 80, h: H - 74 };
+    const axes = (p, ymax, step, label) => {
+      ctx.save(); ctx.font = `11px ${getComputedStyle(document.body).getPropertyValue("--mono")}`; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      for (let v = 0; v <= ymax + 1e-9; v += step) { const y = p.y + p.h - (p.h * v) / ymax; ctx.strokeStyle = pal.grid; ctx.beginPath(); ctx.moveTo(p.x, y); ctx.lineTo(p.x + p.w, y); ctx.stroke(); ctx.fillStyle = pal.dim; ctx.fillText(String(v), p.x - 5, y); }
+      ctx.strokeStyle = pal.axis; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y + p.h); ctx.lineTo(p.x + p.w, p.y + p.h); ctx.stroke(); ctx.restore();
+      MXX.text(ctx, label, p.x, p.y - 14, pal.dim, { size: 11.5, align: "left" });
+    };
+    // CO₂ 누적 막대
+    axes(pA, 400, 100, "CO₂ (kgCO₂e/m³)");
+    const bw = Math.min(56, pA.w / 5);
+    R.forEach((r, i) => {
+      const cx = pA.x + (pA.w * (i + 0.5)) / 3, Y = (v) => pA.y + pA.h - (pA.h * v) / 400;
+      let acc = 0;
+      [["C", r.co.C], ["SCM", r.co.SCM], ["G", r.co.agg]].forEach(([k, v]) => { ctx.fillStyle = col[k]; ctx.fillRect(cx - bw / 2, Y(acc + v), bw, Y(acc) - Y(acc + v)); acc += v; });
+      MXX.text(ctx, CB.num(r.coT, 0), cx, Y(acc) - 9, pal.text, { size: 11 });
+      MXX.text(ctx, NAMES[i], cx, pA.y + pA.h + 13, pal.dim, { size: 11, mono: false });
+    });
+    // 강도 막대(28·91일)
+    axes(pB, 60, 10, "압축 강도 (MPa): 28일 · 91일");
+    const Yb = (v) => pB.y + pB.h - (pB.h * Math.min(60, v)) / 60;
+    R.forEach((r, i) => {
+      const cx = pB.x + (pB.w * (i + 0.5)) / 3, w2 = Math.min(26, pB.w / 9);
+      ctx.fillStyle = i === 0 ? pal.dim : col.SCM; ctx.fillRect(cx - w2 - 2, Yb(r.f28), w2, Yb(0) - Yb(r.f28));
+      ctx.save(); ctx.globalAlpha = 0.5; ctx.fillRect(cx + 2, Yb(r.f91), w2, Yb(0) - Yb(r.f91)); ctx.restore();
+      MXX.text(ctx, CB.num(r.f28, 1), cx - w2 / 2 - 2, Yb(r.f28) - 9, r.f28 < 34.02 - 0.05 ? pal.bad : pal.text, { size: 10.5 });
+      MXX.text(ctx, CB.num(r.f91, 1), cx + w2 / 2 + 2, Yb(r.f91) - 9, pal.dim, { size: 10.5 });
+      MXX.text(ctx, NAMES[i], cx, pB.y + pB.h + 13, pal.dim, { size: 11, mono: false });
+    });
+    [[34.02, pal.accent, "f_cr"], [30, pal.bad, "f_ck"]].forEach(([v, c, l]) => { ctx.save(); ctx.strokeStyle = c; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(pB.x, Yb(v)); ctx.lineTo(pB.x + pB.w, Yb(v)); ctx.stroke(); ctx.restore(); MXX.text(ctx, l, pB.x + pB.w + 4, Yb(v), c, { size: 10.5, align: "left" }); });
+    MXX.legend(ctx, 12, H - 12, W - 24, [["시멘트", col.C], ["혼화재", col.SCM], ["골재", col.G]]);
+  }, { aspect: (W) => (W < 560 ? 1.25 : 0.5), minHeight: 300, maxHeight: 460 });
+  function go() {
+    cv.redraw();
+    const R = calc(), c0 = R[0].coT;
+    ["c0", "c1", "c2"].forEach((id, i) => CB.stat("mx-co-o-" + id, `${CB.num(R[i].coT, 0)} kg` + (i ? ` (−${CB.num((100 * (c0 - R[i].coT)) / c0, 0)} %)` : "")));
+    CB.stat("mx-co-o-cost", R.map((r) => CB.num((100 * r.cost) / R[0].cost, 0)).join(" · "));
+    const msg = document.getElementById("mx-co-msg"), bad = R.filter((r) => r.f28 < 34.02 - 0.05).length;
+    msg.className = "mx-msg" + (bad ? " bad" : "");
+    msg.innerHTML = `W/B ${R.map((r) => r.m.wb.toFixed(3)).join(" · ")} · 결합재 ${R.map((r) => CB.num(r.m.B, 0)).join(" · ")} kg/m³ · ` + (bad ? `28일 강도가 배합강도에 못 미치는 배합이 ${bad}개 있습니다. 28일 판정이라면 W/B를 낮추거나('같은 28일 강도'), 91일 판정이 허용되는 부재에 쓰세요.` : "모든 배합이 28일에 배합강도를 만족합니다.");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

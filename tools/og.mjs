@@ -1,5 +1,5 @@
 // Copyright (c) 2026 geniuskey and ConstructionBooks contributors. MIT. Based on the MathBooks og renderer.
-// Render the 1200×630 share images: og.png (shelf home) and mechanics/og.png (MechanicsBook).
+// Render the 1200×630 share images: og.png (shelf home), mechanics/og.png (MechanicsBook) and materials/og.png (MaterialsBook).
 // Usage: node tools/og.mjs   (rerun after books, chapters or simulators change). Needs Playwright.
 // Covers use the same shelf.css and covers.js as the home page; stats are counted like shared/js/shelf.js.
 import { chromium } from 'playwright';
@@ -19,16 +19,16 @@ const simulators = live.reduce((n, b) => n + (b.simulators || 0), 0);
 const titles = { mechanicsbook: '구조역학', materialsbook: '건설재료', geotechbook: '지반공학', structurebook: '건축구조', concretebook: '철근콘크리트', civilbook: '교량·터널·도로', sitebook: '시공·건설관리', bimbook: 'BIM·디지털' };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-// The structural engine, loaded with a stub DOM, computes the truss drawn on the MechanicsBook card.
+// The engine (materials copy = structural solver + materials models), loaded with a stub DOM, computes the art on the book cards.
 const noop = () => {};
 const stubEl = { getAttribute: () => null, setAttribute: noop, removeAttribute: noop, style: {}, classList: { add: noop, toggle: noop } };
 const sandbox = { console, Math, Number, Object, Array, Set, Map, JSON, isFinite, Promise, String, Error, Float64Array, URL,
   localStorage: { getItem: () => null, setItem: noop }, matchMedia: () => ({ matches: false, addEventListener: noop }),
-  document: { readyState: 'loading', addEventListener: noop, documentElement: stubEl, currentScript: { src: 'http://x/mechanics/js/common.js' }, head: { append: noop }, createElement: () => ({}) },
+  document: { readyState: 'loading', addEventListener: noop, documentElement: stubEl, currentScript: { src: 'http://x/materials/js/common.js' }, head: { append: noop }, createElement: () => ({}) },
   getComputedStyle: () => ({ getPropertyValue: () => '' }), requestAnimationFrame: noop };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
-vm.runInContext(read('mechanics/js/common.js'), sandbox);
+vm.runInContext(read('materials/js/common.js'), sandbox);
 const CB = sandbox.CB;
 
 const base = `
@@ -119,9 +119,46 @@ const mechPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><st
   <div class="art">${mech}</div>
 </body></html>`;
 
+
+// MaterialsBook: concrete compression curves for several strengths over the M-30 reference mix (1 m³ by volume).
+const matArt = (() => {
+  let s = '';
+  const X = (e) => 70 + (e / 0.0038) * 380, Y = (f) => 290 - f * 3.6;
+  s += `<line x1="70" y1="290" x2="550" y2="290" stroke="#4a5670" stroke-width="2"/><line x1="70" y1="290" x2="70" y2="60" stroke="#4a5670" stroke-width="2"/>`;
+  const cols = { 24: '#8b95a7', 30: '#93bcd6', 40: '#ffa94d', 60: '#ff5f57' };
+  for (const fc of [24, 30, 40, 60]) {
+    let d = '';
+    for (let k = 0; k <= 120; k++) { const e = (0.0038 * k) / 120; d += (k ? 'L' : 'M') + X(e).toFixed(1) + ' ' + Y(CB.conc.sigma(e, fc)).toFixed(1); }
+    s += `<path d="${d}" fill="none" stroke="${cols[fc]}" stroke-width="${fc === 30 ? 6 : 3.5}" stroke-linecap="round"/>`;
+    s += `<text x="${X(0.0038) + 8}" y="${Y(CB.conc.sigma(0.0038, fc)) + 6}" fill="${cols[fc]}" font-family="monospace" font-size="18" font-weight="700">${fc} MPa</text>`;
+  }
+  const m = CB.conc.mix({ fck: 30, s: 3, slump: 150, Gmax: 25, air: 4.5 });
+  const parts = [['물', m.vol.W, '#5b8cff', m.W], ['시멘트', m.vol.C, '#c3cad6', m.C], ['공기', m.vol.air, '#4a5670', null], ['잔골재', m.vol.S, '#f5b93a', m.S], ['굵은 골재', m.vol.G, '#93bcd6', m.G]];
+  let x = 60; const bw = 480;
+  parts.forEach(([name, v, c, kg]) => { const w = v * bw; s += `<rect x="${x.toFixed(1)}" y="380" width="${(w - 3).toFixed(1)}" height="78" rx="6" fill="${c}"/>`;
+    if (w > 50) s += `<text x="${(x + w / 2).toFixed(1)}" y="486" text-anchor="middle" fill="#cfd6e4" font-size="16" font-weight="700">${name}</text><text x="${(x + w / 2).toFixed(1)}" y="508" text-anchor="middle" fill="#8b95a7" font-family="monospace" font-size="15">${kg ? Math.round(kg) + ' kg' : ''}</text>`;
+    x += w; });
+  s += `<text x="300" y="356" text-anchor="middle" fill="#ffa94d" font-family="monospace" font-size="22" font-weight="700">M-30 · W/B ${m.wb.toFixed(2)} · 1 m³</text>`;
+  return `<svg viewBox="0 0 600 600" width="600" height="600"><defs><clipPath id="c2"><rect x="20" y="20" width="560" height="560" rx="28"/></clipPath></defs><rect x="20" y="20" width="560" height="560" rx="28" fill="#0f1625" stroke="#26324a"/><g clip-path="url(#c2)">${s}</g></svg>`;
+})();
+const materials = books.find((b) => b.id === 'materialsbook');
+const matPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>${read('shelf.css')}</style><style>${base}
+  .art { position:absolute; right:40px; top:15px; }
+</style></head><body>
+  <div class="left">
+    <div class="brand">${read('materials/favicon.svg')}<span>MaterialsBook</span></div>
+    <div class="eyebrow">INTERACTIVE CONSTRUCTION MATERIALS</div>
+    <h1>콘크리트는 어떻게 굳고<br><span class="soft">강재는 어떻게</span><br><span class="warm">버티는가</span></h1>
+    <p class="lead">시멘트 수화와 배합 설계, 강도와 내구성,<br>강재·철근·아스팔트·목재를 직접 계산하는 건설재료.</p>
+    <div class="stats"><span><b>4</b>부</span><span><b>16</b>개 장</span><span><b>${Math.floor(materials.simulators / 10) * 10}+</b>시뮬레이터</span></div>
+  </div>
+  <div class="url">construction.euiyun.com/materials/</div>
+  <div class="art">${matArt}</div>
+</body></html>`;
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
-for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png']]) {
+for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png']]) {
   await page.setContent(html, { waitUntil: 'networkidle' });
   await page.addScriptTag({ content: read('shared/js/covers.js') });
   await page.evaluate(async () => {
@@ -131,4 +168,4 @@ for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png']]) {
   await page.screenshot({ path: join(root, out) });
 }
 await browser.close();
-console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators} simulators`);
+console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators} simulators`);
