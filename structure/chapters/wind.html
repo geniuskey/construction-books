@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>풍하중과 바람의 영향 · StructureBook</title>
+<meta name="description" content="바람은 건물을 밀고 흔든다. 대기 경계층과 노풍도, 기본 풍속과 재현 기간, 높이에 따른 풍속과 속도압, 풍압 계수와 외장재, 가스트 영향 계수, 층 풍하중, 와류 공진, 거주성, 공력 형상, 타코마 교를 B-10의 층 풍하중으로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .wd-stack { display: grid; grid-template-columns: 1fr; }
+  .wd-stack > div { position: relative; min-width: 0; }
+  .wd-stack > div + div { border-top: 1px solid var(--border); }
+  .wd-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .wd-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .wd-msg b { color: var(--text); }
+  .wd-msg.ok { color: var(--ok); font-weight: 600; }
+  .wd-msg.bad { color: var(--bad); font-weight: 600; }
+  .wd-tbl td, .wd-tbl th { font-variant-numeric: tabular-nums; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="structure"></script>
+</head>
+<body data-chapter="wind">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="wd-ah-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+      <marker id="wd-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="wd-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="wd-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="wd-ah-ten" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--tension)"/></marker>
+      <marker id="wd-ah-comp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--compression)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 06</div>
+    <h1 data-no-glossary>풍하중과 바람의 영향</h1>
+    <p class="lead">5장에서 B-10의 코어와 골조가 나눠 받은 층 하중 118–244 kN은 바람에서 왔습니다. 바람은 땅 가까이에서 마찰로 느려지고 높이 올라갈수록 빨라지며, 평균 속도 위에 끊임없이 요동치는 난류가 얹혀 있습니다. 건물은 이 흐름을 막아서므로 바람 쪽 면은 밀리고, 옆면과 뒷면은 빨려 나갑니다. 큰 건물에서는 바람이 미는 힘만이 아니라 흔드는 힘도 문제입니다. 건물 뒤에서 번갈아 떨어져 나가는 소용돌이가 건물을 옆으로 흔들고, 흔들림이 크면 무너지지 않아도 사람이 멀미를 느낍니다. 이 장은 풍속 → 속도압 → 풍압 → 층 풍하중의 계산 사슬을 B-10으로 따라가고, 가스트·와류·거주성처럼 바람의 "동적인" 얼굴을 시뮬레이터로 만납니다. 이 책의 풍하중 모형은 KDS 41 12 00(건축물 하중기준)의 계산 순서를 닮은 <b>단순 멱법칙 교육용 모형</b>이며, 실제 설계는 현행 기준의 계수와 절차를 따라야 합니다.</p>
+    <ul class="objectives">
+      <li>대기 경계층, 평균 풍속과 난류 강도, 노풍도를 설명하고 재현 기간과 초과 확률을 계산한다.</li>
+      <li>멱법칙으로 높이별 풍속을 구하고 속도압 \(q = \tfrac12\rho V^2\)을 계산해 B-10 지붕의 35.5 m/s, 0.77 kN/m²를 재현한다.</li>
+      <li>풍압 계수로 바람 쪽·옆면·뒷면의 외압과 내압을 구분하고, 외장재 설계에서 모서리 국부 풍압이 중요한 이유를 설명한다.</li>
+      <li>가스트와 동적 응답을 배경 성분과 공진 성분으로 나누고, 가스트 영향 계수 G ≈ 2.0의 의미를 해석한다.</li>
+      <li>B-10의 층 풍하중·밑면 전단·전도 모멘트를 계산하고 지진하중과 비교한다.</li>
+      <li>와류 방출 진동수와 공진 풍속, 건물 가속도와 거주성, 공력 형상 개선, 타코마 교 붕괴의 교훈을 설명한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>폭풍 속에 사라진 다리</b></div>
+      <div class="o-body"><p>1879년 12월 28일 밤, 스코틀랜드 테이강을 건너던 테이 교<span class="en">(Tay Bridge)</span>의 가운데 높은 경간들이 강풍 속에서 달리던 열차와 함께 무너졌습니다. 탑승자는 아무도 살아남지 못했습니다(희생자는 60–75명으로 추정). 사고 조사는 설계에서 바람의 힘을 충분히 고려하지 않았다는 점을 지적했고, 영국은 이후 교량 설계에 쓸 풍압 값을 정하는 일에 나섰습니다. 곧이어 지어진 포스 교<span class="en">(Forth Bridge, 1890)</span>는 바람을 크게 의식해 설계된 다리로 꼽힙니다.</p>
+        <p>한 세기 뒤, 바람 공학은 "얼마나 세게 미는가"에서 "어떻게 흔드는가"로 넓어졌습니다. 1940년 미국 타코마 나로스 교는 그리 세지 않은 바람에 비틀리며 무너졌고, 1960년대부터는 대기 경계층을 흉내 낸 풍동에서 초고층 건물 모형을 시험하는 것이 일상이 되었습니다. 오늘날 기준의 풍하중 식은 이 두 갈래, 곧 정적인 평균 풍압과 동적인 난류·공진 효과를 모두 담고 있습니다.</p>
+        <div class="o-chain"><span>기본 풍속 V₀</span><i>→</i><span>높이별 풍속 V(z)</span><i>→</i><span class="tool">q = ½ρV² · G · C<sub>p</sub></span><i>→</i><span>층 풍하중 · 밑면 전단 · 흔들림</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="boundary-layer">
+    <h2>바람의 성질: 대기 경계층과 난류</h2>
+    <div class="problem"><strong>왜 높은 곳은 바람이 셀까</strong>
+      <p>B-10의 옥상에 서면 1층 출입구에서보다 바람이 확실히 셉니다. 같은 바람인데 높이에 따라 속도가 왜 다르고, 도심과 바닷가는 무엇이 다를까요?</p></div>
+    <p>지표면 근처의 공기는 땅·나무·건물과의 마찰로 느려지고, 그 영향은 위로 갈수록 약해집니다. 이렇게 지표 마찰의 영향을 받는 대기의 아래층을 <span class="term">대기 경계층</span><span class="en">(atmospheric boundary layer)</span>이라 하고, 그 위에서 마찰의 영향이 사라지는 높이를 경도풍 높이라 합니다. 경계층의 두께는 지표가 거칠수록 두꺼워 수백 m에 이릅니다. 지표의 거친 정도를 등급으로 나눈 것이 <span class="term">노풍도</span><span class="en">(terrain exposure)</span>(KDS의 용어로는 지표면 조도 구분)입니다. 이 책은 A(대도시 중심부) – B(도시·교외) – C(개활지) – D(해안·수면)의 네 단계를 쓰며, 거칠수록 풍속이 높이에 따라 천천히 커집니다.</p>
+    <figure class="diagram" id="fig-wd-bl">
+      <svg viewBox="0 0 820 320" role="img" aria-label="거친 지표와 매끈한 지표 위의 대기 경계층 풍속 분포와 경도풍 높이">
+        <rect x="10" y="10" width="800" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(60,0)">
+          <line x1="40" y1="270" x2="40" y2="40" style="stroke:var(--axis);stroke-width:1.2"/>
+          <path d="M40 270C60 250 80 200 110 150C140 100 170 70 220 50" style="fill:none;stroke:var(--blue);stroke-width:2.6"/>
+          <g style="stroke:var(--blue);stroke-width:1.6" marker-end="url(#wd-ah-blue)"><line x1="40" y1="240" x2="72" y2="240"/><line x1="40" y1="190" x2="98" y2="190"/><line x1="40" y1="140" x2="120" y2="140"/><line x1="40" y1="90" x2="160" y2="90"/></g>
+          <line x1="30" y1="50" x2="260" y2="50" style="stroke:var(--text-dim);stroke-dasharray:5 4"/>
+          <text x="262" y="54" class="t-dim">경도풍 높이(높다)</text>
+          <g class="f-acc" style="opacity:.55"><rect x="50" y="230" width="22" height="40"/><rect x="80" y="210" width="18" height="60"/><rect x="104" y="240" width="26" height="30"/><rect x="138" y="200" width="20" height="70"/><rect x="164" y="225" width="24" height="45"/><rect x="194" y="215" width="20" height="55"/></g>
+          <line x1="30" y1="270" x2="260" y2="270" style="stroke:var(--text);stroke-width:2"/>
+          <text x="140" y="296" text-anchor="middle" class="t" style="font-weight:700">거친 지표(도심): 천천히 커진다, α 큼</text>
+        </g>
+        <g transform="translate(450,0)">
+          <line x1="40" y1="270" x2="40" y2="40" style="stroke:var(--axis);stroke-width:1.2"/>
+          <path d="M40 270C70 250 120 220 160 170C190 130 205 110 220 100" style="fill:none;stroke:var(--blue);stroke-width:2.6"/>
+          <g style="stroke:var(--blue);stroke-width:1.6" marker-end="url(#wd-ah-blue)"><line x1="40" y1="240" x2="110" y2="240"/><line x1="40" y1="190" x2="150" y2="190"/><line x1="40" y1="140" x2="185" y2="140"/></g>
+          <line x1="30" y1="100" x2="260" y2="100" style="stroke:var(--text-dim);stroke-dasharray:5 4"/>
+          <text x="262" y="104" class="t-dim" text-anchor="end" dx="-4" dy="-8">경도풍 높이(낮다)</text>
+          <path d="M40 270Q80 262 120 268T200 266T260 270" style="fill:none;stroke:var(--blue);stroke-width:1.4;opacity:.6"/>
+          <line x1="30" y1="270" x2="260" y2="270" style="stroke:var(--text);stroke-width:2"/>
+          <text x="140" y="296" text-anchor="middle" class="t" style="font-weight:700">매끈한 지표(해안): 빨리 커진다, α 작음</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-1.</b> 대기 경계층. 경도풍 높이 위의 바람은 지표의 영향을 받지 않는다. 거친 지표(왼쪽)는 경계층이 두껍고 낮은 높이의 풍속이 많이 줄어 있으며, 매끈한 지표(오른쪽)는 경계층이 얇아 낮은 곳에서도 풍속이 크다. 같은 기상 조건이면 지상 10 m 풍속은 해안이 도심보다 크다.</figcaption>
+    </figure>
+    <p>풍속계 기록을 보면 바람은 일정한 평균값 주위에서 쉼 없이 요동칩니다. 10분 정도 평균한 값을 평균 풍속 \(\bar V\), 그 위의 요동을 <span class="term">난류</span><span class="en">(turbulence)</span>라 합니다. 요동의 크기는 표준편차 \(\sigma_u\)로 재고, 이를 평균 풍속으로 나눈 것이 난류 강도입니다.</p>
+    <div class="callout def"><strong>정의 6.1 (평균 풍속과 난류 강도)</strong> 풍속 기록 \(V(t) = \bar V + u'(t)\)에서
+      <div class="formula">$$I_u = \frac{\sigma_u}{\bar V}$$<div class="where">를 <span class="term">난류 강도</span><span class="en">(turbulence intensity)</span>라 한다. 지표가 거칠수록, 높이가 낮을수록 크며, 도시 지역 건물 높이에서 대략 0.15–0.3 정도다(교육용 범위). 난류의 에너지가 어느 진동수에 몰려 있는지는 풍속 스펙트럼이 말해 주며, 대부분 0.1 Hz보다 낮은 느린 요동에 있다.</div></div></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="basic-wind">
+    <h2>기본 풍속과 재현 기간</h2>
+    <p>설계의 출발점은 그 지역에서 "드물게 오는 강한 바람"의 크기입니다. 기준은 표준 조건(지상 10 m, 정해진 노풍도, 정해진 평균 시간)에서 정해진 재현 기간의 풍속을 지역마다 <span class="term">기본 풍속</span><span class="en">(basic wind speed)</span> \(V_0\)로 줍니다. 이 책은 B-10이 서 있는 서울 형태의 값으로 \(V_0 = 26\) m/s를 씁니다(교육용, 실제 값·재현 기간·평균 시간은 현행 KDS 41 12 00 확인). <span class="term">재현 기간</span><span class="en">(return period)</span> \(T\)년이란 그 풍속 이상이 한 해에 나타날 확률이 \(1/T\)이라는 뜻이지, \(T\)년에 한 번 꼬박꼬박 온다는 뜻이 아닙니다.</p>
+    <div class="callout def"><strong>원리 6.2 (설계 수명 동안의 초과 확률)</strong> 해마다 독립이라 보면, 재현 기간 \(T\)년의 풍속이 \(L\)년 동안 한 번 이상 나타날 확률은
+      <div class="formula">$$P = 1 - \left(1 - \frac{1}{T}\right)^L$$<div class="where">이다. \(L = T\)이면 \(P \approx 1 - e^{-1} = 0.63\)으로, 재현 기간만큼 지나도 셋 중 하나는 그 바람을 겪지 않는다.</div></div></div>
+    <div class="callout"><strong>예제 6.1 (설계 수명 50년의 초과 확률)</strong>
+      <ol style="margin:6px 0 0">
+        <li>\(T = 100\)년, \(L = 50\)년: \(P = 1 - 0.99^{50} = 1 - 0.605 = 0.395\), 약 40 %.</li>
+        <li>\(T = 500\)년: \(P = 1 - 0.998^{50} = 0.095\), 약 10 %.</li>
+        <li>\(T = 1\)년 바람(거주성 검토용)은 해마다 한 번꼴로 기대되는 약한 바람이다.</li>
+      </ol>
+      그래서 강도 설계는 수백 년 재현 수준의 바람으로, 건물 흔들림의 거주성 검토는 1–10년 재현 수준의 바람으로 한다. 같은 건물이라도 무엇을 검토하느냐에 따라 쓰는 풍속이 다르다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="profile">
+    <h2>높이에 따른 풍속과 속도압</h2>
+    <div class="problem"><strong>B-10 지붕의 바람은 얼마나 센가</strong>
+      <p>지상 10 m의 기본 풍속이 26 m/s일 때 41 m 높이의 지붕에서는 몇 m/s일까요? 그리고 그 바람이 1 m²의 벽을 미는 힘은 얼마일까요?</p></div>
+    <p>경계층 안의 평균 풍속 분포는 로그 법칙이나 멱법칙으로 근사합니다. 이 책은 단순한 멱법칙을 씁니다. 바람이 벽에 부딪혀 멈추면 운동 에너지가 압력으로 바뀌는데, 이 압력의 기준값이 <span class="term">속도압</span><span class="en">(velocity pressure)</span>입니다.</p>
+    <div class="callout def"><strong>원리 6.3 (멱법칙 풍속 분포와 속도압, 이 책의 교육용 모형)</strong>
+      <div class="formula">$$V(z) = V_0\left(\frac{z}{10}\right)^{\alpha}, \qquad q(z) = \frac12 \rho V(z)^2$$<div class="where">\(z\)는 지반에서의 높이(m, 5 m 아래는 5 m 값을 쓴다), 멱지수 \(\alpha\)는 노풍도 A 0.33, B 0.22, C 0.15, D 0.10, 공기 밀도 \(\rho = 1.22\) kg/m³. \(q\)를 N/m²로 계산한 뒤 1,000으로 나누면 kN/m²다. 공용 함수 <code>CB.wind.speed</code>, <code>CB.wind.q</code>가 이 식이다.</div></div></div>
+    <div class="callout warn"><strong>이 모형의 단순화</strong> 위 식은 모든 노풍도에서 지상 10 m 풍속을 \(V_0\)로 같게 둔다. 그래서 노풍도 A를 고르면 높은 곳의 풍속이 B보다 커 보이는데, 실제로는 반대다. 실제 기준은 \(V_0\)를 한 가지 표준 지표에서 정의하고, 거친 지표에서는 경도풍 높이 아래의 풍속을 줄이며, 지형 계수(언덕·절벽)와 중요도 계수를 더한다. 이 장에서 노풍도를 바꿔 보는 것은 "높이에 따라 얼마나 빨리 커지는가(\(\alpha\))"를 보는 것으로만 읽고, B-10의 계산은 노풍도 B 한 가지 값을 쓴다.</div>
+    <div class="sim" id="sim-wd-profile">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>높이에 따른 풍속과 속도압</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="wd-cv-pr" aria-label="높이에 따른 풍속 분포와 속도압 분포 그래프"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>기본 풍속 V₀ <output id="wd-pr-v-out"></output></span><input type="range" id="wd-pr-v" min="20" max="45" step="1" value="26"></label>
+          <div class="ctrl"><span>노풍도</span><div class="seg" id="wd-pr-r"><button data-value="A">A</button><button data-value="B" class="on">B</button><button data-value="C">C</button><button data-value="D">D</button></div></div>
+          <label class="ctrl"><span>높이 z <output id="wd-pr-z-out"></output></span><input type="range" id="wd-pr-z" min="5" max="300" step="1" value="41"></label>
+          <label class="check"><input type="checkbox" id="wd-pr-all"> 네 노풍도 모양 비교(V/V₁₀)</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">V(z)</span><span class="v" id="wd-pr-vz">—</span></div>
+        <div class="stat"><span class="k">V(z)/V₀</span><span class="v" id="wd-pr-ratio">—</span></div>
+        <div class="stat"><span class="k">q(z)</span><span class="v" id="wd-pr-q">—</span></div>
+        <div class="stat"><span class="k">설계 풍압 qGC<sub>p</sub></span><span class="v" id="wd-pr-p">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 지붕(41 m) 풍속 35.5 m/s, 속도압 0.77 kN/m²를 확인하세요 · 높이를 두 배로 올려도 풍속은 2<sup>0.22</sup> = 1.16배, 속도압은 1.36배만 커집니다 · 기본 풍속을 26 → 32 m/s로 올리면 속도압은 (32/26)² = 1.5배가 됩니다. 풍하중은 풍속의 제곱으로 민감합니다 · 모델: 이 책의 멱법칙(원리 6.3), 설계 풍압은 가스트 계수 G = 2.0, 풍압 계수 합 C<sub>p</sub> = 1.3(풍상 0.8 + 풍하 0.5)을 곱한 값(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 6.2 (B-10 지붕의 풍속과 속도압)</strong> \(V_0 = 26\) m/s, 노풍도 B(\(\alpha = 0.22\)), 지붕 높이 \(z = 41\) m.
+      <ol style="margin:6px 0 0">
+        <li><b>풍속.</b> \((41/10)^{0.22} = e^{0.22 \ln 4.1} = e^{0.310} = 1.364\) → \(V(41) = 26 \times 1.364 = 35.5\) m/s.</li>
+        <li><b>속도압.</b> \(q = 0.5 \times 1.22 \times 35.5^2 = 767\) N/m² = 0.77 kN/m². 지상 10 m에서는 \(0.5 \times 1.22 \times 26^2 = 412\) N/m² = 0.41 kN/m².</li>
+        <li><b>벽 1 m²를 미는 설계 풍압.</b> \(qGC_p = 0.77 \times 2.0 \times 1.3 = 2.0\) kN/m². 바람 쪽 벽은 0.8 몫(1.23 kN/m²)으로 밀리고 뒷벽은 0.5 몫(0.77 kN/m²)으로 빨려 나간다.</li>
+      </ol>
+      체감으로 바꾸면 2.0 kN/m²는 1 m²에 약 200 kg의 물체를 올려 둔 무게다. B-10의 Y 방향 받는 면(폭 32 m × 높이 41 m)에 고르게 걸린다면 약 2,600 kN이지만, 실제로는 아래로 갈수록 풍속이 작아 다음 절의 층별 합은 1,790 kN이다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="pressure">
+    <h2>풍압 계수: 미는 면과 빨리는 면</h2>
+    <div class="problem"><strong>바람 반대쪽 벽도 힘을 받는다</strong>
+      <p>바람이 건물 앞면을 미는 것은 당연해 보입니다. 그런데 태풍에 떨어져 나가는 유리와 지붕재는 대부분 바람을 등진 면, 옆면의 모서리, 지붕 가장자리에서 나옵니다. 그곳에서는 어떤 힘이 작용할까요?</p></div>
+    <p>건물 표면의 압력은 속도압에 <span class="term">풍압 계수</span><span class="en">(pressure coefficient)</span> \(C_p\)를 곱해 나타냅니다. 바람을 정면으로 받는 면에서는 흐름이 막혀 \(C_p\)가 +0.8 안팎(밀림)이고, 흐름이 모서리에서 떨어져 나가는 옆면·지붕·뒷면에서는 음수(흡인, 빨림)가 됩니다. 특히 모서리 바로 뒤에서는 떨어져 나간 흐름이 강한 소용돌이를 만들어 국부적으로 큰 흡인이 생깁니다. 건물 안쪽에도 공기가 있으므로, 벽 하나에 실제로 걸리는 힘은 바깥 압력(외압)과 안쪽 압력(내압)의 차이입니다.</p>
+    <figure class="diagram" id="fig-wd-cp">
+      <svg viewBox="0 0 820 330" role="img" aria-label="평면과 단면에서 본 풍압 계수 분포: 바람 쪽 양압, 옆면과 뒷면과 지붕의 흡인, 모서리 국부 흡인">
+        <rect x="10" y="10" width="800" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="170" y="10" text-anchor="middle" class="t" style="font-weight:700">평면</text>
+          <rect x="110" y="90" width="120" height="120" class="f-acc-soft" style="stroke:var(--text);stroke-width:2"/>
+          <g style="stroke:var(--blue);stroke-width:1.8" marker-end="url(#wd-ah-blue)"><line x1="10" y1="110" x2="60" y2="110"/><line x1="10" y1="150" x2="60" y2="150"/><line x1="10" y1="190" x2="60" y2="190"/></g>
+          <text x="34" y="96" text-anchor="middle" class="t-mono" style="fill:var(--blue)">바람</text>
+          <g style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#wd-ah-load)"><line x1="74" y1="115" x2="106" y2="115"/><line x1="70" y1="150" x2="106" y2="150"/><line x1="74" y1="185" x2="106" y2="185"/></g>
+          <text x="86" y="236" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">+0.8</text>
+          <g style="stroke:var(--accent);stroke-width:2.2" marker-end="url(#wd-ah-acc)"><line x1="140" y1="86" x2="140" y2="56"/><line x1="200" y1="86" x2="200" y2="66"/><line x1="140" y1="214" x2="140" y2="244"/><line x1="200" y1="214" x2="200" y2="234"/><line x1="234" y1="120" x2="262" y2="120"/><line x1="234" y1="180" x2="262" y2="180"/></g>
+          <text x="170" y="50" text-anchor="middle" class="t-mono" style="fill:var(--accent)">옆면 −0.7</text>
+          <text x="290" y="154" class="t-mono" style="fill:var(--accent)">뒷면 −0.5</text>
+          <circle cx="118" cy="90" r="14" style="fill:var(--bad);opacity:.25"/><circle cx="118" cy="210" r="14" style="fill:var(--bad);opacity:.25"/>
+          <text x="20" y="276" class="t-dim">빨간 원: 모서리 국부 흡인(외장재 주의)</text>
+        </g>
+        <g transform="translate(450,30)">
+          <text x="160" y="10" text-anchor="middle" class="t" style="font-weight:700">단면(외압 + 내압)</text>
+          <rect x="100" y="80" width="140" height="160" class="f-acc-soft" style="stroke:var(--text);stroke-width:2"/>
+          <g style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#wd-ah-load)"><line x1="64" y1="120" x2="96" y2="120"/><line x1="64" y1="170" x2="96" y2="170"/><line x1="64" y1="220" x2="96" y2="220"/></g>
+          <g style="stroke:var(--accent);stroke-width:2.2" marker-end="url(#wd-ah-acc)"><line x1="244" y1="140" x2="272" y2="140"/><line x1="244" y1="200" x2="272" y2="200"/><line x1="140" y1="76" x2="140" y2="44"/><line x1="200" y1="76" x2="200" y2="56"/></g>
+          <text x="170" y="38" text-anchor="middle" class="t-mono" style="fill:var(--accent)">지붕 흡인(들림)</text>
+          <g style="stroke:var(--warn);stroke-width:1.8" marker-end="url(#wd-ah-dim)"><line x1="170" y1="160" x2="122" y2="160"/><line x1="170" y1="160" x2="218" y2="160"/><line x1="170" y1="160" x2="170" y2="104"/></g>
+          <text x="170" y="196" text-anchor="middle" class="t-mono" style="fill:var(--warn)">내압: 모든 면을</text>
+          <text x="170" y="214" text-anchor="middle" class="t-mono" style="fill:var(--warn)">같이 밀거나 당긴다</text>
+          <line x1="80" y1="242" x2="260" y2="242" style="stroke:var(--text);stroke-width:2.4"/>
+          <text x="170" y="276" text-anchor="middle" class="t-dim">바람 쪽에 큰 개구부가 있으면 내압 +</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-2.</b> 풍압 계수의 분포(값은 교육용 대표값). 바람 쪽 면만 밀리고 옆면·뒷면·지붕은 빨린다. 모서리 바로 뒤는 국부 흡인이 커 외장재와 지붕재가 먼저 손상된다. 건물 전체를 미는 힘은 바람 쪽 + 뒷면의 합(이 책의 \(C_p\) 합 1.3)이고, 내압은 모든 면에 같이 걸려 전체 힘에서는 상쇄되지만 벽 하나·유리 한 장의 설계에서는 외압과 더해진다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 6.4 (설계 풍압)</strong> 면 하나에 걸리는 설계 풍압은 바깥 압력과 안쪽 압력의 차이다.
+      <div class="formula">$$p = q_z G C_{pe} - q_h (G C_{pi})$$<div class="where">\(C_{pe}\): <span class="term">외압 계수</span><span class="en">(external pressure coefficient)</span>(양수는 면을 미는 방향), \(GC_{pi}\): <span class="term">내압 계수</span><span class="en">(internal pressure coefficient)</span>(개구부가 고른 밀폐형 건물이면 \(\pm 0.18\) 정도의 형태, 교육용), \(q_z\)·\(q_h\): 각각 그 높이와 기준 높이의 속도압. 구조체 전체(주골조)의 설계에는 면적이 넓어 평균된 계수를, 외장재·지붕재에는 좁은 면적의 큰 국부 계수를 쓴다.</div></div></div>
+    <div class="sim" id="sim-wd-pressure">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>건물 주위의 풍압 분포: 풍향 바꾸기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="wd-cv-cp" aria-label="직사각형 평면의 네 면에 걸리는 풍압 계수 화살표와 풍향"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>풍향 θ <output id="wd-cp-th-out"></output></span><input type="range" id="wd-cp-th" min="0" max="90" step="1" value="0"></label>
+          <label class="ctrl"><span>깊이/폭 D/B <output id="wd-cp-r-out"></output></span><input type="range" id="wd-cp-r" min="0.25" max="4" step="0.05" value="0.75"></label>
+          <div class="ctrl"><span>내압 계수</span><div class="seg" id="wd-cp-in"><button data-value="0" class="on">무시</button><button data-value="0.18">+0.18</button><button data-value="-0.18">−0.18</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">남(아래) 면</span><span class="v" id="wd-cp-s">—</span></div>
+        <div class="stat"><span class="k">동(오른) 면</span><span class="v" id="wd-cp-e">—</span></div>
+        <div class="stat"><span class="k">북(위) 면</span><span class="v" id="wd-cp-n">—</span></div>
+        <div class="stat"><span class="k">풍방향 힘 계수 C<sub>F</sub></span><span class="v" id="wd-cp-cf">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: θ = 0에서 바람 쪽 +0.8, 옆면 −0.7, 뒷면 −0.5를 보고, D/B를 2·4로 키우면 뒷면 흡인이 −0.3·−0.2로 약해지는 것을 보세요(흐름이 긴 옆면에 다시 붙기 때문) · 풍향을 45°로 돌리면 바람을 비스듬히 받는 두 면이 모두 밀립니다 · 내압을 켜면 면마다 순압이 바뀌지만 C<sub>F</sub>는 그대로입니다 · 모델(교육용): 바람 쪽 0.8, 옆면 −0.7, 뒷면은 D/B에 따라 −0.5(≤ 1)·−0.3(2)·−0.2(≥ 4)로 보간(ASCE 7의 벽 계수 형태), 비스듬한 풍향은 면과 바람의 각으로 매끄럽게 보간했습니다. 실제 값은 기준표나 풍동 실험으로 정합니다.</div>
+    </div>
+    <div class="callout"><strong>예제 6.3 (B-10 꼭대기 층 모서리 유리의 풍압)</strong> 지붕 높이 속도압 \(q_h = 0.77\) kN/m², 모서리 영역 국부 외압 \(GC_p = -1.4\), 내압 \(GC_{pi} = +0.18\)(교육용 값)인 유리 한 장(1.5 × 3.0 m).
+      <ol style="margin:6px 0 0">
+        <li><b>순압.</b> \(p = 0.77 \times (-1.4) - 0.77 \times 0.18 = -1.08 - 0.14 = -1.22\) kN/m²(바깥으로 빨림).</li>
+        <li><b>유리 한 장의 힘.</b> \(1.22 \times 4.5 = 5.5\) kN, 약 560 kg의 물체로 유리를 바깥으로 당기는 셈이다.</li>
+        <li><b>주골조와 비교.</b> 같은 높이 바람 쪽 벽의 평균 외압 \(0.77 \times 2.0 \times 0.8 = 1.23\) kN/m²와 크기는 비슷하지만 방향이 반대이고, 유리·고정 철물·실런트는 이 흡인에 대해 따로 설계해야 한다.</li>
+      </ol>
+      강풍 피해에서 외장재가 구조체보다 먼저 떨어지는 이유가 여기 있다. 국부 계수는 기준의 외장재용 표나 풍동 실험으로 정하고, 이 예제의 숫자는 교육용이다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="gust">
+    <h2>가스트와 동적 응답</h2>
+    <div class="problem"><strong>평균 풍속으로 계산하면 충분할까</strong>
+      <p>10분 평균 풍속이 25 m/s여도 몇 초 동안은 35 m/s가 넘는 돌풍이 붑니다. 건물은 그 몇 초를 견뎌야 할까요, 10분 평균만 견디면 될까요? 게다가 건물은 스스로 흔들리는 고유 진동수가 있어서, 바람의 요동 가운데 그 진동수에 맞는 성분은 키워서 받아들입니다.</p></div>
+    <p>평균보다 짧은 시간 동안 부는 강한 바람을 <span class="term">가스트</span><span class="en">(gust)</span>, 돌풍이라 합니다. 평균 시간이 짧을수록 기록의 최대값은 커지므로, "최대 순간 풍속"은 평균 시간(예: 3초)과 함께 말해야 합니다. 건물이 받는 바람 힘의 요동은 두 부분으로 나눌 수 있습니다. 건물 고유 진동수보다 훨씬 느린 요동은 건물이 정적으로 따라가며 받는 <b>배경 성분</b>이고, 고유 진동수 근처의 요동은 건물을 공진시켜 증폭되는 <b>공진 성분</b>입니다.</p>
+    <figure class="diagram" id="fig-wd-spec">
+      <svg viewBox="0 0 820 300" role="img" aria-label="풍하중 스펙트럼과 기계적 증폭 계수, 배경 성분과 공진 성분">
+        <rect x="10" y="10" width="800" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(80,30)">
+          <line x1="0" y1="210" x2="640" y2="210" style="stroke:var(--axis);stroke-width:1.2"/>
+          <line x1="0" y1="210" x2="0" y2="10" style="stroke:var(--axis);stroke-width:1.2"/>
+          <text x="640" y="232" text-anchor="end" class="t-mono">진동수 (로그)</text>
+          <text x="-10" y="20" text-anchor="end" class="t-mono" transform="rotate(-90 -10 20)">스펙트럼</text>
+          <path d="M0 70C80 50 160 60 240 100C320 140 420 170 640 195" style="fill:none;stroke:var(--blue);stroke-width:2.6"/>
+          <text x="120" y="44" class="t-mono" style="fill:var(--blue)">바람 힘의 요동</text>
+          <path d="M0 200C200 199 360 195 410 170C428 120 436 40 445 30C454 40 462 120 480 172C520 200 600 205 640 206" style="fill:none;stroke:var(--accent-2);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="470" y="40" class="t-mono" style="fill:var(--accent-2)">기계적 증폭 |H(f)|²</text>
+          <path d="M0 210V70C80 50 160 60 240 100C300 130 340 150 380 160L380 210Z" style="fill:var(--blue);opacity:.15"/>
+          <path d="M420 210L425 120Q445 60 465 120L470 210Z" style="fill:var(--accent-2);opacity:.35"/>
+          <text x="180" y="150" text-anchor="middle" class="t">배경 성분(B)</text>
+          <text x="445" y="232" text-anchor="middle" class="t">공진 성분(R)</text>
+          <line x1="445" y1="210" x2="445" y2="20" style="stroke:var(--text-dim);stroke-dasharray:3 3"/>
+          <text x="452" y="196" class="t-mono">f₁</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-3.</b> 바람 힘의 요동은 대부분 낮은 진동수에 있다(파랑). 건물은 고유 진동수 \(f_1\) 근처의 요동을 \(1/(2\zeta)\) 정도로 키운다(주황 점선). 그래서 응답의 분산은 넓은 배경 성분과 \(f_1\) 근처의 좁은 공진 성분의 합이다. 낮은 건물(높은 \(f_1\))은 배경 성분이, 높고 유연한 건물(낮은 \(f_1\))은 공진 성분이 중요하다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-wd-gust">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>난류 풍속 기록과 순간 최대 풍속</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="wd-cv-gu" aria-label="10분 동안의 교육용 난류 풍속 기록과 이동 평균, 최대값"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>10분 평균 풍속 <output id="wd-gu-v-out"></output></span><input type="range" id="wd-gu-v" min="10" max="40" step="1" value="25"></label>
+          <label class="ctrl"><span>난류 강도 <output id="wd-gu-i-out"></output></span><input type="range" id="wd-gu-i" min="0.05" max="0.35" step="0.01" value="0.18"></label>
+          <div class="ctrl"><span>평균 시간</span><div class="seg" id="wd-gu-w"><button data-value="1">1 s</button><button data-value="3" class="on">3 s</button><button data-value="10">10 s</button><button data-value="60">1 min</button></div></div>
+          <div class="btn-row"><button class="btn" id="wd-gu-seed">다른 기록</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">표준편차 σ<sub>u</sub></span><span class="v" id="wd-gu-s">—</span></div>
+        <div class="stat"><span class="k">최대(평균 시간)</span><span class="v" id="wd-gu-max">—</span></div>
+        <div class="stat"><span class="k">가스트 계수 V<sub>max</sub>/V̄</span><span class="v" id="wd-gu-gf">—</span></div>
+        <div class="stat"><span class="k">피크 계수 g</span><span class="v" id="wd-gu-g">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 평균 시간을 1 s → 3 s → 10 s → 1 min으로 늘리며 기록의 최대값이 작아지는 것을 보세요. 같은 바람이라도 "최대 순간 풍속"은 평균 시간에 따라 다른 숫자입니다 · 난류 강도를 두 배로 하면 가스트 계수가 대략 1 + g·I<sub>u</sub>로 커집니다(g는 3–4) · '다른 기록'으로 피크가 기록마다 조금씩 다른 것을 확인하세요 · 모델(교육용): 폰 카르만 형태의 풍속 스펙트럼(난류 길이 100 m)을 가진 사인파 800개의 합, 표준편차를 정확히 I<sub>u</sub>·V̄에 맞췄고 Δt = 0.25 s, 600 s.</div>
+    </div>
+    <div class="callout def"><strong>원리 6.5 (가스트 영향 계수의 형태)</strong> 평균 풍속에 기초한 풍하중에 곱하는 <span class="term">가스트 영향 계수</span><span class="en">(gust effect factor)</span>는 다벤포트<span class="en">(A. G. Davenport)</span>가 1960년대에 정리한 형태로
+      <div class="formula">$$G = 1 + 2\,g\,I_H\sqrt{B + R}$$<div class="where">\(I_H\): 기준 높이의 난류 강도, \(g\): 피크 계수(대략 3–4), \(B\): 배경 성분(건물이 클수록 요동이 상쇄되어 작아진다), \(R\): 공진 성분(고유 진동수 \(f_1\)이 낮고 감쇠비 \(\zeta\)가 작을수록 크다)이다. 앞의 2는 힘이 풍속의 제곱에 비례해 \(\Delta F/\bar F \approx 2\,u'/\bar V\)이기 때문이다. 실제 기준식은 이 형태에 여러 보정을 더한 것이다(현행 KDS 41 12 00 확인).</div></div></div>
+    <div class="sim" id="sim-wd-gf">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>가스트 영향 계수: 배경 성분과 공진 성분</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="wd-cv-gf" aria-label="고유 진동수에 따른 가스트 영향 계수 곡선과 배경·공진 성분"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>건물</span><div class="seg" id="wd-gf-b"><button data-value="b10" class="on">B-10</button><button data-value="tower">60층 타워</button></div></div>
+          <label class="ctrl"><span>고유 진동수 f₁ <output id="wd-gf-f-out"></output></span><input type="range" id="wd-gf-f" min="-1.3" max="0.48" step="0.01" value="0"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="wd-gf-z-out"></output></span><input type="range" id="wd-gf-z" min="0.5" max="5" step="0.1" value="2"></label>
+          <label class="ctrl"><span>지붕 난류 강도 <output id="wd-gf-i-out"></output></span><input type="range" id="wd-gf-i" min="0.08" max="0.3" step="0.01" value="0.16"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">배경 B</span><span class="v" id="wd-gf-bb">—</span></div>
+        <div class="stat"><span class="k">공진 R</span><span class="v" id="wd-gf-rr">—</span></div>
+        <div class="stat"><span class="k">피크 계수 g</span><span class="v" id="wd-gf-g">—</span></div>
+        <div class="stat"><span class="k">G</span><span class="v" id="wd-gf-G">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: B-10(f₁ = 1.0 Hz, ζ = 2 %, I<sub>H</sub> = 0.16)에서 G ≈ 2.0이 되는 것을 보세요. 이 책이 B-10에 G = 2.0을 쓰는 근거입니다 · 진동수를 0.2 Hz로 낮추면 공진 성분 R이 커져 G가 오릅니다 · '60층 타워'(높이 240 m, 40 × 40 m)는 건물이 커 배경 성분이 작지만 진동수가 낮아 공진이 중요합니다 · 감쇠비를 두 배로 하면 R이 절반이 됩니다 · 모델(교육용): G = 1 + 2gI<sub>H</sub>√(B + R), B = 1/[1 + 0.63((b + H)/L)<sup>0.63</sup>], R = (1/ζ)R<sub>n</sub>R<sub>h</sub>R<sub>b</sub>(0.53 + 0.47R<sub>d</sub>) (ASCE 7의 배경·공진 성분 식 형태, 난류 길이 L = 100 m, 풍속은 지붕 높이 값), g = √(2 ln 600f₁) + 0.577/√(2 ln 600f₁). 진동수는 로그 눈금.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="story-force">
+    <h2>층 풍하중과 밑면 전단</h2>
+    <div class="problem"><strong>B-10 한 층이 받는 바람</strong>
+      <p>풍압은 높이마다 다르므로, 층마다 "그 층이 맡는 높이 구간"의 풍압을 받는 면적에 곱해 모읍니다. B-10의 Y 방향 바람은 폭 32 m의 면을 밉니다. 층 풍하중을 모두 더하면 밑면 전단력이 되는데, 이것은 8장의 지진 밑면 전단력 5,000 kN과 비교해 어느 정도일까요?</p></div>
+    <div class="callout def"><strong>원리 6.6 (층 풍하중, 이 책의 교육용 모형)</strong> \(i\)층이 맡는 높이 구간을 \([z_1, z_2]\)(아래·위 층과의 중간), 받는 면의 폭을 \(B\)라 하면
+      <div class="formula">$$F_i = \int_{z_1}^{z_2} q(z)\,G\,C_p\,B\,dz, \qquad V_{\text{base}} = \sum F_i, \qquad M_{\text{ot}} = \sum F_i h_i$$<div class="where">\(G = 2.0\), \(C_p = 1.3\)(풍상 0.8 + 풍하 0.5)을 쓴다. 공용 함수 <code>CB.wind.storyForce(z1, z2, B, V0, rough, Cp, G)</code>가 구간을 8개로 나눠 적분한다. 1층 바닥(지반) 근처 0–2.5 m 몫은 기초로 바로 간다고 본다.</div></div></div>
+    <div class="sim" id="sim-wd-story">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>층 풍하중과 밑면 전단: 지진하중과 비교</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="wd-cv-st" aria-label="층마다 풍하중과 지진하중 막대, 층 전단력 분포"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>풍향(받는 폭)</span><div class="seg" id="wd-st-dir"><button data-value="32" class="on">Y 방향(32 m)</button><button data-value="24">X 방향(24 m)</button></div></div>
+          <label class="ctrl"><span>기본 풍속 V₀ <output id="wd-st-v-out"></output></span><input type="range" id="wd-st-v" min="20" max="45" step="1" value="26"></label>
+          <div class="ctrl"><span>노풍도</span><div class="seg" id="wd-st-r"><button data-value="A">A</button><button data-value="B" class="on">B</button><button data-value="C">C</button><button data-value="D">D</button></div></div>
+          <label class="ctrl"><span>층 수 <output id="wd-st-n-out"></output></span><input type="range" id="wd-st-n" min="3" max="30" step="1" value="10"></label>
+          <label class="check"><input type="checkbox" id="wd-st-eq" checked> 지진하중(등가 정적) 겹치기</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">풍하중 밑면 전단</span><span class="v" id="wd-st-vw">—</span></div>
+        <div class="stat"><span class="k">풍하중 전도 모멘트</span><span class="v" id="wd-st-mw">—</span></div>
+        <div class="stat"><span class="k">지진 밑면 전단</span><span class="v" id="wd-st-ve">—</span></div>
+        <div class="stat"><span class="k">풍 / 지진</span><span class="v" id="wd-st-ratio">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: B-10 기본값에서 7층(29 m)의 풍하중이 약 220 kN, 밑면 전단 약 1,790 kN으로 지진의 약 36 %인 것을 보세요 · 층 수를 30층으로 늘리면 풍하중은 받는 면적과 풍속이 함께 커져 빠르게 늘고, 지진하중은 주기가 길어지며 천천히 커져 이 모형에서는 풍하중이 지진의 약 1.3배로 역전됩니다 · X 방향(받는 폭 24 m)은 풍하중이 3/4로 줍니다 · 모델: 층 풍하중은 CB.wind.storyForce(G = 2.0, C<sub>p</sub> = 1.3), 지진은 CB.dyn.els(B-10 층 중량 6,900 kN·지붕 6,000 kN, S<sub>DS</sub> = 0.50, S<sub>D1</sub> = 0.29, R = 6, I<sub>e</sub> = 1.2, T = T<sub>a</sub> = 0.0488h<sub>n</sub><sup>0.75</sup>), 층 높이 1층 5 m·위층 4 m. 둘 다 강도 수준(하중 계수 1.0의 W와 E) 값이므로 그대로 비교합니다.</div>
+    </div>
+    <div class="table-wrap"><table class="wd-tbl">
+      <thead><tr><th>층</th><th>높이 h (m)</th><th>구간 (m)</th><th>풍하중 F (kN), Y 방향</th><th>지진력 F (kN)</th></tr></thead>
+      <tbody>
+        <tr><td>지붕(10)</td><td>41</td><td>39–41</td><td>126</td><td>845</td></tr>
+        <tr><td>9</td><td>37</td><td>35–39</td><td>244</td><td>864</td></tr>
+        <tr><td>8</td><td>33</td><td>31–35</td><td>232</td><td>758</td></tr>
+        <tr><td>7</td><td>29</td><td>27–31</td><td>219</td><td>653</td></tr>
+        <tr><td>6</td><td>25</td><td>23–27</td><td>205</td><td>551</td></tr>
+        <tr><td>5</td><td>21</td><td>19–23</td><td>190</td><td>451</td></tr>
+        <tr><td>4</td><td>17</td><td>15–19</td><td>173</td><td>354</td></tr>
+        <tr><td>3</td><td>13</td><td>11–15</td><td>154</td><td>261</td></tr>
+        <tr><td>2</td><td>9</td><td>7–11</td><td>131</td><td>171</td></tr>
+        <tr><td>1</td><td>5</td><td>2.5–7</td><td>118</td><td>87</td></tr>
+        <tr><th colspan="3">합(밑면 전단) · 전도 모멘트</th><th>1,793 · 44,100 kN·m</th><th>4,995 · 145,000 kN·m</th></tr>
+      </tbody>
+    </table></div>
+    <div class="callout"><strong>예제 6.4 (B-10 7층의 풍하중)</strong> 7층 바닥 높이 29 m, 맡는 구간 27–31 m, 받는 폭 32 m.
+      <ol style="margin:6px 0 0">
+        <li><b>구간 가운데 풍속.</b> \(V(29) = 26 \times 2.9^{0.22} = 26 \times 1.264 = 32.9\) m/s.</li>
+        <li><b>속도압.</b> \(q = 0.5 \times 1.22 \times 32.9^2 = 659\) N/m² = 0.659 kN/m².</li>
+        <li><b>층 풍하중.</b> \(F = 0.659 \times 2.0 \times 1.3 \times 32 \times 4 = 219\) kN(구간을 나눠 적분해도 219 kN).</li>
+        <li><b>골조 한 줄 몫.</b> Y 방향 바람을 받는 골조 다섯 줄에 고르게 나누면 줄마다 약 44 kN, MechanicsBook이 B-10 골조 한 줄에 가정한 "층마다 약 50 kN"과 같은 크기다. (5장에서 본 것처럼 실제로는 코어가 아래층 몫을 대부분 가져간다.)</li>
+      </ol></div>
+    <div class="callout site"><strong>B-10: 풍하중 1,790 kN 대 지진하중 5,000 kN</strong> 노풍도 B, \(V_0 = 26\) m/s에서 B-10의 Y 방향 풍하중 밑면 전단은 약 1,790 kN(X 방향은 받는 폭 24 m로 약 1,350 kN), 전도 모멘트는 약 44,000 kN·m다. 연약 지반 위의 B-10은 지진 밑면 전단(약 5,000 kN, 8장)이 풍하중의 약 2.8배라서 강도 설계는 지진이 지배한다. 그러나 이것으로 바람을 잊어도 되는 것은 아니다. 외장재의 국부 풍압, 지붕재의 들림, 그리고 높고 유연한 건물에서는 바람에 의한 흔들림(거주성)이 별도로 검토된다. 층수가 많아지고 지반이 단단할수록 바람이 강도까지 지배하기 쉽다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="vortex">
+    <h2>와류 방출과 횡풍 진동</h2>
+    <div class="problem"><strong>바람에 직각으로 흔들린다</strong>
+      <p>바람은 건물을 바람 방향으로 밉니다. 그런데 가늘고 높은 굴뚝이나 탑은 바람과 <b>직각 방향</b>으로 크게 흔들리기도 합니다. 미는 방향이 아닌 옆으로 흔드는 힘은 어디서 올까요?</p></div>
+    <p>흐름이 뭉툭한 물체의 양쪽 모서리에서 떨어져 나가면, 물체 뒤에 소용돌이가 한쪽씩 번갈아 생겨 떠내려갑니다. 이 줄지은 소용돌이를 카르만 소용돌이 열이라 하고, 소용돌이가 떨어져 나가는 현상을 <span class="term">와류 방출</span><span class="en">(vortex shedding)</span>이라 합니다. 소용돌이가 한쪽에서 떨어질 때마다 물체는 반대쪽으로 당겨지는 힘을 받으므로, 바람 직각 방향으로 일정한 진동수의 요동 힘이 생깁니다. 그 진동수가 건물의 고유 진동수와 맞으면 공진해 크게 흔들리는데, 이것이 <span class="term">횡풍 진동</span><span class="en">(across-wind vibration)</span>의 대표적인 원인입니다.</p>
+    <figure class="diagram" id="fig-wd-vortex">
+      <svg viewBox="0 0 820 260" role="img" aria-label="정사각형 단면 뒤의 카르만 소용돌이 열과 바람 직각 방향의 교번 힘">
+        <rect x="10" y="10" width="800" height="240" rx="10" class="f-surface"/>
+        <g style="stroke:var(--blue);stroke-width:1.8" marker-end="url(#wd-ah-blue)"><line x1="30" y1="90" x2="100" y2="90"/><line x1="30" y1="130" x2="100" y2="130"/><line x1="30" y1="170" x2="100" y2="170"/></g>
+        <text x="64" y="70" text-anchor="middle" class="t-mono" style="fill:var(--blue)">V</text>
+        <rect x="140" y="100" width="60" height="60" class="f-acc" style="opacity:.6;stroke:var(--accent);stroke-width:2"/>
+        <text x="170" y="184" text-anchor="middle" class="t-mono">D</text>
+        <g style="fill:none;stroke:var(--blue);stroke-width:2">
+          <path d="M260 100a22 22 0 1 0 1 0" /><path d="M262 108a12 12 0 1 0 1 0"/>
+          <path d="M360 160a24 24 0 1 1 1 0"/><path d="M362 152a13 13 0 1 1 1 0"/>
+          <path d="M470 100a26 26 0 1 0 1 0"/><path d="M472 108a14 14 0 1 0 1 0"/>
+          <path d="M580 160a28 28 0 1 1 1 0"/><path d="M582 152a15 15 0 1 1 1 0"/>
+          <path d="M690 100a30 30 0 1 0 1 0"/>
+        </g>
+        <path d="M200 100C220 96 240 98 258 104M200 160C240 164 300 168 340 160" style="fill:none;stroke:var(--blue);stroke-width:1.4;stroke-dasharray:4 3"/>
+        <line x1="170" y1="96" x2="170" y2="44" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#wd-ah-load)"/>
+        <line x1="170" y1="164" x2="170" y2="216" style="stroke:var(--accent-2);stroke-width:2.6;opacity:.45" marker-end="url(#wd-ah-load)"/>
+        <text x="182" y="54" class="t-mono" style="fill:var(--accent-2)">교번 힘(진동수 f_s)</text>
+        <text x="470" y="226" text-anchor="middle" class="t-dim">위·아래에서 번갈아 떨어지는 소용돌이: 같은 쪽 소용돌이 간격 ≈ 0.85V/f_s</text>
+      </svg>
+      <figcaption><b>그림 6-4.</b> 카르만 소용돌이 열. 단면 양쪽 모서리에서 소용돌이가 번갈아 떨어져 나가며 바람 직각 방향으로 진동수 \(f_s\)의 교번 힘을 만든다. 같은 쪽 소용돌이 하나가 떨어질 때마다 힘의 방향이 한 번 바뀌어, 위·아래 한 쌍이 한 주기다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.7 (스트로할 수와 공진 풍속)</strong> 와류 방출 진동수는 풍속에 비례하고 단면 폭에 반비례한다.
+      <div class="formula">$$f_s = \frac{St\,V}{D}, \qquad V_{cr} = \frac{f_1 D}{St}$$<div class="where">\(D\): 바람 직각 방향 단면 폭, \(St\): <span class="term">스트로할 수</span><span class="en">(Strouhal number)</span>(원형 단면 약 0.2, 정사각형 약 0.12–0.14), \(f_1\): 건물의 횡풍 방향 고유 진동수. \(f_s = f_1\)이 되는 풍속 \(V_{cr}\)이 <span class="term">공진 풍속</span><span class="en">(critical wind speed)</span>이다. 공진 근처에서는 건물의 흔들림이 소용돌이 방출을 고유 진동수에 붙잡아 두는 동조(lock-in)도 생긴다. 공용 함수 <code>CB.wind.vortexFreq(V, D, St)</code>.</div></div></div>
+    <div class="sim" id="sim-wd-vortex">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>와류 방출과 공진 풍속</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><div class="wd-stack">
+          <div><canvas id="wd-cv-vx" aria-label="정사각형 단면 뒤로 떨어져 나가는 소용돌이 애니메이션과 건물의 횡풍 흔들림"></canvas><span class="wd-cap" id="wd-vx-cap">평면: 소용돌이 열(시간 축척 조정)</span></div>
+          <div><canvas id="wd-cv-vx2" aria-label="풍속에 따른 와류 방출 진동수 직선과 건물 고유 진동수, 공진 풍속"></canvas></div>
+        </div></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>풍속 V(지붕) <output id="wd-vx-v-out"></output></span><input type="range" id="wd-vx-v" min="2" max="80" step="0.5" value="35.5"></label>
+          <label class="ctrl"><span>바람 직각 폭 D <output id="wd-vx-d-out"></output></span><input type="range" id="wd-vx-d" min="5" max="60" step="1" value="24"></label>
+          <label class="ctrl"><span>고유 주기 T₁ <output id="wd-vx-t-out"></output></span><input type="range" id="wd-vx-t" min="0.2" max="8" step="0.05" value="1"></label>
+          <label class="ctrl"><span>스트로할 수 St <output id="wd-vx-st-out"></output></span><input type="range" id="wd-vx-st" min="0.08" max="0.22" step="0.005" value="0.12"></label>
+          <div class="btn-row"><button class="btn" id="wd-vx-b10">B-10</button><button class="btn" id="wd-vx-tw">가는 탑</button><button class="btn primary" id="wd-vx-play">▶ 재생</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">방출 진동수 f<sub>s</sub></span><span class="v" id="wd-vx-fs">—</span></div>
+        <div class="stat"><span class="k">고유 진동수 f₁</span><span class="v" id="wd-vx-f1">—</span></div>
+        <div class="stat"><span class="k">공진 풍속 V<sub>cr</sub></span><span class="v" id="wd-vx-vcr">—</span></div>
+        <div class="stat"><span class="k">증폭 R<sub>d</sub>(ζ = 2 %)</span><span class="v" id="wd-vx-rd">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 'B-10'(X 방향 바람, D = 24 m, T₁ = 1.00 s)의 공진 풍속이 200 m/s로 설계 풍속 35.5 m/s보다 훨씬 커서 와류 공진이 문제 되지 않음을 보세요 · '가는 탑'(D = 30 m, T₁ = 6 s)은 공진 풍속이 약 42 m/s로 설계 풍속 범위에 들어옵니다. 풍속 슬라이더를 공진 풍속에 맞추면 흔들림이 커집니다 · 모델: f<sub>s</sub> = St·V/D(CB.wind.vortexFreq), 증폭은 1자유도 정상 응답 R<sub>d</sub>(f<sub>s</sub>/f₁, ζ = 0.02)(CB.dyn.Rd). 실제 와류 응답은 동조·공력 감쇠로 이 단순 증폭과 다르며, 애니메이션의 흔들림은 R<sub>d</sub>를 상한 두고 과장했습니다.</div>
+    </div>
+    <div class="callout"><strong>예제 6.5 (B-10과 가는 탑의 공진 풍속)</strong>
+      <ol style="margin:6px 0 0">
+        <li><b>B-10.</b> 1차 모드(T₁ = 1.00 s)는 Y 방향이므로 이를 흔드는 횡풍 진동은 X 방향 바람에서 생긴다. 바람 직각 폭은 Y 방향 치수 \(D = 24\) m, \(St = 0.12\): \(V_{cr} = 1.0 \times 24/0.12 = 200\) m/s. 지붕 설계 풍속 35.5 m/s의 5배가 넘어 와류 공진은 일어나지 않는다.</li>
+        <li><b>가는 탑.</b> \(D = 30\) m, \(T_1 = 6\) s(\(f_1 = 0.167\) Hz): \(V_{cr} = 0.167 \times 30/0.12 = 41.7\) m/s. 높이 수백 m의 꼭대기 풍속으로는 충분히 나타날 수 있는 값이다.</li>
+      </ol>
+      공진 풍속은 \(f_1 D\)에 비례한다. 높아질수록 \(f_1\)이 낮아지고 세장할수록 \(D\)가 상대적으로 작아지므로, 초고층과 굴뚝·탑에서 와류 진동이 설계를 지배하기 쉽다.</div>
+    <div class="callout deep"><strong>심화: 갤로핑</strong> 단면이 흔들리며 바람이 단면에 비스듬히 부딪히면, 단면 모양에 따라 그 움직임을 더 키우는 방향의 양력이 생길 수 있다. 이렇게 진동이 스스로 공기력을 끌어들여 커지는 불안정을 갤로핑(galloping)이라 하며, 덴 하르톡의 판정식 \(dC_L/d\alpha + C_D \lt 0\)(받음각 \(\alpha\)에 대한 양력 계수 기울기와 항력 계수의 합이 음수)이면 일어날 수 있다. 와류 공진이 특정 풍속 근처에서만 생기는 것과 달리, 갤로핑은 임계 풍속을 넘으면 풍속이 클수록 진폭이 계속 커진다. 결빙된 송전선, 가늘고 긴 직사각형 단면에서 문제가 된다.</div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="comfort">
+    <h2>건물 가속도와 거주성</h2>
+    <div class="problem"><strong>무너지지 않아도 불편하면 실패</strong>
+      <p>바람이 센 날 초고층 사무실에서 블라인드 줄이 흔들리고, 물컵의 물이 출렁이고, 몇몇 사람은 멀미를 느낍니다. 구조 안전에는 아무 문제가 없는데도 입주자가 떠나면 그 건물은 실패입니다. 사람은 흔들림의 무엇을 느낄까요?</p></div>
+    <p>사람은 변위보다 <b>가속도</b>를 느낍니다. 같은 가속도라도 진동수에 따라 느끼는 정도가 달라서, 건물 흔들림의 주된 진동수 범위(0.1–1 Hz)에서는 진동수가 낮을수록 같은 가속도를 덜 느끼는 경향이 있습니다. 그래서 거주성 기준은 진동수–가속도 평면 위의 곡선으로 주어지고, 1–10년 재현 바람에서 건물 꼭대기 층의 최대 가속도가 곡선 아래에 있어야 합니다. 흔히 인용되는 대략적인 범위는 10년 재현 최대 가속도로 주거 약 10–15 mg, 사무실 약 20–25 mg입니다(1 mg = 0.00981 m/s²). 주거가 엄격한 것은 밤낮으로 머무르며 누워서도 흔들림을 느끼기 때문입니다.</p>
+    <div class="callout def"><strong>원리 6.8 (풍방향 최대 가속도의 추정, 교육용)</strong> 1차 모드를 직선으로 보고 일반화 질량 \(M^* = m_{\text{total}}/3\), 일반화 평균 풍력 \(F^* = q_H C_D B H/(2 + 2\alpha)\)라 하면 꼭대기의 최대 가속도는
+      <div class="formula">$$a_{\max} \approx g_R \cdot 2 I_H \sqrt{R}\,\frac{F^*}{M^*}$$<div class="where">\(R\): 앞 절의 공진 성분, \(g_R\): 피크 계수. 가속도는 공진 성분에서만 나오며, 고유 진동수 근처의 바람 요동 에너지에 비례하고 감쇠비의 제곱근에 반비례한다. 실제 검토는 풍동 실험이나 기준의 절차로 하며, 횡풍 방향 가속도가 풍방향보다 큰 경우가 많다.</div></div></div>
+    <div class="sim" id="sim-wd-comfort">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>거주성 판정: 진동수–가속도 평면</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="wd-cv-cm" aria-label="진동수와 최대 가속도의 로그 평면 위 교육용 거주성 기준 곡선과 건물 응답 점"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>건물</span><div class="seg" id="wd-cm-b"><button data-value="b10" class="on">B-10</button><button data-value="tower">60층 타워</button></div></div>
+          <label class="ctrl"><span>고유 진동수 f₁ <output id="wd-cm-f-out"></output></span><input type="range" id="wd-cm-f" min="-1.2" max="0.3" step="0.01" value="0"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="wd-cm-z-out"></output></span><input type="range" id="wd-cm-z" min="0.5" max="5" step="0.1" value="2"></label>
+          <label class="ctrl"><span>검토 풍속(지붕, 평균) <output id="wd-cm-v-out"></output></span><input type="range" id="wd-cm-v" min="10" max="45" step="0.5" value="25"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 가속도</span><span class="v" id="wd-cm-a">—</span></div>
+        <div class="stat"><span class="k">m/s²</span><span class="v" id="wd-cm-ams">—</span></div>
+        <div class="stat"><span class="k">√R</span><span class="v" id="wd-cm-r">—</span></div>
+      </div>
+      <div class="wd-msg" id="wd-cm-msg"></div>
+      <div class="sim-note">해볼 것: B-10은 검토 풍속 25 m/s에서 약 2.5 mg로 기준 곡선보다 훨씬 아래입니다 · '60층 타워'(240 m, f₁ = 0.2 Hz)는 풍속 30 → 40 m/s에서 가속도가 두 배 넘게 뛰고 사무실 곡선에 다가갑니다 · 감쇠비를 1 % → 4 %로 올리면 가속도가 절반이 됩니다. 9장의 동조 질량 감쇠기가 초고층에 쓰이는 이유입니다 · 모델(교육용): 원리 6.8, C<sub>D</sub> = 1.3, I<sub>H</sub> = 0.16, 질량 밀도 B-10 220 kg/m³·타워 200 kg/m³. 세 곡선은 a = c·f<sup>−0.41</sup> 꼴의 교육용 곡선(낮은 진동수에서 허용 가속도가 커지는 ISO·AIJ 지침과 같은 꼴, 값은 위 본문의 대략 범위에 맞춤)이며 실제 기준이 아닙니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="shape">
+    <h2>풍동 실험과 공력 형상</h2>
+    <div class="problem"><strong>모서리를 깎으면 바람이 약해진다?</strong>
+      <p>초고층 타워의 평면을 보면 정사각형의 모서리를 깎거나 안으로 들이고, 위로 갈수록 좁아지거나 비틀리며 올라갑니다. 단순한 디자인 선택일까요, 구조적인 이유가 있을까요?</p></div>
+    <p>모양이 복잡한 건물의 풍압과 흔들림은 식만으로 정하기 어렵습니다. 그래서 큰 건물은 대기 경계층의 풍속 분포와 난류를 축소해 흉내 낸 <span class="term">풍동 실험</span><span class="en">(wind tunnel test)</span>으로 확인합니다. 1960년대에 캐나다 웨스턴온타리오 대학의 다벤포트 등이 경계층 풍동을 건물 설계에 쓰기 시작했고, 지금은 초고층마다 표면 압력 측정(외장재 설계), 고주파 힘 저울(구조체 하중), 공탄성 모형(흔들림) 실험을 합니다. 그 결과 알려진 것이 횡풍 진동은 <b>모양</b>으로 크게 줄일 수 있다는 점입니다. 모서리를 깎거나 들이면 흐름이 모서리에서 덜 격렬하게 떨어지고, 높이에 따라 단면이 달라지면(테이퍼·셋백·비틀림) 높이마다 소용돌이가 서로 다른 진동수로 떨어져 한꺼번에 건물을 흔들지 못합니다. 이런 설계를 <span class="term">공력 형상</span><span class="en">(aerodynamic shaping)</span> 개선이라 합니다.</p>
+    <figure class="diagram" id="fig-wd-shapes">
+      <svg viewBox="0 0 820 260" role="img" aria-label="공력 형상 개선의 종류: 모서리 깎기, 모서리 들이기, 둥근 모서리, 테이퍼, 셋백, 비틀림">
+        <rect x="10" y="10" width="800" height="240" rx="10" class="f-surface"/>
+        <g style="stroke:var(--accent);stroke-width:2.2" class="f-acc-soft">
+          <path d="M60 60H120V120H60Z" style="fill:none;stroke:var(--text-dim);stroke-dasharray:4 3"/>
+          <path d="M70 60H110L120 70V110L110 120H70L60 110V70Z"/>
+          <path d="M190 60H250V120H190Z" style="fill:none;stroke:var(--text-dim);stroke-dasharray:4 3"/>
+          <path d="M202 60H238V72H250V108H238V120H202V108H190V72H202Z"/>
+          <rect x="320" y="60" width="60" height="60" rx="14"/>
+          <path d="M450 210L470 60H500L520 210Z"/>
+          <path d="M580 210V160H590V110H600V60H630V110H640V160H650V210Z"/>
+          <path d="M720 210L760 210L752 60L728 60Z" style="opacity:.4"/>
+          <path d="M720 210Q735 150 728 60M760 210Q745 150 752 60" style="fill:none"/>
+        </g>
+        <g class="t" text-anchor="middle" style="font-weight:700"><text x="90" y="150">모서리 깎기</text><text x="220" y="150">모서리 들이기</text><text x="350" y="150">둥근 모서리</text><text x="485" y="236">테이퍼</text><text x="615" y="236">셋백</text><text x="740" y="236">비틀림</text></g>
+        <text x="220" y="196" text-anchor="middle" class="t-dim">평면: 모서리 흐름 분리를 약하게</text>
+        <text x="615" y="40" text-anchor="middle" class="t-dim">입면: 높이마다 방출 진동수를 흩뜨림</text>
+      </svg>
+      <figcaption><b>그림 6-5.</b> 공력 형상 개선의 대표적인 방법. 왼쪽 셋은 평면의 모서리를 다듬어 흐름 분리와 소용돌이의 세기를 줄이고, 오른쪽 셋은 높이에 따라 단면을 바꿔 소용돌이가 건물 전체를 한 박자로 흔들지 못하게 한다. 실제 효과의 크기는 건물마다 풍동 실험으로 확인한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-wd-shape">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>공력 형상 비교(교육용 지수)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="wd-cv-sh" aria-label="끌어서 돌려 보는 타워의 3D 형상: 모서리 처리, 테이퍼, 셋백, 비틀림"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>형상</span><div class="seg" id="wd-sh-type"><button data-value="square" class="on">정사각형</button><button data-value="chamfer">모서리 깎기</button><button data-value="recess">모서리 들이기</button><button data-value="round">둥근 모서리</button><button data-value="taper">테이퍼</button><button data-value="setback">셋백</button><button data-value="twist">비틀림</button></div></div>
+          <label class="ctrl"><span>변형 정도 <output id="wd-sh-a-out"></output></span><input type="range" id="wd-sh-a" min="0" max="1" step="0.05" value="0.6"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">항력 계수 C<sub>D</sub></span><span class="v" id="wd-sh-cd">—</span></div>
+        <div class="stat"><span class="k">스트로할 수 St</span><span class="v" id="wd-sh-st">—</span></div>
+        <div class="stat"><span class="k">횡풍 응답 지수</span><span class="v" id="wd-sh-idx">—</span></div>
+        <div class="stat"><span class="k">공진 풍속(가는 탑)</span><span class="v" id="wd-sh-vcr">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 정사각형(지수 1.00)에서 형상을 바꾸고 변형 정도를 키워 횡풍 응답 지수가 줄어드는 것을 보세요 · 모서리 처리는 스트로할 수를 키워 같은 탑의 공진 풍속을 낮추기도 합니다. 공진 풍속이 설계 풍속 범위로 내려오면 오히려 불리할 수 있으므로 지수 하나로 판단하지 않습니다 · 끌어서 돌려 보세요 · 모델(교육용 지수): 풍동 실험 문헌에서 알려진 경향(모서리 처리·테이퍼·셋백·비틀림이 횡풍 응답을 줄이고, 모서리 처리는 항력도 줄인다)을 선형으로 단순화한 값이며 실제 건물의 수치가 아닙니다. 공진 풍속은 예제 6.5의 가는 탑(D = 30 m, f₁ = 0.167 Hz) 기준.</div>
+    </div>
+    <p>실제 사례로는 모서리를 계단식으로 들인 타이베이 101, 높이에 따라 평면이 나선형으로 줄어드는 셋백을 둔 부르즈 할리파, 비틀리며 좁아지는 상하이 타워가 자주 언급됩니다. 이 건물들은 설계 과정에서 풍동 실험으로 여러 형상을 비교해 바람 응답을 줄였다고 알려져 있습니다. 형상만으로 부족하면 9장의 동조 질량 감쇠기 같은 보조 장치를 더합니다.</p>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="tacoma">
+    <h2>타코마 나로스 교 1940</h2>
+    <p>1940년 7월 1일 미국 워싱턴주 퓨젓 사운드의 타코마 나로스 해협에 중앙 경간 약 853 m(2,800 ft)의 현수교가 개통했습니다. 당시 세계 세 번째로 긴 현수교였지만 2차로의 좁은 다리였고, 보강 거더는 춤 약 2.4 m의 판형으로 경간에 비해 매우 얇고 유연했습니다. 개통 전부터 약한 바람에도 상판이 위아래로 크게 출렁여 "질주하는 거티<span class="en">(Galloping Gertie)</span>"라는 별명이 붙었습니다.</p>
+    <p>1940년 11월 7일 아침, 약 19 m/s(시속 약 68 km)의 바람 속에서 출렁임이 갑자기 바뀌었습니다. 상판이 경간 가운데를 마디로 좌우가 반대로 기울어지는 <b>비틀림 진동</b>을 시작했고, 진폭이 점점 커져 약 한 시간 뒤 중앙 경간의 상판이 떨어져 나갔습니다. 다리 위에 남겨진 차 안의 개 한 마리 말고는 사람이 다치지 않았고, 붕괴 장면이 영상으로 남아 지금도 공학 교육에 쓰입니다.</p>
+    <figure class="diagram" id="fig-wd-tacoma">
+      <svg viewBox="0 0 820 280" role="img" aria-label="타코마 나로스 교 중앙 경간의 비틀림 진동 모드: 가운데 마디를 두고 양쪽 반 경간이 반대로 기운다">
+        <rect x="10" y="10" width="800" height="260" rx="10" class="f-surface"/>
+        <g style="stroke:var(--text);stroke-width:3;fill:none"><path d="M100 60V220M720 60V220"/><path d="M100 60Q410 200 720 60"/></g>
+        <path d="M100 160C200 130 300 130 410 160C520 190 620 190 720 160" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+        <path d="M100 160C200 190 300 190 410 160C520 130 620 130 720 160" style="fill:none;stroke:var(--accent-2);stroke-width:3"/>
+        <circle cx="410" cy="160" r="6" style="fill:var(--text)"/>
+        <text x="410" y="190" text-anchor="middle" class="t-mono">마디(경간 가운데)</text>
+        <g transform="translate(220,236)"><path d="M-40 -6L40 6" style="stroke:var(--accent);stroke-width:5"/><text x="0" y="22" text-anchor="middle" class="t-dim">왼쪽 반: 한쪽으로 기움</text></g>
+        <g transform="translate(600,236)"><path d="M-40 6L40 -6" style="stroke:var(--accent);stroke-width:5"/><text x="0" y="22" text-anchor="middle" class="t-dim">오른쪽 반: 반대로 기움</text></g>
+        <g style="stroke:var(--blue);stroke-width:1.8" marker-end="url(#wd-ah-blue)"><line x1="30" y1="110" x2="80" y2="110"/><line x1="30" y1="140" x2="80" y2="140"/></g>
+        <text x="410" y="40" text-anchor="middle" class="t">중앙 경간 약 853 m · 상판 폭 약 12 m · 거더 춤 약 2.4 m</text>
+      </svg>
+      <figcaption><b>그림 6-6.</b> 1940년 11월 7일 타코마 나로스 교에 나타난 비틀림 진동의 모양(개념도). 경간 가운데가 마디가 되어 양쪽 반 경간이 서로 반대로 기울었다. 위아래 출렁임(개통 때부터)과 달리 이 비틀림은 바람에서 에너지를 계속 받아 커졌다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정리 6.9 (타코마의 교훈: 강제 공진이 아닌 자려 진동)</strong> 타코마 나로스 교의 붕괴는 흔히 "바람의 진동수와 다리의 진동수가 맞은 공진"으로 설명되지만, 이후의 연구는 상판의 움직임이 공기력을 바꾸고 그 공기력이 다시 움직임을 키우는 공탄성 불안정, 곧 비틀림 <span class="term">플러터</span><span class="en">(flutter)</span>를 주된 원인으로 본다. 외부의 일정한 주기 힘이 아니라 구조물의 운동 자체가 에너지를 끌어들이는 자려 진동이라서, 임계 풍속을 넘으면 감쇠가 음수가 된 것처럼 진폭이 커진다. 얇고 납작한 판형 단면, 낮은 비틀림 강성이 이를 부추겼다.</div>
+    <p>붕괴 뒤 장대교 설계에는 풍동 실험과 공탄성 안정 검토가 필수가 되었고, 1950년에 같은 자리에 트러스로 보강한 더 깊고 넓은 새 다리가 개통했습니다. 건물에서도 같은 교훈이 통합니다. 바람은 미는 힘(정적), 흔드는 힘(가스트·와류), 그리고 구조물의 움직임과 맞물려 스스로 커지는 힘(갤로핑·플러터)을 모두 갖고 있고, 기준식은 앞의 둘을 주로 다루므로 세장하고 가벼운 구조물은 마지막 것을 따로 확인해야 합니다.</p>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="loads.html"><small>CH.02 · 설계 하중과 하중 조합</small>1.2D + 1.0W + L, 0.9D + 1.0W<br><span>이 장의 풍하중이 들어가는 하중 조합과 들림 검토.</span></a>
+      <a href="walls.html"><small>CH.05 · 전단벽·코어·튜브</small>코어와 골조의 분담<br><span>층 풍하중 118–244 kN을 벽–골조 상호작용으로 나눈다.</span></a>
+      <a href="dynamics.html"><small>CH.07 · 구조 동역학</small>B-10의 T₁ = 1.00 s<br><span>공진·감쇠·모드 해석이 가스트 응답과 와류 공진의 바탕이다.</span></a>
+      <a href="seismic.html"><small>CH.08 · 내진 설계</small>지진 밑면 전단 5,000 kN<br><span>바람과 지진 중 무엇이 지배하는지 비교한다.</span></a>
+      <a href="isolation.html"><small>CH.09 · 면진과 제진</small>동조 질량 감쇠기<br><span>감쇠를 더해 초고층의 바람 흔들림을 줄인다.</span></a>
+      <a href="serviceability.html"><small>CH.15 · 사용성</small>횡변위와 거주성<br><span>풍하중 층간 변위와 가속도의 사용성 검토.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>바람은 지표 마찰 때문에 높이에 따라 빨라지는 대기 경계층 흐름이고, 평균 풍속 위에 난류(I<sub>u</sub> = σ<sub>u</sub>/V̄)가 얹혀 있다. 재현 기간 T의 바람이 L년에 한 번 이상 올 확률은 1 − (1 − 1/T)<sup>L</sup>이다.</li>
+      <li>이 책의 교육용 모형은 V(z) = V₀(z/10)<sup>α</sup>, q = ½ρV²이다. B-10 지붕은 35.5 m/s, 0.77 kN/m². 실제 기준은 지형·중요도 계수와 노풍도별 기준 높이를 더한다.</li>
+      <li>풍압은 q·G·C<sub>p</sub>로, 바람 쪽은 밀리고(+0.8) 옆면·뒷면·지붕은 빨린다(−). 외장재는 모서리 국부 흡인과 내압을 함께 더해 설계한다.</li>
+      <li>풍하중의 요동은 배경 성분과 공진 성분으로 나뉘고, 가스트 영향 계수 G = 1 + 2gI√(B + R)가 이를 담는다. B-10은 G ≈ 2.0이다.</li>
+      <li>B-10의 Y 방향 풍하중은 층마다 118–244 kN, 밑면 전단 약 1,790 kN, 전도 모멘트 약 44,000 kN·m로 지진(약 5,000 kN)의 약 36 %다. 강도는 지진이 지배하지만 외장재·거주성은 바람으로 따로 검토한다.</li>
+      <li>와류 방출 진동수 f<sub>s</sub> = St·V/D가 고유 진동수와 맞는 공진 풍속 V<sub>cr</sub> = f₁D/St에서 횡풍 진동이 커진다. 사람은 가속도를 느끼며, 공력 형상 개선과 감쇠 증가가 흔들림을 줄인다. 타코마 교는 공진이 아닌 비틀림 플러터(자려 진동)로 무너졌다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 재현 기간 100년의 풍속이 설계 수명 50년 동안 한 번 이상 나타날 확률은 약?</p><div class="opts">
+        <button class="opt">1 %</button><button class="opt">5 %</button><button class="opt" data-correct>40 %</button><button class="opt">50 %</button>
+      </div><div class="quiz-exp">\(P = 1 - (1 - 0.01)^{50} = 1 - 0.605 = 0.395\). "100년에 한 번"은 50년 동안 일어나지 않는다는 뜻이 아니다.</div></div>
+      <div class="quiz-q"><p>2. 이 책의 모형(노풍도 B, α = 0.22)에서 기본 풍속을 26 m/s에서 32 m/s로 올리면 같은 높이의 속도압은 약 몇 배가 되나?</p><div class="opts">
+        <button class="opt">1.23배</button><button class="opt" data-correct>1.51배</button><button class="opt">2배</button><button class="opt">그대로</button>
+      </div><div class="quiz-exp">\(q \propto V^2\)이므로 \((32/26)^2 = 1.51\)배. 풍하중은 풍속에 제곱으로 민감하다.</div></div>
+      <div class="quiz-q"><p>3. 바람을 정면으로 받는 직사각형 건물에서 풍압 계수가 양수(면을 미는 방향)인 면은?</p><div class="opts">
+        <button class="opt" data-correct>바람 쪽 면만</button><button class="opt">바람 쪽 면과 뒷면</button><button class="opt">모든 면</button><button class="opt">옆면과 지붕</button>
+      </div><div class="quiz-exp">흐름이 막히는 바람 쪽 면만 양압(+0.8 안팎)이고, 흐름이 떨어져 나가는 옆면·뒷면·지붕은 흡인(음압)이다. 건물 전체를 미는 힘은 바람 쪽 양압과 뒷면 흡인의 합이다.</div></div>
+      <div class="quiz-q"><p>4. 외장재 설계에서 모서리 부근 유리가 특히 위험한 이유는?</p><div class="opts">
+        <button class="opt">모서리는 햇빛을 많이 받아서</button><button class="opt" data-correct>흐름이 모서리에서 떨어져 나가며 국부적으로 큰 흡인이 생기고 내압이 더해지기 때문</button><button class="opt">모서리 기둥이 가장 많이 처져서</button><button class="opt">모서리에는 내압이 없어서</button>
+      </div><div class="quiz-exp">모서리 뒤의 박리 흐름은 국부 흡인을 크게 만든다. 내압이 양이면 바깥으로 빨리는 순압이 더 커진다(예제 6.3).</div></div>
+      <div class="quiz-q"><p>5. 가스트 영향 계수 G = 1 + 2gI√(B + R)에서 고유 진동수가 낮고 감쇠가 작은 초고층에서 특히 커지는 항은?</p><div class="opts">
+        <button class="opt">배경 성분 B</button><button class="opt" data-correct>공진 성분 R</button><button class="opt">피크 계수 앞의 2</button><button class="opt">아무것도 변하지 않는다</button>
+      </div><div class="quiz-exp">바람 요동의 에너지는 낮은 진동수에 많으므로 \(f_1\)이 낮을수록 공진 성분이 크고, 공진 증폭은 감쇠비에 반비례한다.</div></div>
+      <div class="quiz-q"><p>6. B-10(Y 방향)의 풍하중 밑면 전단 약 1,790 kN과 등가 정적 지진 밑면 전단 약 5,000 kN을 비교한 결론으로 옳은 것은?</p><div class="opts">
+        <button class="opt">바람을 검토할 필요가 없다</button><button class="opt" data-correct>골조의 강도는 지진이 지배하지만, 외장재·지붕재·거주성은 바람으로 따로 검토한다</button><button class="opt">풍하중이 항상 지배한다</button><button class="opt">두 하중을 더해 설계한다</button>
+      </div><div class="quiz-exp">하중 조합에서 W와 E는 따로 조합되므로 더하지 않는다. 주골조 강도는 큰 쪽(지진)이 지배하지만, 국부 풍압과 흔들림은 바람에만 있는 검토 항목이다.</div></div>
+      <div class="quiz-q"><p>7. 폭 D = 30 m, 고유 진동수 0.167 Hz, St = 0.12인 탑의 와류 공진 풍속은?</p><div class="opts">
+        <button class="opt">약 4 m/s</button><button class="opt">약 25 m/s</button><button class="opt" data-correct>약 42 m/s</button><button class="opt">약 200 m/s</button>
+      </div><div class="quiz-exp">\(V_{cr} = f_1 D/St = 0.167 \times 30/0.12 = 41.7\) m/s. B-10(D = 24 m, f₁ = 1 Hz)은 200 m/s라 문제 되지 않는다.</div></div>
+      <div class="quiz-q"><p>8. 타코마 나로스 교 붕괴(1940)의 주된 메커니즘으로 오늘날 받아들여지는 것은?</p><div class="opts">
+        <button class="opt">지진에 의한 공진</button><button class="opt">차량 하중의 과적</button><button class="opt" data-correct>상판 운동과 공기력이 맞물려 스스로 커진 비틀림 플러터</button><button class="opt">케이블 강재의 부식</button>
+      </div><div class="quiz-exp">바람의 일정한 주기와 고유 진동수가 맞은 단순 공진이 아니라, 얇은 판형 상판의 비틀림 운동이 공기력을 바꿔 에너지를 계속 끌어들인 공탄성 불안정이다. 이후 장대교에는 풍동 실험과 플러터 검토가 필수가 되었다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 공통 도우미 ---------- */
+const WDX = {
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.7, y1 - uy * hd * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45); ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  /** 다벤포트 형식 가스트 계수(교육용): ASCE 7 형태의 배경·공진 성분 */
+  gust({ f, zeta, I, V, H, B, D, L = 100 }) {
+    const Q2 = 1 / (1 + 0.63 * Math.pow((B + H) / L, 0.63));
+    const N1 = (f * L) / V, Rn = (7.47 * N1) / Math.pow(1 + 10.3 * N1, 5 / 3);
+    const Rf = (eta) => (eta < 1e-6 ? 1 : 1 / eta - (1 - Math.exp(-2 * eta)) / (2 * eta * eta));
+    const R2 = (1 / zeta) * Rn * Rf((4.6 * f * H) / V) * Rf((4.6 * f * B) / V) * (0.53 + 0.47 * Rf((15.4 * f * D) / V));
+    const x = Math.sqrt(2 * Math.log(Math.max(600 * f, 3))), g = x + 0.577 / x;
+    return { B: Q2, R: R2, g, G: 1 + 2 * g * I * Math.sqrt(Q2 + R2) };
+  },
+  BLD: { b10: { H: 41, B: 32, D: 24, rho: 220, f: 1.0 }, tower: { H: 240, B: 40, D: 40, rho: 200, f: 0.2 } },
+  levels(n) { const h = [0]; for (let i = 1; i <= n; i++) h.push(i === 1 ? 5 : h[i - 1] + 4); return h; },
+  hz(v) { return v < 1 ? v.toFixed(3) + " Hz" : v.toFixed(2) + " Hz"; },
+};
+
+/* ---------- 1. 풍속 분포와 속도압 ---------- */
+(function () {
+  const gV = CB.range("wd-pr-v", (v) => v + " m/s", go), gz = CB.range("wd-pr-z", (v) => v + " m", go), rough = CB.seg("wd-pr-r", go), all = CB.check("wd-pr-all", go);
+  const cv = CB.canvas("#wd-cv-pr", (ctx, W, H) => {
+    const pal = CB.palette(), V0 = gV(), r = rough(), z = gz(), zmax = Math.max(100, Math.ceil((z * 1.25) / 50) * 50), wide = W >= 520;
+    const b1 = wide ? { x: 56, y: 30, w: W / 2 - 76, h: H - 76 } : { x: 56, y: 30, w: W - 74, h: H / 2 - 76 };
+    const b2 = wide ? { x: W / 2 + 40, y: 30, w: W / 2 - 58, h: H - 76 } : { x: 56, y: H / 2 + 24, w: W - 74, h: H / 2 - 76 };
+    const zs = Array.from({ length: 121 }, (_, k) => (zmax * k) / 120);
+    if (all()) {
+      const cols = { A: pal.series[4], B: pal.accent, C: pal.series[2], D: pal.series[3] };
+      const ser = ["A", "B", "C", "D"].map((t) => ({ data: zs.map((zz) => [CB.wind.speed(zz, 1, t), zz]), color: cols[t], width: t === r ? 3 : 1.6 }));
+      CB.chart(ctx, b1, { x: [0.8, 3], y: [0, zmax], xLabel: "V / V(10 m)", series: ser });
+      ["A", "B", "C", "D"].forEach((t) => WDX.text(ctx, t, b1.x + ((CB.wind.speed(zmax * 0.92, 1, t) - 0.8) / 2.2) * b1.w + 10, b1.y + b1.h * 0.08, cols[t], { size: 11 }));
+    } else {
+      const vmax = CB.wind.speed(zmax, V0, r) * 1.1;
+      CB.chart(ctx, b1, { x: [0, vmax], y: [0, zmax], xLabel: "풍속 V (m/s)", series: [{ data: zs.map((zz) => [CB.wind.speed(zz, V0, r), zz]), color: pal.blue, width: 2.6 }], hlines: [{ y: z, color: pal.text }].concat(Math.abs(z - 41) > 8 ? [{ y: 41, color: pal.faint, label: "B-10 지붕" }] : []), points: [{ x: CB.wind.speed(z, V0, r), y: z, color: pal.text, r: 5 }] });
+      WDX.text(ctx, CB.num(CB.wind.speed(z, V0, r), 1) + " m/s", b1.x + 8, b1.y + b1.h - ((z / zmax) * b1.h) - 12, pal.text, { size: 11.5, align: "left" });
+    }
+    const qs = zs.map((zz) => [CB.wind.q(CB.wind.speed(zz, V0, r)), zz]), qmax = CB.wind.q(CB.wind.speed(zmax, V0, r)) * 1.1;
+    CB.chart(ctx, b2, { x: [0, qmax], y: [0, zmax], xLabel: "속도압 q (kN/m²)", series: [{ data: qs, color: pal.accent2, width: 2.6, fill: CB.color("accent-soft") }], hlines: [{ y: z, color: pal.text }], points: [{ x: CB.wind.q(CB.wind.speed(z, V0, r)), y: z, color: pal.text, r: 5, label: CB.num(CB.wind.q(CB.wind.speed(z, V0, r)), 2) }] });
+    WDX.text(ctx, "높이 z (m)", b1.x - 30, b1.y - 14, pal.dim, { size: 11, align: "left", mono: false });
+  }, { aspect: (W) => (W < 520 ? 1.25 : 0.5), minHeight: 280, maxHeight: 520 });
+  function go() {
+    cv.redraw(); const V = CB.wind.speed(gz(), gV(), rough()), q = CB.wind.q(V);
+    CB.stat("wd-pr-vz", CB.num(V, 1) + " m/s"); CB.stat("wd-pr-ratio", CB.num(V / gV(), 3));
+    CB.stat("wd-pr-q", CB.num(q, 3) + " kN/m²"); CB.stat("wd-pr-p", CB.num(q * 2.0 * 1.3, 2) + " kN/m²");
+  }
+  go();
+})();
+
+/* ---------- 2. 풍압 계수 분포 ---------- */
+(function () {
+  const gth = CB.range("wd-cp-th", (v) => v + "°", go), gr = CB.range("wd-cp-r", (v) => v.toFixed(2), go), gin = CB.seg("wd-cp-in", go);
+  const Cw = 0.8, Cs = -0.7;
+  const Cl = (ratio) => (ratio <= 1 ? -0.5 : ratio <= 2 ? -0.5 + 0.2 * (ratio - 1) : ratio <= 4 ? -0.3 + 0.05 * (ratio - 2) : -0.2);
+  let st;
+  function solve() {
+    const th = (gth() * Math.PI) / 180, r = gr(), Bw = 26 / Math.max(1, r), Dd = Bw * r, w = [Math.sin(th), Math.cos(th)];
+    const along = Bw * Math.abs(Math.sin(th)) + Dd * Math.abs(Math.cos(th)), cross = Bw * Math.abs(Math.cos(th)) + Dd * Math.abs(Math.sin(th)), cl = Cl(along / cross);
+    const faces = [
+      { key: "s", n: [0, -1], a: [-Bw / 2, -Dd / 2], b: [Bw / 2, -Dd / 2], len: Bw },
+      { key: "e", n: [1, 0], a: [Bw / 2, -Dd / 2], b: [Bw / 2, Dd / 2], len: Dd },
+      { key: "n", n: [0, 1], a: [Bw / 2, Dd / 2], b: [-Bw / 2, Dd / 2], len: Bw },
+      { key: "w", n: [-1, 0], a: [-Bw / 2, Dd / 2], b: [-Bw / 2, -Dd / 2], len: Dd },
+    ];
+    let F = [0, 0];
+    faces.forEach((f) => {
+      const cb = CB.clamp(-(f.n[0] * w[0] + f.n[1] * w[1]), -1, 1), beta = Math.acos(cb);
+      f.cp = beta <= Math.PI / 2 ? Cs + (Cw - Cs) * Math.cos(beta) : cl + (Cs - cl) * Math.sin(beta);
+      F[0] += -f.n[0] * f.cp * f.len; F[1] += -f.n[1] * f.cp * f.len;
+    });
+    st = { faces, Bw, Dd, w, CF: (F[0] * w[0] + F[1] * w[1]) / cross, gi: Number(gin()) };
+  }
+  solve();
+  const pl = CB.plane("#wd-cv-cp", { x: [-34, 34], y: null, cy: 0, grid: false, axes: false, aspect: (W) => (W < 520 ? 1.0 : 0.85), maxHeight: 460, minHeight: 280,
+    draw(P) {
+      const pal = P.P, ctx = P.ctx, { faces, Bw, Dd, w, gi } = st, sc = 6;
+      P.poly([[-Bw / 2, -Dd / 2], [Bw / 2, -Dd / 2], [Bw / 2, Dd / 2], [-Bw / 2, Dd / 2]], { color: pal.text, width: 2, fill: CB.color("accent-soft") });
+      faces.forEach((f) => {
+        const net = f.cp - gi, col = net >= 0 ? pal.accent2 : pal.accent;
+        for (let k = 1; k <= 5; k++) {
+          const t = k / 6, x = f.a[0] + (f.b[0] - f.a[0]) * t, y = f.a[1] + (f.b[1] - f.a[1]) * t, L = net * sc;
+          if (Math.abs(L) < 0.1) continue;
+          if (net >= 0) WDX.arrow(ctx, P.X(x + f.n[0] * (L + 0.6)), P.Y(y + f.n[1] * (L + 0.6)), P.X(x + f.n[0] * 0.4), P.Y(y + f.n[1] * 0.4), col, 2, 8);
+          else WDX.arrow(ctx, P.X(x + f.n[0] * 0.4), P.Y(y + f.n[1] * 0.4), P.X(x + f.n[0] * (0.6 - L)), P.Y(y + f.n[1] * (0.6 - L)), col, 2, 8);
+        }
+        const mx = (f.a[0] + f.b[0]) / 2, my = (f.a[1] + f.b[1]) / 2, off = Math.abs(f.cp - gi) * sc + 4.5;
+        WDX.text(ctx, (gi ? "순 " : "") + CB.num(f.cp - gi, 2), P.X(mx + f.n[0] * off), P.Y(my + f.n[1] * off), col, { size: 12 });
+        // 국부 흡인: 바람을 비스듬히~옆으로 받는 면의 바람 쪽 모서리
+        const cb = -(f.n[0] * w[0] + f.n[1] * w[1]);
+        if (cb < 0.35 && cb > -0.2) { const ua = f.a[0] * w[0] + f.a[1] * w[1], ub = f.b[0] * w[0] + f.b[1] * w[1], c = ua < ub ? f.a : f.b; P.circle(c[0], c[1], 2.2, { color: pal.bad, fill: pal.bad, alpha: 0.25 }); }
+      });
+      for (let k = -2; k <= 2; k++) { const px = -w[1] * k * 7, py = w[0] * k * 7, sx = px - w[0] * 27, sy = py - w[1] * 27; WDX.arrow(ctx, P.X(sx), P.Y(sy), P.X(sx + w[0] * 6), P.Y(sy + w[1] * 6), pal.blue, 2, 9); }
+      WDX.text(ctx, "바람", P.X(-w[0] * 25 - w[1] * 18), P.Y(-w[1] * 25 + w[0] * 18), pal.blue, { size: 12 });
+      WDX.text(ctx, "주황: 미는 압력 · 청록: 흡인 · 빨간 원: 모서리 국부 흡인", P.w / 2, 14, pal.dim, { size: 11, mono: false });
+    } });
+  function go() {
+    solve(); pl.redraw();
+    const F = Object.fromEntries(st.faces.map((f) => [f.key, f.cp]));
+    CB.stat("wd-cp-s", CB.num(F.s, 2)); CB.stat("wd-cp-e", CB.num(F.e, 2)); CB.stat("wd-cp-n", CB.num(F.n, 2)); CB.stat("wd-cp-cf", CB.num(st.CF, 2));
+  }
+  go();
+})();
+
+/* ---------- 3. 난류 풍속 기록 ---------- */
+(function () {
+  const dt = 0.25, Tlen = 600, N = Tlen / dt, Lu = 100;
+  let seed = 3, shape = null;
+  const gV = CB.range("wd-gu-v", (v) => v + " m/s", go), gI = CB.range("wd-gu-i", (v) => v.toFixed(2), go), win = CB.seg("wd-gu-w", go);
+  document.getElementById("wd-gu-seed").addEventListener("click", () => { seed++; shape = null; go(); });
+  function build() {
+    const r = CB.rng(seed), V = 25, comps = [], df = 1 / Tlen;
+    for (let k = 1; k <= 800; k++) { const f = k * df, x = (f * Lu) / V, S = (4 * (Lu / V)) / Math.pow(1 + 70.8 * x * x, 5 / 6); comps.push({ w: 2 * Math.PI * f, a: Math.sqrt(2 * S * df), ph: r() * 2 * Math.PI }); }
+    const u = new Float64Array(N);
+    comps.forEach((c) => { for (let i = 0; i < N; i++) u[i] += c.a * Math.cos(c.w * i * dt + c.ph); });
+    let m = 0; for (let i = 0; i < N; i++) m += u[i]; m /= N; let s = 0; for (let i = 0; i < N; i++) { u[i] -= m; s += u[i] * u[i]; } s = Math.sqrt(s / N);
+    for (let i = 0; i < N; i++) u[i] /= s;
+    shape = u;
+  }
+  let st;
+  function solve() {
+    if (!shape) build();
+    const V = gV(), I = gI(), sig = I * V, v = Array.from(shape, (x) => V + sig * x), m = Math.max(1, Math.round(Number(win()) / dt));
+    const avg = []; let acc = 0; for (let i = 0; i < N; i++) { acc += v[i]; if (i >= m) acc -= v[i - m]; if (i >= m - 1) avg.push([(i - (m - 1) / 2) * dt, acc / m]); }
+    let ix = 0; avg.forEach((p, i) => { if (p[1] > avg[ix][1]) ix = i; });
+    st = { v, avg, peak: avg[ix], V, sig };
+  }
+  solve();
+  const cv = CB.canvas("#wd-cv-gu", (ctx, W, H) => {
+    const pal = CB.palette(), { v, avg, peak, V } = st, lo = Math.max(0, V * 0.2), hi = V * 1.9;
+    const step = W < 520 ? 4 : 2, raw = []; for (let i = 0; i < N; i += step) raw.push([i * dt, v[i]]);
+    CB.chart(ctx, null, { x: [0, Tlen], y: [lo, hi], xLabel: "시간 (s)", yLabel: "풍속 (m/s)", series: [{ data: raw, color: pal.faint, width: 1 }, { data: avg, color: pal.blue, width: 1.8 }], hlines: [{ y: V, color: pal.text, label: "평균 " + V + " m/s" }], points: [{ x: peak[0], y: peak[1], color: pal.accent2, r: 5, label: "최대 " + CB.num(peak[1], 1) }] });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 400 });
+  function go() {
+    solve(); cv.redraw();
+    CB.stat("wd-gu-s", CB.num(st.sig, 2) + " m/s"); CB.stat("wd-gu-max", CB.num(st.peak[1], 1) + " m/s");
+    CB.stat("wd-gu-gf", CB.num(st.peak[1] / st.V, 2)); CB.stat("wd-gu-g", CB.num((st.peak[1] - st.V) / st.sig, 2));
+  }
+  solve(); go();
+})();
+
+/* ---------- 4. 가스트 영향 계수 ---------- */
+(function () {
+  const bld = CB.seg("wd-gf-b", () => { gf.set(Math.log10(WDX.BLD[bld()].f), false); go(); });
+  const gf = CB.range("wd-gf-f", (v) => WDX.hz(Math.pow(10, v)), go), gz = CB.range("wd-gf-z", (v) => v.toFixed(1) + " %", go), gI = CB.range("wd-gf-i", (v) => v.toFixed(2), go);
+  const Vh = (b) => CB.wind.speed(b.H, 26, "B");
+  const par = (f) => { const b = WDX.BLD[bld()]; return { f, zeta: gz() / 100, I: gI(), V: Vh(b), H: b.H, B: b.B, D: b.D }; };
+  const cv = CB.canvas("#wd-cv-gf", (ctx, W, H) => {
+    const pal = CB.palette(), fs = [], Gs = [], Bs = [];
+    for (let k = 0; k <= 120; k++) { const f = 0.05 * Math.pow(60, k / 120), r = WDX.gust(par(f)); Gs.push([f, r.G]); Bs.push([f, 1 + 2 * r.g * gI() * Math.sqrt(r.B)]); }
+    const f = Math.pow(10, gf()), r = WDX.gust(par(f)), ymax = Math.max(3, Math.ceil(Math.max(...Gs.map((p) => p[1])) * 2) / 2);
+    CB.chart(ctx, null, { x: [0.05, 3], y: [1, ymax], logX: true, xLabel: "고유 진동수 f₁ (Hz)", yLabel: "가스트 영향 계수 G", series: [{ data: Bs, color: pal.faint, width: 1.6, dash: [5, 4] }, { data: Gs, color: pal.accent, width: 2.6 }], hlines: [{ y: 2.0, color: pal.accent2, label: "G = 2.0(B-10)" }], points: [{ x: f, y: r.G, color: pal.text, r: 5 }] });
+    WDX.text(ctx, "점선: 배경 성분만", 70, 30, pal.dim, { size: 11, align: "left", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.5), minHeight: 260, maxHeight: 400 });
+  function go() {
+    cv.redraw(); const r = WDX.gust(par(Math.pow(10, gf())));
+    CB.stat("wd-gf-bb", CB.num(r.B, 3)); CB.stat("wd-gf-rr", CB.num(r.R, 3)); CB.stat("wd-gf-g", CB.num(r.g, 2)); CB.stat("wd-gf-G", CB.num(r.G, 2));
+  }
+  go();
+})();
+
+/* ---------- 5. 층 풍하중 vs 지진하중 ---------- */
+(function () {
+  const dir = CB.seg("wd-st-dir", go), gV = CB.range("wd-st-v", (v) => v + " m/s", go), rough = CB.seg("wd-st-r", go), gn = CB.range("wd-st-n", (v) => v + "층", go), eq = CB.check("wd-st-eq", go);
+  let st;
+  function solve() {
+    const n = gn(), h = WDX.levels(n), B = Number(dir()), V0 = gV(), r = rough();
+    const Fw = []; for (let i = 1; i <= n; i++) { const z1 = i === 1 ? 2.5 : (h[i - 1] + h[i]) / 2, z2 = i < n ? (h[i] + h[i + 1]) / 2 : h[i]; Fw.push(CB.wind.storyForce(z1, z2, B, V0, r, 1.3, 2.0)); }
+    const w = h.slice(1).map((_, i) => (i === n - 1 ? 6000 : 6900)), hs = h.slice(1), D = CB.dyn.B10;
+    const e = CB.dyn.els({ W: w.reduce((a, b) => a + b, 0), SDS: D.SDS, SD1: D.SD1, R: D.R, Ie: D.Ie, T: CB.dyn.Ta(h[n], "other"), w, h: hs });
+    const Vw = Fw.reduce((a, b) => a + b, 0), Mw = Fw.reduce((s, f, i) => s + f * hs[i], 0);
+    st = { n, Fw, Fe: e.F, Vw, Mw, Ve: e.V, Me: e.Mot, T: CB.dyn.Ta(h[n], "other") };
+  }
+  solve();
+  const cv = CB.canvas("#wd-cv-st", (ctx, W, H) => {
+    const pal = CB.palette(), { n, Fw, Fe } = st, show = eq(), fmax = Math.max(...Fw, ...(show ? Fe : [0])) * 1.12;
+    const box = { x: 58, y: 30, w: W - 76, h: H - 76 }, c = CB.chart(ctx, box, { x: [0, fmax], y: [0.4, n + 0.6], yTicks: Array.from({ length: n }, (_, i) => i + 1).filter((k) => n <= 12 || k % Math.ceil(n / 10) === 0 || k === 1), xLabel: "층 하중 (kN)", yLabel: "층", series: [] });
+    const bh = Math.min(16, (box.h / n) * 0.36);
+    for (let i = 0; i < n; i++) {
+      const y = c.Y(i + 1);
+      ctx.fillStyle = pal.blue; ctx.globalAlpha = 0.8; ctx.fillRect(c.X(0), y - (show ? bh : bh / 2), c.X(Fw[i]) - c.X(0), bh); ctx.globalAlpha = 1;
+      if (show) { ctx.fillStyle = pal.accent2; ctx.globalAlpha = 0.75; ctx.fillRect(c.X(0), y, c.X(Fe[i]) - c.X(0), bh); ctx.globalAlpha = 1; }
+      if (n <= 12) WDX.text(ctx, CB.num(Fw[i], 0), c.X(Fw[i]) + 18, y - (show ? bh / 2 : 0), pal.blue, { size: 10.5 });
+    }
+    WDX.text(ctx, "■ 풍하중", box.x + 4, 12, pal.blue, { size: 11.5, align: "left" });
+    if (show) WDX.text(ctx, "■ 지진력(등가 정적)", box.x + 90, 12, pal.accent2, { size: 11.5, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.55), minHeight: 280, maxHeight: 460 });
+  function go() {
+    solve(); cv.redraw();
+    CB.stat("wd-st-vw", CB.sig(st.Vw) + " kN"); CB.stat("wd-st-mw", CB.sig(st.Mw) + " kN·m");
+    CB.stat("wd-st-ve", CB.sig(st.Ve) + " kN"); CB.stat("wd-st-ratio", CB.num(st.Vw / st.Ve, 2));
+  }
+  go();
+})();
+
+/* ---------- 6. 와류 방출과 공진 ---------- */
+(function () {
+  const gV = CB.range("wd-vx-v", (v) => v.toFixed(1) + " m/s", go), gD = CB.range("wd-vx-d", (v) => v + " m", go), gT = CB.range("wd-vx-t", (v) => v.toFixed(2) + " s", go), gS = CB.range("wd-vx-st", (v) => v.toFixed(3), go);
+  const preset = (d, t, v) => { gD.set(d, false); gT.set(t, false); gV.set(v, false); vort = []; go(); };
+  document.getElementById("wd-vx-b10").addEventListener("click", () => preset(24, 1, 35.5));
+  document.getElementById("wd-vx-tw").addEventListener("click", () => preset(30, 6, 41.5));
+  let vort = [], tAnim = 0, nextSpawn = 0, side = 1, phase = 0;
+  const calc = () => { const V = gV(), D = gD(), St = gS(), f1 = 1 / gT(), fs = CB.wind.vortexFreq(V, D, St), Vcr = (f1 * D) / St, Rd = CB.dyn.Rd(fs / f1, 0.02).Rd; return { V, D, St, f1, fs, Vcr, Rd }; };
+  const cv = CB.canvas("#wd-cv-vx", (ctx, W, H) => {
+    const pal = CB.palette(), c = calc(), Dp = Math.min(54, H * 0.32), x0 = W * 0.18, y0 = H / 2;
+    const amp = Math.min(1, c.Rd / 25) * Dp * 0.35, yb = y0 + amp * Math.sin(phase);
+    for (let k = -2; k <= 2; k++) WDX.arrow(ctx, 10, y0 + k * Dp * 0.55, x0 - Dp / 2 - 14, y0 + k * Dp * 0.55, pal.blue, 1.6, 8);
+    ctx.save();
+    vort.forEach((v) => {
+      ctx.globalAlpha = Math.max(0, 1 - v.x / W) * 0.9; ctx.strokeStyle = pal.blue; ctx.lineWidth = 1.8;
+      for (let r = 4; r < v.r; r += 6) { ctx.beginPath(); ctx.arc(v.x, v.y, r, v.rot + (v.s > 0 ? 0 : Math.PI), v.rot + (v.s > 0 ? 0 : Math.PI) + 4.6); ctx.stroke(); }
+    });
+    ctx.restore();
+    ctx.fillStyle = CB.color("accent-soft"); ctx.strokeStyle = pal.accent; ctx.lineWidth = 2;
+    ctx.fillRect(x0 - Dp / 2, yb - Dp / 2, Dp, Dp); ctx.strokeRect(x0 - Dp / 2, yb - Dp / 2, Dp, Dp);
+    WDX.text(ctx, "D", x0, yb, pal.accent, { size: 12 });
+    if (amp > 1) WDX.arrow(ctx, x0, y0 - Dp / 2 - 6, x0, y0 - Dp / 2 - 6 - amp * 1.4, pal.accent2, 2, 7);
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.34), minHeight: 170, maxHeight: 260 });
+  const ch = CB.canvas("#wd-cv-vx2", (ctx, W, H) => {
+    const pal = CB.palette(), c = calc(), fmax = Math.max(c.f1 * 2.2, CB.wind.vortexFreq(80, c.D, c.St) * 0.6, 0.05);
+    const data = [[0, 0], [80, CB.wind.vortexFreq(80, c.D, c.St)]];
+    const cc = CB.chart(ctx, { x: 56, y: 22, w: W - 74, h: H - 68 }, { x: [0, 80], y: [0, fmax], xLabel: "풍속 V (m/s)", yLabel: "진동수 (Hz)", series: [{ data, color: pal.blue, width: 2.4 }], hlines: [{ y: c.f1, color: pal.accent, label: "f₁ = " + WDX.hz(c.f1) }], vlines: c.Vcr <= 80 ? [{ x: c.Vcr, color: pal.bad, label: "V_cr " + CB.num(c.Vcr, 1) }] : [], bands: [{ x0: 0, x1: Math.min(80, 35.5), color: CB.color("accent-soft") }], points: [{ x: c.V, y: c.fs, color: pal.text, r: 5 }] });
+    WDX.text(ctx, "B-10 지붕 설계 풍속까지", cc.X(17.7), cc.Y(fmax * 0.92), pal.dim, { size: 10.5, mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.36), minHeight: 200, maxHeight: 290 });
+  let run = false;
+  const loop = CB.loop(document.getElementById("wd-cv-vx"), (dt) => {
+    if (!run) return;
+    const c = calc(), W = cv.w, H = cv.h, Dp = Math.min(54, H * 0.32), sPx = Dp / c.D, k = 110 / Math.max(1e-6, 0.85 * c.V * sPx);
+    tAnim += dt;
+    const period = 1 / (2 * Math.max(1e-4, c.fs)) / k;
+    phase += dt * 2 * Math.PI * c.fs * k;
+    if (tAnim >= nextSpawn) { nextSpawn = tAnim + period; side = -side; vort.push({ x: W * 0.18 + Dp * 0.6, y: H / 2 + side * Dp * 0.42, r: Dp * 0.35, s: side, rot: 0 }); }
+    vort.forEach((v) => { v.x += 110 * dt; v.r = Math.min(Dp * 0.7, v.r + 4 * dt); v.rot += v.s * 3 * dt; v.y += (H / 2 + v.s * Dp * 0.55 - v.y) * 0.5 * dt; });
+    vort = vort.filter((v) => v.x < W + 40).slice(-40);
+    cv.redraw();
+  });
+  CB.playButton("wd-vx-play", () => { run = true; loop.start(); }, () => { run = false; });
+  function go() {
+    vort = []; nextSpawn = 0; tAnim = 0;
+    cv.redraw(); ch.redraw(); const c = calc();
+    CB.stat("wd-vx-fs", WDX.hz(c.fs)); CB.stat("wd-vx-f1", WDX.hz(c.f1)); CB.stat("wd-vx-vcr", CB.num(c.Vcr, 1) + " m/s"); CB.stat("wd-vx-rd", CB.num(c.Rd, 2));
+  }
+  go();
+})();
+
+/* ---------- 7. 거주성 판정 ---------- */
+(function () {
+  const bld = CB.seg("wd-cm-b", () => { gf.set(Math.log10(WDX.BLD[bld()].f), false); gv.set(bld() === "b10" ? 25 : 30, false); go(); });
+  const gf = CB.range("wd-cm-f", (v) => WDX.hz(Math.pow(10, v)), go), gz = CB.range("wd-cm-z", (v) => v.toFixed(1) + " %", go), gv = CB.range("wd-cm-v", (v) => v.toFixed(1) + " m/s", go);
+  const CURVES = [{ name: "사무실(교육용)", c: 11 }, { name: "주거(교육용)", c: 7 }, { name: "인지 한계(교육용)", c: 3.5 }];
+  const lim = (c, f) => c * Math.pow(Math.min(f, 1), -0.41);
+  function calc() {
+    const b = WDX.BLD[bld()], f = Math.pow(10, gf()), V = gv(), I = 0.16, g = WDX.gust({ f, zeta: gz() / 100, I, V, H: b.H, B: b.B, D: b.D });
+    const q = CB.wind.q(V), Fs = (q * 1.3 * b.B * b.H) / (2 + 2 * 0.22), Ms = (b.rho * b.B * b.D * b.H) / 3 / 1000;
+    const a = (g.g * 2 * I * Math.sqrt(g.R) * Fs) / Ms;
+    return { f, a, mg: (a / 9.81) * 1000, sR: Math.sqrt(g.R) };
+  }
+  const cv = CB.canvas("#wd-cv-cm", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), cols = [pal.warn, pal.accent2, pal.ok];
+    const series = CURVES.map((c, i) => ({ data: Array.from({ length: 60 }, (_, k) => { const f = 0.05 * Math.pow(40, k / 59); return [f, lim(c.c, f)]; }), color: cols[i], width: 2 }));
+    const c = CB.chart(ctx, null, { x: [0.05, 2], y: [0.5, 100], logX: true, logY: true, xLabel: "고유 진동수 f₁ (Hz)", yLabel: "최대 가속도 (mg)", series, points: [{ x: r.f, y: CB.clamp(r.mg, 0.5, 100), color: pal.text, r: 6, label: CB.num(r.mg, 1) + " mg" }] });
+    CURVES.forEach((cc, i) => WDX.text(ctx, cc.name, c.X(0.06), c.Y(lim(cc.c, 0.06)) - 10, cols[i], { size: 11, align: "left", mono: false }));
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 400 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("wd-cm-a", CB.num(r.mg, 1) + " mg"); CB.stat("wd-cm-ams", CB.num(r.a, 3)); CB.stat("wd-cm-r", CB.num(r.sR, 3));
+    const m = document.getElementById("wd-cm-msg"), lo = lim(7, r.f), hi = lim(11, r.f);
+    if (r.mg <= lo) { m.className = "wd-msg ok"; m.textContent = `${CB.num(r.mg, 1)} mg ≤ 주거 곡선 ${CB.num(lo, 1)} mg: 교육용 기준으로 주거·사무실 모두 만족합니다.`; }
+    else if (r.mg <= hi) { m.className = "wd-msg"; m.innerHTML = `<b>${CB.num(r.mg, 1)} mg</b>: 사무실 곡선(${CB.num(hi, 1)} mg) 아래, 주거 곡선(${CB.num(lo, 1)} mg) 위입니다. 주거 용도라면 감쇠 장치나 강성 보강을 검토합니다.`; }
+    else { m.className = "wd-msg bad"; m.textContent = `${CB.num(r.mg, 1)} mg > 사무실 곡선 ${CB.num(hi, 1)} mg: 교육용 기준으로 거주성 불만족. 감쇠 증가(TMD), 형상 개선, 강성 증대를 검토합니다.`; }
+  }
+  go();
+})();
+
+/* ---------- 8. 공력 형상(3D) ---------- */
+(function () {
+  const type = CB.seg("wd-sh-type", go), ga = CB.range("wd-sh-a", (v) => v.toFixed(2), go);
+  const Hs = 120, Wd = 30;
+  const MOD = {
+    square: () => ({ cd: 1.3, st: 0.12, idx: 1 }),
+    chamfer: (a) => ({ cd: 1.3 - 0.35 * a, st: 0.12 + 0.05 * a, idx: 1 - 0.45 * a }),
+    recess: (a) => ({ cd: 1.3 - 0.3 * a, st: 0.12 + 0.04 * a, idx: 1 - 0.5 * a }),
+    round: (a) => ({ cd: 1.3 - 0.45 * a, st: 0.12 + 0.06 * a, idx: 1 - 0.4 * a }),
+    taper: (a) => ({ cd: 1.3 - 0.1 * a, st: 0.12, idx: 1 - 0.45 * a }),
+    setback: (a) => ({ cd: 1.3 - 0.1 * a, st: 0.12, idx: 1 - 0.4 * a }),
+    twist: (a) => ({ cd: 1.3 - 0.05 * a, st: 0.12, idx: 1 - 0.5 * a }),
+  };
+  function section(t, a) {
+    const ty = type(), c = 0.15 * a, h = 0.5;
+    let pts;
+    if (ty === "chamfer") pts = [[-h + c, -h], [h - c, -h], [h, -h + c], [h, h - c], [h - c, h], [-h + c, h], [-h, h - c], [-h, -h + c]];
+    else if (ty === "recess") pts = [[-h + c, -h], [h - c, -h], [h - c, -h + c], [h, -h + c], [h, h - c], [h - c, h - c], [h - c, h], [-h + c, h], [-h + c, h - c], [-h, h - c], [-h, -h + c], [-h + c, -h + c]];
+    else if (ty === "round") { pts = []; const r = Math.max(1e-3, c), cs = [[h - r, h - r], [-h + r, h - r], [-h + r, -h + r], [h - r, -h + r]]; cs.forEach((q, i) => { for (let k = 0; k <= 4; k++) { const th = (i * Math.PI) / 2 + (k / 4) * (Math.PI / 2); pts.push([q[0] + r * Math.cos(th), q[1] + r * Math.sin(th)]); } }); }
+    else pts = [[-h, -h], [h, -h], [h, h], [-h, h]];
+    let s = 1, rot = 0;
+    if (ty === "taper") s = 1 - 0.45 * a * t;
+    if (ty === "setback") s = 1 - 0.45 * a * Math.min(2, Math.floor(t * 3)) / 2;
+    if (ty === "twist") rot = a * Math.PI * t;
+    const cr = Math.cos(rot), sr = Math.sin(rot);
+    return pts.map(([x, y]) => [Wd * s * (x * cr - y * sr), Wd * s * (x * sr + y * cr)]);
+  }
+  const orb = CB.orbit("#wd-cv-sh", { yaw: -0.7, pitch: 0.3, dist: 230, target: [0, 0, Hs * 0.45], spin: 0.12, aspect: (W) => (W < 520 ? 1.1 : 0.72), maxHeight: 460, minHeight: 280,
+    draw(V) {
+      const pal = V.P, a = type() === "square" ? 0 : ga(), lv = 24, rings = [];
+      for (let k = 0; k <= lv; k++) { const t = k / lv; let tt = t; if (type() === "setback" && k > 0 && Math.floor(t * 3) !== Math.floor(((k - 1) / lv) * 3) && k < lv) tt = t; rings.push(section(Math.min(t, 0.9999), a).map(([x, y]) => [x, y, t * Hs])); }
+      V.poly3([[-40, -40, 0], [40, -40, 0], [40, 40, 0], [-40, 40, 0]], { color: pal.grid, fill: pal.grid, fillAlpha: 0.3 });
+      const m = rings[0].length;
+      for (let j = 0; j < m; j++) for (let k = 0; k < lv; k++) V.line3(rings[k][j], rings[k + 1][j], { color: pal.accent, width: 1.2, alpha: 0.75 });
+      rings.forEach((r, k) => { if (k % 3 === 0 || k === lv) V.poly3(r, { color: pal.accent, width: k === lv ? 2 : 1, fill: k === lv ? CB.color("accent-soft") : undefined, fillAlpha: 0.9 }); });
+      if (type() === "setback") for (let s = 1; s <= 2; s++) { const t = s / 3; V.poly3(section(t - 1e-4, a).map(([x, y]) => [x, y, t * Hs]), { color: pal.accent, width: 1.6 }); V.poly3(section(t + 1e-4, a).map(([x, y]) => [x, y, t * Hs]), { color: pal.accent, width: 1.6 }); }
+      for (let k = -1; k <= 1; k++) { const p0 = V.p([-75, k * 14, Hs * 0.6]), p1 = V.p([-42, k * 14, Hs * 0.6]); if (p0 && p1) WDX.arrow(V.ctx, p0[0], p0[1], p1[0], p1[1], pal.blue, 2, 9); }
+    } });
+  function go() {
+    document.getElementById("wd-sh-a").disabled = type() === "square";
+    orb.redraw(); const a = type() === "square" ? 0 : ga(), r = MOD[type()](a), Vcr = ((1 / 6) * 30) / r.st;
+    CB.stat("wd-sh-cd", CB.num(r.cd, 2)); CB.stat("wd-sh-st", CB.num(r.st, 3)); CB.stat("wd-sh-idx", CB.num(r.idx, 2)); CB.stat("wd-sh-vcr", CB.num(Vcr, 1) + " m/s");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>구조 해석 모델링 · StructureBook</title>
+<meta name="description" content="건물을 컴퓨터에 옮기는 법. 선 요소와 벽 모델, 강역, 균열 단면 강성 저감, 강막 가정과 층 전단 분배, 질량 중심·강성 중심과 비틀림, 지점과 하중·질량 입력, 해석 결과 검증과 흔한 실수, B-10 3D 모델과 모드 형상까지 계산하며 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .md-stack { display: grid; grid-template-columns: 1fr; }
+  .md-stack > div { position: relative; min-width: 0; }
+  .md-stack > div + div { border-top: 1px solid var(--border); }
+  .md-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .md-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .md-msg b { color: var(--text); }
+  .md-msg.ok { color: var(--ok); font-weight: 600; }
+  .md-msg.bad { color: var(--bad); font-weight: 600; }
+  .md-tbl td, .md-tbl th { font-variant-numeric: tabular-nums; }
+  .md-report { margin: 0; border-top: 1px solid var(--border); overflow-x: auto; }
+  .md-report table { width: 100%; font-size: 13.5px; border-collapse: collapse; }
+  .md-report td, .md-report th { padding: 6px 12px; border-bottom: 1px solid var(--border); text-align: left; font-variant-numeric: tabular-nums; }
+  .md-report th { color: var(--text-dim); font-weight: 600; }
+  .md-report td.v { font-family: var(--mono); white-space: nowrap; }
+  .md-choices { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 18px; border-top: 1px solid var(--border); }
+  .md-choices button { font: inherit; font-size: 13.5px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+  .md-choices button.right { border-color: var(--ok); color: var(--ok); font-weight: 700; }
+  .md-choices button.wrong { border-color: var(--bad); color: var(--bad); }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="structure"></script>
+</head>
+<body data-chapter="modeling">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="md-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="md-ah-react" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="md-ah-int" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+      <marker id="md-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 14</div>
+    <h1 data-no-glossary>구조 해석 모델링</h1>
+    <p class="lead">구조 해석 프로그램은 입력한 모델을 정확히 풉니다. 문제는 그 모델이 건물을 얼마나 닮았느냐입니다. 보와 기둥은 선이 되고, 벽은 판이나 굵은 기둥이 되고, 바닥은 휘지 않는 판으로 가정되고, 콘크리트의 균열은 강성에 곱하는 계수 하나로 바뀝니다. 이 모든 결정이 해석 결과를 바꾸고, 그 결정은 프로그램이 아니라 엔지니어가 합니다. MechanicsBook 16장에서 강성법의 속을 들여다보았다면, 이 장에서는 그 해석기에 <b>건물을 어떻게 옮길지</b>를 다룹니다. 부재와 접합부, 바닥과 지점, 하중과 질량을 모델로 바꾸는 법, 강막 위에서 층 전단력이 기둥·벽에 나뉘고 비틀리는 원리, 해석 결과가 맞는지 검증하는 습관, 그리고 기준 건물 B-10의 3차원 모델과 모드 형상까지 따라갑니다.</p>
+    <ul class="objectives">
+      <li>건물을 절점·선 요소·판 요소·강막·지점·하중·질량으로 이루어진 해석 모델로 바꾸는 순서를 설명한다.</li>
+      <li>강역과 균열 단면 강성 저감 계수가 변위·주기·부재력을 어떻게 바꾸는지 계산한다.</li>
+      <li>강막과 유연 격막에서 층 전단력이 수평 저항 요소에 나뉘는 방식을 비교한다.</li>
+      <li>질량 중심과 강성 중심, 편심과 우발 편심으로 바닥의 비틀림 회전과 가장자리 변위비를 구한다.</li>
+      <li>면 하중 분배, 질량 원, 지점·기초 조건을 입력하고, 하중 합–반력 합·주기·처짐으로 결과를 검증한다.</li>
+      <li>모델 단순화의 효과를 비교하고, B-10 3D 모델의 모드 형상과 변형을 해석한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>정확하게 틀린 숫자</b></div>
+      <div class="o-body"><p>1970년대 이후 건물 전체를 3차원으로 푸는 해석 프로그램이 널리 쓰이면서 구조 설계는 손계산으로는 엄두를 못 내던 비정형 건물까지 다룰 수 있게 되었습니다. 동시에 새로운 위험도 생겼습니다. 단위 하나, 지점 하나, 바닥 가정 하나가 틀려도 프로그램은 소수점 넷째 자리까지 그럴듯한 답을 내놓습니다.</p>
+        <p>그래서 모델링은 두 가지 기술로 이루어집니다. 하나는 실제 건물의 거동을 가장 단순하면서도 충분히 닮은 모델로 바꾸는 <b>이상화</b>이고, 다른 하나는 나온 숫자를 평형·손계산·상식으로 의심하는 <b>검증</b>입니다.</p>
+        <div class="o-chain"><span>실제 건물</span><i>→</i><span>이상화: 요소·강막·지점·하중·질량</span><i>→</i><span class="tool">강성법·모드 해석</span><i>→</i><span>검증과 판단</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="idealization">
+    <h2>건물에서 해석 모델로</h2>
+    <p>해석 모델은 건물의 '뼈대 지도'입니다. 기둥과 보는 부재의 도심을 따라 그은 <span class="term">선 요소</span><span class="en">(line element)</span>가 되고, 그 끝이 만나는 곳이 절점이 됩니다. 벽과 슬래브는 두께를 가진 면을 작은 사각형으로 나눈 <span class="term">판 요소</span><span class="en">(shell element)</span>로 모델링하거나, 벽은 도심선의 굵은 기둥(등가 기둥)으로 단순화합니다. 바닥은 흔히 면내로 휘지 않는 <span class="term">강막</span><span class="en">(rigid diaphragm)</span>으로 가정해 한 층의 모든 절점이 함께 움직이게 묶습니다.</p>
+    <figure class="diagram" id="fig-md-ideal">
+      <svg viewBox="0 0 760 300" role="img" aria-label="실제 건물에서 선 요소, 판 요소, 강막, 지점으로 이루어진 해석 모델로">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,20)">
+          <rect x="0" y="40" width="220" height="180" style="fill:var(--accent-soft);opacity:.4;stroke:var(--text-dim)"/>
+          <g style="fill:var(--text-faint);opacity:.6"><rect x="10" y="60" width="40" height="30"/><rect x="90" y="60" width="40" height="30"/><rect x="170" y="60" width="40" height="30"/><rect x="10" y="120" width="40" height="30"/><rect x="170" y="120" width="40" height="30"/></g>
+          <rect x="88" y="110" width="44" height="110" style="fill:var(--text-dim);opacity:.5"/>
+          <text x="110" y="238" text-anchor="middle" class="t" style="font-weight:700">실제 건물</text>
+          <text x="110" y="254" text-anchor="middle" class="t-mono">마감·창·칸막이·설비 …</text>
+        </g>
+        <line x1="285" y1="150" x2="345" y2="150" style="stroke:var(--text);stroke-width:2.4" marker-end="url(#md-ah-int)"/>
+        <text x="315" y="140" text-anchor="middle" class="t-mono">이상화</text>
+        <g transform="translate(380,26)">
+          <path d="M0 220L60 190H340L280 220Z" style="fill:none;stroke:var(--text-faint)"/>
+          <g style="stroke:var(--text);stroke-width:2.2"><path d="M20 210V30M100 210V30M180 210V30M260 210V30"/><path d="M80 186V10M160 186V10M240 186V10M320 186V10" style="stroke-width:1.4;opacity:.6"/></g>
+          <g style="fill:var(--accent-soft);stroke:var(--accent);opacity:.75"><path d="M20 150L80 126H320L260 150Z"/><path d="M20 90L80 66H320L260 90Z"/><path d="M20 30L80 6H320L260 30Z"/></g>
+          <g style="stroke:var(--accent-2);stroke-width:1"><path d="M110 150V210M140 150V210M110 170H140M110 190H140"/></g>
+          <rect x="110" y="150" width="30" height="60" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <g style="fill:var(--text)"><circle cx="20" cy="150" r="3"/><circle cx="100" cy="150" r="3"/><circle cx="180" cy="150" r="3"/><circle cx="260" cy="150" r="3"/><circle cx="20" cy="90" r="3"/><circle cx="260" cy="90" r="3"/></g>
+          <g style="stroke:var(--ok);stroke-width:3"><path d="M10 212H30M90 212H110M170 212H190M250 212H270"/></g>
+          <circle cx="170" cy="78" r="5" style="fill:var(--accent)"/><text x="178" y="76" class="t-mono" style="fill:var(--accent)">질량 중심(층 질량)</text>
+          <text x="300" y="150" class="t-mono">강막</text>
+          <text x="150" y="236" text-anchor="middle" class="t" style="font-weight:700">해석 모델</text>
+          <text x="150" y="252" text-anchor="middle" class="t-mono">선 요소 · 판 요소 · 강막 · 지점 · 하중 · 질량</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-1.</b> 실제 건물(왼쪽)과 해석 모델(오른쪽). 기둥·보는 도심선의 선 요소, 벽은 판 요소(주황 격자) 또는 등가 기둥, 바닥은 강막으로 묶은 층 평면이 되고, 각 층의 질량은 질량 중심에 모인다. 마감·창·칸막이는 하중과 질량으로만 들어가고 강성에서는 보통 빠진다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 14.1 (해석 모델의 일곱 가지 결정)</strong> 해석 모델은 다음을 정한다. ① <b>기하</b>: 절점과 부재 도심선, 층 높이. ② <b>요소</b>: 선 요소·판 요소·스프링, 단면과 재료(E, 강성 저감 계수). ③ <b>접합</b>: 강접·핀·강역·반강접. ④ <b>바닥</b>: 강막·반강성·유연 격막. ⑤ <b>지점</b>: 고정·핀·기초 스프링, 지하층 포함 여부. ⑥ <b>하중</b>: 고정·활·풍·지진 하중의 크기·위치·조합. ⑦ <b>질량</b>: 동적 해석용 층 질량과 회전 관성(질량 원). 각 결정에는 '이 가정이 결과를 어느 쪽으로 틀리게 하는가'라는 질문이 따른다.</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="elements">
+    <h2>부재 모델링: 선 요소, 벽, 강역</h2>
+    <p>선 요소는 부재 도심선 사이의 거리를 부재 길이로 씁니다. 그런데 보–기둥 접합부(<span class="term">패널 존</span><span class="en">(panel zone)</span>)는 크기가 있습니다. 경간 8 m 보는 실제로는 기둥 면 사이 7.2 m만 휘고, 기둥 폭 안쪽 0.4 m씩은 거의 휘지 않는 덩어리입니다. 이 부분을 무한히 단단한 부재로 두는 것이 <span class="term">강역</span><span class="en">(rigid end zone)</span>입니다. 강역을 넣으면 휘는 길이가 짧아져 골조가 단단해지고, 설계에 쓰는 기둥 면의 모멘트를 바로 얻습니다. 실제로는 접합부도 조금 변형하므로 강역 길이에 0.5 정도의 계수를 곱해 쓰기도 합니다(프로그램과 기준에 따라 다름).</p>
+    <figure class="diagram" id="fig-md-rz">
+      <svg viewBox="0 0 760 270" role="img" aria-label="보–기둥 접합부의 강역과 기둥 면 모멘트">
+        <rect x="10" y="10" width="740" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="0" y="0" width="40" height="190" style="fill:var(--text-faint);opacity:.45;stroke:var(--text-dim)"/>
+          <rect x="300" y="0" width="40" height="190" style="fill:var(--text-faint);opacity:.45;stroke:var(--text-dim)"/>
+          <rect x="40" y="70" width="260" height="36" style="fill:var(--accent-soft);opacity:.6;stroke:var(--text-dim)"/>
+          <path d="M20 0V190M320 0V190M20 88H320" style="stroke:var(--text);stroke-width:1.4;stroke-dasharray:5 3"/>
+          <path d="M20 88H40M300 88H320" style="stroke:var(--accent-2);stroke-width:7"/>
+          <path d="M20 70V106" style="stroke:var(--accent-2);stroke-width:7;opacity:.6"/>
+          <text x="170" y="62" text-anchor="middle" class="t-mono">휘는 길이 ℓn = 7.2 m</text>
+          <text x="170" y="140" text-anchor="middle" class="t-mono">중심선 길이 L = 8.0 m</text>
+          <text x="30" y="210" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">강역 0.4 m</text>
+        </g>
+        <g transform="translate(430,40)">
+          <text x="0" y="8" class="t" style="font-weight:700">고정단 보 wu = 100 kN/m</text>
+                    <line x1="0" y1="90" x2="280" y2="90" class="s-axis"/>
+          <path d="M0.0 30.0L7.0 38.8L14.0 47.1L21.0 55.0L28.0 62.4L35.0 69.4L42.0 75.9L49.0 82.0L56.0 87.6L63.0 92.8L70.0 97.5L77.0 101.8L84.0 105.6L91.0 109.0L98.0 111.9L105.0 114.4L112.0 116.4L119.0 118.0L126.0 119.1L133.0 119.8L140.0 120.0L147.0 119.8L154.0 119.1L161.0 118.0L168.0 116.4L175.0 114.4L182.0 111.9L189.0 109.0L196.0 105.6L203.0 101.8L210.0 97.5L217.0 92.8L224.0 87.6L231.0 82.0L238.0 75.9L245.0 69.4L252.0 62.4L259.0 55.0L266.0 47.1L273.0 38.8L280.0 30.0" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <line x1="14" y1="24" x2="14" y2="170" style="stroke:var(--accent-2);stroke-dasharray:3 3"/>
+          <text x="150" y="140" class="t-mono">+267 (가운데)</text><text x="30" y="34" class="t-mono">−533 (끝, 위가 인장)</text>
+          <text x="0" y="190" class="t-mono">중심선 끝 533 kN·m</text>
+          <text x="0" y="208" class="t-mono" style="fill:var(--accent-2)">기둥 면 381 (중심선 모델)</text>
+          <text x="0" y="226" class="t-mono" style="fill:var(--accent)">기둥 면 432 (강역 모델 = wℓn²/12)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-2.</b> 강역(왼쪽, 주황)과 고정단 보의 모멘트(오른쪽, 개략). 중심선 모델의 끝 모멘트 \(wL^2/12\)는 기둥 속의 값이라 설계에는 기둥 면 값을 쓴다. 강역 모델은 휘는 길이가 짧아 끝이 더 단단해지므로 기둥 면 모멘트가 중심선 모델에서 읽은 값보다 조금 크다(\(w\ell_n^2/12\)).</figcaption>
+    </figure>
+    <p>벽은 두 가지로 모델링합니다. <b>판 요소</b>는 벽을 격자로 나누어 개구부와 전단 변형을 자연스럽게 담지만 결과가 응력으로 나오므로 부재력으로 적분해야 합니다. <span class="term">등가 기둥</span><span class="en">(equivalent column, wide-column model)</span>은 벽 도심선에 벽의 단면 성질(I, A, 전단 면적)을 가진 선 요소를 두고, 벽 끝에서 보와 이어지는 곳까지 수평 강역 팔을 붙입니다. 높이가 폭보다 충분히 큰 벽에는 등가 기둥이 간단하고 정확하며, 낮고 넓은 벽이나 큰 개구부가 있는 벽은 판 요소가 낫습니다.</p>
+    <figure class="diagram" id="fig-md-wall">
+      <svg viewBox="0 0 760 260" role="img" aria-label="벽의 판 요소 모델과 등가 기둥 모델">
+        <rect x="10" y="10" width="740" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(80,30)">
+          <g style="fill:var(--accent-2-soft);stroke:var(--accent-2)"><rect x="0" y="0" width="120" height="180"/></g>
+          <g style="stroke:var(--accent-2);stroke-width:.8"><path d="M30 0V180M60 0V180M90 0V180M0 30H120M0 60H120M0 90H120M0 120H120M0 150H120"/></g>
+          <rect x="45" y="100" width="30" height="50" style="fill:var(--surface);stroke:var(--text-dim)"/>
+          <text x="60" y="206" text-anchor="middle" class="t" style="font-weight:700">판 요소(격자)</text>
+          <text x="60" y="224" text-anchor="middle" class="t-mono">개구부·전단 변형 직접 표현</text>
+        </g>
+        <g transform="translate(330,30)">
+          <rect x="0" y="0" width="120" height="180" style="fill:var(--accent-2-soft);opacity:.3;stroke:var(--text-faint);stroke-dasharray:4 3"/>
+          <path d="M60 0V180" style="stroke:var(--accent-2);stroke-width:6"/>
+          <path d="M0 0H120M0 60H120M0 120H120" style="stroke:var(--accent-2);stroke-width:4;opacity:.7"/>
+          <path d="M120 0H200M120 60H200M120 120H200" style="stroke:var(--text);stroke-width:2"/>
+          <g style="stroke:var(--ok);stroke-width:3"><path d="M40 182H80"/></g>
+          <text x="210" y="4" class="t-mono">보</text>
+          <text x="60" y="206" text-anchor="middle" class="t" style="font-weight:700">등가 기둥 + 강역 팔</text>
+          <text x="60" y="224" text-anchor="middle" class="t-mono">I·A·전단 면적을 도심선에</text>
+        </g>
+        <g transform="translate(590,60)">
+          <text x="0" y="0" class="t-mono">높이/폭 ≥ 약 3: 등가 기둥</text>
+          <text x="0" y="22" class="t-mono">낮고 넓은 벽·큰 개구부:</text>
+          <text x="0" y="40" class="t-mono">  판 요소</text>
+          <text x="0" y="70" class="t-mono">코어: 판 요소로 상자 단면</text>
+          <text x="0" y="88" class="t-mono">  (비틀림·플랜지 효과)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-3.</b> 벽 모델. 판 요소(왼쪽)는 개구부와 면내 전단을 직접 담고, 등가 기둥(가운데)은 벽 도심선의 굵은 선 요소에 수평 강역 팔을 붙여 보와 잇는다. 이 장의 시뮬레이터는 B-10 코어를 등가 기둥 하나로 둔다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 14.1 (B-10 골조의 강역 효과)</strong> B-10 Y 방향 골조 한 줄(3경간 × 8 m, 10층, 기둥 800²/700², 보 400 × 700, \(E_c = 27{,}500\) MPa, 기초 고정)에 층마다 풍하중 50 kN을 건다(MechanicsBook 16장의 모델).
+      <ol style="margin:6px 0 0">
+        <li><b>중심선 모델.</b> 지붕 변위 약 34.6 mm.</li>
+        <li><b>강역 100 %.</b> 보 끝에 기둥 반폭(0.35–0.4 m), 기둥 끝에 보 반춤(0.35 m)의 강체 부재를 넣으면 지붕 변위 약 25.7 mm, 약 26 % 줄어든다. 휘는 길이가 10–20 % 짧아지고, 휨 강성은 길이의 세제곱에 반비례해 커지기 때문이다.</li>
+        <li><b>중력 모멘트.</b> \(w_u = 100\) kN/m에서 2층 바닥 가운데 보의 끝 모멘트: 중심선 모델은 중심선에서 533(\(wL^2/12\)), 기둥 면(0.4 m)에서 381 kN·m. 강역 모델의 기둥 면 모멘트는 432 kN·m(\(w\ell_n^2/12 = 100 \times 7.2^2/12\)). 중심선 끝 값으로 설계하면 과하고, 중심선 모델에서 면 값을 읽으면 약 12 % 작게 본다.</li>
+      </ol></div>
+    <div class="sim" id="sim-md-zone">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>강역 효과: B-10 골조 한 줄</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view md-stack">
+          <div><canvas id="md-cv-rz" aria-label="강역을 넣은 10층 골조의 변형"></canvas><span class="md-cap" id="md-rz-cap">변형 과장</span></div>
+          <div><canvas id="md-cv-rz2" aria-label="층간 변위비 비교"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>강역 비 r (0 = 중심선) <output id="md-rz-r-out"></output></span><input type="range" id="md-rz-r" min="0" max="1" step="0.05" value="1"></label>
+          <div class="ctrl"><span>하중</span><div class="seg" id="md-rz-load"><button data-value="wind" class="on">풍하중 50 kN/층</button><button data-value="grav">중력 w<sub>u</sub> 100 kN/m</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">지붕 변위</span><span class="v" id="md-rz-top">—</span></div>
+        <div class="stat"><span class="k">중심선 모델 대비</span><span class="v" id="md-rz-ratio">—</span></div>
+        <div class="stat"><span class="k">2층 가운데 보 기둥 면 M</span><span class="v" id="md-rz-mf">—</span></div>
+        <div class="stat"><span class="k">중심선 모델의 면 M</span><span class="v" id="md-rz-mc">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: r을 0에서 1로 올리며 지붕 변위가 약 26 % 줄어드는 것을 보세요 · 중력 하중으로 바꾸면 기둥 면 모멘트가 중심선 모델에서 읽은 값보다 커집니다(예제 14.1) · 모델: CB.frame, 보 끝 강역 = r × 기둥 반폭, 기둥 끝 강역 = r × 보 반춤(0.35 m), 강체 부재는 EI·EA × 1,000. 기둥 1–3층 800 × 800, 4–10층 700 × 700. 아래 그래프 점선은 중심선 모델(r = 0)의 층간 변위비.</div>
+    </div>
+    <h3>균열 단면 강성 저감</h3>
+    <p>철근콘크리트 부재는 하중을 받으면 인장 쪽에 균열이 생겨 휨 강성이 총단면보다 작아집니다. 보는 휨 균열이 많고, 기둥은 축압축이 균열을 줄이며, 벽은 균열 여부에 따라 크게 다릅니다. 해석에서는 총단면 2차 모멘트 \(I_g\)에 <span class="term">강성 저감 계수</span><span class="en">(stiffness modifier)</span>를 곱해 이 효과를 근사합니다.</p>
+    <div class="callout def"><strong>원리 14.2 (유효 강성의 대표값)</strong> 강도 설계용 선형 해석에서 흔히 인용되는 값(ACI 318 형태)은
+      <div class="formula">$$I_{eff} = \alpha I_g: \quad \text{보 } 0.35, \quad \text{기둥 } 0.70, \quad \text{벽(균열 없음) } 0.70, \quad \text{벽(균열) } 0.35, \quad \text{플랫 플레이트 } 0.25$$<div class="where">단면적은 보통 \(1.0A_g\). 사용하중 수준의 해석(풍하중 변위 등)에는 이보다 큰 값(대략 1.4배)을 쓰는 규정 형태도 있다. 국내 기준(KDS 41 20, KDS 41 17 00)의 값과 적용 범위는 현행 기준을 확인할 것. 강성을 줄이면 주기가 길어져 설계 스펙트럼의 지진력은 작아지지만 변위는 커진다.</div></div></div>
+    <div class="callout"><strong>예제 14.2 (B-10 벽–골조 모델의 주기)</strong> 코어를 등가 기둥(\(I = 105\) m⁴, 개구부를 고려한 교육용 값)으로, 골조 다섯 줄을 하나로 묶어 강막으로 연결한 2차원 모델(이 장의 시뮬레이터).
+      <ol style="margin:6px 0 0">
+        <li><b>총단면.</b> \(T_1 \approx 0.70\) s, 등가 정적 하중(V ≈ 5,000 kN) 아래 지붕 변위 약 18 mm.</li>
+        <li><b>보 0.35, 기둥 0.70, 벽 0.70.</b> \(T_1 \approx 0.87\) s, 지붕 변위 약 29 mm.</li>
+        <li><b>벽까지 균열(0.35).</b> \(T_1 \approx 1.15\) s, 지붕 변위 약 50 mm. 모든 강성이 반이 되면 주기는 \(\sqrt2\)배, 변위는 2배다.</li>
+        <li><b>비교.</b> B-10 동적 모형(전단 건물, \(T_1 = 1.00\) s)은 이 범위 안에 있다. 근사 주기 \(T_a = 0.79\) s는 해석 주기보다 짧다(기준은 해석 주기를 근사 주기의 일정 배 이하로 제한한다, 기준 확인).</li>
+      </ol></div>
+    <div class="sim" id="sim-md-crack">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>균열 강성 저감: 주기·변위·분담</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view md-stack">
+          <div><canvas id="md-cv-ck" aria-label="벽–골조 모델 1차 모드 형상과 층 변위"></canvas></div>
+          <div><canvas id="md-cv-ck2" aria-label="총단면 대비 주기와 변위 막대"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시</span><div class="seg" id="md-ck-pre"><button data-value="g">총단면</button><button data-value="u" class="on">0.35 / 0.70 / 0.70</button><button data-value="c">벽 균열 0.35</button></div></div>
+          <label class="ctrl"><span>보 강성 계수 <output id="md-ck-b-out"></output></span><input type="range" id="md-ck-b" min="0.2" max="1" step="0.05" value="0.35"></label>
+          <label class="ctrl"><span>기둥 강성 계수 <output id="md-ck-c-out"></output></span><input type="range" id="md-ck-c" min="0.2" max="1" step="0.05" value="0.7"></label>
+          <label class="ctrl"><span>코어 벽 강성 계수 <output id="md-ck-w-out"></output></span><input type="range" id="md-ck-w" min="0.2" max="1" step="0.05" value="0.7"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">1차 주기 T₁</span><span class="v" id="md-ck-t">—</span></div>
+        <div class="stat"><span class="k">C<sub>s</sub>(T₁) / C<sub>s</sub>(T<sub>a</sub>)</span><span class="v" id="md-ck-cs">—</span></div>
+        <div class="stat"><span class="k">지붕 변위(등가 정적)</span><span class="v" id="md-ck-u">—</span></div>
+        <div class="stat"><span class="k">최대 층간 변위비 × C<sub>d</sub>/I<sub>e</sub></span><span class="v" id="md-ck-dr">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 세 예시를 차례로 눌러 예제 14.2의 주기 0.70 → 0.87 → 1.15 s를 확인하세요 · 보 계수만 바꾸면 주기는 거의 그대로입니다(B-10은 코어가 대부분을 받음) · 모델: 2차원 벽–골조(CB.frame), 골조는 Y 방향 다섯 줄을 하나로(강성 × 5), 코어는 등가 기둥 I = 105 m⁴·A = 18.6 m², 층마다 축 강체 링크로 연결(강막), 기초 고정. 층 횡강성 행렬은 층마다 단위 하중을 걸어 구한 유연도 행렬의 역행렬, 모드는 CB.dyn.modes(B-10 층 질량). 하중은 B-10 등가 정적 층 지진력(T = T<sub>a</sub> = 0.79 s, V ≈ 5,000 kN). C<sub>s</sub>는 CB.dyn.els 형태(R 6, I<sub>e</sub> 1.2), 층간 변위는 탄성 × C<sub>d</sub>/I<sub>e</sub> = 5/1.2. 벽의 전단 변형은 무시(교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="diaphragm">
+    <h2>바닥: 강막과 층 전단력의 분배</h2>
+    <div class="problem"><strong>같은 층 전단력, 다른 분배</strong>
+      <p>B-10의 1층 층 전단력 약 5,000 kN을 다섯 줄의 Y 방향 골조와 코어 벽이 나눠 받습니다. 바닥이 단단한 판이면 강성이 큰 코어가 거의 다 받고, 바닥이 무른 판이면 각 줄이 자기 몫의 바닥 면적만큼 받습니다. 어느 쪽이 맞을까요?</p></div>
+    <p>콘크리트 슬래브는 면내로 매우 단단합니다. B-10 바닥(210 mm × 24 m)을 X 방향으로 32 m 걸친 보로 보면 면내 휨 강성은 약 \(6.7 \times 10^9\) kN·m²로, 기둥·벽의 층 강성보다 훨씬 커서 바닥은 한 층 전체가 <b>강체처럼 움직입니다</b>. 그러면 층의 운동은 X·Y 이동과 연직축 회전, 세 자유도로 줄고, 층 전단력은 각 요소의 <b>강성에 비례해</b> 나뉩니다. 목조·데크 바닥이나 길쭉한 평면, 큰 개구부가 있는 바닥은 면내로 휘어 <span class="term">유연 격막</span><span class="en">(flexible diaphragm)</span>에 가깝고, 이때는 각 요소가 맡은 바닥 면적, 곧 <span class="term">기여 폭</span><span class="en">(tributary width)</span>에 비례해 나뉩니다.</p>
+    <figure class="diagram" id="fig-md-diaph">
+      <svg viewBox="0 0 760 270" role="img" aria-label="강막과 유연 격막에서 수평 저항 요소의 하중 분배">
+        <rect x="10" y="10" width="740" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="140" y="0" text-anchor="middle" class="t" style="font-weight:700">강막: 강성에 비례(+ 비틀림)</text>
+          <rect x="0" y="30" width="280" height="70" style="fill:var(--accent-soft);opacity:.5;stroke:var(--accent)"/>
+          <rect x="0" y="110" width="280" height="70" style="fill:var(--accent-soft);stroke:var(--accent);stroke-dasharray:5 3" transform="translate(0,-8)"/>
+          <g style="stroke:var(--text);stroke-width:3"><path d="M0 30V100M70 30V100M140 30V100M210 30V100M280 30V100"/></g>
+          <rect x="62" y="30" width="16" height="70" style="fill:var(--text-dim)"/><rect x="202" y="30" width="16" height="70" style="fill:var(--text-dim)"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.6" marker-end="url(#md-ah-load)"><line x1="35" y1="10" x2="35" y2="28"/><line x1="105" y1="10" x2="105" y2="28"/><line x1="175" y1="10" x2="175" y2="28"/><line x1="245" y1="10" x2="245" y2="28"/></g>
+          <text x="140" y="210" text-anchor="middle" class="t-mono">벽 두 줄이 대부분을 받는다</text>
+        </g>
+        <g transform="translate(420,40)">
+          <text x="140" y="0" text-anchor="middle" class="t" style="font-weight:700">유연 격막: 기여 폭에 비례</text>
+          <path d="M0 30H280V100H0Z" style="fill:var(--accent-soft);opacity:.5;stroke:var(--accent)"/>
+          <path d="M0 100Q35 125 70 100Q105 128 140 100Q175 128 210 100Q245 125 280 100" style="fill:none;stroke:var(--accent);stroke-dasharray:5 3"/>
+          <g style="stroke:var(--text);stroke-width:3"><path d="M0 30V100M70 30V100M140 30V100M210 30V100M280 30V100"/></g>
+          <rect x="62" y="30" width="16" height="70" style="fill:var(--text-dim)"/><rect x="202" y="30" width="16" height="70" style="fill:var(--text-dim)"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.6" marker-end="url(#md-ah-load)"><line x1="35" y1="10" x2="35" y2="28"/><line x1="105" y1="10" x2="105" y2="28"/><line x1="175" y1="10" x2="175" y2="28"/><line x1="245" y1="10" x2="245" y2="28"/></g>
+          <text x="0" y="150" class="t-mono">1/8</text><text x="62" y="150" class="t-mono">1/4</text><text x="132" y="150" class="t-mono">1/4</text><text x="202" y="150" class="t-mono">1/4</text><text x="262" y="150" class="t-mono">1/8</text>
+          <text x="140" y="210" text-anchor="middle" class="t-mono">바닥 조각이 단순보처럼 걸침</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-4.</b> 평면을 위에서 본 바닥(X 방향 32 m, 저항 요소 다섯 줄, 짙은 사각형 = 벽). 강막(왼쪽)은 강체로 움직여 강성이 큰 벽이 거의 다 받고, 유연 격막(오른쪽)은 줄 사이에서 휘며 각 줄이 기여 폭만큼 받는다. 실제 바닥은 그 사이(반강성)다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 14.3 (강막·유연 격막의 판정 형태)</strong> 바닥의 최대 면내 처짐이 그 층 연직 요소의 평균 층간 변위의 2배를 넘으면 유연 격막으로 보는 형태의 판정을 기준이 둔다(ASCE 7 형태, KDS 41 17 00 확인). 콘크리트 슬래브·데크 위 콘크리트는 보통 강막, 목재·데크만의 바닥은 유연 격막으로 시작하되, 평면비가 크거나(약 3 이상) 개구부·요철이 크면 <span class="term">반강성 격막</span><span class="en">(semi-rigid diaphragm)</span>(판 요소)으로 모델링한다.</div>
+    <div class="sim" id="sim-md-diaph">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>강막 vs 유연 바닥: 다섯 줄의 분담</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view md-stack">
+          <div><canvas id="md-cv-dp" aria-label="스프링 위의 바닥 보, 바닥 변형"></canvas></div>
+          <div><canvas id="md-cv-dp2" aria-label="줄별 분담률 막대"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>벽 배치</span><div class="seg" id="md-dp-pre"><button data-value="b10" class="on">B-10 (x = 8, 24)</button><button data-value="one">한쪽 끝 (x = 32)</button><button data-value="none">골조만</button></div></div>
+          <label class="ctrl"><span>벽 줄 / 골조 줄 강성 비 <output id="md-dp-r-out"></output></span><input type="range" id="md-dp-r" min="1" max="100" step="1" value="30"></label>
+          <label class="ctrl"><span>바닥 면내 EI (log₁₀ kN·m²) <output id="md-dp-ei-out"></output></span><input type="range" id="md-dp-ei" min="4" max="11" step="0.1" value="9.8"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">벽 줄 분담(현재)</span><span class="v" id="md-dp-w">—</span></div>
+        <div class="stat"><span class="k">강막 극한 / 기여 폭</span><span class="v" id="md-dp-lim">—</span></div>
+        <div class="stat"><span class="k">바닥 처짐 / 평균 층 변위</span><span class="v" id="md-dp-flex">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="md-dp-j">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: EI를 11(콘크리트 슬래브 수준 약 6.7 × 10⁹은 9.8)에서 4로 낮추며 분담이 강성 비례에서 기여 폭 쪽으로 옮겨 가는 것을 보세요 · '한쪽 끝'에서는 강막일 때 바닥이 회전하며(비틀림) 반대쪽 골조가 오히려 많이 움직입니다 · 모델: 바닥을 32 m 보(CB.beam)로, 다섯 줄(x = 0, 8, 16, 24, 32 m)을 스프링으로 보고 층 전단력 5,000 kN을 등분포로 건 1차원 모델. 골조 줄 강성 5 × 10⁴ kN/m(교육용), 벽 줄 = 골조 + 비 × 골조. 강막 극한은 EI = 10¹³, 기여 폭은 1/8·1/4·1/4·1/4·1/8. 바닥 처짐은 스프링 사이의 최대 상대 처짐, 판정은 정의 14.3 형태.</div>
+    </div>
+    <h3>질량 중심, 강성 중심, 비틀림</h3>
+    <p>강막 위에서 층의 관성력(지진)은 그 층 질량의 중심, 곧 <span class="term">질량 중심</span><span class="en">(center of mass)</span>에 작용합니다. 한편 층의 수평 저항 요소들이 만드는 합력의 작용점, 곧 바닥을 회전 없이 평행 이동시키려면 힘을 걸어야 하는 점이 <span class="term">강성 중심</span><span class="en">(center of rigidity)</span>입니다. 두 점이 어긋나면 그 거리, 곧 <span class="term">편심</span><span class="en">(eccentricity)</span>만큼 비틀림 모멘트가 생겨 바닥이 돌고, 강성 중심에서 먼 쪽 요소가 더 많이 움직이며 더 큰 힘을 받습니다.</p>
+    <figure class="diagram" id="fig-md-cmcr">
+      <svg viewBox="0 0 760 280" role="img" aria-label="평면의 질량 중심, 강성 중심, 편심과 비틀림 회전">
+        <rect x="10" y="10" width="740" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <rect x="0" y="0" width="320" height="200" style="fill:var(--accent-soft);opacity:.4;stroke:var(--text-dim)"/>
+          <rect x="-6" y="60" width="12" height="80" style="fill:var(--text-dim)"/>
+          <rect x="300" y="40" width="20" height="120" style="fill:var(--text-dim)"/>
+          <rect x="120" y="-6" width="80" height="12" style="fill:var(--text-dim)"/><rect x="120" y="194" width="80" height="12" style="fill:var(--text-dim)"/>
+          <circle cx="160" cy="100" r="7" style="fill:var(--accent)"/><text x="150" y="88" text-anchor="end" class="t-mono" style="fill:var(--accent)">CM</text>
+          <path d="M232 92L248 108M248 92L232 108" style="stroke:var(--accent-2);stroke-width:3"/><text x="252" y="88" class="t-mono" style="fill:var(--accent-2)">CR</text>
+          <path d="M160 125H240" style="stroke:var(--text);stroke-width:1.4" marker-start="url(#md-ah-int)" marker-end="url(#md-ah-int)"/>
+          <text x="200" y="142" text-anchor="middle" class="t-mono">e</text>
+          <line x1="160" y1="222" x2="160" y2="108" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#md-ah-load)"/>
+          <text x="170" y="190" class="t-mono" style="fill:var(--accent-2)">V (Y 방향)</text>
+          <path d="M60 30A130 130 0 0 1 120 10" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#md-ah-int)"/>
+        </g>
+        <g transform="translate(430,50)">
+          <text x="0" y="0" class="t" style="font-weight:700">강성 중심과 비틀림</text>
+          <text x="0" y="30" class="t-mono">x_R = Σ k_y,i x_i / Σ k_y,i</text>
+          <text x="0" y="54" class="t-mono">J_R = Σk_y(x−x_R)² + Σk_x(y−y_R)²</text>
+          <text x="0" y="78" class="t-mono">θ = V (e ± e_acc) / J_R</text>
+          <text x="0" y="102" class="t-mono">δ_i = V/Σk_y + θ (x_i − x_R)</text>
+          <text x="0" y="136" class="t-dim">e_acc = 0.05 × (하중에 직각인 평면 치수)</text>
+          <text x="0" y="158" class="t-dim">비틀림 비정형: δ_max &gt; 1.2 δ_avg (기준 확인)</text>
+          <text x="0" y="180" class="t-dim">X 방향 벽도 비틀림에 저항한다(팔 y)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-5.</b> 평면의 질량 중심(CM)과 강성 중심(CR). 강한 벽이 오른쪽에 몰려 CR이 오른쪽으로 치우치면, CM에 작용하는 지진력이 편심 \(e\)만큼 비틀림을 만들고 바닥이 돈다. 약한 쪽(왼쪽) 끝이 가장 많이 움직인다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 14.4 (강막의 3자유도 평형)</strong> 층의 저항 요소 \(i\)가 위치 \((x_i, y_i)\)에서 X·Y 방향 강성 \(k_{x,i}, k_{y,i}\)를 가지면, 강막의 이동 \(u, v\)와 회전 \(\theta\)(원점 기준)는
+      <div class="formula">$$\begin{bmatrix} \sum k_x & 0 & -\sum k_x y \\ 0 & \sum k_y & \sum k_y x \\ -\sum k_x y & \sum k_y x & \sum (k_x y^2 + k_y x^2) \end{bmatrix}\begin{bmatrix} u \\ v \\ \theta \end{bmatrix} = \begin{bmatrix} F_x \\ F_y \\ T \end{bmatrix}$$<div class="where">\(T = F_y x_m - F_x y_m\): 질량 중심 \((x_m, y_m)\)에 작용하는 층 하중의 원점에 대한 비틀림 모멘트(우발 편심을 더한다). 원점을 강성 중심에 두면 비대각 항이 0이 되어 이동과 회전이 분리된다. 요소 \(i\)의 변위는 \(u - \theta y_i\), \(v + \theta x_i\), 힘은 강성 × 변위다. 이 장의 시뮬레이터는 이 3 × 3 식을 페이지 안에서 푼다.</div></div></div>
+    <div class="callout"><strong>예제 14.3 (한쪽에 몰린 벽의 비틀림)</strong> 평면 32 × 24 m. Y 방향 벽 W1(x = 0, \(k_y = 1 \times 10^5\) kN/m), W2(x = 32, \(3 \times 10^5\)), X 방향 벽 둘(y = 0, 24, 각각 \(k_x = 2 \times 10^5\)). 질량 중심 (16, 12), Y 방향 층 전단력 \(V = 1{,}000\) kN.
+      <ol style="margin:6px 0 0">
+        <li><b>강성 중심.</b> \(x_R = (0 \times 1 + 32 \times 3)/4 = 24\) m, \(y_R = 12\) m. 편심 \(e = 16 - 24 = -8\) m.</li>
+        <li><b>비틀림 강성.</b> \(J_R = 1 \times 24^2 + 3 \times 8^2 + 2 \times (2 \times 12^2) = 576 + 192 + 576 = 1{,}344\) (× 10⁵ kN·m/rad).</li>
+        <li><b>이동과 회전.</b> \(v = 1{,}000/(4 \times 10^5) = 2.5\) mm, \(\theta = 1{,}000 \times (-8)/(1.344 \times 10^8) = -5.95 \times 10^{-5}\) rad.</li>
+        <li><b>가장자리.</b> x = 0: \(2.5 + 5.95 \times 10^{-5} \times 24{,}000 = 3.93\) mm, x = 32: \(2.5 - 0.48 = 2.02\) mm. \(\delta_{max}/\delta_{avg} = 3.93/2.98 = 1.32 > 1.2\): <span class="term">비틀림 비정형</span><span class="en">(torsional irregularity)</span>. 질량 분포의 불확실성을 고려한 <span class="term">우발 편심</span><span class="en">(accidental eccentricity)</span> \(\pm 0.05 \times 32 = 1.6\) m를 불리하게 더하면 1.37.</li>
+        <li><b>힘.</b> W1 393 kN, W2 606 kN(합 1,000), X 방향 벽은 ±143 kN을 주고받으며 회전에 저항한다. 강성 비례로만 나눴다면 W1 250 kN이었을 것이다. 약한 벽이 57 % 더 받는다.</li>
+      </ol></div>
+    <div class="sim" id="sim-md-torsion">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>질량 중심·강성 중심과 바닥 비틀림</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="md-cv-tr" aria-label="평면의 벽, 질량 중심, 강성 중심과 변형된 바닥"></canvas><span class="md-cap">벽(■)과 CM(●)을 끌어 옮기기</span></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시 배치</span><div class="seg" id="md-tr-pre"><button data-value="b10" class="on">B-10 코어</button><button data-value="ex">예제 14.3</button><button data-value="corner">코어 모서리</button></div></div>
+          <div class="ctrl"><span>하중 방향</span><div class="seg" id="md-tr-dir"><button data-value="y" class="on">Y</button><button data-value="x">X</button></div></div>
+          <div class="ctrl"><span>우발 편심 5 %</span><div class="seg" id="md-tr-acc"><button data-value="0">없음</button><button data-value="1" class="on">+ 쪽</button><button data-value="-1">− 쪽</button></div></div>
+          <label class="ctrl"><span>벽 강성 / 기둥 강성 <output id="md-tr-r-out"></output></span><input type="range" id="md-tr-r" min="2" max="200" step="1" value="40"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">강성 중심 (x, y)</span><span class="v" id="md-tr-cr">—</span></div>
+        <div class="stat"><span class="k">편심 e (우발 포함)</span><span class="v" id="md-tr-e">—</span></div>
+        <div class="stat"><span class="k">회전 θ</span><span class="v" id="md-tr-th">—</span></div>
+        <div class="stat"><span class="k">δ<sub>max</sub>/δ<sub>avg</sub></span><span class="v" id="md-tr-ratio">—</span></div>
+      </div>
+      <div class="md-msg" id="md-tr-msg"></div>
+      <div class="sim-note">해볼 것: B-10 코어를 평면 모서리로 끌어 비틀림 비정형(1.2 초과)이 되는 위치를 찾아보세요 · 질량 중심을 강성 중심 위로 옮기면 우발 편심만 남습니다 · '예제 14.3'에서 1.32(우발 편심 없음)와 1.37(− 쪽, 불리한 방향)을 확인하세요 · 모델: 원리 14.4의 3자유도 강막. 기둥 20개(8 m 격자, 각 방향 k = 1, 예제 14.3에서는 없음), 벽은 자기 방향만 강성(벽 강성 / 기둥 강성 비). 층 전단력 1,000 kN, 단위는 상대값이며 변위 그림은 과장. 비틀림 비정형 판정 1.2·1.4는 KDS 41 17 00 형태(기준 확인).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="supports">
+    <h2>지점 조건, 지하층과 기초</h2>
+    <p>모델의 맨 아래를 어디에, 어떻게 고정할지도 결과를 크게 바꿉니다. 지하층이 없고 기초가 단단한 지반 위의 독립 기초라면 기둥 밑을 고정으로 둘 수 있습니다. 그러나 지하층이 있으면 지하 외벽과 주변 흙이 건물을 옆에서 잡아 주므로, 지하층을 모델에 넣고 지반을 스프링으로 두거나, 지상 1층 바닥을 고정점으로 보는 단순화를 씁니다. 연약 지반 위 전면 기초는 회전할 수 있어 코어 밑에 <b>회전 스프링</b>을 두는 편이 정직합니다. 스프링 강성은 <span class="term">지반 반력 계수</span><span class="en">(modulus of subgrade reaction)</span>와 기초 크기로 정합니다(GeotechBook).</p>
+    <figure class="diagram" id="fig-md-base">
+      <svg viewBox="0 0 760 270" role="img" aria-label="지점 조건: 고정, 지하층과 지반 스프링, 기초 회전 스프링">
+        <rect x="10" y="10" width="740" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(50,40)">
+          <path d="M20 0V150M100 0V150" style="stroke:var(--text);stroke-width:3"/><path d="M20 50H100M20 100H100M20 0H100" style="stroke:var(--text);stroke-width:2"/>
+          <path d="M0 152H120" style="stroke:var(--ok);stroke-width:5"/><g style="stroke:var(--ok)"><path d="M5 152L-5 164M25 152L15 164M45 152L35 164M65 152L55 164M85 152L75 164M105 152L95 164"/></g>
+          <text x="60" y="194" text-anchor="middle" class="t" style="font-weight:700">① 기초 고정</text>
+          <text x="60" y="212" text-anchor="middle" class="t-mono">가장 단단함(변위 과소)</text>
+        </g>
+        <g transform="translate(290,40)">
+          <rect x="-20" y="100" width="180" height="90" style="fill:var(--warn);opacity:.15"/>
+          <path d="M20 0V180M120 0V180" style="stroke:var(--text);stroke-width:3"/><path d="M20 50H120M20 100H120M20 140H120M20 180H120M20 0H120" style="stroke:var(--text);stroke-width:2"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.5;fill:none"><path d="M-14 120h6l3 -5l4 10l4 -10l4 10l3 -5h6M-14 160h6l3 -5l4 10l4 -10l4 10l3 -5h6M128 120h6l3 -5l4 10l4 -10l4 10l3 -5h6M128 160h6l3 -5l4 10l4 -10l4 10l3 -5h6"/></g>
+          <text x="70" y="96" text-anchor="middle" class="t-mono">GL</text>
+          <text x="70" y="214" text-anchor="middle" class="t" style="font-weight:700">② 지하층 + 지반 스프링</text>
+        </g>
+        <g transform="translate(560,40)">
+          <path d="M60 0V150" style="stroke:var(--accent-2);stroke-width:8"/>
+          <rect x="0" y="150" width="120" height="16" style="fill:var(--text-faint);stroke:var(--text-dim)"/>
+          <path d="M40 182A20 20 0 1 1 80 182" style="fill:none;stroke:var(--accent);stroke-width:2" marker-end="url(#md-ah-acc)"/>
+          <text x="60" y="214" text-anchor="middle" class="t" style="font-weight:700">③ 기초 회전 스프링</text>
+          <text x="60" y="232" text-anchor="middle" class="t-mono">k_θ ≈ k_s × I_기초</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-6.</b> 지점 조건의 세 가지 모델. 고정(①)은 가장 단단해 변위·주기를 작게 보고, 지하층과 지반 스프링(②)은 흙이 지하 외벽을 잡는 정도를 반영하며, 회전 스프링(③)은 연약 지반 위 기초의 흔들림을 담는다. 결과가 지점 가정에 민감하면 두 극한(고정·유연)을 모두 풀어 설계를 감싼다(<span class="term">민감도 분석</span><span class="en">(sensitivity analysis)</span>).</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="loads-mass">
+    <h2>하중과 질량의 입력</h2>
+    <p>바닥의 면 하중(kN/m²)은 프로그램이 슬래브 판 요소를 통해 보에 나르게 하거나, 엔지니어가 손으로 보에 선하중으로 나누어 줍니다. 2방향 슬래브는 모서리에서 45°로 그은 선(항복선과 비슷)으로 판을 나누어, 짧은 변의 보에는 삼각형, 긴 변의 보에는 사다리꼴 하중을 줍니다. 어느 방법이든 반드시 지켜야 할 규칙은 <b>보에 나눈 하중의 합 = 바닥 하중의 합</b>이며, 해석 뒤에는 반력 합과 비교하는 <span class="term">하중 합 검사</span><span class="en">(load–reaction check)</span>로 확인합니다.</p>
+    <figure class="diagram" id="fig-md-trib">
+      <svg viewBox="0 0 760 260" role="img" aria-label="2방향 슬래브의 45도 하중 분담과 보의 삼각형, 사다리꼴 하중">
+        <rect x="10" y="10" width="740" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <rect x="0" y="0" width="200" height="200" style="fill:var(--accent-soft);opacity:.4;stroke:var(--text);stroke-width:3"/>
+          <path d="M0 0L100 100L200 0M0 200L100 100L200 200" style="stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 3"/>
+          <path d="M0 0L100 100L0 200Z" style="fill:var(--accent-2-soft);opacity:.6"/>
+          <text x="40" y="104" class="t-mono">16 m²</text>
+          <text x="100" y="222" text-anchor="middle" class="t-mono">8 × 8 m 정사각형: 네 보가 1/4씩</text>
+        </g>
+        <g transform="translate(330,40)">
+          <rect x="0" y="0" width="320" height="140" style="fill:var(--accent-soft);opacity:.4;stroke:var(--text);stroke-width:3"/>
+          <path d="M0 0L70 70H250L320 0M0 140L70 70M250 70L320 140" style="stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 3"/>
+          <path d="M0 160L70 190H250L320 160Z" style="fill:var(--accent-2-soft);stroke:var(--accent-2)" transform="translate(0,10)"/>
+          <path d="M340 0L380 70L340 140Z" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <text x="160" y="222" text-anchor="middle" class="t-mono">긴 변 보: 사다리꼴 · 짧은 변 보: 삼각형</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-7.</b> 2방향 슬래브의 45° 분담. 정사각형 판은 네 보가 하중을 1/4씩, 직사각형 판은 긴 변의 보가 사다리꼴, 짧은 변의 보가 삼각형 하중을 받는다. 어느 쪽이든 네 보의 하중 합은 판의 하중 합과 같아야 한다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 14.4 (기여 폭 단순화와 하중 합 검사)</strong> B-10 바닥 8 × 8 m 구획, 계수 하중 \(w_u = 1.2 \times 6.5 + 1.6 \times 2.5 = 11.8\) kN/m². 큰보 G1은 X·Y 두 방향에 모두 있다.
+      <ol style="margin:6px 0 0">
+        <li><b>45° 분담.</b> 안쪽 큰보 하나는 양쪽 판에서 삼각형(16 m²)씩, 합 32 m², 하중 \(11.8 \times 32 = 378\) kN. 최대 세기 \(11.8 \times 4 \times 2 = 94.4\) kN/m의 삼각형이며, 고정단 모멘트가 같은 등분포로 바꾸면 \(5/8 \times 94.4 = 59\) kN/m다.</li>
+        <li><b>기여 폭 8 m 단순화.</b> MechanicsBook의 G1 값(\(w_u \approx 100\) kN/m)은 판이 한 방향으로만 보에 걸친다고 보고 기여 폭 8 m 전체를 준 값이다. 보 하나에 \(11.8 \times 64 = 755\) kN.</li>
+        <li><b>하중 합 검사.</b> 구획 하나(64 m², 755 kN)의 하중을 두 방향 보 모두에 기여 폭 8 m로 주면 보들이 받는 합이 1,510 kN, 곧 <b>두 배</b>가 된다. 한 방향 보만 있는 바닥에서는 맞는 단순화지만 2방향 보 배치에서는 보수적이며, 모델 전체에 쓰면 기둥 축력과 기초 하중이 부풀려진다. 반력 합을 바닥 하중 합과 비교하면 바로 드러난다.</li>
+      </ol></div>
+    <div class="sim" id="sim-md-trib">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>면 하중 분배와 하중 합 검사</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="md-cv-tb" aria-label="슬래브 구획과 네 보의 분담 하중"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>분배 방법</span><div class="seg" id="md-tb-m"><button data-value="45" class="on">45° 분담</button><button data-value="one">1방향(짧은 변)</button><button data-value="trib">기여 폭(두 방향 모두)</button></div></div>
+          <label class="ctrl"><span>긴 변 길이(짧은 변 8 m) <output id="md-tb-l-out"></output></span><input type="range" id="md-tb-l" min="8" max="20" step="0.5" value="8"></label>
+          <label class="ctrl"><span>계수 면 하중 <output id="md-tb-w-out"></output></span><input type="range" id="md-tb-w" min="2" max="20" step="0.1" value="11.8"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">긴 변 보 하나</span><span class="v" id="md-tb-ly">—</span></div>
+        <div class="stat"><span class="k">짧은 변 보 하나</span><span class="v" id="md-tb-lx">—</span></div>
+        <div class="stat"><span class="k">네 보 합 / 판 하중</span><span class="v" id="md-tb-sum">—</span></div>
+      </div>
+      <div class="md-msg" id="md-tb-msg"></div>
+      <div class="sim-note">해볼 것: 정사각형에서 45° 분담이 네 보에 1/4씩인 것을 보고 '기여 폭'으로 바꿔 합이 두 배가 되는 것을 보세요 · 긴 변을 16 m 이상(장단변비 2)으로 늘리면 45° 분담도 1방향에 가까워집니다 · 모델: 한 구획을 고립시켜 네 변 보가 판 하중을 나눈다고 본 교육용 계산(이웃 구획 몫은 따로 더함). 기여 폭 방법은 각 보에 판 폭의 절반씩 양쪽(= 판 전체)을 두 방향 모두에 준 경우.</div>
+    </div>
+    <p>동적 해석에는 하중과 별도로 <span class="term">질량 원</span><span class="en">(mass source)</span>을 정합니다. 지진 해석의 질량은 <span class="term">유효 지진 중량</span><span class="en">(effective seismic weight)</span>(고정하중 + 창고 활하중의 일부 + 칸막이·설비 등, KDS 41 17 00 형태, 기준 확인)을 중력 가속도로 나눈 것이고, 강막에서는 층 질량과 그 회전 관성(질량 × 회전 반경²)을 질량 중심에 모읍니다. 흔한 실수는 프로그램이 자동 계산하는 부재 자중과 엔지니어가 입력한 고정하중에 슬래브 자중이 <b>두 번</b> 들어가는 것, 그리고 질량 원을 부재 자중만으로 두어 마감·설비 질량이 빠지는 것입니다.</p>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="analysis-types">
+    <h2>해석의 종류</h2>
+    <div class="table-wrap"><table class="md-tbl">
+      <thead><tr><th>해석</th><th>무엇을 푸나</th><th>입력의 핵심</th><th>쓰임과 한계</th></tr></thead>
+      <tbody>
+        <tr><td>선형 정적</td><td>[K]{d} = {F}</td><td>강성, 하중 조합</td><td>중력·풍하중·등가 정적 지진. 가장 기본, 검증이 쉽다</td></tr>
+        <tr><td>모드 해석</td><td>K φ = ω² M φ</td><td>강성, 질량 원</td><td>고유 주기·모드 형상·유효 질량. 모델 이상을 찾는 첫 도구</td></tr>
+        <tr><td>응답 스펙트럼</td><td>모드별 최대 응답 + SRSS·CQC</td><td>설계 스펙트럼, 감쇠, 모드 수(유효 질량 90 % 이상 형태)</td><td>내진 설계의 표준. 결과가 모두 양수(부호 잃음)</td></tr>
+        <tr><td>시간 이력</td><td>운동 방정식의 단계 적분</td><td>지진파 여러 개, 감쇠</td><td>면진·감쇠기·중요 건물. 입력에 민감</td></tr>
+        <tr><td>비선형 정적(푸시오버)</td><td>하중을 늘리며 소성 힌지 추적</td><td>힌지 특성, 하중 분포</td><td>성능 기반 설계, 붕괴 메커니즘 확인</td></tr>
+      </tbody></table></div>
+    <p>선형 해석의 모든 결과는 입력 하중에 비례합니다. 그래서 하중 하나를 두 배로 잘못 넣으면 결과도 정확히 두 배가 되고, 해석 자체에서는 어떤 경고도 나오지 않습니다. 검증이 필요한 이유입니다.</p>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="verification">
+    <h2>결과 검증과 흔한 실수</h2>
+    <p>해석 결과를 받으면 다음 순서로 확인합니다. MechanicsBook 16장의 검증 체크리스트를 건물 전체로 넓힌 것입니다.</p>
+    <div class="cards">
+      <div><b>① 하중 합 = 반력 합</b>연직 하중 조합의 밑면 반력 합을 바닥 면적 × 면 하중 + 부재 자중의 손계산과 비교한다(±몇 %). 수평 하중이면 밑면 전단 합 = 층 하중 합.</div>
+      <div><b>② 주기의 상식</b>1차 주기를 근사식(T<sub>a</sub>)이나 경험값(RC 골조 대략 층 수 × 0.1 s)과 비교한다. 두 배 넘게 다르면 질량이나 강성, 지점을 의심한다.</div>
+      <div><b>③ 모드 형상</b>1·2차가 X·Y 병진, 3차가 비틀림인 것이 보통이다. 1차부터 비틀림이거나, 바닥 일부만 흔들리는 <span class="term">국부 모드</span><span class="en">(local mode)</span>면 강막·접합 오류다. 유효 질량 합도 본다.</div>
+      <div><b>④ 변형과 크기</b>변형 애니메이션으로 이상한 꺾임·떨어진 부재를 찾고, 처짐·층간 변위가 손계산 범위인지 본다.</div>
+    </div>
+    <div class="sim" id="sim-md-game">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>오류 찾기: 이 모델에서 무엇이 틀렸나</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="md-cv-gm" aria-label="해석 모델의 1차 모드 형상과 반력 막대"></canvas></div>
+        <div class="sim-controls">
+          <div class="btn-row"><button class="btn" id="md-gm-new">새 모델 받기</button><button class="btn" id="md-gm-hint">힌트</button></div>
+          <div class="ctrl"><span>점수</span><div id="md-gm-score" style="font:600 15px var(--mono)">0 / 0</div></div>
+        </div>
+      </div>
+      <div class="md-report"><table><thead><tr><th>검사 항목</th><th>해석 결과</th><th>손계산·기준</th></tr></thead><tbody id="md-gm-tbl"></tbody></table></div>
+      <div class="md-choices" id="md-gm-ch"></div>
+      <div class="md-msg" id="md-gm-msg">결과표를 보고 숨은 오류를 고르세요. 오류가 없는 모델도 나옵니다.</div>
+      <div class="sim-note">해볼 것: 표의 세 기둥(하중 합–반력 합, 주기, 모드·변위)을 차례로 손계산과 대조하세요 · 평형만으로는 지점·강막·질량 오류를 못 잡습니다 · 모델: B-10형 건물(평면 32 × 24 m, 층 수 6–14 무작위), 고정하중 6.5(슬래브 5.04 포함) + 부재 자중 2.48 kN/m², 활하중 2.5 kN/m². 주기는 층 질량·층 강성 1.2 × 10⁶ kN/m의 전단 건물(CB.dyn.modes), 지붕 변위는 등가 정적 하중(CB.dyn.els). 오류마다 교육용으로 정한 영향을 결과에 반영한다.</div>
+    </div>
+    <div class="callout warn"><strong>흔한 실수 일곱 가지</strong> ① 단위(kgf·tf와 kN, mm와 m, MPa와 kN/m²). ② 자중 중복(자동 자중 + 고정하중 속 슬래브). ③ 하중 누락(지붕·한 층·한 방향). ④ 지점·접합 해제(기초 하나가 핀, 보 끝이 핀). ⑤ 강막 미지정 또는 개구부가 큰 바닥에 강막 적용. ⑥ 질량 원 누락·중복. ⑦ 하중 조합·방향 부호. 평형 검사는 ①–③을, 주기와 모드는 ④–⑥을, 변형 애니메이션은 ④·⑦을 잘 잡는다.</div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="simplification">
+    <h2>모델 단순화 비교</h2>
+    <p>3차원 모델이 늘 정답은 아니고, 평면 골조 한 줄이 늘 틀린 것도 아닙니다. 중요한 것은 단순화가 무엇을 빠뜨리는지 아는 것입니다. 벽–골조 건물에서 흔한 단순화는 '벽과 골조를 따로 풀고 강성 비로 나누기'인데, 휨형인 벽과 전단형인 골조는 높이에 따라 변형 모양이 달라 서로 밀고 당깁니다(5장의 <span class="term">벽–골조 상호작용</span><span class="en">(wall–frame interaction)</span>). 아래 층에서는 벽이 골조를 붙잡고, 위층에서는 골조가 벽을 붙잡아 골조가 오히려 반대 방향 힘을 받기도 합니다. 강막으로 묶은 모델만 이것을 보여 줍니다.</p>
+    <div class="sim" id="sim-md-simplify">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>모델 단순화와 지점 조건 비교</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view md-stack">
+          <div><canvas id="md-cv-sp" aria-label="층별 골조 전단 분담률"></canvas></div>
+          <div><canvas id="md-cv-sp2" aria-label="모델별 지붕 변위와 주기"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>모델</span><div class="seg" id="md-sp-m"><button data-value="full" class="on">벽–골조(강막)</button><button data-value="split">따로 풀어 강성 비 분배</button><button data-value="frame">골조만</button><button data-value="wall">코어만</button></div></div>
+          <div class="ctrl"><span>코어 기초</span><div class="seg" id="md-sp-base"><button data-value="fixed" class="on">고정</button><button data-value="spring">회전 스프링(G-10)</button></div></div>
+          <label class="ctrl"><span>코어 강성 배율 <output id="md-sp-w-out"></output></span><input type="range" id="md-sp-w" min="0.1" max="2" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">1차 주기</span><span class="v" id="md-sp-t">—</span></div>
+        <div class="stat"><span class="k">지붕 변위</span><span class="v" id="md-sp-u">—</span></div>
+        <div class="stat"><span class="k">밑면 골조 분담</span><span class="v" id="md-sp-fb">—</span></div>
+        <div class="stat"><span class="k">지붕층 골조 분담</span><span class="v" id="md-sp-ft">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: '벽–골조'에서 골조 분담이 아래는 몇 %인데 위층에서 크게 커지거나 100 %를 넘는 것(벽이 반대로 당겨짐)을 보세요 · '강성 비 분배'는 모든 층에서 같은 비율이라 위층 골조를 과소 설계하게 됩니다 · 코어 기초를 회전 스프링으로 바꾸면 주기와 변위가 커지고 골조 몫이 늘어납니다 · 모델: 예제 14.2의 2차원 벽–골조(균열 계수 보 0.35, 기둥 0.70, 벽 0.70), B-10 등가 정적 층 지진력. 강성 비 분배는 골조만·코어만의 지붕 강성 비로 나눈 교육용 단순화. 회전 스프링 k<sub>θ</sub> = k<sub>s</sub>I<sub>f</sub> ≈ 9.2 × 10⁷ kN·m/rad(코어가 쓰는 전면 기초 유효 32 × 12 m, 지반 반력 계수 20,000 kN/m³, 교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="b10-3d">
+    <h2>B-10 3D 모델과 모드 형상</h2>
+    <p>이제 B-10 전체를 봅시다. 평면 32 × 24 m에 기둥 20개, 큰보, 코어 16 × 8 m, 바닥 강막 10개 층입니다. 이 책의 동적 모형(<code>CB.dyn.B10</code>)은 Y 방향 전단 건물(층 질량 703 t, 지붕 612 t, 층 강성 1.2 × 10⁶ kN/m)로, 모드 해석에서 \(T_1 = 1.00\) s, \(T_2 = 0.34\) s, \(T_3 = 0.21\) s, 유효 질량비 0.85 / 0.09 / 0.03을 줍니다. 아래 3D 모델은 이 모드 형상과 정적 하중의 변형을 건물에 입혀 보여 줍니다.</p>
+    <div class="sim" id="sim-md-b10">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-10 3D 변형과 모드 애니메이션</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="md-cv-3d" aria-label="B-10 3차원 골조와 코어의 변형"></canvas><span class="md-cap" id="md-3d-cap">끌어서 돌리기</span></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>보기</span><div class="seg" id="md-3d-mode"><button data-value="m1" class="on">1차 모드</button><button data-value="m2">2차</button><button data-value="m3">3차</button><button data-value="els">등가 정적 지진</button><button data-value="wind">풍하중</button></div></div>
+          <label class="ctrl"><span>변형 과장 <output id="md-3d-s-out"></output></span><input type="range" id="md-3d-s" min="0" max="1" step="0.05" value="0.6"></label>
+          <label class="check"><input type="checkbox" id="md-3d-slab" checked> 바닥 강막 보이기</label>
+          <div class="btn-row"><button class="btn" id="md-3d-play">■ 정지</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">주기 / 유효 질량비</span><span class="v" id="md-3d-t">—</span></div>
+        <div class="stat"><span class="k">지붕 변위</span><span class="v" id="md-3d-u">—</span></div>
+        <div class="stat"><span class="k">최대 층간 변위비</span><span class="v" id="md-3d-dr">—</span></div>
+        <div class="stat"><span class="k">밑면 전단력</span><span class="v" id="md-3d-v">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 1·2·3차 모드에서 마디(움직이지 않는 층)의 수가 0·1·2개로 늘어나는 것을 보세요 · 등가 정적 지진과 1차 모드의 모양을 비교하세요(거의 같다) · 풍하중은 층마다 약 220 kN(Y 방향, 6장)으로 지진보다 훨씬 작습니다 · 모델: CB.dyn.B10 전단 건물(Y 방향), CB.dyn.modes, CB.dyn.els(T = T<sub>a</sub> 0.79 s). 정적 변위 = 층 전단력 / 층 강성의 누적(탄성, C<sub>d</sub> 증폭 전). 모드는 지붕 = 1로 정규화해 진폭만 보여 준다. 3D 그림은 CB.orbit, 코어는 반투명 상자, 모든 층이 강막으로 함께 움직인다고 가정(비틀림 없음).</div>
+    </div>
+    <div class="callout site"><strong>B-10 모델의 숫자들, 서로 맞는가</strong> 이 책의 B-10에는 같은 건물을 다르게 단순화한 숫자가 여러 개 있다. 전단 건물 동적 모형은 \(T_1 = 1.00\) s, 근사식은 \(T_a = 0.79\) s, 이 장의 2차원 벽–골조 모델은 균열 계수에 따라 0.70–1.15 s다. 셋이 다르지만 서로 모순은 아니다. 근사식은 실측 주기의 하한 쪽에 맞춘 통계식이고, 전단 건물은 층 강성을 하나의 숫자로 둔 모형이며, 벽–골조 모델은 코어의 휨 변형을 직접 담는다. 그래서 2차 주기의 비가 다르다: 전단 건물은 \(T_2/T_1 = 0.34\), 휨형 코어가 지배하는 벽–골조는 약 0.17이다. 하중 쪽에서는 MechanicsBook G1의 기여 폭 8 m 하중(\(w_u \approx 100\) kN/m)이 2방향 보 배치에서는 보수적이라는 점(예제 14.4)을 기억하고, 기둥·기초 하중은 층 면적 × 면 하중의 합으로 다시 검산한다. 모두 교육용 값이다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="../../mechanics/chapters/matrix.html"><small>MechanicsBook · 매트릭스 구조해석</small>해석기의 속<br><span>강성 행렬, 조립, 경계 조건, 검증 체크리스트.</span></a>
+      <a href="walls.html"><small>CH.05 · 전단벽·코어·튜브</small>벽–골조 상호작용<br><span>휨형 벽과 전단형 골조가 강막으로 묶일 때.</span></a>
+      <a href="dynamics.html"><small>CH.07 · 구조 동역학</small>모드 해석과 질량<br><span>고유값 문제, 유효 질량, 모드 중첩.</span></a>
+      <a href="seismic.html"><small>CH.08 · 내진 설계</small>비틀림 비정형과 우발 편심<br><span>등가 정적 해석, 층간 변위, 비정형성.</span></a>
+      <a href="timber-modular.html"><small>CH.13 · 목구조와 모듈러 건축</small>유연 격막과 접합 스프링<br><span>목조 바닥과 모듈러 유닛 접합의 모델링.</span></a>
+      <a href="../../geotech/chapters/bearing.html"><small>GeotechBook · 얕은 기초</small>기초의 지점 모델<br><span>지반 반력 계수와 기초 스프링.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>해석 모델은 기하·요소·접합·바닥·지점·하중·질량의 일곱 가지 결정으로 이루어지며, 각 결정이 결과를 어느 쪽으로 틀리게 하는지 알고 써야 한다.</li>
+      <li>강역은 접합부의 단단한 덩어리를 표현해 골조를 단단하게 하고(B-10 골조 지붕 변위 약 26 % 감소) 기둥 면 모멘트를 직접 준다. 설계 모멘트는 기둥 면 값이다.</li>
+      <li>균열 단면 강성 저감(보 0.35, 기둥 0.70, 벽 0.70/0.35 형태, 기준 확인)은 주기를 늘리고 변위를 키운다. 모든 강성이 반이 되면 주기는 √2배, 변위는 2배다.</li>
+      <li>강막에서는 층 전단력이 강성에 비례해, 유연 격막에서는 기여 폭에 비례해 나뉜다. 바닥 처짐이 평균 층간 변위의 2배를 넘으면 유연 격막으로 보는 형태의 판정이 있다.</li>
+      <li>질량 중심과 강성 중심의 편심(+ 우발 편심 5 %)은 바닥을 돌려 약한 쪽 요소에 힘을 더 준다. δ<sub>max</sub>/δ<sub>avg</sub> &gt; 1.2이면 비틀림 비정형이다.</li>
+      <li>지점은 고정·지하층과 지반 스프링·기초 회전 스프링 중에서 고르고, 결과가 민감하면 두 극한을 모두 푼다.</li>
+      <li>면 하중 분배의 합은 판 하중의 합과 같아야 하며, 질량 원은 유효 지진 중량으로 정한다. 자중 중복과 질량 누락이 흔한 실수다.</li>
+      <li>결과는 하중 합–반력 합, 주기와 모드 형상, 변형과 크기의 순서로 검증한다. 평형만으로는 지점·강막·질량 오류를 잡지 못한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 강역을 넣은 골조 모델이 중심선 모델보다 수평 변위가 작은 이유는?</p><div class="opts">
+        <button class="opt">하중이 줄어들기 때문</button><button class="opt" data-correct>휘는 부재 길이가 짧아져 휨 강성이 커지기 때문</button><button class="opt">균열이 줄어들기 때문</button><button class="opt">지점이 고정되기 때문</button>
+      </div><div class="quiz-exp">접합부 안쪽을 강체로 보면 보·기둥의 휘는 길이가 기둥 폭·보 춤만큼 줄고, 휨 강성은 대략 길이의 세제곱에 반비례해 커진다.</div></div>
+      <div class="quiz-q"><p>2. 철근콘크리트 건물의 모든 부재 강성을 0.5배로 줄이면 1차 주기와 변위는?</p><div class="opts">
+        <button class="opt">주기 0.5배, 변위 2배</button><button class="opt">주기 2배, 변위 2배</button><button class="opt" data-correct>주기 약 1.41배, 변위 2배</button><button class="opt">주기 그대로, 변위 1.41배</button>
+      </div><div class="quiz-exp">\(T = 2\pi\sqrt{m/k}\)이므로 \(k\)가 반이면 주기는 \(\sqrt2\)배, 정적 변위 \(F/k\)는 2배다(같은 하중일 때).</div></div>
+      <div class="quiz-q"><p>3. 콘크리트 슬래브 바닥을 강막으로 볼 때 층 전단력은 수평 저항 요소에 어떻게 나뉘나?</p><div class="opts">
+        <button class="opt">각 요소의 기여 면적에 비례해</button><button class="opt" data-correct>각 요소의 강성에 비례해(편심이 있으면 비틀림 몫을 더해)</button><button class="opt">모든 요소에 똑같이</button><button class="opt">가장 가까운 요소가 모두</button>
+      </div><div class="quiz-exp">강막은 강체로 움직이므로 같은 변위에서 힘은 강성에 비례한다. 기여 면적 비례는 유연 격막의 가정이다.</div></div>
+      <div class="quiz-q"><p>4. Y 방향 벽 두 개가 x = 0(k)과 x = 32 m(3k)에 있을 때 강성 중심의 x 좌표는?</p><div class="opts">
+        <button class="opt">8 m</button><button class="opt">16 m</button><button class="opt" data-correct>24 m</button><button class="opt">32 m</button>
+      </div><div class="quiz-exp">\(x_R = (0 \times k + 32 \times 3k)/(4k) = 24\) m. 질량 중심이 16 m면 편심 8 m.</div></div>
+      <div class="quiz-q"><p>5. 평면 치수 32 × 24 m 건물에 Y 방향 지진력이 작용할 때 우발 편심(5 % 형태)은?</p><div class="opts">
+        <button class="opt">±1.2 m</button><button class="opt" data-correct>±1.6 m</button><button class="opt">±2.8 m</button><button class="opt">±0.8 m</button>
+      </div><div class="quiz-exp">하중 방향(Y)에 직각인 평면 치수 32 m의 5 %: \(0.05 \times 32 = 1.6\) m. X 방향 지진이면 24 m의 5 %인 1.2 m다.</div></div>
+      <div class="quiz-q"><p>6. 연직 하중 해석의 밑면 반력 합이 손계산 하중 합보다 약 1.4배 크다. 가장 먼저 의심할 것은?</p><div class="opts">
+        <button class="opt">기초 하나가 핀으로 입력됨</button><button class="opt" data-correct>슬래브 자중이 자동 자중과 고정하중에 두 번 들어감</button><button class="opt">강막 미지정</button><button class="opt">균열 계수 누락</button>
+      </div><div class="quiz-exp">지점·강막·강성 오류는 평형을 바꾸지 않는다(반력 합 = 입력 하중 합). 반력 합이 손계산보다 크면 입력 하중 자체가 많은 것이다. B-10형 바닥에서 슬래브 5.04 kN/m²가 중복되면 (8.98 + 2.5 + 5.04)/(8.98 + 2.5) ≈ 1.44배가 된다.</div></div>
+      <div class="quiz-q"><p>7. 모드 해석에서 1차 모드의 유효 질량비가 3 %이고 모양이 바닥 한 귀퉁이만 흔들린다. 의심할 것은?</p><div class="opts">
+        <button class="opt">하중 조합 계수</button><button class="opt">균열 계수가 너무 작음</button><button class="opt" data-correct>강막 미지정 또는 바닥과 골조의 접합 누락(국부 모드)</button><button class="opt">정상이다</button>
+      </div><div class="quiz-exp">건물의 1차 모드는 보통 병진으로 유효 질량이 60–85 % 안팎이다. 작은 질량만 움직이는 국부 모드가 먼저 나오면 그 부분이 구조에서 떨어져 있거나 강막·접합이 빠진 것이다.</div></div>
+      <div class="quiz-q"><p>8. 벽–골조 건물을 벽과 골조로 따로 풀고 밑면 강성 비로 층 전단력을 나누면 어떤 문제가 생기나?</p><div class="opts">
+        <button class="opt">아래층 벽의 힘을 크게 과대평가한다</button><button class="opt" data-correct>위층에서 골조가 실제로 받는 큰 전단(벽을 붙잡는 힘)을 과소평가한다</button><button class="opt">주기가 0이 된다</button><button class="opt">아무 차이가 없다</button>
+      </div><div class="quiz-exp">휨형 벽과 전단형 골조는 높이에 따라 변형 모양이 달라, 강막으로 묶이면 위층에서 골조가 벽을 붙잡으며 큰 전단을 받는다. 강성 비 분배는 모든 층에 같은 비율을 써서 이를 놓친다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const MDX = {
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.7, y1 - uy * hd * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45); ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  rgba(c, a) {
+    c = (c || "").trim();
+    if (c[0] === "#") { let h = c.slice(1); if (h.length === 3) h = h.split("").map((x) => x + x).join(""); const n = parseInt(h.slice(0, 6), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
+    const m = c.match(/rgba?\(([^)]+)\)/); if (m) { const p = m[1].split(",").map((s) => s.trim()); return `rgba(${p[0]},${p[1]},${p[2]},${a})`; }
+    return c;
+  },
+  bars(ctx, W, H, rows, o = {}) {
+    const pal = CB.palette(), x0 = o.left || Math.min(150, W * 0.34), x1 = W - (o.right || 70), top = o.top || 26, gap = (H - top - 14) / rows.length, bh = Math.min(22, gap * 0.62);
+    const vmax = o.max || Math.max(1e-9, ...rows.map((r) => r.parts.reduce((s, p) => s + Math.max(0, p.v), 0))) * 1.05, X = (v) => x0 + (v / vmax) * (x1 - x0);
+    if (o.title) MDX.text(ctx, o.title, W / 2, 12, pal.dim, { size: 11, mono: false });
+    rows.forEach((r, i) => {
+      const y = top + gap * i + (gap - bh) / 2; let acc = 0;
+      MDX.text(ctx, r.label, x0 - 8, y + bh / 2, r.labelColor || pal.text, { size: 11.5, align: "right", mono: false });
+      r.parts.forEach((p) => { ctx.save(); ctx.fillStyle = p.color; ctx.fillRect(X(acc), y, X(acc + Math.max(0, p.v)) - X(acc), bh); ctx.restore(); acc += Math.max(0, p.v); });
+      if (r.note) MDX.text(ctx, r.note, Math.min(W - 4, X(acc) + 6), y + bh / 2, pal.dim, { size: 11, align: "left" });
+    });
+    if (o.vline != null) { ctx.save(); ctx.strokeStyle = pal.bad; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(X(o.vline), top - 6); ctx.lineTo(X(o.vline), H - 8); ctx.stroke(); ctx.restore(); }
+    return { X };
+  },
+};
+const MD = {
+  Ec: 2.75e7,
+  H: (() => { const h = [0, 5]; for (let k = 2; k <= 10; k++) h.push(5 + 4 * (k - 1)); return h; })(),
+  // B-10 Y 방향 골조 한 줄 + 강역(비 rz). load: "wind" | "grav"
+  zoneFrame(rz, load) {
+    const H = MD.H, Ec = MD.Ec, nodes = [], members = [], supports = {}, loads = [], memberLoads = [], big = 1e3, beams = [];
+    const nid = (x, y) => { const k = nodes.findIndex((p) => Math.abs(p[0] - x) < 1e-9 && Math.abs(p[1] - y) < 1e-9); if (k >= 0) return k; nodes.push([x, y]); return nodes.length - 1; };
+    const seg = (a, b, A, I, tag) => { members.push({ i: a, j: b, E: Ec, A, I, tag }); return members.length - 1; };
+    for (let lev = 1; lev <= 10; lev++) {
+      const sc = lev <= 3 ? 0.8 : 0.7;
+      for (let c = 0; c < 4; c++) {
+        const x = 8 * c, y0 = H[lev - 1], y1 = H[lev], zb = lev === 1 ? 0 : rz * 0.35, zt = rz * 0.35, A = sc * sc, I = sc ** 4 / 12;
+        const p0 = nid(x, y0), p3 = nid(x, y1), p1 = zb > 1e-9 ? nid(x, y0 + zb) : p0, p2 = zt > 1e-9 ? nid(x, y1 - zt) : p3;
+        if (p1 !== p0) seg(p0, p1, A * big, I * big, "rz");
+        seg(p1, p2, A, I, "col");
+        if (p2 !== p3) seg(p2, p3, A * big, I * big, "rz");
+      }
+      for (let c = 0; c < 3; c++) {
+        const xa = 8 * c, xb = xa + 8, y = H[lev], z = (rz * sc) / 2, A = 0.28, I = (0.4 * 0.7 ** 3) / 12, ms = [];
+        const q0 = nid(xa, y), q3 = nid(xb, y), q1 = z > 1e-9 ? nid(xa + z, y) : q0, q2 = z > 1e-9 ? nid(xb - z, y) : q3;
+        if (q1 !== q0) ms.push(seg(q0, q1, A * big, I * big, "rz"));
+        const mm = seg(q1, q2, A, I, "beam"); ms.push(mm);
+        if (q2 !== q3) ms.push(seg(q2, q3, A * big, I * big, "rz"));
+        beams.push({ lev, c, mm, z });
+        if (load === "grav") ms.forEach((m) => memberLoads.push({ member: m, w: [0, -100] }));
+      }
+      if (load === "wind") loads.push({ node: nid(0, H[lev]), fx: 50 });
+    }
+    for (let c = 0; c < 4; c++) supports[nid(8 * c, 0)] = "fixed";
+    const r = CB.frame({ nodes, members, supports, loads, memberLoads });
+    const ux = H.map((y) => (r.ok ? r.d[nid(0, y)][0] : 0));
+    // 2층 바닥 가운데 보의 왼쪽 기둥 면(중심에서 0.4 m) 모멘트
+    const b = beams.find((q) => q.lev === 1 && q.c === 1), pts = r.ok ? r.sample(b.mm, 400) : [];
+    let face = 0; if (pts.length) { if (b.z > 0.399) face = pts[0].M; else { let pf = pts[0]; for (const p of pts) if (Math.abs(p.s + b.z - 0.4) < Math.abs(pf.s + b.z - 0.4)) pf = p; face = pf.M; } }
+    return { r, ux, face };
+  },
+  // 2차원 벽–골조 모델: 골조 다섯 줄을 하나로(× nL), 코어 등가 기둥, 층마다 축 강체 링크
+  wallFrame(o = {}) {
+    const H = MD.H, Ec = MD.Ec, nL = 5, fb = o.fb ?? 0.35, fc = o.fc ?? 0.7, fw = o.fw ?? 0.7, Iw = 105 * (o.ws ?? 1), Aw = 18.6;
+    const withF = o.frame !== false, withW = o.wall !== false, nodes = [], members = [], supports = {}, springs = {}, links = [], wallM = [];
+    const id = (c, l) => l * 5 + c;
+    for (let l = 0; l <= 10; l++) { for (let c = 0; c < 4; c++) nodes.push([8 * c, H[l]]); nodes.push([-12, H[l]]); }
+    for (let l = 1; l <= 10; l++) {
+      const s = l <= 3 ? 0.8 : 0.7;
+      if (withF) {
+        for (let c = 0; c < 4; c++) members.push({ i: id(c, l - 1), j: id(c, l), E: Ec, A: s * s * nL, I: (s ** 4 / 12) * fc * nL });
+        for (let c = 0; c < 3; c++) members.push({ i: id(c, l), j: id(c + 1, l), E: Ec, A: 0.28 * nL, I: ((0.4 * 0.7 ** 3) / 12) * fb * nL });
+      }
+      if (withW) { members.push({ i: id(4, l - 1), j: id(4, l), E: Ec, A: Aw, I: Iw * fw }); wallM.push(members.length - 1); }
+      if (withW && withF) { members.push({ i: id(4, l), j: id(0, l), E: Ec, A: 100, I: 1, truss: true }); links.push(members.length - 1); }
+    }
+    for (let c = 0; c < 4; c++) supports[id(c, 0)] = "fixed";
+    if (o.base === "spring") { supports[id(4, 0)] = [1, 1, 0]; springs[id(4, 0)] = [0, 0, 9.2e7]; } else supports[id(4, 0)] = "fixed";
+    if (!withF) for (let l = 1; l <= 10; l++) for (let c = 0; c < 4; c++) supports[id(c, l)] = "fixed";
+    if (!withW) for (let l = 1; l <= 10; l++) supports[id(4, l)] = "fixed";
+    const lat = (l) => (withW ? id(4, l) : id(0, l));
+    const solve = (F) => CB.frame({ nodes, members, supports, springs, loads: F.map((f, i) => ({ node: lat(i + 1), fx: f })) });
+    const Fm = [];
+    for (let j = 0; j < 10; j++) { const F = Array(10).fill(0); F[j] = 1; const r = solve(F); if (!r.ok) return null; Fm.push(H.slice(1).map((_, l) => r.d[lat(l + 1)][0])); }
+    const K = CB.mat.inv(Fm), B = CB.dyn.B10, modes = CB.dyn.modes(K, B.m);
+    const els = CB.dyn.els({ W: B.W, SDS: B.SDS, SD1: B.SD1, R: B.R, Ie: B.Ie, T: CB.dyn.Ta(B.hn), w: B.w, h: B.h });
+    const r = solve(els.F), u = H.slice(1).map((_, l) => r.d[lat(l + 1)][0]);
+    const drift = u.map((x, i) => (x - (i ? u[i - 1] : 0)) / (H[i + 1] - H[i]));
+    let fshare = null;
+    if (withW && withF) { const Ff = links.map((m) => -r.ends[m].N1); fshare = els.Vx.map((Vx, i) => Ff.slice(i).reduce((a, b) => a + b, 0) / Vx); }
+    return { modes, u, drift, els, fshare, K };
+  },
+};
+
+/* ---------- 1. 강역 효과 ---------- */
+(function () {
+  const gr = CB.range("md-rz-r", (v) => v.toFixed(2), go), load = CB.seg("md-rz-load", go);
+  let F, F0;
+  function solve() { F = MD.zoneFrame(gr(), load()); F0 = gr() === 0 ? F : MD.zoneFrame(0, load()); }
+  solve();
+  const pl = CB.plane("#md-cv-rz", { x: [-10, 34], y: [-2, 44], aspect: (W) => (W < 520 ? 1.0 : 0.62), minHeight: 280, maxHeight: 400, grid: false, axes: false,
+    draw(P) {
+      if (!F.r.ok) return;
+      const md = F.r.maxAbs("disp") || 1, k = (load() === "wind" ? 5 : 2) / md;
+      CB.drawFrame(P, F.r, { deformed: k, loadPx: 22, loadLabels: false, reactions: false, memberWidth: 2, nodeLabels: false });
+      document.getElementById("md-rz-cap").textContent = `변형 × ${CB.sig(k, 2)}`;
+    } });
+  const ch = CB.canvas("#md-cv-rz2", (ctx, W, H) => {
+    const pal = CB.palette(), dr = (u) => { const a = []; for (let i = 1; i <= 10; i++) { const d = (u[i] - u[i - 1]) / (MD.H[i] - MD.H[i - 1]); a.push([d * 1000, i - 1], [d * 1000, i]); } return a; };
+    if (load() === "grav") { MDX.text(ctx, "중력 하중: 수평 변위 없음 — 오른쪽 위 판독값의 보 끝 모멘트를 보세요", W / 2, H / 2, pal.dim, { size: 12, mono: false }); return; }
+    const a = dr(F.ux), b = dr(F0.ux), m = Math.max(...b.map((p) => p[0]), 0.1);
+    CB.chart(ctx, null, { x: [0, m * 1.2], y: [0, 10], xLabel: "층간 변위비 (× 10⁻³)", yLabel: "층", yTicks: [0, 2, 4, 6, 8, 10], series: [{ data: b, color: pal.dim, width: 1.6, dash: [5, 4] }, { data: a, color: pal.accent, width: 2.6 }] });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.32), minHeight: 180, maxHeight: 240 });
+  function go() {
+    solve(); pl.redraw(); ch.redraw();
+    if (!F.r.ok) return;
+    const w = load() === "wind";
+    CB.stat("md-rz-top", w ? CB.num(F.ux[10] * 1000, 1) + " mm" : "— (중력)");
+    CB.stat("md-rz-ratio", w ? CB.num((100 * F.ux[10]) / F0.ux[10], 0) + " %" : "—");
+    CB.stat("md-rz-mf", CB.num(F.face, 0) + " kN·m");
+    CB.stat("md-rz-mc", CB.num(F0.face, 0) + " kN·m");
+  }
+  go();
+})();
+
+/* ---------- 2. 균열 강성 저감 ---------- */
+(function () {
+  const PRE = { g: [1, 1, 1], u: [0.35, 0.7, 0.7], c: [0.35, 0.7, 0.35] };
+  const pre = CB.seg("md-ck-pre", (v) => { gb.set(PRE[v][0], false); gc.set(PRE[v][1], false); gw.set(PRE[v][2], false); go(); });
+  const gb = CB.range("md-ck-b", (v) => v.toFixed(2), go), gc = CB.range("md-ck-c", (v) => v.toFixed(2), go), gw = CB.range("md-ck-w", (v) => v.toFixed(2), go);
+  const G = MD.wallFrame({ fb: 1, fc: 1, fw: 1 }), B = CB.dyn.B10;
+  let R = G;
+  const Cs = (T) => CB.dyn.els({ W: B.W, SDS: B.SDS, SD1: B.SD1, R: B.R, Ie: B.Ie, T, w: B.w, h: B.h }).Cs;
+  const top = CB.canvas("#md-cv-ck", (ctx, W, Hh) => {
+    const pal = CB.palette(), uG = G.u.map((x) => x * 1000), uR = R.u.map((x) => x * 1000), m = Math.max(...uR, ...uG) * 1.15;
+    const pr = (u) => [[0, 0], ...u.map((x, i) => [x, MD.H[i + 1]])];
+    const phi = R.modes[0].phi, sc = Math.max(...uR);
+    CB.chart(ctx, null, { x: [0, m], y: [0, 42], xLabel: "층 변위 (mm, 등가 정적 지진)", yLabel: "높이 (m)", series: [{ data: pr(uG), color: pal.dim, width: 1.6, dash: [5, 4] }, { data: pr(uR), color: pal.accent, width: 2.8 }, { data: pr(phi.map((p) => p * sc)), color: pal.accent2, width: 1.4, dash: [2, 3] }] });
+    MDX.text(ctx, "실선: 현재 · 회색 점선: 총단면 · 주황: 1차 모드 형상(지붕 맞춤)", W / 2, 10, pal.dim, { size: 10.5, mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.48), minHeight: 240, maxHeight: 330 });
+  const bot = CB.canvas("#md-cv-ck2", (ctx, W, H) => {
+    const pal = CB.palette();
+    MDX.bars(ctx, W, H, [
+      { label: "T₁ 총단면", parts: [{ v: G.modes[0].T, color: pal.dim }], note: CB.num(G.modes[0].T, 2) + " s" },
+      { label: "T₁ 현재", parts: [{ v: R.modes[0].T, color: pal.accent }], note: CB.num(R.modes[0].T, 2) + " s" },
+      { label: "T₁ B-10 동적 모형", parts: [{ v: 1.005, color: pal.warn }], note: "1.00 s" },
+      { label: "T_a 근사식", parts: [{ v: CB.dyn.Ta(41), color: pal.ok }], note: CB.num(CB.dyn.Ta(41), 2) + " s" },
+    ], { left: Math.min(130, W * 0.36), title: "1차 주기 (s)", max: 1.9 });
+  }, { aspect: (W) => (W < 520 ? 0.55 : 0.28), minHeight: 160, maxHeight: 210 });
+  function go() {
+    R = MD.wallFrame({ fb: gb(), fc: gc(), fw: gw() }) || G; top.redraw(); bot.redraw();
+    const T = R.modes[0].T, dmax = Math.max(...R.drift) * (5 / 1.2);
+    CB.stat("md-ck-t", `${CB.num(T, 2)} s <small>T₂ ${CB.num(R.modes[1].T, 2)}</small>`);
+    CB.stat("md-ck-cs", `${CB.num(Cs(T), 4)} / ${CB.num(Cs(CB.dyn.Ta(41)), 4)}`);
+    CB.stat("md-ck-u", CB.num(R.u[9] * 1000, 1) + " mm");
+    CB.stat("md-ck-dr", `${CB.num(dmax * 100, 2)} % <small>한계 1.5 %</small>`);
+  }
+  go();
+})();
+
+/* ---------- 3. 강막 vs 유연 바닥 ---------- */
+(function () {
+  const pre = CB.seg("md-dp-pre", go), gr = CB.range("md-dp-r", (v) => v + "배", go), gei = CB.range("md-dp-ei", (v) => "10^" + v.toFixed(1), go);
+  const X = [0, 8, 16, 24, 32], kf = 5e4, V = 5000, L = 32, trib = [1 / 8, 1 / 4, 1 / 4, 1 / 4, 1 / 8];
+  const ks = () => X.map((x) => { const wall = pre() === "b10" ? x === 8 || x === 24 : pre() === "one" ? x === 32 : false; return kf * (1 + (wall ? gr() : 0)); });
+  function solve(EI) {
+    const k = ks(), b = CB.beam({ L, EI, supports: X.map((x, i) => ({ x, type: "spring", k: k[i] })), loads: [{ type: "udl", w: V / L, a: 0, b: L }] });
+    if (!b.ok) return null;
+    const d = X.map((x) => b.at(x).v), f = d.map((v, i) => -k[i] * v);
+    let flex = 0; const pts = b.sample(320);
+    pts.forEach((p) => { let i = Math.min(3, Math.floor(p.x / 8)); const t = (p.x - X[i]) / 8, lin = d[i] + (d[i + 1] - d[i]) * t; flex = Math.max(flex, Math.abs(p.v - lin)); });
+    const avg = d.reduce((a, b2) => a + Math.abs(b2), 0) / 5;
+    return { b, d, f, share: f.map((x) => x / V), flex, avg, pts };
+  }
+  const cur = () => solve(Math.pow(10, gei()));
+  const top = CB.canvas("#md-cv-dp", (ctx, W, H) => {
+    const pal = CB.palette(), s = cur(); if (!s) return;
+    const x0 = 30, x1 = W - 30, XX = (x) => x0 + ((x1 - x0) * x) / L, yb = H * 0.38, m = Math.max(...s.pts.map((p) => Math.abs(p.v)), 1e-9), sc = (H * 0.3) / m;
+    ctx.save(); ctx.strokeStyle = pal.faint; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(XX(0), yb); ctx.lineTo(XX(L), yb); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.strokeStyle = pal.accent; ctx.lineWidth = 6; ctx.globalAlpha = 0.6; ctx.beginPath(); s.pts.forEach((p, i) => { const y = yb - p.v * sc; i ? ctx.lineTo(XX(p.x), y) : ctx.moveTo(XX(p.x), y); }); ctx.stroke(); ctx.restore();
+    const k = ks();
+    X.forEach((x, i) => {
+      const y = yb - s.d[i] * sc, wall = k[i] > kf * 1.01;
+      ctx.save(); ctx.strokeStyle = wall ? pal.text : pal.dim; ctx.lineWidth = wall ? 3 : 1.5; ctx.beginPath(); for (let j = 0; j <= 8; j++) { const yy = y + 6 + j * 4; ctx.lineTo(XX(x) + (j % 2 ? 6 : -6) * (j > 0 && j < 8 ? 1 : 0), yy); } ctx.stroke(); ctx.restore();
+      MDX.text(ctx, CB.num(100 * s.share[i], 1) + " %", XX(x), H - 14, wall ? pal.text : pal.dim, { size: 11 });
+    });
+    for (let i = 0; i <= 16; i++) MDX.arrow(ctx, XX((L * i) / 16), 6, XX((L * i) / 16), 22, pal.accent2, 1.4, 6);
+    MDX.text(ctx, "바닥 변형(과장) · 숫자 = 줄별 분담", W / 2, 34, pal.dim, { size: 10.5, mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.32), minHeight: 180, maxHeight: 240 });
+  const bot = CB.canvas("#md-cv-dp2", (ctx, W, H) => {
+    const pal = CB.palette(), s = cur(), rg = solve(1e13); if (!s || !rg) return;
+    const x0 = 56, x1 = W - 16, y0 = 18, y1 = H - 34, gw = (x1 - x0) / 5, Y = (v) => y1 - (y1 - y0) * Math.min(1, v);
+    const mx = Math.max(...rg.share, ...s.share, 0.3) * 1.1, YY = (v) => y1 - ((y1 - y0) * v) / mx;
+    ctx.save(); ctx.strokeStyle = pal.axis; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.lineTo(x1, y1); ctx.stroke(); ctx.restore();
+    [0, 0.25, 0.5, 0.75, 1].filter((v) => v <= mx).forEach((v) => MDX.text(ctx, Math.round(v * 100) + "%", x0 - 6, YY(v), pal.dim, { size: 10, align: "right" }));
+    X.forEach((x, i) => {
+      const cx = x0 + gw * i + gw / 2, bw = Math.min(16, gw / 4);
+      [[trib[i], pal.dim], [rg.share[i], pal.accent2], [s.share[i], pal.accent]].forEach(([v, col], j) => { ctx.save(); ctx.fillStyle = col; ctx.fillRect(cx + (j - 1.5) * bw, YY(v), bw - 2, y1 - YY(v)); ctx.restore(); });
+      MDX.text(ctx, "x=" + x, cx, y1 + 12, pal.dim, { size: 10.5 });
+    });
+    MDX.text(ctx, "회색 기여 폭 · 주황 강막 · 청록 현재", (x0 + x1) / 2, H - 6, pal.dim, { size: 10.5, mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.32), minHeight: 180, maxHeight: 240 });
+  function go() {
+    top.redraw(); bot.redraw();
+    const s = cur(), rg = solve(1e13); if (!s) return;
+    const k = ks(), wi = X.map((_, i) => i).filter((i) => k[i] > kf * 1.01), sum = (a) => wi.reduce((t, i) => t + a[i], 0);
+    CB.stat("md-dp-w", wi.length ? CB.num(100 * sum(s.share), 1) + " %" : "벽 없음");
+    CB.stat("md-dp-lim", wi.length ? `${CB.num(100 * sum(rg.share), 1)} / ${CB.num(100 * sum(trib), 1)} %` : "—");
+    const ratio = s.flex / Math.max(1e-12, s.avg);
+    CB.stat("md-dp-flex", CB.num(ratio, 2));
+    CB.stat("md-dp-j", ratio > 2 ? '<span style="color:var(--bad)">유연 격막</span>' : ratio > 0.5 ? '<span style="color:var(--warn)">반강성</span>' : '<span style="color:var(--ok)">강막</span>');
+  }
+  go();
+})();
+
+/* ---------- 4. 질량 중심·강성 중심 ---------- */
+(function () {
+  const pre = CB.seg("md-tr-pre", () => { setPre(); go(); }), dir = CB.seg("md-tr-dir", go), acc = CB.seg("md-tr-acc", go), gr = CB.range("md-tr-r", (v) => v + "배", go);
+  const kc = 2e4, V = 1000, Lx = 32, Ly = 24;
+  const CORE = [{ dx: -8, dy: 0, d: "y", len: 8 }, { dx: 8, dy: 0, d: "y", len: 8 }, { dx: 0, dy: -4, d: "x", len: 16 }, { dx: 0, dy: 4, d: "x", len: 16 }];
+  let groups = [], cm;
+  function setPre() {
+    const p = pre();
+    if (p === "ex") groups = [{ x: 0, y: 12, walls: [{ dx: 0, dy: 0, d: "y", len: 8, k: 1e5 }] }, { x: 32, y: 12, walls: [{ dx: 0, dy: 0, d: "y", len: 12, k: 3e5 }] }, { x: 16, y: 0, walls: [{ dx: 0, dy: 0, d: "x", len: 12, k: 2e5 }] }, { x: 16, y: 24, walls: [{ dx: 0, dy: 0, d: "x", len: 12, k: 2e5 }] }];
+    else groups = [{ x: p === "b10" ? 16 : 8, y: p === "b10" ? 12 : 4, walls: CORE.map((w) => ({ ...w })) }];
+    cm = { x: 16, y: 12 };
+    if (pl) { pl.points = [...groups.map((g) => ({ x: g.x, y: g.y, r: 8, color: CB.palette().text, g })), { x: cm.x, y: cm.y, r: 8, color: CB.palette().accent, cm: true }]; }
+  }
+  function elems() {
+    const E = [];
+    if (pre() !== "ex") for (let i = 0; i <= 4; i++) for (let j = 0; j <= 3; j++) E.push({ x: 8 * i, y: 8 * j, kx: kc, ky: kc, col: true });
+    groups.forEach((g) => g.walls.forEach((w) => { const k = w.k ?? kc * gr(); E.push({ x: g.x + w.dx, y: g.y + w.dy, kx: w.d === "x" ? k : 0, ky: w.d === "y" ? k : 0, w }); }));
+    return E;
+  }
+  function solve() {
+    const E = elems(), Y = dir() === "y", ea = +acc() * 0.05 * (Y ? Lx : Ly);
+    let Kxx = 0, Kyy = 0, Kxt = 0, Kyt = 0, Ktt = 0, sx = 0, sy = 0;
+    E.forEach((e) => { Kxx += e.kx; Kyy += e.ky; Kxt += -e.kx * e.y; Kyt += e.ky * e.x; Ktt += e.kx * e.y * e.y + e.ky * e.x * e.x; sx += e.ky * e.x; sy += e.kx * e.y; });
+    const xr = sx / Kyy, yr = sy / Kxx, Fx = Y ? 0 : V, Fy = Y ? V : 0, xm = cm.x + (Y ? ea : 0), ym = cm.y + (Y ? 0 : ea), T = Fy * xm - Fx * ym;
+    const sol = CB.solve([[Kxx, 0, Kxt], [0, Kyy, Kyt], [Kxt, Kyt, Ktt]], [Fx, Fy, T]);
+    const [u, v, th] = sol, d = (x, y) => [u - th * y, v + th * x];
+    const e1 = Y ? d(0, 12)[1] : d(16, 0)[0], e2 = Y ? d(Lx, 12)[1] : d(16, Ly)[0], dmax = Math.max(Math.abs(e1), Math.abs(e2)), davg = (Math.abs(e1) + Math.abs(e2)) / 2;
+    const e = Y ? xm - xr : ym - yr;
+    return { E, xr, yr, u, v, th, d, ratio: dmax / davg, e, ea, Y };
+  }
+  let pl = null;
+  setPre();
+  pl = CB.plane("#md-cv-tr", { x: [-6, 38], y: [-6, 30], aspect: (W) => (W < 520 ? 0.9 : 0.66), minHeight: 260, maxHeight: 420, grid: false, axes: false,
+    points: [...groups.map((g) => ({ x: g.x, y: g.y, r: 8, g })), { x: cm.x, y: cm.y, r: 8, cm: true }],
+    onDrag(p) { p.x = CB.clamp(Math.round(p.x * 2) / 2, 0, Lx); p.y = CB.clamp(Math.round(p.y * 2) / 2, 0, Ly); if (p.cm) { cm.x = p.x; cm.y = p.y; } else { p.g.x = p.x; p.g.y = p.y; } go(false); },
+    draw(P) {
+      const pal = P.P, s = solve(), m = Math.max(1e-9, ...[[0, 0], [Lx, 0], [Lx, Ly], [0, Ly]].map(([x, y]) => Math.hypot(...s.d(x, y)))), k = 3 / m;
+      P.poly([[0, 0], [Lx, 0], [Lx, Ly], [0, Ly]], { color: pal.dim, fill: MDX.rgba(pal.accent, 0.06), width: 1.4 });
+      P.poly([[0, 0], [Lx, 0], [Lx, Ly], [0, Ly]].map(([x, y]) => { const [a, b] = s.d(x, y); return [x + a * k, y + b * k]; }), { color: pal.accent, dash: [6, 4], width: 2 });
+      s.E.forEach((e) => {
+        if (e.col) { P.dot(e.x, e.y, { r: 3, color: pal.dim }); return; }
+        const w = e.w, h = w.len / 2;
+        P.line(w.d === "x" ? e.x - h : e.x, w.d === "x" ? e.y : e.y - h, w.d === "x" ? e.x + h : e.x, w.d === "x" ? e.y : e.y + h, { color: pal.text, width: 7 });
+      });
+      const Y = s.Y; for (let i = 0; i < 5; i++) { const t = (i + 0.5) / 5; if (Y) P.arrow(t * Lx, -5, t * Lx, -0.8, { color: pal.accent2, width: 1.6, head: 7 }); else P.arrow(-5, t * Ly, -0.8, t * Ly, { color: pal.accent2, width: 1.6, head: 7 }); }
+      if (s.ea) P.dot(cm.x + (Y ? s.ea : 0), cm.y + (Y ? 0 : s.ea), { r: 4, color: pal.accent2 });
+      P.line(s.xr - 0.9, s.yr - 0.9, s.xr + 0.9, s.yr + 0.9, { color: pal.accent2, width: 3 }); P.line(s.xr - 0.9, s.yr + 0.9, s.xr + 0.9, s.yr - 0.9, { color: pal.accent2, width: 3 });
+      P.text("CR", s.xr + 1.2, s.yr - 1.4, { color: pal.accent2, size: 12, bold: true });
+      P.text("CM", cm.x + 1.2, cm.y + 1.6, { color: pal.accent, size: 12, bold: true });
+    } });
+  setPre(); pl.redraw();
+  function go(re = true) {
+    if (re !== false) pl.redraw(); else pl.redraw();
+    const s = solve(), msg = document.getElementById("md-tr-msg");
+    CB.stat("md-tr-cr", `(${CB.num(s.xr, 1)}, ${CB.num(s.yr, 1)}) m`);
+    CB.stat("md-tr-e", `${CB.num(s.e, 2)} m <small>우발 ${CB.num(s.ea, 1)}</small>`);
+    CB.stat("md-tr-th", CB.num(s.th * 1e5, 2) + " × 10⁻⁵ rad");
+    CB.stat("md-tr-ratio", `<span style="color:${s.ratio > 1.4 ? "var(--bad)" : s.ratio > 1.2 ? "var(--warn)" : "var(--ok)"}">${CB.num(s.ratio, 2)}</span>`);
+    msg.className = "md-msg" + (s.ratio > 1.2 ? " bad" : " ok");
+    msg.innerHTML = s.ratio > 1.4 ? "δ<sub>max</sub>/δ<sub>avg</sub> &gt; 1.4: <b>심한 비틀림 비정형</b>(형태). 벽을 평면 반대쪽에 더하거나 코어를 질량 중심 쪽으로 옮기세요." : s.ratio > 1.2 ? "δ<sub>max</sub>/δ<sub>avg</sub> &gt; 1.2: <b>비틀림 비정형</b>(형태). 우발 비틀림 증폭 등 추가 규정을 확인합니다." : "가장자리 변위비 1.2 이하: 비틀림이 지배하지 않습니다.";
+  }
+  go();
+})();
+
+/* ---------- 5. 면 하중 분배 ---------- */
+(function () {
+  const meth = CB.seg("md-tb-m", go), gl = CB.range("md-tb-l", (v) => v.toFixed(1) + " m", go), gw = CB.range("md-tb-w", (v) => v.toFixed(1) + " kN/m²", go);
+  const lx = 8;
+  function calc() {
+    const ly = gl(), w = gw(), P = w * lx * ly, m = meth();
+    let Py, Px; // Py: 긴 변(길이 ly) 보 하나, Px: 짧은 변(길이 lx) 보 하나
+    if (m === "45") { Px = w * (lx * lx) / 4; Py = (P - 2 * Px) / 2; }
+    else if (m === "one") { Px = 0; Py = P / 2; }
+    else { Py = P / 2; Px = P / 2; }
+    return { ly, w, P, Px, Py, sum: 2 * Px + 2 * Py };
+  }
+  const cv = CB.canvas("#md-cv-tb", (ctx, W, H) => {
+    const pal = CB.palette(), c = calc(), m = meth(), sc = Math.min((W - 60) / Math.max(12, c.ly), (H - 90) / 8), ox = W / 2 - (c.ly * sc) / 2, oy = 32, PX = (x) => ox + x * sc, PY = (y) => oy + y * sc;
+    const lx2 = lx, ly = c.ly;
+    // 판: x 방향이 긴 변(ly), y 방향이 짧은 변(lx)로 그림
+    ctx.save(); ctx.fillStyle = MDX.rgba(pal.accent, 0.12); ctx.fillRect(PX(0), PY(0), ly * sc, lx2 * sc); ctx.restore();
+    const fillPoly = (pts, col) => { ctx.save(); ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(PX(x), PY(y)) : ctx.moveTo(PX(x), PY(y)))); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = pal.accent; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.restore(); };
+    const h = lx2 / 2;
+    if (m === "45") { fillPoly([[0, 0], [h, h], [ly - h, h], [ly, 0]], MDX.rgba(pal.accent2, 0.25)); fillPoly([[0, 0], [h, h], [0, lx2]], MDX.rgba(pal.ok, 0.25)); }
+    else if (m === "one") fillPoly([[0, 0], [ly, 0], [ly, h], [0, h]], MDX.rgba(pal.accent2, 0.25));
+    else { fillPoly([[0, 0], [ly, 0], [ly, lx2], [0, lx2]], MDX.rgba(pal.accent2, 0.18)); fillPoly([[0, 0], [ly, 0], [ly, lx2], [0, lx2]], MDX.rgba(pal.ok, 0.18)); }
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 5; ctx.strokeRect(PX(0), PY(0), ly * sc, lx2 * sc); ctx.restore();
+    MDX.text(ctx, `긴 변 보 ${CB.num(c.Py, 0)} kN`, PX(ly / 2), PY(0) - 12, pal.accent2, { size: 11.5 });
+    MDX.text(ctx, `짧은 변 보 ${CB.num(c.Px, 0)} kN`, PX(ly / 2), PY(lx2) + 16, pal.ok, { size: 11.5 });
+    MDX.text(ctx, `${CB.num(ly, 1)} × 8 m`, PX(ly / 2), PY(lx2 / 2), pal.dim, { size: 11 });
+    MDX.text(ctx, `판 하중 ${CB.num(c.P, 0)} kN · 보 합 ${CB.num(c.sum, 0)} kN`, PX(ly / 2), PY(lx2) + 36, Math.abs(c.sum - c.P) > 1 ? pal.bad : pal.ok, { size: 12 });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.42), minHeight: 220, maxHeight: 320 });
+  function go() {
+    cv.redraw();
+    const c = calc(), msg = document.getElementById("md-tb-msg"), r = c.sum / c.P;
+    CB.stat("md-tb-ly", `${CB.num(c.Py, 0)} kN <small>평균 ${CB.num(c.Py / c.ly, 1)} kN/m</small>`);
+    CB.stat("md-tb-lx", `${CB.num(c.Px, 0)} kN <small>평균 ${CB.num(c.Px / lx, 1)} kN/m</small>`);
+    CB.stat("md-tb-sum", `<span style="color:${Math.abs(r - 1) > 0.01 ? "var(--bad)" : "var(--ok)"}">${CB.num(r, 2)}</span>`);
+    msg.className = "md-msg" + (Math.abs(r - 1) > 0.01 ? " bad" : " ok");
+    msg.innerHTML = Math.abs(r - 1) > 0.01 ? `하중 합 검사 실패: 보들이 판 하중의 <b>${CB.num(r, 2)}배</b>를 받습니다. 두 방향 보 모두에 기여 폭 전체를 주면 하중이 중복됩니다.` : "하중 합 검사 통과: 네 보의 합 = 판 하중.";
+  }
+  go();
+})();
+
+/* ---------- 6. 오류 찾기 게임 ---------- */
+(function () {
+  const A = 768, Dm = 2.48, Ds = 6.5, Dslab = 5.04, Lv = 2.5, k = 1.2e6, g = 9.81;
+  const ERR = [
+    ["none", "오류 없음"], ["dup", "슬래브 자중 중복"], ["unit", "단위(kgf/m² 숫자)"], ["roof", "지붕층 하중 누락"],
+    ["mass", "질량 원 누락(부재 자중만)"], ["diaph", "강막 미지정"], ["base", "코어 기초 지점 해제"], ["story", "층 지진력 한 층 누락"],
+  ];
+  const HINT = { none: "모든 행이 손계산·기준과 몇 % 안에서 맞는지 보세요.", dup: "연직 반력 합과 손계산을 비교하세요. 차이를 층 면적·층 수로 나누면 kN/m²가 나옵니다.", unit: "활하중 입력 합의 자릿수를 보세요.", roof: "반력 합의 부족분이 한 층 몫과 같은지 보세요.", mass: "주기가 층 수 × 0.1 s나 근사식보다 너무 짧지 않은지 보세요.", diaph: "1차 모드의 유효 질량비와 모양을 보세요.", base: "반력 합은 맞는데 주기·변위가 너무 큽니다.", story: "밑면 전단 반력 합과 등가 정적 V를 비교하세요." };
+  let st = { N: 10, err: "none", answered: false }, score = [0, 0], rng = CB.rng(20261107);
+  function model(N, err) {
+    const B = CB.dyn.B10, wf = (Ds + Dm) * A, mF = Array(N).fill(wf / g), kk = Array(N).fill(k), h = []; for (let i = 0; i < N; i++) h.push(5 + 4 * i);
+    const hand = { D: wf * N, L: Lv * A * N };
+    let D = hand.D, L = hand.L, mf = 1, kf = 1;
+    if (err === "dup") { D += Dslab * A * N; mf = (Ds + Dm + Dslab) / (Ds + Dm); }
+    if (err === "unit") L = 250 * A * N;
+    if (err === "roof") { D -= Ds * A; L -= Lv * A; }
+    if (err === "mass") mf = Dm / (Ds + Dm);
+    if (err === "base") kf = 0.3;
+    const m = mF.map((x, i) => x * mf * (err === "roof" && i === N - 1 ? Dm / (Ds + Dm) : 1)), kv = kk.map((x, i) => (i === 0 ? x * kf : x));
+    const sb = CB.dyn.shearBuilding(m, kv), md = CB.dyn.modes(sb.K, sb.M);
+    const hn = h[N - 1], Ta = CB.dyn.Ta(hn), w = m.map((x) => x * g), els = CB.dyn.els({ SDS: B.SDS, SD1: B.SD1, R: B.R, Ie: B.Ie, T: Ta, w, h });
+    const elsHand = CB.dyn.els({ SDS: B.SDS, SD1: B.SD1, R: B.R, Ie: B.Ie, T: Ta, w: mF.map((x) => x * g), h });
+    let F = els.F.slice(); if (err === "story") F[Math.floor(N / 2)] = 0;
+    const Vb = F.reduce((a, b) => a + b, 0); let acc = 0, u = 0; const us = [];
+    for (let i = 0; i < N; i++) { const Vi = F.slice(i).reduce((a, b) => a + b, 0); u += Vi / kv[i]; us.push(u); }
+    let uHand = 0; for (let i = 0; i < N; i++) uHand += elsHand.F.slice(i).reduce((a, b) => a + b, 0) / k;
+    let T1 = md[0].T, r1 = md[0].ratio, shape = "X·Y 병진(층마다 같은 방향)";
+    if (err === "diaph") { T1 = 0.08 + 0.01 * N; r1 = 0.02; shape = "바닥 한 귀퉁이만 흔들림(국부 모드)"; }
+    return { N, hand, D, L, Vb, V: elsHand.V, T1, r1, shape, Ta, u: us[N - 1], uHand, phi: md[0].phi, err };
+  }
+  function newRound() {
+    const N = 6 + Math.floor(rng() * 9), err = ERR[Math.floor(rng() * ERR.length)][0];
+    st = { N, err, answered: false, M: model(N, err) };
+    document.querySelectorAll("#md-gm-ch button").forEach((b) => (b.className = ""));
+    const msg = document.getElementById("md-gm-msg"); msg.className = "md-msg"; msg.innerHTML = `${N}층 모델(평면 32 × 24 m)의 결과표입니다. 숨은 오류를 고르세요.`;
+    render();
+  }
+  const kN = (v) => CB.sig(v, 4) + " kN";
+  function render() {
+    const M = st.M, rows = [
+      ["연직 하중 입력 합 D / L", `${kN(M.D)} / ${kN(M.L)}`, `${kN(M.hand.D)} / ${kN(M.hand.L)}`],
+      ["밑면 연직 반력 합 (D + L)", kN(M.D + M.L), kN(M.hand.D + M.hand.L)],
+      ["밑면 전단 반력 합 (등가 정적 지진)", kN(M.Vb), "V = " + kN(M.V)],
+      ["1차 주기 T₁", CB.num(M.T1, 2) + " s", `T_a ${CB.num(M.Ta, 2)} s · 경험 약 ${CB.num(M.N * 0.1, 1)} s`],
+      ["1차 모드 유효 질량비 · 모양", `${CB.num(M.r1 * 100, 0)} % · ${M.shape}`, "60–85 % 안팎 · 병진"],
+      ["지붕 변위 (등가 정적, 탄성)", CB.num(M.u * 1000, 1) + " mm", `손계산 Σ V_i/k ≈ ${CB.num(M.uHand * 1000, 1)} mm`],
+    ];
+    document.getElementById("md-gm-tbl").innerHTML = rows.map((r) => `<tr><td>${r[0]}</td><td class="v">${r[1]}</td><td class="v">${r[2]}</td></tr>`).join("");
+    document.getElementById("md-gm-score").textContent = `${score[0]} / ${score[1]}`;
+    cv.redraw();
+  }
+  document.getElementById("md-gm-ch").innerHTML = ERR.map(([k2, t]) => `<button data-e="${k2}">${t}</button>`).join("");
+  document.querySelectorAll("#md-gm-ch button").forEach((b) => b.addEventListener("click", () => {
+    if (st.answered) return; st.answered = true; score[1]++;
+    const ok = b.dataset.e === st.err; if (ok) score[0]++;
+    b.className = ok ? "right" : "wrong";
+    document.querySelector(`#md-gm-ch button[data-e="${st.err}"]`).className = "right";
+    const msg = document.getElementById("md-gm-msg"); msg.className = "md-msg " + (ok ? "ok" : "bad");
+    msg.innerHTML = (ok ? "정답! " : "아쉽습니다. ") + `숨은 오류: <b>${ERR.find((e) => e[0] === st.err)[1]}</b>. ${HINT[st.err]} '새 모델 받기'로 계속하세요.`;
+    render();
+  }));
+  document.getElementById("md-gm-new").addEventListener("click", newRound);
+  document.getElementById("md-gm-hint").addEventListener("click", () => { const msg = document.getElementById("md-gm-msg"); msg.className = "md-msg"; msg.innerHTML = "힌트: " + (st.err === "none" ? HINT.none : ["dup", "unit", "roof"].includes(st.err) ? "하중 합과 반력 합의 두 행을 손계산과 비교하세요." : ["story"].includes(st.err) ? "수평 반력 합을 보세요." : "평형은 맞습니다. 주기·모드·변위 행을 보세요."); });
+  const cv = CB.canvas("#md-cv-gm", (ctx, W, H) => {
+    const pal = CB.palette(), M = st.M; if (!M) return;
+    const N = M.N, x0 = W * 0.18, bw = Math.min(90, W * 0.22), hs = (H - 40) / N, yb = H - 20, amp = Math.min(60, W * 0.15);
+    ctx.save(); ctx.fillStyle = MDX.rgba(pal.dim, 0.3); ctx.fillRect(x0 - 20, yb, bw + 40, 6); ctx.restore();
+    const sh = (i) => (M.err === "diaph" ? 0 : M.phi[i] * amp);
+    ctx.save(); ctx.strokeStyle = pal.faint; ctx.strokeRect(x0, yb - N * hs, bw, N * hs); ctx.restore();
+    ctx.save(); ctx.strokeStyle = pal.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, yb); for (let i = 0; i < N; i++) ctx.lineTo(x0 + sh(i), yb - (i + 1) * hs); ctx.moveTo(x0 + bw, yb); for (let i = 0; i < N; i++) ctx.lineTo(x0 + bw + sh(i), yb - (i + 1) * hs); for (let i = 0; i < N; i++) { ctx.moveTo(x0 + sh(i), yb - (i + 1) * hs); ctx.lineTo(x0 + bw + sh(i), yb - (i + 1) * hs); } ctx.stroke(); ctx.restore();
+    if (M.err === "diaph") { const y = yb - Math.ceil(N * 0.6) * hs; MDX.arrow(ctx, x0 + bw, y, x0 + bw + 30, y - 10, pal.bad, 2.4, 8); }
+    MDX.text(ctx, "1차 모드 형상", x0 + bw / 2, 10, pal.dim, { size: 11, mono: false });
+    const bx = W * 0.58, bwid = W * 0.36, mx = Math.max(M.D + M.L, M.hand.D + M.hand.L) * 1.1;
+    [["반력 합", M.D + M.L, pal.accent], ["손계산", M.hand.D + M.hand.L, pal.dim]].forEach(([t, v, c], i) => { const y = H * 0.35 + i * 34; ctx.save(); ctx.fillStyle = c; ctx.fillRect(bx, y, (bwid * v) / mx, 20); ctx.restore(); MDX.text(ctx, t, bx - 6, y + 10, pal.text, { size: 11, align: "right", mono: false }); });
+    MDX.text(ctx, "연직 D + L", bx + bwid / 2, H * 0.35 - 14, pal.dim, { size: 11, mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.42), minHeight: 220, maxHeight: 300 });
+  newRound();
+})();
+
+/* ---------- 7. 모델 단순화 비교 ---------- */
+(function () {
+  const mod = CB.seg("md-sp-m", go), base = CB.seg("md-sp-base", go), gw = CB.range("md-sp-w", (v) => v.toFixed(2) + "×", go);
+  let S;
+  function solve() {
+    const o = { fb: 0.35, fc: 0.7, fw: 0.7, ws: gw(), base: base() };
+    const full = MD.wallFrame(o), fr = MD.wallFrame({ ...o, wall: false }), wl = MD.wallFrame({ ...o, frame: false });
+    const kf = 1 / fr.u[9], kw = 1 / wl.u[9], sf = kf / (kf + kw);
+    S = { full, fr, wl, sf, split: { T: full.modes[0].T, u: fr.u[9] * sf, share: Array(10).fill(sf) } };
+  }
+  solve();
+  const top = CB.canvas("#md-cv-sp", (ctx, W, H) => {
+    const pal = CB.palette(), a = [], b = [];
+    S.full.fshare.forEach((v, i) => { a.push([v * 100, i], [v * 100, i + 1]); }); S.split.share.forEach((v, i) => b.push([v * 100, i], [v * 100, i + 1]));
+    const mx = Math.max(110, ...a.map((p) => p[0])) , mn = Math.min(-10, ...a.map((p) => p[0]));
+    const m = mod();
+    CB.chart(ctx, null, { x: [mn, mx * 1.05], y: [0, 10], xLabel: "층 전단력 중 골조 분담 (%)", yLabel: "층", yTicks: [0, 2, 4, 6, 8, 10],
+      series: [{ data: b, color: m === "split" ? pal.accent2 : MDX.rgba(pal.accent2, 0.5), width: m === "split" ? 2.8 : 1.4, dash: [6, 4] }, { data: a, color: m === "full" ? pal.accent : MDX.rgba(pal.accent, 0.5), width: m === "full" ? 2.8 : 1.6 }],
+      vlines: [{ x: 0, color: pal.axis, dash: [] }, { x: 100, color: pal.faint, label: "100 %" }] });
+    MDX.text(ctx, "실선: 벽–골조(강막) · 점선: 강성 비 분배", W / 2, 10, pal.dim, { size: 10.5, mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.45), minHeight: 230, maxHeight: 320 });
+  const bot = CB.canvas("#md-cv-sp2", (ctx, W, H) => {
+    const pal = CB.palette(), m = mod(), rows = [["full", "벽–골조", S.full.modes[0].T, S.full.u[9]], ["split", "강성 비 분배", S.split.T, S.split.u], ["frame", "골조만", S.fr.modes[0].T, S.fr.u[9]], ["wall", "코어만", S.wl.modes[0].T, S.wl.u[9]]];
+    const mu = Math.max(...rows.map((r) => r[3])) * 1000;
+    MDX.bars(ctx, W, H, rows.map((r) => ({ label: r[1], labelColor: r[0] === m ? pal.accent : pal.text, parts: [{ v: r[3] * 1000, color: r[0] === m ? pal.accent : pal.dim }], note: `${CB.num(r[3] * 1000, 0)} mm · T ${CB.num(r[2], 2)} s` })), { left: Math.min(100, W * 0.28), right: 120, max: mu * 1.05, title: "지붕 변위(등가 정적)와 1차 주기" });
+  }, { aspect: (W) => (W < 520 ? 0.55 : 0.28), minHeight: 170, maxHeight: 220 });
+  function go() {
+    solve(); top.redraw(); bot.redraw();
+    const m = mod(), R = m === "full" ? { T: S.full.modes[0].T, u: S.full.u[9] } : m === "split" ? S.split : m === "frame" ? { T: S.fr.modes[0].T, u: S.fr.u[9] } : { T: S.wl.modes[0].T, u: S.wl.u[9] };
+    CB.stat("md-sp-t", CB.num(R.T, 2) + " s");
+    CB.stat("md-sp-u", CB.num(R.u * 1000, 1) + " mm");
+    const fb = m === "full" ? S.full.fshare[0] : m === "split" ? S.sf : m === "frame" ? 1 : 0, ft = m === "full" ? S.full.fshare[9] : m === "split" ? S.sf : m === "frame" ? 1 : 0;
+    CB.stat("md-sp-fb", CB.num(fb * 100, 1) + " %");
+    CB.stat("md-sp-ft", CB.num(ft * 100, 0) + " %");
+  }
+  go();
+})();
+
+/* ---------- 8. B-10 3D 변형과 모드 ---------- */
+(function () {
+  const B = CB.dyn.B10, sb = CB.dyn.shearBuilding(B.m, B.k), modes = CB.dyn.modes(sb.K, sb.M);
+  const els = CB.dyn.els({ W: B.W, SDS: B.SDS, SD1: B.SD1, R: B.R, Ie: B.Ie, T: CB.dyn.Ta(B.hn), w: B.w, h: B.h });
+  const Z = [0, ...B.h], wind = B.h.map((z, i) => { const z1 = i ? (B.h[i - 1] + z) / 2 : 0, z2 = i < 9 ? (z + B.h[i + 1]) / 2 : z; return CB.wind.storyForce(z1, z2, 32, B.V0, B.rough, 1.3, 2.0); });
+  const stat = (F) => { const u = []; let acc = 0; for (let i = 0; i < 10; i++) { acc += F.slice(i).reduce((a, b) => a + b, 0) / B.k[i]; u.push(acc); } return u; };
+  const uE = stat(els.F), uW = stat(wind);
+  const mode = CB.seg("md-3d-mode", go), gs = CB.range("md-3d-s", (v) => v.toFixed(2), go), slab = CB.check("md-3d-slab", go);
+  let t = 0, playing = true;
+  const shape = () => { const m = mode(); if (m[0] === "m") return modes[+m[1] - 1].phi; const u = m === "els" ? uE : uW, mx = Math.max(...u.map(Math.abs)); return u.map((x) => x / mx); };
+  const o3 = CB.orbit("#md-cv-3d", { yaw: -0.75, pitch: 0.3, dist: 105, target: [16, 12, 20], aspect: (W) => (W < 520 ? 1.05 : 0.66), minHeight: 300, maxHeight: 480,
+    draw(V) {
+      const pal = V.P, phi = shape(), stat2 = mode()[0] !== "m", amp = gs() * 4 * (stat2 ? 0.6 + 0.4 * Math.abs(Math.sin(t * 1.2)) * 0 + 0.4 : Math.sin((2 * Math.PI * t) / 1.6));
+      const dy = (lev) => (lev === 0 ? 0 : phi[lev - 1] * amp);
+      const P = (x, y, lev) => [x, y + dy(lev), Z[lev]];
+      if (slab()) for (let l = 1; l <= 10; l++) V.poly3([P(0, 0, l), P(32, 0, l), P(32, 24, l), P(0, 24, l)], { fill: pal.accent, fillAlpha: 0.06, color: MDX.rgba(pal.dim, 0.35), width: 0.6 });
+      const walls = [[[8, 8], [24, 8]], [[8, 16], [24, 16]], [[8, 8], [8, 16]], [[24, 8], [24, 16]]];
+      for (let l = 1; l <= 10; l++) walls.forEach(([a, b]) => V.poly3([P(a[0], a[1], l - 1), P(b[0], b[1], l - 1), P(b[0], b[1], l), P(a[0], a[1], l)], { fill: pal.accent2, fillAlpha: 0.13, color: MDX.rgba(pal.accent2, 0.5), width: 0.7 }));
+      for (let l = 1; l <= 10; l++) {
+        for (let i = 0; i <= 4; i++) for (let j = 0; j <= 3; j++) V.line3(P(8 * i, 8 * j, l - 1), P(8 * i, 8 * j, l), { color: pal.text, width: 1.6 });
+        for (let j = 0; j <= 3; j++) V.line3(P(0, 8 * j, l), P(32, 8 * j, l), { color: MDX.rgba(pal.text, 0.6), width: 1 });
+        for (let i = 0; i <= 4; i++) V.line3(P(8 * i, 0, l), P(8 * i, 24, l), { color: MDX.rgba(pal.text, 0.6), width: 1 });
+      }
+      for (let i = 0; i <= 4; i++) for (let j = 0; j <= 3; j++) V.dot3([8 * i, 8 * j, 0], { r: 2.5, color: pal.ok });
+      if (stat2) for (let l = 1; l <= 10; l++) { const a = V.p([-1, -6 + dy(l), Z[l]]), b = V.p([-1, -1 + dy(l), Z[l]]); if (a && b) MDX.arrow(V.ctx, a[0], a[1], b[0], b[1], mode() === "wind" ? pal.blue : pal.accent2, 1.8, 7); }
+      V.text3("Y →", [34, 26, 0], { color: pal.dim, size: 11 });
+    } });
+  const pb = CB.playButton("md-3d-play", () => { playing = true; }, () => { playing = false; });
+  pb.set(true);
+  CB.loop(o3.cv.canvas, (dt) => { if (!playing) return; t += dt; o3.redraw(); });
+  function go() {
+    o3.redraw();
+    const m = mode();
+    if (m[0] === "m") { const md = modes[+m[1] - 1]; CB.stat("md-3d-t", `${CB.num(md.T, 2)} s / ${CB.num(md.ratio, 2)}`); CB.stat("md-3d-u", "모드(정규화)"); CB.stat("md-3d-dr", "—"); CB.stat("md-3d-v", "—"); return; }
+    const u = m === "els" ? uE : uW, F = m === "els" ? els.F : wind, dr = u.map((x, i) => (x - (i ? u[i - 1] : 0)) / (Z[i + 1] - Z[i]));
+    CB.stat("md-3d-t", `T₁ ${CB.num(modes[0].T, 2)} s / ${CB.num(modes[0].ratio, 2)}`);
+    CB.stat("md-3d-u", CB.num(u[9] * 1000, 1) + " mm");
+    CB.stat("md-3d-dr", `1/${Math.round(1 / Math.max(...dr))}`);
+    CB.stat("md-3d-v", CB.sig(F.reduce((a, b) => a + b, 0), 4) + " kN");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

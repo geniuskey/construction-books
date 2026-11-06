@@ -1,0 +1,1172 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>바닥 구조 · StructureBook</title>
+<meta name="description" content="하중이 처음 닿는 곳, 바닥. 1방향·2방향 슬래브 판별과 하중 분담, 직접 설계법의 정적 모멘트와 주열대·중간대 분배, 플랫 플레이트의 뚫림 전단과 드롭 패널, 보 배치와 데크 합성 슬래브, 처짐과 보행 진동을 B-10의 210 mm 슬래브로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .fl-stack { display: grid; grid-template-columns: 1fr; }
+  .fl-stack > div { position: relative; min-width: 0; }
+  .fl-stack > div + div { border-top: 1px solid var(--border); }
+  .fl-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .fl-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .fl-msg b { color: var(--text); }
+  .fl-msg.ok { color: var(--ok); }
+  .fl-msg.bad { color: var(--bad); }
+  .fl-msg.ok b, .fl-msg.bad b { color: inherit; }
+  .fl-tbl td, .fl-tbl th { font-variant-numeric: tabular-nums; }
+  .fl-tbl td.num { text-align: right; font-family: var(--mono); font-size: 13.5px; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="structure"></script>
+</head>
+<body data-chapter="floors">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="fl-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="fl-ah-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+      <marker id="fl-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="fl-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="fl-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 03</div>
+    <h1 data-no-glossary>바닥 구조</h1>
+    <p class="lead">건물에 올려놓는 거의 모든 것, 곧 사람·가구·서고·설비·칸막이벽의 무게는 먼저 바닥에 닿습니다. 바닥은 그 하중을 보와 기둥으로 나누어 보내는 동시에, 바람과 지진이 층마다 밀어 넣는 수평력을 코어와 골조로 모아 주는 얇고 넓은 판입니다. 그리고 건물 콘크리트 물량의 절반 안팎이 바닥에 들어가므로(교육용 감각) 바닥 두께 1 cm가 건물 전체의 무게와 층고, 공사비를 바꿉니다. 이 장에서는 슬래브가 1방향으로 휘는지 2방향으로 휘는지 가르고, 2방향 슬래브의 모멘트를 정적 모멘트 \(M_0\)에서 출발해 주열대와 중간대로 나누고, 보 없는 플랫 플레이트의 약점인 뚫림 전단을 검토하고, 보 배치·데크 합성 슬래브·처짐·보행 진동까지 따져서 기준 건물 B-10의 210 mm 슬래브가 왜 그 두께인지 확인합니다.</p>
+    <ul class="objectives">
+      <li>바닥의 두 역할(연직 하중 분배와 수평 격막)을 설명하고, 장단변비로 1방향·2방향 슬래브를 판별해 보에 가는 하중을 45° 분담선으로 구한다.</li>
+      <li>직접 설계법으로 정적 모멘트 \(M_0 = w_u \ell_2 \ell_n^2/8\)를 구하고, 부·정 모멘트와 주열대·중간대·보로 분배한다.</li>
+      <li>플랫 플레이트 기둥 주위의 뚫림 전단을 \(d/2\) 임계 단면에서 검토하고, 드롭 패널·전단 보강의 효과를 계산한다.</li>
+      <li>보 배치와 경간에 따라 슬래브 두께·보 춤·콘크리트 물량이 어떻게 바뀌는지 비교하고, 데크 합성 슬래브 단면의 자중과 강성을 구한다.</li>
+      <li>즉시 처짐과 장기 처짐을 계산해 처짐 한계와 비교하고, 바닥 고유 진동수 \(f \approx 18/\sqrt{\delta}\)와 보행 가속도로 진동을 판정한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>보 없는 바닥을 감으로 설계하던 시절</b></div>
+      <div class="o-body"><p>1900년대 초 미국에서는 보 없이 기둥 머리를 버섯처럼 넓힌 철근콘크리트 바닥, 이른바 버섯 슬래브가 창고와 공장에 빠르게 퍼졌습니다. C. A. P. 터너(Turner)가 1906년 미니애폴리스의 한 창고 건물에 쓴 것이 초기 사례로 꼽힙니다. 문제는 해석이었습니다. 판이 두 방향으로 휘고 기둥 위에서 하중이 집중되는 거동을 풀 방법이 없어서, 설계자마다 특허받은 경험식과 재하 시험에 기대어 철근량을 정했습니다.</p>
+        <p>1914년 J. R. 니컬스(Nichols)는 해석 대신 <b>평형</b>으로 이 문제를 잘랐습니다. 한 구획을 기둥 줄에서 잘라 반쪽을 자유물체로 보면, 판이 어떻게 휘든 부 모멘트와 정 모멘트의 합은 대략 \(w\ell_2\ell_n^2/8\)보다 작을 수 없다는 것입니다. 당시 쓰이던 많은 설계가 이 값에 크게 못 미치는 철근을 넣고 있었고, 그런 바닥이 무너지지 않은 것은 판의 아치 작용과 막 작용 같은 여유 덕분이었습니다. 니컬스의 정적 모멘트는 오늘날 직접 설계법의 출발점입니다. 기준이 그의 값을 온전히 받아들이기까지는 수십 년이 걸렸습니다.</p>
+        <div class="o-chain"><span>면 하중 w<sub>u</sub></span><i>→</i><span class="tool">M<sub>0</sub> = w<sub>u</sub>ℓ<sub>2</sub>ℓ<sub>n</sub>²/8 · 뚫림 전단 · f ≈ 18/√δ</span><i>→</i><span>슬래브 두께 · 철근 · 보 배치 · 진동 판정</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="role">
+    <h2>바닥이 하는 일</h2>
+    <div class="problem"><strong>한 층 바닥은 무엇을 몇 kN 나르나</strong>
+      <p>B-10의 기준층 바닥은 32 m × 24 m, 768 m²입니다. 계수 하중 \(w_u = 1.2D + 1.6L = 1.2 \times 6.5 + 1.6 \times 2.5 = 11.8\) kN/m²을 곱하면 한 층이 약 9,060 kN, 대형 버스 70대쯤의 무게를 기둥과 코어에 넘겨야 합니다. 같은 바닥이 바람 부는 날에는 한 층에 약 220 kN의 수평력을 받아 코어로 보냅니다. 두 일을 한 장의 판이 어떻게 함께 할까요?</p></div>
+    <p>바닥의 첫 번째 일은 <b>연직 하중 분배</b>입니다. 슬래브가 면 하중을 받아 휘면서 그 하중을 둘레의 보에 넘기고, 보는 기둥에, 기둥은 기초에 넘깁니다(MechanicsBook 1장의 하중 경로). 슬래브는 보통 경간의 1/30–1/35 정도로 얇아서(경험값) 자기 무게가 하중의 큰 몫을 차지합니다. B-10에서 210 mm 슬래브의 자중 5.04 kN/m²는 고정하중 6.5 kN/m²의 78 %입니다.</p>
+    <p>두 번째 일은 <span class="term">격막</span><span class="en">(diaphragm)</span> 작용입니다. 바람이나 지진의 수평력은 외벽과 바닥 질량에 걸리는데, 그 힘을 받아 줄 코어 벽과 골조는 평면의 몇 곳에만 있습니다. 바닥 판은 제 평면 안에서 매우 강해서(깊이 24 m짜리 보와 같다) 층의 수평력을 모아 그 저항 요소들로 나누어 줍니다. 판이 평면 안에서 거의 변형하지 않는다고 보면 <span class="term">강막</span><span class="en">(rigid diaphragm)</span> 가정이 되고, 그러면 층의 모든 기둥과 벽이 같은 수평 변위·회전을 갖습니다(14장). 큰 개구부, 긴 평면, 프리캐스트 판 사이의 이음은 이 가정을 깨므로 따로 검토합니다.</p>
+    <figure class="diagram" id="fig-fl-role">
+      <svg viewBox="0 0 760 300" role="img" aria-label="바닥의 연직 하중 경로와 격막 작용">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <text x="190" y="36" text-anchor="middle" class="t" style="font-weight:700">① 연직 하중: 슬래브 → 보 → 기둥</text>
+        <g transform="translate(40,60)">
+          <path d="M40 60L240 60L300 110L100 110Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4"/>
+          <path d="M40 60L100 110M240 60L300 110M40 60L240 60M100 110L300 110" style="stroke:var(--text);stroke-width:4;fill:none"/>
+          <path d="M40 60V160M240 60V160M100 110V200M300 110V200" style="stroke:var(--text);stroke-width:6"/>
+          <path d="M40 60L170 85L100 110M240 60L170 85L300 110" style="stroke:var(--accent);stroke-width:1.2;stroke-dasharray:4 3;fill:none"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.6" marker-end="url(#fl-ah-load)"><line x1="120" y1="20" x2="120" y2="74"/><line x1="170" y1="20" x2="170" y2="80"/><line x1="220" y1="20" x2="220" y2="86"/></g>
+          <text x="175" y="14" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">w<tspan font-size="9" dy="3">u</tspan><tspan dy="-3"> = 11.8 kN/m²</tspan></text>
+          <g style="stroke:var(--ok);stroke-width:2" marker-end="url(#fl-ah-ok)"><line x1="40" y1="166" x2="40" y2="192"/><line x1="300" y1="204" x2="300" y2="226"/></g>
+          <text x="32" y="186" text-anchor="end" class="t-dim">기둥 축력</text>
+          <text x="306" y="162" class="t-mono">45° 분담선</text>
+          <path d="M302 158L238 92" style="stroke:var(--text-dim);stroke-width:1;fill:none"/>
+        </g>
+        <text x="565" y="36" text-anchor="middle" class="t" style="font-weight:700">② 수평력: 격막 → 코어·골조</text>
+        <g transform="translate(430,60)">
+          <rect x="20" y="20" width="256" height="192" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4"/>
+          <rect x="84" y="84" width="128" height="64" style="fill:var(--surface-2);stroke:var(--text);stroke-width:3"/>
+          <text x="148" y="121" text-anchor="middle" class="t" style="font-weight:700">코어</text>
+          <g style="fill:var(--text)"><circle cx="20" cy="20" r="4"/><circle cx="84" cy="20" r="4"/><circle cx="148" cy="20" r="4"/><circle cx="212" cy="20" r="4"/><circle cx="276" cy="20" r="4"/><circle cx="20" cy="212" r="4"/><circle cx="84" cy="212" r="4"/><circle cx="148" cy="212" r="4"/><circle cx="212" cy="212" r="4"/><circle cx="276" cy="212" r="4"/><circle cx="20" cy="84" r="4"/><circle cx="20" cy="148" r="4"/><circle cx="276" cy="84" r="4"/><circle cx="276" cy="148" r="4"/></g>
+          <g style="stroke:var(--blue);stroke-width:2" marker-end="url(#fl-ah-blue)"><line x1="52" y1="244" x2="52" y2="218"/><line x1="116" y1="244" x2="116" y2="218"/><line x1="180" y1="244" x2="180" y2="218"/><line x1="244" y1="244" x2="244" y2="218"/></g>
+          <text x="148" y="262" text-anchor="middle" class="t-mono" style="fill:var(--blue)">Y 방향 바람 · 층마다 약 220 kN</text>
+          <g style="stroke:var(--accent);stroke-width:1.8" marker-end="url(#fl-ah-acc)"><line x1="70" y1="190" x2="110" y2="152"/><line x1="226" y1="190" x2="186" y2="152"/><line x1="148" y1="192" x2="148" y2="154"/></g>
+          <text x="284" y="56" class="t-mono" style="fill:var(--accent)">판 안의</text><text x="284" y="70" class="t-mono" style="fill:var(--accent)">전단 흐름</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-1.</b> 바닥의 두 역할. ① 슬래브는 면 하중을 휨으로 둘레 보에 넘긴다. 정사각 구획이면 45° 분담선으로 나뉜 네 삼각형이 각 보의 몫이다. ② 같은 판이 제 평면 안에서는 깊은 보처럼 일해 외벽에 걸린 수평력을 코어와 골조로 모은다(격막).</figcaption>
+    </figure>
+    <p>아래 3D 장면에서 B-10의 기준층을 돌려 보며 두 하중 경로를 따라가 보세요. 연직 보기에서는 한 구획(8 × 8 m)의 하중이 네 보와 네 기둥으로, 격막 보기에서는 Y 방향 층 풍하중이 판을 거쳐 코어와 골조로 갑니다.</p>
+    <div class="sim" id="sim-fl-3d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-10 기준층: 연직 하중 경로와 격막</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fl-cv-3d" aria-label="B-10 기준층 3D 장면"></canvas><span class="hint">끌어서 돌리기</span></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>보기</span><div class="seg" id="fl-3-mode"><button data-value="grav" class="on">연직 하중</button><button data-value="dia">격막(수평력)</button></div></div>
+          <div class="ctrl"><span>구획 고르기</span><div class="seg" id="fl-3-bay"><button data-value="0" class="on">모서리 구획</button><button data-value="1">코어 옆 구획</button></div></div>
+          <label class="ctrl"><span>활하중 L <output id="fl-3-l-out"></output></span><input type="range" id="fl-3-l" min="2" max="6" step="0.5" value="2.5"></label>
+          <label class="check"><input type="checkbox" id="fl-3-slab" checked> 슬래브 보이기</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">w<sub>u</sub></span><span class="v" id="fl-3-wu">—</span></div>
+        <div class="stat"><span class="k">구획 하중</span><span class="v" id="fl-3-p">—</span></div>
+        <div class="stat"><span class="k">보 하나의 몫</span><span class="v" id="fl-3-b">—</span></div>
+        <div class="stat"><span class="k">격막이 옮기는 힘</span><span class="v" id="fl-3-h">—</span></div>
+      </div>
+      <div class="fl-msg" id="fl-3-msg"></div>
+      <div class="sim-note">해볼 것: 활하중을 5 kN/m²(서고 정도)로 올리면 구획 하중이 얼마나 느나요 · 격막 보기에서 수평력이 어디로 모이는지 보세요 · 모델: B-10 기준층(4 × 3 경간, 8 m), D = 6.5 kN/m², w<sub>u</sub> = 1.2D + 1.6L, 45° 분담, 층 풍하중은 GL 28–32 m 층 약 220 kN(CB.wind, 교육용). 격막 화살표의 분담 비율은 그림용이며 실제 분담은 강성에 따른다(5·14장).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="one-two-way">
+    <h2>1방향 슬래브와 2방향 슬래브</h2>
+    <p>네 변이 보로 받쳐진 직사각형 판에 등분포 하중이 걸리면, 판은 두 방향으로 동시에 휩니다. 그런데 한 변이 다른 변보다 훨씬 길면 사정이 달라집니다. 판 가운데를 지나는 두 띠, 곧 짧은 방향 띠(경간 \(\ell_a\))와 긴 방향 띠(경간 \(\ell_b\))를 생각해 봅시다. 두 띠는 가운데에서 같은 처짐을 가져야 하는데, 등분포 하중을 받는 띠의 처짐은 경간의 네제곱에 비례하므로 짧은 띠가 훨씬 강합니다. 그래서 하중의 대부분이 짧은 방향으로 갑니다.</p>
+    <div class="callout def"><strong>원리 3.1 (띠의 처짐 적합과 하중 분담)</strong> 가운데에서 교차하는 두 띠가 같은 지지 조건과 같은 휨 강성을 갖고 가운데 처짐이 같다면, 짧은 방향 띠가 받는 하중 몫은
+      <div class="formula">$$\frac{w_a}{w} = \frac{\ell_b^4}{\ell_a^4 + \ell_b^4}, \qquad \frac{w_b}{w} = \frac{\ell_a^4}{\ell_a^4 + \ell_b^4}$$</div>
+      이다. \(\ell_b/\ell_a = 2\)이면 짧은 방향이 \(16/17 \approx 94\,\%\)를 받는다. 이 간이 모형(그라스호프–랭킨의 띠 방법)은 판의 비틀림 저항을 무시하므로 실제 판보다 짧은 방향 몫을 조금 크게 준다.</div>
+    <div class="callout def"><strong>정의 3.2 (1방향·2방향 슬래브)</strong> 장변 경간 \(\ell_b\)와 단변 경간 \(\ell_a\)의 비 \(\beta = \ell_b/\ell_a\)가 2 이상이거나 두 대변으로만 지지되는 슬래브를 <span class="term">1방향 슬래브</span><span class="en">(one-way slab)</span>, \(\beta \lt 2\)이고 네 변(또는 기둥 줄)으로 지지되는 슬래브를 <span class="term">2방향 슬래브</span><span class="en">(two-way slab)</span>라 한다. 1방향 슬래브는 단변 방향 폭 1 m 띠를 보처럼 설계하고, 장변 방향에는 수축·온도 철근만 둔다. 2방향 슬래브는 두 방향 모두 주철근을 둔다.</div>
+    <figure class="diagram" id="fig-fl-strips">
+      <svg viewBox="0 0 760 300" role="img" aria-label="1방향 슬래브와 2방향 슬래브의 휨 방향과 45도 분담선">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <text x="200" y="36" text-anchor="middle" class="t" style="font-weight:700">1방향: β = ℓ<tspan font-size="10" dy="3">b</tspan><tspan dy="-3">/ℓ</tspan><tspan font-size="10" dy="3">a</tspan><tspan dy="-3"> ≥ 2</tspan></text>
+        <rect x="60" y="60" width="280" height="120" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:3"/>
+        <rect x="185" y="60" width="30" height="120" style="fill:var(--accent);opacity:.35"/>
+        <text x="200" y="198" text-anchor="middle" class="t-mono">ℓb = 2ℓₐ 이상</text>
+        <text x="350" y="124" class="t-mono">ℓₐ</text>
+        <path d="M70 240 Q200 290 330 240" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+        <line x1="70" y1="240" x2="330" y2="240" style="stroke:var(--text);stroke-width:3"/>
+        <text x="200" y="232" text-anchor="middle" class="t-dim">단변 방향 1 m 띠 = 보</text>
+        <text x="580" y="36" text-anchor="middle" class="t" style="font-weight:700">2방향: β &lt; 2</text>
+        <g transform="translate(450,56)">
+          <rect x="0" y="0" width="260" height="180" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:3"/>
+          <path d="M0 0L90 90L170 90L260 0M0 180L90 90M170 90L260 180" style="fill:none;stroke:var(--accent-2);stroke-width:1.8;stroke-dasharray:5 3"/>
+          <path d="M0 0L90 90L0 180Z" style="fill:var(--accent-2);opacity:.16"/>
+          <path d="M260 0L170 90L260 180Z" style="fill:var(--accent-2);opacity:.16"/>
+          <path d="M0 0L90 90L170 90L260 0Z" style="fill:var(--accent);opacity:.12"/>
+          <text x="40" y="96" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">삼각형</text>
+          <text x="130" y="48" text-anchor="middle" class="t-mono" style="fill:var(--accent)">사다리꼴</text>
+          <text x="130" y="200" text-anchor="middle" class="t-mono">ℓb (긴 변)</text>
+          <text x="270" y="94" class="t-mono">ℓₐ</text>
+          <rect x="120" y="0" width="20" height="180" style="fill:var(--accent);opacity:.25"/>
+          <rect x="0" y="80" width="260" height="20" style="fill:var(--accent-2);opacity:.22"/>
+        </g>
+        <text x="580" y="276" text-anchor="middle" class="t-dim">짧은 보는 삼각형, 긴 보는 사다리꼴 하중을 받는다</text>
+      </svg>
+      <figcaption><b>그림 3-2.</b> 1방향과 2방향 슬래브. 왼쪽: 긴 판은 거의 단변 방향으로만 휘므로 단변 방향 띠를 보로 설계한다. 오른쪽: 2방향 판의 하중은 모서리에서 45°로 그은 분담선으로 나누어 짧은 보에 삼각형, 긴 보에 사다리꼴 분포로 보낸다(보 설계용 근사). 가운데의 교차 띠가 원리 3.1의 처짐 적합 모형이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fl-share">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>슬래브 판별과 하중 분담</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fl-cv-share" aria-label="슬래브 평면과 45도 분담선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>X 방향 경간 ℓₓ <output id="fl-s-x-out"></output></span><input type="range" id="fl-s-x" min="3" max="12" step="0.5" value="8"></label>
+          <label class="ctrl"><span>Y 방향 경간 ℓy <output id="fl-s-y-out"></output></span><input type="range" id="fl-s-y" min="3" max="12" step="0.5" value="6"></label>
+          <label class="ctrl"><span>계수 하중 wᵤ <output id="fl-s-w-out"></output></span><input type="range" id="fl-s-w" min="5" max="20" step="0.1" value="11.8"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">β = ℓ<sub>장</sub>/ℓ<sub>단</sub></span><span class="v" id="fl-s-b">—</span></div>
+        <div class="stat"><span class="k">판별</span><span class="v" id="fl-s-k">—</span></div>
+        <div class="stat"><span class="k">단변 방향 몫(띠)</span><span class="v" id="fl-s-a">—</span></div>
+        <div class="stat"><span class="k">긴 보 / 짧은 보 하중</span><span class="v" id="fl-s-p">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 경간 하나를 다른 것의 두 배로 만들어 단변 방향 몫이 94 %에 이르는 것을 보세요 · 45° 분담과 띠 모형은 서로 다른 질문(보에 가는 하중 / 판 속 휨의 방향)에 답합니다 · 모델: 네 변 지지, 45° 분담선(보 하중), 원리 3.1의 띠 처짐 적합(판 비틀림 무시). 보 하중은 한 구획에서 보 하나로 가는 몫(kN)이다.</div>
+    </div>
+    <div class="callout"><strong>예제 3.1 (8 × 6 m 구획의 하중 분담)</strong> 네 변이 보로 받쳐진 8 m × 6 m 구획, \(w_u = 11.8\) kN/m².
+      <ol style="margin:6px 0 0">
+        <li><b>판별.</b> \(\beta = 8/6 = 1.33 \lt 2\) → 2방향 슬래브.</li>
+        <li><b>띠 모형.</b> 단변 방향 몫 \(8^4/(6^4 + 8^4) = 4{,}096/5{,}392 = 0.760\). 판 속 휨의 약 3/4이 6 m 방향이다.</li>
+        <li><b>45° 분담.</b> 짧은 보(6 m)의 삼각형 넓이 \(6^2/4 = 9\) m², 긴 보(8 m)의 사다리꼴 넓이 \((8 \times 6 - 2 \times 9)/2 = 15\) m². 검산: \(2 \times 9 + 2 \times 15 = 48\) m² = 구획 넓이.</li>
+        <li><b>보 하중.</b> 짧은 보 \(9 \times 11.8 = 106\) kN, 긴 보 \(15 \times 11.8 = 177\) kN(이 구획에서 오는 몫. 보 양쪽에 구획이 있으면 두 몫을 더한다).</li>
+      </ol></div>
+    <p>1방향 슬래브는 폭 1 m의 보이므로 MechanicsBook의 보 해석이 그대로 쓰입니다. 두께는 처짐 계산을 생략할 수 있는 최소 두께로 먼저 정하는 일이 많습니다. 널리 쓰는 형태(ACI 318과 같은 형태, fy = 400 MPa급 기준값)는 단순 지지 \(\ell/20\), 1단 연속 \(\ell/24\), 양단 연속 \(\ell/28\), 캔틸레버 \(\ell/10\)이고, 항복강도가 다르면 \((0.43 + f_y/700)\) 형태의 보정 계수를 곱합니다. KDS 41 20(건축물 콘크리트구조 설계기준)의 해당 조항에서 현행 값을 확인하세요.</p>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="two-way-moments">
+    <h2>2방향 슬래브의 모멘트: 직접 설계법</h2>
+    <div class="problem"><strong>판은 어떻게 휘든 평형을 피할 수 없다</strong>
+      <p>B-10의 내부 구획(8 × 8 m, 기둥 800 × 800 mm)에 \(w_u = 11.8\) kN/m²이 걸립니다. 판의 휨을 정확히 풀려면 판 이론이나 유한요소 해석이 필요합니다. 하지만 X 방향으로 기둥 줄 사이의 폭 8 m 판 띠를 떼어 보면, 그 띠는 결국 양 끝 기둥에 얹힌 보입니다. 그 "넓은 보"가 견뎌야 할 모멘트의 총량은 얼마일까요?</p></div>
+    <p>한 방향으로 기둥 중심선 사이 폭 \(\ell_2\)의 판 띠(설계대)를 떼어 내면, 이 띠는 순경간 \(\ell_n\)(기둥 면 사이 거리)인 넓은 보입니다. 띠 위의 하중 \(w_u\ell_2\)를 받는 단순보의 최대 모멘트가 \(w_u\ell_2\ell_n^2/8\)이고, 연속 띠라면 이 값이 지점의 부 모멘트와 가운데 정 모멘트로 나뉠 뿐 합은 줄지 않습니다. 중요한 것은 <b>두 방향 모두</b> 이 총량을 견뎌야 한다는 점입니다. X 방향 띠도 하중 전체를 기둥 줄까지 날라야 하고, Y 방향 띠도 마찬가지입니다. 하중이 두 방향으로 "나뉘어" 각각 절반만 받는 것이 아닙니다(그림 3-2의 띠 모형은 판 가운데의 처짐 분담이고, 기둥 줄까지의 전체 평형은 방향마다 성립해야 한다).</p>
+    <div class="callout def"><strong>원리 3.3 (정적 모멘트)</strong> 설계대 한 경간의 전체 계수 정적 모멘트는
+      <div class="formula">$$M_0 = \frac{w_u\, \ell_2\, \ell_n^2}{8}$$</div>
+      <div class="where">\(\ell_2\): 설계 방향에 직각인 경간(기둥 중심 간), \(\ell_n\): 설계 방향 순경간(기둥·기둥 머리·벽 면 사이, \(0.65\ell_1\) 이상). 이 \(M_0\)를 지점의 부 모멘트 \(M^-\)와 경간 가운데의 정 모멘트 \(M^+\)로 나누되 \(\tfrac{1}{2}(M^-_{\text{좌}} + M^-_{\text{우}}) + M^+ = M_0\)를 지킨다.</div></div>
+    <p><span class="term">직접 설계법</span><span class="en">(direct design method)</span>은 <span class="term">정적 모멘트</span><span class="en">(total static moment)</span> \(M_0\)를 정해진 계수로 부·정 모멘트에 나누고, 다시 설계대 폭을 <span class="term">주열대</span><span class="en">(column strip)</span>와 <span class="term">중간대</span><span class="en">(middle strip)</span>로 나눕니다. 주열대는 기둥 중심선 양쪽으로 \(0.25\min(\ell_1, \ell_2)\)씩의 띠이고 중간대는 그 나머지입니다. 기둥 근처의 판이 더 많이 휘므로(특히 부 모멘트) 주열대가 더 큰 몫을 받습니다. 아래 계수는 ACI 318의 직접 설계법과 같은 형태이며 KDS 41 20의 2방향 슬래브 조항도 이 체계를 따릅니다(세부 값과 적용 조건은 현행 기준 확인).</p>
+    <div class="table-wrap"><table class="fl-tbl">
+      <thead><tr><th>위치</th><th>내부 경간</th><th>단부 경간: 모든 지지점 사이에 보</th><th>단부 경간: 보 없음(플랫 플레이트), 가장자리 보 없음</th></tr></thead>
+      <tbody>
+        <tr><td>바깥 지점 부 모멘트</td><td class="num">—</td><td class="num">0.16</td><td class="num">0.26</td></tr>
+        <tr><td>경간 가운데 정 모멘트</td><td class="num">0.35</td><td class="num">0.57</td><td class="num">0.52</td></tr>
+        <tr><td>안쪽 지점 부 모멘트</td><td class="num">0.65</td><td class="num">0.70</td><td class="num">0.70</td></tr>
+      </tbody>
+    </table></div>
+    <p style="font-size:14px;color:var(--text-dim)">표 3-1. \(M_0\)에 곱하는 분배 계수(ACI 318 직접 설계법 형태, 교육용 인용). 단부 경간에는 바깥 지점이 완전 고정인 경우와 가장자리 보가 있는 플랫 플레이트 경우가 더 있다.</p>
+    <div class="callout def"><strong>원리 3.4 (주열대·보의 몫)</strong> 주열대가 받는 비율은 장단변비 \(\ell_2/\ell_1\)과 보 강성 매개변수 \(\alpha_{f1}\ell_2/\ell_1\)에 따라 정한다. \(\alpha_f = E_{cb}I_b/(E_{cs}I_s)\)는 보(슬래브 일부를 플랜지로 포함한 T형)와 같은 폭 슬래브의 휨 강성 비다.
+      <ul style="margin:6px 0 0">
+        <li>안쪽 부 모멘트: 보 없음(\(\alpha_f = 0\)) 75 %. \(\alpha_{f1}\ell_2/\ell_1 \ge 1\)이면 \(\ell_2/\ell_1 = 0.5, 1, 2\)에서 90, 75, 45 %.</li>
+        <li>정 모멘트: 보 없음 60 %. \(\alpha_{f1}\ell_2/\ell_1 \ge 1\)이면 90, 75, 45 %.</li>
+        <li>바깥 부 모멘트: 가장자리 보의 비틀림 강성이 없으면(\(\beta_t = 0\)) 100 %, \(\beta_t \ge 2.5\)이면 안쪽 부 모멘트와 같은 비율.</li>
+        <li>\(\alpha_{f1}\ell_2/\ell_1 \ge 1\)이면 주열대 모멘트의 85 %를 보가 받는다. 사이 값은 직선 보간한다. 중간대는 나머지를 받는다.</li>
+      </ul></div>
+    <figure class="diagram" id="fig-fl-ddm">
+      <svg viewBox="0 0 760 340" role="img" aria-label="주열대와 중간대, 정적 모멘트의 분배">
+        <rect x="10" y="10" width="740" height="320" rx="10" class="f-surface"/>
+        <g transform="translate(40,34)">
+          <text x="140" y="0" text-anchor="middle" class="t" style="font-weight:700">평면: 설계대 폭 ℓ₂</text>
+          <rect x="20" y="14" width="240" height="240" style="fill:none;stroke:var(--border)"/>
+          <rect x="20" y="14" width="240" height="60" style="fill:var(--accent);opacity:.22"/>
+          <rect x="20" y="194" width="240" height="60" style="fill:var(--accent);opacity:.22"/>
+          <rect x="20" y="74" width="240" height="120" style="fill:var(--accent-2);opacity:.14"/>
+          <g style="fill:var(--text)"><rect x="12" y="6" width="16" height="16"/><rect x="252" y="6" width="16" height="16"/><rect x="12" y="246" width="16" height="16"/><rect x="252" y="246" width="16" height="16"/></g>
+          <text x="140" y="48" text-anchor="middle" class="t-mono" style="fill:var(--accent)">주열대 반쪽 0.25ℓ</text>
+          <text x="140" y="138" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">중간대</text>
+          <text x="140" y="230" text-anchor="middle" class="t-mono" style="fill:var(--accent)">주열대 반쪽 0.25ℓ</text>
+          <line x1="20" y1="276" x2="260" y2="276" style="stroke:var(--text-dim)" marker-start="url(#fl-ah-dim)" marker-end="url(#fl-ah-dim)"/>
+          <text x="140" y="292" text-anchor="middle" class="t-mono">ℓ₁ (설계 방향)</text>
+        </g>
+        <g transform="translate(360,40)">
+          <text x="175" y="-6" text-anchor="middle" class="t" style="font-weight:700">설계대의 모멘트 (내부 경간)</text>
+          <line x1="0" y1="120" x2="350" y2="120" style="stroke:var(--text);stroke-width:3"/>
+          <path d="M0 50 Q175 280 350 50" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+          <path d="M0 120V50" style="stroke:var(--accent);stroke-width:1.4"/><path d="M350 120V50" style="stroke:var(--accent);stroke-width:1.4"/>
+          <line x1="175" y1="120" x2="175" y2="165" style="stroke:var(--accent);stroke-width:1.4;stroke-dasharray:3 3"/>
+          <text x="10" y="40" class="t-mono" style="fill:var(--accent)">M⁻ = 0.65M₀</text>
+          <text x="262" y="40" class="t-mono" style="fill:var(--accent)">0.65M₀</text>
+          <text x="186" y="160" class="t-mono" style="fill:var(--accent)">M⁺ = 0.35M₀</text>
+          <path d="M0 120 L0 50 M0 50 L350 50" style="stroke:var(--text-faint);stroke-dasharray:2 4;fill:none"/>
+          <text x="175" y="210" text-anchor="middle" class="t-dim">0.65 + 0.35 = 1 : 부 모멘트 평균 + 정 모멘트 = M₀</text>
+          <text x="175" y="236" text-anchor="middle" class="t-dim">휨모멘트도는 인장측: 지점 위(부)는 위, 가운데(정)는 아래</text>
+          <text x="175" y="266" text-anchor="middle" class="t-mono">M₀ = wᵤ ℓ₂ ℓn² / 8</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-3.</b> 직접 설계법의 두 단계 분배. 설계대 한 경간의 정적 모멘트 \(M_0\)를 먼저 부·정 모멘트로 나누고(오른쪽), 각각을 다시 평면의 주열대와 중간대(왼쪽)로, 보가 있으면 주열대 몫의 대부분을 보로 나눈다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fl-ddm">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>2방향 슬래브 정적 모멘트 분배</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view fl-stack">
+          <div><canvas id="fl-cv-ddm" aria-label="설계대 휨모멘트도"></canvas><span class="fl-cap">설계대 휨모멘트 (kN·m)</span></div>
+          <div><canvas id="fl-cv-ddmb" aria-label="주열대·중간대·보 분배 막대"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>설계 방향 경간 ℓ₁ <output id="fl-d-l1-out"></output></span><input type="range" id="fl-d-l1" min="5" max="12" step="0.5" value="8"></label>
+          <label class="ctrl"><span>직각 방향 경간 ℓ₂ <output id="fl-d-l2-out"></output></span><input type="range" id="fl-d-l2" min="5" max="12" step="0.5" value="8"></label>
+          <label class="ctrl"><span>기둥 크기 c <output id="fl-d-c-out"></output></span><input type="range" id="fl-d-c" min="400" max="1000" step="50" value="800"></label>
+          <label class="ctrl"><span>슬래브 두께 h <output id="fl-d-h-out"></output></span><input type="range" id="fl-d-h" min="150" max="350" step="10" value="210"></label>
+          <div class="ctrl"><span>경간 위치</span><div class="seg" id="fl-d-pos"><button data-value="int" class="on">내부</button><button data-value="end">단부</button></div></div>
+          <div class="ctrl"><span>바닥 형식</span><div class="seg" id="fl-d-sys"><button data-value="beam" class="on">보 있음(G1)</button><button data-value="flat">플랫 플레이트</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">w<sub>u</sub></span><span class="v" id="fl-d-wu">—</span></div>
+        <div class="stat"><span class="k">ℓ<sub>n</sub></span><span class="v" id="fl-d-ln">—</span></div>
+        <div class="stat"><span class="k">M<sub>0</sub></span><span class="v" id="fl-d-m0">—</span></div>
+        <div class="stat"><span class="k">α<sub>f</sub>ℓ<sub>2</sub>/ℓ<sub>1</sub></span><span class="v" id="fl-d-al">—</span></div>
+      </div>
+      <div class="fl-msg" id="fl-d-msg"></div>
+      <div class="sim-note">해볼 것: ℓ<sub>2</sub>/ℓ<sub>1</sub>을 2로 만들면 보가 있을 때 주열대 비율이 45 %로 떨어집니다(넓은 판은 중간대가 더 일한다) · 플랫 플레이트로 바꾸면 보 몫이 사라지고 주열대 판이 부 모멘트의 75 %를 받습니다 · 모델: ACI 318 직접 설계법 형태(표 3-1, 원리 3.4), D = 24h + 1.5 kN/m², L = 2.5 kN/m², w<sub>u</sub> = 1.2D + 1.6L. 보는 400 × 700 T형(플랜지 돌출 = min(보 춤 − h, 4h)). 단부 바깥 지점의 가장자리 보는 β<sub>t</sub> ≥ 2.5로 가정(보 있음). 교육용이며 설계 검토가 아니다.</div>
+    </div>
+    <div class="callout"><strong>예제 3.2 (B-10 내부 구획의 모멘트)</strong> \(\ell_1 = \ell_2 = 8\) m, 기둥 800 mm, \(h = 210\) mm, \(w_u = 11.8\) kN/m², 사방에 G1(400 × 700).
+      <ol style="margin:6px 0 0">
+        <li><b>정적 모멘트.</b> \(\ell_n = 8.0 - 0.8 = 7.2\) m, \(M_0 = 11.8 \times 8 \times 7.2^2/8 = 612\) kN·m.</li>
+        <li><b>부·정 분배(내부 경간).</b> \(M^- = 0.65 \times 612 = 398\) kN·m, \(M^+ = 0.35 \times 612 = 214\) kN·m.</li>
+        <li><b>보 강성.</b> T형 보(웨브 400 × 490 + 플랜지 1,380 × 210)의 \(I_b = 1.93 \times 10^{-2}\) m⁴, 폭 8 m 슬래브 \(I_s = 8 \times 0.21^3/12 = 6.17 \times 10^{-3}\) m⁴ → \(\alpha_f = 3.13\), \(\alpha_f\ell_2/\ell_1 = 3.13 \ge 1\).</li>
+        <li><b>주열대(ℓ₂/ℓ₁ = 1 → 75 %).</b> 부 모멘트 \(0.75 \times 398 = 298\)(그중 보 85 % = 254, 슬래브 45), 정 모멘트 \(0.75 \times 214 = 161\)(보 137, 슬래브 24).</li>
+        <li><b>중간대(폭 4 m).</b> 부 모멘트 \(398 - 298 = 100\) kN·m → 폭 1 m당 25 kN·m/m, 정 모멘트 54 kN·m → 13 kN·m/m.</li>
+      </ol>
+      보 G1 지점의 부 모멘트 254 kN·m는 MechanicsBook에서 기여 폭 8 m 전체를 보에 실어 구한 \(w_uL^2/12 \approx 533\) kN·m의 절반쯤입니다. 판이 직접 기둥으로 나르는 몫(주열대 슬래브·중간대)과 기둥 면까지의 순경간을 고려했기 때문입니다. 보에 하중을 몽땅 싣는 단순화는 안전 측이지만 보를 과하게 만듭니다.</div>
+    <p>직접 설계법은 계수 하나로 끝나는 대신 쓸 수 있는 조건이 좁습니다. 형태상 방향마다 3경간 이상 연속, 이웃 경간 길이 차이가 긴 경간의 1/3 이하, 구획의 장단변비 2 이하, 기둥 어긋남이 경간의 10 % 이하, 중력 하중만 있고 등분포이며 활하중이 고정하중의 2배 이하인 경우입니다(ACI 318 형태, 현행 기준 확인). 이를 벗어나면 기둥과 판 띠를 골조로 보고 해석하는 <span class="term">등가 골조법</span><span class="en">(equivalent frame method)</span>이나 유한요소 해석을 씁니다.</p>
+    <div class="callout deep"><strong>심화: 계수법과 판 이론</strong> 예전 기준에는 보로 받쳐진 2방향 슬래브를 단변·장변 모멘트 계수 표(구획의 연속 조건과 장단변비별)로 푸는 <b>계수법</b>이 있었고, 실무 교재에도 자주 실립니다. 계수 표는 판 이론(키르히호프 판의 \(D\nabla^4 w = q\), \(D = Eh^3/(12(1-\nu^2))\))의 해와 소성 재분배를 감안해 만든 것입니다. 오늘날의 상용 프로그램은 판 요소로 바닥을 직접 풀고, 결과 모멘트를 설계대 폭에 걸쳐 적분해 철근을 정합니다. 어느 방법이든 설계대의 부·정 모멘트 합이 \(M_0\)를 밑돌지 않는지는 손으로 확인할 수 있습니다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="flat-plate">
+    <h2>플랫 플레이트와 뚫림 전단</h2>
+    <div class="problem"><strong>보를 없애면 무엇을 얻고 무엇을 잃나</strong>
+      <p>보가 없는 바닥은 천장이 평평해 설비 배관이 자유롭고, 거푸집이 단순하며, 같은 층고에서 천장을 더 높게 쓸 수 있습니다. 그래서 주거와 주차장, 많은 업무시설에 보 없는 바닥이 쓰입니다. 대신 슬래브가 기둥 위에 바로 얹혀, 기둥 둘레의 좁은 판이 구획 하중 전체를 기둥으로 넘겨야 합니다. 그 둘레가 견디지 못하면 판이 기둥을 따라 원뿔 모양으로 뚫려 내려앉습니다.</p></div>
+    <p>보 없이 기둥에 직접 얹힌 균일한 두께의 판을 <span class="term">플랫 플레이트</span><span class="en">(flat plate)</span>, 기둥 위에 <span class="term">드롭 패널</span><span class="en">(drop panel)</span>(기둥 주위를 두껍게 한 부분)이나 <span class="term">기둥 머리</span><span class="en">(column capital)</span>(기둥 윗부분을 넓힌 것)를 둔 판을 <span class="term">플랫 슬래브</span><span class="en">(flat slab)</span>라 합니다. 두 형식 모두 휨보다 기둥 주위의 전단이 먼저 두께를 정하는 일이 많습니다.</p>
+    <div class="callout def"><strong>정의 3.5 (뚫림 전단과 임계 단면)</strong> 집중 반력 주위에서 판이 경사 균열을 따라 원뿔대 모양으로 떨어져 나가는 파괴를 <span class="term">뚫림 전단</span><span class="en">(punching shear)</span>이라 한다. 검토 단면, 곧 <span class="term">임계 단면</span><span class="en">(critical section)</span>은 기둥(또는 집중 하중, 기둥 머리, 드롭 패널) 면에서 \(d/2\)만큼 떨어진 연직 단면이고, 그 둘레 길이를 \(b_0\)라 한다(\(d\): 유효 깊이). 정사각 기둥 \(c \times c\)에서
+      <div class="formula">$$b_0 = \begin{cases} 4(c + d) & \text{내부 기둥} \\ 2(c + d/2) + (c + d) & \text{가장자리 기둥(판 끝이 기둥 바깥면과 일치)} \\ 2(c + d/2) & \text{모서리 기둥} \end{cases}$$</div></div>
+    <figure class="diagram" id="fig-fl-punch">
+      <svg viewBox="0 0 760 300" role="img" aria-label="뚫림 전단 원뿔과 내부·가장자리·모서리 기둥의 임계 단면">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <text x="190" y="36" text-anchor="middle" class="t" style="font-weight:700">단면: 기둥 둘레의 경사 균열</text>
+        <g transform="translate(30,60)">
+          <rect x="0" y="40" width="320" height="44" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:1.6"/>
+          <rect x="135" y="84" width="50" height="110" style="fill:var(--surface-2);stroke:var(--text);stroke-width:1.6"/>
+          <path d="M135 84L95 40M185 84L225 40" style="stroke:var(--bad);stroke-width:2.4;fill:none"/>
+          <line x1="113" y1="34" x2="113" y2="90" style="stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 3"/>
+          <line x1="207" y1="34" x2="207" y2="90" style="stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 3"/>
+          <text x="207" y="26" text-anchor="middle" class="t-mono" style="fill:var(--accent)">d/2</text>
+          <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#fl-ah-load)"><line x1="30" y1="6" x2="30" y2="36"/><line x1="70" y1="6" x2="70" y2="36"/><line x1="250" y1="6" x2="250" y2="36"/><line x1="290" y1="6" x2="290" y2="36"/></g>
+          <line x1="160" y1="230" x2="160" y2="198" style="stroke:var(--ok);stroke-width:2.4" marker-end="url(#fl-ah-ok)"/>
+          <text x="170" y="222" class="t-mono" style="fill:var(--ok)">V<tspan font-size="9" dy="3">u</tspan></text>
+          <text x="240" y="118" class="t-mono" style="fill:var(--bad)">경사 균열(약 30–45°)</text>
+          <line x1="330" y1="40" x2="330" y2="84" style="stroke:var(--text-dim)" marker-start="url(#fl-ah-dim)" marker-end="url(#fl-ah-dim)"/><text x="336" y="66" class="t-mono">h</text>
+        </g>
+        <text x="570" y="36" text-anchor="middle" class="t" style="font-weight:700">평면: 임계 둘레 b₀</text>
+        <g transform="translate(410,70)">
+          <rect x="30" y="40" width="40" height="40" style="fill:var(--text)"/>
+          <rect x="16" y="26" width="68" height="68" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 3"/>
+          <text x="50" y="128" text-anchor="middle" class="t-dim">내부</text>
+          <text x="50" y="146" text-anchor="middle" class="t-mono">4(c + d)</text>
+          <line x1="120" y1="10" x2="220" y2="10" style="stroke:var(--text);stroke-width:2"/>
+          <rect x="150" y="10" width="40" height="40" style="fill:var(--text)"/>
+          <path d="M136 10V64H204V10" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 3"/>
+          <text x="170" y="128" text-anchor="middle" class="t-dim">가장자리</text>
+          <text x="170" y="146" text-anchor="middle" class="t-mono">2(c + d/2) + (c + d)</text>
+          <path d="M260 10H330M260 10V90" style="stroke:var(--text);stroke-width:2;fill:none"/>
+          <rect x="260" y="10" width="40" height="40" style="fill:var(--text)"/>
+          <path d="M260 64H314V10" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 3"/>
+          <text x="290" y="128" text-anchor="middle" class="t-dim">모서리</text>
+          <text x="290" y="146" text-anchor="middle" class="t-mono">2(c + d/2)</text>
+          <text x="170" y="190" text-anchor="middle" class="t-dim">굵은 선 = 판 끝, 점선 = 기둥 면에서 d/2 떨어진 임계 단면</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-4.</b> 뚫림 전단. 왼쪽: 기둥 둘레의 판이 경사 균열을 따라 원뿔대로 떨어져 나간다. 검토는 기둥 면에서 \(d/2\) 떨어진 연직 단면에서 한다. 오른쪽: 기둥 위치에 따른 임계 둘레. 판 끝에 가까울수록 둘레가 짧아지고, 판 끝을 따라 불균형 모멘트도 커진다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 3.6 (뚫림 전단 강도, ACI 318 형태)</strong> 전단 보강이 없는 2방향 슬래브의 공칭 전단 응력 강도는 다음 셋 중 가장 작은 값이다(MPa, \(\lambda\): 경량 콘크리트 계수, 보통 콘크리트 1.0).
+      <div class="formula">$$v_c = \min\left[\,0.33\lambda\sqrt{f_{ck}},\;\; 0.17\left(1 + \frac{2}{\beta_c}\right)\lambda\sqrt{f_{ck}},\;\; 0.083\left(\frac{\alpha_s d}{b_0} + 2\right)\lambda\sqrt{f_{ck}}\,\right]$$</div>
+      <div class="where">\(\beta_c\): 기둥 장변/단변, \(\alpha_s\): 내부 40·가장자리 30·모서리 20. 설계는 \(v_u = V_u/(b_0 d) \le \phi v_c\), \(\phi = 0.75\). 슬래브와 기둥 사이에 불균형 모멘트 \(M_u\)가 전달되면 그 일부 \(\gamma_v M_u\)가 임계 단면의 편심 전단으로 더해진다: \(v_u = V_u/(b_0d) + \gamma_v M_u c_{AB}/J_c\), 정사각 내부 기둥에서 \(\gamma_v = 0.4\).</div>
+      현행 KDS 41 20(및 KDS 14 20 22)의 뚫림 전단 강도 식은 이와 형태가 다르므로 설계에는 반드시 현행 기준을 쓴다. 여기서는 개념과 크기 감각을 위해 널리 알려진 ACI 형태를 쓴다.</div>
+    <div class="sim" id="sim-fl-punch">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>뚫림 전단 검토</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fl-cv-punch" aria-label="기둥 주위 평면과 임계 단면"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>기둥 위치</span><div class="seg" id="fl-p-pos"><button data-value="int" class="on">내부</button><button data-value="edge">가장자리</button><button data-value="corner">모서리</button></div></div>
+          <label class="ctrl"><span>경간 ℓ (정사각 구획) <output id="fl-p-l-out"></output></span><input type="range" id="fl-p-l" min="5" max="11" step="0.5" value="8"></label>
+          <label class="ctrl"><span>슬래브 두께 h <output id="fl-p-h-out"></output></span><input type="range" id="fl-p-h" min="150" max="350" step="10" value="210"></label>
+          <label class="ctrl"><span>기둥 크기 c <output id="fl-p-c-out"></output></span><input type="range" id="fl-p-c" min="300" max="1000" step="50" value="800"></label>
+          <label class="ctrl"><span>불균형 모멘트 Mᵤ (내부 기둥) <output id="fl-p-m-out"></output></span><input type="range" id="fl-p-m" min="0" max="300" step="10" value="0"></label>
+          <label class="check"><input type="checkbox" id="fl-p-drop"> 드롭 패널(ℓ/3 × ℓ/3)</label>
+          <label class="ctrl"><span>드롭 두께 hdp <output id="fl-p-dp-out"></output></span><input type="range" id="fl-p-dp" min="40" max="200" step="10" value="60"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">임계 둘레 b<sub>0</sub></span><span class="v" id="fl-p-b0">—</span></div>
+        <div class="stat"><span class="k">V<sub>u</sub></span><span class="v" id="fl-p-vu">—</span></div>
+        <div class="stat"><span class="k">v<sub>u</sub> / φv<sub>c</sub></span><span class="v" id="fl-p-r">—</span></div>
+        <div class="stat"><span class="k">지배 식</span><span class="v" id="fl-p-g">—</span></div>
+      </div>
+      <div class="fl-msg" id="fl-p-msg"></div>
+      <div class="sim-note">해볼 것: B-10을 플랫 플레이트로 바꾼 경우(ℓ = 8 m, h = 210, c = 800, 내부)는 통과하지만 불균형 모멘트 100 kN·m를 더하면 한계에 닿습니다 · 같은 두께로 모서리 기둥을 보세요 · 드롭 패널을 켜면 기둥 면 단면은 두꺼워진 깊이로, 드롭 패널 바깥 단면은 원래 깊이로 두 번 검토합니다 · 모델: 원리 3.6(ACI 318 형태), f<sub>ck</sub> = 30 MPa, d = h − 35 mm, D = 24h + 1.5 kN/m², L = 2.5 kN/m², 기여 면적은 내부 ℓ², 가장자리 ℓ²/2, 모서리 ℓ²/4(판 끝이 기둥 바깥면, 외장 하중 제외). 가장자리·모서리 기둥의 불균형 모멘트는 이 모델에서 다루지 않는다. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 3.3 (B-10을 플랫 플레이트로 바꾸면)</strong> 보를 모두 없애고 \(h = 210\) mm를 유지한다. 내부 기둥 800 × 800, \(d = 175\) mm, \(f_{ck} = 30\) MPa.
+      <ol style="margin:6px 0 0">
+        <li><b>하중.</b> \(D = 24 \times 0.21 + 1.5 = 6.54\), \(w_u = 1.2 \times 6.54 + 1.6 \times 2.5 = 11.85\) kN/m².</li>
+        <li><b>임계 단면.</b> \(c + d = 975\) mm, \(b_0 = 3{,}900\) mm. \(V_u = 11.85 \times (64 - 0.975^2) = 747\) kN.</li>
+        <li><b>강도.</b> \(\sqrt{30} = 5.48\): 첫째 식 1.81, 둘째 2.79, 셋째 \(0.083(40 \times 175/3{,}900 + 2) \times 5.48 = 1.73\) MPa → \(b_0/d = 22\)로 둘레가 길어 셋째 식이 지배한다. \(\phi v_c = 0.75 \times 1.73 = 1.29\) MPa.</li>
+        <li><b>판정.</b> \(v_u = 747{,}000/(3{,}900 \times 175) = 1.09\) MPa, 비 0.85 → 통과. 그러나 \(M_u = 100\) kN·m의 불균형 모멘트가 더해지면 \(J_c \approx 1.09 \times 10^{11}\) mm⁴, 편심 전단 \(0.4 \times 10^8 \times 487.5/J_c = 0.18\) MPa가 더해져 비 0.98이 된다.</li>
+      </ol>
+      그리고 플랫 플레이트의 처짐 최소 두께는 형태상 \(\ell_n/31\)(fy 500 MPa급 내부 구획, ACI 표 형태) = 7,200/31 = 232 mm이므로 210 mm로는 처짐 계산 없이 쓸 수 없습니다. 보를 없애면 두께를 230–250 mm로 키우거나 드롭 패널을 두는 것이 보통입니다.</div>
+    <div class="callout warn"><strong>뚫림 전단은 예고 없이 온다</strong> 휨 파괴는 철근이 늘어나며 큰 처짐과 균열로 예고하지만, 뚫림 전단은 취성적이어서 거의 경고 없이 일어납니다. 한 기둥에서 판이 뚫리면 그 기둥이 받던 하중이 이웃 기둥으로 옮겨 가 그 기둥들도 차례로 뚫리는 연쇄 붕괴로 번질 수 있습니다. 1995년 6월 29일 서울 삼풍백화점 붕괴(사망 502명)는 플랫 슬래브 구조에서 뚫림 전단 파괴가 번진 사고로 조사되었고, 설계·시공·용도 변경과 하중 증가 등 여러 원인이 함께 지적되었습니다. 그래서 기준은 기둥 위를 지나는 하부 철근 일부를 연속시켜(구조 일체성 철근) 판이 뚫린 뒤에도 매달려 버티게 하는 상세를 요구합니다(16장).</div>
+    <p>뚫림 전단 강도를 키우는 방법은 세 가지입니다. 깊이를 키우거나(두께 증가, 드롭 패널), 둘레를 키우거나(기둥 키우기, 기둥 머리), 전단 보강을 넣는 것입니다. 드롭 패널은 형태상 판 아래로 \(h/4\) 이상 내밀고, 기둥 중심에서 각 방향으로 경간의 1/6 이상 뻗어야 휨 계산에 두께를 반영할 수 있습니다(ACI 형태, 현행 기준 확인). 전단 보강으로는 기둥 둘레에 머리 달린 스터드를 줄지어 박는 <span class="term">스터드 레일</span><span class="en">(stud rail)</span>, 강재를 십자로 묻는 <span class="term">전단 머리</span><span class="en">(shear head)</span>, 스터럽이 쓰입니다.</p>
+    <figure class="diagram" id="fig-fl-flat">
+      <svg viewBox="0 0 760 240" role="img" aria-label="플랫 플레이트, 드롭 패널과 기둥 머리, 스터드 레일, 전단 머리의 단면">
+        <rect x="10" y="10" width="740" height="220" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">플랫 플레이트</text>
+          <rect x="0" y="40" width="160" height="22" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:1.4"/>
+          <rect x="62" y="62" width="36" height="90" style="fill:var(--surface-2);stroke:var(--text);stroke-width:1.4"/>
+          <path d="M62 62L46 40M98 62L114 40" style="stroke:var(--bad);stroke-width:1.8"/>
+          <text x="80" y="176" text-anchor="middle" class="t-dim">가장 단순, 가장 얇은 층</text>
+        </g>
+        <g transform="translate(210,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">드롭 패널 + 기둥 머리</text>
+          <rect x="0" y="40" width="160" height="22" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:1.4"/>
+          <rect x="40" y="62" width="80" height="12" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:1.4"/>
+          <path d="M50 74L62 96H98L110 74Z" style="fill:var(--surface-2);stroke:var(--text);stroke-width:1.4"/>
+          <rect x="62" y="96" width="36" height="56" style="fill:var(--surface-2);stroke:var(--text);stroke-width:1.4"/>
+          <text x="128" y="72" class="t-mono">≥ h/4</text>
+          <text x="80" y="176" text-anchor="middle" class="t-dim">깊이·둘레를 함께 키운다</text>
+        </g>
+        <g transform="translate(390,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">스터드 레일</text>
+          <rect x="0" y="40" width="160" height="22" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:1.4"/>
+          <rect x="62" y="62" width="36" height="90" style="fill:var(--surface-2);stroke:var(--text);stroke-width:1.4"/>
+          <g style="stroke:var(--accent-2);stroke-width:2.2"><path d="M22 44V60M36 44V60M50 44V60M110 44V60M124 44V60M138 44V60"/><path d="M18 44h8M32 44h8M46 44h8M106 44h8M120 44h8M134 44h8" style="stroke-width:3"/></g>
+          <line x1="14" y1="60" x2="56" y2="60" style="stroke:var(--accent-2);stroke-width:2.6"/><line x1="104" y1="60" x2="146" y2="60" style="stroke:var(--accent-2);stroke-width:2.6"/>
+          <text x="80" y="176" text-anchor="middle" class="t-dim">균열을 가로지르는 연직 철물</text>
+        </g>
+        <g transform="translate(570,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">전단 머리</text>
+          <rect x="0" y="40" width="160" height="22" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:1.4"/>
+          <rect x="62" y="62" width="36" height="90" style="fill:var(--surface-2);stroke:var(--text);stroke-width:1.4"/>
+          <rect x="24" y="50" width="112" height="8" style="fill:var(--accent-2);opacity:.8"/>
+          <text x="80" y="176" text-anchor="middle" class="t-dim">강재 십자형이 둘레를 넓힌다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-5.</b> 보 없는 바닥의 뚫림 전단 대책. 드롭 패널은 깊이를, 기둥 머리와 전단 머리는 임계 둘레를, 스터드 레일은 경사 균열을 가로지르는 철물로 강도를 키운다. 빨간 선은 보강이 없을 때의 경사 균열.</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="layout">
+    <h2>보 배치와 바닥의 경제적 경간</h2>
+    <p>같은 8 × 8 m 구획도 바닥을 짜는 방법은 여럿입니다. 보 없이 두꺼운 판 하나로 덮을 수도 있고(플랫 플레이트), 기둥 줄에만 <span class="term">큰보</span><span class="en">(girder)</span>를 두고 2방향 판을 얹을 수도 있고(B-10), 큰보 사이에 <span class="term">작은보</span><span class="en">(beam, joist)</span>를 한두 줄 더 넣어 판을 짧은 1방향 판으로 바꿀 수도 있습니다. 보를 많이 넣을수록 판은 얇아지지만, 보 춤 때문에 구조 층의 깊이가 커지고 거푸집과 철근 작업이 복잡해집니다. 반대로 보를 없애면 콘크리트 물량이 늘지만 층고가 줄어 건물 전체의 외장 면적과 높이가 줄어듭니다.</p>
+    <figure class="diagram" id="fig-fl-layout">
+      <svg viewBox="0 0 760 240" role="img" aria-label="한 구획을 덮는 네 가지 보 배치의 평면">
+        <rect x="10" y="10" width="740" height="220" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="0" y="0" width="130" height="130" style="fill:var(--accent-soft);stroke:var(--border)"/>
+          <g style="fill:var(--text)"><rect x="-6" y="-6" width="12" height="12"/><rect x="124" y="-6" width="12" height="12"/><rect x="-6" y="124" width="12" height="12"/><rect x="124" y="124" width="12" height="12"/></g>
+          <text x="65" y="160" text-anchor="middle" class="t" style="font-weight:700">플랫 플레이트</text><text x="65" y="178" text-anchor="middle" class="t-dim">두꺼운 판, 보 없음</text>
+        </g>
+        <g transform="translate(220,40)">
+          <rect x="0" y="0" width="130" height="130" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:5"/>
+          <g style="fill:var(--text)"><rect x="-6" y="-6" width="12" height="12"/><rect x="124" y="-6" width="12" height="12"/><rect x="-6" y="124" width="12" height="12"/><rect x="124" y="124" width="12" height="12"/></g>
+          <text x="65" y="160" text-anchor="middle" class="t" style="font-weight:700">큰보 + 2방향 판</text><text x="65" y="178" text-anchor="middle" class="t-dim">B-10 (210 mm)</text>
+        </g>
+        <g transform="translate(400,40)">
+          <rect x="0" y="0" width="130" height="130" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:5"/>
+          <line x1="65" y1="0" x2="65" y2="130" style="stroke:var(--accent-2);stroke-width:3.5"/>
+          <g style="fill:var(--text)"><rect x="-6" y="-6" width="12" height="12"/><rect x="124" y="-6" width="12" height="12"/><rect x="-6" y="124" width="12" height="12"/><rect x="124" y="124" width="12" height="12"/></g>
+          <text x="65" y="160" text-anchor="middle" class="t" style="font-weight:700">작은보 1줄</text><text x="65" y="178" text-anchor="middle" class="t-dim">1방향 판, 경간 ℓ/2</text>
+        </g>
+        <g transform="translate(580,40)">
+          <rect x="0" y="0" width="130" height="130" style="fill:var(--accent-soft);stroke:var(--text);stroke-width:5"/>
+          <line x1="43" y1="0" x2="43" y2="130" style="stroke:var(--accent-2);stroke-width:3.5"/><line x1="87" y1="0" x2="87" y2="130" style="stroke:var(--accent-2);stroke-width:3.5"/>
+          <g style="fill:var(--text)"><rect x="-6" y="-6" width="12" height="12"/><rect x="124" y="-6" width="12" height="12"/><rect x="-6" y="124" width="12" height="12"/><rect x="124" y="124" width="12" height="12"/></g>
+          <text x="65" y="160" text-anchor="middle" class="t" style="font-weight:700">작은보 2줄</text><text x="65" y="178" text-anchor="middle" class="t-dim">1방향 판, 경간 ℓ/3</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-6.</b> 한 구획을 덮는 보 배치. 왼쪽에서 오른쪽으로 갈수록 판은 얇아지고 보는 많아진다. 어느 것이 경제적인지는 경간, 하중, 층고 제약, 거푸집 재사용, 설비 계획이 함께 정한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fl-layout">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>보 배치 비교: 두께·춤·콘크리트 물량</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fl-cv-lay" aria-label="다섯 가지 바닥 형식의 물량과 구조 깊이 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>구획 경간 ℓ (정사각) <output id="fl-l-l-out"></output></span><input type="range" id="fl-l-l" min="6" max="12" step="0.5" value="8"></label>
+          <label class="ctrl"><span>활하중 L <output id="fl-l-q-out"></output></span><input type="range" id="fl-l-q" min="2" max="8" step="0.5" value="2.5"></label>
+          <div class="ctrl"><span>강조할 형식</span><div class="seg" id="fl-l-sel"><button data-value="0">플랫 플레이트</button><button data-value="1">드롭 패널</button><button data-value="2" class="on">큰보 2방향</button><button data-value="3">작은보 1</button><button data-value="4">작은보 2</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">슬래브 두께</span><span class="v" id="fl-l-h">—</span></div>
+        <div class="stat"><span class="k">최대 보 춤</span><span class="v" id="fl-l-b">—</span></div>
+        <div class="stat"><span class="k">구조 깊이</span><span class="v" id="fl-l-d">—</span></div>
+        <div class="stat"><span class="k">환산 콘크리트 두께</span><span class="v" id="fl-l-v">—</span></div>
+      </div>
+      <div class="fl-msg" id="fl-l-msg"></div>
+      <div class="sim-note">해볼 것: 경간 8 m에서 다섯 형식의 콘크리트 물량과 구조 깊이를 비교하세요 · 경간을 11 m로 늘리면 플랫 플레이트의 두께가 뚫림 전단 때문에 빠르게 커집니다 · 모델: f<sub>y</sub> = 500 MPa, 기둥 800 × 800. 플랫 플레이트 ℓ<sub>n</sub>/31, 드롭 패널 ℓ<sub>n</sub>/34(ACI 표 형태), 보가 있는 2방향 판 ℓ<sub>n</sub>(0.8 + f<sub>y</sub>/1400)/45, 1방향 판(양단 연속) ℓ/28 × (0.43 + f<sub>y</sub>/700)로 최소 두께를 정하고, 보 없는 형식은 내부 기둥 뚫림 전단(원리 3.6)이 통과할 때까지 10 mm씩 키운다. 큰보 춤 ℓ/12, 작은보 ℓ/15(경험값, 50 mm 단위 올림), 큰보 폭 400, 작은보 폭 300. 환산 두께 = (슬래브 + 보 웨브 + 드롭 패널 체적)/구획 면적. 교육용.</div>
+    </div>
+    <p>대략의 경험으로는 플랫 플레이트가 6–9 m, 드롭 패널이 있는 플랫 슬래브가 8–11 m, 큰보와 2방향 판이 6–10 m 정도의 구획에서 많이 쓰이고, 그보다 긴 경간에는 작은보를 넣은 1방향 체계, 포스트텐션 슬래브, 강 합성보가 유리해집니다(모두 교육용 감각이며 하중·지역·공법에 따라 다르다). B-10이 8 m 구획에 큰보와 2방향 판을 고른 것은 업무시설의 활하중, 코어와 골조를 잇는 큰보가 어차피 필요한 이중 골조라는 점(4·5장), 그리고 층고 4 m 안에 설비를 넣을 여유를 함께 따진 결과입니다.</p>
+    <div class="callout deep"><strong>심화: 포스트텐션 슬래브와 중공 슬래브</strong> 판 속에 긴장재를 포물선으로 배치하고 콘크리트가 굳은 뒤 당기는 <span class="term">포스트텐션 슬래브</span><span class="en">(post-tensioned slab)</span>는 긴장재가 위로 미는 힘(등가 하중)이 자중의 상당 부분을 상쇄해 같은 경간에서 판을 얇게, 처짐과 균열을 작게 만듭니다(11장의 프리스트레스). 판 속에 플라스틱 구체나 상자를 넣어 휨에 덜 기여하는 중립축 근처 콘크리트를 비우는 <span class="term">중공 슬래브</span><span class="en">(voided slab)</span>는 자중을 줄여 긴 경간을 가능하게 합니다. 둘 다 기둥 주위의 뚫림 전단과 개구부 처리에 별도 검토가 필요합니다.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="deck">
+    <h2>데크 플레이트와 합성 슬래브</h2>
+    <p>강구조 건물의 바닥은 대개 골이 진 얇은 강판, 곧 <span class="term">데크 플레이트</span><span class="en">(steel deck)</span>를 보 위에 깔고 그 위에 콘크리트를 붓습니다. 데크는 시공 중에는 거푸집이자 작업 바닥이고, 콘크리트가 굳은 뒤에는 엠보싱(돌기)이나 골의 형상으로 콘크리트와 맞물려 하부 인장 철근 역할을 합니다. 이렇게 강판과 콘크리트가 함께 휨에 저항하는 바닥이 <span class="term">합성 슬래브</span><span class="en">(composite slab)</span>입니다. 보와 슬래브를 스터드 볼트로 묶으면 보도 슬래브를 압축 플랜지로 쓰는 합성보가 됩니다(11장).</p>
+    <figure class="diagram" id="fig-fl-deck">
+      <svg viewBox="0 0 760 260" role="img" aria-label="데크 합성 슬래브와 합성보 단면">
+        <rect x="10" y="10" width="740" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <path d="M0 40H640V110H0Z" style="fill:var(--accent-soft);stroke:none"/>
+          <path d="M0 110H40L60 160H120L140 110H200L220 160H280L300 110H360L380 160H440L460 110H520L540 160H600L620 110H640V40H0Z" style="fill:var(--accent-soft);stroke:none"/>
+          <path d="M0 110H40L60 160H120L140 110H200L220 160H280L300 110H360L380 160H440L460 110H520L540 160H600L620 110H640" style="fill:none;stroke:var(--accent-2);stroke-width:3"/>
+          <line x1="0" y1="40" x2="640" y2="40" style="stroke:var(--text);stroke-width:1.4"/>
+          <rect x="230" y="160" width="180" height="10" style="fill:var(--text)"/>
+          <rect x="314" y="170" width="12" height="20" style="fill:var(--text)"/>
+          <path d="M300 160V96M340 160V96" style="stroke:var(--text-dim);stroke-width:4"/>
+          <path d="M292 96h16M332 96h16" style="stroke:var(--text-dim);stroke-width:6"/>
+          <line x1="660" y1="40" x2="660" y2="110" style="stroke:var(--text-dim)" marker-start="url(#fl-ah-dim)" marker-end="url(#fl-ah-dim)"/><text x="666" y="80" class="t-mono">t<tspan font-size="9" dy="3">c</tspan></text>
+          <line x1="660" y1="110" x2="660" y2="160" style="stroke:var(--text-dim)" marker-start="url(#fl-ah-dim)" marker-end="url(#fl-ah-dim)"/><text x="666" y="140" class="t-mono">h<tspan font-size="9" dy="3">r</tspan></text>
+          <text x="90" y="186" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">데크 (t ≈ 1 mm)</text>
+          <text x="420" y="88" class="t-mono">스터드 볼트</text>
+          <text x="420" y="206" class="t-mono">강재 보 상부 플랜지</text>
+          <text x="40" y="30" class="t-dim">콘크리트 토핑 (골 위 두께 tc)</text>
+          <line x1="140" y1="200" x2="200" y2="200" style="stroke:var(--text-dim)" marker-start="url(#fl-ah-dim)" marker-end="url(#fl-ah-dim)"/><text x="170" y="214" text-anchor="middle" class="t-mono">골 간격 p</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-7.</b> 데크 합성 슬래브. 골(리브) 사이의 콘크리트는 무게에 비해 휨에 덜 기여하고(중립축 아래), 골 위 토핑이 압축을, 데크 강판이 인장을 맡는다. 데크 골이 보와 직각이면 스터드 볼트를 골 안에서 보 플랜지에 용접한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fl-deck">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>합성 슬래브 단면: 자중과 강성</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fl-cv-deck" aria-label="데크 합성 슬래브 단면과 중립축"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>골 높이 hᵣ</span><div class="seg" id="fl-k-hr"><button data-value="50">50 mm</button><button data-value="75" class="on">75 mm</button></div></div>
+          <label class="ctrl"><span>토핑 두께 tc <output id="fl-k-tc-out"></output></span><input type="range" id="fl-k-tc" min="50" max="150" step="5" value="80"></label>
+          <div class="ctrl"><span>골 간격 p</span><div class="seg" id="fl-k-p"><button data-value="200">200</button><button data-value="300" class="on">300</button></div></div>
+          <label class="ctrl"><span>골 평균 폭 / 간격 <output id="fl-k-w-out"></output></span><input type="range" id="fl-k-w" min="0.3" max="0.7" step="0.05" value="0.5"></label>
+          <div class="ctrl"><span>데크 두께 t</span><div class="seg" id="fl-k-t"><button data-value="0.8">0.8</button><button data-value="1.0" class="on">1.0</button><button data-value="1.2">1.2 mm</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">자중</span><span class="v" id="fl-k-w8">—</span></div>
+        <div class="stat"><span class="k">합성 I (폭 1 m)</span><span class="v" id="fl-k-i">—</span></div>
+        <div class="stat"><span class="k">중립축 (아래에서)</span><span class="v" id="fl-k-y">—</span></div>
+        <div class="stat"><span class="k">같은 무게 평판 대비 강성</span><span class="v" id="fl-k-r">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 골 높이를 75 mm로 두고 토핑을 늘리면 강성은 빠르게 커지지만 무게는 천천히 커집니다 · 골 폭을 줄이면 무게는 줄고 강성은 조금만 줄어듭니다(골 콘크리트는 중립축 근처에 있다) · 모델: 비균열 환산 단면(CB.section.rects), 폭 1 m, 데크 강판은 아래·위 플랜지와 웨브를 직사각형으로 근사해 n = E<sub>s</sub>/E<sub>c</sub> = 7.27배 폭으로 환산, 콘크리트 24 kN/m³, 데크 78.5 kN/m³ × 펼친 길이. 실제 합성 슬래브의 강성은 균열과 미끄럼으로 이보다 작다. 교육용.</div>
+    </div>
+    <p>데크 슬래브의 설계는 두 단계입니다. <b>시공 단계</b>에서는 데크 혼자서 젖은 콘크리트와 작업 하중을 받으므로, 데크의 경간(보 간격)이 데크 단면의 강도·처짐으로 제한되고 넘으면 동바리를 둡니다. <b>합성 단계</b>에서는 굳은 콘크리트와 데크가 함께 일하며, 강도는 대개 데크와 콘크리트 사이의 수평 전단(미끄럼) 저항이 정합니다. 화재 시에는 데크 강판이 먼저 뜨거워져 인장재 역할을 잃으므로, 내화 성능을 위해 골 속에 철근을 더하거나 토핑을 두껍게 합니다(16장).</p>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="deflection">
+    <h2>슬래브의 처짐: 즉시와 장기</h2>
+    <p>슬래브는 얇아서 강도보다 처짐이 두께를 정하는 일이 많습니다. 처짐 계산의 뼈대는 MechanicsBook 11장의 \(EIv'' = M\)이고, 철근콘크리트에서 달라지는 것은 두 가지입니다. 첫째, 휨 균열이 생기면 강성이 줄어듭니다. 균열 전에는 전단면의 \(I_g\)가, 균열이 많이 진행되면 균열 환산 단면의 \(I_{cr}\)이 일하고, 실제 부재는 그 사이입니다. 둘째, 콘크리트는 지속 하중 아래에서 크리프와 건조 수축으로 시간이 갈수록 더 휩니다(MaterialsBook 8장).</p>
+    <div class="callout def"><strong>원리 3.7 (유효 단면 2차 모멘트와 장기 처짐)</strong> 사용 하중 모멘트 \(M_a\)가 <span class="term">균열 모멘트</span><span class="en">(cracking moment)</span> \(M_{cr} = f_r I_g/y_t\)(\(f_r = 0.63\lambda\sqrt{f_{ck}}\))를 넘으면, 브랜슨(Branson)의 <span class="term">유효 단면 2차 모멘트</span><span class="en">(effective moment of inertia)</span>
+      <div class="formula">$$I_e = \left(\frac{M_{cr}}{M_a}\right)^3 I_g + \left[1 - \left(\frac{M_{cr}}{M_a}\right)^3\right] I_{cr} \;\le\; I_g$$</div>
+      로 즉시 처짐을 구한다. 지속 하중에 의한 <span class="term">장기 처짐</span><span class="en">(long-term deflection)</span>은 즉시 처짐에 \(\lambda_\Delta = \xi/(1 + 50\rho')\)를 곱해 구한다. \(\xi\)는 지속 기간 3개월 1.0, 6개월 1.2, 12개월 1.4, 5년 이상 2.0, \(\rho'\)은 압축 철근비다. (ACI 318의 전통적인 형태. 최신판은 \(I_e\) 식을 바꾸었고 KDS의 현행 식도 확인할 것.)</div>
+    <p>허용 처짐은 처짐이 무엇을 해치는가로 정합니다. 형태상 활하중 즉시 처짐은 경간의 1/360, 비구조 요소를 붙인 뒤에 생기는 처짐(장기 처짐 + 추가 활하중 처짐)은 손상되기 쉬운 칸막이벽을 받치면 1/480, 그렇지 않으면 1/240입니다(ACI·KDS 형태, 현행 기준 확인. 15장에서 다시 다룬다).</p>
+    <div class="sim" id="sim-fl-defl">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>슬래브 띠의 즉시·장기 처짐</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fl-cv-defl" aria-label="1 m 슬래브 띠의 처짐 곡선과 한계"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경간 ℓ <output id="fl-f-l-out"></output></span><input type="range" id="fl-f-l" min="3" max="10" step="0.25" value="4.5"></label>
+          <label class="ctrl"><span>두께 h <output id="fl-f-h-out"></output></span><input type="range" id="fl-f-h" min="120" max="350" step="10" value="180"></label>
+          <div class="ctrl"><span>지지 조건</span><div class="seg" id="fl-f-sup"><button data-value="ss" class="on">단순</button><button data-value="fp">1단 연속</button><button data-value="ff">양단 연속</button></div></div>
+          <label class="ctrl"><span>인장 철근비 ρ <output id="fl-f-r-out"></output></span><input type="range" id="fl-f-r" min="0.2" max="1.2" step="0.05" value="0.4"></label>
+          <label class="ctrl"><span>활하중 L <output id="fl-f-q-out"></output></span><input type="range" id="fl-f-q" min="1" max="6" step="0.5" value="2.5"></label>
+          <div class="ctrl"><span>지속 기간 ξ</span><div class="seg" id="fl-f-xi"><button data-value="1.0">3개월</button><button data-value="1.4">1년</button><button data-value="2.0" class="on">5년+</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">I<sub>e</sub>/I<sub>g</sub></span><span class="v" id="fl-f-ie">—</span></div>
+        <div class="stat"><span class="k">활하중 즉시 처짐</span><span class="v" id="fl-f-dl">—</span></div>
+        <div class="stat"><span class="k">부착 후 처짐</span><span class="v" id="fl-f-da">—</span></div>
+        <div class="stat"><span class="k">판정 (ℓ/360 · ℓ/480)</span><span class="v" id="fl-f-ok">—</span></div>
+      </div>
+      <div class="fl-msg" id="fl-f-msg"></div>
+      <div class="sim-note">해볼 것: 경간을 4.5 m에서 6 m로 늘리면 처짐이 몇 배가 되나요(ℓ⁴ 법칙에 균열이 더해진다) · 지지 조건을 양단 연속으로 바꾸면 같은 두께로 훨씬 긴 경간을 덮습니다 · 모델: 폭 1 m 띠, CB.beam(단순·고정–핀·고정–고정), E<sub>c</sub> = 27,500 MPa, f<sub>ck</sub> = 30 MPa, f<sub>r</sub> = 3.45 MPa, d = h − 35 mm, D = 24h + 1.5 kN/m², 지속 하중 D + 0.25L(교육용), I<sub>e</sub>는 경간의 최대 |M|로 한 번 계산(연속 조건에서는 안전 측 단순화), ρ′ = 0. 부착 후 처짐 = λ<sub>Δ</sub> × 지속 하중 즉시 처짐 + 활하중 즉시 처짐. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 3.4 (단순 지지 1방향 슬래브의 처짐)</strong> \(\ell = 4.5\) m, \(h = 180\) mm, \(d = 145\) mm, \(\rho = 0.4\,\%\), 폭 1 m, \(D = 24 \times 0.18 + 1.5 = 5.82\), \(L = 2.5\) kN/m².
+      <ol style="margin:6px 0 0">
+        <li><b>균열 판정.</b> \(M_a = 8.32 \times 4.5^2/8 = 21.1\) kN·m. \(I_g = 0.18^3/12 = 4.86 \times 10^{-4}\) m⁴, \(M_{cr} = 3{,}450 \times 4.86 \times 10^{-4}/0.09 = 18.6\) kN·m → \(M_a \gt M_{cr}\), 균열.</li>
+        <li><b>균열 단면.</b> \(n = 7.27\), \(\rho n = 0.0291\), \(k = \sqrt{2\rho n + (\rho n)^2} - \rho n = 0.214\), \(kd = 31\) mm. \(I_{cr} = 1 \times 0.031^3/3 + 7.27 \times 5.8 \times 10^{-4} \times 0.114^2 = 6.5 \times 10^{-5}\) m⁴ \((0.13 I_g)\).</li>
+        <li><b>유효 강성.</b> \((M_{cr}/M_a)^3 = 0.69\) → \(I_e = 0.69 I_g + 0.31 I_{cr} = 3.56 \times 10^{-4}\) m⁴ \((0.73 I_g)\).</li>
+        <li><b>즉시 처짐.</b> \(\delta_{D+L} = 5wL^4/(384E_cI_e) = 4.5\) mm, 활하중 몫 \(4.5 \times 2.5/8.32 = 1.4\) mm \(\lt \ell/360 = 12.5\) mm.</li>
+        <li><b>장기.</b> 지속 하중 \(D + 0.25L = 6.45\) kN/m² → 즉시 3.5 mm, \(\times \xi = 2.0\) → 7.0 mm. 부착 후 처짐 \(7.0 + 1.4 = 8.4\) mm \(\lt \ell/480 = 9.4\) mm. 겨우 통과한다.</li>
+      </ol>
+      시간이 지나며 생기는 장기 처짐이 즉시 처짐의 두 배라는 것, 그리고 균열 때문에 강성이 총단면의 73 %로 줄었다는 것이 손계산의 요점입니다.</div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="vibration">
+    <h2>바닥 진동</h2>
+    <div class="problem"><strong>무너지지 않아도 불편하면 실패다</strong>
+      <p>긴 경간의 가벼운 바닥에서는 옆자리 사람이 걸을 때마다 모니터가 흔들리고 컵의 물이 떨립니다. 강도와 처짐 기준을 모두 통과한 바닥도 이런 불만을 받습니다. 사람은 바닥 가속도에 매우 민감해서, 사무실에서 중력 가속도의 0.5 % 정도면 이미 거슬린다고 느낍니다. 걷는 사람이 바닥을 얼마나 흔드는지, 어떤 바닥이 잘 흔들리는지 계산해 봅시다.</p></div>
+    <p>사람이 걸으면 발이 바닥을 주기적으로 밀어 <span class="term">보행 하중</span><span class="en">(walking excitation)</span>이 생깁니다. 보행 진동수는 대략 1.6–2.4 Hz이고, 발걸음의 힘은 정확한 사인파가 아니어서 그 2·3·4배 진동수의 고조파 성분도 들어 있습니다. 바닥의 <span class="term">고유 진동수</span><span class="en">(natural frequency)</span>가 이 고조파 중 하나와 겹치면 공진으로 응답이 커집니다. 그래서 가볍고 긴 바닥(고유 진동수 4–8 Hz)이 문제를 일으키고, 무겁고 짧은 RC 바닥(10 Hz 이상)은 대개 문제가 없습니다.</p>
+    <div class="callout def"><strong>원리 3.8 (처짐으로 고유 진동수 어림하기)</strong> 등분포 질량의 단순보에서 \(f_1 = \tfrac{\pi}{2L^2}\sqrt{EI/m}\)이고 자중 처짐은 \(\delta = 5mgL^4/(384EI)\)이므로 둘을 엮으면 \(f_1 = 0.18\sqrt{g/\delta}\)이다. \(g = 9{,}810\) mm/s²를 넣으면
+      <div class="formula">$$f \approx \frac{18}{\sqrt{\delta\,[\text{mm}]}} \;\text{Hz}$$</div>
+      <div class="where">\(\delta\): 진동하는 질량(고정하중 + 실제로 있을 법한 활하중, 교육용으로 0.5 kN/m²)에 의한 처짐(mm). 슬래브와 보가 직렬로 처지면 처짐을 더한다(던컬리 식 \(1/f^2 = 1/f_s^2 + 1/f_b^2\)과 같다). 고정 판·단순 판에서는 정확해보다 약 10 % 낮게 나와 안전 측이다.</div></div>
+    <div class="callout def"><strong>원리 3.9 (보행 가속도, 교육용 형태)</strong> 미국 강구조협회 설계 지침(AISC Design Guide 11)의 간이 식 형태로, 보행에 의한 최대 가속도는
+      <div class="formula">$$\frac{a_p}{g} = \frac{P_0\, e^{-0.35 f_n}}{\beta W} \;\le\; \frac{a_0}{g}$$</div>
+      <div class="where">\(P_0 = 0.29\) kN(일정한 보행 힘), \(f_n\): 바닥 고유 진동수(Hz), \(\beta\): <span class="term">감쇠비</span><span class="en">(damping ratio)</span>(칸막이·천장이 없으면 0.02, 일반 사무실 0.03, 칸막이가 많으면 0.05), \(W\): 진동에 참여하는 유효 중량(kN). 한계 \(a_0/g\)는 사무실·주거 0.5 %, 쇼핑몰·실내 보도 1.5 %(형태값). 이 식은 대략 \(f_n \le 9\) Hz인 바닥에 쓰며, 더 높은 진동수의 바닥은 발걸음 하나하나의 충격 응답과 강성(예: 1 kN에 1 mm 이하)으로 검토한다. 최소 고유 진동수 3 Hz, 보행 4차 고조파를 피하는 8 Hz 이상을 목표로 삼는 경험칙도 쓴다(교육용).</div></div>
+    <figure class="diagram" id="fig-fl-vib">
+      <svg viewBox="0 0 760 270" role="img" aria-label="보행 하중의 고조파와 바닥 고유 진동수 대역">
+        <rect x="10" y="10" width="740" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(70,30)">
+          <line x1="0" y1="170" x2="620" y2="170" style="stroke:var(--axis);stroke-width:1.2"/>
+          <line x1="0" y1="170" x2="0" y2="10" style="stroke:var(--axis);stroke-width:1.2"/>
+          <text x="310" y="214" text-anchor="middle" class="t-dim">진동수 (Hz)</text>
+          <text x="-14" y="90" text-anchor="middle" class="t-dim" transform="rotate(-90 -14 90)">힘의 크기</text>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="186">0</text><text x="124" y="186">4</text><text x="248" y="186">8</text><text x="372" y="186">12</text><text x="496" y="186">16</text><text x="620" y="186">20</text></g>
+          <rect x="50" y="20" width="24" height="150" style="fill:var(--accent-2);opacity:.18"/>
+          <rect x="100" y="20" width="49" height="150" style="fill:var(--accent-2);opacity:.12"/>
+          <rect x="149" y="20" width="74" height="150" style="fill:var(--accent-2);opacity:.08"/>
+          <rect x="198" y="20" width="99" height="150" style="fill:var(--accent-2);opacity:.05"/>
+          <g style="fill:var(--accent-2)"><rect x="56" y="50" width="12" height="120"/><rect x="118" y="120" width="12" height="50"/><rect x="180" y="140" width="12" height="30"/><rect x="242" y="150" width="12" height="20"/></g>
+          <text x="62" y="42" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">1차 ≈ 2 Hz</text>
+          <text x="186" y="132" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">3차</text>
+          <text x="248" y="142" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">4차</text>
+          <line x1="93" y1="10" x2="93" y2="170" style="stroke:var(--bad);stroke-width:1.4;stroke-dasharray:4 3"/><text x="97" y="20" class="t-mono" style="fill:var(--bad)">3 Hz</text>
+          <line x1="248" y1="10" x2="248" y2="170" style="stroke:var(--warn);stroke-width:1.4;stroke-dasharray:4 3"/><text x="252" y="20" class="t-mono" style="fill:var(--warn)">8 Hz</text>
+          <path d="M150 74H246" style="stroke:var(--accent);stroke-width:6;opacity:.5"/><text x="198" y="68" text-anchor="middle" class="t-mono" style="fill:var(--accent)">가벼운 강 바닥 5–8</text>
+          <path d="M340 74H560" style="stroke:var(--ok);stroke-width:6;opacity:.5"/><text x="450" y="68" text-anchor="middle" class="t-mono" style="fill:var(--ok)">RC 보–슬래브 10 Hz 이상</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-8.</b> 보행 하중의 고조파(주황 막대, 크기는 개념)와 바닥 고유 진동수의 대략적 위치(교육용). 고유 진동수가 보행 고조파 대역 안에 있으면 공진 응답이 생긴다. 차수가 높을수록 고조파의 힘이 작아지므로 고유 진동수가 높을수록 응답이 지수적으로 줄어든다(원리 3.9의 \(e^{-0.35f_n}\)).</figcaption>
+    </figure>
+    <div class="sim" id="sim-fl-vib">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>바닥 진동: 고유 진동수와 보행 가속도</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fl-cv-vib" aria-label="고유 진동수와 보행 가속도 그래프"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>바닥 형식</span><div class="seg" id="fl-v-sys"><button data-value="rc" class="on">RC 보–슬래브</button><button data-value="fp">RC 플랫 플레이트</button><button data-value="st">강 합성보</button></div></div>
+          <label class="ctrl"><span>경간 L <output id="fl-v-l-out"></output></span><input type="range" id="fl-v-l" min="6" max="14" step="0.5" value="8"></label>
+          <label class="ctrl"><span>슬래브 두께 h <output id="fl-v-h-out"></output></span><input type="range" id="fl-v-h" min="100" max="350" step="10" value="210"></label>
+          <div class="ctrl"><span>감쇠비 β</span><div class="seg" id="fl-v-b"><button data-value="0.02">0.02</button><button data-value="0.03" class="on">0.03</button><button data-value="0.05">0.05</button></div></div>
+          <div class="ctrl"><span>용도 (한계 a₀/g)</span><div class="seg" id="fl-v-use"><button data-value="0.005" class="on">사무실 0.5 %</button><button data-value="0.015">쇼핑몰 1.5 %</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">처짐 δ</span><span class="v" id="fl-v-d">—</span></div>
+        <div class="stat"><span class="k">고유 진동수 f<sub>n</sub></span><span class="v" id="fl-v-f">—</span></div>
+        <div class="stat"><span class="k">유효 중량 W</span><span class="v" id="fl-v-w">—</span></div>
+        <div class="stat"><span class="k">a<sub>p</sub>/g</span><span class="v" id="fl-v-a">—</span></div>
+      </div>
+      <div class="fl-msg" id="fl-v-msg"></div>
+      <div class="sim-note">해볼 것: B-10(RC 보–슬래브, 8 m, 210 mm)은 약 13 Hz로 보행 대역에서 멀리 있습니다 · 강 합성보로 바꾸고 경간을 14 m, 슬래브를 100 mm로 줄이면 고유 진동수가 어디까지 내려오나요 · 감쇠비 0.02(칸막이 없는 개방형 사무실)와 0.05의 차이를 보세요 · 모델: 진동 질량 = 슬래브 자중 + 마감·설비 1.5 + 활하중 0.5 kN/m²(강 바닥은 보 자중 추가). RC 보–슬래브: 네 변 고정 판(계수 0.00126, 순경간 L − 0.4) + 400 × (L/12) T형 보(양단 고정, 기여 폭 L/2). 플랫 플레이트: 기둥 지지 정사각 판 계수 0.0058(교육용). 강 합성보: 간격 3 m, H-(L/22) × 200 × 10 × 16(교육용 단면) + 폭 3 m 슬래브, n = E<sub>s</sub>/(1.35E<sub>c</sub>), 단순 지지. W = 진동 질량 × L²(교육용). 회색 점선 9 Hz를 넘으면 가속도 식은 참고값이다.</div>
+    </div>
+    <div class="callout"><strong>예제 3.5 (B-10 바닥의 고유 진동수)</strong> 슬래브 210 mm, 진동 질량 \(q = 5.04 + 1.5 + 0.5 \approx 7.0\) kN/m²(자중 + 마감·설비 + 활하중 일부), \(E_c = 2.75 \times 10^7\) kPa.
+      <ol style="margin:6px 0 0">
+        <li><b>판 강성.</b> \(D = E_c h^3/(12(1-\nu^2)) = 2.75 \times 10^7 \times 0.21^3/(12 \times 0.96) = 2.21 \times 10^4\) kN·m(\(\nu = 0.2\)).</li>
+        <li><b>판 처짐.</b> 네 변 고정 정사각 판(순경간 7.6 m): \(\delta_s = 0.00126\,qL^4/D = 0.00126 \times 7.0 \times 7.6^4/22{,}100 = 1.33\) mm.</li>
+        <li><b>보 처짐.</b> G1 T형 \(I = 1.93 \times 10^{-2}\) m⁴, 기여 폭 4 m: \(w = 7.0 \times 4 + 4.7 = 32.7\) kN/m, 양단 고정 \(\delta_b = wL^4/(384EI) = 0.66\) mm.</li>
+        <li><b>고유 진동수.</b> \(f \approx 18/\sqrt{1.33 + 0.66} = 12.8\) Hz. 보행 4차 고조파(약 8 Hz)보다 높다.</li>
+        <li><b>가속도(참고).</b> \(W = 7.0 \times 64 = 448\) kN, \(\beta = 0.03\): \(a_p/g = 0.29e^{-0.35 \times 12.8}/(0.03 \times 448) = 0.024\,\%\) ≪ 0.5 %.</li>
+      </ol>
+      무겁고 경간이 짧은 RC 보–슬래브 바닥은 진동이 문제되지 않는다는 상식이 숫자로 확인됩니다. 같은 계산을 경간 12 m 강 합성 바닥에 하면 6 Hz 근처로 내려와 검토가 필요해집니다(15장).</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="b10">
+    <h2>B-10의 210 mm 슬래브</h2>
+    <p>이 장의 계산을 기준 건물의 바닥 하나에 모아 봅시다. B-10은 8 × 8 m 구획마다 사방에 큰보 G1(400 × 700)을 두고 210 mm 2방향 슬래브를 얹었습니다. 작은보는 없습니다.</p>
+    <div class="table-wrap"><table class="fl-tbl">
+      <thead><tr><th>검토</th><th>계산</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td>판별</td><td>β = 8/8 = 1</td><td>2방향 슬래브</td></tr>
+        <tr><td>최소 두께</td><td>α<sub>fm</sub> ≈ 3.1 &gt; 2 → ℓ<sub>n</sub>(0.8 + f<sub>y</sub>/1400)/(36 + 9β) = 7,600 × 1.157/45</td><td class="num">195 mm ≤ 210 mm</td></tr>
+        <tr><td>정적 모멘트</td><td>11.8 × 8 × 7.2²/8</td><td class="num">612 kN·m</td></tr>
+        <tr><td>내부 구획 분배</td><td>부 398 / 정 214 → 보 254 · 137, 중간대 25 · 13 kN·m/m</td><td>예제 3.2</td></tr>
+        <tr><td>뚫림 전단</td><td>사방에 보가 있어 기둥 반력은 보가 전달</td><td>지배하지 않음</td></tr>
+        <tr><td>바닥 진동</td><td>δ ≈ 2.0 mm → f ≈ 18/√2.0</td><td class="num">약 13 Hz</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout site"><strong>210 mm는 어디서 왔나</strong> 보가 있는 2방향 판의 처짐 최소 두께가 약 195 mm이고, 피복(20 mm)과 두 방향 철근이 겹치는 층(D13 두 겹)을 넣으면 유효 깊이 약 175 mm, 바닥 차음(층간 소음)과 내화 성능에서도 200 mm 안팎이 흔한 선택입니다. 10 mm 단위로 올려 210 mm를 정했다고 보면 됩니다(교육용 가정). 같은 바닥을 플랫 플레이트로 바꾸면 처짐 최소 두께가 약 230 mm로 커지고 뚫림 전단 여유가 줄어들며(예제 3.3), 보를 두 줄 더 넣어 1방향으로 바꾸면 판은 130 mm 안팎으로 얇아지지만 작은보 춤과 거푸집이 늘어납니다. 모든 값은 교육용이며 설계 검토가 아니다.</div>
+    <div class="callout site"><strong>바닥 하중이 골조로 가는 길</strong> B-10 기준층 바닥 하나는 계수 하중으로 약 9,060 kN을 큰보와 코어 벽에 넘기고, 큰보는 그 하중을 휨모멘트로 바꿔 기둥에 전달합니다. 같은 큰보가 4장에서는 바람과 지진에 저항하는 모멘트 골조의 보가 됩니다. 바닥 설계에서 정한 보 모멘트(중력)와 골조 해석의 보 모멘트(수평력)를 하중 조합으로 더해 보 철근을 정합니다(4장의 B-10 골조).</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="frames.html"><small>CH.04 · 모멘트 골조</small>큰보는 골조의 보이기도 하다<br><span>바닥의 중력 모멘트와 수평 하중 모멘트를 조합해 보를 설계한다.</span></a>
+      <a href="composite.html"><small>CH.11 · 합성 구조와 프리캐스트</small>합성보·합성 슬래브<br><span>유효 폭, 스터드, 프리스트레스 바닥과 중공 슬래브의 강도.</span></a>
+      <a href="serviceability.html"><small>CH.15 · 사용성</small>처짐과 보행 진동 다시 보기<br><span>처짐 한계, 보행 공진, 보도교 진동을 사용성 한계상태로 정리한다.</span></a>
+      <a href="modeling.html"><small>CH.14 · 구조 해석 모델링</small>강막 가정<br><span>바닥이 평면 안에서 단단하다는 가정이 언제 맞고 언제 깨지는가.</span></a>
+      <a href="../../mechanics/chapters/deflection.html"><small>MECHANICSBOOK · 보의 처짐</small>EIv″ = M과 처짐 공식표<br><span>슬래브 띠의 처짐은 보 처짐 그대로다.</span></a>
+      <a href="../../materials/chapters/shrinkage.html"><small>MATERIALSBOOK · 수축과 크리프</small>장기 처짐의 원인<br><span>크리프 계수와 건조 수축이 시간에 따라 처짐을 키운다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>바닥은 연직 하중을 보·기둥으로 분배하고, 제 평면 안에서는 격막으로 층의 수평력을 코어와 골조로 모은다.</li>
+      <li>장단변비 β ≥ 2(또는 두 변 지지)면 1방향, β &lt; 2면 2방향 슬래브. 띠의 처짐 적합으로 단변 몫은 ℓ<sub>b</sub>⁴/(ℓ<sub>a</sub>⁴ + ℓ<sub>b</sub>⁴), 보 하중은 45° 분담선으로 나눈다.</li>
+      <li>2방향 슬래브는 방향마다 정적 모멘트 M<sub>0</sub> = w<sub>u</sub>ℓ<sub>2</sub>ℓ<sub>n</sub>²/8 전체를 견뎌야 한다. 직접 설계법은 이를 부·정 모멘트(내부 경간 0.65/0.35)로, 다시 주열대·중간대·보로 나눈다.</li>
+      <li>플랫 플레이트는 기둥 면에서 d/2 떨어진 임계 둘레 b<sub>0</sub>의 뚫림 전단이 두께를 정하기 쉽다. 뚫림은 취성적이므로 드롭 패널·기둥 머리·전단 보강·일체성 철근으로 대비한다.</li>
+      <li>보를 많이 넣을수록 판은 얇아지지만 구조 깊이와 거푸집이 늘어난다. 데크 합성 슬래브는 강판이 거푸집과 인장재를 겸한다.</li>
+      <li>RC 슬래브 처짐은 균열(I<sub>e</sub>)과 크리프(λ<sub>Δ</sub> = ξ/(1 + 50ρ′))로 커진다. 바닥 진동은 f ≈ 18/√δ로 어림하고 보행 고조파 대역과 가속도 한계로 판정한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 네 변이 보로 받쳐진 9 m × 4 m 슬래브는?</p><div class="opts">
+        <button class="opt">2방향 슬래브: 네 변이 지지되므로</button><button class="opt" data-correct>1방향 슬래브: 장단변비 2.25 ≥ 2</button><button class="opt">플랫 슬래브</button><button class="opt">판별할 수 없다</button>
+      </div><div class="quiz-exp">\(\beta = 9/4 = 2.25 \ge 2\)이므로 하중의 대부분(띠 모형으로 \(9^4/(4^4 + 9^4) = 96\,\%\))이 4 m 방향으로 간다. 단변 방향 1 m 띠를 보로 설계한다.</div></div>
+      <div class="quiz-q"><p>2. 2방향 슬래브의 X 방향 설계대가 견뎌야 할 정적 모멘트에 대해 옳은 것은?</p><div class="opts">
+        <button class="opt">하중이 두 방향으로 나뉘므로 w<sub>u</sub>ℓ<sub>2</sub>ℓ<sub>n</sub>²/16이다</button><button class="opt" data-correct>Y 방향과 상관없이 w<sub>u</sub>ℓ<sub>2</sub>ℓ<sub>n</sub>²/8 전체를 견뎌야 한다</button><button class="opt">주열대만 견디면 된다</button><button class="opt">부 모멘트만 견디면 된다</button>
+      </div><div class="quiz-exp">기둥 줄에서 자른 띠의 자유물체도는 판이 어떻게 휘든 평형을 지켜야 하므로 방향마다 \(M_0\) 전체가 필요하다(니컬스). 두 방향의 "분담"은 판 가운데 처짐의 이야기다.</div></div>
+      <div class="quiz-q"><p>3. 직접 설계법에서 내부 경간의 \(M_0 = 600\) kN·m이면 지점 부 모멘트는?</p><div class="opts">
+        <button class="opt">210 kN·m</button><button class="opt">300 kN·m</button><button class="opt" data-correct>390 kN·m</button><button class="opt">600 kN·m</button>
+      </div><div class="quiz-exp">내부 경간은 부 0.65, 정 0.35로 나눈다: \(0.65 \times 600 = 390\) kN·m, 정 모멘트는 210 kN·m.</div></div>
+      <div class="quiz-q"><p>4. 내부 기둥 600 × 600 mm, 슬래브 유효 깊이 d = 200 mm일 때 뚫림 전단 임계 둘레 b<sub>0</sub>는?</p><div class="opts">
+        <button class="opt">2,400 mm</button><button class="opt">2,800 mm</button><button class="opt" data-correct>3,200 mm</button><button class="opt">4,000 mm</button>
+      </div><div class="quiz-exp">기둥 면에서 \(d/2 = 100\) mm 떨어진 정사각형: \(b_0 = 4(c + d) = 4 \times 800 = 3{,}200\) mm.</div></div>
+      <div class="quiz-q"><p>5. 같은 두께의 플랫 플레이트에서 뚫림 전단에 가장 불리한 기둥은?</p><div class="opts">
+        <button class="opt">내부 기둥: 기여 면적이 가장 크므로</button><button class="opt">모든 기둥이 같다</button><button class="opt" data-correct>모서리·가장자리 기둥: 임계 둘레가 짧고 불균형 모멘트가 크다</button><button class="opt">코어 옆 기둥</button>
+      </div><div class="quiz-exp">기여 면적은 작지만 둘레가 1/2–1/4로 줄고, 판 끝에서는 슬래브 모멘트가 한쪽으로만 걸려 기둥에 큰 불균형 모멘트가 전달된다. 그래서 가장자리 보나 기둥 확대를 두는 일이 많다.</div></div>
+      <div class="quiz-q"><p>6. 콘크리트 슬래브의 장기 처짐이 즉시 처짐의 약 두 배로 계산되는 주된 이유는?</p><div class="opts">
+        <button class="opt">활하중이 시간이 지나며 커지므로</button><button class="opt" data-correct>지속 하중 아래의 크리프와 건조 수축 때문</button><button class="opt">철근이 녹슬기 때문</button><button class="opt">온도 변화 때문</button>
+      </div><div class="quiz-exp">지속 하중이 5년 이상이면 \(\xi = 2.0\), 압축 철근이 없으면 \(\lambda_\Delta = 2.0\)이 된다. 압축 철근 \(\rho'\)이 있으면 크리프를 억제해 계수가 줄어든다.</div></div>
+      <div class="quiz-q"><p>7. 진동 질량에 의한 바닥 처짐이 4 mm다. 고유 진동수의 어림값은?</p><div class="opts">
+        <button class="opt">약 4.5 Hz</button><button class="opt" data-correct>약 9 Hz</button><button class="opt">약 18 Hz</button><button class="opt">약 72 Hz</button>
+      </div><div class="quiz-exp">\(f \approx 18/\sqrt{4} = 9\) Hz. 처짐이 4배가 되면 진동수는 절반이 된다.</div></div>
+      <div class="quiz-q"><p>8. 보행 진동이 문제된 가벼운 강 합성 바닥을 고칠 때 가속도를 낮추는 데 효과가 작은 것은?</p><div class="opts">
+        <button class="opt">보를 키워 고유 진동수를 높인다</button><button class="opt">칸막이·천장 등으로 감쇠를 늘린다</button><button class="opt">슬래브를 두껍게 해 참여 중량을 늘린다</button><button class="opt" data-correct>보의 항복 강도만 높인다</button>
+      </div><div class="quiz-exp">\(a_p/g = P_0 e^{-0.35f_n}/(\beta W)\)에는 강성(\(f_n\)), 감쇠(\(\beta\)), 중량(\(W\))만 들어간다. 강도는 진동에 영향이 없다. 같은 단면에서 강종만 올리면 진동은 그대로다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const FL = {
+  font(o = {}) { return `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`; },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = FL.font(o);
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  alpha(c, a) { const m = /^#([0-9a-f]{6})$/i.exec((c || "").trim()); if (!m) return c; const n = parseInt(m[1], 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; },
+  ceil(v, s) { return Math.ceil(v / s - 1e-9) * s; },
+  /** 계수 면 하중(kN/m²): h는 m, D = 24h + 1.5, w_u = 1.2D + 1.6L */
+  wu(h, L = 2.5) { return 1.2 * (24 * h + 1.5) + 1.6 * L; },
+  /** 뚫림 전단 응력 강도(MPa, ACI 318 형태): 세 식의 최솟값과 지배 식 번호 */
+  vc(b0, d, as, fck = 30) {
+    const s = Math.sqrt(fck), v = [0.33 * s, 0.17 * 3 * s, 0.083 * ((as * d) / b0 + 2) * s], k = v.indexOf(Math.min(...v));
+    return { v: v[k], k, all: v };
+  },
+  /** 임계 단면: a = 판 끝에 평행한 지지 폭, b = 직각 폭(mm). 둘레와 안쪽 넓이(mm, mm²) */
+  perim(pos, a, b, d) {
+    if (pos === "edge") return { b0: 2 * (b + d / 2) + (a + d), A: (a + d) * (b + d / 2) };
+    if (pos === "corner") return { b0: (a + d / 2) + (b + d / 2), A: (a + d / 2) * (b + d / 2) };
+    return { b0: 2 * (a + d) + 2 * (b + d), A: (a + d) * (b + d) };
+  },
+  /** 정사각 구획 플랫 플레이트 기둥의 뚫림 전단(ℓ: m, h·c·hdp: mm, Mu: kN·m) */
+  punch(o) {
+    const { pos = "int", l, h, c, Mu = 0, drop = false, hdp = 0, L = 2.5, fck = 30 } = o;
+    const d = h - 35, wu = FL.wu(h / 1000, L), as = { int: 40, edge: 30, corner: 20 }[pos], trib = l * l * { int: 1, edge: 0.5, corner: 0.25 }[pos] * 1e6;
+    const dropDims = pos === "int" ? [l * 1000 / 3, l * 1000 / 3] : pos === "edge" ? [l * 1000 / 3, l * 1000 / 6 + c / 2] : [l * 1000 / 6 + c / 2, l * 1000 / 6 + c / 2];
+    const dropArea = drop ? dropDims[0] * dropDims[1] : 0, extra = drop ? 1.2 * 24 * (hdp / 1000) * dropArea / 1e6 : 0; // 드롭 패널 자중(kN)
+    const secs = [];
+    const d1 = drop ? d + hdp : d, p1 = FL.perim(pos, c, c, d1), Vu1 = wu * (trib - p1.A) / 1e6 + extra * (1 - p1.A / Math.max(dropArea, 1));
+    let vu1 = (Vu1 * 1000) / (p1.b0 * d1), ecc = 0;
+    if (pos === "int" && Mu > 0) {
+      const c1 = c + d1, Jc = (d1 * c1 ** 3) / 6 + (c1 * d1 ** 3) / 6 + (d1 * c1 * c1 ** 2) / 2;
+      ecc = (0.4 * Mu * 1e6 * (c1 / 2)) / Jc; vu1 += ecc;
+    }
+    const v1 = FL.vc(p1.b0, d1, as, fck); secs.push({ name: drop ? "기둥 면 (d + h<sub>dp</sub>)" : "기둥 면", d: d1, b0: p1.b0, Vu: Vu1, vu: vu1, vc: v1, ratio: vu1 / (0.75 * v1.v), dims: [c, c], ecc });
+    if (drop) {
+      const p2 = FL.perim(pos, dropDims[0], dropDims[1], d), Vu2 = wu * (trib - p2.A) / 1e6, vu2 = (Vu2 * 1000) / (p2.b0 * d), v2 = FL.vc(p2.b0, d, as, fck);
+      secs.push({ name: "드롭 패널 바깥 (d)", d, b0: p2.b0, Vu: Vu2, vu: vu2, vc: v2, ratio: vu2 / (0.75 * v2.v), dims: dropDims, ecc: 0 });
+    }
+    const gov = secs.reduce((b, s) => (s.ratio > b.ratio ? s : b), secs[0]);
+    return { d, wu, secs, gov, ratio: gov.ratio, dropDims };
+  },
+};
+
+/* ---------- 1. B-10 기준층 3D ---------- */
+(function () {
+  const mode = CB.seg("fl-3-mode", go), bay = CB.seg("fl-3-bay", go), gl = CB.range("fl-3-l", (v) => v.toFixed(1) + " kN/m²", go), slab = CB.check("fl-3-slab", go);
+  const inCore = (x, y) => x >= 8 && x <= 24 && y >= 8 && y <= 16;
+  const coreNode = (x, y) => inCore(x, y) && (x === 8 || x === 16 || x === 24) && (y === 8 || y === 16);
+  const BAYS = [[0, 0], [8, 0]];
+  const v = CB.orbit("#fl-cv-3d", { yaw: -0.55, pitch: 0.62, dist: 62, target: [16, 12, -1.5], aspect: 0.66, minHeight: 280, maxHeight: 460,
+    draw(V) {
+      const P = V.P, m = mode(), [bx, by] = BAYS[+bay()], z0 = 0, zc = -4;
+      // 기둥
+      for (let x = 0; x <= 32; x += 8) for (let y = 0; y <= 24; y += 8) {
+        if (coreNode(x, y)) continue;
+        const hl = m === "grav" && (x === bx || x === bx + 8) && (y === by || y === by + 8) && !coreNode(x, y);
+        V.line3([x, y, zc], [x, y, z0 - 0.35], { color: hl ? P.ok : P.dim, width: hl ? 5 : 3.5 });
+      }
+      // 코어 벽
+      const cw = [[8, 8], [24, 8], [24, 16], [8, 16]];
+      for (let k = 0; k < 4; k++) { const a = cw[k], b = cw[(k + 1) % 4]; V.poly3([[a[0], a[1], zc], [b[0], b[1], zc], [b[0], b[1], z0 + 1.2], [a[0], a[1], z0 + 1.2]], { fill: P.dim, fillAlpha: 0.18, color: P.text, width: 1.4 }); }
+      // 슬래브
+      if (slab()) V.poly3([[0, 0, z0], [32, 0, z0], [32, 24, z0], [0, 24, z0]], { fill: P.accent, fillAlpha: m === "dia" ? 0.22 : 0.1, color: P.accent, width: 1.2 });
+      // 보(격자선)
+      for (let x = 0; x <= 32; x += 8) V.line3([x, 0, z0 - 0.2], [x, 24, z0 - 0.2], { color: P.text, width: 2.6 });
+      for (let y = 0; y <= 24; y += 8) V.line3([0, y, z0 - 0.2], [32, y, z0 - 0.2], { color: P.text, width: 2.6 });
+      if (m === "grav") {
+        const c = [bx + 4, by + 4, z0 + 0.02], corners = [[bx, by], [bx + 8, by], [bx + 8, by + 8], [bx, by + 8]], cols = [P.accent2, P.accent, P.accent2, P.accent];
+        for (let k = 0; k < 4; k++) { const a = corners[k], b = corners[(k + 1) % 4]; V.poly3([[a[0], a[1], z0 + 0.02], [b[0], b[1], z0 + 0.02], c], { fill: cols[k], fillAlpha: 0.3, color: cols[k], width: 1.4, dash: [4, 3] }); }
+        for (let i = 1; i <= 3; i++) for (let j = 1; j <= 3; j++) { const x = bx + 2 * i, y = by + 2 * j; V.line3([x, y, z0 + 3], [x, y, z0 + 0.3], { color: P.accent2, width: 1.6 }); V.dot3([x, y, z0 + 0.3], { color: P.accent2, r: 2.6 }); }
+        corners.forEach(([x, y]) => { if (coreNode(x, y)) return; V.line3([x, y, zc - 0.2], [x, y, zc - 2.6], { color: P.ok, width: 2.6 }); V.dot3([x, y, zc - 2.6], { color: P.ok, r: 3.5 }); });
+        V.text3(`wu = ${FL_wu().toFixed(1)} kN/m²`, [bx + 4, by + 4, z0 + 5.2], { color: P.accent2, size: 12, bold: true });
+        if (bx === 8) V.text3("이 변은 코어 벽이 받는다", [bx + 4, by + 8, z0 + 1.6], { color: P.text, size: 11.5 });
+      } else {
+        for (let x = 4; x < 32; x += 8) { V.line3([x, -6, z0 + 0.1], [x, -0.6, z0 + 0.1], { color: P.blue, width: 2.6 }); V.dot3([x, -0.6, z0 + 0.1], { color: P.blue, r: 3.5 }); }
+        V.text3("Y 방향 바람 · 층 약 220 kN", [16, -8.5, z0 + 0.1], { color: P.blue, size: 12, bold: true });
+        [[16, 3, 16, 7.4], [6, 4, 9.5, 7.6], [26, 4, 22.5, 7.6], [4, 14, 7.4, 13], [28, 14, 24.6, 13], [16, 21, 16, 16.6]].forEach(([x0, y0, x1, y1]) => { V.line3([x0, y0, z0 + 0.05], [x1, y1, z0 + 0.05], { color: P.accent, width: 2.2 }); V.dot3([x1, y1, z0 + 0.05], { color: P.accent, r: 3 }); });
+        V.text3("판 안의 전단 → 코어", [16, 12, z0 + 1.9], { color: P.accent, size: 12, bold: true });
+        [0, 32].forEach((x) => V.text3("골조", [x, 12, z0 + 1.2], { color: P.dim, size: 11 }));
+      }
+    } });
+  function FL_wu() { return 1.2 * 6.5 + 1.6 * gl(); }
+  function go() {
+    v.redraw();
+    const wu = FL_wu(), P = wu * 64, beam = wu * 16;
+    CB.stat("fl-3-wu", wu.toFixed(1) + " kN/m²"); CB.stat("fl-3-p", CB.sig(P) + " kN"); CB.stat("fl-3-b", CB.sig(beam) + " kN"); CB.stat("fl-3-h", "약 220 kN");
+    const msg = document.getElementById("fl-3-msg");
+    msg.innerHTML = mode() === "grav"
+      ? `8 × 8 m 구획 하중 ${CB.sig(P)} kN을 45° 분담선으로 네 보에 ${CB.sig(beam)} kN씩 나눕니다. 각 기둥은 둘레 네 구획에서 같은 몫을 받으므로 내부 기둥 한 층 기여 면적 64 m² × ${wu.toFixed(1)} = <b>${CB.sig(P)} kN</b>${+bay() === 1 ? ". 코어 옆 구획은 한 변이 코어 벽에 얹힌다." : "."} 층 전체(768 m²)는 ${CB.sig(wu * 768)} kN.`
+      : "격막 보기: 외벽에 걸린 층 풍하중이 바닥 판의 평면 내 전단으로 코어 벽과 양 끝 골조에 모입니다. 판은 깊이 24 m의 보처럼 일해 거의 변형하지 않으므로(강막) 모든 저항 요소가 같은 수평 변위를 갖습니다.";
+  }
+  go();
+})();
+
+/* ---------- 2. 슬래브 판별과 하중 분담 ---------- */
+(function () {
+  const gx = CB.range("fl-s-x", (v) => v.toFixed(1) + " m", go), gy = CB.range("fl-s-y", (v) => v.toFixed(1) + " m", go), gw = CB.range("fl-s-w", (v) => v.toFixed(1) + " kN/m²", go);
+  const cv = CB.canvas("#fl-cv-share", (ctx, W, H) => {
+    const pal = CB.palette(), lx = gx(), ly = gy(), s = Math.min((W - 90) / 12, (H - 70) / 12), X0 = (W - lx * s) / 2, Y0 = (H - ly * s) / 2 + 4;
+    const X = (x) => X0 + x * s, Y = (y) => Y0 + (ly - y) * s, a = Math.min(lx, ly) / 2;
+    const poly = (pts, fill, alpha) => { ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = fill; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y)))); ctx.closePath(); ctx.fill(); ctx.restore(); };
+    // 분담 영역: 짧은 보는 삼각형, 긴 보는 사다리꼴
+    let A, B, C, D;
+    if (lx >= ly) { A = [[0, 0], [a, a], [0, ly]]; B = [[lx, 0], [lx - a, a], [lx, ly]]; C = [[0, 0], [a, a], [lx - a, a], [lx, 0]]; D = [[0, ly], [a, a], [lx - a, a], [lx, ly]]; }
+    else { A = [[0, 0], [a, a], [lx, 0]]; B = [[0, ly], [a, ly - a], [lx, ly]]; C = [[0, 0], [a, a], [a, ly - a], [0, ly]]; D = [[lx, 0], [a, a], [a, ly - a], [lx, ly]]; }
+    poly(A, pal.accent2, 0.22); poly(B, pal.accent2, 0.22); poly(C, pal.accent, 0.16); poly(D, pal.accent, 0.16);
+    ctx.save(); ctx.strokeStyle = pal.accent2; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]); ctx.beginPath();
+    [A, B].forEach((p) => { ctx.moveTo(X(p[0][0]), Y(p[0][1])); ctx.lineTo(X(p[1][0]), Y(p[1][1])); ctx.lineTo(X(p[2][0]), Y(p[2][1])); });
+    if (lx >= ly) { ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(lx - a), Y(a)); } else { ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(a), Y(ly - a)); }
+    ctx.stroke(); ctx.restore();
+    // 교차 띠
+    const sw = 0.35;
+    ctx.save(); ctx.globalAlpha = 0.28; ctx.fillStyle = pal.ok; ctx.fillRect(X(lx / 2 - sw / 2), Y(ly), sw * s, ly * s); ctx.fillRect(X(0), Y(ly / 2 + sw / 2), lx * s, sw * s); ctx.restore();
+    // 보와 기둥
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 4; ctx.strokeRect(X(0), Y(ly), lx * s, ly * s); ctx.restore();
+    [[0, 0], [lx, 0], [0, ly], [lx, ly]].forEach(([x, y]) => { ctx.fillStyle = pal.text; ctx.fillRect(X(x) - 6, Y(y) - 6, 12, 12); });
+    const short = Math.min(lx, ly), long = Math.max(lx, ly), tri = (short * short) / 4, trap = (lx * ly - 2 * tri) / 2;
+    if (lx >= ly) { FL.text(ctx, `${CB.num(tri, 1)} m²`, X(a * 0.55), Y(ly / 2), pal.accent2, { size: 11.5 }); FL.text(ctx, `${CB.num(trap, 1)} m²`, X(lx / 2), Y(a * 0.45), pal.accent, { size: 11.5 }); }
+    else { FL.text(ctx, `${CB.num(tri, 1)} m²`, X(lx / 2), Y(a * 0.5), pal.accent2, { size: 11.5 }); FL.text(ctx, `${CB.num(trap, 1)} m²`, X(a * 0.45), Y(ly / 2), pal.accent, { size: 11.5 }); }
+    FL.text(ctx, `ℓx = ${lx.toFixed(1)} m`, X(lx / 2), Y(0) + 18, pal.dim, { size: 11.5 });
+    FL.text(ctx, `ℓy = ${ly.toFixed(1)} m`, X(0) - 10, Y(ly / 2), pal.dim, { size: 11.5, align: "right" });
+    FL.text(ctx, "초록 띠: 처짐 적합 모형", W - 10, H - 12, pal.ok, { size: 11, align: "right", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.62), minHeight: 240, maxHeight: 400 });
+  function go() {
+    cv.redraw();
+    const lx = gx(), ly = gy(), w = gw(), short = Math.min(lx, ly), long = Math.max(lx, ly), beta = long / short, share = long ** 4 / (short ** 4 + long ** 4);
+    const tri = (short * short) / 4, trap = (lx * ly - 2 * tri) / 2;
+    CB.stat("fl-s-b", beta.toFixed(2));
+    CB.stat("fl-s-k", beta >= 2 ? '<span style="color:var(--accent-2)">1방향</span>' : '<span style="color:var(--accent)">2방향</span>');
+    CB.stat("fl-s-a", (share * 100).toFixed(1) + " %");
+    CB.stat("fl-s-p", `${CB.sig(trap * w)} / ${CB.sig(tri * w)} kN`);
+  }
+  go();
+})();
+
+/* ---------- 3. 직접 설계법 ---------- */
+(function () {
+  const g1 = CB.range("fl-d-l1", (v) => v.toFixed(1) + " m", go), g2 = CB.range("fl-d-l2", (v) => v.toFixed(1) + " m", go), gc = CB.range("fl-d-c", (v) => v + " mm", go), gh = CB.range("fl-d-h", (v) => v + " mm", go);
+  const pos = CB.seg("fl-d-pos", go), sys = CB.seg("fl-d-sys", go);
+  const COEF = { int: { ext: 0.65, pos: 0.35, int: 0.65 }, beam: { ext: 0.16, pos: 0.57, int: 0.70 }, flat: { ext: 0.26, pos: 0.52, int: 0.70 } };
+  const f1 = (r) => { r = CB.clamp(r, 0.5, 2); return r <= 1 ? CB.lerp(90, 75, (r - 0.5) / 0.5) : CB.lerp(75, 45, r - 1); };
+  let S;
+  function solve() {
+    const l1 = g1(), l2 = g2(), c = gc() / 1000, h = gh() / 1000, wu = FL.wu(h), ln = Math.max(l1 - c, 0.65 * l1), M0 = (wu * l2 * ln * ln) / 8;
+    let a = 0, af = 0;
+    if (sys() === "beam") {
+      const hb = 700, bw = 400, hs = gh(), proj = Math.min(hb - hs, 4 * hs);
+      const Ib = CB.section.rects([{ x: -bw / 2, y: 0, b: bw, h: hb - hs }, { x: -bw / 2 - proj, y: hb - hs, b: bw + 2 * proj, h: hs }]).Ix / 1e12;
+      const Is = (l2 * h ** 3) / 12; af = Ib / Is; a = (af * l2) / l1;
+    }
+    const k = pos() === "int" ? COEF.int : sys() === "beam" ? COEF.beam : COEF.flat, r = l2 / l1, t = Math.min(a, 1);
+    const frNeg = 75 + t * (f1(r) - 75), frPos = 60 + t * (f1(r) - 60), frExt = pos() === "int" ? frNeg : sys() === "beam" ? 75 + t * (f1(r) - 75) : 100;
+    const beamShare = 0.85 * t, csW = 0.5 * Math.min(l1, l2), msW = Math.max(l2 - csW, 0.01);
+    const split = (M, fr) => { const cs = (M * fr) / 100, b = cs * beamShare; return { M, beam: b, cs: cs - b, ms: M - cs, fr }; };
+    S = { l1, l2, c, h, wu, ln, M0, a, af, r, k, csW, msW, ext: split(k.ext * M0, frExt), pos: split(k.pos * M0, frPos), int: split(k.int * M0, frNeg) };
+  }
+  solve();
+  const cvM = CB.canvas("#fl-cv-ddm", (ctx, W, H) => {
+    const pal = CB.palette(), { ln, M0, k } = S, x0 = 44, x1 = W - 44, y0 = H * 0.42, scale = (H * 0.36) / Math.max(M0, 1);
+    const Mx = (xi) => M0 * 4 * xi * (1 - xi) - (k.ext * M0 * (1 - xi) + k.int * M0 * xi);
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke(); ctx.restore();
+    [x0, x1].forEach((x) => { ctx.fillStyle = pal.text; ctx.fillRect(x - 7, y0, 14, 16); });
+    ctx.save(); ctx.beginPath(); ctx.moveTo(x0, y0);
+    for (let q = 0; q <= 80; q++) { const xi = q / 80; ctx.lineTo(x0 + (x1 - x0) * xi, y0 + Mx(xi) * scale); }
+    ctx.lineTo(x1, y0); ctx.closePath(); ctx.globalAlpha = 0.16; ctx.fillStyle = pal.accent; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = pal.accent; ctx.lineWidth = 2.2; ctx.beginPath();
+    for (let q = 0; q <= 80; q++) { const xi = q / 80, X = x0 + (x1 - x0) * xi, Y = y0 + Mx(xi) * scale; q ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+    ctx.stroke(); ctx.restore();
+    const lab = pos() === "int" ? ["0.65M₀", "0.35M₀", "0.65M₀"] : [`${k.ext}M₀`, `${k.pos}M₀`, `${k.int}M₀`];
+    FL.text(ctx, `${lab[0]} = ${CB.sig(S.ext.M)}`, x0 + 4, y0 - k.ext * M0 * scale - 10, pal.accent, { size: 11.5, align: "left" });
+    FL.text(ctx, `${lab[2]} = ${CB.sig(S.int.M)}`, x1 - 4, y0 - k.int * M0 * scale - 10, pal.accent, { size: 11.5, align: "right" });
+    FL.text(ctx, `${lab[1]} = ${CB.sig(S.pos.M)}`, (x0 + x1) / 2, y0 + Mx(0.5) * scale + 14, pal.accent, { size: 11.5 });
+    FL.text(ctx, `ℓn = ${ln.toFixed(2)} m · M₀ = ${CB.sig(M0)} kN·m`, (x0 + x1) / 2, H - 12, pal.dim, { size: 11.5 });
+    FL.text(ctx, pos() === "int" ? "내부 경간" : "단부 경간 (왼쪽이 바깥)", W - 10, 14, pal.dim, { size: 11, align: "right", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.36), minHeight: 190, maxHeight: 260 });
+  const cvB = CB.canvas("#fl-cv-ddmb", (ctx, W, H) => {
+    const pal = CB.palette(), rows = [["바깥 부", S.ext], ["정", S.pos], ["안쪽 부", S.int]].filter((r, i) => !(pos() === "int" && i === 0));
+    const left = 70, right = W - 14, top = 22, rh = Math.min(46, (H - top - 30) / rows.length), mx = Math.max(...rows.map((r) => r[1].M), 1);
+    const sc = (right - left) / mx;
+    rows.forEach(([name, m], i) => {
+      const y = top + i * rh; let x = left;
+      FL.text(ctx, name, left - 8, y + rh * 0.38, pal.text, { size: 11.5, align: "right", mono: false });
+      [[m.beam, pal.accent, "보"], [m.cs, pal.accent2, "주열대"], [m.ms, pal.ok, "중간대"]].forEach(([v, col, nm]) => {
+        if (v <= 1e-9) return; const w = v * sc;
+        ctx.save(); ctx.globalAlpha = 0.75; ctx.fillStyle = col; ctx.fillRect(x, y + 4, w, rh * 0.62); ctx.restore();
+        if (w > 44) FL.text(ctx, CB.sig(v), x + w / 2, y + 4 + rh * 0.31, pal.text, { size: 11 });
+        x += w;
+      });
+    });
+    let lx = left; [["보", pal.accent], ["주열대 슬래브", pal.accent2], ["중간대", pal.ok]].forEach(([t, c]) => { ctx.fillStyle = c; ctx.fillRect(lx, H - 16, 12, 8); FL.text(ctx, t, lx + 16, H - 12, pal.dim, { size: 11, align: "left", mono: false }); lx += 26 + t.length * 11; });
+  }, { aspect: (W) => (W < 520 ? 0.5 : 0.26), minHeight: 150, maxHeight: 200 });
+  function go() {
+    solve(); cvM.redraw(); cvB.redraw();
+    CB.stat("fl-d-wu", S.wu.toFixed(2) + " kN/m²"); CB.stat("fl-d-ln", S.ln.toFixed(2) + " m"); CB.stat("fl-d-m0", CB.sig(S.M0) + " kN·m"); CB.stat("fl-d-al", sys() === "beam" ? S.a.toFixed(2) : "0 (보 없음)");
+    const msg = document.getElementById("fl-d-msg"), per = (v, w) => CB.num(v / w, 1);
+    const p = S.int;
+    let t = `안쪽 부 모멘트 ${CB.sig(p.M)} kN·m 중 주열대 ${p.fr.toFixed(0)} %${sys() === "beam" ? `(그중 보 ${CB.sig(p.beam)})` : ""}, 중간대 ${CB.sig(p.ms)} kN·m = 폭 ${S.msW.toFixed(1)} m에 <b>${per(p.ms, S.msW)} kN·m/m</b>. 정 모멘트 중간대 ${per(S.pos.ms, S.msW)} kN·m/m.`;
+    if (S.r > 2 || S.r < 0.5) { msg.className = "fl-msg bad"; msg.innerHTML = `ℓ₂/ℓ₁ = ${S.r.toFixed(2)}: 구획 장단변비가 2를 넘어 직접 설계법의 적용 범위 밖입니다(1방향 거동에 가깝다). 비율은 끝값으로 잘라 표시합니다. ` + t; }
+    else { msg.className = "fl-msg"; msg.innerHTML = t; }
+  }
+  go();
+})();
+
+/* ---------- 4. 뚫림 전단 ---------- */
+(function () {
+  const pos = CB.seg("fl-p-pos", go), gl = CB.range("fl-p-l", (v) => v.toFixed(1) + " m", go), gh = CB.range("fl-p-h", (v) => v + " mm", go), gc = CB.range("fl-p-c", (v) => v + " mm", go);
+  const gm = CB.range("fl-p-m", (v) => v + " kN·m", go), drop = CB.check("fl-p-drop", go), gdp = CB.range("fl-p-dp", (v) => v + " mm", go);
+  let R;
+  function solve() { R = FL.punch({ pos: pos(), l: gl(), h: gh(), c: gc(), Mu: pos() === "int" ? gm() : 0, drop: drop(), hdp: gdp() }); }
+  solve();
+  const cv = CB.canvas("#fl-cv-punch", (ctx, W, H) => {
+    const pal = CB.palette(), p = pos(), c = gc(), wide = W >= 520, planW = wide ? W * 0.6 : W, planH = wide ? H : H * 0.62;
+    // 평면: 기둥 중심 원점, mm
+    const span = drop() ? Math.max(...R.dropDims) * 1.25 + 600 : c + 2 * R.d + 1400, s = Math.min((planW - 40) / span, (planH - 40) / span);
+    const cxp = planW / 2, cyp = planH / 2 + 6, X = (x) => cxp + x * s, Y = (y) => cyp - y * s;
+    // 판 끝: 가장자리는 위(y = c/2), 모서리는 위와 왼쪽(x = −c/2)
+    const edgeY = p === "int" ? Infinity : c / 2, edgeX = p === "corner" ? -c / 2 : -Infinity;
+    const clipR = { x0: edgeX === -Infinity ? 0 : X(edgeX), y0: edgeY === Infinity ? 0 : Y(edgeY) };
+    ctx.save(); ctx.fillStyle = CB.color("accent-soft"); ctx.fillRect(clipR.x0, clipR.y0, planW - clipR.x0, planH - clipR.y0); ctx.restore();
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 2.4; ctx.beginPath();
+    if (edgeY !== Infinity) { ctx.moveTo(clipR.x0, clipR.y0); ctx.lineTo(planW, clipR.y0); }
+    if (edgeX !== -Infinity) { ctx.moveTo(clipR.x0, clipR.y0); ctx.lineTo(clipR.x0, planH); }
+    ctx.stroke(); ctx.restore();
+    // 드롭 패널 (판 끝 방향으로 잘림)
+    const rectOf = (a, b, off) => { // a: x 방향 폭, b: y 방향 폭, off: 바깥으로 넓힘
+      let x0 = -a / 2 - off, x1 = a / 2 + off, y0 = -b / 2 - off, y1 = b / 2 + off;
+      if (p === "edge" || p === "corner") { y1 = c / 2; y0 = c / 2 - b - off; }
+      if (p === "corner") { x0 = -c / 2; x1 = -c / 2 + a + off; }
+      return [x0, y0, x1, y1];
+    };
+    if (drop()) { const [a, b] = R.dropDims, [x0, y0, x1, y1] = rectOf(a, b, 0); ctx.save(); ctx.fillStyle = pal.accent2; ctx.globalAlpha = 0.14; ctx.fillRect(X(x0), Y(y1), (x1 - x0) * s, (y1 - y0) * s); ctx.globalAlpha = 1; ctx.strokeStyle = pal.accent2; ctx.lineWidth = 1.4; ctx.strokeRect(X(x0), Y(y1), (x1 - x0) * s, (y1 - y0) * s); ctx.restore(); }
+    ctx.fillStyle = pal.text; ctx.fillRect(X(-c / 2), Y(c / 2), c * s, c * s);
+    // 임계 단면
+    R.secs.forEach((sec, i) => {
+      const [a, b] = sec.dims, d = sec.d;
+      let x0 = -a / 2 - d / 2, x1 = a / 2 + d / 2, y0 = -b / 2 - d / 2, y1 = b / 2 + d / 2;
+      if (i === 0 && (p === "edge" || p === "corner")) y1 = c / 2;
+      if (i === 1 && (p === "edge" || p === "corner")) { y1 = c / 2; y0 = c / 2 - b - d / 2; }
+      if (i === 0 && p === "corner") x0 = -c / 2;
+      if (i === 1 && p === "corner") { x0 = -c / 2; x1 = -c / 2 + a + d / 2; }
+      const col = sec === R.gov ? (sec.ratio > 1 ? pal.bad : pal.accent) : pal.dim;
+      ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath();
+      if (p === "int") ctx.rect(X(x0), Y(y1), (x1 - x0) * s, (y1 - y0) * s);
+      else if (p === "edge") { ctx.moveTo(X(x0), Y(y1)); ctx.lineTo(X(x0), Y(y0)); ctx.lineTo(X(x1), Y(y0)); ctx.lineTo(X(x1), Y(y1)); }
+      else { ctx.moveTo(X(x0), Y(y0)); ctx.lineTo(X(x1), Y(y0)); ctx.lineTo(X(x1), Y(y1)); }
+      ctx.stroke(); ctx.restore();
+      FL.text(ctx, `b₀ = ${CB.sig(sec.b0)} mm`, X(x1) + 6, Y(y0) + 12 + i * 2, col, { size: 11, align: "left" });
+    });
+    FL.text(ctx, { int: "내부 기둥", edge: "가장자리 기둥 (위 = 판 끝)", corner: "모서리 기둥 (위·왼쪽 = 판 끝)" }[p], 10, 14, pal.dim, { size: 11, align: "left", mono: false });
+    // 단면도
+    const sx0 = wide ? planW + 10 : 20, sy0 = wide ? 40 : planH + 14, sw = wide ? W - planW - 24 : W - 40, sh = wide ? H - 80 : H - planH - 30;
+    const hs = gh(), hd = drop() ? gdp() : 0, tot = hs + hd + 260, k = Math.min(sh / tot, sw / (c + 2 * (hs + hd) + 400));
+    const mid = sx0 + sw / 2, top = sy0 + 10;
+    ctx.save(); ctx.fillStyle = CB.color("accent-soft"); ctx.strokeStyle = pal.text; ctx.lineWidth = 1.4;
+    ctx.fillRect(sx0, top, sw, hs * k); ctx.strokeRect(sx0, top, sw, hs * k);
+    if (drop()) { const dw = Math.min(sw, (c + 2 * hs * 2.2) * k); ctx.fillRect(mid - dw / 2, top + hs * k, dw, hd * k); ctx.strokeRect(mid - dw / 2, top + hs * k, dw, hd * k); }
+    ctx.fillStyle = pal.surface; ctx.fillRect(mid - (c * k) / 2, top + (hs + hd) * k, c * k, 200 * k); ctx.strokeRect(mid - (c * k) / 2, top + (hs + hd) * k, c * k, 200 * k);
+    ctx.restore();
+    const dd = R.secs[0].d;
+    ctx.save(); ctx.strokeStyle = R.secs[0].ratio > 1 ? pal.bad : pal.accent; ctx.lineWidth = 1.6; ctx.setLineDash([4, 3]);
+    [-1, 1].forEach((sg) => { const x = mid + sg * ((c / 2 + dd / 2) * k); ctx.beginPath(); ctx.moveTo(x, top - 4); ctx.lineTo(x, top + (hs + hd) * k + 4); ctx.stroke(); });
+    ctx.restore();
+    ctx.save(); ctx.strokeStyle = pal.bad; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.7; [-1, 1].forEach((sg) => { ctx.beginPath(); ctx.moveTo(mid + sg * (c / 2) * k, top + (hs + hd) * k); ctx.lineTo(mid + sg * (c / 2 + (hs + hd) * 1.2) * k, top); ctx.stroke(); }); ctx.restore();
+    FL.text(ctx, `h = ${hs}${hd ? " + " + hd : ""} mm, d = ${dd} mm`, mid, top + (hs + hd) * k + 200 * k + 14, pal.dim, { size: 11 });
+    FL.text(ctx, "단면 (점선 = d/2)", mid, sy0 - 8, pal.dim, { size: 11, mono: false });
+  }, { aspect: (W) => (W < 520 ? 1.15 : 0.56), minHeight: 260, maxHeight: 420 });
+  function go() {
+    document.getElementById("fl-p-m").disabled = pos() !== "int"; document.getElementById("fl-p-dp").disabled = !drop();
+    solve(); cv.redraw();
+    const g = R.gov, names = ["0.33√f<sub>ck</sub>", "0.17(1 + 2/β)√f<sub>ck</sub>", "0.083(α<sub>s</sub>d/b<sub>0</sub> + 2)√f<sub>ck</sub>"];
+    CB.stat("fl-p-b0", CB.sig(g.b0) + " mm"); CB.stat("fl-p-vu", CB.sig(g.Vu) + " kN");
+    CB.stat("fl-p-r", `<span style="color:var(--${g.ratio > 1 ? "bad" : "ok"})">${g.ratio.toFixed(2)}</span>`); CB.stat("fl-p-g", ["①", "②", "③"][g.vc.k]);
+    const msg = document.getElementById("fl-p-msg");
+    msg.className = "fl-msg " + (R.ratio > 1 ? "bad" : "ok");
+    const parts = R.secs.map((s) => `${s.name}: v<sub>u</sub> = ${s.vu.toFixed(2)}${s.ecc ? ` (편심 전단 ${s.ecc.toFixed(2)} 포함)` : ""} / φv<sub>c</sub> = ${(0.75 * s.vc.v).toFixed(2)} MPa → <b>${s.ratio.toFixed(2)}</b>`).join(" · ");
+    msg.innerHTML = `${R.ratio > 1 ? "불합격" : "통과"} — ${parts}. 지배 강도 식 ${names[g.vc.k]} (b<sub>0</sub>/d = ${(g.b0 / g.d).toFixed(1)}).${pos() !== "int" ? " 판 끝 기둥은 불균형 모멘트가 커서 실제로는 이보다 불리하다." : ""}`;
+  }
+  go();
+})();
+
+/* ---------- 5. 보 배치 비교 ---------- */
+(function () {
+  const gl = CB.range("fl-l-l", (v) => v.toFixed(1) + " m", go), gq = CB.range("fl-l-q", (v) => v.toFixed(1) + " kN/m²", go), sel = CB.seg("fl-l-sel", go);
+  const NAMES = ["플랫 플레이트", "드롭 패널", "큰보 + 2방향", "작은보 1줄", "작은보 2줄"], fy = 500;
+  let O;
+  function solve() {
+    const l = gl(), q = gq(), ok = (h, dp) => FL.punch({ pos: "int", l, h: Math.round(h * 1000), c: 800, drop: dp > 0, hdp: Math.round(dp * 1000), L: q }).ratio <= 1;
+    const out = [], hb = Math.max(FL.ceil(l / 12, 0.05), 0.5), hsb = Math.max(FL.ceil(l / 15, 0.05), 0.4);
+    let h = Math.max(FL.ceil((l - 0.8) / 31, 0.01), 0.125); while (!ok(h, 0) && h < 0.6) h += 0.01;
+    out.push({ h, beam: 0, depth: h, vol: h, note: "처짐 ℓn/31 또는 뚫림 전단" });
+    let h1 = Math.max(FL.ceil((l - 0.8) / 34, 0.01), 0.1), dp = FL.ceil(h1 / 4, 0.01); while (!ok(h1, dp) && h1 < 0.6) { h1 += 0.01; dp = FL.ceil(h1 / 4, 0.01); }
+    out.push({ h: h1, beam: 0, depth: h1 + dp, vol: h1 + (dp * (l / 3) ** 2) / (l * l), note: `드롭 ${Math.round(dp * 1000)} mm × ℓ/3` });
+    const h2 = Math.max(FL.ceil(((l - 0.4) * (0.8 + fy / 1400)) / 45, 0.01), 0.09);
+    out.push({ h: h2, beam: hb, depth: hb, vol: h2 + (2 * l * 0.4 * (hb - h2)) / (l * l), note: "ℓn(0.8 + fy/1400)/45" });
+    [1, 2].forEach((n) => {
+      const sp = l / (n + 1), hh = Math.max(FL.ceil((sp / 28) * (0.43 + fy / 700), 0.01), 0.1);
+      out.push({ h: hh, beam: hb, depth: hb, vol: hh + (2 * l * 0.4 * (hb - hh) + n * l * 0.3 * (hsb - hh)) / (l * l), note: `1방향 경간 ${sp.toFixed(2)} m, 작은보 ${Math.round(hsb * 1000)}` });
+    });
+    O = out;
+  }
+  solve();
+  const cv = CB.canvas("#fl-cv-lay", (ctx, W, H) => {
+    const pal = CB.palette(), left = W < 520 ? 92 : 112, right = W - 16, top = 26, rh = (H - top - 34) / 5, mxV = Math.max(...O.map((o) => o.vol)) * 1.15, mxD = Math.max(...O.map((o) => o.depth)) * 1.15, s = +sel();
+    FL.text(ctx, "환산 콘크리트 두께 (mm)", left, 12, pal.accent, { size: 11, align: "left", mono: false });
+    FL.text(ctx, "구조 깊이 (mm)", right, 12, pal.accent2, { size: 11, align: "right", mono: false });
+    O.forEach((o, i) => {
+      const y = top + i * rh, on = i === s;
+      if (on) { ctx.save(); ctx.fillStyle = pal.accent; ctx.globalAlpha = 0.07; ctx.fillRect(4, y, W - 8, rh - 2); ctx.restore(); }
+      FL.text(ctx, NAMES[i], left - 8, y + rh * 0.42, on ? pal.text : pal.dim, { size: W < 520 ? 10.5 : 11.5, align: "right", mono: false, bold: on });
+      const wv = ((right - left) * o.vol) / mxV, wd = ((right - left) * o.depth) / mxD;
+      ctx.save(); ctx.globalAlpha = on ? 0.85 : 0.45; ctx.fillStyle = pal.accent; ctx.fillRect(left, y + 4, wv, rh * 0.34); ctx.fillStyle = pal.accent2; ctx.fillRect(left, y + 6 + rh * 0.34, wd, rh * 0.34); ctx.restore();
+      FL.text(ctx, String(Math.round(o.vol * 1000)), left + wv + 4, y + 4 + rh * 0.17, pal.accent, { size: 10.5, align: "left" });
+      FL.text(ctx, String(Math.round(o.depth * 1000)), left + wd + 4, y + 6 + rh * 0.51, pal.accent2, { size: 10.5, align: "left" });
+    });
+    FL.text(ctx, `정사각 구획 ${gl().toFixed(1)} m, L = ${gq().toFixed(1)} kN/m²`, W - 10, H - 10, pal.dim, { size: 11, align: "right", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.56), minHeight: 260, maxHeight: 380 });
+  function go() {
+    solve(); cv.redraw();
+    const o = O[+sel()];
+    CB.stat("fl-l-h", Math.round(o.h * 1000) + " mm"); CB.stat("fl-l-b", o.beam ? Math.round(o.beam * 1000) + " mm" : "없음");
+    CB.stat("fl-l-d", Math.round(o.depth * 1000) + " mm"); CB.stat("fl-l-v", Math.round(o.vol * 1000) + " mm");
+    const best = O.reduce((b, x, i) => (x.vol < O[b].vol ? i : b), 0), shallow = O.reduce((b, x, i) => (x.depth < O[b].depth ? i : b), 0);
+    document.getElementById("fl-l-msg").innerHTML = `${NAMES[+sel()]}: ${o.note}. 콘크리트가 가장 적은 형식은 <b>${NAMES[best]}</b>(${Math.round(O[best].vol * 1000)} mm), 구조 깊이가 가장 얕은 형식은 <b>${NAMES[shallow]}</b>(${Math.round(O[shallow].depth * 1000)} mm)입니다. 층마다 구조 깊이 차이 × 층수만큼 건물 높이와 외장 면적이 달라진다.`;
+  }
+  go();
+})();
+
+/* ---------- 6. 데크 합성 슬래브 ---------- */
+(function () {
+  const ghr = CB.seg("fl-k-hr", go), gtc = CB.range("fl-k-tc", (v) => v + " mm", go), gp = CB.seg("fl-k-p", go), gw = CB.range("fl-k-w", (v) => v.toFixed(2), go), gt = CB.seg("fl-k-t", go);
+  const n = 200000 / 27500;
+  let S;
+  function solve() {
+    const hr = +ghr(), tc = gtc(), p = +gp(), wa = gw() * p, t = +gt(), ribs = 1000 / p, wb = 0.8 * wa, wt = Math.min(1.2 * wa, 0.92 * p);
+    const slant = Math.hypot(hr, (wt - wb) / 2), dev = ribs * (wb + 2 * slant + (p - wt));
+    const conc = [{ x: -500, y: hr, b: 1000, h: tc }, { x: -(ribs * wa) / 2, y: 0, b: ribs * wa, h: hr }];
+    const steel = [{ x: -(ribs * wb) / 2, y: 0, b: ribs * wb, h: t, n }, { x: -(ribs * (p - wt)) / 2, y: hr - t, b: ribs * (p - wt), h: t, n }, { x: -ribs * t * (slant / hr), y: 0, b: 2 * ribs * t * (slant / hr), h: hr, n }];
+    const sec = CB.section.rects([...conc, ...steel]), Ac = 1000 * tc + ribs * wa * hr;
+    const w = (Ac / 1e6) * 24 + (dev * t / 1e6) * 78.5, heq = Ac / 1000, Ieq = (1000 * heq ** 3) / 12;
+    S = { hr, tc, p, wa, wb, wt, t, sec, w, heq, Ieq, ratio: sec.Ix / Ieq, Ac };
+  }
+  solve();
+  const cv = CB.canvas("#fl-cv-deck", (ctx, W, H) => {
+    const pal = CB.palette(), { hr, tc, p, wb, wt, sec } = S, show = Math.min(3, Math.max(2, Math.floor(700 / p))) * p, s = Math.min((W - 150) / show, (H - 70) / (hr + tc));
+    const x0 = (W - show * s) / 2, yb = H / 2 + ((hr + tc) * s) / 2, X = (x) => x0 + x * s, Y = (y) => yb - y * s;
+    // 콘크리트 외곽: 토핑 + 골
+    ctx.save(); ctx.fillStyle = CB.color("accent-soft"); ctx.strokeStyle = pal.text; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(X(0), Y(hr + tc)); ctx.lineTo(X(show), Y(hr + tc)); ctx.lineTo(X(show), Y(hr));
+    const deck = [];
+    for (let k = Math.ceil(show / p); k >= 0; k--) {
+      const c = k * p + p / 2; // 골 중심
+      const pts = [[c + wt / 2, hr], [c + wb / 2, 0], [c - wb / 2, 0], [c - wt / 2, hr]];
+      pts.forEach(([x, y]) => { const xx = CB.clamp(x, 0, show); deck.push([xx, y]); });
+    }
+    deck.forEach(([x, y]) => ctx.lineTo(X(x), Y(y)));
+    ctx.lineTo(X(0), Y(hr)); ctx.closePath(); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.strokeStyle = pal.accent2; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(X(show), Y(hr)); deck.forEach(([x, y]) => ctx.lineTo(X(x), Y(y))); ctx.lineTo(X(0), Y(hr)); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(X(0), Y(hr + tc)); ctx.lineTo(X(show), Y(hr + tc)); ctx.stroke(); ctx.restore();
+    // 중립축
+    ctx.save(); ctx.strokeStyle = pal.accent; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(X(0) - 20, Y(sec.cy)); ctx.lineTo(X(show) + 20, Y(sec.cy)); ctx.stroke(); ctx.restore();
+    FL.text(ctx, `중립축 ${sec.cy.toFixed(0)} mm`, X(show) + 2, Y(sec.cy) - 10, pal.accent, { size: 11, align: "right" });
+    FL.text(ctx, `tc = ${tc}`, X(0) + 6, Y(hr + tc / 2), pal.dim, { size: 11, align: "left" });
+    FL.text(ctx, `hr = ${hr}`, X(0) - 6, Y(hr / 2), pal.dim, { size: 11, align: "right" });
+    FL.text(ctx, `p = ${p} mm · 데크 ${S.t} mm (주황)`, W / 2, H - 12, pal.dim, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.36), minHeight: 190, maxHeight: 260 });
+  function go() {
+    solve(); cv.redraw();
+    CB.stat("fl-k-w8", S.w.toFixed(2) + " kN/m²"); CB.stat("fl-k-i", CB.sig(S.sec.Ix / 1e6) + " × 10⁶ mm⁴");
+    CB.stat("fl-k-y", S.sec.cy.toFixed(0) + " mm"); CB.stat("fl-k-r", S.ratio.toFixed(2) + "배 <small>(평판 " + S.heq.toFixed(0) + " mm)</small>");
+  }
+  go();
+})();
+
+/* ---------- 7. 슬래브 처짐 ---------- */
+(function () {
+  const gL = CB.range("fl-f-l", (v) => v.toFixed(2) + " m", go), gh = CB.range("fl-f-h", (v) => v + " mm", go), sup = CB.seg("fl-f-sup", go), gr = CB.range("fl-f-r", (v) => v.toFixed(2) + " %", go), gq = CB.range("fl-f-q", (v) => v.toFixed(1) + " kN/m²", go), xi = CB.seg("fl-f-xi", go);
+  const Ec = 2.75e7, fr = 3450, n = 200000 / 27500;
+  let S;
+  function solve() {
+    const L = gL(), h = gh() / 1000, rho = gr() / 100, q = gq(), D = 24 * h + 1.5, w = D + q, wsus = D + 0.25 * q, Ig = h ** 3 / 12;
+    const types = { ss: ["pin", "roller"], fp: ["fixed", "roller"], ff: ["fixed", "fixed"] }[sup()];
+    const b = CB.beam({ L, EI: Ec * Ig, supports: [{ x: 0, type: types[0] }, { x: L, type: types[1] }], loads: [{ type: "udl", w, a: 0, b: L }] });
+    const ex = b.extremes(), Ma = Math.max(Math.abs(ex.Mmax.v), Math.abs(ex.Mmin.v)), dg = Math.max(Math.abs(ex.vmin.v), Math.abs(ex.vmax.v));
+    const d = h - 0.035, rn = rho * n, k = Math.sqrt(2 * rn + rn * rn) - rn, kd = k * d, As = rho * d, Icr = kd ** 3 / 3 + n * As * (d - kd) ** 2;
+    const Mcr = (fr * Ig) / (h / 2), m3 = Ma > Mcr ? (Mcr / Ma) ** 3 : 1, Ie = Math.min(Ig, m3 * Ig + (1 - m3) * Icr);
+    const dDL = dg * (Ig / Ie), dL = (dDL * q) / w, dS = (dDL * wsus) / w, after = +xi() * dS + dL;
+    S = { L, h, b, Ig, Ie, Icr, Ma, Mcr, dDL, dL, dS, after, w };
+  }
+  solve();
+  const cv = CB.canvas("#fl-cv-defl", (ctx, W, H) => {
+    const pal = CB.palette(), { L, b, dDL, after } = S, x0 = 46, x1 = W - 30, y0 = 56, lim240 = L / 240, lim480 = L / 480;
+    const big = Math.max(lim240, after) * 1.1, sc = (H - y0 - 40) / big, pts = b.sample(160), vmax = Math.max(...pts.map((p) => Math.abs(p.v))) || 1;
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke(); ctx.restore();
+    const supT = { ss: ["pin", "roller"], fp: ["fixed", "roller"], ff: ["fixed", "fixed"] }[sup()];
+    [[x0, supT[0]], [x1, supT[1]]].forEach(([x, t]) => {
+      ctx.save(); ctx.strokeStyle = pal.text; ctx.fillStyle = pal.surface; ctx.lineWidth = 1.6;
+      if (t === "fixed") { ctx.fillRect(x - 5, y0 - 18, 10, 36); ctx.strokeRect(x - 5, y0 - 18, 10, 36); }
+      else { ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x - 9, y0 + 14); ctx.lineTo(x + 9, y0 + 14); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+      ctx.restore();
+    });
+    [[lim480, pal.warn, `ℓ/480 = ${(lim480 * 1000).toFixed(1)} mm`], [lim240, pal.bad, `ℓ/240 = ${(lim240 * 1000).toFixed(1)} mm`]].forEach(([v, c, t]) => {
+      const y = y0 + v * sc; ctx.save(); ctx.strokeStyle = c; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.restore();
+      FL.text(ctx, t, x1, y - 8, c, { size: 10.5, align: "right" });
+    });
+    const curve = (amp, color, dash) => { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 2.2; ctx.setLineDash(dash); ctx.beginPath(); pts.forEach((p, i) => { const X = x0 + ((x1 - x0) * p.x) / L, Y = y0 + (Math.abs(p.v) / vmax) * amp * sc; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke(); ctx.restore(); };
+    curve(dDL, pal.dim, [3, 3]); curve(after, pal.accent, [6, 4]);
+    FL.text(ctx, `즉시 D+L ${(dDL * 1000).toFixed(1)} mm`, x0 + 6, y0 - 24, pal.dim, { size: 11, align: "left" });
+    FL.text(ctx, `부착 후 ${(after * 1000).toFixed(1)} mm`, x0 + 6, y0 - 10, pal.accent, { size: 11, align: "left" });
+    FL.text(ctx, "처짐은 과장(같은 축척)", x1, y0 - 24, pal.faint, { size: 10.5, align: "right", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.38), minHeight: 200, maxHeight: 280 });
+  function go() {
+    solve(); cv.redraw();
+    const { L, Ie, Ig, dL, after, Ma, Mcr, Icr } = S, okL = dL <= L / 360, ok480 = after <= L / 480, ok240 = after <= L / 240;
+    CB.stat("fl-f-ie", (Ie / Ig).toFixed(2)); CB.stat("fl-f-dl", (dL * 1000).toFixed(1) + " mm"); CB.stat("fl-f-da", (after * 1000).toFixed(1) + " mm");
+    CB.stat("fl-f-ok", `<span style="color:var(--${okL ? "ok" : "bad"})">${okL ? "✓" : "✗"}</span> · <span style="color:var(--${ok480 ? "ok" : ok240 ? "warn" : "bad"})">${ok480 ? "✓" : ok240 ? "ℓ/240만" : "✗"}</span>`);
+    const msg = document.getElementById("fl-f-msg");
+    msg.className = "fl-msg " + (okL && ok480 ? "ok" : ok240 && okL ? "" : "bad");
+    msg.innerHTML = `M<sub>a</sub> = ${Ma.toFixed(1)} kN·m ${Ma > Mcr ? "&gt;" : "≤"} M<sub>cr</sub> = ${Mcr.toFixed(1)} kN·m → ${Ma > Mcr ? `균열, I<sub>cr</sub> = ${(Icr / Ig).toFixed(2)}I<sub>g</sub>, I<sub>e</sub> = ${(Ie / Ig).toFixed(2)}I<sub>g</sub>` : "균열 전, I<sub>e</sub> = I<sub>g</sub>"}. 부착 후 처짐 ${(after * 1000).toFixed(1)} mm = ℓ/${Math.round(L / Math.max(after, 1e-9))} — ${ok480 ? "칸막이를 받쳐도 통과(ℓ/480)" : ok240 ? "손상되기 쉬운 칸막이를 받치면 불합격, 아니면 통과(ℓ/240)" : "ℓ/240도 넘는다: 두께·지지 조건을 바꾼다"}.`;
+  }
+  go();
+})();
+
+/* ---------- 8. 바닥 진동 ---------- */
+(function () {
+  const sys = CB.seg("fl-v-sys", go), gL = CB.range("fl-v-l", (v) => v.toFixed(1) + " m", go), gh = CB.range("fl-v-h", (v) => v + " mm", go), gb = CB.seg("fl-v-b", go), use = CB.seg("fl-v-use", go);
+  const Ec = 2.75e7, Es = 2.0e8;
+  let S;
+  function solve() {
+    const L = gL(), h = gh() / 1000, sy = sys(), Dp = (Ec * h ** 3) / (12 * 0.96);
+    let q = 24 * h + 1.5 + 0.5, delta, parts, extra = "";
+    if (sy === "rc") {
+      const hb = Math.max(FL.ceil(L / 12, 0.05), 0.5), proj = Math.min(hb - h, 4 * h);
+      const I = CB.section.rects([{ x: -200, y: 0, b: 400, h: (hb - h) * 1000 }, { x: -200 - proj * 1000, y: (hb - h) * 1000, b: 400 + 2 * proj * 1000, h: h * 1000 }]).Ix / 1e12;
+      const ds = (0.00126 * q * (L - 0.4) ** 4) / Dp, wl = (q * L) / 2 + 24 * 0.4 * Math.max(hb - h, 0), db = (wl * L ** 4) / (384 * Ec * I);
+      delta = ds + db; parts = [ds, db]; extra = `보 400 × ${Math.round(hb * 1000)}`;
+    } else if (sy === "fp") {
+      delta = (0.0058 * q * L ** 4) / Dp; parts = [delta, 0];
+    } else {
+      const dmm = Math.max(FL.ceil((L * 1000) / 22, 10), 250), H = CB.section.H(dmm, 200, 10, 16), nd = 200000 / (1.35 * 27500);
+      const comp = CB.section.rects([...H.rects, { x: -1500, y: dmm, b: 3000, h: h * 1000, n: 1 / nd }]), I = comp.Ix / 1e12, ws = (H.A / 1e6) * 77;
+      q += ws / 3; const wl = q * 3; delta = (5 * wl * L ** 4) / (384 * Es * I); parts = [0, delta]; extra = `H-${dmm} × 200 × 10 × 16 @ 3 m`;
+    }
+    const dmm = delta * 1000, fn = 18 / Math.sqrt(Math.max(dmm, 1e-6)), W = q * L * L, beta = +gb(), ap = (0.29 * Math.exp(-0.35 * fn)) / (beta * W);
+    S = { L, h, q, delta: dmm, parts, fn, W, beta, ap, a0: +use(), extra, sy };
+  }
+  solve();
+  const cv = CB.canvas("#fl-cv-vib", (ctx, W, H) => {
+    const pal = CB.palette(), { W: Wt, beta, fn, ap, a0 } = S, curve = [];
+    for (let f = 1; f <= 20.001; f += 0.1) curve.push([f, (100 * 0.29 * Math.exp(-0.35 * f)) / (beta * Wt)]);
+    const bands = [1, 2, 3, 4].map((k) => ({ x0: 1.6 * k, x1: Math.min(2.4 * k, 20), color: FL.alpha(pal.accent2, k === 1 ? 0.18 : 0.1) }));
+    CB.chart(ctx, null, { x: [1, 20], y: [0.001, 10], logY: true, xLabel: "고유 진동수 (Hz)", yLabel: "보행 가속도 a/g (%)",
+      bands, series: [{ data: curve, color: pal.accent, width: 2.2 }],
+      hlines: [{ y: a0 * 100, color: pal.bad, label: `한계 ${a0 * 100} %` }],
+      vlines: [{ x: 3, color: pal.bad, label: "3 Hz" }, { x: 8, color: pal.warn, label: "8 Hz" }, { x: 9, color: pal.dim }],
+      points: [{ x: CB.clamp(fn, 1, 20), y: CB.clamp(ap * 100, 0.0011, 9.9), color: ap > a0 || fn < 3 ? pal.bad : pal.ok, r: 6, label: `${fn.toFixed(1)} Hz` }] });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.46), minHeight: 230, maxHeight: 320 });
+  function go() {
+    solve(); cv.redraw();
+    const { delta, fn, W, ap, a0, parts, extra, sy } = S, bad = fn < 3 || ap > a0;
+    CB.stat("fl-v-d", delta.toFixed(2) + " mm"); CB.stat("fl-v-f", fn.toFixed(1) + " Hz"); CB.stat("fl-v-w", CB.sig(W) + " kN");
+    CB.stat("fl-v-a", `<span style="color:var(--${bad ? "bad" : "ok"})">${(ap * 100).toFixed(3)} %</span>`);
+    const msg = document.getElementById("fl-v-msg"), harm = [1, 2, 3, 4].find((k) => fn >= 1.6 * k && fn <= 2.4 * k);
+    msg.className = "fl-msg " + (bad ? "bad" : "ok");
+    const comp = sy === "rc" ? `판 ${(parts[0] * 1000).toFixed(2)} + 보 ${(parts[1] * 1000).toFixed(2)} mm (${extra})` : sy === "st" ? `강 합성보 ${extra}` : "기둥 지지 판";
+    msg.innerHTML = `${comp}. ${fn < 3 ? "고유 진동수가 3 Hz 미만: 매우 유연한 바닥, 강성을 키운다." : ap > a0 ? `보행 가속도 ${(ap * 100).toFixed(2)} %가 한계 ${a0 * 100} %를 넘는다.` : fn > 9 ? "고진동수 바닥(9 Hz 초과): 공진 가속도 식은 참고값이며 강성·충격 응답으로 따로 본다." : "보행 가속도가 한계 안."}${harm ? ` 보행 ${harm}차 고조파 대역(${(1.6 * harm).toFixed(1)}–${(2.4 * harm).toFixed(1)} Hz)과 겹친다.` : ""}`;
+  }
+  go();
+})();
+</script>
+</body>
+</html>

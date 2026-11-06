@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>설계 하중과 하중 조합 · StructureBook</title>
+<meta name="description" content="무엇을 얼마나 견뎌야 하나. 하중의 분류와 지속 시간, 고정하중 산정, 용도별 활하중과 활하중 저감, 부분 재하, 적설 하중, 풍·지진 하중 개요, 하중 조합과 하중 계수, 신뢰도 지수 β, 기준 건물 B-10 기둥 C1의 층별 하중 집계를 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .ld-stack { display: grid; grid-template-columns: 1fr; }
+  .ld-stack > div { position: relative; min-width: 0; }
+  .ld-stack > div + div { border-top: 1px solid var(--border); }
+  .ld-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .ld-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .ld-msg b { color: var(--text); }
+  .ld-msg.ok { color: var(--ok); font-weight: 600; }
+  .ld-msg.bad { color: var(--bad); font-weight: 600; }
+  .ld-tbl td, .ld-tbl th { font-variant-numeric: tabular-nums; }
+  .ld-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .ld-checks { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .ld-spans { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ld-spans button { flex: 1 1 0; min-width: 52px; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="structure"></script>
+</head>
+<body data-chapter="loads">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="ld-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="ld-ah-react" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="ld-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="ld-ah-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+      <marker id="ld-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 02</div>
+    <h1 data-no-glossary>설계 하중과 하중 조합</h1>
+    <p class="lead">MechanicsBook 1장에서 우리는 B-10의 바닥 하중 11.8 kN/m²가 1층 기둥에서 약 9,000 kN이 되는 것을 따라갔습니다. 그 숫자에는 질문이 여럿 숨어 있습니다. 6.5 kN/m²라는 고정하중은 무엇을 더한 값일까요? 열 개 층의 사무실이 동시에 사람으로 가득 찰 수 있을까요? 지붕에 쌓인 눈, 옆에서 미는 바람, 땅의 흔들림은 언제 함께 오고 언제 따로 올까요? 그리고 1.2와 1.6이라는 계수는 어디서 왔을까요? 이 장은 하중을 <b>정하는</b> 법을 다룹니다. 층마다 재료를 쌓아 고정하중을 만들고, 용도별 활하중을 기여 면적에 따라 줄이고, 연속보에 활하중을 골라 놓아 가장 나쁜 경우를 찾고, 여러 하중을 계수와 함께 조합하고, 그 계수가 파괴 확률과 어떻게 이어지는지 계산합니다. 마지막에 B-10 기둥 C1의 하중을 층마다 다시 쌓습니다.</p>
+    <ul class="objectives">
+      <li>하중을 고정·활·적설·풍·지진·기타로 나누고, 하중의 <b>지속 시간</b>이 크리프·동적 응답·하중 조합에 주는 영향을 설명한다.</li>
+      <li>재료 단위중량 × 두께로 바닥의 고정하중을 층층이 쌓아 계산하고, B-10 바닥 D = 6.5 kN/m²를 재현한다.</li>
+      <li>용도별 활하중을 쓰고, <b>영향면적</b>에 따른 활하중 저감 계수 C = 0.3 + 4.2/√A<sub>I</sub>(KDS 형태)와 하한을 적용한다.</li>
+      <li>연속보에서 활하중의 <b>부분 재하</b>가 정·부 휨모멘트를 키우는 원리를 알고 CB.beam으로 가장 나쁜 배치를 찾는다.</li>
+      <li>평지붕·경사 지붕·단차 지붕의 적설 하중 분포를 개략 계산하고, 풍하중·지진 하중의 크기를 B-10에서 비교한다.</li>
+      <li>KDS 형태의 하중 조합으로 지배 조합을 찾고 0.9D 조합으로 들림·인장을 검토하며, 신뢰도 지수 β와 파괴 확률로 하중 계수의 뜻을 설명한다.</li>
+      <li>B-10 기둥 C1의 고정·활하중을 층별로 집계하고 활하중 저감 전후의 계수 축력(약 9,210 → 7,670 kN)을 계산한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>안전율 하나로 모든 불확실성을 덮던 시대</b></div>
+      <div class="o-body"><p>20세기 중반까지 대부분의 구조 설계는 재료가 견디는 응력을 하나의 안전율로 나눈 허용응력에 맞췄습니다. 잘 아는 자중과, 얼마나 올지 모르는 사람·눈·바람에 같은 여유를 준 셈입니다. 콘크리트 기준은 1960년대부터 하중에 계수를 곱해 부재의 극한 강도와 비교하는 <b>강도 설계</b>를 받아들였고, 1970년대에는 하중과 저항을 확률 변수로 보고 파괴 확률을 계산하는 구조 신뢰성 이론이 자리를 잡았습니다. 1980년 무렵 미국에서 엘링우드(Ellingwood) 등이 기존 설계의 신뢰도 지수를 거꾸로 계산해 확률에 근거한 하중 계수와 조합을 제안했고, 강구조의 하중·저항 계수 설계 시방서가 1986년에 나왔습니다. 오늘날 국내 건축물 구조기준(KDS 41)의 하중 조합도 같은 생각 위에 있습니다.</p>
+        <p>하중 계수 1.2와 1.6은 "적당히 키운 값"이 아닙니다. 고정하중과 활하중이 얼마나 흩어지는지, 둘이 동시에 커질 가능성이 얼마인지, 그리고 사회가 받아들이는 파괴 확률이 얼마인지에서 거꾸로 정한 값입니다.</p>
+        <div class="o-chain"><span>하중의 통계와 지속 시간</span><i>→</i><span class="tool">단위중량·활하중 저감·하중 계수·조합·β</span><i>→</i><span>부재마다 가장 불리한 계수 하중</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="classification">
+    <h2>하중의 분류와 지속 시간</h2>
+    <p>하중의 종류와 크기 감각(사람·물·눈·자동차가 몇 kN/m²인가)은 <a href="../../mechanics/chapters/loads.html#load-types">MechanicsBook 1장</a>에서 보았습니다. 설계에서는 여기에 한 가지 질문을 더합니다. <b>그 하중은 얼마나 오래, 얼마나 자주 걸리는가?</b> <span class="term">하중 지속 시간</span>은 세 가지를 바꿉니다. 오래 걸리는 하중은 콘크리트의 크리프와 목재의 강도 저하를 일으키고, 짧고 빠르게 변하는 하중은 구조물을 흔들어 동적 응답을 만들며, 서로 다른 시간 규모의 하중은 최댓값이 동시에 올 가능성이 낮아 조합할 때 줄여 더할 수 있습니다.</p>
+    <div class="callout def"><strong>정의 2.1 (하중의 분류와 기호)</strong> 건축물 구조기준(KDS 41)은 하중을 원인에 따라 나누고 기호를 붙인다(이 책에서 쓰는 형태).
+      <ul style="margin:6px 0 0">
+        <li><span class="term">고정하중</span><span class="en">(dead load)</span> D: 구조체와 마감·설비·고정 칸막이처럼 위치와 크기가 변하지 않는 하중.</li>
+        <li><span class="term">활하중</span><span class="en">(live load)</span> L: 사람·가구·물품처럼 용도에 따라 놓였다 치워지는 하중. 지붕의 유지보수 하중은 따로 <span class="term">지붕 활하중</span> L<sub>r</sub>로 둔다.</li>
+        <li><span class="term">적설 하중</span><span class="en">(snow load)</span> S, 강우 하중 R, <span class="term">풍하중</span><span class="en">(wind load)</span> W, <span class="term">지진 하중</span><span class="en">(earthquake load)</span> E: 환경이 만드는 하중. W와 E는 주로 수평이고 방향이 바뀐다.</li>
+        <li>토압 H, 유체압 F, 온도·수축·크리프·부등 침하의 영향 T: 구속된 변형이나 흙·물이 만드는 하중.</li>
+      </ul></div>
+    <figure class="diagram" id="fig-ld-duration">
+      <svg viewBox="0 0 860 300" role="img" aria-label="하중의 지속 시간: 초에서 50년까지 로그 시간 축 위의 고정, 활, 적설, 풍, 지진 하중의 시간 규모">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <line x1="150" y1="240" x2="820" y2="240" class="s-axis"/>
+        <g class="t-mono" text-anchor="middle"><text x="160" y="258">1초</text><text x="270" y="258">1분</text><text x="380" y="258">1시간</text><text x="480" y="258">1일</text><text x="590" y="258">1달</text><text x="680" y="258">1년</text><text x="800" y="258">50년</text></g>
+        <g style="stroke:var(--grid)"><line x1="160" y1="40" x2="160" y2="240"/><line x1="270" y1="40" x2="270" y2="240"/><line x1="380" y1="40" x2="380" y2="240"/><line x1="480" y1="40" x2="480" y2="240"/><line x1="590" y1="40" x2="590" y2="240"/><line x1="680" y1="40" x2="680" y2="240"/><line x1="800" y1="40" x2="800" y2="240"/></g>
+        <g class="t" text-anchor="end"><text x="140" y="60">고정하중 D</text><text x="140" y="94">활하중 L(지속)</text><text x="140" y="124">활하중 L(일시)</text><text x="140" y="158">적설 S</text><text x="140" y="192">풍하중 W</text><text x="140" y="226">지진 E</text></g>
+        <rect x="160" y="48" width="640" height="18" rx="4" style="fill:var(--text-dim);opacity:.55"/>
+        <rect x="590" y="82" width="210" height="18" rx="4" style="fill:var(--accent);opacity:.6"/>
+        <rect x="330" y="112" width="160" height="18" rx="4" style="fill:var(--accent);opacity:.35"/>
+        <rect x="470" y="146" width="150" height="18" rx="4" style="fill:var(--accent-2);opacity:.55"/>
+        <rect x="160" y="180" width="250" height="18" rx="4" style="fill:var(--blue);opacity:.5"/>
+        <rect x="185" y="214" width="105" height="18" rx="4" style="fill:var(--bad);opacity:.5"/>
+        <g class="t-dim"><text x="808" y="62">구조물 수명 내내</text><text x="604" y="96" text-anchor="end">입주자의 가구·물품</text><text x="500" y="126">행사·이사·군중</text><text x="628" y="160">겨울 몇 주</text><text x="418" y="194">돌풍 수 초 · 폭풍 몇 시간</text><text x="298" y="228">강진동 수십 초</text></g>
+        <text x="480" y="282" text-anchor="middle" class="t-dim">길게 걸리는 하중 → 크리프·장기 처짐, 짧게 변하는 하중 → 동적 응답, 시간 규모가 다른 하중 → 최댓값이 함께 올 가능성이 낮다</text>
+      </svg>
+      <figcaption><b>그림 2-1.</b> 하중의 지속 시간(로그 시간 축, 개략). 고정하중과 지속 활하중은 장기 처짐(3·15장)을, 바람과 지진은 동적 응답(6·7장)을 만든다. 하중 조합이 "주 하중 하나 + 나머지는 평소 값"의 꼴인 것도 이 시간 규모의 차이 때문이다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="dead">
+    <h2>고정하중 산정</h2>
+    <div class="problem"><strong>6.5 kN/m²는 무엇을 더한 값인가</strong>
+      <p>B-10의 구조 계산서에는 기준층 바닥 고정하중이 6.5 kN/m²로 적혀 있습니다. 슬래브 210 mm만으로 5.04 kN/m²입니다. 나머지 약 1.5 kN/m²는 무엇일까요? 임차인이 바닥에 석재를 깔겠다고 하면 몇이 될까요?</p></div>
+    <p>고정하중은 층을 아래에서 위로 쌓아 계산합니다. 각 층의 <span class="term">단위중량</span><span class="en">(unit weight)</span>(kN/m³)에 두께(m)를 곱하면 면 하중(kN/m²)이 되고, 천장·설비처럼 두께로 말하기 어려운 것은 면적당 무게를 그대로 더합니다.</p>
+    <div class="callout def"><strong>원리 2.2 (고정하중의 산정)</strong> 바닥의 고정하중은 구성 층의 무게를 더한 값이다.
+      <div class="formula">$$D = \sum_i \gamma_i\, t_i + \sum_j q_j \quad (\text{kN/m}^2)$$<div class="where">\(\gamma_i\): 층 \(i\)의 단위중량(kN/m³), \(t_i\): 두께(m), \(q_j\): 천장·설비·고정 칸막이처럼 면적당 무게로 주는 항목(kN/m²). 보·기둥·벽의 자중은 부재의 단면적 × 단위중량(kN/m)으로 따로 더한다. 계산에는 설계 도서의 실제 사양을 쓰고, 사양이 정해지지 않은 항목은 기준의 값이나 보수적 가정을 쓴다.</div></div></div>
+    <div class="table-wrap"><table class="ld-tbl">
+      <thead><tr><th>재료·항목</th><th>단위중량 또는 면 하중(교육용 대표값)</th><th>메모</th></tr></thead>
+      <tbody>
+        <tr><td>철근콘크리트</td><td class="hl">24 kN/m³</td><td>B-10 슬래브 0.21 × 24 = 5.04 kN/m²</td></tr>
+        <tr><td>시멘트 모르타르</td><td>약 20 kN/m³</td><td>바닥 미장 50 mm → 약 1.0 kN/m²</td></tr>
+        <tr><td>석재(화강석)</td><td>약 26–27 kN/m³</td><td>30 mm 판 → 약 0.8 kN/m²</td></tr>
+        <tr><td>강재</td><td>77–78.5 kN/m³</td><td>H-600×200 약 1.0 kN/m</td></tr>
+        <tr><td>천장(경량 철골 + 석고보드) · 조명</td><td>약 0.2 kN/m²</td><td>사양에 따라 다름</td></tr>
+        <tr><td>덕트·배관·스프링클러</td><td>약 0.3 kN/m²</td><td>기계실·전산실은 훨씬 큼</td></tr>
+        <tr><td>이중 바닥(OA 플로어)</td><td>약 0.5 kN/m²</td><td>사양에 따라 다름</td></tr>
+        <tr><td>커튼월(외벽 면적당)</td><td>약 0.5–1.0 kN/m²</td><td>외곽 보·기둥에 선 하중으로</td></tr>
+      </tbody></table></div>
+    <p>표의 값은 교육용 대표값입니다. 재료 단위중량은 KDS 41 12 00의 표와 제품 자료를 확인합니다. 칸막이는 위치가 고정된 벽이면 고정하중이고, 사무실처럼 위치가 바뀌는 경량 칸막이는 기준이 정하는 칸막이 하중(면 하중 형태)으로 따로 더합니다(값은 현행 기준 확인).</p>
+    <figure class="diagram" id="fig-ld-layers">
+      <svg viewBox="0 0 860 280" role="img" aria-label="B-10 기준층 바닥의 구성 층과 각 층의 무게: 마감, 모르타르, 슬래브, 천장과 설비">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <rect x="0" y="0" width="420" height="10" style="fill:var(--accent-2);opacity:.6"/>
+          <rect x="0" y="10" width="420" height="40" style="fill:var(--text-faint);opacity:.55"/>
+          <rect x="0" y="50" width="420" height="84" style="fill:var(--text-dim);opacity:.5;stroke:var(--text)"/>
+          <g style="stroke:var(--tension);stroke-width:2.4"><line x1="10" y1="68" x2="410" y2="68"/><line x1="10" y1="118" x2="410" y2="118"/></g>
+          <g style="stroke:var(--text-dim);stroke-width:1.4"><line x1="60" y1="134" x2="60" y2="170"/><line x1="200" y1="134" x2="200" y2="170"/><line x1="340" y1="134" x2="340" y2="170"/></g>
+          <rect x="30" y="152" width="120" height="12" rx="6" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <rect x="240" y="150" width="70" height="16" rx="3" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <rect x="0" y="170" width="420" height="10" style="fill:var(--bg-elev);stroke:var(--text-dim)"/>
+          <g class="t-mono"><text x="430" y="10">타일 마감</text><text x="430" y="34">타일 + 모르타르 50 mm ≈ 1.0</text><text x="430" y="96">슬래브 210 mm × 24 = 5.04</text><text x="430" y="162">덕트·배관 0.3</text><text x="430" y="182">천장·조명 0.2</text></g>
+          <line x1="-14" y1="0" x2="-14" y2="180" class="s-line" marker-start="url(#ld-ah-dim)" marker-end="url(#ld-ah-dim)"/>
+          <text x="-20" y="94" text-anchor="end" class="t-mono">층고</text>
+        </g>
+        <g transform="translate(660,60)">
+          <text x="0" y="0" class="t" style="font-weight:700">합계(교육용)</text>
+          <text x="0" y="30" class="t-mono">5.04 + 1.0 + 0.3 + 0.2</text>
+          <text x="0" y="56" class="t-mono" style="fill:var(--accent);font-weight:700">D = 6.54 ≈ 6.5 kN/m²</text>
+          <text x="0" y="92" class="t-dim">계수 하중</text>
+          <text x="0" y="114" class="t-mono">1.2 × 6.5 + 1.6 × 2.5</text>
+          <text x="0" y="136" class="t-mono" style="fill:var(--accent-2)">= 11.8 kN/m²</text>
+          <text x="0" y="172" class="t-dim">슬래브 자중이 77 %</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-2.</b> B-10 기준층 바닥의 구성(개략). 마감·모르타르·천장·설비를 합한 약 1.5 kN/m²가 MechanicsBook이 "마감·천장·설비 1.5"로 묶은 값이다. RC 바닥에서는 슬래브 자중이 고정하중의 대부분을 차지하므로 슬래브 두께를 줄이는 것이 가장 큰 절감이다(중공·PT 슬래브, 3장).</figcaption>
+    </figure>
+    <div class="sim" id="sim-ld-dead">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>바닥 하중 쌓기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ld-cv-dead" aria-label="바닥 구성 층의 단면과 고정하중 누적 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>슬래브 두께 <output id="ld-d-t-out"></output></span><input type="range" id="ld-d-t" min="150" max="300" step="10" value="210"></label>
+          <div class="ctrl"><span>바닥 마감</span><div class="seg" id="ld-d-fin"><button data-value="none">없음</button><button data-value="tile" class="on">모르타르 + 타일</button><button data-value="oa">이중 바닥</button><button data-value="stone">석재</button></div></div>
+          <div class="ctrl"><span>슬래브 아래</span><div class="ld-checks">
+            <label class="check"><input type="checkbox" id="ld-d-ceil" checked> 천장·조명 0.2</label>
+            <label class="check"><input type="checkbox" id="ld-d-mep" checked> 덕트·배관 0.3</label>
+            <label class="check"><input type="checkbox" id="ld-d-part"> 이동 칸막이 1.0(교육용)</label></div></div>
+          <div class="ctrl"><span>슬래브 종류</span><div class="seg" id="ld-d-type"><button data-value="1" class="on">일반 RC</button><button data-value="0.75">중공(약 −25 %)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">고정하중 D</span><span class="v" id="ld-d-D">—</span></div>
+        <div class="stat"><span class="k">계수 q<sub>u</sub></span><span class="v" id="ld-d-qu">—</span></div>
+        <div class="stat"><span class="k">G1 w<sub>u</sub></span><span class="v" id="ld-d-w">—</span></div>
+        <div class="stat"><span class="k">C1 1층 N<sub>u</sub></span><span class="v" id="ld-d-n">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-d-msg"></div>
+      <div class="sim-note">해볼 것: 기본값이 B-10(D 6.54 kN/m²)인지 확인하고, 마감을 석재로 바꾸면 1층 기둥 축력이 몇 kN 느는지 보세요 · 슬래브를 210에서 250 mm로 두껍게 하면 무엇이 가장 크게 바뀌나요 · 모델(교육용): 모르타르 50 mm + 타일 약 1.0, 이중 바닥 0.5, 석재 30 mm(27 kN/m³) + 모르타르 40 mm, 중공 슬래브는 자중 약 75 %로 어림, L = 2.5 kN/m², G1은 기여 폭 8 m + 보 자중 0.4 × (0.7 − t) × 24, C1은 10개 층 × 64 m² + 보·기둥 자중(활하중 저감 없음).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="live">
+    <h2>활하중과 활하중 저감</h2>
+    <div class="problem"><strong>열 개 층이 동시에 가득 찰까</strong>
+      <p>사무실 활하중 2.5 kN/m²는 드물게 생길 수 있는 큰 값을 대표합니다. 바닥 한 칸(64 m²)이라면 그만큼 붐빌 수 있습니다. 그런데 B-10의 1층 기둥은 10개 층 × 64 m² = 640 m²를 받칩니다. 640 m² 전부가 같은 순간 2.5 kN/m²로 가득 찰 가능성은 얼마나 될까요?</p></div>
+    <div class="callout def"><strong>정의 2.3 (기본 등분포 활하중)</strong> 용도별로 기준이 정한 면 하중의 대표값을 <span class="term">기본 등분포 활하중</span>이라 한다. 구조물 수명 동안 드물게 나타날 수 있는 큰 값을 목표로 정한 것이며 평균값이 아니다. 기준은 일부 용도에 국부 검토를 위한 <span class="term">집중 활하중</span>도 함께 정한다.</div>
+    <div class="table-wrap"><table class="ld-tbl">
+      <thead><tr><th>용도(예)</th><th>기본 등분포 활하중 (kN/m²)</th><th>저감</th></tr></thead>
+      <tbody>
+        <tr><td>주거(주택·아파트의 거실 등)</td><td>2.0</td><td>가능</td></tr>
+        <tr><td>사무실</td><td class="hl">2.5</td><td>가능</td></tr>
+        <tr><td>학교 교실</td><td>3.0</td><td>가능</td></tr>
+        <tr><td>집회장(이동 좌석)</td><td>5.0</td><td>공중 집회 용도는 저감하지 않는다</td></tr>
+        <tr><td>도서관 서고</td><td>7.5</td><td>5 kN/m² 초과 → 저감 제한</td></tr>
+        <tr><td>옥내 주차장(승용차)</td><td>3.0</td><td>제한(기준 확인)</td></tr>
+      </tbody></table></div>
+    <p>표의 값은 MechanicsBook과 같은 교육용 대표값입니다. 같은 사무실 건물이라도 로비·복도·전산실·기계실은 값이 다르고, 세부 용도와 값은 판에 따라 바뀌므로 현행 KDS 41 12 00의 표를 확인합니다.</p>
+    <p>넓은 면적일수록 그 전체가 동시에 큰 활하중을 받을 가능성이 작습니다. 그래서 기준은 부재가 받는 면적이 넓으면 활하중을 줄여 쓰게 합니다. 이때 면적은 부재가 직접 받는 <span class="term">부하면적</span><span class="en">(tributary area)</span> \(A_T\)가 아니라, 그 위에 하중이 놓였을 때 부재의 단면력에 영향을 주는 더 넓은 <span class="term">영향면적</span><span class="en">(influence area)</span> \(A_I\)로 잽니다.</p>
+    <figure class="diagram" id="fig-ld-influence">
+      <svg viewBox="0 0 860 280" role="img" aria-label="기둥과 보의 부하면적과 영향면적: 기둥은 둘러싼 네 구획, 보는 양쪽 두 구획">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(50,40)">
+          <text x="120" y="-10" text-anchor="middle" class="t" style="font-weight:700">(a) 내부 기둥</text>
+          <rect x="0" y="0" width="240" height="200" class="f-elev"/>
+          <rect x="20" y="20" width="160" height="160" style="fill:color-mix(in srgb, var(--accent-2) 18%, transparent);stroke:var(--accent-2);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <rect x="60" y="60" width="80" height="80" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <g class="s-line" style="stroke:var(--text-dim)"><line x1="20" y1="0" x2="20" y2="200"/><line x1="100" y1="0" x2="100" y2="200"/><line x1="180" y1="0" x2="180" y2="200"/><line x1="0" y1="20" x2="240" y2="20"/><line x1="0" y1="100" x2="240" y2="100"/><line x1="0" y1="180" x2="240" y2="180"/></g>
+          <rect x="94" y="94" width="12" height="12" style="fill:var(--text)"/>
+          <text x="100" y="86" text-anchor="middle" class="t-mono" style="fill:var(--accent)">A_T = 64</text>
+          <text x="100" y="196" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">A_I = 4A_T = 256 m²</text>
+        </g>
+        <g transform="translate(330,40)">
+          <text x="120" y="-10" text-anchor="middle" class="t" style="font-weight:700">(b) 큰보</text>
+          <rect x="0" y="0" width="240" height="200" class="f-elev"/>
+          <rect x="60" y="20" width="80" height="160" style="fill:color-mix(in srgb, var(--accent-2) 18%, transparent);stroke:var(--accent-2);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <rect x="60" y="60" width="80" height="80" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <g class="s-line" style="stroke:var(--text-dim)"><line x1="60" y1="0" x2="60" y2="200"/><line x1="140" y1="0" x2="140" y2="200"/><line x1="0" y1="20" x2="240" y2="20"/><line x1="0" y1="180" x2="240" y2="180"/></g>
+          <line x1="60" y1="100" x2="140" y2="100" style="stroke:var(--text);stroke-width:5"/>
+          <text x="100" y="86" text-anchor="middle" class="t-mono" style="fill:var(--accent)">A_T = 64</text>
+          <text x="100" y="196" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">A_I = 2A_T = 128 m²</text>
+        </g>
+        <g transform="translate(610,60)">
+          <text x="0" y="0" class="t" style="font-weight:700">왜 4배·2배인가</text>
+          <text x="0" y="28" class="t-dim">기둥 위 하중은 둘러싼 네</text>
+          <text x="0" y="48" class="t-dim">구획 어디에 놓여도 그 기둥의</text>
+          <text x="0" y="68" class="t-dim">축력을 키운다(영향선 ≠ 0).</text>
+          <text x="0" y="100" class="t-dim">보는 양쪽 구획의 하중이</text>
+          <text x="0" y="120" class="t-dim">휨모멘트에 영향을 준다.</text>
+          <text x="0" y="156" class="t-mono" style="fill:var(--accent)">실선: 부하면적 A_T</text>
+          <text x="0" y="176" class="t-mono" style="fill:var(--accent-2)">점선: 영향면적 A_I</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-3.</b> 부하면적과 영향면적(경간 8 m 격자). 영향면적은 영향선(MechanicsBook 6장)이 0이 아닌 넓이로, 기둥은 부하면적의 약 4배, 보는 약 2배다. 이 비율을 영향면적 계수라 한다(기준 형태, 확인).</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 2.4 (활하중 저감, KDS 41 12 00 형태)</strong> 영향면적 \(A_I\)가 36 m² 이상인 부재는 기본 등분포 활하중 \(L_0\)에 <span class="term">활하중 저감 계수</span> \(C\)를 곱해 쓸 수 있다.
+      <div class="formula">$$L = C\,L_0, \qquad C = 0.3 + \frac{4.2}{\sqrt{A_I}}, \qquad A_I = K\,A_T$$<div class="where">\(K\): 영향면적 계수(기둥·기초 4, 보 2, 슬래브 1 형태). \(C\)는 1개 층을 지지하는 부재에서 0.5, 2개 층 이상을 지지하는 부재에서 0.4보다 작게 할 수 없다. \(A_I = 36\) m²이면 \(C = 1\)이다. 활하중이 5 kN/m²를 넘는 용도, 공중 집회 용도, 지붕 활하중 등에는 적용하지 않거나 제한한다. 여러 층을 받치는 기둥은 이 책의 모형에서 받치는 모든 층의 영향면적을 더한다. 계수·하한·적용 범위와 다층 부재의 영향면적 정의는 현행 기준을 확인할 것.</div></div></div>
+    <div class="callout"><strong>예제 2.1 (C1의 활하중 저감)</strong> B-10 내부 기둥 C1, \(A_T = 64\) m², \(L_0 = 2.5\) kN/m²(사무실).
+      <ol style="margin:6px 0 0">
+        <li><b>10층 기둥(지붕 한 층만 받침).</b> \(A_I = 4 \times 64 = 256\) m², \(C = 0.3 + 4.2/16 = 0.5625\). 1개 층 하한 0.5보다 크므로 \(C = 0.56\), 활하중 축력 \(0.56 \times 160 = 90\) kN(저감 전 160 kN).</li>
+        <li><b>1층 기둥(10개 층을 받침).</b> \(A_I = 4 \times 64 \times 10 = 2{,}560\) m², \(C = 0.3 + 4.2/50.6 = 0.383\) → 하한 0.4. 활하중 축력 \(0.4 \times 1{,}600 = 640\) kN(저감 전 1,600 kN).</li>
+        <li><b>뜻.</b> 1층 기둥의 활하중 축력이 60 % 준다. 계수 축력으로는 \(1.6 \times 960 = 1{,}536\) kN, 약 17 %의 차이다(예제 2.7). 큰보 G1은 \(A_I = 2 \times 64 = 128\) m²에서 \(C = 0.67\)이다.</li>
+      </ol></div>
+    <div class="sim" id="sim-ld-reduce">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>활하중 저감 계산기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ld-cv-red" aria-label="영향면적에 따른 활하중 저감 계수 곡선과 하한"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>부재</span><div class="seg" id="ld-r-kind"><button data-value="4" class="on">기둥 (K = 4)</button><button data-value="2">보 (K = 2)</button><button data-value="1">슬래브 (K = 1)</button></div></div>
+          <label class="ctrl"><span><span>부하면적 A<sub>T</sub>(한 층)</span> <output id="ld-r-at-out"></output></span><input type="range" id="ld-r-at" min="4" max="150" step="1" value="64"></label>
+          <label class="ctrl"><span>받치는 층 수 <output id="ld-r-n-out"></output></span><input type="range" id="ld-r-n" min="1" max="20" step="1" value="10"></label>
+          <div class="ctrl"><span>용도</span><div class="seg" id="ld-r-use"><button data-value="2.0">주거 2.0</button><button data-value="2.5" class="on">사무실 2.5</button><button data-value="5.0a">집회 5.0</button><button data-value="7.5">서고 7.5</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">영향면적 A<sub>I</sub></span><span class="v" id="ld-r-ai">—</span></div>
+        <div class="stat"><span class="k">저감 계수 C</span><span class="v" id="ld-r-c">—</span></div>
+        <div class="stat"><span class="k">활하중 합 L<sub>0</sub>ΣA<sub>T</sub> → CL<sub>0</sub>ΣA<sub>T</sub></span><span class="v" id="ld-r-l">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-r-msg"></div>
+      <div class="sim-note">해볼 것: 기둥·64 m²·1개 층에서 C = 0.56, 10개 층에서 하한 0.4에 닿는 것을 보세요 · 집회·서고로 바꾸면 저감이 사라집니다 · 슬래브(K = 1)는 64 m²에서도 C가 0.83에 그칩니다 · 모델: 원리 2.4의 형태, A<sub>I</sub> = K × A<sub>T</sub> × 층 수, 하한 0.5(1개 층)·0.4(2개 층 이상), A<sub>I</sub> &lt; 36 m²이면 저감 없음, L<sub>0</sub> &gt; 5 kN/m²·공중 집회는 저감 없음(교육용 단순화, 현행 기준 확인).</div>
+    </div>
+
+    <h3 id="pattern">부분 재하: 활하중은 골라서 놓인다</h3>
+    <p>고정하중은 늘 모든 경간에 있지만 활하중은 어떤 경간에는 있고 어떤 경간에는 없을 수 있습니다. 연속보에서는 이 차이가 중요합니다. 한 경간에 하중이 놓이면 그 경간은 아래로 휘고 이웃 경간은 위로 들리므로, <b>모든 경간에 하중을 놓는 것이 가장 나쁜 경우가 아닙니다.</b> 영향선(MechanicsBook 6장)의 부호를 보면 어디에 놓아야 하는지 알 수 있습니다.</p>
+    <div class="callout def"><strong>원리 2.5 (연속보의 부분 재하)</strong> 고정하중은 모든 경간에 두고, 활하중은 구하려는 단면력의 영향선이 같은 부호인 경간에만 둔다. 연속보에서는
+      <ul style="margin:6px 0 0">
+        <li>경간 \(i\)의 최대 정(+) 휨모멘트: 경간 \(i\)와 하나 건너 경간들에 활하중(체커보드 배치).</li>
+        <li>지점 \(j\)의 최대 부(−) 휨모멘트: 지점 \(j\) 양옆 두 경간과 거기서 하나 건너 경간들에 활하중.</li>
+      </ul>
+      이런 배치를 <span class="term">부분 재하</span><span class="en">(pattern loading)</span>라 한다. 2차원 골조와 2방향 슬래브에도 같은 생각을 쓴다(3·4장).</div>
+    <figure class="diagram" id="fig-ld-pattern">
+      <svg viewBox="0 0 860 270" role="img" aria-label="4경간 연속보에서 경간 1 최대 정모멘트와 지점 B 최대 부모멘트를 만드는 활하중 배치">
+        <rect x="10" y="10" width="840" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">(a) 경간 1의 최대 +M: 경간 1·3에 활하중</text>
+          <rect x="0" y="22" width="160" height="22" class="f-acc2-soft"/><rect x="320" y="22" width="160" height="22" class="f-acc2-soft"/>
+          <line x1="0" y1="56" x2="640" y2="56" style="stroke:var(--text);stroke-width:4"/>
+          <g class="f-elev" style="stroke:var(--text)"><path d="M0 58l-8 13h16z"/><path d="M160 58l-8 13h16z"/><path d="M320 58l-8 13h16z"/><path d="M480 58l-8 13h16z"/><path d="M640 58l-8 13h16z"/></g>
+          <path d="M0 56 Q80 92 160 56 Q240 34 320 56 Q400 92 480 56 Q560 34 640 56" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="86">A</text><text x="160" y="86">B</text><text x="320" y="86">C</text><text x="480" y="86">D</text><text x="640" y="86">E</text></g>
+        </g>
+        <g transform="translate(60,150)">
+          <text x="0" y="0" class="t" style="font-weight:700">(b) 지점 B의 최대 −M: 경간 1·2·4에 활하중</text>
+          <rect x="0" y="22" width="160" height="22" class="f-acc2-soft"/><rect x="160" y="22" width="160" height="22" class="f-acc2-soft"/><rect x="480" y="22" width="160" height="22" class="f-acc2-soft"/>
+          <line x1="0" y1="56" x2="640" y2="56" style="stroke:var(--text);stroke-width:4"/>
+          <g class="f-elev" style="stroke:var(--text)"><path d="M0 58l-8 13h16z"/><path d="M160 58l-8 13h16z"/><path d="M320 58l-8 13h16z"/><path d="M480 58l-8 13h16z"/><path d="M640 58l-8 13h16z"/></g>
+          <path d="M0 56 Q80 86 160 56 Q240 86 320 56 Q400 44 480 56 Q560 86 640 56" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+        </g>
+        <g transform="translate(720,60)"><text x="0" y="0" class="t-mono" style="fill:var(--accent-2)">활하중</text><text x="0" y="22" class="t-mono" style="fill:var(--accent)">변형(개략)</text><text x="0" y="44" class="t-dim">고정하중은</text><text x="0" y="62" class="t-dim">모든 경간에</text></g>
+      </svg>
+      <figcaption><b>그림 2-4.</b> 4경간 연속보의 부분 재하. 하중이 놓인 경간은 처지고 빈 경간은 들려, 체커보드 배치가 하중 경간의 처짐을 서로 키운다. 지점 위 부모멘트는 양옆 두 경간을 함께 누를 때 가장 크다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 2.2 (B-10 큰보 줄의 부분 재하)</strong> X 방향 큰보 한 줄을 4경간 × 8 m 연속보(단순 지지, 기둥 강성 무시)로 보고 계수 하중 \(1.2w_D = 68.0\) kN/m(모든 경간), \(1.6w_L = 32.0\) kN/m(고른 경간)를 건다(CB.beam).
+      <ol style="margin:6px 0 0">
+        <li><b>모든 경간 재하.</b> 경간 1 최대 \(+M = 494\) kN·m, 지점 B \(-M = 686\) kN·m.</li>
+        <li><b>경간 1·3 재하.</b> 경간 1 최대 \(+M = 538\) kN·m — 모든 경간 재하보다 9 % 크다.</li>
+        <li><b>경간 1·2·4 재하.</b> 지점 B \(-M = 713\) kN·m — 4 % 크다.</li>
+        <li><b>설계.</b> 단면마다 모든 배치의 최댓값(포락선)으로 철근을 정한다. 활하중/고정하중 비가 클수록 차이가 커진다. 단순보로 본 \(w_u L^2/8 = 800\) kN·m와 비교하면 연속성의 효과도 보인다.</li>
+      </ol></div>
+    <div class="sim" id="sim-ld-pattern">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>경간마다 활하중 켜기: 가장 나쁜 배치 찾기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view ld-stack">
+          <div><canvas id="ld-cv-pat" aria-label="4경간 연속보와 경간별 활하중"></canvas><span class="ld-cap">경간을 눌러 활하중 켜고 끄기</span></div>
+          <div><canvas id="ld-cv-pat2" aria-label="현재 배치의 휨모멘트도와 모든 배치의 포락선"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>경간별 활하중</span><div class="ld-spans" id="ld-p-spans"><button class="btn" data-i="0">경간 1</button><button class="btn" data-i="1">경간 2</button><button class="btn" data-i="2">경간 3</button><button class="btn" data-i="3">경간 4</button></div></div>
+          <div class="btn-row"><button class="btn" data-pre="1111">모두</button><button class="btn" data-pre="1010">1·3</button><button class="btn" data-pre="1101">1·2·4</button><button class="btn" data-pre="0110">2·3</button></div>
+          <label class="ctrl"><span><span>활하중 w<sub>L</sub>(사용)</span> <output id="ld-p-wl-out"></output></span><input type="range" id="ld-p-wl" min="0" max="60" step="1" value="20"></label>
+          <label class="check"><input type="checkbox" id="ld-p-env" checked> 16가지 배치의 포락선</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">경간 1 최대 +M</span><span class="v" id="ld-p-m1">—</span></div>
+        <div class="stat"><span class="k">지점 B −M</span><span class="v" id="ld-p-mb">—</span></div>
+        <div class="stat"><span class="k">경간 2 최대 +M</span><span class="v" id="ld-p-m2">—</span></div>
+        <div class="stat"><span class="k">지점 C −M</span><span class="v" id="ld-p-mc">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-p-msg"></div>
+      <div class="sim-note">해볼 것: "모두"와 "1·3"을 번갈아 눌러 경간 1의 +M이 커지는 것을, "1·2·4"에서 지점 B의 −M이 가장 커지는 것을 확인하세요 · w<sub>L</sub>을 0으로 하면 배치가 상관없어집니다 · 모델: 4경간 × 8 m 연속보, 양끝 핀·중간 롤러, 계수 하중 1.2 × 56.7 kN/m(전 경간) + 1.6 × w<sub>L</sub>(고른 경간), CB.beam. 실제 골조는 기둥이 보 끝을 붙잡아 값이 달라집니다(4장). 굵은 선: 현재 배치, 옅은 띠: 포락선.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="snow">
+    <h2>적설 하중</h2>
+    <div class="problem"><strong>눈은 지붕에 고르게 쌓이지 않는다</strong>
+      <p>B-10 옆의 체육관 L-60은 가벼운 강 트러스 지붕입니다. 고정하중이 1.0 kN/m²밖에 안 되는 지붕에서 적설 0.5 kN/m²는 큰 몫입니다. 그런데 바람이 눈을 쓸어 옮기면 지붕 한쪽이나 낮은 지붕의 벽 앞에 눈이 몇 배로 쌓입니다.</p></div>
+    <p>적설 하중은 땅 위에 쌓이는 눈의 무게(<span class="term">지상 적설 하중</span> \(S_g\), 지역과 재현 기간으로 정함)에서 출발해, 지붕이 놓인 조건에 따라 줄이거나 키웁니다. 바람이 잘 통하는 평평한 지붕은 땅보다 눈이 덜 쌓이고, 경사가 급하면 미끄러져 내리며, 단차나 난간 앞에서는 바람에 날린 눈이 쌓입니다.</p>
+    <div class="callout def"><strong>원리 2.6 (지붕 적설 하중, KDS 41 12 00 형태)</strong>
+      <div class="formula">$$S_f = C_b\,C_e\,C_t\,I_s\,S_g, \qquad S_s = C_s\,S_f$$<div class="where">\(C_b\): 기본 지붕 적설 계수(0.7 형태), \(C_e\): <span class="term">노출 계수</span>(바람에 노출된 정도, 바람에 많이 노출될수록 작다), \(C_t\): 온도 계수(난방 여부), \(I_s\): 중요도 계수, \(C_s\): 지붕 경사 계수(경사가 급하고 표면이 미끄러울수록 작다). 여기에 바람에 따른 <span class="term">불균형 적설</span>, 단차·난간 앞의 <span class="term">적설 쌓임</span>(drift), 눈 위의 비, 처짐에 따른 물고임을 따로 검토한다. 계수의 값과 식은 현행 기준을 확인할 것.</div></div></div>
+    <figure class="diagram" id="fig-ld-snow">
+      <svg viewBox="0 0 860 270" role="img" aria-label="평지붕, 박공 지붕의 균형·불균형 적설, 단차 지붕의 적설 쌓임 분포">
+        <rect x="10" y="10" width="840" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(40,60)">
+          <text x="100" y="-24" text-anchor="middle" class="t" style="font-weight:700">평지붕: 균일 S_f</text>
+          <rect x="0" y="0" width="200" height="20" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <rect x="0" y="22" width="200" height="8" style="fill:var(--text-dim)"/>
+          <rect x="0" y="30" width="200" height="120" class="f-elev"/>
+        </g>
+        <g transform="translate(320,60)">
+          <text x="110" y="-24" text-anchor="middle" class="t" style="font-weight:700">박공: 바람 불어가는 쪽이 무겁다</text>
+          <path d="M0 110 L110 40 L220 110" style="fill:none;stroke:var(--text);stroke-width:3"/>
+          <path d="M0 110 L110 40 L110 32 L0 104z" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <path d="M110 40 L220 110 L220 76 L110 6z" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <rect x="0" y="110" width="220" height="40" class="f-elev"/>
+          <line x1="-30" y1="20" x2="40" y2="20" style="stroke:var(--blue);stroke-width:2" marker-end="url(#ld-ah-blue)"/>
+          <text x="40" y="70" class="t-mono">0.3S_s</text><text x="170" y="40" class="t-mono">1.5S_s</text>
+        </g>
+        <g transform="translate(600,40)">
+          <text x="115" y="-4" text-anchor="middle" class="t" style="font-weight:700">단차: 낮은 지붕에 쌓임</text>
+          <rect x="0" y="20" width="110" height="150" class="f-elev" style="stroke:var(--text)"/>
+          <rect x="110" y="90" width="120" height="80" class="f-elev" style="stroke:var(--text)"/>
+          <path d="M110 90 L110 40 L190 82 L230 82 L230 90z" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <rect x="0" y="12" width="110" height="8" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <line x1="-30" y1="0" x2="40" y2="0" style="stroke:var(--blue);stroke-width:2" marker-end="url(#ld-ah-blue)"/>
+          <text x="120" y="34" class="t-mono">h_d</text><text x="150" y="190" class="t-mono">폭 ≈ 4h_d</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-5.</b> 지붕 형상에 따른 적설 분포(개략). 박공 지붕의 불균형 계수 0.3·1.5는 교육용 단순 모형이고, 단차 지붕의 쌓임 높이 \(h_d\)는 위 지붕 길이와 지상 적설이 클수록 커진다. 쌓임은 좁은 폭에 몇 배의 하중을 만들어 경량 지붕의 국부 붕괴 원인이 된다.</figcaption>
+    </figure>
+    <p>가벼운 강구조 지붕은 적설에 민감합니다. 2014년 2월 경주의 한 리조트 체육관이 폭설 뒤 지붕이 무너져 10명이 숨졌고, 조사에서는 쌓인 눈의 하중과 함께 부재·접합의 시공 품질 문제가 지적되었습니다. 적설은 하중 자체보다 <b>고정하중에 비해 얼마나 큰가</b>, 그리고 <b>어디에 몰리는가</b>가 위험을 정합니다(12장 L-60).</p>
+    <div class="sim" id="sim-ld-snow">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>지붕 형상과 적설 하중 분포</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ld-cv-snow" aria-label="지붕 단면 위의 적설 하중 분포"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>지붕 형상</span><div class="seg" id="ld-s-roof"><button data-value="flat" class="on">평지붕</button><button data-value="gable">박공</button><button data-value="step">단차</button></div></div>
+          <label class="ctrl"><span><span>지상 적설 S<sub>g</sub></span> <output id="ld-s-sg-out"></output></span><input type="range" id="ld-s-sg" min="0.5" max="3" step="0.1" value="0.7"></label>
+          <label class="ctrl"><span>지붕 경사(박공) <output id="ld-s-th-out"></output></span><input type="range" id="ld-s-th" min="0" max="60" step="1" value="20"></label>
+          <label class="ctrl"><span>단차 높이(단차) <output id="ld-s-h-out"></output></span><input type="range" id="ld-s-h" min="0.5" max="6" step="0.1" value="3"></label>
+          <div class="ctrl"><span><span>노출 C<sub>e</sub> · 온도 C<sub>t</sub></span></span><div class="seg" id="ld-s-ce"><button data-value="0.8">바람 많음 0.8</button><button data-value="1.0" class="on">보통 1.0</button><button data-value="1.2">비난방 1.2</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평지붕 S<sub>f</sub></span><span class="v" id="ld-s-sf">—</span></div>
+        <div class="stat"><span class="k">최대 국부 적설</span><span class="v" id="ld-s-max">—</span></div>
+        <div class="stat"><span class="k">L-60 고정하중 1.0 대비</span><span class="v" id="ld-s-r">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-s-msg"></div>
+      <div class="sim-note">해볼 것: S<sub>g</sub> 0.7에서 평지붕 S<sub>f</sub> ≈ 0.5 kN/m²(L-60의 교육용 값)를 확인하세요 · 박공 경사를 30°보다 크게 하면 눈이 줄고, 단차를 낮추면 쌓임이 단차 높이에 걸려 잘립니다 · 모델(교육용): S<sub>f</sub> = 0.7C<sub>e</sub>C<sub>t</sub>S<sub>g</sub>(I<sub>s</sub> = 1, 세 번째 버튼은 C<sub>t</sub> = 1.2), C<sub>s</sub> = 1(θ ≤ 30°), (70 − θ)/40(30–70°); 불균형 0.3·1.5S<sub>s</sub>(θ ≥ 10°); 쌓임은 ASCE 7 형태의 식을 SI로 옮긴 것 — 눈 단위중량 γ = 0.43S<sub>g</sub> + 2.2 ≤ 4.7 kN/m³, 위 지붕 길이 40 m, h<sub>d</sub> = 0.3048[0.43(40 × 3.28)<sup>1/3</sup>(20.9S<sub>g</sub> + 10)<sup>1/4</sup> − 1.5] m, 단차 여유 높이에서 잘림, 폭 4h<sub>d</sub>. 실제 식과 계수는 KDS 41 12 00을 확인할 것.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="lateral">
+    <h2>풍하중·지진 하중 개요</h2>
+    <p>수평 하중은 6장(바람)과 8장(지진)에서 자세히 계산합니다. 여기서는 하중 조합에 넣을 크기만 먼저 잡습니다. 둘은 성격이 다릅니다. 풍하중은 건물이 바람을 <b>받는 면적</b>과 높이에 따른 풍속으로 정해지고, 지진 하중은 건물의 <b>무게</b>와 고유 주기, 지반, 연성(R)으로 정해집니다.</p>
+    <div class="formula">$$W:\ q = \tfrac12 \rho V(z)^2,\ \ F_i \approx q\,G\,C_p\,B\,h_i \qquad\quad E:\ V = C_s W_e,\ \ C_s = \frac{S_{D1}}{(R/I_e)\,T}$$<div class="where">B-10(Y 방향, 교육용): 지붕 높이 풍속 35.5 m/s, 속도압 0.77 kN/m², G = 2.0, C<sub>p</sub> = 1.3, 받는 폭 32 m → 층 풍하중 약 220 kN, 밑면 약 1,790 kN. 지진은 T<sub>a</sub> = 0.79 s, C<sub>s</sub> = 0.0734, W<sub>e</sub> = 68,100 kN → 밑면 전단력 약 5,000 kN. 지진 하중은 R로 줄인 "강도 수준" 값이라 하중 계수 1.0으로 조합한다.</div></div>
+    <figure class="diagram" id="fig-ld-wind-eq">
+      <svg viewBox="0 0 860 300" role="img" aria-label="B-10의 층별 풍하중과 지진 하중 막대 비교">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <text x="430" y="34" text-anchor="middle" class="t" style="font-weight:700">B-10 Y 방향 층 하중 (kN, 교육용)</text>
+        <g transform="translate(130,50)">
+          <line x1="300" y1="0" x2="300" y2="220" class="s-axis"/>
+          <g class="t-mono" text-anchor="middle"><text x="300" y="236">0</text><text x="120" y="236">← 바람</text><text x="480" y="236">지진 →</text></g>
+          <g class="t-mono" text-anchor="end">
+            <text x="-6" y="13">RF</text><text x="-6" y="35">10F</text><text x="-6" y="57">9F</text><text x="-6" y="79">8F</text><text x="-6" y="101">7F</text><text x="-6" y="123">6F</text><text x="-6" y="145">5F</text><text x="-6" y="167">4F</text><text x="-6" y="189">3F</text><text x="-6" y="211">2F</text></g>
+          <g style="fill:var(--blue);opacity:.65">
+            <rect x="262" y="2" width="38" height="16"/><rect x="227" y="24" width="73" height="16"/><rect x="230" y="46" width="70" height="16"/><rect x="234" y="68" width="66" height="16"/><rect x="238" y="90" width="62" height="16"/><rect x="243" y="112" width="57" height="16"/><rect x="248" y="134" width="52" height="16"/><rect x="254" y="156" width="46" height="16"/><rect x="261" y="178" width="39" height="16"/><rect x="265" y="200" width="35" height="16"/></g>
+          <g style="fill:var(--accent-2);opacity:.75">
+            <rect x="300" y="2" width="254" height="16"/><rect x="300" y="24" width="259" height="16"/><rect x="300" y="46" width="227" height="16"/><rect x="300" y="68" width="196" height="16"/><rect x="300" y="90" width="165" height="16"/><rect x="300" y="112" width="135" height="16"/><rect x="300" y="134" width="106" height="16"/><rect x="300" y="156" width="78" height="16"/><rect x="300" y="178" width="51" height="16"/><rect x="300" y="200" width="26" height="16"/></g>
+          <g class="t-mono"><text x="258" y="14" text-anchor="end">126</text><text x="223" y="36" text-anchor="end">244</text><text x="261" y="212" text-anchor="end">118</text><text x="560" y="14">845</text><text x="565" y="36">864</text><text x="332" y="212">87</text></g>
+        </g>
+        <text x="430" y="282" text-anchor="middle" class="t-dim">밑면: 바람 약 1,790 kN · 지진 약 5,000 kN(등가 정적, k = 1.15). 지진은 무게가 높이에 비례해 위로 갈수록 커지고, 바람은 풍속이 높이의 0.22제곱으로 커진다.</text>
+      </svg>
+      <figcaption><b>그림 2-6.</b> B-10의 층별 수평 하중(Y 방향). 풍하중은 각 층이 맡는 외벽 높이(지붕은 반 층)에 걸리는 값(<code>CB.wind.storyForce</code>), 지진 하중은 등가 정적 해석의 수직 분포(<code>CB.dyn.els</code>)다. 강도는 지진이 지배하고, 바람은 거주성(가속도)과 외장재를 지배하는 일이 많다(6·8장).</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="other">
+    <h2>온도·부등 침하 등 기타 하중</h2>
+    <p>힘이 아니라 <b>변형</b>을 주는 하중도 있습니다. 온도 변화, 건조 수축, 크리프, 부등 침하는 부재를 늘이거나 줄이거나 옮기려 하고, 그 변형이 막히면 힘이 됩니다. 정정 구조에서는 힘이 생기지 않고 부정정 구조에서만 생긴다는 점이 특징입니다(MechanicsBook 14장).</p>
+    <div class="table-wrap"><table class="ld-tbl">
+      <thead><tr><th>하중</th><th>원인과 크기 감각(교육용)</th><th>B-10에서</th></tr></thead>
+      <tbody>
+        <tr><td>온도 T</td><td>RC 열팽창계수 약 10 × 10⁻⁶ /°C. 32 m 바닥이 30 °C 변하면 약 10 mm</td><td>지붕 슬래브·외곽 기둥, 신축 이음(15장)</td></tr>
+        <tr><td>건조 수축·크리프</td><td>수축 약 400–800 × 10⁻⁶(MaterialsBook 8장), 크리프 계수 약 2</td><td>10층 기둥 축소, 장기 처짐(15장)</td></tr>
+        <tr><td>부등 침하</td><td>이웃 기초의 침하 차 → 골조에 강제 변위</td><td>매트 + 말뚝으로 작게(GeotechBook)</td></tr>
+        <tr><td>토압 H · 수압 F</td><td>지하 외벽에 수평으로, 매트 바닥에 양압력</td><td>굴착 11 m, 양압력 88 kPa(GeotechBook 4장)</td></tr>
+        <tr><td>충격·진동</td><td>엘리베이터·기계 설비의 동적 하중(충격 계수)</td><td>코어 상부 기계실</td></tr>
+        <tr><td>시공 하중</td><td>타설 중 콘크리트·거푸집·장비, 아직 굳지 않은 아래층</td><td>동바리 계획(시공 단계 해석)</td></tr>
+      </tbody></table></div>
+    <div class="callout site"><strong>B-10의 지하와 물</strong> 지하 2층 바닥(GL −11.0 m)에는 지하수위 GL −2.0 m에서 오는 양압력 약 88 kPa가 위로 작용하고, 지하 외벽은 토압과 수압을 받는다(GeotechBook 4·11장). 지상 건물의 무게가 이 양압력보다 훨씬 커서 B-10 전체가 뜨지는 않지만, 공사 중 지상층이 올라가기 전에는 들림을 검토해야 한다. 이때 고정하중은 "버티는 쪽"이므로 0.9D처럼 작게 잡는다(다음 절).</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="combinations">
+    <h2>하중 조합</h2>
+    <div class="problem"><strong>가장 큰 눈과 가장 센 바람과 가장 큰 지진이 같은 날 올까</strong>
+      <p>모든 하중의 설계값을 그대로 더하면 지나치게 보수적입니다. 50년에 한 번 올 큰 지진이 그해 가장 많은 눈이 쌓인 날, 가장 붐비는 시간에 올 가능성은 매우 낮습니다. 그렇다고 다른 하중을 0으로 둘 수도 없습니다.</p></div>
+    <p>하중 조합의 생각은 단순합니다. <b>한 하중이 설계 수명 중 최댓값에 이를 때, 다른 하중은 아무 때나 볼 수 있는 평소 값(동반값)에 있다.</b> 그래서 조합마다 "주 하중" 하나에 큰 계수를, 나머지에 작은 계수를 붙입니다. 이것을 하중마다 돌려 가며 만든 묶음이 하중 조합입니다.</p>
+    <div class="callout def"><strong>정의 2.7 (하중 계수와 하중 조합)</strong> 하중의 공칭값 \(Q_i\)에 곱하는 계수 \(\gamma_i\)를 <span class="term">하중 계수</span><span class="en">(load factor)</span>, \(\sum\gamma_i Q_i\)를 <span class="term">계수 하중</span><span class="en">(factored load)</span>, 동시에 고려하는 하중과 계수의 묶음을 <span class="term">하중 조합</span><span class="en">(load combination)</span>이라 한다. 주 하중이 아닌 하중에 붙는 작은 계수의 값을 <span class="term">동반 하중</span>이라 한다. 계수를 곱하지 않은 <span class="term">사용 하중</span> 조합(D + L 등)은 처짐·균열·진동 같은 사용성 검토에 쓴다.</div>
+    <div class="callout def"><strong>원리 2.8 (강도 설계용 하중 조합, KDS 41 형태)</strong>
+      <div class="formula">$$\begin{aligned}
+&U_1 = 1.4D \\
+&U_2 = 1.2D + 1.6L + 0.5S \\
+&U_3 = 1.2D + 1.6S + 1.0L \\
+&U_4 = 1.2D + 1.0W + 1.0L + 0.5S \\
+&U_5 = 1.2D + 1.0E + 1.0L + 0.2S \\
+&U_6 = 0.9D + 1.0W \\
+&U_7 = 0.9D + 1.0E
+\end{aligned}$$<div class="where">W와 E는 방향이 바뀌므로 ± 둘 다 본다. U<sub>6</sub>·U<sub>7</sub>은 고정하중이 "버티는 쪽"인 경우(들림, 전도, 기둥 인장)를 위한 조합이다. 일부 기준 판은 풍하중 계수를 1.3으로 쓰거나 기본 풍속의 정의와 함께 계수를 바꾸었고, 활하중이 크지 않은 용도에서는 U<sub>3</sub>–U<sub>5</sub>의 1.0L을 0.5L로 줄이는 규정이 있다. 토압 H, 유체압 F, 온도 T, 지붕 활하중 L<sub>r</sub>, 강우 R이 들어가는 항과 조합 전체는 현행 KDS 41을 확인할 것.</div></div></div>
+    <div class="callout"><strong>예제 2.3 (C1과 모서리 기둥의 지배 조합)</strong> 축력(압축 +, kN). 지진·바람에 따른 축력 변동은 교육용 가정이다.
+      <ol style="margin:6px 0 0">
+        <li><b>C1 1층.</b> D = 5,542, L = 1,600(저감 전), S = 32(0.5 × 64), W = ±60, E = ±300. U<sub>1</sub> = 7,759, U<sub>2</sub> = 9,226, U<sub>3</sub> = 8,301, U<sub>4</sub> = 8,326, U<sub>5</sub> = 8,557. → <b>U<sub>2</sub> = 9,226 kN 지배</b>. 내부 기둥은 수평 하중의 축력 변동이 작아 중력 조합이 지배한다.</li>
+        <li><b>모서리 기둥 1층.</b> D = 2,690(외벽 포함), L = 400, E = ±2,600(전도 모멘트가 만드는 축력, 교육용). U<sub>5</sub> = 1.2 × 2,690 + 2,600 + 400 = <b>6,228</b>(최대 압축), U<sub>7</sub> = 0.9 × 2,690 − 2,600 = <b>−179 kN</b>(인장).</li>
+        <li><b>뜻.</b> 모서리 기둥은 지진 때 압축이 U<sub>2</sub>(3,868)보다 60 % 크고, 반대 방향 지진에서는 인장으로 바뀐다. 기둥 철근의 이음·정착과 기초(말뚝 인발)를 인장으로도 검토해야 한다. 0.9D 조합이 없으면 이 경우를 놓친다.</li>
+      </ol></div>
+    <div class="sim" id="sim-ld-combo">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>하중 조합 탐색기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ld-cv-combo" aria-label="일곱 하중 조합의 계수 하중 효과 범위 막대"></canvas></div>
+        <div class="sim-controls">
+          <div class="btn-row"><button class="btn" data-pre="5542,1600,32,60,300">C1 1층</button><button class="btn" data-pre="2690,400,8,350,2600">모서리 기둥</button><button class="btn" data-pre="5,0,8,12,0">경량 지붕 퍼린</button></div>
+          <label class="ctrl"><span>고정 D <output id="ld-c-d-out"></output></span><input type="range" id="ld-c-d" min="0" max="8000" step="1" value="5542"></label>
+          <label class="ctrl"><span>활 L <output id="ld-c-l-out"></output></span><input type="range" id="ld-c-l" min="0" max="3000" step="1" value="1600"></label>
+          <label class="ctrl"><span>적설 S <output id="ld-c-s-out"></output></span><input type="range" id="ld-c-s" min="0" max="500" step="1" value="32"></label>
+          <label class="ctrl"><span>바람 ±W <output id="ld-c-w-out"></output></span><input type="range" id="ld-c-w" min="0" max="3000" step="1" value="60"></label>
+          <label class="ctrl"><span>지진 ±E <output id="ld-c-e-out"></output></span><input type="range" id="ld-c-e" min="0" max="4000" step="1" value="300"></label>
+          <label class="check"><input type="checkbox" id="ld-c-half"> U₃–U₅의 활하중 계수 0.5</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대(압축·하향)</span><span class="v" id="ld-c-max">—</span></div>
+        <div class="stat"><span class="k">최소(인장·들림)</span><span class="v" id="ld-c-min">—</span></div>
+        <div class="stat"><span class="k">사용 하중 D + L</span><span class="v" id="ld-c-svc">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-c-msg"></div>
+      <div class="sim-note">해볼 것: "모서리 기둥"에서 U<sub>7</sub>이 인장으로 넘어가는 것을, "경량 지붕 퍼린"(단위: kN·m, 바람이 지붕을 들어 올리는 경우)에서 U<sub>6</sub>이 부호를 바꾸는 것을 보세요 · E를 줄여 가며 지배 조합이 U<sub>5</sub>에서 U<sub>2</sub>로 바뀌는 지점을 찾으세요 · 모델: 원리 2.8의 일곱 조합, W·E는 ± 두 방향(막대는 각 조합의 범위). 프리셋의 W·E 축력은 교육용 가정, 실제 계수와 조합은 현행 KDS 41을 확인할 것.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="reliability">
+    <h2>신뢰도 이론 맛보기</h2>
+    <p>하중 효과 \(S\)와 저항 \(R\)이 모두 흩어지는 확률 변수라면, "안전하다"는 말은 \(R \gt S\)일 확률이 충분히 크다는 뜻입니다. 둘의 차 \(g = R - S\)를 <b>안전 여유</b>라 하면 \(g \lt 0\)이 파괴입니다.</p>
+    <div class="callout def"><strong>정의 2.9 (신뢰도 지수와 파괴 확률)</strong> 안전 여유 \(g = R - S\)의 평균을 표준편차로 나눈 값을 <span class="term">신뢰도 지수</span><span class="en">(reliability index)</span> β라 한다.
+      <div class="formula">$$\beta = \frac{\mu_R - \mu_S}{\sqrt{\sigma_R^2 + \sigma_S^2}}, \qquad P_f = P(g \lt 0) = \Phi(-\beta)$$
+      $$\text{대수 정규}:\ \ \beta = \frac{\ln(\mu_R/\mu_S) + \tfrac12(\zeta_S^2 - \zeta_R^2)}{\sqrt{\zeta_R^2 + \zeta_S^2}},\quad \zeta^2 = \ln(1 + V^2)$$<div class="where">\(V = \sigma/\mu\)는 <span class="term">변동 계수</span>, \(\Phi\)는 표준 정규 누적 분포, \(P_f\)는 <span class="term">파괴 확률</span>이다. 첫 식은 R, S가 정규 분포일 때 정확하다. 저항과 하중은 음수가 될 수 없고 꼬리가 오른쪽으로 긴 경우가 많아 대수 정규 분포를 자주 쓴다. \(V\)가 작으면 둘째 식은 \(\ln(\mu_R/\mu_S)/\sqrt{V_R^2 + V_S^2}\)에 가깝다.</div></div></div>
+    <figure class="diagram" id="fig-ld-beta">
+      <svg viewBox="0 0 860 260" role="img" aria-label="안전 여유 g의 확률 분포와 평균에서 0까지의 거리 β 시그마, 파괴 영역">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <line x1="60" y1="200" x2="800" y2="200" class="s-axis"/>
+        <path d="M100 200 C220 200 300 60 430 60 C560 60 640 200 760 200" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.4"/>
+        <path d="M100 200 C150 200 175 192 200 182 L200 200z" style="fill:var(--bad);opacity:.6"/>
+        <line x1="200" y1="210" x2="200" y2="40" style="stroke:var(--text);stroke-width:1.6"/>
+        <line x1="430" y1="210" x2="430" y2="50" style="stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 4"/>
+        <line x1="200" y1="110" x2="430" y2="110" style="stroke:var(--ok);stroke-width:1.8" marker-start="url(#ld-ah-react)" marker-end="url(#ld-ah-react)"/>
+        <text x="315" y="102" text-anchor="middle" class="t-mono" style="fill:var(--ok)">β σ_g</text>
+        <g class="t-mono" text-anchor="middle"><text x="200" y="226">g = 0</text><text x="430" y="226">μ_g = μ_R − μ_S</text></g>
+        <text x="150" y="172" text-anchor="middle" class="t-mono" style="fill:var(--bad)">P_f</text>
+        <text x="80" y="36" class="t-dim">파괴 (R &lt; S)</text><text x="640" y="80" class="t-dim">안전 여유 g = R − S</text>
+        <g class="t-mono"><text x="600" y="130">β = 2.5 → P_f ≈ 6 × 10⁻³</text><text x="600" y="152">β = 3.0 → P_f ≈ 1.3 × 10⁻³</text><text x="600" y="174">β = 3.5 → P_f ≈ 2.3 × 10⁻⁴</text></g>
+      </svg>
+      <figcaption><b>그림 2-7.</b> 신뢰도 지수는 안전 여유의 평균이 파괴 경계(g = 0)에서 표준편차 몇 개만큼 떨어져 있는지다. β가 0.5 커질 때마다 파괴 확률은 몇 배씩 준다. 1980년 무렵의 보정 연구는 중력 하중 조합에서 β 약 3(50년 기준), 바람·지진 조합에서 그보다 낮은 값(약 2.5, 1.75)을 목표로 삼았다고 알려져 있다.</figcaption>
+    </figure>
+    <p>하중 계수는 이 β를 목표값에 맞추도록 거꾸로 정한 것입니다. 설계점에서 하중 \(i\)의 값은 대략 \(\mu_i(1 + \alpha_i \beta V_i)\)이므로, 공칭값에 대한 하중 계수는 \(\gamma_i \approx (\mu_i/Q_{n,i})(1 + \alpha_i\beta V_i)\)입니다(\(\alpha_i\)는 그 하중이 전체 불확실성에서 차지하는 몫). 변동 계수가 약 0.1인 고정하중은 1.2 안팎, 0.25 안팎인 활하중은 1.6 안팎이 되는 이유입니다. 1장의 시뮬레이터가 보인 것처럼, 이렇게 정한 계수는 하중 비가 달라도 β를 고르게 유지합니다.</p>
+    <div class="callout"><strong>예제 2.4 (β와 파괴 확률)</strong> 평균 안전율 \(\mu_R/\mu_S = 2.0\), \(V_R = 0.10\), \(V_S = 0.20\).
+      <ol style="margin:6px 0 0">
+        <li><b>정규 가정.</b> \(\mu_S = 1\)이라 하면 \(\sigma_R = 0.2\), \(\sigma_S = 0.2\), \(\beta = 1/\sqrt{0.04 + 0.04} = 3.54\), \(P_f = \Phi(-3.54) = 2.0 \times 10^{-4}\).</li>
+        <li><b>대수 정규 가정.</b> \(\zeta_R^2 = \ln 1.01 = 0.00995\), \(\zeta_S^2 = \ln 1.04 = 0.0392\), \(\beta = (0.693 + 0.0146)/0.2218 = 3.19\), \(P_f = 7.1 \times 10^{-4}\).</li>
+        <li><b>뜻.</b> 같은 평균과 변동에서도 분포의 꼴(특히 하중의 오른쪽 꼬리)에 따라 파괴 확률이 3배 넘게 다르다. 그래서 β는 절대적인 확률이라기보다 설계법끼리 비교하는 <b>상대적 척도</b>로 쓴다.</li>
+      </ol></div>
+    <div class="sim" id="sim-ld-beta">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>신뢰도 지수: 두 분포가 겹치는 넓이</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view ld-stack">
+          <div><canvas id="ld-cv-beta" aria-label="하중 효과 S와 저항 R의 확률 밀도 곡선"></canvas><span class="ld-cap">S(주황) · R(청록)</span></div>
+          <div><canvas id="ld-cv-beta2" aria-label="안전 여유의 확률 밀도와 파괴 영역"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>평균 안전율 μ<sub>R</sub>/μ<sub>S</sub></span> <output id="ld-b-th-out"></output></span><input type="range" id="ld-b-th" min="1" max="3" step="0.01" value="2"></label>
+          <label class="ctrl"><span><span>저항 변동 계수 V<sub>R</sub></span> <output id="ld-b-vr-out"></output></span><input type="range" id="ld-b-vr" min="0.05" max="0.3" step="0.01" value="0.1"></label>
+          <label class="ctrl"><span><span>하중 변동 계수 V<sub>S</sub></span> <output id="ld-b-vs-out"></output></span><input type="range" id="ld-b-vs" min="0.05" max="0.4" step="0.01" value="0.2"></label>
+          <div class="ctrl"><span>분포</span><div class="seg" id="ld-b-dist"><button data-value="n" class="on">정규</button><button data-value="ln">대수 정규</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">신뢰도 지수 β</span><span class="v" id="ld-b-beta">—</span></div>
+        <div class="stat"><span class="k">파괴 확률 P<sub>f</sub></span><span class="v" id="ld-b-pf">—</span></div>
+        <div class="stat"><span class="k">β = 3에 필요한 μ<sub>R</sub>/μ<sub>S</sub></span><span class="v" id="ld-b-need">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-b-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(2.0, 0.10, 0.20)에서 예제 2.4의 β = 3.54(정규)·3.19(대수 정규)를 확인하세요 · V<sub>S</sub>를 0.1에서 0.3으로 올리면 같은 β를 위해 평균 안전율을 얼마나 키워야 하나요 — 활하중 계수가 고정하중 계수보다 큰 이유입니다 · 모델: μ<sub>S</sub> = 1, P<sub>f</sub> = Φ(−β)(CB.normCdf). 아래 그림은 정규에서는 g = R − S, 대수 정규에서는 ln(R/S)의 분포이고 빨간 넓이가 P<sub>f</sub>입니다(넓이가 작으면 눈에 잘 안 보입니다).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="takedown">
+    <h2>B-10 기둥 C1의 하중 집계</h2>
+    <div class="problem"><strong>9,000 kN을 층마다 다시</strong>
+      <p>MechanicsBook은 C1의 1층 계수 축력을 "바닥 11.8 kN/m² × 640 m² + 자중 ≈ 9,000 kN"으로 어림했습니다. 구조 계산서는 이것을 층마다 고정하중과 활하중을 따로 쌓고, 활하중은 층마다 다른 저감 계수로 줄인 표로 씁니다. 이런 표를 <span class="term">하중 집계</span><span class="en">(load take-down)</span>라 합니다.</p></div>
+    <p>층 \(s\)의 기둥(그 층 바닥 아래 기둥)이 받치는 바닥 수를 \(n = 11 - s\)라 하면, 고정하중은 \(n\)개 층의 바닥·보 무게에 그 위 기둥 자중을 더하고, 활하중은 \(n\)개 층의 활하중에 \(A_I = 4 \times 64 \times n\)의 저감 계수를 곱합니다.</p>
+    <div class="table-wrap"><table class="ld-tbl">
+      <thead><tr><th>층(기둥)</th><th>받치는 바닥</th><th>D (kN)</th><th>L<sub>0</sub> (kN)</th><th>A<sub>I</sub> (m²)</th><th>C</th><th>1.2D + 1.6L<sub>0</sub></th><th>1.2D + 1.6CL<sub>0</sub></th></tr></thead>
+      <tbody>
+        <tr><td>10층</td><td>1</td><td>553</td><td>160</td><td>256</td><td>0.563</td><td>919</td><td>807</td></tr>
+        <tr><td>9층</td><td>2</td><td>1,105</td><td>320</td><td>512</td><td>0.486</td><td>1,838</td><td>1,575</td></tr>
+        <tr><td>7층</td><td>4</td><td>2,211</td><td>640</td><td>1,024</td><td>0.431</td><td>3,677</td><td>3,094</td></tr>
+        <tr><td>5층</td><td>6</td><td>3,316</td><td>960</td><td>1,536</td><td>0.407</td><td>5,515</td><td>4,604</td></tr>
+        <tr><td>3층</td><td>8</td><td>4,421</td><td>1,280</td><td>2,048</td><td>0.400</td><td>7,353</td><td>6,125</td></tr>
+        <tr><td>2층</td><td>9</td><td>4,974</td><td>1,440</td><td>2,304</td><td>0.400</td><td>8,273</td><td>6,890</td></tr>
+        <tr><td>1층</td><td>10</td><td class="hl">5,542</td><td>1,600</td><td>2,560</td><td>0.400</td><td class="hl">9,210</td><td class="hl">7,674</td></tr>
+      </tbody></table></div>
+    <div class="callout"><strong>예제 2.5 (C1 1층의 하중 집계)</strong>
+      <ol style="margin:6px 0 0">
+        <li><b>한 층의 고정하중.</b> 바닥 \(6.5 \times 64 = 416\) kN + 큰보 자중 \(4.7 \times 16 = 75.2\) kN = 491.2 kN.</li>
+        <li><b>기둥 자중.</b> \(0.8 \times 0.8 \times 24 = 15.36\) kN/m × 41 m = 630 kN(교육용으로 전 층 800 × 800).</li>
+        <li><b>합.</b> \(D = 10 \times 491.2 + 630 = 5{,}542\) kN, \(L_0 = 10 \times 2.5 \times 64 = 1{,}600\) kN.</li>
+        <li><b>계수 축력.</b> 저감 전 \(1.2 \times 5{,}542 + 1.6 \times 1{,}600 = 9{,}210\) kN(MechanicsBook의 "약 9,000 kN"과 같은 값). 저감 후(C = 0.4) \(6{,}650 + 1.6 \times 640 = 7{,}674\) kN, 17 % 작다.</li>
+        <li><b>사용 하중.</b> \(D + L_0 = 7{,}142\) kN, \(D + 0.4L_0 = 6{,}182\) kN. GeotechBook이 말뚝 설계에 쓴 사용 축력 약 6,700 kN(= 9,000/1.35로 어림)은 이 두 값 사이에 있다.</li>
+      </ol></div>
+    <div class="sim" id="sim-ld-takedown">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>기둥 축력 누적: 층마다 쌓고 줄이기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ld-cv-td" aria-label="층별 기둥 축력 막대: 저감 전과 저감 후"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>기둥</span><div class="seg" id="ld-t-col"><button data-value="int" class="on">내부 C1 64 m²</button><button data-value="edge">외곽 32 m²</button><button data-value="corner">모서리 16 m²</button></div></div>
+          <label class="ctrl"><span>지상 층수 <output id="ld-t-n-out"></output></span><input type="range" id="ld-t-n" min="1" max="30" step="1" value="10"></label>
+          <label class="ctrl"><span>살펴볼 층 <output id="ld-t-s-out"></output></span><input type="range" id="ld-t-s" min="1" max="10" step="1" value="1"></label>
+          <div class="ctrl"><span>조합</span><div class="seg" id="ld-t-cmb"><button data-value="u2" class="on">1.2D + 1.6L</button><button data-value="u1">1.4D</button><button data-value="svc">D + L(사용)</button></div></div>
+          <label class="check"><input type="checkbox" id="ld-t-red" checked> 활하중 저감</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">D · L<sub>0</sub></span><span class="v" id="ld-t-dl">—</span></div>
+        <div class="stat"><span class="k">A<sub>I</sub> · C</span><span class="v" id="ld-t-c">—</span></div>
+        <div class="stat"><span class="k">축력(선택 조합)</span><span class="v" id="ld-t-nu">—</span></div>
+        <div class="stat"><span class="k">축력비(800 × 800)</span><span class="v" id="ld-t-r">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-t-msg"></div>
+      <div class="sim-note">해볼 것: 기본값의 1층에서 9,210(옅은 막대)과 7,674 kN(진한 막대)을 확인하세요 · 위층으로 갈수록 저감 계수가 0.4에서 0.56까지 커지는 것을, 모서리 기둥은 같은 층에서도 저감이 덜 되는 것을 보세요 · 층수를 20층으로 올리면 800 × 800 기둥의 축력비가 얼마가 되나요 · 모델(교육용): 층마다 D = 6.5A + 4.7 × 보 길이(내부 16, 외곽 12, 모서리 8 m), 기둥 자중 15.36 kN/m(1층 5 m, 나머지 4 m), L<sub>0</sub> = 2.5A, 지붕층도 사무실 바닥과 같다고 단순화(MechanicsBook 1장과 같음, 실제 지붕 활하중은 저감하지 않음), A<sub>I</sub> = 4An, 하한 0.5(1개 층)·0.4. 외벽 하중과 코어의 분담은 무시.</div>
+    </div>
+    <div class="callout site"><strong>C1: 9,210 kN과 7,670 kN</strong> 같은 기둥의 1층 계수 축력이 저감 전 9,210 kN, 저감 후 약 7,670 kN이다. 이 책은 기둥 설계와 축력비 검토(4·8장)에 저감한 값을, 앞 권과 비교할 때는 "약 9,000 kN"을 쓴다. 지진 조합 U<sub>5</sub> = 1.2D + 1.0E + 1.0L에서는 활하중이 1.0L(저감 후 640 kN)이므로 내부 기둥 C1의 축력이 약 7,600 kN 안팎이 된다(지진 축력 변동은 8장에서 계산).</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="floors.html"><small>CH.03 · 바닥 구조</small>D 6.5 · L 2.5 kN/m²의 슬래브<br><span>부분 재하와 2방향 슬래브의 모멘트 분배.</span></a>
+      <a href="frames.html"><small>CH.04 · 모멘트 골조</small>연직 + 수평 하중 조합<br><span>U<sub>4</sub>·U<sub>5</sub>로 골조의 보·기둥을 검토한다.</span></a>
+      <a href="wind.html"><small>CH.06 · 풍하중과 바람의 영향</small>층마다 약 220 kN<br><span>속도압·가스트·풍압 계수로 W를 계산한다.</span></a>
+      <a href="seismic.html"><small>CH.08 · 내진 설계</small>밑면 전단력 약 5,000 kN<br><span>E와 0.9D + 1.0E의 기둥 인장.</span></a>
+      <a href="long-span.html"><small>CH.12 · 대공간 구조</small>L-60 지붕의 눈과 바람<br><span>적설 쌓임과 풍하중 들림이 경량 지붕을 지배한다.</span></a>
+      <a href="../../mechanics/chapters/influence.html"><small>MECHANICSBOOK · 영향선</small>부분 재하의 근거<br><span>영향선의 부호가 활하중을 놓을 경간을 알려 준다.</span></a>
+      <a href="../../geotech/chapters/piles.html"><small>GEOTECHBOOK · 말뚝</small>C1 사용 축력 약 6,700 kN<br><span>하중 집계의 마지막 값이 말뚝 개수를 정한다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>하중은 D·L·S·W·E와 변형이 만드는 하중(T, 침하)·토압·수압으로 나뉜다. 지속 시간이 길면 크리프·장기 처짐, 짧으면 동적 응답이 문제이며, 시간 규모가 달라 최댓값이 동시에 오기 어렵다.</li>
+      <li>고정하중은 단위중량 × 두께를 층층이 더한다. B-10: 슬래브 5.04 + 마감·천장·설비 1.5 = 6.5 kN/m², 슬래브 자중이 77 %다.</li>
+      <li>활하중은 용도별 대표값(주거 2.0, 사무실 2.5, 교실 3.0, 서고 7.5 kN/m² 등, 기준 확인)이며, 영향면적 A<sub>I</sub> = K A<sub>T</sub>가 36 m² 이상이면 C = 0.3 + 4.2/√A<sub>I</sub>(하한 0.5·0.4, KDS 형태)로 줄인다. 집회·5 kN/m² 초과 용도는 저감하지 않는다.</li>
+      <li>연속보의 최대 정모멘트는 그 경간과 하나 건너 경간, 지점의 최대 부모멘트는 양옆 경간과 하나 건너 경간에 활하중을 놓을 때 생긴다(B-10 큰보 줄: 494 → 538, 686 → 713 kN·m).</li>
+      <li>지붕 적설은 S<sub>f</sub> = C<sub>b</sub>C<sub>e</sub>C<sub>t</sub>I<sub>s</sub>S<sub>g</sub>에 경사·불균형·쌓임을 더한다. 경량 지붕에서는 쌓임이 국부적으로 몇 배의 하중을 만든다.</li>
+      <li>하중 조합은 "주 하중 하나 + 동반값"의 묶음이다(1.4D, 1.2D + 1.6L + 0.5S, 1.2D + 1.0W + L + 0.5S, 1.2D + 1.0E + L + 0.2S, 0.9D ± W, 0.9D ± E, KDS 형태). 0.9D 조합은 들림·기둥 인장을 잡는다.</li>
+      <li>신뢰도 지수 β = (μ<sub>R</sub> − μ<sub>S</sub>)/√(σ<sub>R</sub>² + σ<sub>S</sub>²), P<sub>f</sub> = Φ(−β). 하중 계수는 변동 계수가 큰 하중일수록 크게 정해져 목표 β(중력 조합 약 3)를 고르게 맞춘다.</li>
+      <li>B-10 C1 1층: D 5,542 kN, L<sub>0</sub> 1,600 kN → 1.2D + 1.6L 9,210 kN(저감 전), 활하중 저감(C = 0.4) 후 7,674 kN.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 슬래브 200 mm(RC 24 kN/m³), 모르타르 40 mm(20 kN/m³), 천장 0.2, 설비 0.3 kN/m²인 바닥의 고정하중은?</p><div class="opts">
+        <button class="opt">4.8 kN/m²</button><button class="opt">5.6 kN/m²</button><button class="opt" data-correct>6.1 kN/m²</button><button class="opt">7.3 kN/m²</button>
+      </div><div class="quiz-exp">\(0.2 \times 24 + 0.04 \times 20 + 0.2 + 0.3 = 4.8 + 0.8 + 0.5 = 6.1\) kN/m².</div></div>
+      <div class="quiz-q"><p>2. 부하면적 50 m²인 내부 기둥이 한 개 층만 받칠 때 활하중 저감 계수 C는(KDS 형태, K = 4)?</p><div class="opts">
+        <button class="opt">1.0(저감 없음)</button><button class="opt" data-correct>약 0.60</button><button class="opt">0.40</button><button class="opt">약 0.89</button>
+      </div><div class="quiz-exp">\(A_I = 4 \times 50 = 200\) m², \(C = 0.3 + 4.2/\sqrt{200} = 0.3 + 0.297 = 0.597\). 1개 층 하한 0.5보다 크므로 그대로 쓴다.</div></div>
+      <div class="quiz-q"><p>3. 활하중을 저감하지 않는 경우로 옳은 것은?</p><div class="opts">
+        <button class="opt">사무실 바닥의 큰보</button><button class="opt">10개 층을 받치는 기둥</button><button class="opt" data-correct>공중 집회 용도의 바닥</button><button class="opt">영향면적 300 m²의 주거 바닥 보</button>
+      </div><div class="quiz-exp">많은 사람이 한꺼번에 모일 수 있는 집회 용도, 5 kN/m²를 넘는 무거운 용도 등은 넓은 면적이 동시에 가득 찰 가능성이 있어 저감하지 않는다(기준 확인).</div></div>
+      <div class="quiz-q"><p>4. 4경간 연속보(A–B–C–D–E)에서 지점 B의 부모멘트를 가장 크게 하는 활하중 배치는?</p><div class="opts">
+        <button class="opt">모든 경간</button><button class="opt">경간 1·3</button><button class="opt" data-correct>경간 1·2·4</button><button class="opt">경간 2·4</button>
+      </div><div class="quiz-exp">B 양옆의 경간 1·2를 누르고, 거기서 하나 건너 경간 4에도 놓는다. 경간 3에 놓으면 B의 부모멘트가 오히려 줄어든다(예제 2.2: 713 vs 686 kN·m).</div></div>
+      <div class="quiz-q"><p>5. 하중 조합 1.2D + 1.0E + 1.0L + 0.2S에서 적설에 0.2라는 작은 계수를 붙이는 이유는?</p><div class="opts">
+        <button class="opt">눈은 지진 때 녹기 때문</button><button class="opt" data-correct>설계 지진이 올 때 눈이 최댓값에 있을 가능성은 낮아 평소 값(동반값)만 더하기 때문</button><button class="opt">눈은 수평 하중이 아니기 때문</button><button class="opt">지진 하중이 이미 눈을 포함하기 때문</button>
+      </div><div class="quiz-exp">조합은 주 하중 하나가 최대일 때 나머지는 아무 때나 볼 수 있는 값이라는 생각으로 만든다. 지진이 주 하중인 조합에서 눈은 작은 동반값이다.</div></div>
+      <div class="quiz-q"><p>6. 모서리 기둥에서 D = 2,000 kN, 지진 축력 E = ±2,000 kN이다. 0.9D + 1.0E 조합의 최솟값과 그 뜻은?</p><div class="opts">
+        <button class="opt">+3,800 kN, 압축만 검토하면 된다</button><button class="opt" data-correct>−200 kN, 기둥과 기초를 인장으로도 검토해야 한다</button><button class="opt">0 kN, 영향이 없다</button><button class="opt">+200 kN, 들림이 없다</button>
+      </div><div class="quiz-exp">\(0.9 \times 2{,}000 - 2{,}000 = -200\) kN(인장). 고정하중이 버티는 쪽일 때는 작게 잡아야 불리한 경우를 놓치지 않는다(예제 2.3).</div></div>
+      <div class="quiz-q"><p>7. 정규 분포 R, S에서 μ<sub>R</sub> = 150, μ<sub>S</sub> = 100, σ<sub>R</sub> = 15, σ<sub>S</sub> = 20일 때 신뢰도 지수 β는?</p><div class="opts">
+        <button class="opt">1.0</button><button class="opt" data-correct>2.0</button><button class="opt">2.5</button><button class="opt">3.3</button>
+      </div><div class="quiz-exp">\(\beta = (150 - 100)/\sqrt{15^2 + 20^2} = 50/25 = 2.0\), \(P_f = \Phi(-2) \approx 0.023\). 중력 조합의 목표(약 3)에는 모자란다.</div></div>
+      <div class="quiz-q"><p>8. B-10 C1 1층의 D = 5,542 kN, L<sub>0</sub> = 1,600 kN, 활하중 저감 계수 C = 0.4일 때 1.2D + 1.6L은?</p><div class="opts">
+        <button class="opt">약 9,210 kN</button><button class="opt" data-correct>약 7,670 kN</button><button class="opt">약 6,180 kN</button><button class="opt">약 7,760 kN</button>
+      </div><div class="quiz-exp">\(1.2 \times 5{,}542 + 1.6 \times 0.4 \times 1{,}600 = 6{,}650 + 1{,}024 = 7{,}674\) kN. 9,210은 저감 전, 6,180은 사용 하중(D + CL<sub>0</sub>), 7,760은 1.4D다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const LDX = {
+  font(o = {}) { return `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`; },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = LDX.font(o);
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.7, y1 - uy * hd * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45); ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  /** 활하중 저감 계수(KDS 형태, 교육용): A_I = K A_T n */
+  C(AI, n) { if (AI < 36) return 1; return Math.max(n >= 2 ? 0.4 : 0.5, Math.min(1, 0.3 + 4.2 / Math.sqrt(AI))); },
+  sci(p) { if (!(p > 0)) return "0"; if (p >= 0.01) return CB.num(p, 3); const e = Math.floor(Math.log10(p)), m = p / 10 ** e; return `${m.toFixed(1)} × 10<sup>${String(e).replace("-", "−")}</sup>`; },
+  LV: [0, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41],
+};
+
+/* ---------- 1. 바닥 하중 쌓기 ---------- */
+(function () {
+  const gt = CB.range("ld-d-t", (v) => v + " mm", update), fin = CB.seg("ld-d-fin", update), typ = CB.seg("ld-d-type", update);
+  const ceil = CB.check("ld-d-ceil", update), mep = CB.check("ld-d-mep", update), part = CB.check("ld-d-part", update);
+  const FIN = { none: [], tile: [["모르타르 + 타일", 1.0]], oa: [["이중 바닥", 0.5]], stone: [["석재 30 mm", 0.81], ["모르타르 40 mm", 0.8]] };
+  let R = null;
+  function solve() {
+    const t = gt() / 1000, k = Number(typ()), layers = [];
+    FIN[fin()].forEach(([n, q]) => layers.push({ n, q, c: "accent2" }));
+    layers.push({ n: `슬래브 ${gt()} mm${k < 1 ? "(중공)" : ""}`, q: t * 24 * k, c: "dim", slab: true });
+    if (mep()) layers.push({ n: "덕트·배관", q: 0.3, c: "accent" });
+    if (ceil()) layers.push({ n: "천장·조명", q: 0.2, c: "accent" });
+    if (part()) layers.push({ n: "이동 칸막이", q: 1.0, c: "warn" });
+    const D = layers.reduce((a, l) => a + l.q, 0), qu = Math.max(1.4 * D, 1.2 * D + 4), bs = 0.4 * Math.max(0, 0.7 - t) * 24;
+    const w = 1.2 * (8 * D + bs) + 1.6 * 20, N = 10 * (1.2 * (64 * D + 16 * bs) + 1.6 * 160) + 1.2 * 15.36 * 41;
+    R = { t, layers, D, qu, w, N };
+  }
+  const cv = CB.canvas("#ld-cv-dead", (ctx, W, H) => {
+    if (!R) solve();
+    const P = CB.palette(), r = R, narrow = W < 520, sx0 = 16, sw = narrow ? W * 0.5 : W * 0.46, top = 24, bot = H - 24, Dmax = 12;
+    const s = (bot - top) / Dmax;
+    // 왼쪽: 층 단면(높이 ∝ 무게)
+    let y = top + (Dmax - r.D) * s;
+    r.layers.forEach((l) => {
+      const h = l.q * s, col = P[l.c] || P.dim;
+      ctx.fillStyle = col; ctx.globalAlpha = l.slab ? 0.45 : 0.6; ctx.fillRect(sx0, y, sw, Math.max(1, h)); ctx.globalAlpha = 1;
+      ctx.strokeStyle = P.border; ctx.strokeRect(sx0, y, sw, Math.max(1, h));
+      if (h > 13) LDX.text(ctx, `${l.n} ${CB.num(l.q, 2)}`, sx0 + sw / 2, y + h / 2, P.text, { size: narrow ? 10 : 11 });
+      y += h;
+    });
+    // 오른쪽: 누적 막대와 기준선
+    const bx = sx0 + sw + (narrow ? 30 : 60), bw = Math.min(70, W - bx - 70), Y = (v) => bot - v * s;
+    ctx.fillStyle = P.accent; ctx.globalAlpha = 0.75; ctx.fillRect(bx, Y(r.D), bw, r.D * s); ctx.globalAlpha = 1;
+    ctx.fillStyle = P.accent2; ctx.globalAlpha = 0.35; ctx.fillRect(bx, Y(r.D + 2.5), bw, 2.5 * s); ctx.globalAlpha = 1;
+    [[6.54, "B-10 6.54"], [r.D + 2.5, "D + L"]].forEach(([v, t], i) => { ctx.strokeStyle = i ? P.accent2 : P.bad; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(bx - 6, Y(v)); ctx.lineTo(bx + bw + 6, Y(v)); ctx.stroke(); ctx.setLineDash([]); LDX.text(ctx, t, bx + bw + 8, Y(v), i ? P.accent2 : P.bad, { size: 10.5, align: "left" }); });
+    LDX.text(ctx, `D = ${CB.num(r.D, 2)}`, bx + bw / 2, Y(r.D) + 14, P.text, { size: 11.5 });
+    LDX.text(ctx, "kN/m²", bx + bw / 2, bot + 12, P.dim, { size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.6), minHeight: 260, maxHeight: 400 });
+  function update() {
+    solve(); cv.redraw();
+    const r = R;
+    CB.stat("ld-d-D", `${CB.num(r.D, 2)} kN/m²`); CB.stat("ld-d-qu", `${CB.num(r.qu, 2)} kN/m²`);
+    CB.stat("ld-d-w", `${CB.num(r.w, 1)} kN/m`); CB.stat("ld-d-n", `${CB.sig(r.N, 4)} kN`);
+    const slab = r.layers.find((l) => l.slab).q, bs0 = 0.4 * 0.49 * 24, N0 = 10 * (1.2 * (64 * 6.54 + 16 * bs0) + 256) + 1.2 * 15.36 * 41, dN = r.N - N0;
+    document.getElementById("ld-d-msg").innerHTML = `슬래브가 고정하중의 <b>${CB.num((slab / r.D) * 100, 0)} %</b>입니다. B-10 기본값보다 바닥 D가 ${CB.num(r.D - 6.54, 2)} kN/m², 1층 C1 계수 축력이 <b>${dN >= 0 ? "+" : ""}${CB.sig(dN, 3)} kN</b> 달라집니다(10개 층 × 64 m² × 1.2).`;
+  }
+  update();
+})();
+
+/* ---------- 2. 활하중 저감 ---------- */
+(function () {
+  const kind = CB.seg("ld-r-kind", update), gat = CB.range("ld-r-at", (v) => v + " m²", update), gn = CB.range("ld-r-n", (v) => v + "개 층", update), use = CB.seg("ld-r-use", update);
+  const st = () => { const K = Number(kind()), At = gat(), n = gn(), u = use(), L0 = parseFloat(u), noRed = u.endsWith("a") || L0 > 5, AI = K * At * n; return { K, At, n, L0, noRed, AI, C: noRed ? 1 : LDX.C(AI, n) }; };
+  const cv = CB.canvas("#ld-cv-red", (ctx) => {
+    const P = CB.palette(), s = st(), xs = []; for (let a = 10; a <= 10000; a *= 1.05) xs.push(a);
+    const curve = (lim) => xs.map((a) => [a, a < 36 ? 1 : Math.max(lim, Math.min(1, 0.3 + 4.2 / Math.sqrt(a)))]);
+    CB.chart(ctx, null, { x: [10, 10000], y: [0, 1.1], logX: true, xLabel: "영향면적 A_I (m²)", yLabel: "저감 계수 C", series: [{ data: xs.map((a) => [a, Math.min(1, 0.3 + 4.2 / Math.sqrt(a))]), color: P.faint, width: 1.4, dash: [4, 4] }, { data: curve(s.n >= 2 ? 0.4 : 0.5), color: P.accent, width: 2.6 }],
+      hlines: [{ y: 0.5, color: P.warn, label: "하한 0.5 (1개 층)" }, { y: 0.4, color: P.bad, label: "하한 0.4 (2개 층 이상)" }], vlines: [{ x: 36, color: P.dim, label: "36 m²" }],
+      points: [{ x: CB.clamp(s.AI, 10, 10000), y: s.C, color: s.noRed ? P.bad : P.accent2, r: 6 }] });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.52), minHeight: 260, maxHeight: 380 });
+  function update() {
+    cv.redraw();
+    const s = st(), tot = s.L0 * s.At * s.n;
+    CB.stat("ld-r-ai", `${CB.sig(s.AI, 4)} m²`); CB.stat("ld-r-c", s.C.toFixed(3));
+    CB.stat("ld-r-l", `${CB.sig(tot, 4)} → ${CB.sig(tot * s.C, 4)} kN`);
+    const msg = document.getElementById("ld-r-msg");
+    msg.className = "ld-msg" + (s.noRed ? " bad" : "");
+    msg.innerHTML = s.noRed ? "이 용도(공중 집회 또는 5 kN/m² 초과)는 활하중을 저감하지 않습니다." : s.AI < 36 ? "영향면적이 36 m² 미만이라 저감하지 않습니다." : `C = 0.3 + 4.2/√${CB.sig(s.AI, 4)} = ${CB.num(0.3 + 4.2 / Math.sqrt(s.AI), 3)}${0.3 + 4.2 / Math.sqrt(s.AI) < s.C - 1e-9 ? ` → 하한 ${s.C.toFixed(1)} 적용` : ""}. 활하중이 <b>${CB.num((1 - s.C) * 100, 0)} %</b> 줄어듭니다.`;
+  }
+  update();
+})();
+
+/* ---------- 3. 부분 재하 ---------- */
+(function () {
+  const on = [true, true, true, true], gw = CB.range("ld-p-wl", (v) => v + " kN/m", recompute), env = CB.check("ld-p-env", draw);
+  const btns = [...document.querySelectorAll("#ld-p-spans button")];
+  btns.forEach((b) => b.addEventListener("click", () => { on[+b.dataset.i] = !on[+b.dataset.i]; draw(); }));
+  document.querySelectorAll("#sim-ld-pattern [data-pre]").forEach((b) => b.addEventListener("click", () => { b.dataset.pre.split("").forEach((c, i) => { on[i] = c === "1"; }); draw(); }));
+  const wD = 1.2 * 56.7;
+  function solve(pat) {
+    const loads = [{ type: "udl", w: wD, a: 0, b: 32 }];
+    pat.forEach((o, i) => { if (o && gw() > 0) loads.push({ type: "udl", w: 1.6 * gw(), a: 8 * i, b: 8 * i + 8 }); });
+    const b = CB.beam({ L: 32, EI: 3.14e5, supports: [0, 8, 16, 24, 32].map((x, i) => ({ x, type: i ? "roller" : "pin" })), loads });
+    const s = b.sample(320), sp = (k) => Math.max(...s.filter((p) => p.x > 8 * k + 1e-6 && p.x < 8 * k + 8 - 1e-6).map((p) => p.M));
+    return { b, s, m1: sp(0), m2: sp(1), mb: b.at(8, -1).M, mc: b.at(16, -1).M };
+  }
+  let E = null, cur = null;
+  function recompute() {
+    const all = []; for (let m = 0; m < 16; m++) all.push(solve([0, 1, 2, 3].map((i) => ((m >> i) & 1) === 1)));
+    const xs = all[0].s.map((p) => p.x);
+    E = { hi: xs.map((x, j) => [x, Math.max(...all.map((r) => r.s[j].M))]), lo: xs.map((x, j) => [x, Math.min(...all.map((r) => r.s[j].M))]),
+      m1: Math.max(...all.map((r) => r.m1)), m2: Math.max(...all.map((r) => r.m2)), mb: Math.min(...all.map((r) => r.mb)), mc: Math.min(...all.map((r) => r.mc)) };
+    draw();
+  }
+  const cv = CB.canvas("#ld-cv-pat", (ctx, W, H) => {
+    const P = CB.palette(), x0 = 24, x1 = W - 24, X = (x) => x0 + ((x1 - x0) * x) / 32, by = H * 0.68;
+    for (let i = 0; i < 4; i++) {
+      const hD = 18, hL = on[i] ? (gw() / 60) * 30 + 6 : 0;
+      ctx.fillStyle = P.dim; ctx.globalAlpha = 0.3; ctx.fillRect(X(8 * i) + 1, by - hD - 4, X(8) - X(0) - 2, hD); ctx.globalAlpha = 1;
+      if (hL) { ctx.fillStyle = CB.color("accent-2-soft"); ctx.strokeStyle = P.accent2; ctx.fillRect(X(8 * i) + 1, by - hD - 4 - hL, X(8) - X(0) - 2, hL); ctx.strokeRect(X(8 * i) + 1, by - hD - 4 - hL, X(8) - X(0) - 2, hL); }
+      LDX.text(ctx, `경간 ${i + 1}`, X(8 * i + 4), by + 26, on[i] ? P.accent2 : P.dim, { size: 11 });
+    }
+    ctx.strokeStyle = P.text; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(X(0), by); ctx.lineTo(X(32), by); ctx.stroke();
+    [0, 8, 16, 24, 32].forEach((x, i) => { const px = X(x); ctx.fillStyle = P.surface; ctx.strokeStyle = P.text; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(px, by + 2); ctx.lineTo(px - 7, by + 13); ctx.lineTo(px + 7, by + 13); ctx.closePath(); ctx.fill(); ctx.stroke(); LDX.text(ctx, "ABCDE"[i], px, by + 26 - (i % 4 ? 0 : 0), P.dim, { size: 10.5 }); });
+    LDX.text(ctx, "D(전 경간)", X(2), by - 13, P.text, { size: 10, mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.45 : 0.22), minHeight: 130, maxHeight: 180 });
+  cv.canvas.style.cursor = "pointer";
+  cv.canvas.addEventListener("click", (e) => { const r = cv.canvas.getBoundingClientRect(), x = ((e.clientX - r.left - 24) / (r.width - 48)) * 32; if (x < 0 || x > 32) return; const i = Math.min(3, Math.floor(x / 8)); on[i] = !on[i]; draw(); });
+  const cv2 = CB.canvas("#ld-cv-pat2", (ctx) => {
+    if (!E) return;
+    const P = CB.palette(), lo = Math.min(...E.lo.map((p) => p[1])), hi = Math.max(...E.hi.map((p) => p[1]));
+    const series = [];
+    if (env()) { series.push({ data: E.hi, color: P.faint, width: 1.2, dash: [4, 3] }, { data: E.lo, color: P.faint, width: 1.2, dash: [4, 3] }); }
+    series.push({ data: cur.s.map((p) => [p.x, p.M]), color: P.accent, width: 2.4, fill: CB.color("accent-soft") });
+    CB.chart(ctx, null, { x: [0, 32], y: [lo * 1.12, hi * 1.25], xLabel: "x (m)", yLabel: "M (kN·m), 새깅 +", series, hlines: [{ y: 0, color: P.axis, dash: [] }], vlines: [8, 16, 24].map((x) => ({ x, color: P.grid })) });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.38), minHeight: 220, maxHeight: 320 });
+  function draw() {
+    btns.forEach((b, i) => b.classList.toggle("primary", on[i]));
+    cur = solve(on); cv.redraw(); cv2.redraw();
+    const f = (v, e) => `${CB.num(v, 0)} <small>(최대 ${CB.num(e, 0)})</small>`;
+    CB.stat("ld-p-m1", f(cur.m1, E.m1)); CB.stat("ld-p-mb", f(cur.mb, E.mb)); CB.stat("ld-p-m2", f(cur.m2, E.m2)); CB.stat("ld-p-mc", f(cur.mc, E.mc));
+    const hit = [["경간 1 +M", cur.m1, E.m1], ["지점 B −M", cur.mb, E.mb], ["경간 2 +M", cur.m2, E.m2], ["지점 C −M", cur.mc, E.mc]].filter(([, a, b]) => Math.abs(a - b) < 0.5 && Math.abs(b) > 1).map((h) => h[0]);
+    document.getElementById("ld-p-msg").innerHTML = hit.length ? `이 배치는 <b>${hit.join(", ")}</b>의 최댓값을 만듭니다.` : "이 배치는 네 단면 어디에서도 최댓값을 만들지 않습니다.";
+  }
+  recompute();
+})();
+
+/* ---------- 4. 적설 하중 ---------- */
+(function () {
+  const roof = CB.seg("ld-s-roof", update), gsg = CB.range("ld-s-sg", (v) => v.toFixed(1) + " kN/m²", update), gth = CB.range("ld-s-th", (v) => v + "°", update), gh = CB.range("ld-s-h", (v) => v.toFixed(1) + " m", update), gce = CB.seg("ld-s-ce", update);
+  let R = null;
+  function solve() {
+    const Sg = gsg(), c = Number(gce()), Ce = c === 1.2 ? 1.0 : c, Ct = c === 1.2 ? 1.2 : 1.0, Sf = 0.7 * Ce * Ct * Sg, th = gth(), Cs = th <= 30 ? 1 : Math.max(0, (70 - th) / 40), Ss = Cs * Sf;
+    const gam = Math.min(4.7, 0.43 * Sg + 2.2), hb = Sf / gam, hc = Math.max(0, gh() - hb);
+    let hd = 0.3048 * (0.43 * Math.cbrt(40 * 3.28) * Math.pow(20.9 * Sg + 10, 0.25) - 1.5); hd = Math.max(0, hd);
+    let w = 4 * hd; if (hd > hc) { w = hc > 0 ? Math.min(8 * hc, (4 * hd * hd) / hc) : 0; hd = hc; }
+    const pd = hd * gam, kind = roof();
+    const max = kind === "flat" ? Sf : kind === "gable" ? (th >= 10 ? 1.5 * Ss : Ss) : Sf + pd;
+    R = { Sg, Sf, Ss, Cs, th, gam, hd, w, pd, kind, max };
+  }
+  const cv = CB.canvas("#ld-cv-snow", (ctx, W, H) => {
+    if (!R) solve();
+    const P = CB.palette(), r = R, base = H - 30, x0 = 30, x1 = W - 30, span = x1 - x0, ks = Math.min(36, (H * 0.4) / Math.max(0.5, r.max));
+    const load = (pts) => { ctx.fillStyle = CB.color("accent-2-soft"); ctx.strokeStyle = P.accent2; ctx.lineWidth = 1.6; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill(); ctx.stroke(); };
+    ctx.save(); ctx.strokeStyle = P.text; ctx.lineWidth = 3;
+    if (r.kind === "flat") {
+      const y = base - 60; ctx.fillStyle = P.elev; ctx.fillRect(x0, y, span, 60); ctx.strokeRect(x0, y, span, 60);
+      load([[x0, y], [x1, y], [x1, y - r.Sf * ks], [x0, y - r.Sf * ks]]);
+      LDX.text(ctx, `S_f = ${CB.num(r.Sf, 2)} kN/m²`, (x0 + x1) / 2, y - r.Sf * ks - 12, P.accent2, { size: 12 });
+    } else if (r.kind === "gable") {
+      const rise = Math.min(H * 0.35, (span / 2) * Math.tan((r.th * Math.PI) / 180)), ye = base - 50, xm = (x0 + x1) / 2;
+      ctx.fillStyle = P.elev; ctx.fillRect(x0, ye, span, 50); ctx.beginPath(); ctx.moveTo(x0, ye); ctx.lineTo(xm, ye - rise); ctx.lineTo(x1, ye); ctx.stroke();
+      const unb = r.th >= 10, wl = unb ? 0.3 * r.Ss : r.Ss, ll = unb ? 1.5 * r.Ss : r.Ss;
+      load([[x0, ye], [xm, ye - rise], [xm, ye - rise - wl * ks], [x0, ye - wl * ks]]);
+      load([[xm, ye - rise], [x1, ye], [x1, ye - ll * ks], [xm, ye - rise - ll * ks]]);
+      LDX.arrow(ctx, x0 - 20, ye - rise - 30, x0 + 40, ye - rise - 30, P.blue, 2);
+      LDX.text(ctx, `${CB.num(wl, 2)}`, (x0 + xm) / 2 - 10, ye - rise / 2 - wl * ks - 14, P.accent2, { size: 11.5 });
+      LDX.text(ctx, `${CB.num(ll, 2)} kN/m²`, (xm + x1) / 2 + 10, ye - rise / 2 - ll * ks - 14, P.accent2, { size: 11.5 });
+      LDX.text(ctx, `C_s = ${CB.num(r.Cs, 2)}${unb ? " · 불균형" : ""}`, xm, base - 12, P.dim, { size: 11 });
+    } else {
+      const xs = x0 + span * 0.42, mpp = (x1 - xs) / 30, hpx = Math.min(H * 0.45, gh() * 22), yl = base - 40, yh = yl - hpx;
+      ctx.fillStyle = P.elev; ctx.fillRect(x0, yh, xs - x0, base - yh); ctx.strokeRect(x0, yh, xs - x0, base - yh); ctx.fillRect(xs, yl, x1 - xs, 40); ctx.strokeRect(xs, yl, x1 - xs, 40);
+      load([[x0, yh], [xs, yh], [xs, yh - r.Sf * ks], [x0, yh - r.Sf * ks]]);
+      const wpx = Math.min(x1 - xs, r.w * mpp), top = yl - (r.Sf + r.pd) * ks;
+      load([[xs, yl], [x1, yl], [x1, yl - r.Sf * ks], [xs + wpx, yl - r.Sf * ks], [xs, top]]);
+      LDX.arrow(ctx, x0 - 10, yh - 40, x0 + 50, yh - 40, P.blue, 2);
+      LDX.text(ctx, `최대 ${CB.num(r.Sf + r.pd, 2)} kN/m²`, xs + 10, top - 12, P.accent2, { size: 11.5, align: "left" });
+      LDX.text(ctx, `h_d ${CB.num(r.hd, 2)} m · 폭 ${CB.num(r.w, 1)} m`, (xs + x1) / 2, base - 12, P.dim, { size: 11 });
+    }
+    ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 240, maxHeight: 360 });
+  function update() {
+    solve(); cv.redraw();
+    const r = R;
+    CB.stat("ld-s-sf", `${CB.num(r.Sf, 2)} kN/m²`); CB.stat("ld-s-max", `${CB.num(r.max, 2)} kN/m²`); CB.stat("ld-s-r", `${CB.num(r.max * 100, 0)} %`);
+    const msg = document.getElementById("ld-s-msg");
+    msg.className = "ld-msg" + (r.max > 1.0 ? " bad" : "");
+    msg.innerHTML = r.max > 1.0 ? `국부 적설 ${CB.num(r.max, 2)} kN/m²가 경량 지붕 고정하중 1.0 kN/m²보다 큽니다 — 지붕재·퍼린이 이 국부 하중을 견뎌야 합니다.` : `지붕 적설 최대 ${CB.num(r.max, 2)} kN/m², 눈 단위중량 ${CB.num(r.gam, 2)} kN/m³(균형 적설 깊이 ${CB.num((r.Sf / r.gam) * 100, 0)} cm).`;
+  }
+  update();
+})();
+
+/* ---------- 5. 하중 조합 ---------- */
+(function () {
+  const f = (v) => CB.sig(v, 4);
+  const gd = CB.range("ld-c-d", f, draw), gl = CB.range("ld-c-l", f, draw), gs = CB.range("ld-c-s", f, draw), gw = CB.range("ld-c-w", (v) => "± " + f(v), draw), ge = CB.range("ld-c-e", (v) => "± " + f(v), draw);
+  const half = CB.check("ld-c-half", draw);
+  document.querySelectorAll("#sim-ld-combo [data-pre]").forEach((b) => b.addEventListener("click", () => { const v = b.dataset.pre.split(",").map(Number); [gd, gl, gs, gw, ge].forEach((g, i) => g.set(v[i], false)); draw(); }));
+  const combos = () => {
+    const D = gd(), L = gl(), S = gs(), Wn = gw(), En = ge(), a = half() ? 0.5 : 1.0;
+    const r = (k, base, lat) => ({ k, lo: base - lat, hi: base + lat });
+    return [r("U1 1.4D", 1.4 * D, 0), r("U2 1.2D+1.6L+0.5S", 1.2 * D + 1.6 * L + 0.5 * S, 0), r("U3 1.2D+1.6S+L", 1.2 * D + 1.6 * S + a * L, 0),
+      r("U4 1.2D±W+L+0.5S", 1.2 * D + a * L + 0.5 * S, Wn), r("U5 1.2D±E+L+0.2S", 1.2 * D + a * L + 0.2 * S, En), r("U6 0.9D±W", 0.9 * D, Wn), r("U7 0.9D±E", 0.9 * D, En)];
+  };
+  const cv = CB.canvas("#ld-cv-combo", (ctx, W, H) => {
+    const P = CB.palette(), c = combos(), lo = Math.min(0, ...c.map((d) => d.lo)), hi = Math.max(1, ...c.map((d) => d.hi)), pad = (hi - lo) * 0.08;
+    const narrow = W < 520, padL = narrow ? 92 : 150, padR = 60, padT = 14, padB = 22, rh = (H - padT - padB) / c.length;
+    const X = (v) => padL + ((v - lo + pad) / (hi - lo + 2 * pad)) * (W - padL - padR);
+    const mx = c.reduce((a, b) => (b.hi > a.hi ? b : a)), mn = c.reduce((a, b) => (b.lo < a.lo ? b : a));
+    ctx.save(); ctx.strokeStyle = P.axis; ctx.beginPath(); ctx.moveTo(X(0), padT - 4); ctx.lineTo(X(0), H - padB + 4); ctx.stroke();
+    c.forEach((d, i) => {
+      const y = padT + i * rh + rh * 0.2, h = rh * 0.6, isMax = d === mx, isMin = d === mn && d.lo < 0;
+      ctx.fillStyle = isMax ? P.accent2 : P.accent; ctx.globalAlpha = isMax ? 0.9 : 0.5; ctx.fillRect(X(Math.min(d.lo, d.hi)), y, Math.max(3, X(d.hi) - X(d.lo)), h); ctx.globalAlpha = 1;
+      if (d.lo < 0) { ctx.fillStyle = P.bad; ctx.globalAlpha = isMin ? 0.9 : 0.5; ctx.fillRect(X(d.lo), y, X(Math.min(0, d.hi)) - X(d.lo), h); ctx.globalAlpha = 1; }
+      ctx.fillStyle = P.text; ctx.font = LDX.font({ size: narrow ? 9.5 : 11, bold: isMax }); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(narrow ? d.k.split(" ")[0] + " " + d.k.split(" ")[1].slice(0, 9) : d.k, padL - 8, y + h / 2);
+      LDX.text(ctx, d.lo === d.hi ? CB.sig(d.hi, 4) : `${CB.sig(d.lo, 3)} ~ ${CB.sig(d.hi, 4)}`, Math.min(W - 4, X(d.hi) + 4), y + h / 2, P.dim, { size: 10, align: X(d.hi) + 90 > W ? "right" : "left" });
+    });
+    ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.5), minHeight: 260, maxHeight: 380 });
+  function draw() {
+    cv.redraw();
+    const c = combos(), mx = c.reduce((a, b) => (b.hi > a.hi ? b : a)), mn = c.reduce((a, b) => (b.lo < a.lo ? b : a));
+    CB.stat("ld-c-max", `${CB.sig(mx.hi, 4)} (${mx.k.split(" ")[0]})`); CB.stat("ld-c-min", `${CB.sig(mn.lo, 4)} (${mn.k.split(" ")[0]})`); CB.stat("ld-c-svc", CB.sig(gd() + gl(), 4));
+    const msg = document.getElementById("ld-c-msg");
+    msg.className = "ld-msg" + (mn.lo < 0 ? " bad" : "");
+    msg.innerHTML = `최대는 <b>${mx.k}</b>.` + (mn.lo < 0 ? ` ${mn.k}에서 ${CB.sig(mn.lo, 3)} — 부호가 바뀝니다(기둥 인장·지붕 들림). 접합·정착·앵커와 기초 인발을 이 값으로 검토합니다.` : " 모든 조합에서 부호가 바뀌지 않습니다.");
+  }
+  draw();
+})();
+
+/* ---------- 6. 신뢰도 지수 ---------- */
+(function () {
+  const gth = CB.range("ld-b-th", (v) => v.toFixed(2), update), gvr = CB.range("ld-b-vr", (v) => v.toFixed(2), update), gvs = CB.range("ld-b-vs", (v) => v.toFixed(2), update), dist = CB.seg("ld-b-dist", update);
+  function beta(th, VR, VS, ln) {
+    if (ln) { const zR = Math.sqrt(Math.log(1 + VR * VR)), zS = Math.sqrt(Math.log(1 + VS * VS)); return { b: (Math.log(th) + 0.5 * (zS * zS - zR * zR)) / Math.hypot(zR, zS), zR, zS }; }
+    return { b: (th - 1) / Math.hypot(th * VR, VS) };
+  }
+  const lnpdf = (x, mu, V) => { if (x <= 0) return 0; const z = Math.sqrt(Math.log(1 + V * V)), l = Math.log(mu) - z * z / 2; return CB.normPdf(Math.log(x), l, z) / x; };
+  const cv = CB.canvas("#ld-cv-beta", (ctx) => {
+    const P = CB.palette(), th = gth(), VR = gvr(), VS = gvs(), ln = dist() === "ln", xmax = Math.max(2.5, th * (1 + 4 * VR)), N = 300;
+    const pdf = (x, mu, V) => (ln ? lnpdf(x, mu, V) : CB.normPdf(x, mu, mu * V));
+    const S = [], R = []; for (let i = 0; i <= N; i++) { const x = (xmax * i) / N; S.push([x, pdf(x, 1, VS)]); R.push([x, pdf(x, th, VR)]); }
+    const ym = Math.max(...S.map((p) => p[1]), ...R.map((p) => p[1])) * 1.1;
+    CB.chart(ctx, null, { x: [0, xmax], y: [0, ym], xLabel: "하중 효과 · 저항 (μ_S = 1)", yLabel: "확률 밀도", series: [{ data: S, color: P.accent2, width: 2.2, fill: CB.color("accent-2-soft") }, { data: R, color: P.accent, width: 2.2, fill: CB.color("accent-soft") }] });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.34), minHeight: 190, maxHeight: 280 });
+  const cv2 = CB.canvas("#ld-cv-beta2", (ctx) => {
+    const P = CB.palette(), th = gth(), VR = gvr(), VS = gvs(), ln = dist() === "ln", B = beta(th, VR, VS, ln);
+    const mu = ln ? Math.log(th) + 0.5 * (B.zS * B.zS - B.zR * B.zR) : th - 1, sd = ln ? Math.hypot(B.zR, B.zS) : Math.hypot(th * VR, VS);
+    const x0 = Math.min(-sd, mu - 4 * sd), x1 = mu + 4 * sd, N = 300, G = [], F = [];
+    for (let i = 0; i <= N; i++) { const x = x0 + ((x1 - x0) * i) / N, y = CB.normPdf(x, mu, sd); G.push([x, y]); if (x <= 0) F.push([x, y]); }
+    if (F.length) F.push([0, CB.normPdf(0, mu, sd)]);
+    const ym = CB.normPdf(mu, mu, sd) * 1.15;
+    const ch = CB.chart(ctx, null, { x: [x0, x1], y: [0, ym], xLabel: ln ? "ln(R/S)" : "g = R − S", yLabel: "확률 밀도", series: [{ data: G, color: P.accent, width: 2.2 }, { data: F, color: P.bad, width: 1.5, fill: P.bad }], vlines: [{ x: 0, color: P.bad, dash: [], label: "파괴 경계" }, { x: mu, color: P.dim }] });
+    const yA = ch.Y(ym * 0.55); LDX.arrow(ctx, ch.X(mu), yA, ch.X(0), yA, P.ok, 1.6, 8); LDX.arrow(ctx, ch.X(0), yA, ch.X(mu), yA, P.ok, 1.6, 8);
+    LDX.text(ctx, `β σ = ${CB.num(B.b, 2)} σ`, (ch.X(0) + ch.X(mu)) / 2, yA - 12, P.ok, { size: 11.5 });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.34), minHeight: 190, maxHeight: 280 });
+  function update() {
+    cv.redraw(); cv2.redraw();
+    const th = gth(), VR = gvr(), VS = gvs(), ln = dist() === "ln", b = beta(th, VR, VS, ln).b, pf = CB.normCdf(-b);
+    let a = 1, c = 10; for (let i = 0; i < 60; i++) { const m = (a + c) / 2; if (beta(m, VR, VS, ln).b < 3) a = m; else c = m; }
+    const lim = ln ? 99 : 1 / (VR * 3); // 정규 가정에서 θV_R가 너무 크면 β가 3에 못 닿는다
+    const need = beta(c, VR, VS, ln).b >= 2.999 ? c : NaN;
+    CB.stat("ld-b-beta", b.toFixed(2)); CB.stat("ld-b-pf", LDX.sci(pf)); CB.stat("ld-b-need", isFinite(need) && need < 9.9 ? need.toFixed(2) : "도달 불가");
+    const msg = document.getElementById("ld-b-msg");
+    msg.className = "ld-msg" + (b < 2.5 ? " bad" : b >= 3 ? " ok" : "");
+    msg.innerHTML = `P<sub>f</sub> ≈ ${LDX.sci(pf)} — 같은 구조물 약 ${CB.sig(1 / Math.max(pf, 1e-15), 2)}개 중 하나가 파괴되는 수준. ${b >= 3 ? "중력 조합의 목표(약 3)를 넘습니다." : "목표 β 약 3에 못 미칩니다."}${!ln && lim < 10 && !isFinite(need) ? " (정규 가정에서는 저항 변동이 크면 평균 안전율을 키워도 β가 1/V<sub>R</sub>을 넘지 못합니다.)" : ""}`;
+  }
+  update();
+})();
+
+/* ---------- 7. 기둥 축력 누적 ---------- */
+(function () {
+  const COL = { int: { A: 64, b: 16, name: "내부 C1" }, edge: { A: 32, b: 12, name: "외곽" }, corner: { A: 16, b: 8, name: "모서리" } };
+  const col = CB.seg("ld-t-col", update), gn = CB.range("ld-t-n", (v) => v + "층", () => { const s = document.getElementById("ld-t-s"); s.max = gn(); if (gs() > gn()) gs.set(gn(), false); else gs.set(gs(), false); update(); });
+  const gs = CB.range("ld-t-s", (v) => v + "층", update), cmb = CB.seg("ld-t-cmb", update), red = CB.check("ld-t-red", update);
+  const lv = (k) => (k === 0 ? 0 : 5 + 4 * (k - 1));
+  function at(s) {
+    const c = COL[col()], N = gn(), n = N + 1 - s, H = lv(N);
+    const D = n * (6.5 * c.A + 4.7 * c.b) + 15.36 * (H - lv(s - 1)), L0 = 2.5 * c.A * n, AI = 4 * c.A * n, C = red() ? LDX.C(AI, n) : 1, L = C * L0;
+    const k = cmb(), U = k === "u1" ? 1.4 * D : k === "svc" ? D + L : 1.2 * D + 1.6 * L, U0 = k === "u1" ? 1.4 * D : k === "svc" ? D + L0 : 1.2 * D + 1.6 * L0;
+    return { s, n, D, L0, AI, C, U, U0 };
+  }
+  const cv = CB.canvas("#ld-cv-td", (ctx, W, H) => {
+    const P = CB.palette(), N = gn(), rows = Array.from({ length: N }, (_, i) => at(N - i)), sel = gs();
+    const vmax = Math.max(...rows.map((r) => r.U0)) * 1.18, padL = 40, padR = 16, padT = 10, padB = 26, rh = (H - padT - padB) / N;
+    const X = (v) => padL + (v / vmax) * (W - padL - padR);
+    rows.forEach((r, i) => {
+      const y = padT + i * rh + rh * 0.15, h = Math.max(2, rh * 0.7), on = r.s === sel;
+      ctx.strokeStyle = P.faint; ctx.strokeRect(X(0), y, X(r.U0) - X(0), h);
+      ctx.fillStyle = on ? P.accent2 : P.accent; ctx.globalAlpha = on ? 0.95 : 0.6; ctx.fillRect(X(0), y, X(r.U) - X(0), h); ctx.globalAlpha = 1;
+      if (rh > 11 || on) { ctx.fillStyle = on ? P.text : P.dim; ctx.font = LDX.font({ size: 10, bold: on }); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(r.s + "F", padL - 6, y + h / 2); }
+      if (on) LDX.text(ctx, `${CB.sig(r.U, 4)} kN`, Math.min(X(r.U) + 6, W - 80), y + h / 2, P.text, { size: 11, align: "left" });
+    });
+    ctx.fillStyle = P.dim; ctx.font = LDX.font({ size: 10.5, mono: false, bold: false }); ctx.textAlign = "left"; ctx.fillText("축력 (kN) · 테두리: 저감 전", padL, H - 8);
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 260, maxHeight: 420 });
+  function update() {
+    cv.redraw();
+    const r = at(Math.min(gs(), gn())), ratio = (r.U * 1000) / (640000 * 30);
+    CB.stat("ld-t-dl", `${CB.sig(r.D, 4)} · ${CB.sig(r.L0, 4)} kN`); CB.stat("ld-t-c", `${CB.sig(r.AI, 4)} m² · ${r.C.toFixed(3)}`);
+    CB.stat("ld-t-nu", `${CB.sig(r.U, 4)} kN`); CB.stat("ld-t-r", ratio.toFixed(2));
+    const msg = document.getElementById("ld-t-msg");
+    msg.className = "ld-msg" + (ratio > 0.6 ? " bad" : "");
+    msg.innerHTML = `${COL[col()].name} 기둥 ${r.s}층: 바닥 ${r.n}개를 받칩니다. ` + (r.U0 - r.U > 0.5 ? `활하중 저감으로 <b>${CB.sig(r.U0 - r.U, 3)} kN(${CB.num(((r.U0 - r.U) / r.U0) * 100, 0)} %)</b> 줄었습니다.` : "저감 효과가 없습니다.") + (ratio > 0.6 ? " 축력비가 0.6을 넘습니다 — 단면을 키우거나 고강도 콘크리트를 검토하세요(1장 경험값)." : "");
+  }
+  update();
+})();
+</script>
+</body>
+</html>

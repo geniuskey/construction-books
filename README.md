@@ -11,7 +11,7 @@
 | `/mechanics/` | MechanicsBook · 구조역학 | 공개, 4부 16장 + 용어집 |
 | `/materials/` | MaterialsBook · 건설재료 | 공개, 4부 16장 + 용어집 |
 | `/geotech/` | GeotechBook · 지반공학 | 공개, 4부 16장 + 용어집 |
-| `/structure/` | StructureBook · 건축구조 | 준비 예정 |
+| `/structure/` | StructureBook · 건축구조 | 공개, 4부 16장 + 용어집 |
 | `/concrete/` | ConcreteBook · 철근콘크리트 구조 | 준비 예정 |
 | `/civil/` | CivilBook · 교량·터널·도로 | 준비 예정 |
 | `/site/` | SiteBook · 시공과 건설관리 | 준비 예정 |
@@ -19,7 +19,7 @@
 
 준비 중인 책은 `roadmap.json`에 적습니다. 공개할 때 그 항목을 지우고 `tools/sync-catalog.py`의 `LOCAL_BOOKS`에 옮깁니다.
 
-MechanicsBook(`mechanics/`)은 math-books의 CalculusBook 엔진(`MB`)을 물려받아 전역 객체 이름을 `CB`로 바꾸고 구조 해석 모듈을 더했습니다. 2차원 골조·트러스 강성법 해석기(`CB.frame`, `CB.truss`, `CB.beam`), 단면 성질(`CB.section`), 구조물·하중·단면력도 그리기(`CB.drawFrame`, `CB.beamDiagrams`, `CB.drawSection`), 끌어서 돌리는 3D 보기(`CB.orbit`)입니다. 다음 책들(건축구조·철근콘크리트·교량)도 이 엔진을 복사해 씁니다. MaterialsBook(`materials/`)은 같은 엔진에 재료 모델(`CB.conc` 배합·강도·내구성, `CB.agg` 골재, `CB.steel` 강재·철근, `CB.asph` 아스팔트, `CB.wall` 열관류)을 더했고, 기준 배합 **M-30**과 기준 포장 **P-13**을 더해 씁니다. 집필 규칙은 [materials/CONTRIBUTING.md](materials/CONTRIBUTING.md)를 참고하세요. GeotechBook(`geotech/`)은 재료 모델 대신 지반 모델(`CB.soil`: 상 관계, 응력 단면, 부시네스크 지중 응력, 압밀·연직 배수, 토압, 지지력, 사면, 액상화)과 기준 지반 **G-10**을 더했습니다([geotech/CONTRIBUTING.md](geotech/CONTRIBUTING.md)). 모든 장은 가상의 기준 구조물 두 개, 10층 RC 업무시설 **B-10**과 36 m 강 트러스 보도교 **T-36**의 숫자를 함께 씁니다. 집필 규칙·부호 규약·기준 구조물 표·엔진 API는 [mechanics/CONTRIBUTING.md](mechanics/CONTRIBUTING.md)를 참고하세요.
+MechanicsBook(`mechanics/`)은 math-books의 CalculusBook 엔진(`MB`)을 물려받아 전역 객체 이름을 `CB`로 바꾸고 구조 해석 모듈을 더했습니다. 2차원 골조·트러스 강성법 해석기(`CB.frame`, `CB.truss`, `CB.beam`), 단면 성질(`CB.section`), 구조물·하중·단면력도 그리기(`CB.drawFrame`, `CB.beamDiagrams`, `CB.drawSection`), 끌어서 돌리는 3D 보기(`CB.orbit`)입니다. 다음 책들(건축구조·철근콘크리트·교량)도 이 엔진을 복사해 씁니다. MaterialsBook(`materials/`)은 같은 엔진에 재료 모델(`CB.conc` 배합·강도·내구성, `CB.agg` 골재, `CB.steel` 강재·철근, `CB.asph` 아스팔트, `CB.wall` 열관류)을 더했고, 기준 배합 **M-30**과 기준 포장 **P-13**을 더해 씁니다. 집필 규칙은 [materials/CONTRIBUTING.md](materials/CONTRIBUTING.md)를 참고하세요. GeotechBook(`geotech/`)은 재료 모델 대신 지반 모델(`CB.soil`: 상 관계, 응력 단면, 부시네스크 지중 응력, 압밀·연직 배수, 토압, 지지력, 사면, 액상화)과 기준 지반 **G-10**을 더했습니다([geotech/CONTRIBUTING.md](geotech/CONTRIBUTING.md)). StructureBook(`structure/`)은 구조 동역학·횡하중 모델(`CB.dyn`: 1자유도·뉴마크·응답 스펙트럼·모드 해석·설계 스펙트럼·등가 정적 해석·TMD, `CB.wind`)을 더했습니다([structure/CONTRIBUTING.md](structure/CONTRIBUTING.md)). 모든 장은 가상의 기준 구조물 두 개, 10층 RC 업무시설 **B-10**과 36 m 강 트러스 보도교 **T-36**의 숫자를 함께 씁니다. 집필 규칙·부호 규약·기준 구조물 표·엔진 API는 [mechanics/CONTRIBUTING.md](mechanics/CONTRIBUTING.md)를 참고하세요.
 
 ## 구성
 
@@ -41,10 +41,11 @@ tools/katex.mjs, katex.test.mjs       빌드 시 수식 렌더링과 회귀 검�
 tools/engine.test.cjs                 구조 해석 엔진을 손계산 공식과 대조(단순보·캔틸레버·연속보·게르버보·트러스·라멘·단면)
 tools/materials.test.cjs              재료 모델(배합·강도·내구성·강재·아스팔트·열관류)을 손계산과 대조
 tools/geotech.test.cjs                지반 모델(응력·압밀·토압·지지력·사면·액상화)을 손계산과 대조
+tools/structure.test.cjs              동역학·풍하중 모델(모드·뉴마크·스펙트럼·등가 정적·TMD)을 손계산과 대조
 tools/merge-glossary.py               장별 용어 파일 {slug}/js/glossary/*.json → glossary-data.js
 tools/check.py                        메타데이터·링크 정적 검사
 tools/browser-check.cjs               데스크톱·모바일 브라우저 검사(Playwright)
-tools/og.mjs                          공유 이미지 og.png, mechanics/og.png, materials/og.png, geotech/og.png 생성(Playwright)
+tools/og.mjs                          공유 이미지 og.png, mechanics/og.png, materials/og.png, geotech/og.png, structure/og.png 생성(Playwright)
 tools/sim-shots.mjs                   홈 실험 카드 이미지 생성(Playwright)
 ```
 
@@ -55,7 +56,7 @@ npm ci
 npm test                                   # 수식·해석 엔진·링크 검사
 npm run build                              # .book-dist/ 생성
 python3 -m http.server 8000 --directory .book-dist
-node tools/browser-check.cjs --offline mechanics materials geotech   # Playwright 필요
+node tools/browser-check.cjs --offline mechanics materials geotech structure   # Playwright 필요
 ```
 
 배포물은 `.book-dist/`입니다. GitHub Pages의 Source를 GitHub Actions로 설정하고 커스텀 도메인과 DNS를 연결하면 `main`에 push할 때 Deploy Book 워크플로가 검사·빌드 후 배포합니다. `CNAME`의 `construction.euiyun.com`은 예정 주소이며, 이 파일만으로 DNS나 GitHub 설정이 바뀌지는 않습니다.

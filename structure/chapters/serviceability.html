@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>사용성 · StructureBook</title>
+<meta name="description" content="무너지지 않아도 불편하면 실패다. 처짐 제한과 장기 처짐, 균열 폭, 보행 진동과 바닥 응답, T-36 보도교의 연직 진동수와 군중 수평 진동, 풍하중 횡변위·가속도, 기둥 축소와 보정, 신축 이음, 기계 진동 차단을 B-10과 T-36으로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .sv-stack { display: grid; grid-template-columns: 1fr; }
+  .sv-stack > div { position: relative; min-width: 0; }
+  .sv-stack > div + div { border-top: 1px solid var(--border); }
+  .sv-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .sv-msg b { color: var(--text); }
+  .sv-msg.ok { color: var(--ok); font-weight: 600; }
+  .sv-msg.bad { color: var(--bad); font-weight: 600; }
+  .sv-tbl td, .sv-tbl th { font-variant-numeric: tabular-nums; }
+  .sv-lab { font-style: normal; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="structure"></script>
+</head>
+<body data-chapter="serviceability">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="sv-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="sv-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="sv-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="sv-ah-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+      <marker id="sv-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 15</div>
+    <h1 data-no-glossary>사용성</h1>
+    <p class="lead">구조 설계의 첫 질문은 "무너지지 않는가"입니다. 그러나 무너지지 않는 건물도 실패할 수 있습니다. 바닥이 처져 칸막이벽에 금이 가고, 사람이 걸을 때마다 책상 위 커피잔이 떨리고, 바람 부는 날 꼭대기 층 사무실이 울렁이고, 보도교가 옆으로 흔들려 사람들이 난간을 붙잡는다면, 강도 계산이 아무리 정확해도 그 건물은 쓰기 어렵습니다. 이 장은 <b>사용성 한계상태</b>를 다룹니다. 처짐과 균열, 보행 진동과 보도교 진동, 바람에 의한 흔들림, 10층 기둥이 해마다 조금씩 짧아지는 기둥 축소, 온도에 따른 신축과 이음을 기준 건물 B-10과 보도교 T-36으로 계산하고, 각 응답을 사람이 느끼는 한계와 비교해 판단합니다.</p>
+    <ul class="objectives">
+      <li>강도 한계상태와 사용성 한계상태를 구분하고, 사용성 검토에 쓰는 하중(사용 하중, 지속 하중, 재현 기간이 짧은 바람)을 설명한다.</li>
+      <li>처짐 제한 L/360·L/480·L/240의 뜻(어떤 처짐을 어디에 비교하는가)을 알고, <code>CB.beam</code>으로 즉시·장기 처짐을 계산해 판정한다.</li>
+      <li>보행 하중을 고조파로 나누어 바닥의 공진 응답을 계산하고, 사무실·상가의 가속도 한계(교육용)와 비교한다.</li>
+      <li>레일리 방법으로 T-36 보도교의 연직 1차 진동수를 <code>CB.truss</code>의 자중 처짐에서 구하고, 보행 진동수 대역과 겹치는지 판정한다.</li>
+      <li>군중 동기화에 의한 수평 진동(런던 밀레니엄 브리지 2000)을 음의 감쇠 모형으로 설명하고 임계 군중 수를 계산한다.</li>
+      <li>B-10 기둥과 코어의 탄성·크리프·수축 축소를 시공 순서대로 누적해 차등 축소와 보정량을 구하고, 온도 신축과 이음 간격, 풍하중 횡변위·가속도를 판정한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>개통 이틀 만에 닫힌 다리</b></div>
+      <div class="o-body"><p>2000년 6월 10일, 런던 템스강에 세인트 폴 대성당과 테이트 모던을 잇는 보행자 전용 현수교 밀레니엄 브리지가 개통했습니다. 첫날 수많은 사람이 다리를 건너자 상판이 <b>옆으로</b> 눈에 띄게 흔들리기 시작했고, 사람들은 걸음을 넓게 벌리고 난간을 붙잡았습니다. 다리는 이틀 뒤인 6월 12일 닫혔습니다. 강도는 충분했고 무너질 위험도 없었습니다. 문제는 사람이었습니다. 흔들리는 바닥 위에서 균형을 잡으려는 보행자들이 저도 모르게 흔들림에 발걸음을 맞추었고, 그 발걸음이 다시 흔들림을 키웠습니다.</p>
+        <p>설계자들은 실험과 해석으로 이 현상을 밝혀냈고, 점성 감쇠기와 <span class="term">동조 질량 감쇠기</span>를 달아 진동을 잡은 뒤 다리는 2002년 2월 다시 열렸습니다. 이 사건 뒤 세계의 보도교 설계 지침은 연직 진동뿐 아니라 수평 진동수와 군중 밀도를 따로 검토하도록 바뀌었습니다. 사용성은 "편의"가 아니라 구조물이 제 역할을 하는지를 가르는 한계상태입니다.</p>
+        <div class="o-chain"><span>사람 · 바람 · 시간 · 온도</span><i>→</i><span class="tool">처짐 δ · 진동수 f · 가속도 a · 축소 Δ</span><i>→</i><span>한계와 비교 · 감쇠·강성·보정으로 해결</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="limit-states">
+    <h2>사용성 한계상태</h2>
+    <p>1장에서 한계상태를 두 갈래로 나누었습니다. <b>강도 한계상태</b>는 부재가 부서지거나 건물이 무너지는 상태이고, 계수 하중(1.2D + 1.6L 등)과 감소된 강도 φR<sub>n</sub>으로 검토합니다. <span class="term">사용성 한계상태</span><span class="en">(Serviceability limit state)</span>는 무너지지는 않지만 건물을 원래 용도대로 쓰기 어렵게 만드는 상태입니다. 과도한 처짐, 보기 싫거나 물이 새는 균열, 사람이 불쾌하게 느끼는 진동, 비구조재와 설비를 망가뜨리는 변형이 여기에 속합니다.</p>
+    <figure class="diagram" id="fig-sv-overview">
+      <svg viewBox="0 0 820 300" role="img" aria-label="건물의 사용성 문제: 처짐, 바닥 진동, 횡변위와 가속도, 기둥 차등 축소, 온도 신축">
+        <rect x="10" y="10" width="800" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <rect x="0" y="0" width="260" height="220" style="fill:none;stroke:var(--text-dim);stroke-dasharray:5 4"/>
+          <g style="stroke:var(--text);stroke-width:2.4">
+            <line x1="0" y1="220" x2="0" y2="0"/><line x1="130" y1="220" x2="130" y2="0"/><line x1="260" y1="220" x2="260" y2="0"/>
+            <line x1="0" y1="55" x2="260" y2="55"/><line x1="0" y1="110" x2="260" y2="110"/><line x1="0" y1="165" x2="260" y2="165"/><line x1="0" y1="0" x2="260" y2="0"/>
+          </g>
+          <rect x="150" y="0" width="40" height="220" style="fill:var(--blue);opacity:.15"/>
+          <path d="M0 110Q65 128 130 110" style="fill:none;stroke:var(--accent);stroke-width:2.6;stroke-dasharray:6 4"/>
+          <text x="65" y="140" text-anchor="middle" class="t-mono" style="fill:var(--accent)">① 처짐</text>
+          <path d="M18 55L22 47L26 55L30 47L34 55" style="fill:none;stroke:var(--accent-2);stroke-width:2"/>
+          <text x="40" y="44" class="t-mono" style="fill:var(--accent-2)">② 바닥 진동</text>
+          <line x1="262" y1="-6" x2="300" y2="-6" style="stroke:var(--blue);stroke-width:2.4" marker-end="url(#sv-ah-blue)"/>
+          <text x="306" y="-2" class="t-mono" style="fill:var(--blue)">③ 바람: 횡변위·가속도</text>
+          <text x="170" y="236" text-anchor="middle" class="t-mono" style="fill:var(--blue)">코어</text>
+          <text x="0" y="250" class="t-mono">④ 기둥이 코어보다 더 줄어든다 → 바닥 기울어짐</text>
+        </g>
+        <g transform="translate(440,60)">
+          <text x="0" y="0" class="t" style="font-weight:700">사용성 검토의 짝</text>
+          <text x="0" y="30" class="t-dim">① 처짐 δ ↔ L/360 · L/480 · L/240</text>
+          <text x="0" y="56" class="t-dim">② 보행 가속도 a ↔ 0.5 % g(사무실, 교육용)</text>
+          <text x="0" y="82" class="t-dim">　 보도교 진동수 f ↔ 보행 대역 1.6–2.4 Hz</text>
+          <text x="0" y="108" class="t-dim">③ 층간 변위비 ↔ h/500(교육용) · 가속도 ↔ 지각 곡선</text>
+          <text x="0" y="134" class="t-dim">④ 차등 축소 Δ ↔ 바닥 기울기·설비 공차</text>
+          <text x="0" y="160" class="t-dim">⑤ 온도 신축 αΔTL ↔ 이음 간격·폭</text>
+          <text x="0" y="194" class="t-mono">하중: 사용 하중(계수 없음), 지속 하중, 짧은 재현 기간</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-1.</b> 건물의 사용성 문제와 판단 기준의 짝. 강도 검토는 계수 하중으로 "버티는가"를 묻지만, 사용성 검토는 계수 없는 사용 하중으로 "얼마나 움직이고 흔들리는가"를 계산해 사람·비구조재·설비가 견디는 한계와 비교한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 15.1 (사용성 검토의 하중)</strong> 사용성은 보통 하중 계수를 1.0으로 둔 사용 하중으로 검토한다. 어떤 하중을 쓰는지는 현상에 따라 다르다.
+      <ul style="margin:6px 0 0">
+        <li><b>즉시 처짐·진동:</b> D + L(또는 진동은 실제 질량 = 고정하중 + 실제로 있을 법한 활하중 일부, 교육용으로 0.5 kN/m²).</li>
+        <li><b>장기 처짐·기둥 축소:</b> <span class="term">지속 하중</span>(sustained load) = 고정하중 + 오래 머무는 활하중(사무실은 활하중의 약 30 %, 교육용 가정).</li>
+        <li><b>바람에 의한 흔들림:</b> 설계 풍속(재현 기간 수백 년 수준)이 아니라 재현 기간 1–10년 정도의 작은 바람(교육용으로 설계 기본 풍속의 약 0.75배).</li>
+      </ul>
+      사용성의 한계값은 법적 최소 기준이기보다 발주자와 설계자가 정하는 성능 목표인 경우가 많다. 이 장의 수치는 KDS 41(건축물 구조기준)과 국제 지침의 형태를 빌린 교육용이며, 실제 설계는 현행 기준과 지침을 확인한다.</div>
+    <div class="table-wrap"><table class="sv-tbl">
+      <thead><tr><th>현상</th><th>무엇이 망가지나</th><th>계산하는 응답</th><th>이 장의 절</th></tr></thead>
+      <tbody>
+        <tr><td>처짐</td><td>칸막이벽·마감 균열, 문 끼임, 지붕 물 고임, 외관</td><td>즉시·장기 처짐 δ</td><td>15.2</td></tr>
+        <tr><td>균열</td><td>외관, 누수, 철근 부식(내구성)</td><td>균열 폭 w</td><td>15.3</td></tr>
+        <tr><td>바닥 진동</td><td>거주자의 불쾌감, 정밀 장비</td><td>고유 진동수 f, 가속도 a</td><td>15.4</td></tr>
+        <tr><td>보도교 진동</td><td>보행 불안, 군중의 동기화</td><td>연직·수평 진동수, 가속도</td><td>15.5–15.6</td></tr>
+        <tr><td>바람 흔들림</td><td>외장·칸막이 손상, 멀미</td><td>층간 변위비, 가속도</td><td>15.7</td></tr>
+        <tr><td>기둥 축소</td><td>바닥 기울어짐, 설비·엘리베이터·외장 공차</td><td>차등 축소 Δ</td><td>15.8</td></tr>
+        <tr><td>온도 신축</td><td>단부 기둥 균열, 이음부 누수</td><td>신축량, 기둥 강제 변위</td><td>15.9</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="deflection">
+    <h2>처짐 제한</h2>
+    <div class="problem"><strong>보는 버티는데 벽이 갈라졌다</strong>
+      <p>준공 2년 뒤, 8 m 경간 보 위에 쌓은 조적 칸막이벽에 대각선 금이 갔습니다. 보의 강도는 충분하고 처짐도 준공 때 측정한 값은 작았습니다. 그런데 칸막이벽을 쌓은 <b>뒤에</b> 보가 크리프로 더 처졌습니다. 벽이 보지 못한 것은 "총 처짐"이 아니라 "벽을 쌓은 뒤의 처짐"이었습니다.</p></div>
+    <p>구조역학 11장에서 처짐을 계산했고, MaterialsBook 8장에서 콘크리트의 크리프가 처짐을 몇 년에 걸쳐 두세 배로 키운다는 것을 보았습니다. 사용성 검토는 그 숫자를 <b>무엇에 비교하는가</b>의 문제이고, 그 비교 기준이 <span class="term">처짐 제한</span>입니다. 기준은 처짐을 하나로 뭉뚱그리지 않고, 누가 그 처짐을 겪는지에 따라 나누어 제한합니다.</p>
+    <figure class="diagram" id="fig-sv-deflect">
+      <svg viewBox="0 0 820 280" role="img" aria-label="칸막이벽을 붙인 뒤의 처짐이 벽에 대각선 균열을 만드는 모습과 처짐의 시간 구성">
+        <rect x="10" y="10" width="800" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="40" y="20" width="240" height="90" class="f-acc2-soft" style="stroke:var(--text-dim)"/>
+          <text x="160" y="12" text-anchor="middle" class="t">칸막이벽(손상 우려 비구조재)</text>
+          <path d="M0 110Q160 150 320 110" style="fill:none;stroke:var(--text);stroke-width:5"/>
+          <path d="M0 110L320 110" style="fill:none;stroke:var(--text-dim);stroke-width:1.2;stroke-dasharray:4 4"/>
+          <g style="stroke:var(--bad);stroke-width:2;fill:none"><path d="M70 104L92 82L104 70L120 54"/><path d="M250 104L228 82L216 70L200 54"/></g>
+          <polygon points="0,110 -10,128 10,128" style="fill:var(--surface);stroke:var(--text)"/><polygon points="320,110 310,128 330,128" style="fill:var(--surface);stroke:var(--text)"/>
+          <text x="160" y="166" text-anchor="middle" class="t-mono" style="fill:var(--bad)">벽을 붙인 뒤의 처짐 → 대각선(전단) 균열</text>
+          <text x="160" y="190" text-anchor="middle" class="t-dim">보의 강도와는 무관하다</text>
+        </g>
+        <g transform="translate(430,36)">
+          <line x1="20" y1="200" x2="360" y2="200" class="s-axis"/><line x1="20" y1="200" x2="20" y2="10" class="s-axis"/>
+          <text x="360" y="218" text-anchor="end" class="t-mono">시간</text><text x="26" y="18" class="t-mono">처짐 δ</text>
+          <path d="M20 200L60 150" style="stroke:var(--text-dim);stroke-width:2.4"/>
+          <path d="M60 150Q140 110 220 96Q300 86 350 82" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <path d="M250 92L262 58L350 50" style="fill:none;stroke:var(--accent-2);stroke-width:2.4;stroke-dasharray:5 4"/>
+          <line x1="80" y1="200" x2="80" y2="30" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="84" y="40" class="t-mono">벽 설치</text>
+          <text x="64" y="170" class="t-mono">고정하중 즉시</text>
+          <text x="160" y="128" class="t-mono" style="fill:var(--accent)">지속 하중 크리프</text>
+          <text x="270" y="44" class="t-mono" style="fill:var(--accent-2)">활하중 즉시</text>
+          <line x1="350" y1="141" x2="350" y2="52" style="stroke:var(--bad);stroke-width:2" marker-start="url(#sv-ah-bad)" marker-end="url(#sv-ah-bad)"/>
+          <text x="344" y="176" text-anchor="end" class="t-mono" style="fill:var(--bad)">벽이 겪는 처짐 ≤ L/480</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-2.</b> 칸막이벽이 겪는 처짐. 고정하중의 즉시 처짐은 벽을 쌓기 전에 이미 일어나 벽과 상관이 없다. 벽이 겪는 것은 그 뒤에 자라는 지속 하중의 크리프 처짐과 나중에 오는 활하중의 즉시 처짐이다. 손상되기 쉬운 <span class="term">비구조재</span>를 받치는 바닥은 이 처짐을 L/480 이하로 제한한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.2 (처짐 제한의 네 칸, KDS 14 20 30 · ACI 318 형태)</strong> 경간 ℓ에 대해
+      <div class="table-wrap"><table class="sv-tbl">
+        <thead><tr><th>부재</th><th>비교하는 처짐</th><th>한계</th></tr></thead>
+        <tbody>
+          <tr><td>손상 우려 비구조재를 받치지 않는 평지붕</td><td>활하중(적설 등) 즉시 처짐</td><td>ℓ/180</td></tr>
+          <tr><td>손상 우려 비구조재를 받치지 않는 바닥</td><td>활하중 즉시 처짐</td><td>ℓ/360</td></tr>
+          <tr><td>손상 우려 비구조재를 받치는 바닥·지붕</td><td>비구조재 설치 뒤의 처짐 = 지속 하중 장기 처짐 + 활하중 즉시 처짐</td><td>ℓ/480</td></tr>
+          <tr><td>손상 우려 없는 비구조재를 받치는 바닥·지붕</td><td>위와 같음</td><td>ℓ/240</td></tr>
+        </tbody></table></div>
+      장기 처짐은 지속 하중의 즉시 처짐에 <span class="term">처짐 증가 계수</span>를 곱해 구한다.
+      <div class="formula">$$\delta_{\text{after}} = \lambda_\Delta\,\delta_{i,\text{sus}} + \delta_{i,L}, \qquad \lambda_\Delta = \frac{\xi}{1 + 50\rho'}$$<div class="where">\(\xi\): 시간 경과 계수(5년 이상 2.0, 12개월 1.4, 6개월 1.2, 3개월 1.0), \(\rho'\): 압축 철근비. 엄밀히는 비구조재 설치 전에 일어난 장기 처짐을 빼야 하지만 이 책은 안전 측으로 전부 포함한다. 콘크리트 부재의 즉시 처짐은 균열을 반영한 <span class="term">유효 단면 2차 모멘트</span> \(I_e\)로 계산한다(이 장은 \(I_e/I_g\)를 입력값으로 둔다, 교육용). 현행 기준 확인.</div></div></div>
+    <div class="callout"><strong>예제 15.1 (B-10 큰보 G1의 처짐 검토)</strong> G1(400 × 700 mm, \(EI_g = 3.14 \times 10^5\) kN·m²)은 경간 8 m의 4경간 연속보다. 사용 하중 \(w_D = 56.7\), \(w_L = 20\) kN/m(구조역학 표). 균열을 고려해 \(I_e = 0.5I_g\), 지속 활하중 30 %, \(\rho' = 0\)(\(\lambda_\Delta = 2.0\)). 칸막이벽을 받친다고 보고 ℓ/480으로 검토한다.
+      <ol style="margin:6px 0 0">
+        <li><b>단위 하중 처짐.</b> <code>CB.beam</code>으로 모든 경간에 1 kN/m를 실으면 둘째 경간 최대 처짐은 \(I_g\)로 0.0247 mm, \(I_e = 0.5I_g\)로 0.0493 mm다(76.7 kN/m에서 \(I_g\)로 1.89 mm, 구조역학 11장의 1.86 mm와 같은 크기).</li>
+        <li><b>활하중 즉시 처짐.</b> \(\delta_{i,L} = 20 \times 0.0493 = 0.99\) mm \(\ll\) ℓ/360 = 22.2 mm.</li>
+        <li><b>설치 뒤 처짐.</b> 지속 하중 \(56.7 + 0.3 \times 20 = 62.7\) kN/m → \(\delta_{i,\text{sus}} = 3.09\) mm. \(\delta_{\text{after}} = 2.0 \times 3.09 + 0.99 = 7.2\) mm \(\lt\) ℓ/480 = 16.7 mm. 합격.</li>
+        <li><b>끝 경간은?</b> 같은 계산을 끝 경간에 하면 단위 처짐이 0.168 mm로 3.4배다. \(\delta_{\text{after}} = 2.0 \times 10.6 + 3.4 = 24.5\) mm \(\gt\) 16.7 mm로 ℓ/480을 넘는다. 다만 이 모형은 바깥 기둥을 핀으로 보았다. 실제 G1은 바깥 기둥과 강접합되어 끝이 구속되므로 처짐이 이보다 작다. 판정이 모형의 지점 가정에 달려 있다면 골조 모형(<code>CB.frame</code>)으로 다시 확인한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sv-deflect">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>처짐 제한 검토기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-df" aria-label="보의 즉시 처짐과 장기 처짐 곡선, 처짐 한계선"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>지지 조건</span><div class="seg" id="sv-df-sup"><button data-value="ss">단순보</button><button data-value="end">연속 끝 경간</button><button data-value="int" class="on">연속 내부 경간</button><button data-value="cant">캔틸레버</button></div></div>
+          <label class="ctrl"><span>경간 L <output id="sv-df-L-out"></output></span><input type="range" id="sv-df-L" min="3" max="14" step="0.5" value="8"></label>
+          <label class="ctrl"><span>보 춤 h <output id="sv-df-h-out"></output></span><input type="range" id="sv-df-h" min="300" max="1200" step="10" value="700"></label>
+          <label class="ctrl"><span><em class="sv-lab">유효 강성 I<sub>e</sub>/I<sub>g</sub></em> <output id="sv-df-ie-out"></output></span><input type="range" id="sv-df-ie" min="0.25" max="1" step="0.05" value="0.5"></label>
+          <label class="ctrl"><span><em class="sv-lab">고정하중 w<sub>D</sub></em> <output id="sv-df-wd-out"></output></span><input type="range" id="sv-df-wd" min="5" max="120" step="0.1" value="56.7"></label>
+          <label class="ctrl"><span><em class="sv-lab">활하중 w<sub>L</sub></em> <output id="sv-df-wl-out"></output></span><input type="range" id="sv-df-wl" min="0" max="60" step="0.5" value="20"></label>
+          <div class="ctrl"><span>받치는 비구조재</span><div class="seg" id="sv-df-ns"><button data-value="480" class="on">손상 우려(ℓ/480)</button><button data-value="240">손상 우려 없음(ℓ/240)</button></div></div>
+          <div class="btn-row"><button class="btn" id="sv-df-b10">B-10 G1</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">활하중 즉시 δ<sub>L</sub></span><span class="v" id="sv-df-o1">—</span></div>
+        <div class="stat"><span class="k">설치 뒤 처짐 δ<sub>after</sub></span><span class="v" id="sv-df-o2">—</span></div>
+        <div class="stat"><span class="k">장기 총 처짐</span><span class="v" id="sv-df-o3">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="sv-df-o4">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-df-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(G1 내부 경간)에서 예제 15.1의 7.2 mm를 확인하고 "연속 끝 경간"으로 바꿔 보세요 · 경간을 8 → 12 m로 늘리면 처짐은 (12/8)⁴ ≈ 5배가 됩니다. 보 춤을 몇 mm로 키워야 다시 합격할까요? · 캔틸레버는 끝 처짐을 ℓ = 2L로 보고 비교합니다(교육용 관행) · 모형: <code>CB.beam</code>(4경간 연속은 모든 경간 재하, 패턴 재하 무시), 폭 400 mm 직사각형, E<sub>c</sub> = 27,500 MPa, EI = E<sub>c</sub>·bh³/12·(I<sub>e</sub>/I<sub>g</sub>), 지속 활하중 30 %, λ<sub>Δ</sub> = 2.0(ρ′ = 0). 교육용.</div>
+    </div>
+    <div class="callout warn"><strong>처짐은 경간의 네제곱</strong> 등분포 하중 아래 처짐은 \(\delta \propto wL^4/EI\)이고 한계는 \(L/n\)이므로, 같은 단면에서 \(\delta/(L/n) \propto L^3\)이다. 경간이 1.26배가 되면 처짐 비율은 두 배가 된다. 그래서 사용성은 긴 경간·얇은 바닥·가벼운 구조(강 데크, 목조, PT 슬래브)에서 강도보다 먼저 설계를 지배한다. 보 춤을 정하는 경험식(1장의 L/12–L/15)은 사실상 처짐 제한에서 나온 숫자다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="cracking">
+    <h2>균열 폭</h2>
+    <p>철근콘크리트는 금이 가도록 설계된 재료입니다. 콘크리트의 인장 강도는 압축 강도의 약 1/10이어서, 보통의 사용 하중에서도 보의 인장 쪽에는 가는 휨 균열이 생기고 그때부터 철근이 인장을 받습니다. 그러므로 사용성 검토의 목표는 균열을 없애는 것이 아니라 <span class="term">균열 폭</span><span class="en">(Crack width)</span>을 작게, 고르게 나누는 것입니다.</p>
+    <ul>
+      <li><b>왜 폭이 중요한가.</b> 폭이 넓은 균열을 따라 물·CO₂·염화물이 철근까지 빨리 닿는다(MaterialsBook 9장 내구성, 11장 부식). 0.3 mm 안팎부터 눈에 잘 띄어 외관과 불안감의 문제가 되고, 수조·지하 외벽에서는 누수가 된다.</li>
+      <li><b>무엇이 폭을 정하나.</b> 균열 폭은 대략 "균열 간격 × 철근 변형률"이다. 같은 철근량이라도 <b>가는 철근을 촘촘히</b> 배치하면 균열이 많아지는 대신 하나하나가 가늘어진다. 사용 하중에서 철근 응력 f<sub>s</sub>가 클수록(고강도 철근을 쓰고 철근량을 줄일수록), 피복이 두꺼울수록 폭이 넓어진다.</li>
+      <li><b>기준의 방식.</b> 콘크리트구조 기준(KDS 14 20 형태)은 균열 폭을 직접 계산하기보다 사용 하중 철근 응력과 피복 두께에 따라 인장 철근의 <b>최대 간격</b>을 제한한다. 수조처럼 엄격한 구조물은 균열 폭을 계산해 노출 환경별 허용 폭(대략 0.1–0.4 mm 범위, ACI 224R 표 형태)과 비교한다. 수치는 현행 기준을 확인한다.</li>
+    </ul>
+    <p>균열 폭은 처짐과도 이어집니다. 균열이 생긴 단면은 강성이 크게 떨어지므로(\(I_{cr}\)은 보통 \(I_g\)의 25–50 %), 앞 절의 \(I_e/I_g\)가 바로 균열의 정도를 나타냅니다. 수축이 구속되어 생기는 균열과 줄눈은 MaterialsBook 8장에서 다루었습니다.</p>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="floor-vibration">
+    <h2>바닥 진동: 걷는 사람이 만드는 공진</h2>
+    <div class="problem"><strong>12 m 경간 사무실 바닥이 출렁인다</strong>
+      <p>기둥 없는 넓은 사무실을 위해 경량 강 데크 합성 바닥을 12 m 경간으로 놓았습니다. 처짐과 강도는 모두 합격했습니다. 그런데 입주 뒤 누군가 복도를 걸어가면 옆자리 모니터가 흔들린다는 민원이 들어옵니다. 무게가 70 kg인 사람 한 명이 수백 kN짜리 바닥을 어떻게 흔들 수 있을까요?</p></div>
+    <p>답은 <b>공진</b>입니다(7장). 사람은 초당 약 2걸음(1.6–2.4 Hz)으로 걷고, 한 걸음마다 체중보다 조금 큰 힘을 바닥에 줍니다. 이 힘은 일정한 체중에 주기적으로 오르내리는 성분이 얹힌 모양이어서, 푸리에 급수로 나누면 걸음 진동수 \(f_p\)와 그 정수배 \(2f_p, 3f_p, \dots\)의 사인 성분(<span class="term">고조파</span>)이 됩니다. 바닥의 고유 진동수가 이 가운데 하나와 맞으면 작은 힘이 걸음마다 쌓여 응답이 커집니다.</p>
+    <figure class="diagram" id="fig-sv-walk">
+      <svg viewBox="0 0 820 280" role="img" aria-label="보행 하중의 시간 이력과 고조파 스펙트럼">
+        <rect x="10" y="10" width="800" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="170" y="8" text-anchor="middle" class="t">한 사람의 발걸음 힘 F(t)</text>
+          <line x1="20" y1="190" x2="340" y2="190" class="s-axis"/><line x1="20" y1="190" x2="20" y2="20" class="s-axis"/>
+          <line x1="20" y1="110" x2="340" y2="110" style="stroke:var(--text-faint);stroke-dasharray:4 4"/>
+          <text x="344" y="114" class="t-mono">체중 Q</text>
+          <path d="M20 190C40 60 60 80 80 110C90 125 100 60 120 70C140 80 150 170 160 130C170 70 190 60 200 90C210 120 230 60 240 70C260 80 270 170 280 130C290 70 310 60 320 90L340 110" style="fill:none;stroke:var(--accent-2);stroke-width:2.6"/>
+          <text x="180" y="212" text-anchor="middle" class="t-mono">시간 → (걸음 주기 1/f_p ≈ 0.5 s)</text>
+        </g>
+        <g transform="translate(440,30)">
+          <text x="170" y="8" text-anchor="middle" class="t">고조파 성분(동적 하중 계수 α_i)</text>
+          <line x1="20" y1="190" x2="340" y2="190" class="s-axis"/><line x1="20" y1="190" x2="20" y2="20" class="s-axis"/>
+          <rect x="60" y="90" width="26" height="100" class="f-acc"/><rect x="130" y="150" width="26" height="40" class="f-acc"/><rect x="200" y="170" width="26" height="20" class="f-acc"/><rect x="270" y="180" width="26" height="10" class="f-acc"/>
+          <g class="t-mono" text-anchor="middle"><text x="73" y="84">0.5</text><text x="143" y="144">0.2</text><text x="213" y="164">0.1</text><text x="283" y="174">0.05</text></g>
+          <g class="t-mono" text-anchor="middle"><text x="73" y="208">f_p</text><text x="143" y="208">2f_p</text><text x="213" y="208">3f_p</text><text x="283" y="208">4f_p</text></g>
+          <rect x="40" y="26" width="290" height="16" style="fill:var(--warn);opacity:.18"/>
+          <text x="185" y="38" text-anchor="middle" class="t-mono">바닥 f_n이 이 중 하나와 맞으면 공진</text>
+          <text x="180" y="228" text-anchor="middle" class="t-dim">걸음 1.6–2.4 Hz → 1차 1.6–2.4, 2차 3.2–4.8, 3차 4.8–7.2 Hz</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-3.</b> <span class="term">보행 하중</span>. 체중 Q에 걸음 진동수 f<sub>p</sub>의 주기 성분이 얹힌 힘을 고조파로 나눈다. 동적 하중 계수 α<sub>i</sub>는 AISC Design Guide 11의 값(1–4차 0.5, 0.2, 0.1, 0.05)이다. 고유 진동수가 약 9 Hz보다 높은 바닥은 고조파와 거의 맞지 않아 걸음 하나하나의 충격 응답만 남는다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.3 (보행 하중의 고조파)</strong> 체중 \(Q\)(약 0.7 kN)인 사람이 <span class="term">걸음 진동수</span> \(f_p\)로 걸을 때 바닥에 주는 힘은
+      <div class="formula">$$F(t) = Q\left[1 + \sum_{i=1}^{4} \alpha_i \cos(2\pi i f_p t + \phi_i)\right]$$<div class="where">\(\alpha_i\): \(i\)차 고조파의 <span class="term">동적 하중 계수</span>(이 책은 0.5, 0.2, 0.1, 0.05, AISC DG11 형태). 바닥을 고유 진동수 \(f_n\), 감쇠비 \(\beta\), 유효 무게 \(W\)인 1자유도로 보면 \(i\)차 고조파가 만드는 정상 상태 가속도는 7장의 동적 증폭으로
+      $$\frac{a_i}{g} = R\,\frac{2\alpha_i Q}{W}\,\frac{r_i^2}{\sqrt{(1 - r_i^2)^2 + (2\beta r_i)^2}}, \qquad r_i = \frac{i f_p}{f_n}$$
+      여기서 2는 단순 지지 판의 모드 질량이 전체의 절반이라는 뜻이고, \(R \approx 0.5\)는 걷는 사람이 경간을 지나는 동안 공진이 다 쌓이지 못하고 걷는 사람과 느끼는 사람의 위치가 다른 것을 반영한 감소 계수다. 공진(\(r_i = 1\))에서는 \(a/g = R\alpha_i Q/(\beta W)\)가 된다.</div></div></div>
+    <div class="callout def"><strong>원리 15.4 (바닥 진동 판정, AISC Design Guide 11 형태·교육용)</strong> 고유 진동수가 약 9 Hz 이하인 바닥의 최대 가속도는
+      <div class="formula">$$\frac{a_p}{g} = \frac{P_0\, e^{-0.35 f_n}}{\beta W} \ \le\ \frac{a_0}{g}$$<div class="where">\(P_0 = 0.29\) kN(바닥), \(e^{-0.35 f_n}\)은 공진하는 고조파의 동적 하중 계수가 진동수와 함께 줄어드는 것을 나타낸다. \(\beta\): 감쇠비(마감·천장·설비만 0.02–0.03, 칸막이벽이 있으면 약 0.05), \(W\): 진동에 참여하는 바닥의 <span class="term">유효 무게</span>(고정하중 + 실제 활하중 약 0.5 kN/m²). 한계 \(a_0/g\): 사무실·주거 0.5 %, 상가 1.5 %, 실외 보도교 5 %(교육용, 지침 확인). 사람은 약 4–8 Hz의 연직 진동에 가장 민감하다(ISO 2631·ISO 10137 계열의 기준 곡선). 9 Hz보다 높은 바닥은 가속도 대신 집중 하중 1 kN에 대한 처짐이 1 mm 이하인지 같은 강성 기준으로 본다.</div></div></div>
+    <div class="callout"><strong>예제 15.2 (B-10 바닥과 경량 데크 바닥)</strong>
+      <ol style="margin:6px 0 0">
+        <li><b>B-10 바닥의 고유 진동수.</b> 3장의 근사 \(f_n \approx 18/\sqrt{\delta}\)(δ: 고정하중 + 0.5 kN/m²에 대한 처짐, mm)를 쓴다. 동적 탄성계수를 정적 값의 1.2배로 보면 G1 내부 경간의 처짐은 \(1.89 \times (60.7/76.7)/1.2 \approx 1.25\) mm, 210 mm 슬래브 한 구획(8 × 8 m, 연속 내부 구획의 처짐 계수 약 0.002로 가정)은 \(0.002 \times 7.0 \times 8^4/D \approx 2.2\) mm(\(D = E h^3/12(1 - \nu^2) \approx 26{,}500\) kN·m)다. \(\delta = 1.25 + 2.2 \approx 3.4\) mm → \(f_n \approx 18/\sqrt{3.4} \approx 9.7\) Hz.</li>
+        <li><b>B-10 가속도.</b> 한 구획 \(W = 7.0 \times 64 = 448\) kN, \(\beta = 0.03\)이면 \(a_p/g = 0.29e^{-0.35 \times 9.7}/(0.03 \times 448) = 0.07\) %로 0.5 %보다 훨씬 작다. 무겁고 진동수가 높은 RC 바닥은 보행 진동이 거의 문제되지 않는다.</li>
+        <li><b>12 m 경량 데크 바닥.</b> \(f_n = 4.5\) Hz, \(W = 380\) kN, \(\beta = 0.025\)이면 \(a_p/g = 0.29e^{-1.575}/(0.025 \times 380) = 0.63\) % \(\gt\) 0.5 %. 걸음 2.25 Hz의 2차 고조파가 4.5 Hz와 공진한다. 해결은 질량(W↑), 강성(\(f_n\)↑, 보 춤), 감쇠(칸막이·TMD)다. 강성을 올려 \(f_n\)을 6 Hz로 만들면 \(e^{-0.35f}\) 덕분에 0.37 %로 떨어진다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sv-floor">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>보행자 하중과 바닥 응답</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sv-stack">
+          <div><canvas id="sv-cv-fl" aria-label="걸음 진동수에 따른 바닥 가속도와 한계"></canvas></div>
+          <div><canvas id="sv-cv-fl2" aria-label="고조파별 가속도 기여"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><em class="sv-lab">바닥 고유 진동수 f<sub>n</sub></em> <output id="sv-fl-fn-out"></output></span><input type="range" id="sv-fl-fn" min="2" max="14" step="0.1" value="9.7"></label>
+          <label class="ctrl"><span>유효 무게 W <output id="sv-fl-w-out"></output></span><input type="range" id="sv-fl-w" min="50" max="1200" step="10" value="448"></label>
+          <label class="ctrl"><span>감쇠비 β <output id="sv-fl-b-out"></output></span><input type="range" id="sv-fl-b" min="0.01" max="0.06" step="0.005" value="0.03"></label>
+          <label class="ctrl"><span><em class="sv-lab">걸음 진동수 f<sub>p</sub></em> <output id="sv-fl-fp-out"></output></span><input type="range" id="sv-fl-fp" min="1.6" max="2.4" step="0.01" value="2.0"></label>
+          <div class="ctrl"><span>용도(한계)</span><div class="seg" id="sv-fl-use"><button data-value="0.5" class="on">사무실 0.5 %</button><button data-value="1.5">상가 1.5 %</button><button data-value="5">실외 5 %</button></div></div>
+          <div class="btn-row"><button class="btn" id="sv-fl-b10">B-10 바닥</button><button class="btn" id="sv-fl-lite">12 m 경량 데크</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">현재 f<sub>p</sub>의 가속도</span><span class="v" id="sv-fl-o1">—</span></div>
+        <div class="stat"><span class="k">걸음 대역 최댓값</span><span class="v" id="sv-fl-o2">—</span></div>
+        <div class="stat"><span class="k">DG11 식(원리 15.4)</span><span class="v" id="sv-fl-o3">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="sv-fl-o4">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-fl-msg"></div>
+      <div class="sim-note">해볼 것: "12 m 경량 데크"를 누르고 걸음 진동수를 움직여 2.25 Hz 근처(2차 고조파 공진)에서 가속도가 솟는 것을 보세요 · f<sub>n</sub>을 9 Hz 위로 올리면 4차 고조파(최대 9.6 Hz)도 닿지 않습니다 · 감쇠비를 0.02 → 0.05로 올리면(칸막이벽) 공진 봉우리가 낮아집니다 · 위 그래프는 1.4–2.6 Hz를 훑은 가속도(음영 = 실제 걸음 대역), 아래는 현재 f<sub>p</sub>에서 고조파별 기여입니다 · 모형: 원리 15.3, Q = 0.7 kN, R = 0.5, α = 0.5·0.2·0.1·0.05, 고조파 응답의 SRSS. 교육용.</div>
+    </div>
+    <div class="callout site"><strong>B-10 바닥의 진동</strong> 210 mm 2방향 슬래브와 G1 400 × 700 mm로 이루어진 B-10 기준층 바닥은 고유 진동수 약 9–10 Hz(예제 15.2의 거친 추정, 3장과 비교), 한 구획 유효 무게 약 450 kN으로 무겁고 단단하다. 보행 가속도는 사무실 한계의 1/5 이하다. 문제는 가볍고 긴 경간이다. 같은 건물에 12 m 경간 강 데크 회의실이나 로비 브리지를 붙이면 2차 고조파 공진 범위(3.2–4.8 Hz)에 들어가기 쉬워 따로 검토한다. 에어로빅·체육 시설처럼 리듬에 맞춘 활동은 하중 계수가 훨씬 커서 별도 기준을 쓴다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="footbridge">
+    <h2>보도교의 연직 진동: T-36의 고유 진동수</h2>
+    <div class="problem"><strong>36 m 보도교는 걸음과 맞을까</strong>
+      <p>기준 교량 T-36은 길이 36 m의 강 트러스 보도교입니다. 구조역학에서 부재력과 처짐을 계산했고 강도는 충분합니다. 이제 질문은 하나입니다. 이 다리의 연직 1차 고유 진동수는 사람의 걸음(1.6–2.4 Hz)과 겹칠까요? 모드 해석 프로그램 없이, 이미 가진 정적 해석기로 답할 수 있을까요?</p></div>
+    <p>보도교는 바닥보다 훨씬 가볍고 감쇠가 작습니다(강 보도교의 <span class="term">감쇠비</span>는 0.2–0.5 % 정도로 작다, 교육용). 그래서 진동수가 보행 대역에 있으면 몇 명만 걸어도 크게 흔들립니다. 여러 지침(EN 1990 부속서 A2 형태)은 <b>연직 진동수가 5 Hz보다 낮거나 수평·비틀림 진동수가 2.5 Hz보다 낮은</b> 보도교는 보행 쾌적성을 따로 검토하도록 합니다. 먼저 진동수를 알아야 합니다.</p>
+    <figure class="diagram" id="fig-sv-t36">
+      <svg viewBox="0 0 820 290" role="img" aria-label="T-36 트러스 보도교의 절점 질량과 자중 처짐 형상">
+        <rect x="10" y="10" width="800" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(70,60)">
+          <g style="stroke:var(--text);stroke-width:2.4">
+            <line x1="0" y1="120" x2="660" y2="120"/><line x1="110" y1="30" x2="550" y2="30"/>
+            <line x1="0" y1="120" x2="110" y2="30"/><line x1="660" y1="120" x2="550" y2="30"/>
+            <line x1="110" y1="30" x2="110" y2="120"/><line x1="220" y1="30" x2="220" y2="120"/><line x1="330" y1="30" x2="330" y2="120"/><line x1="440" y1="30" x2="440" y2="120"/><line x1="550" y1="30" x2="550" y2="120"/>
+            <line x1="110" y1="30" x2="220" y2="120"/><line x1="220" y1="30" x2="330" y2="120"/><line x1="550" y1="30" x2="440" y2="120"/><line x1="440" y1="30" x2="330" y2="120"/>
+          </g>
+          <path d="M0 120Q330 200 660 120" style="fill:none;stroke:var(--accent);stroke-width:2.6;stroke-dasharray:7 5"/>
+          <g style="fill:var(--accent-2)"><circle cx="110" cy="120" r="8"/><circle cx="220" cy="120" r="8"/><circle cx="330" cy="120" r="8"/><circle cx="440" cy="120" r="8"/><circle cx="550" cy="120" r="8"/></g>
+          <g style="fill:var(--text-dim)"><circle cx="110" cy="30" r="4.5"/><circle cx="220" cy="30" r="4.5"/><circle cx="330" cy="30" r="4.5"/><circle cx="440" cy="30" r="4.5"/><circle cx="550" cy="30" r="4.5"/></g>
+          <polygon points="0,120 -10,138 10,138" style="fill:var(--surface);stroke:var(--text)"/><polygon points="660,120 650,136 670,136" style="fill:var(--surface);stroke:var(--text)"/>
+          <text x="330" y="-12" text-anchor="middle" class="t">절점 질량 m<tspan dy="3" font-size="9">i</tspan><tspan dy="-3">에 중력 m</tspan><tspan dy="3" font-size="9">i</tspan><tspan dy="-3">g를 정적으로 걸어 처짐 u</tspan><tspan dy="3" font-size="9">i</tspan><tspan dy="-3">를 얻는다</tspan></text>
+          <text x="330" y="190" text-anchor="middle" class="t-mono" style="fill:var(--accent)">자중 처짐 형상 ≈ 1차 모드 형상 (가운데 약 13 mm)</text>
+          <text x="0" y="16" class="t-mono" style="fill:var(--accent-2)">● 하현: 바닥판·바닥보·나머지 강재</text>
+          <text x="420" y="16" class="t-mono">● 상현: 트러스 부재 질량의 절반</text>
+          <text x="330" y="214" text-anchor="middle" class="t-dim">지간 36 m = 6 패널 × 6 m, 높이 4.5 m, 트러스 2면(한 면 해석 × 2)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-4.</b> <span class="term">레일리 방법</span>의 준비. 트러스 한 면의 질량을 절점에 모으고(부재 질량은 양 끝 절점에 반씩, 바닥판과 나머지 강재는 하현 절점에 패널 길이 비율로), 그 무게를 정적 하중으로 걸어 <code>CB.truss</code>로 처짐을 구한다. 자중 처짐 형상은 1차 모드 형상과 아주 비슷하다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.5 (레일리 방법: 정적 처짐으로 구하는 고유 진동수)</strong> 구조물이 모드 형상 \(\phi\)로 조화 진동하면 최대 운동 에너지와 최대 변형 에너지가 같다. \(\phi\) 대신 <b>자기 무게를 정적으로 걸었을 때의 처짐</b> \(u_i\)를 쓰면, 변형 에너지는 외력이 한 일 \(\tfrac12\sum m_i g u_i\)와 같으므로
+      <div class="formula">$$\omega^2 \approx \frac{g\sum_i m_i u_i}{\sum_i m_i u_i^2}, \qquad f_1 = \frac{\omega}{2\pi}$$<div class="where">\(m_i\): 절점 질량(t), \(u_i\): 절점 \(i\)의 연직 처짐(m), \(g = 9.81\) m/s². 레일리 몫은 참값의 위쪽 근사이고(가정 형상은 실제보다 강하게 행동한다), 자중 처짐 형상이 1차 모드와 매우 비슷하므로 오차는 보통 1–2 % 이내다. 질량이 고르게 퍼진 단순보라면 \(f_1 \approx 17.75/\sqrt{\delta_{\max}}\)(mm)가 되고, 3장의 \(18/\sqrt{\delta}\)는 이 식을 반올림한 것이다.</div></div></div>
+    <div class="callout"><strong>예제 15.3 (T-36의 연직 1차 진동수)</strong> 강재 전체 32 t(트러스 2면·바닥보·가로보·브레이싱, MechanicsBook 표의 "고정하중 4 kN/m"와 같은 크기), 바닥판·포장·난간 1.0 kN/m²(교육용 가정, 폭 3 m), 사람 없음.
+      <ol style="margin:6px 0 0">
+        <li><b>트러스 한 면의 질량.</b> 현재·단부 경사재(H-200×200, 6,208 mm²)와 사재·수직재(H-150×150, 3,910 mm²)의 부재 질량 합은 5.27 t다. 한 면 몫 16 t에서 나머지 10.73 t(바닥보·브레이싱·이음판)와 바닥판 \(1.0 \times 1.5 \times 36/9.81 = 5.50\) t를 하현 절점에 나누면 한 면 21.5 t, 다리 전체 43.0 t.</li>
+        <li><b>자중 처짐.</b> 절점 질량 × g를 걸어 <code>CB.truss</code>로 풀면 가운데 하현 처짐은 13.4 mm(L/2,680)다. 같은 트러스에 패널 절점마다 60 kN을 걸면 처짐 22.5 mm이고 부재력은 MechanicsBook 표(하현 +320, 상현 −360 kN)와 같다.</li>
+        <li><b>레일리 몫.</b> 모든 절점 \(m_i, u_i\)로 계산하면 \(f_1 = 4.80\) Hz. 간이식 \(17.75/\sqrt{13.4} = 4.85\) Hz와 거의 같다.</li>
+        <li><b>판정.</b> 4.8 Hz는 걸음의 1차 고조파 대역(1.6–2.4 Hz)보다 두 배 높아 <b>1차 공진은 없다</b>. 그러나 5 Hz보다 낮으므로 쾌적성 검토 대상이고, 2차 고조파 대역(3.2–4.8 Hz)의 위쪽 끝에 걸쳐 있다. 사람이 많이 올라가면 질량이 늘어 진동수가 내려간다(1 명/m²이면 약 4.4 Hz). 아래 시뮬레이터가 이 경우의 가속도를 계산한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sv-t36">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>T-36 보도교 연직 고유 진동수(레일리, CB.truss)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sv-stack">
+          <div><canvas id="sv-cv-tb" aria-label="T-36 트러스와 자중 처짐 형상 애니메이션"></canvas></div>
+          <div><canvas id="sv-cv-tb2" aria-label="고유 진동수와 보행 대역 비교"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>강재 전체 질량 <output id="sv-tb-st-out"></output></span><input type="range" id="sv-tb-st" min="20" max="60" step="1" value="32"></label>
+          <label class="ctrl"><span>바닥판·포장 <output id="sv-tb-dk-out"></output></span><input type="range" id="sv-tb-dk" min="0" max="4" step="0.1" value="1.0"></label>
+          <label class="ctrl"><span>군중 밀도 <output id="sv-tb-cr-out"></output></span><input type="range" id="sv-tb-cr" min="0" max="1" step="0.05" value="0"></label>
+          <label class="ctrl"><span>트러스 높이 <output id="sv-tb-h-out"></output></span><input type="range" id="sv-tb-h" min="2.5" max="6" step="0.1" value="4.5"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="sv-tb-z-out"></output></span><input type="range" id="sv-tb-z" min="0.002" max="0.03" step="0.001" value="0.005"></label>
+          <div class="btn-row"><button class="btn" id="sv-tb-play">▶ 진동 보기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">연직 1차 f<sub>1</sub></span><span class="v" id="sv-tb-o1">—</span></div>
+        <div class="stat"><span class="k">자중 처짐(가운데)</span><span class="v" id="sv-tb-o2">—</span></div>
+        <div class="stat"><span class="k">다리 전체 질량</span><span class="v" id="sv-tb-o3">—</span></div>
+        <div class="stat"><span class="k">군중 가속도(추정)</span><span class="v" id="sv-tb-o4">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-tb-msg"></div>
+      <div class="sim-note">해볼 것: 기본값에서 f<sub>1</sub> = 4.80 Hz(예제 15.3)를 확인하고 군중 밀도를 0.8–1.0 명/m²로 올려 2차 고조파 대역으로 내려오는 것을 보세요 · 트러스 높이를 3 m로 낮추면 강성이 줄어 진동수가 크게 내려갑니다 · 바닥판을 무거운 콘크리트(3–4 kN/m²)로 바꾸면? · 모형: 트러스 한 면을 <code>CB.truss</code>(E = 210 GPa, 부재 단면 고정)로 풀고 원리 15.5로 f<sub>1</sub>, 모드 질량 M* = 2Σm<sub>i</sub>φ<sub>i</sub>²(가운데 φ = 1). 군중 가속도는 Sétra(2006) 지침 형태: 사람 1명 연직 힘 1차 280 N·2차 70 N, 진동수 가중 ψ(1차 1.7–2.1 Hz에서 1, 1.25·2.3 Hz에서 0, 2차 3.4–4.2 Hz에서 1, 2.5·4.6 Hz에서 0), 등가 인원 10.8√(ζn), 모드 형상 평균 2/π, 공진 a = F/(2ζM*). 사람 1명 = 75 kg. 수평·비틀림 모드는 이 평면 모형에 없습니다. 교육용.</div>
+    </div>
+    <div class="callout site"><strong>T-36의 진동 판정</strong> 빈 다리의 연직 1차 진동수는 약 4.8 Hz로 걸음의 1차 고조파 대역(1.6–2.4 Hz)과 겹치지 않는다. 이것이 결론의 전부는 아니다. 5 Hz 미만이므로 쾌적성 검토 대상이고, 군중이 0.8–1.0 명/m²로 붐비면 진동수가 약 4.4–4.5 Hz로 내려가 2차 고조파 공진 범위에 들어간다. 감쇠비 0.5 %에서 이 시뮬레이터의 추정 가속도는 1.0 명/m²일 때 약 0.66 m/s²로, 쾌적 기준 0.7 m/s²(EN 1990 부속서 A2 권장값 형태)에 거의 닿는다. 축제처럼 군중이 예상되는 위치라면 감쇠를 높이거나(TMD, 9장), 트러스 높이·현재 단면으로 진동수를 5 Hz 위로 올리는 것을 검토한다. 수평 진동수는 트러스 2면과 바닥 수평 브레이싱의 강성으로 정해지며, 다음 절의 수평 동기화 대역(약 0.5–1.2 Hz)과 멀리 떨어지도록 확인한다. 모두 교육용 추정이다.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="lateral">
+    <h2>군중 동기화와 수평 진동</h2>
+    <p>걸을 때 몸의 무게중심은 왼발과 오른발 사이를 오가므로, 사람은 바닥에 연직 힘뿐 아니라 걸음 진동수의 <b>절반</b>(약 0.8–1.2 Hz)으로 좌우를 번갈아 미는 작은 수평 힘(체중의 수 %)도 줍니다. 평소에는 사람마다 위상이 제각각이라 서로 상쇄됩니다. 그런데 다리가 그 진동수 근처에서 옆으로 조금 흔들리기 시작하면, 사람들은 균형을 잡으려고 발을 넓게 벌리고 흔들림에 걸음을 맞춥니다. 이렇게 <b>동기화</b>된 발걸음은 흔들림의 속도와 같은 위상으로 다리를 밀어, 구조물에 에너지를 넣는 <span class="term">음의 감쇠</span>처럼 행동합니다. 이것이 밀레니엄 브리지에서 일어난 <span class="term">군중 동기화</span><span class="en">(Synchronous lateral excitation, lock-in)</span>입니다.</p>
+    <figure class="diagram" id="fig-sv-lockin">
+      <svg viewBox="0 0 820 270" role="img" aria-label="다리의 수평 흔들림과 보행자 동기화가 서로를 키우는 되먹임 고리">
+        <rect x="10" y="10" width="800" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <rect x="0" y="40" width="200" height="60" rx="10" class="f-acc-soft"/>
+          <text x="100" y="66" text-anchor="middle" class="t">다리가 옆으로 조금 흔들림</text>
+          <text x="100" y="86" text-anchor="middle" class="t-mono">f_L ≈ 0.5–1.2 Hz</text>
+          <rect x="320" y="40" width="220" height="60" rx="10" class="f-acc2-soft"/>
+          <text x="430" y="66" text-anchor="middle" class="t">보행자가 걸음을 맞춤</text>
+          <text x="430" y="86" text-anchor="middle" class="t-mono">균형 잡기 → 위상 고정</text>
+          <rect x="160" y="150" width="240" height="60" rx="10" style="fill:var(--bad);opacity:.15;stroke:var(--bad)"/>
+          <text x="280" y="176" text-anchor="middle" class="t">속도에 비례한 수평 힘 ≈ k·u̇</text>
+          <text x="280" y="196" text-anchor="middle" class="t-mono" style="fill:var(--bad)">음의 감쇠: c_eff = c − N k/2</text>
+          <line x1="204" y1="70" x2="314" y2="70" style="stroke:var(--text);stroke-width:2" marker-end="url(#sv-ah-dim)"/>
+          <line x1="430" y1="104" x2="350" y2="146" style="stroke:var(--text);stroke-width:2" marker-end="url(#sv-ah-dim)"/>
+          <line x1="200" y1="146" x2="120" y2="104" style="stroke:var(--text);stroke-width:2" marker-end="url(#sv-ah-dim)"/>
+          <text x="590" y="70" class="t-dim">N &lt; N_crit: 고리가 꺼진다</text>
+          <text x="590" y="96" class="t-dim" style="fill:var(--bad)">N &gt; N_crit: 갑자기 커진다</text>
+          <text x="590" y="122" class="t-dim">해결: 감쇠 c를 키운다</text>
+          <text x="590" y="148" class="t-dim">　(점성 감쇠기·TMD)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-5.</b> 수평 동기화의 되먹임. 흔들림이 동기화를 부르고 동기화가 흔들림을 키운다. 사람 수가 임계값 N<sub>crit</sub>을 넘는 순간 구조 감쇠가 보행자의 음의 감쇠를 이기지 못해 진폭이 갑자기 커진다. 진폭은 사람들이 걷기를 멈추거나 걸음이 흩어질 때까지 자란다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.6 (임계 보행자 수, Dallard 등(2001)의 형태·교육용)</strong> 보행자 한 명이 다리의 수평 속도 \(\dot u\)에 비례하는 힘 \(k\dot u\)를 준다고 하자(\(k \approx 300\) N·s/m, 진동수 약 0.5–1.0 Hz에서 측정된 값). 사인 모드 위에 \(N\)명이 고르게 있으면 모드에 대한 등가 감쇠는 \(Nk/2\)이고, 구조 감쇠 \(c = 4\pi\zeta f M\)(\(M\): <span class="term">모드 질량</span>)를 넘으면 불안정해진다. 이 경계의 인원이 <span class="term">임계 보행자 수</span>다.
+      <div class="formula">$$N_{\text{crit}} = \frac{8\pi\,\zeta\, f\, M}{k}$$<div class="where">\(\zeta\): 수평 모드 감쇠비, \(f\): 수평 고유 진동수(Hz), \(M\): 모드 질량(kg). 임계 인원은 감쇠와 질량에 비례한다. 진동수가 수평 보행 대역(약 0.5–1.2 Hz) 밖이면 동기화가 약해 \(k\)가 크게 줄어든다. 밀레니엄 브리지의 보강은 이 식대로 구조 감쇠를 크게 키우는 방식(점성 감쇠기·동조 질량 감쇠기)이었다.</div></div></div>
+    <div class="callout"><strong>예제 15.4 (임계 인원 가늠)</strong> 수평 진동수 0.8 Hz, 모드 질량 100 t, 수평 감쇠비 0.7 %인 보도교(교육용 가정).
+      <ol style="margin:6px 0 0">
+        <li>\(N_{\text{crit}} = 8\pi \times 0.007 \times 0.8 \times 100{,}000/300 \approx 47\)명. 다리 길이 100 m, 폭 4 m라면 밀도 0.12 명/m²에 불과하다. 개통일 행사 인파는 이보다 몇 배 많다.</li>
+        <li>감쇠기로 감쇠비를 10배(7 %)로 키우면 \(N_{\text{crit}} \approx 470\)명. 같은 질량을 더 무겁게 만드는 것보다 감쇠를 키우는 쪽이 훨씬 효율적이다.</li>
+        <li>T-36처럼 폭 3 m 트러스 2면에 바닥 수평 브레이싱을 둔 짧은 보도교는 수평 진동수가 보통 이 대역보다 훨씬 높다. 그 경우에는 \(k\)가 작아 동기화가 일어나기 어렵다. 다만 수평 진동수는 따로 계산해서 확인해야 하는 값이다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sv-crowd">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>군중 동기화 수평 진동</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sv-stack">
+          <div><canvas id="sv-cv-cw" aria-label="보도교 평면과 수평 흔들림"></canvas></div>
+          <div><canvas id="sv-cv-cw2" aria-label="시간에 따른 사람 수와 수평 가속도"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><em class="sv-lab">수평 진동수 f<sub>L</sub></em> <output id="sv-cw-f-out"></output></span><input type="range" id="sv-cw-f" min="0.3" max="2.5" step="0.05" value="0.8"></label>
+          <label class="ctrl"><span>모드 질량 M <output id="sv-cw-m-out"></output></span><input type="range" id="sv-cw-m" min="20" max="300" step="5" value="100"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="sv-cw-z-out"></output></span><input type="range" id="sv-cw-z" min="0.002" max="0.08" step="0.001" value="0.007"></label>
+          <label class="ctrl"><span>최대 인원 <output id="sv-cw-n-out"></output></span><input type="range" id="sv-cw-n" min="0" max="400" step="5" value="150"></label>
+          <div class="btn-row"><button class="btn" id="sv-cw-play">▶ 재생</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">임계 인원 N<sub>crit</sub></span><span class="v" id="sv-cw-o1">—</span></div>
+        <div class="stat"><span class="k">불안정 시작</span><span class="v" id="sv-cw-o2">—</span></div>
+        <div class="stat"><span class="k">최대 수평 가속도</span><span class="v" id="sv-cw-o3">—</span></div>
+        <div class="stat"><span class="k">판정(0.2 m/s²)</span><span class="v" id="sv-cw-o4">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-cw-msg"></div>
+      <div class="sim-note">해볼 것: 10분 동안 사람이 0명에서 최대 인원까지 고르게 늘어납니다. 기본값에서 약 47명을 넘으면 진폭이 스스로 자라기 시작하고, 사람이 더 늘수록 빨리 커져 100명 남짓에서 폭발적으로 커지는 것을 보세요 · 감쇠비를 0.07로 올리면(감쇠기) 같은 인원에서 조용합니다 · 수평 진동수를 2 Hz로 올리면 동기화가 거의 사라집니다 · 모형: 모드 1자유도 M ü + (c − N k<sub>eff</sub>/2) u̇ + K u = F<sub>r</sub>(t), k<sub>eff</sub> = 300 N·s/m × 진동수 가중(0.5–1.1 Hz에서 1, 밖에서 감소), 보행자 힘은 1인당 30 N에서 포화(tanh), F<sub>r</sub>은 동기화되지 않은 보행자 힘(1인당 약 25 N, 위상 무작위 √N 합). 시간 간격 0.01 s 반음함수 적분, 입력이 바뀔 때만 다시 계산. 판정선 0.2 m/s²(EN 1990 A2 형태, 보통 사용 시의 수평 가속도 권장값). 교육용.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="drift">
+    <h2>바람에 흔들리는 건물: 횡변위와 가속도</h2>
+    <p>6장에서 풍하중을, 7장에서 건물의 고유 주기를 구했습니다. 강도 검토는 재현 기간이 긴 설계 풍속으로 하지만, 사용성은 자주 부는 바람에 대해 두 가지를 봅니다. 하나는 <span class="term">층간 변위</span>입니다. 외장 커튼월, 유리, 칸막이벽, 엘리베이터 레일은 층과 층 사이의 상대 변위를 따라 비틀리며(<span class="term">라킹</span>), 그 비가 수백분의 일을 넘으면 실링이 찢기고 유리가 깨집니다. 다른 하나는 <b>가속도</b>입니다. 높고 가벼운 건물의 꼭대기 층에서 사람은 수 mg(1 mg = 0.001g)의 흔들림을 느끼고, 더 크면 멀미와 불안을 느낍니다.</p>
+    <figure class="diagram" id="fig-sv-drift">
+      <svg viewBox="0 0 820 270" role="img" aria-label="층간 변위로 비틀리는 외장재와 칸막이, 꼭대기 층 가속도">
+        <rect x="10" y="10" width="800" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <path d="M0 210L0 0M100 210L100 0" style="stroke:var(--text-faint);stroke-dasharray:4 4"/>
+          <path d="M0 210L8 160L20 110L36 60L56 10M100 210L108 160L120 110L136 60L156 10" style="fill:none;stroke:var(--text);stroke-width:2.6"/>
+          <g style="stroke:var(--text);stroke-width:2"><line x1="8" y1="160" x2="108" y2="160"/><line x1="20" y1="110" x2="120" y2="110"/><line x1="36" y1="60" x2="136" y2="60"/><line x1="56" y1="10" x2="156" y2="10"/></g>
+          <g style="stroke:var(--blue);stroke-width:2.2" marker-end="url(#sv-ah-blue)"><line x1="-50" y1="40" x2="-6" y2="40"/><line x1="-50" y1="100" x2="-6" y2="100"/><line x1="-50" y1="160" x2="-6" y2="160"/></g>
+          <path d="M20 110L36 60" style="stroke:var(--bad);stroke-width:3"/>
+          <text x="164" y="88" class="t-mono" style="fill:var(--bad)">층간 변위 Δ = u_i − u_(i−1)</text>
+          <text x="164" y="106" class="t-mono" style="fill:var(--bad)">층간 변위비 Δ/h</text>
+          <text x="164" y="14" class="t-mono" style="fill:var(--accent)">꼭대기 가속도 a (mg)</text>
+        </g>
+        <g transform="translate(460,40)">
+          <rect x="0" y="20" width="140" height="120" style="fill:var(--blue);opacity:.12;stroke:var(--text)"/>
+          <path d="M0 20L-12 140M140 20L128 140" style="stroke:var(--text-dim);stroke-dasharray:4 4"/>
+          <polygon points="0,20 140,20 128,140 -12,140" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <text x="70" y="10" text-anchor="middle" class="t">외장 패널의 라킹</text>
+          <path d="M140 20L180 0" style="stroke:var(--bad);stroke-width:2"/><text x="184" y="2" class="t-mono" style="fill:var(--bad)">실링 파손</text>
+          <text x="70" y="168" text-anchor="middle" class="t-dim">유리·칸막이·엘리베이터 레일은</text>
+          <text x="70" y="186" text-anchor="middle" class="t-dim">층간 변위를 수용하도록 상세를 둔다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-6.</b> 바람에 의한 사용성. 층간 변위는 외장재·칸막이벽을 평행사변형으로 비틀고, 꼭대기 층 가속도는 사람이 느끼는 흔들림이 된다. 앞의 것은 강성(변위)이, 뒤의 것은 강성·질량·감쇠(공진 응답)가 함께 정한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.7 (풍하중 사용성의 두 판정, 교육용)</strong>
+      <ul style="margin:6px 0 0">
+        <li><b>층간 변위비.</b> 설계 풍하중(또는 재현 기간 10–50년 바람)에서 \(\Delta_i/h_i\)를 약 1/400–1/600 이하로 둔다(이 책은 1/500, 교육용). 지진의 층간 변위 한계(0.015h, 8장)는 손상을 허용하는 큰 지진의 값이라 바람의 사용성 한계보다 훨씬 크다.</li>
+        <li><b>가속도.</b> 재현 기간 약 1–10년 바람에서 꼭대기 층의 공진 가속도를 진동수에 따라 내려가는 지각·쾌적 곡선과 비교한다. 이 장은 ISO 6897 형태의 곡선 \(\sigma_a = e^{-3.65 - 0.41\ln f}\)(m/s², RMS)를 교육용 기준선으로 쓴다. 대략 주거는 사무실보다 엄격하다(밤에도 사람이 있고 오래 머문다).</li>
+      </ul>
+      공진 가속도는 바람 방향 난류의 1차 모드 성분으로 근사한다(EN 1991-1-4의 가스트 응답 형태).
+      <div class="formula">$$\sigma_x \approx \bar x\,\cdot 2I_u\sqrt{\frac{\pi}{4\zeta} S_L(f) R_h R_b}, \qquad \sigma_a = (2\pi f)^2\sigma_x$$<div class="where">\(\bar x\): 평균 풍하중의 꼭대기 변위(1차 모드 성분), \(I_u\): <span class="term">난류 강도</span>(\(1/\ln(z/z_0)\)), \(S_L\): 무차원 풍속 스펙트럼, \(R_h, R_b\): 건물 높이·폭에 걸친 난류의 상관이 떨어지는 효과. 바람 직각 방향의 와류 진동(6장)은 가늘고 높은 건물에서 이보다 클 수 있어 따로 본다.</div></div></div>
+    <div class="sim" id="sim-sv-drift">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>풍하중 횡변위와 거주성(B-10)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sv-stack">
+          <div><canvas id="sv-cv-dr" aria-label="층별 층간 변위비"></canvas></div>
+          <div><canvas id="sv-cv-dr2" aria-label="진동수–가속도 평면의 쾌적 곡선과 건물 점"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>층 강성 배율 <output id="sv-dr-k-out"></output></span><input type="range" id="sv-dr-k" min="0.1" max="2" step="0.05" value="1"></label>
+          <label class="ctrl"><span><em class="sv-lab">기본 풍속 V<sub>0</sub></em> <output id="sv-dr-v-out"></output></span><input type="range" id="sv-dr-v" min="20" max="45" step="1" value="26"></label>
+          <label class="ctrl"><span>사용성 풍속 비 <output id="sv-dr-rf-out"></output></span><input type="range" id="sv-dr-rf" min="0.5" max="1" step="0.05" value="0.75"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="sv-dr-z-out"></output></span><input type="range" id="sv-dr-z" min="0.005" max="0.05" step="0.005" value="0.02"></label>
+          <div class="ctrl"><span>바람 방향</span><div class="seg" id="sv-dr-dir"><button data-value="32" class="on">Y(폭 32 m)</button><button data-value="24">X(폭 24 m)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">고유 진동수 f<sub>1</sub></span><span class="v" id="sv-dr-o1">—</span></div>
+        <div class="stat"><span class="k">설계풍 최대 층간 변위비</span><span class="v" id="sv-dr-o2">—</span></div>
+        <div class="stat"><span class="k">꼭대기 RMS / 최대 가속도</span><span class="v" id="sv-dr-o3">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="sv-dr-o4">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-dr-msg"></div>
+      <div class="sim-note">해볼 것: 기본 B-10(층 강성 1.2 × 10⁶ kN/m, T<sub>1</sub> = 1.0 s)은 층간 변위비가 1/2,700 정도로 매우 작고 가속도도 약 3 mg입니다 · 층 강성 배율을 0.25로 낮추면(가벼운 강 골조 가정) 주기가 2 s로 길어지며 가속도가 기준선에 다가갑니다 · 감쇠비를 1 %로 낮춰 보세요 · 모형: <code>CB.dyn.B10</code>의 전단 건물(층 질량 703 t·지붕 612 t), <code>CB.wind.storyForce</code>(노풍도 B, Cp = 1.3)로 층 풍하중. 층간 변위는 설계 풍속(G = 2.0)의 정적 해석(<code>CB.solve</code>), 가속도는 사용성 풍속(V<sub>0</sub> × 비, G = 1.0의 평균 하중)과 원리 15.7(I<sub>u</sub> = 1/ln(z/0.3), 난류 길이 300(z/200)<sup>0.52</sup> m, S<sub>L</sub> = 6.8n/(1 + 10.2n)<sup>5/3</sup>, 피크 계수 3.5). 교육용.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="shortening">
+    <h2>기둥 축소: 시간이 줄이는 기둥</h2>
+    <div class="problem"><strong>꼭대기 층 바닥이 기울었다</strong>
+      <p>B-10의 바깥 기둥 C1과 가운데 코어 벽은 둘 다 철근콘크리트이고 높이도 41 m로 같습니다. 그런데 기둥은 단면이 작고 응력이 높으며, 코어 벽은 단면이 크고 응력이 낮습니다. 몇 년 뒤 기둥이 코어보다 더 줄어들면 그 사이에 걸친 바닥은 기둥 쪽으로 기울고, 보에는 강제 변위에 의한 휨이 생깁니다. 얼마나 줄어들고, 어떻게 미리 보정할까요?</p></div>
+    <p>MaterialsBook 8장은 기둥 하나 안에서 콘크리트가 크리프·수축으로 하중을 철근에 넘기는 과정을 계산했습니다. 이제 그 기둥을 10층 쌓습니다. <span class="term">기둥 축소</span><span class="en">(Column shortening)</span>는 세 성분의 합입니다.</p>
+    <ul>
+      <li><b><span class="term">탄성 축소</span></b> — 위층이 지어질 때마다 늘어나는 하중에 대한 즉시 변형 \(\sigma/E_c\).</li>
+      <li><b><span class="term">크리프 축소</span></b> — 각 하중 증분이 걸린 뒤 시간에 따라 자라는 변형 \(\varphi\sigma/E_c\). 하중이 시공 내내 조금씩 더해지므로 증분마다 따로 계산해 더한다.</li>
+      <li><b><span class="term">수축 축소</span></b> — 하중과 무관하게 각 층 기둥을 친 뒤부터 진행하는 \(\varepsilon_{sh}\). 철근이 일부를 붙잡는다.</li>
+    </ul>
+    <figure class="diagram" id="fig-sv-shorten">
+      <svg viewBox="0 0 820 320" role="img" aria-label="기둥과 코어의 차등 축소, 바닥 기울어짐, 거푸집 보정">
+        <rect x="10" y="10" width="800" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <rect x="0" y="0" width="22" height="230" style="fill:var(--compression);opacity:.22;stroke:var(--compression)"/>
+          <rect x="220" y="0" width="60" height="230" style="fill:var(--blue);opacity:.16;stroke:var(--blue)"/>
+          <g style="stroke:var(--text);stroke-width:2.4"><line x1="22" y1="66" x2="220" y2="56"/><line x1="22" y1="126" x2="220" y2="118"/><line x1="22" y1="186" x2="220" y2="181"/><line x1="22" y1="12" x2="220" y2="4"/></g>
+          <g style="stroke:var(--text-faint);stroke-dasharray:4 4"><line x1="22" y1="56" x2="220" y2="56"/><line x1="22" y1="118" x2="220" y2="118"/><line x1="22" y1="181" x2="220" y2="181"/><line x1="22" y1="4" x2="220" y2="4"/></g>
+          <text x="11" y="250" text-anchor="middle" class="t-mono" style="fill:var(--compression)">기둥</text>
+          <text x="250" y="250" text-anchor="middle" class="t-mono" style="fill:var(--blue)">코어 벽</text>
+          <text x="120" y="96" text-anchor="middle" class="t-mono" style="fill:var(--bad)">바닥이 기둥 쪽으로 기운다</text>
+          <text x="120" y="270" text-anchor="middle" class="t-dim">응력 높고 철근 많다 · 응력 낮고 단면 크다</text>
+        </g>
+        <g transform="translate(400,36)">
+          <text x="0" y="0" class="t" style="font-weight:700">차등 축소를 키우는 것</text>
+          <text x="0" y="26" class="t-dim">· 응력 차이(기둥 σ ≈ 8–10 MPa, 벽 ≈ 3–4 MPa, 교육용)</text>
+          <text x="0" y="48" class="t-dim">· 층수: 아래층 축소가 위층으로 누적된다</text>
+          <text x="0" y="70" class="t-dim">· 이론 부재 두께 h₀ · 철근비(철근이 크리프·수축을 붙잡음)</text>
+          <text x="0" y="102" class="t" style="font-weight:700">시공에서 이미 보정되는 것</text>
+          <text x="0" y="128" class="t-dim">· 각 층 슬래브는 그 시점의 높이에 수평으로 친다</text>
+          <text x="0" y="150" class="t-dim">· 그 전에 일어난 축소는 바닥 높이에 영향이 없다</text>
+          <text x="0" y="172" class="t-dim">· 문제는 슬래브를 친 <tspan style="fill:var(--bad)">뒤에</tspan> 일어나는 축소의 차이</text>
+          <text x="0" y="204" class="t" style="font-weight:700">보정</text>
+          <text x="0" y="230" class="t-dim">· 기둥 쪽 거푸집을 예측 차등 축소만큼 높여 친다</text>
+          <text x="0" y="252" class="t-dim">· 강구조는 기둥 절단 길이·심(shim)으로 보정</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-7.</b> 기둥과 코어의 <span class="term">차등 축소</span>. 슬래브는 칠 때마다 수평으로 맞추므로, 문제가 되는 것은 그 층 슬래브를 친 뒤에 아래층들에서 일어나는 축소의 합이다. 기둥이 코어보다 더 줄면 바닥이 기둥 쪽으로 기울고 보·슬래브에 강제 변위 휨이 생긴다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>모델 15.8 (시공 순서를 따른 축소의 누적, 교육용)</strong> 층 \(i\)를 재령 \(t_i\)에 치고, 위의 바닥 \(k\)가 지어지며 응력 증분 \(\Delta\sigma_k\)가 시각 \(t_k\)에 더해진다고 하자. 층 \(i\)(높이 \(h_i\))의 시각 \(t\)까지 변형은
+      <div class="formula">$$\varepsilon_i(t) = \sum_{k \ge i}\frac{\Delta\sigma_k}{E_c}\left[\kappa_e + \kappa_c\,\varphi(t - t_k)\right] + \kappa_c\,\varepsilon_{sh}(t - t_i - 7)$$
+      $$\varphi(\tau) = \varphi_\infty\frac{\tau^{0.6}}{10 + \tau^{0.6}}, \qquad \varepsilon_{sh}(\tau) = \varepsilon_{sh,\infty}\frac{\tau}{35 + \tau}$$<div class="where">\(\tau\): 일. 시간 함수는 ACI 209 형태다. \(\varphi_\infty = 2.0\), \(\varepsilon_{sh,\infty} = 500 \times 10^{-6}\)(MaterialsBook 8장의 M-30 값). \(\kappa_e = 1/(1 + (n - 1)\rho)\)은 탄성 응력의 철근 분담, \(\kappa_c = 1/(1 + n\rho(1 + \chi\varphi_\infty))\)은 철근이 크리프·수축을 붙잡는 효과(MaterialsBook 원리 8.10, \(\chi = 0.8\), \(n = 7.3\)). 레벨 \(j\)(층 \(j\) 위 슬래브)를 시각 \(T_j\)에 칠 때 그 레벨이 <b>그 뒤에</b> 내려가는 양은 \(\Delta_j = \sum_{i \le j} h_i[\varepsilon_i(t_{\text{end}}) - \varepsilon_i(T_j)]\)이다. 재하 재령에 따른 크리프 계수 보정, 응력 이력에 따른 이완은 생략했다.</div></div></div>
+    <div class="callout"><strong>예제 15.5 (B-10 1층 기둥과 코어의 최종 축소)</strong> 1층 기둥 C1(800 × 800, 철근비 2 %)의 지속 하중 응력(총단면) 9.4 MPa(약 6,000 kN), 코어 벽(400 mm, 철근비 0.5 %)은 3.5 MPa(교육용 가정). 층고 5 m.
+      <ol style="margin:6px 0 0">
+        <li><b>철근 효과.</b> 기둥 \(\kappa_e = 1/(1 + 6.3 \times 0.02) = 0.888\), \(\kappa_c = 1/(1 + 7.3 \times 0.02 \times 2.6) = 0.725\). 코어 \(\kappa_e = 0.970\), \(\kappa_c = 0.913\).</li>
+        <li><b>기둥 변형률(최종).</b> 탄성 \(9.4 \times 0.888/27{,}500 = 304 \times 10^{-6}\), 크리프 \(9.4 \times 2.0 \times 0.725/27{,}500 = 496 \times 10^{-6}\), 수축 \(500 \times 0.725 = 363 \times 10^{-6}\). 합 \(1{,}163 \times 10^{-6}\) → 5 m 층에서 5.8 mm.</li>
+        <li><b>코어 변형률(최종).</b> 탄성 124, 크리프 232, 수축 457, 합 \(813 \times 10^{-6}\) → 4.1 mm. 코어는 응력이 낮지만 철근이 적어 수축이 거의 그대로 나타난다.</li>
+        <li><b>누적.</b> 위층으로 갈수록 응력이 줄어 탄성·크리프 몫은 줄고 수축은 그대로다. 시뮬레이터로 10층을 쌓으면 기둥은 지붕에서 총 약 33 mm, 코어는 약 27 mm 줄고, 슬래브를 친 뒤의 차등 축소는 중간 레벨(6층 위 슬래브)에서 최대 약 5 mm다. 최대 레벨 아래 기둥 축소의 구성은 탄성 약 24 %, 크리프 38 %, 수축 38 %로 시간에 따른 성분이 3/4을 차지한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sv-shorten">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>기둥 축소 누적: 기둥 vs 코어</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-sh" aria-label="층별 슬래브 타설 뒤 축소량과 차등 축소"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>층수 <output id="sv-sh-n-out"></output></span><input type="range" id="sv-sh-n" min="5" max="60" step="1" value="10"></label>
+          <label class="ctrl"><span>기둥 밑 응력(지속) <output id="sv-sh-sc-out"></output></span><input type="range" id="sv-sh-sc" min="3" max="16" step="0.1" value="9.4"></label>
+          <label class="ctrl"><span>코어 밑 응력(지속) <output id="sv-sh-sw-out"></output></span><input type="range" id="sv-sh-sw" min="1" max="10" step="0.1" value="3.5"></label>
+          <label class="ctrl"><span>기둥 철근비 <output id="sv-sh-rc-out"></output></span><input type="range" id="sv-sh-rc" min="0.01" max="0.04" step="0.001" value="0.02"></label>
+          <label class="ctrl"><span>코어 철근비 <output id="sv-sh-rw-out"></output></span><input type="range" id="sv-sh-rw" min="0.0025" max="0.02" step="0.0005" value="0.005"></label>
+          <label class="ctrl"><span>최종 크리프 계수 φ <output id="sv-sh-phi-out"></output></span><input type="range" id="sv-sh-phi" min="0.5" max="3.5" step="0.1" value="2.0"></label>
+          <label class="ctrl"><span><em class="sv-lab">최종 수축 ε<sub>sh</sub></em> <output id="sv-sh-esh-out"></output></span><input type="range" id="sv-sh-esh" min="0" max="800" step="10" value="500"></label>
+          <label class="ctrl"><span>한 층 공기 <output id="sv-sh-dt-out"></output></span><input type="range" id="sv-sh-dt" min="4" max="21" step="1" value="7"></label>
+          <div class="ctrl"><span>준공 뒤 시점</span><div class="seg" id="sv-sh-t"><button data-value="365">1년</button><button data-value="3650">10년</button><button data-value="18250" class="on">50년</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 차등 축소</span><span class="v" id="sv-sh-o1">—</span></div>
+        <div class="stat"><span class="k">지붕 총 축소: 기둥 / 코어</span><span class="v" id="sv-sh-o2">—</span></div>
+        <div class="stat"><span class="k">8 m 바닥 기울기</span><span class="v" id="sv-sh-o3">—</span></div>
+        <div class="stat"><span class="k">구성(최대층 기둥)</span><span class="v" id="sv-sh-o4">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-sh-msg"></div>
+      <div class="sim-note">해볼 것: B-10(10층)에서 차등 축소가 중간 레벨에서 최대(약 5 mm)가 되는 모양을 보세요. 아래층은 위에 쌓일 하중이 적게 남았고, 위층은 아래층들의 축소가 대부분 이미 일어났기 때문입니다 · 층수를 40으로 늘리면 차등이 약 18 mm, 지붕 총 축소가 기둥 약 120 mm로 커집니다(밑 응력은 그대로 두어 기둥 크기를 층수에 맞춰 키운다고 가정) · 코어 철근비를 기둥과 같게 하면? 수축을 0으로 하면? · 그래프: 가로축 = 슬래브 타설 뒤 내려가는 양(mm), 세로축 = 층. 주황 막대가 기둥 쪽 거푸집을 높여야 할 보정량(기둥 − 코어). 모형: 모델 15.8, 층마다 같은 응력 증분(밑 응력/층수), 슬래브는 층을 친 뒤 한 층 공기만큼 지나 타설, 수축은 7일 양생 뒤 시작, 1층 5 m·나머지 4 m. 교육용.</div>
+    </div>
+    <div class="callout site"><strong>B-10의 기둥 축소</strong> 10층 RC 건물에서 기둥과 코어의 차등 축소는 시뮬레이터 기본값으로 최대 약 5 mm(6층 위 슬래브)이고, 기둥–코어 사이 8 m 바닥에서 기울기 1/1,600 정도다. 이 크기는 보통 마감 공차 안에 들어가므로 B-10은 특별한 보정 없이 설계할 수 있다(교육용 판단). 그러나 같은 원리가 40층 이상 초고층에서는 수십 mm에 이르러(이 모형으로 40층이면 약 18 mm, 기둥 총 축소 약 120 mm) 커튼월 이음, 엘리베이터 레일, 배관, 아웃리거(5장) 부재력에 직접 영향을 주므로, 시공 단계 해석과 현장 계측으로 층마다 보정량을 정하고 거푸집 높이를 조정한다. 강 기둥과 RC 코어를 섞은 복합 구조는 강 기둥에 크리프·수축이 없어 차이의 방향이 바뀌기도 한다.</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="thermal">
+    <h2>온도와 신축 이음</h2>
+    <p>바닥판은 데워지면 늘고 식으면 줄어듭니다(콘크리트 α ≈ 10 × 10⁻⁶ /°C). 바닥이 강막처럼 한 덩어리로 움직이면, 평면의 강성 중심(대략 가운데)에서 멀리 있는 기둥일수록 바닥에 끌려 크게 옆으로 밀립니다. 기둥은 위아래가 바닥과 기초에 붙잡혀 있으므로 이 <span class="term">강제 변위</span>가 기둥의 전단력과 휨모멘트가 됩니다. 건물이 길수록 끝 기둥의 변위가 커지므로, 어느 길이를 넘으면 건물을 둘로 나누는 <span class="term">신축 이음</span><span class="en">(Expansion joint)</span>을 둡니다. 건조 수축도 같은 방향(줄어듦)의 강제 변형이라 등가 온도 강하로 더해 생각합니다.</p>
+    <figure class="diagram" id="fig-sv-joint">
+      <svg viewBox="0 0 820 300" role="img" aria-label="긴 건물의 온도 신축, 끝 기둥의 강제 변위와 신축 이음">
+        <rect x="10" y="10" width="800" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="350" y="0" text-anchor="middle" class="t">이음 없음: 끝 기둥 변위 = αΔT·L/2</text>
+          <line x1="0" y1="40" x2="700" y2="40" style="stroke:var(--text);stroke-width:4"/>
+          <g style="stroke:var(--text);stroke-width:2.4"><line x1="0" y1="40" x2="-14" y2="100"/><line x1="140" y1="40" x2="134" y2="100"/><line x1="280" y1="40" x2="279" y2="100"/><line x1="420" y1="40" x2="421" y2="100"/><line x1="560" y1="40" x2="566" y2="100"/><line x1="700" y1="40" x2="714" y2="100"/></g>
+          <g style="stroke:var(--text-faint);stroke-dasharray:3 3"><line x1="0" y1="40" x2="0" y2="100"/><line x1="700" y1="40" x2="700" y2="100"/></g>
+          <g style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#sv-ah-load)"><line x1="330" y1="26" x2="240" y2="26"/><line x1="370" y1="26" x2="460" y2="26"/></g>
+          <text x="350" y="120" text-anchor="middle" class="t-mono" style="fill:var(--bad)">끝으로 갈수록 기둥이 크게 휜다</text>
+          <text x="350" y="150" text-anchor="middle" class="t">이음 1개: 구간 길이가 절반 → 끝 기둥 변위도 절반</text>
+          <line x1="0" y1="180" x2="340" y2="180" style="stroke:var(--text);stroke-width:4"/><line x1="360" y1="180" x2="700" y2="180" style="stroke:var(--text);stroke-width:4"/>
+          <g style="stroke:var(--text);stroke-width:2.4"><line x1="0" y1="180" x2="-7" y2="230"/><line x1="340" y1="180" x2="347" y2="230"/><line x1="360" y1="180" x2="353" y2="230"/><line x1="700" y1="180" x2="707" y2="230"/></g>
+          <rect x="342" y="170" width="16" height="20" style="fill:var(--warn);opacity:.35"/>
+          <text x="350" y="166" text-anchor="middle" class="t-mono" style="fill:var(--warn)">이음 폭 w</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-8.</b> 온도 신축과 신축 이음. 바닥이 강성 중심에서 양쪽으로 늘면 끝 기둥은 위아래가 붙잡힌 채 옆으로 밀려 휜다. 이음으로 건물을 나누면 구간 길이와 끝 기둥 변위가 줄고, 이음 폭은 두 구간이 서로 다가오는 양과 벌어지는 양을 모두 받아야 한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.9 (끝 기둥의 강제 변위와 이음 폭)</strong> 길이 \(L_s\)인 구간의 바닥이 온도 변화 \(\Delta T\)와 수축 \(\varepsilon_{sh}\)로 자유롭게 움직인다면 끝 기둥 위끝의 수평 변위와, 위아래 끝이 회전하지 않는 기둥(높이 \(h\))의 전단력·모멘트는
+      <div class="formula">$$\delta = \left(\alpha\,\Delta T + \varepsilon_{sh}\right)\frac{L_s}{2}, \qquad V = \frac{12EI}{h^3}\delta, \qquad M = \frac{Vh}{2}$$<div class="where">이음 폭은 이웃한 두 구간 끝이 서로 다가오고 멀어지는 양을 모두 받아야 하므로 대략 \(w \ge \alpha\,\Delta T_{\text{범위}}\,L_s + \varepsilon_{sh}L_s\)에 시공 오차와 지진 시 충돌 방지 간격을 더한다. 실제 바닥은 기둥 강성에 조금 붙잡혀 자유 변위보다 덜 움직이고, 균열·크리프로 기둥 강성이 줄어 이 식은 안전 측 상한이다. 간격에 대한 경험값은 기후·난방·구조에 따라 수십 m–100 m 남짓으로 넓게 흩어져 있다(교육용, 기준 확인).</div></div></div>
+    <div class="callout"><strong>예제 15.6 (B-10은 이음이 필요한가)</strong> B-10 X 방향 길이 32 m, 실내 냉난방으로 골조 온도 변화 ±15 °C(교육용), 1층 기둥 C1 800 × 800, h = 5 m, 균열 강성 0.7\(EI_g\).
+      <ol style="margin:6px 0 0">
+        <li>\(\delta = 10 \times 10^{-6} \times 15 \times 16{,}000 = 2.4\) mm(온도만).</li>
+        <li>\(EI = 0.7 \times 27.5 \times 10^6 \times 0.8^4/12 = 6.57 \times 10^5\) kN·m², \(V = 12 \times 6.57 \times 10^5 \times 0.0024/5^3 = 151\) kN, \(M = 379\) kN·m.</li>
+        <li>B-10 1층 기둥의 지진 설계 모멘트에 비하면 작은 값이어서 32 m 건물은 이음 없이 한 덩어리로 짓는다. 같은 단면으로 길이 120 m 주차장을 이음 없이 만들면 끝 기둥 변위가 9 mm, 모멘트가 약 1,400 kN·m로 커져 균열과 기둥 손상을 부른다. 이음 2개로 세 구간(40 m)을 만들면 3 mm로 줄어든다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sv-thermal">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>온도 신축과 이음 간격</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-th" aria-label="건물 입면의 신축 변위와 끝 기둥 변형"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>건물 길이 L <output id="sv-th-L-out"></output></span><input type="range" id="sv-th-L" min="16" max="200" step="4" value="32"></label>
+          <label class="ctrl"><span>신축 이음 수 <output id="sv-th-j-out"></output></span><input type="range" id="sv-th-j" min="0" max="4" step="1" value="0"></label>
+          <label class="ctrl"><span>온도 변화 ±ΔT <output id="sv-th-dt-out"></output></span><input type="range" id="sv-th-dt" min="5" max="40" step="1" value="15"></label>
+          <label class="ctrl"><span>등가 수축(바닥) <output id="sv-th-sh-out"></output></span><input type="range" id="sv-th-sh" min="0" max="300" step="10" value="0"></label>
+          <label class="ctrl"><span>기둥 크기 <output id="sv-th-c-out"></output></span><input type="range" id="sv-th-c" min="400" max="1200" step="50" value="800"></label>
+          <label class="ctrl"><span>층고 h <output id="sv-th-h-out"></output></span><input type="range" id="sv-th-h" min="3" max="7" step="0.5" value="5"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">구간 길이</span><span class="v" id="sv-th-o1">—</span></div>
+        <div class="stat"><span class="k">끝 기둥 변위 δ</span><span class="v" id="sv-th-o2">—</span></div>
+        <div class="stat"><span class="k">끝 기둥 V / M (CB.frame)</span><span class="v" id="sv-th-o3">—</span></div>
+        <div class="stat"><span class="k">필요 이음 폭(개략)</span><span class="v" id="sv-th-o4">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-th-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(B-10, 32 m)은 끝 기둥 변위 2.4 mm, 모멘트 약 380 kN·m입니다 · 길이를 120 m로 늘리고 이음을 0 → 2개로 바꿔 보세요 · 등가 수축 150 × 10⁻⁶을 더하면 겨울(수축 + 온도 강하)에 끝 기둥 변위가 두 배 가까이 됩니다 · 기둥을 키우면 변위는 그대로인데 모멘트는 커집니다(강제 변위는 강성이 클수록 힘이 크다) · 모형: 원리 15.9, 끝 기둥은 아래 고정·위 회전 구속(수평 강제 변위)으로 <code>CB.frame</code>에 지점 변위를 주어 계산, E<sub>c</sub> = 27,500 MPa, 균열 강성 0.7EI<sub>g</sub>, 바닥은 기둥에 구속되지 않는다고 본 상한. 이음 폭 = α·2ΔT·L<sub>s</sub> + ε<sub>sh</sub>L<sub>s</sub> + 10 mm(시공 여유). 교육용.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="machine">
+    <h2>기계 진동과 차음 맛보기</h2>
+    <p>옥상의 냉각탑, 기계실의 펌프와 송풍기는 회전 속도에 해당하는 진동수로 바닥을 계속 흔듭니다. 이 진동이 구조체를 타고 아래층 사무실이나 회의실까지 전해지면 웅웅거리는 소리(고체 전달음)와 미세한 떨림이 됩니다. 대책은 기계와 바닥 사이에 부드러운 스프링이나 고무를 넣는 <span class="term">방진</span><span class="en">(Vibration isolation)</span>입니다. 원리는 9장 면진과 같습니다. 받침 위 기계의 고유 진동수를 가진 진동수보다 충분히 낮추면(진동수 비 \(r \gt \sqrt2\)) 바닥으로 전해지는 힘이 줄어듭니다.</p>
+    <div class="callout def"><strong>원리 15.10 (힘의 전달률과 정적 처짐)</strong> 받침의 정적 처짐 \(\delta_{st}\)(mm)이면 받침 위 기계의 고유 진동수는 \(f_n = \frac{1}{2\pi}\sqrt{g/\delta_{st}} \approx 15.8/\sqrt{\delta_{st}}\) Hz이고, 가진 진동수 \(f\)(= 회전수/60)에서 바닥에 전해지는 힘의 비율(<span class="term">전달률</span>)은
+      <div class="formula">$$TR = \frac{\sqrt{1 + (2\zeta r)^2}}{\sqrt{(1 - r^2)^2 + (2\zeta r)^2}}, \qquad r = \frac{f}{f_n}$$<div class="where">9장의 <code>CB.dyn.TR</code>과 같은 식이다. \(r \lt \sqrt2\)이면 오히려 증폭되고, 특히 \(r \approx 1\)(공진)을 피해야 한다. 감쇠는 공진 통과를 돕지만 높은 진동수에서는 차단 효과를 약간 줄인다. 받치는 바닥 자체가 유연하면(경간이 긴 지붕) 바닥 진동수도 함께 따져야 한다.</div></div></div>
+    <div class="sim" id="sim-sv-iso">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>설비 방진: 받침 처짐과 전달률</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-is" aria-label="진동수 비에 따른 전달률 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>기계 회전수 <output id="sv-is-rpm-out"></output></span><input type="range" id="sv-is-rpm" min="300" max="3600" step="10" value="1450"></label>
+          <label class="ctrl"><span><em class="sv-lab">받침 정적 처짐 δ<sub>st</sub></em> <output id="sv-is-d-out"></output></span><input type="range" id="sv-is-d" min="0.5" max="50" step="0.5" value="5"></label>
+          <label class="ctrl"><span>받침 감쇠비 ζ <output id="sv-is-z-out"></output></span><input type="range" id="sv-is-z" min="0.01" max="0.3" step="0.01" value="0.05"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">가진 진동수 f</span><span class="v" id="sv-is-o1">—</span></div>
+        <div class="stat"><span class="k">받침 위 f<sub>n</sub></span><span class="v" id="sv-is-o2">—</span></div>
+        <div class="stat"><span class="k">전달률 TR</span><span class="v" id="sv-is-o3">—</span></div>
+        <div class="stat"><span class="k">차단 효율</span><span class="v" id="sv-is-o4">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-is-msg"></div>
+      <div class="sim-note">해볼 것: 1,450 rpm(약 24 Hz) 펌프에 고무 패드(δ<sub>st</sub> ≈ 1–3 mm)와 스프링(25 mm)을 비교해 보세요 · 저속 냉각탑(300–500 rpm)은 같은 효율을 얻으려면 훨씬 부드러운 받침이 필요합니다 · δ<sub>st</sub>를 줄여 공진(r ≈ 1)에 닿으면 전달률이 1보다 훨씬 커집니다 · 모형: 원리 15.10, <code>CB.dyn.TR</code>, 강체 바닥 가정. 교육용.</div>
+    </div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="../../mechanics/chapters/deflection.html"><small>MECHANICSBOOK · CH.11 보의 처짐</small>처짐 계산의 바탕<br><span>EI v″ = M과 처짐 공식이 처짐 제한 검토의 입력이다.</span></a>
+      <a href="../../materials/chapters/shrinkage.html"><small>MATERIALSBOOK · CH.08 수축과 크리프</small>장기 처짐과 기둥의 하중 이동<br><span>φ = 2.0, ε<sub>sh</sub> = 500 × 10⁻⁶이 기둥 축소 누적의 재료값이다.</span></a>
+      <a href="../../mechanics/chapters/truss.html"><small>MECHANICSBOOK · CH.03 트러스</small>T-36의 부재력<br><span>같은 트러스 모형에 자중을 걸어 레일리 진동수를 얻는다.</span></a>
+      <a href="floors.html"><small>CH.03 · 바닥 구조</small>바닥 진동수와 처짐<br><span>f ≈ 18/√δ와 슬래브 두께가 보행 진동 검토로 이어진다.</span></a>
+      <a href="wind.html"><small>CH.06 · 풍하중과 바람의 영향</small>층 풍하중과 거주성<br><span>층 풍하중을 횡변위·가속도 판정에 쓴다.</span></a>
+      <a href="dynamics.html"><small>CH.07 · 구조 동역학</small>공진과 감쇠<br><span>동적 증폭 계수와 1자유도 응답이 보행 진동 식의 뿌리다.</span></a>
+      <a href="isolation.html"><small>CH.09 · 면진과 제진</small>TMD와 감쇠기<br><span>보도교·바닥 진동의 해결책인 감쇠 장치를 설계한다.</span></a>
+      <a href="walls.html"><small>CH.05 · 전단벽·코어·튜브</small>코어와 아웃리거<br><span>기둥–코어 차등 축소가 아웃리거 부재력을 바꾼다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>사용성 한계상태는 무너지지 않지만 쓰기 어려운 상태(처짐, 균열, 진동, 횡변위, 축소, 신축)이고, 계수 없는 사용 하중·지속 하중·짧은 재현 기간의 바람으로 검토한다. 한계값은 대부분 성능 목표이며 이 장의 수치는 교육용이다.</li>
+      <li>처짐 제한은 "누가 겪는 처짐인가"로 나눈다: 활하중 즉시 처짐 ≤ ℓ/360(바닥), 비구조재 설치 뒤 처짐 λ<sub>Δ</sub>δ<sub>i,sus</sub> + δ<sub>i,L</sub> ≤ ℓ/480(손상 우려) 또는 ℓ/240, λ<sub>Δ</sub> = ξ/(1 + 50ρ′). B-10 G1 내부 경간은 7.2 mm로 합격, 끝 경간은 지점 가정에 따라 판정이 갈린다.</li>
+      <li>보행 하중은 걸음 진동수 1.6–2.4 Hz와 그 고조파(α ≈ 0.5, 0.2, 0.1, 0.05)로 나뉜다. 공진 가속도 a/g = Rα<sub>i</sub>Q/(βW), DG11 형태 a<sub>p</sub>/g = P<sub>0</sub>e<sup>−0.35f<sub>n</sub></sup>/(βW) ≤ 0.5 %(사무실). 무거운 B-10 바닥(약 9–10 Hz)은 문제가 없고 가볍고 긴 경간이 위험하다.</li>
+      <li>레일리 방법 ω² ≈ gΣm<sub>i</sub>u<sub>i</sub>/Σm<sub>i</sub>u<sub>i</sub>²는 자중 정적 처짐만으로 1차 진동수를 준다. T-36은 f<sub>1</sub> ≈ 4.8 Hz로 걸음 1차 대역 밖이지만 5 Hz 미만이라 검토 대상이고, 붐비는 군중에서 2차 고조파 공진 가속도가 쾌적 기준에 다가간다.</li>
+      <li>수평 동기화는 보행자의 속도 비례 힘이 음의 감쇠처럼 작용하는 현상으로, N<sub>crit</sub> = 8πζfM/k(k ≈ 300 N·s/m)를 넘으면 갑자기 커진다. 해결은 감쇠다(밀레니엄 브리지 2000 → 감쇠기 보강 뒤 2002 재개통).</li>
+      <li>바람의 사용성은 층간 변위비(약 h/500, 외장·칸막이)와 꼭대기 가속도(지각 곡선, 강성·질량·감쇠)로 판정한다. B-10은 둘 다 여유가 크다.</li>
+      <li>기둥 축소 = 탄성 + 크리프 + 수축을 시공 순서대로 누적한 것이며, 문제는 슬래브 타설 뒤의 차등 축소다. B-10은 최대 약 5 mm(중간 레벨)로 작지만 층수가 늘면 수십 mm로 커져 거푸집 보정이 필요하다. 온도 신축은 끝 기둥에 δ = αΔTL<sub>s</sub>/2의 강제 변위를 주며, 긴 건물은 신축 이음으로 나눈다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 손상되기 쉬운 칸막이벽을 받치는 바닥보의 처짐 제한 ℓ/480과 비교해야 하는 처짐은?</p><div class="opts">
+        <button class="opt">고정하중과 활하중의 즉시 처짐 합</button><button class="opt" data-correct>벽 설치 뒤의 처짐: 지속 하중의 장기(크리프) 처짐 + 활하중 즉시 처짐</button><button class="opt">고정하중의 즉시 처짐만</button><button class="opt">계수 하중 1.2D + 1.6L의 처짐</button>
+      </div><div class="quiz-exp">고정하중의 즉시 처짐은 벽을 쌓기 전에 이미 일어나 벽이 겪지 않는다. 벽이 겪는 것은 그 뒤에 자라는 크리프 처짐과 나중에 오는 활하중의 처짐이다(원리 15.2). 사용성은 계수 없는 하중으로 검토한다.</div></div>
+      <div class="quiz-q"><p>2. 같은 단면의 보에서 경간만 8 m → 10 m로 늘리면 처짐/한계(L/360) 비는 대략 몇 배가 되는가?</p><div class="opts">
+        <button class="opt">1.25배</button><button class="opt">1.56배</button><button class="opt" data-correct>1.95배</button><button class="opt">2.44배</button>
+      </div><div class="quiz-exp">처짐 ∝ L⁴, 한계 ∝ L이므로 비는 L³에 비례한다. (10/8)³ = 1.95. 처짐 자체는 (10/8)⁴ = 2.44배다.</div></div>
+      <div class="quiz-q"><p>3. 고유 진동수 4.4 Hz인 바닥이 걸음 진동수 2.2 Hz로 걷는 사람에게 크게 응답하는 이유는?</p><div class="opts">
+        <button class="opt">걸음의 1차 고조파와 공진해서</button><button class="opt" data-correct>걸음의 2차 고조파(2 × 2.2 = 4.4 Hz)와 공진해서</button><button class="opt">바닥 질량이 커서</button><button class="opt">감쇠가 커서</button>
+      </div><div class="quiz-exp">보행 힘은 f<sub>p</sub>, 2f<sub>p</sub>, 3f<sub>p</sub>… 성분을 가진다. 2차 성분의 동적 하중 계수(약 0.2)는 1차보다 작지만 공진하면 1/(2β)배로 증폭된다.</div></div>
+      <div class="quiz-q"><p>4. 레일리 방법으로 진동수를 구할 때 자중의 정적 처짐 형상을 모드 형상 대신 쓰는 이유로 옳은 것은?</p><div class="opts">
+        <button class="opt">정적 처짐이 정확한 모드 형상이라서</button><button class="opt" data-correct>1차 모드와 매우 비슷하고, 정적 해석만으로 구할 수 있으며, 레일리 몫이 형상 오차에 둔감해서</button><button class="opt">진동수가 낮게 나와 안전 측이라서</button><button class="opt">감쇠를 자동으로 포함해서</button>
+      </div><div class="quiz-exp">레일리 몫은 형상 오차의 제곱으로만 틀어지므로 비슷한 형상이면 아주 정확하다. 가정 형상은 실제보다 뻣뻣하게 행동해 참값보다 약간 높은 진동수를 준다(위쪽 근사).</div></div>
+      <div class="quiz-q"><p>5. T-36(f<sub>1</sub> ≈ 4.8 Hz)에 대한 판단으로 가장 알맞은 것은?</p><div class="opts">
+        <button class="opt">보행 대역 1.6–2.4 Hz 밖이므로 진동 검토가 필요 없다</button><button class="opt" data-correct>1차 공진은 없지만 5 Hz 미만이라 검토 대상이며, 군중이 붐비면 진동수가 내려가 2차 고조파 공진을 확인해야 한다</button><button class="opt">1차 고조파와 공진하므로 반드시 TMD가 필요하다</button><button class="opt">수평 동기화가 반드시 일어난다</button>
+      </div><div class="quiz-exp">진동수가 보행 1차 대역의 두 배라 1차 공진은 없다. 그러나 2차 고조파 대역(3.2–4.8 Hz)과 지침의 5 Hz 기준에 걸쳐 있고, 군중 질량이 진동수를 낮춘다.</div></div>
+      <div class="quiz-q"><p>6. 수평 진동수 0.9 Hz, 모드 질량 80 t인 보도교의 임계 보행자 수를 두 배로 늘리는 가장 직접적인 방법은? (k ≈ 300 N·s/m)</p><div class="opts">
+        <button class="opt">보행자 수를 제한하는 표지를 단다</button><button class="opt">상판을 가볍게 한다</button><button class="opt" data-correct>감쇠비를 두 배로 키운다(감쇠기·TMD)</button><button class="opt">진동수를 0.45 Hz로 낮춘다</button>
+      </div><div class="quiz-exp">N<sub>crit</sub> = 8πζfM/k는 ζ, f, M에 비례한다. 상판을 가볍게 하거나 진동수를 낮추면 오히려 줄어든다. 질량을 두 배로 하기는 어렵지만 감쇠는 장치로 몇 배씩 키울 수 있다.</div></div>
+      <div class="quiz-q"><p>7. 10층 RC 건물에서 기둥–코어의 "슬래브 타설 뒤" 차등 축소가 중간층에서 가장 큰 이유는?</p><div class="opts">
+        <button class="opt">중간층 기둥이 가장 가늘어서</button><button class="opt" data-correct>아래층은 타설 뒤에 더해질 위층 하중이 적고(대부분 이미 걸림), 위층은 아래층 축소의 대부분이 타설 전에 일어나서</button><button class="opt">중간층의 수축이 가장 커서</button><button class="opt">중간층에 아웃리거가 있어서</button>
+      </div><div class="quiz-exp">슬래브는 칠 때 수평으로 맞추므로 그 전의 축소는 보정된다. 레벨 j가 겪는 것은 그 뒤 아래 j개 층의 축소다. 아래 레벨은 누적 층수가 적고, 위 레벨은 남은 하중·시간이 적어 가운데에서 최대가 된다.</div></div>
+      <div class="quiz-q"><p>8. 길이 96 m 건물(이음 없음), 온도 변화 20 °C, α = 10 × 10⁻⁶ /°C일 때 끝 기둥 위끝의 자유 변위는? 이음 하나를 가운데 두면?</p><div class="opts">
+        <button class="opt">19.2 mm → 9.6 mm</button><button class="opt" data-correct>9.6 mm → 4.8 mm</button><button class="opt">4.8 mm → 2.4 mm</button><button class="opt">9.6 mm → 9.6 mm</button>
+      </div><div class="quiz-exp">δ = αΔT·L<sub>s</sub>/2 = 10⁻⁵ × 20 × 48,000 = 9.6 mm. 이음 하나로 구간이 48 m가 되면 4.8 mm다. 기둥 모멘트는 변위에 비례해 절반이 된다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const SVX = {
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  verdict: (ok, yes = "합격", no = "불합격") => `<span style="color:var(--${ok ? "ok" : "bad"})">${ok ? yes : no}</span>`,
+  msg(id, html, cls = "") { const el = document.getElementById(id); el.className = "sv-msg" + (cls ? " " + cls : ""); el.innerHTML = html; },
+};
+
+/* ---------- 1. 처짐 제한 ---------- */
+(function () {
+  const sup = CB.seg("sv-df-sup", go), ns = CB.seg("sv-df-ns", go);
+  const gL = CB.range("sv-df-L", (v) => v.toFixed(1) + " m", go), gh = CB.range("sv-df-h", (v) => v + " mm", go), gie = CB.range("sv-df-ie", (v) => v.toFixed(2), go);
+  const gD = CB.range("sv-df-wd", (v) => v.toFixed(1) + " kN/m", go), gLL = CB.range("sv-df-wl", (v) => v.toFixed(1) + " kN/m", go);
+  document.getElementById("sv-df-b10").addEventListener("click", () => { gL.set(8, false); gh.set(700, false); gie.set(0.5, false); gD.set(56.7, false); gLL.set(20, false); ns.set("480", false); sup.set("int"); });
+  const EC = 2.75e7, B = 0.4, PSI = 0.3, LAM = 2.0;
+  let R = null;
+  function calc() {
+    const L = gL(), h = gh() / 1000, EI = EC * (B * h ** 3) / 12 * gie(), s = sup();
+    let model, span, ell;
+    if (s === "ss") { model = { L, supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }] }; span = [0, L]; ell = L; }
+    else if (s === "cant") { model = { L, supports: [{ x: 0, type: "fixed" }] }; span = [0, L]; ell = 2 * L; }
+    else { const xs = [0, L, 2 * L, 3 * L, 4 * L]; model = { L: 4 * L, supports: xs.map((x, i) => ({ x, type: i ? "roller" : "pin" })) }; span = s === "end" ? [0, L] : [L, 2 * L]; ell = L; }
+    const b = CB.beam(Object.assign({ EI, loads: [{ type: "udl", w: 1, a: 0, b: model.L }] }, model));
+    const pts = b.sample(320);
+    let d1 = 0; pts.forEach((p) => { if (p.x >= span[0] - 1e-9 && p.x <= span[1] + 1e-9) d1 = Math.max(d1, -p.v); });
+    const wD = gD(), wL = gLL(), dsus = (wD + PSI * wL) * d1, dL = wL * d1;
+    const after = LAM * dsus + dL, total = (1 + LAM) * dsus + (1 - PSI) * wL * d1;
+    return { L, ell, s, pts, span, d1, dL, after, total, imm: (wD + wL) * d1, wD, wL, lim2: +ns(), wsus: wD + PSI * wL };
+  }
+  const cv = CB.canvas("#sv-cv-df", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), xmax = R.pts[R.pts.length - 1].x;
+    const imm = R.pts.map((p) => [p.x, p.v * (R.wD + R.wL) * 1000]);
+    const lt = R.pts.map((p) => [p.x, p.v * ((1 + LAM) * R.wsus + (1 - PSI) * R.wL) * 1000]);
+    const lim360 = (R.ell / 360) * 1000, limA = (R.ell / R.lim2) * 1000;
+    const ymin = -Math.max(-Math.min(...lt.map((q) => q[1])) * 1.1, lim360 * 1.25, limA * 1.1, 1);
+    const ymax = Math.max(1, -ymin * 0.25);
+    const c = CB.chart(ctx, null, { x: [0, xmax], y: [ymin, ymax], xLabel: "보 위치 x (m)", yLabel: "처짐 (mm, 아래 −)",
+      bands: [{ x0: R.span[0], x1: R.span[1], color: SVX.alpha(pal.accent, 0.08) }],
+      series: [{ data: [[0, 0], [xmax, 0]], color: pal.text, width: 3 }, { data: imm, color: pal.accent, width: 2, dash: [6, 4] }, { data: lt, color: pal.accent, width: 3 }],
+      hlines: [{ y: -lim360, color: pal.warn, label: `ℓ/360 = ${CB.num(lim360, 1)}` }, { y: -limA, color: pal.bad, label: `ℓ/${R.lim2} = ${CB.num(limA, 1)}` }] });
+    const sups = R.s === "ss" ? [0, xmax] : R.s === "cant" ? [0] : [0, 1, 2, 3, 4].map((k) => k * R.L);
+    sups.forEach((x, i) => { const px = c.X(x), py = c.Y(0); ctx.save(); ctx.fillStyle = pal.surface; ctx.strokeStyle = pal.text; ctx.lineWidth = 1.5; if (R.s === "cant") { ctx.fillStyle = pal.text; ctx.fillRect(px - 4, py - 14, 4, 28); } else { ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - 7, py + 11); ctx.lineTo(px + 7, py + 11); ctx.closePath(); ctx.fill(); ctx.stroke(); } ctx.restore(); });
+    SVX.text(ctx, "— 장기 총 처짐", c.box.x + 8, c.box.y + 12, pal.accent, { size: 11, align: "left" });
+    SVX.text(ctx, "-- 즉시 D + L", c.box.x + 8, c.box.y + 28, pal.accent, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.72 : 0.5), minHeight: 230, maxHeight: 360 });
+  function go() {
+    R = calc(); cv.redraw();
+    const lim360 = (R.ell / 360) * 1000, limA = (R.ell / R.lim2) * 1000, dL = R.dL * 1000, af = R.after * 1000, tot = R.total * 1000;
+    const ok1 = dL <= lim360, ok2 = af <= limA;
+    CB.stat("sv-df-o1", `${CB.num(dL, 1)} mm / ${CB.num(lim360, 1)}`);
+    CB.stat("sv-df-o2", `${CB.num(af, 1)} mm / ${CB.num(limA, 1)}`);
+    CB.stat("sv-df-o3", `${CB.num(tot, 1)} mm (ℓ/${CB.sig(R.ell * 1000 / Math.max(tot, 1e-6), 3)})`);
+    CB.stat("sv-df-o4", SVX.verdict(ok1 && ok2));
+    const what = !ok1 ? "활하중 즉시 처짐이 ℓ/360을 넘습니다. 강성(보 춤, I<sub>e</sub>)이 부족합니다." : !ok2 ? `비구조재 설치 뒤 처짐이 ℓ/${R.lim2}을 넘습니다. 크리프가 지배하므로 지속 하중을 줄이거나, 압축 철근(ρ′)으로 λ<sub>Δ</sub>를 낮추거나, 비구조재 설치를 늦추거나, 솟음(캠버)을 검토하세요.` : `두 검토 모두 합격입니다. δ<sub>after</sub> = 2.0 × ${CB.num(R.wsus * R.d1 * 1000, 2)} + ${CB.num(dL, 2)} = <b>${CB.num(af, 1)} mm</b>.`;
+    SVX.msg("sv-df-msg", what, ok1 && ok2 ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 2. 보행자 하중과 바닥 응답 ---------- */
+(function () {
+  const gfn = CB.range("sv-fl-fn", (v) => v.toFixed(1) + " Hz", go), gw = CB.range("sv-fl-w", (v) => v + " kN", go), gb = CB.range("sv-fl-b", (v) => v.toFixed(3), go), gfp = CB.range("sv-fl-fp", (v) => v.toFixed(2) + " Hz", go);
+  const use = CB.seg("sv-fl-use", go);
+  document.getElementById("sv-fl-b10").addEventListener("click", () => { gfn.set(9.7, false); gw.set(448, false); gb.set(0.03, false); gfp.set(2.0, false); use.set("0.5"); });
+  document.getElementById("sv-fl-lite").addEventListener("click", () => { gfn.set(4.5, false); gw.set(380, false); gb.set(0.025, false); gfp.set(2.25, false); use.set("0.5"); });
+  const ALPHA = [0.5, 0.2, 0.1, 0.05], Q = 0.7, RF = 0.5;
+  const harm = (fp, fn, W, b) => ALPHA.map((a, i) => { const r = ((i + 1) * fp) / fn; return RF * (2 * a * Q / W) * (r * r) / Math.sqrt((1 - r * r) ** 2 + (2 * b * r) ** 2) * 100; });
+  const total = (fp, fn, W, b) => CB.dyn.srss(harm(fp, fn, W, b));
+  const top = CB.canvas("#sv-cv-fl", (ctx, W, H) => {
+    const pal = CB.palette(), fn = gfn(), w = gw(), b = gb(), lim = +use(), data = [];
+    for (let f = 1.4; f <= 2.6001; f += 0.004) data.push([f, total(f, fn, w, b)]);
+    const ymax = Math.max(lim * 1.6, ...data.map((p) => p[1])) * 1.1;
+    CB.chart(ctx, null, { x: [1.4, 2.6], y: [0, ymax], xLabel: "걸음 진동수 f_p (Hz)", yLabel: "가속도 (% g)", bands: [{ x0: 1.6, x1: 2.4, color: SVX.alpha(pal.accent2, 0.1) }],
+      series: [{ data, color: pal.accent, width: 2.6 }], hlines: [{ y: lim, color: pal.bad, label: `한계 ${lim} %` }], points: [{ x: gfp(), y: total(gfp(), fn, w, b), color: pal.text, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.42), minHeight: 200, maxHeight: 300 });
+  const bot = CB.canvas("#sv-cv-fl2", (ctx, W, H) => {
+    const pal = CB.palette(), hs = harm(gfp(), gfn(), gw(), gb()), mx = Math.max(+use(), ...hs) * 1.15;
+    const x0 = 60, bw = (W - x0 - 20) / 4, base = H - 34, top0 = 18;
+    ctx.save(); ctx.strokeStyle = pal.axis; ctx.beginPath(); ctx.moveTo(x0, top0); ctx.lineTo(x0, base); ctx.lineTo(W - 16, base); ctx.stroke();
+    const ly = base - ((+use()) / mx) * (base - top0); ctx.setLineDash([4, 4]); ctx.strokeStyle = pal.bad; ctx.beginPath(); ctx.moveTo(x0, ly); ctx.lineTo(W - 16, ly); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+    hs.forEach((v, i) => { const hgt = (v / mx) * (base - top0), x = x0 + i * bw + bw * 0.22; ctx.fillStyle = i === hs.indexOf(Math.max(...hs)) ? pal.accent : SVX.alpha(pal.accent, 0.45); ctx.fillRect(x, base - hgt, bw * 0.56, hgt);
+      SVX.text(ctx, W < 520 ? `${i + 1}차` : `${i + 1}차 ${CB.num((i + 1) * gfp(), 1)} Hz`, x + bw * 0.28, base + 14, pal.dim, { size: 10.5, bold: false }); SVX.text(ctx, CB.num(v, 3), x + bw * 0.28, base - hgt - 9, pal.text, { size: 10.5 }); });
+    SVX.text(ctx, "고조파별 % g", 8, 10, pal.dim, { size: 11, align: "left", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.5 : 0.3), minHeight: 150, maxHeight: 210 });
+  function go() {
+    top.redraw(); bot.redraw();
+    const fn = gfn(), w = gw(), b = gb(), lim = +use(), now = total(gfp(), fn, w, b);
+    let mx = 0, fmx = 1.6; for (let f = 1.6; f <= 2.4001; f += 0.002) { const a = total(f, fn, w, b); if (a > mx) { mx = a; fmx = f; } }
+    const dg = (0.29 * Math.exp(-0.35 * fn)) / (b * w) * 100;
+    CB.stat("sv-fl-o1", CB.num(now, 3) + " % g");
+    CB.stat("sv-fl-o2", `${CB.num(mx, 3)} % g (${CB.num(fmx, 2)} Hz)`);
+    CB.stat("sv-fl-o3", fn <= 9 ? CB.num(dg, 3) + " % g" : `${CB.num(dg, 3)} % g (f<sub>n</sub> > 9 Hz)`);
+    const ok = mx <= lim; CB.stat("sv-fl-o4", SVX.verdict(ok));
+    const hs = harm(fmx, fn, w, b), k = hs.indexOf(Math.max(...hs)) + 1;
+    SVX.msg("sv-fl-msg", fn > 4 * 2.4 ? `f<sub>n</sub> = ${CB.num(fn, 1)} Hz는 4차 고조파(최대 9.6 Hz)보다 높아 공진이 없습니다. 고진동수 바닥은 걸음 충격에 대한 응답과 강성(1 kN당 처짐)으로 판단합니다.` : `걸음 대역에서 가장 큰 응답은 ${CB.num(fmx, 2)} Hz 걸음의 <b>${k}차 고조파</b>(${CB.num(k * fmx, 2)} Hz)가 f<sub>n</sub>과 맞을 때입니다. ${ok ? "한계 안입니다." : "한계를 넘습니다: 질량·강성·감쇠 가운데 무엇을 키울지 정하세요."}`, ok ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 3. T-36 보도교 진동수(레일리) ---------- */
+(function () {
+  const gst = CB.range("sv-tb-st", (v) => v + " t", go), gdk = CB.range("sv-tb-dk", (v) => v.toFixed(1) + " kN/m²", go), gcr = CB.range("sv-tb-cr", (v) => v.toFixed(2) + " 명/m²", go), gh = CB.range("sv-tb-h", (v) => v.toFixed(1) + " m", go), gz = CB.range("sv-tb-z", (v) => (v * 100).toFixed(1) + " %", go);
+  const AC = 6208e-6, AW = 3910e-6, ES = 2.1e8, G = 9.81;
+  const BARS = []; for (let i = 0; i < 6; i++) BARS.push([i, i + 1, "c"]); for (let k = 7; k < 11; k++) BARS.push([k, k + 1, "c"]);
+  BARS.push([0, 7, "c"], [6, 11, "c"]); for (let k = 1; k <= 5; k++) BARS.push([k, 6 + k, "w"]); BARS.push([7, 2, "w"], [8, 3, "w"], [11, 4, "w"], [10, 3, "w"]);
+  const psi1 = (x) => (x < 1.25 || x > 2.3 ? 0 : x < 1.7 ? (x - 1.25) / 0.45 : x <= 2.1 ? 1 : (2.3 - x) / 0.2);
+  const psi2 = (x) => (x < 2.5 || x > 4.6 ? 0 : x < 3.4 ? (x - 2.5) / 0.9 : x <= 4.2 ? 1 : (4.6 - x) / 0.4);
+  function calc() {
+    const H = gh(), nodes = []; for (let i = 0; i <= 6; i++) nodes.push([6 * i, 0]); for (let i = 1; i <= 5; i++) nodes.push([6 * i, H]);
+    const mass = new Array(12).fill(0); let mt = 0;
+    BARS.forEach((b) => { const L = Math.hypot(nodes[b[1]][0] - nodes[b[0]][0], nodes[b[1]][1] - nodes[b[0]][1]), m = L * (b[2] === "c" ? AC : AW) * 7.85; mt += m; mass[b[0]] += m / 2; mass[b[1]] += m / 2; });
+    const rest = Math.max(0, gst() / 2 - mt), crowdKN = gcr() * 0.075 * G, wq = (gdk() + crowdKN) * 1.5;
+    for (let n = 0; n <= 6; n++) { const tw = n === 0 || n === 6 ? 3 : 6; mass[n] += (tw / 36) * rest + (tw * wq) / G; }
+    const r = CB.truss({ nodes, bars: BARS.map((b) => [b[0], b[1]]), supports: { 0: "pin", 6: "roller" }, loads: mass.map((m, n) => ({ node: n, fy: -m * G })), EA: BARS.map((b) => ES * (b[2] === "c" ? AC : AW)) });
+    if (!r.ok) return null;
+    let num = 0, den = 0; mass.forEach((m, n) => { const u = -r.d[n][1]; num += m * G * u; den += m * u * u; });
+    const f = Math.sqrt(num / Math.max(den, 1e-12)) / (2 * Math.PI), umid = -r.d[3][1];
+    const Ms = 2 * mass.reduce((s, m, n) => s + m * (r.d[n][1] / r.d[3][1]) ** 2, 0), Mtot = 2 * mass.reduce((a, b) => a + b, 0);
+    const z = gz(), n = gcr() * 36 * 3, Neq = n > 0 ? 10.8 * Math.sqrt(z * n) : 1, shape = n > 0 ? 2 / Math.PI : 1;
+    const F1 = 280 * psi1(f) * Neq * shape, F2 = 70 * psi2(f) * Neq * shape, a = Math.max(F1, F2) / (2 * z * Ms * 1000);
+    return { r, nodes, mass, f, umid, Ms, Mtot, mt, a, harm: F1 >= F2 ? 1 : 2, psi: Math.max(psi1(f), psi2(f)), n, Neq };
+  }
+  let R = calc(), phase = 0, playing = false;
+  const pl = CB.plane("#sv-cv-tb", { x: [-3, 39], y: null, cy: 1.2, grid: false, axes: false, aspect: (W) => (W < 520 ? 0.5 : 0.3), minHeight: 150, maxHeight: 250,
+    draw(P) {
+      if (!R) return;
+      const pal = P.P, amp = (playing ? Math.cos(phase) : 1) * (2.4 / Math.max(R.umid, 1e-6));
+      BARS.forEach((b) => { const [i, j] = b; const A = R.nodes[i], Bn = R.nodes[j]; P.line(A[0], A[1], Bn[0], Bn[1], { color: pal.faint, width: 1, dash: [3, 3] });
+        P.line(A[0] + R.r.d[i][0] * amp, A[1] + R.r.d[i][1] * amp, Bn[0] + R.r.d[j][0] * amp, Bn[1] + R.r.d[j][1] * amp, { color: b[2] === "c" ? pal.text : pal.dim, width: b[2] === "c" ? 3 : 2 }); });
+      R.mass.forEach((m, n) => { const [x, y] = R.nodes[n]; P.dot(x + R.r.d[n][0] * amp, y + R.r.d[n][1] * amp, { r: 2.5 + Math.sqrt(m) * 1.2, color: y ? pal.dim : pal.accent2 }); });
+      P.poly([[0, 0], [-0.8, -1.1], [0.8, -1.1]], { color: pal.text, fill: pal.surface, width: 1.4 }); P.poly([[36, 0], [35.2, -1.1], [36.8, -1.1]], { color: pal.text, fill: pal.surface, width: 1.4 });
+      P.text(`모드 형상(과장) · 실제 가운데 처짐 ${CB.num(R.umid * 1000, 1)} mm`, 18, -3.6, { color: pal.accent, align: "center", size: 12 });
+    } });
+  const strip = CB.canvas("#sv-cv-tb2", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette();
+    const c = CB.chart(ctx, { x: 30, y: 26, w: W - 50, h: H - 66 }, { x: [0, 8], y: [0, 1], yTicks: [], xLabel: "진동수 (Hz)", xTicks: [0, 1, 2, 3, 4, 5, 6, 7, 8],
+      bands: [{ x0: 1.6, x1: 2.4, color: SVX.alpha(pal.bad, 0.22) }, { x0: 3.2, x1: 4.8, color: SVX.alpha(pal.warn, 0.22) }, { x0: 4.8, x1: 7.2, color: SVX.alpha(pal.faint, 0.14) }],
+      vlines: [{ x: 5, color: pal.dim, label: "5 Hz 검토 기준" }] });
+    SVX.text(ctx, "보행 1차", c.X(2), c.Y(0.32), pal.bad, { size: 10.5 }); SVX.text(ctx, "2차 고조파", c.X(4), c.Y(0.32), pal.warn, { size: 10.5 }); SVX.text(ctx, "3차", c.X(6), c.Y(0.32), pal.dim, { size: 10.5 });
+    const x = c.X(Math.min(7.95, R.f)); ctx.save(); ctx.strokeStyle = pal.accent; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, c.box.y); ctx.lineTo(x, c.box.y + c.box.h); ctx.stroke(); ctx.restore();
+    SVX.text(ctx, `f₁ = ${CB.num(R.f, 2)} Hz`, Math.min(Math.max(x, 60), W - 60), c.box.y - 10, pal.accent, { size: 12 });
+  }, { aspect: (W) => (W < 520 ? 0.36 : 0.18), minHeight: 110, maxHeight: 150 });
+  const loop = CB.loop(document.getElementById("sv-cv-tb"), (dt) => { if (!playing || !R) return; phase += dt * 2 * Math.PI * Math.min(R.f, 8) / 6; pl.redraw(); });
+  CB.playButton("sv-tb-play", () => { playing = true; loop.start(); }, () => { playing = false; pl.redraw(); }, ["▶ 진동 보기", "■ 멈춤"]);
+  function go() {
+    R = calc(); pl.redraw(); strip.redraw();
+    if (!R) { CB.stat("sv-tb-o1", "—"); return; }
+    CB.stat("sv-tb-o1", CB.num(R.f, 2) + " Hz");
+    CB.stat("sv-tb-o2", `${CB.num(R.umid * 1000, 1)} mm (L/${CB.sig(36 / R.umid, 3)})`);
+    CB.stat("sv-tb-o3", `${CB.num(R.Mtot, 1)} t (M* ${CB.num(R.Ms, 1)})`);
+    CB.stat("sv-tb-o4", R.n > 0 ? `${CB.num(R.a, 2)} m/s²` : "군중 없음");
+    const band1 = R.f >= 1.6 && R.f <= 2.4, band2 = R.f >= 3.2 && R.f <= 4.8;
+    let t = band1 ? `f₁ = ${CB.num(R.f, 2)} Hz가 <b>보행 1차 대역</b> 안입니다. 공진 위험이 큽니다.` : band2 ? `f₁ = ${CB.num(R.f, 2)} Hz는 1차 대역 밖이지만 <b>2차 고조파 대역(3.2–4.8 Hz)</b>에 있습니다.` : R.f < 5 ? `f₁ = ${CB.num(R.f, 2)} Hz: 보행 대역과 겹치지 않지만 5 Hz 미만이라 쾌적성 검토 대상입니다.` : `f₁ = ${CB.num(R.f, 2)} Hz ≥ 5 Hz: 연직 보행 진동 검토 대상이 아닙니다(지침 형태).`;
+    if (R.n > 0) t += ` 군중 ${CB.sig(R.n, 3)}명(등가 ${CB.num(R.Neq, 1)}명, ψ = ${CB.num(R.psi, 2)}) → 가속도 <b>${CB.num(R.a, 2)} m/s²</b> ${R.a <= 0.7 ? "≤" : ">"} 0.7 m/s².`;
+    SVX.msg("sv-tb-msg", t, band1 || (R.n > 0 && R.a > 0.7) ? "bad" : R.f >= 5 || (R.n > 0 && R.a <= 0.7) ? "ok" : "");
+  }
+  go();
+})();
+
+/* ---------- 4. 군중 동기화 수평 진동 ---------- */
+(function () {
+  const gf = CB.range("sv-cw-f", (v) => v.toFixed(2) + " Hz", go), gm = CB.range("sv-cw-m", (v) => v + " t", go), gz = CB.range("sv-cw-z", (v) => (v * 100).toFixed(1) + " %", go), gn = CB.range("sv-cw-n", (v) => v + "명", go);
+  const K0 = 300, FMAX = 30, TEND = 600, DT = 0.01;
+  const kf = (f) => (f >= 0.5 && f <= 1.1 ? 1 : f < 0.5 ? Math.exp(-(((0.5 - f) / 0.15) ** 2)) : Math.exp(-(((f - 1.1) / 0.2) ** 2)));
+  function sim() {
+    const f = gf(), M = gm() * 1000, z = gz(), Nmax = gn(), w = 2 * Math.PI * f, K = M * w * w, c = 2 * z * M * w, keff = K0 * kf(f);
+    const rnd = CB.rng(11), comps = []; for (let i = 0; i < 6; i++) comps.push({ f: f * (0.85 + 0.3 * rnd()), ph: rnd() * 6.283 });
+    let u = 0, v = 0; const out = [], every = 50; let amax = 0, onset = null;
+    const Ncrit = keff > 0 ? (8 * Math.PI * z * f * M) / keff : Infinity;
+    for (let k = 0, t = 0; t <= TEND; k++, t += DT) {
+      const N = (Nmax * t) / TEND;
+      const Fr = 25 * Math.sqrt(N) * comps.reduce((s, q) => s + Math.sin(2 * Math.PI * q.f * t + q.ph), 0) / Math.sqrt(comps.length);
+      const Fp = (N / 2) * FMAX * Math.tanh((keff * v) / FMAX);
+      const a = (Fr + Fp - c * v - K * u) / M;
+      v += a * DT; u += v * DT;
+      if (k % every === 0) { out.push([t, Math.abs(a), N]); }
+      if (Math.abs(a) > amax) amax = Math.abs(a);
+      if (onset === null && N > Ncrit && Math.abs(a) > 0.1) onset = t;
+    }
+    return { out, amax, onset, Ncrit, f, Nmax, z };
+  }
+  let S = sim(), tPlay = TEND, playing = false;
+  const pl = CB.canvas("#sv-cv-cw", (ctx, W, H) => {
+    const pal = CB.palette(), i = Math.min(S.out.length - 1, Math.max(0, Math.round((tPlay / TEND) * (S.out.length - 1)))), p = S.out[i];
+    const acc = p[1], N = p[2], swing = CB.clamp(acc / 0.6, 0, 1) * 18 * Math.sin(2 * Math.PI * S.f * tPlay * 0.25 + 1);
+    const x0 = 30, x1 = W - 30, y = H / 2;
+    ctx.save(); ctx.strokeStyle = pal.faint; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x0, y - 16); ctx.lineTo(x1, y - 16); ctx.moveTo(x0, y + 16); ctx.lineTo(x1, y + 16); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 2.2; ctx.fillStyle = SVX.alpha(pal.accent, 0.12);
+    ctx.beginPath(); for (let k = 0; k <= 60; k++) { const s = k / 60, xx = x0 + (x1 - x0) * s, d = swing * Math.sin(Math.PI * s); k ? ctx.lineTo(xx, y - 16 + d) : ctx.moveTo(xx, y - 16 + d); }
+    for (let k = 60; k >= 0; k--) { const s = k / 60, xx = x0 + (x1 - x0) * s, d = swing * Math.sin(Math.PI * s); ctx.lineTo(xx, y + 16 + d); } ctx.closePath(); ctx.fill(); ctx.stroke();
+    const rn = CB.rng(5), shown = Math.min(120, Math.round(N));
+    for (let k = 0; k < shown; k++) { const s = 0.04 + 0.92 * rn(), off = (rn() - 0.5) * 24, d = swing * Math.sin(Math.PI * s); ctx.fillStyle = N > S.Ncrit ? pal.bad : pal.accent2; ctx.beginPath(); ctx.arc(x0 + (x1 - x0) * s, y + off + d, 2.2, 0, 6.283); ctx.fill(); }
+    ctx.restore();
+    SVX.text(ctx, `t = ${CB.num(tPlay, 0)} s · 사람 ${CB.num(N, 0)}명 · 수평 가속도 ${CB.num(acc, 3)} m/s²`, W / 2, 14, N > S.Ncrit ? pal.bad : pal.text, { size: 11.5 });
+    SVX.text(ctx, "평면(흔들림 과장)", x0, H - 10, pal.dim, { size: 10.5, align: "left", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.42 : 0.22), minHeight: 120, maxHeight: 170 });
+  const ch = CB.canvas("#sv-cv-cw2", (ctx, W, H) => {
+    const pal = CB.palette(), shown = S.out.filter((p) => p[0] <= tPlay + 1e-9), ymax = Math.max(0.3, S.amax * 1.15);
+    const c = CB.chart(ctx, null, { x: [0, TEND], y: [0, ymax], xLabel: "시간 (s) — 사람 수가 고르게 늘어난다", yLabel: "수평 가속도 (m/s²)", series: [{ data: shown.map((p) => [p[0], p[1]]), color: pal.accent, width: 1.6 }],
+      hlines: [{ y: 0.2, color: pal.bad, label: "0.2 m/s²" }], vlines: isFinite(S.Ncrit) && S.Ncrit < S.Nmax ? [{ x: (S.Ncrit / S.Nmax) * TEND, color: pal.warn, label: `N_crit ≈ ${CB.num(S.Ncrit, 0)}명` }] : [] });
+    const NN = shown.map((p) => [p[0], (p[2] / Math.max(1, S.Nmax)) * ymax * 0.9]);
+    ctx.save(); ctx.beginPath(); ctx.rect(c.box.x, c.box.y, c.box.w, c.box.h); ctx.clip(); ctx.strokeStyle = pal.faint; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.4; ctx.beginPath(); NN.forEach(([x, y], k) => (k ? ctx.lineTo(c.X(x), c.Y(y)) : ctx.moveTo(c.X(x), c.Y(y)))); ctx.stroke(); ctx.restore();
+    SVX.text(ctx, "-- 사람 수(상대)", c.box.x + 8, c.box.y + c.box.h * 0.45, pal.dim, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.66 : 0.4), minHeight: 200, maxHeight: 280 });
+  const loop = CB.loop(document.getElementById("sv-cv-cw"), (dt) => { if (!playing) return; tPlay = Math.min(TEND, tPlay + dt * 40); pl.redraw(); ch.redraw(); if (tPlay >= TEND) { playing = false; btn.set(false); } });
+  const btn = CB.playButton("sv-cw-play", () => { playing = true; tPlay = 0; loop.start(); }, () => { playing = false; });
+  function go() {
+    S = sim(); if (!playing) tPlay = TEND; pl.redraw(); ch.redraw();
+    CB.stat("sv-cw-o1", S.Ncrit < 1e5 ? CB.num(S.Ncrit, 0) + "명" : "동기화 거의 없음");
+    CB.stat("sv-cw-o2", S.onset !== null ? `약 ${CB.num(S.onset, 0)} s (${CB.num((S.onset / TEND) * S.Nmax, 0)}명)` : "없음");
+    CB.stat("sv-cw-o3", CB.num(S.amax, 3) + " m/s²");
+    CB.stat("sv-cw-o4", SVX.verdict(S.amax <= 0.2));
+    SVX.msg("sv-cw-msg", S.Nmax > S.Ncrit ? `최대 인원 ${S.Nmax}명이 임계 인원 ${CB.num(S.Ncrit, 0)}명을 넘습니다. 넘는 순간부터 보행자의 힘이 구조 감쇠를 이겨 진폭이 스스로 자랍니다(포화로 멈출 때까지). 감쇠비를 몇 배로 키우는 것이 근본 해결입니다.` : `${S.Ncrit < 1e5 ? "임계 인원 " + CB.num(S.Ncrit, 0) + "명이 최대 인원보다 많아" : "수평 진동수가 보행 대역(약 0.5–1.1 Hz)에서 멀어 동기화가 거의 일어나지 않고,"} 흔들림은 무작위 보행 힘에 의한 작은 진동에 머뭅니다.`, S.amax > 0.2 ? "bad" : "ok");
+  }
+  go();
+})();
+
+/* ---------- 5. 풍하중 횡변위와 거주성 ---------- */
+(function () {
+  const gk = CB.range("sv-dr-k", (v) => v.toFixed(2) + "×", go), gv = CB.range("sv-dr-v", (v) => v + " m/s", go), grf = CB.range("sv-dr-rf", (v) => v.toFixed(2), go), gz = CB.range("sv-dr-z", (v) => (v * 100).toFixed(1) + " %", go);
+  const dir = CB.seg("sv-dr-dir", go);
+  const B = CB.dyn.B10, HS = [0, ...B.h];
+  const LEV = B.h, forces = (V0, b, G) => LEV.map((z, i) => CB.wind.storyForce(i === 0 ? 0 : (LEV[i - 1] + LEV[i]) / 2, i === 9 ? 41 : (LEV[i] + LEV[i + 1]) / 2, b, V0, "B", 1.3, G));
+  function calc() {
+    const kf = gk(), b = +dir(), V0 = gv(), z = gz();
+    const sb = CB.dyn.shearBuilding(B.m, B.k.map((k) => k * kf)), md = CB.dyn.modes(sb.K, sb.M)[0], f = md.f, phi = md.phi;
+    const Fd = forces(V0, b, 2.0), ud = CB.solve(sb.K, Fd);
+    const drift = ud.map((u, i) => (u - (i ? ud[i - 1] : 0)) / (HS[i + 1] - HS[i]));
+    const Fs = forces(V0 * grf(), b, 1.0);
+    const Ms = phi.reduce((s, p, i) => s + B.m[i] * p * p, 0), Fst = phi.reduce((s, p, i) => s + Fs[i] * p, 0), Kst = Ms * (2 * Math.PI * f) ** 2;
+    const VH = CB.wind.speed(41, V0 * grf(), "B"), Iu = 1 / Math.log(41 / 0.3), Lt = 300 * Math.pow(41 / 200, 0.52), nL = (f * Lt) / VH;
+    const SL = (6.8 * nL) / Math.pow(1 + 10.2 * nL, 5 / 3), Rf = (e) => (e <= 1e-9 ? 1 : 1 / e - (1 - Math.exp(-2 * e)) / (2 * e * e));
+    const sx = (Fst / Kst) * 2 * Iu * Math.sqrt((Math.PI * SL * Rf((4.6 * 41 * f) / VH) * Rf((4.6 * b * f) / VH)) / (4 * z));
+    const sa = (2 * Math.PI * f) ** 2 * sx;
+    return { f, drift, ud, sa, peak: 3.5 * sa, lim: Math.exp(-3.65 - 0.41 * Math.log(f)) };
+  }
+  let R = calc();
+  const c1 = CB.canvas("#sv-cv-dr", (ctx, W, H) => {
+    const pal = CB.palette(), mx = Math.max(1 / 500, ...R.drift) * 1.15 * 1000;
+    const c = CB.chart(ctx, null, { x: [0, mx], y: [0, 10.5], xLabel: "층간 변위비 (× 10⁻³)", yLabel: "층", yTicks: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], vlines: [{ x: 2, color: pal.bad, label: "1/500" }] });
+    R.drift.forEach((d, i) => { const y0 = c.Y(i + 1 + 0.32), y1 = c.Y(i + 1 - 0.32); ctx.fillStyle = SVX.alpha(pal.blue, 0.75); ctx.fillRect(c.X(0), y0, c.X(d * 1000) - c.X(0), y1 - y0); });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 210, maxHeight: 300 });
+  const c2 = CB.canvas("#sv-cv-dr2", (ctx, W, H) => {
+    const pal = CB.palette(), iso = (f) => Math.exp(-3.65 - 0.41 * Math.log(f)) * 1000 / 9.81, curve = [], ext = []; for (let f = 0.063; f <= 1.0001; f *= 1.05) curve.push([f, iso(f)]); for (let f = 1; f <= 2.0001; f *= 1.05) ext.push([f, iso(f)]);
+    const curve2 = curve.map(([f, a]) => [f, a * 0.6]);
+    const fx = CB.clamp(R.f, 0.063, 2), ymax = Math.max(12, (R.sa * 1000) / 9.81 * 1.3);
+    CB.chart(ctx, null, { x: [0.063, 2], y: [0, ymax], logX: true, xTicks: [0.063, 0.1, 0.2, 0.5, 1, 2], xFmt: (v) => String(v), xLabel: "고유 진동수 f (Hz, 로그)", yLabel: "RMS 가속도 (mg)",
+      series: [{ data: curve, color: pal.bad, width: 2 }, { data: ext, color: pal.bad, width: 1.2, dash: [2, 4] }, { data: curve2, color: pal.warn, width: 1.6, dash: [5, 4] }], points: [{ x: fx, y: (R.sa * 1000) / 9.81, color: pal.accent, r: 6, label: "B-10" }] });
+    SVX.text(ctx, "— ISO 6897 형태(사무실, 교육용)", W - 16, 24, pal.bad, { size: 10.5, align: "right" }); SVX.text(ctx, "-- 그 60 %(주거 가늠, 교육용)", W - 16, 40, pal.warn, { size: 10.5, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.42), minHeight: 210, maxHeight: 290 });
+  function go() {
+    R = calc(); c1.redraw(); c2.redraw();
+    const md = Math.max(...R.drift), ok1 = md <= 1 / 500, ok2 = R.sa <= R.lim;
+    CB.stat("sv-dr-o1", `${CB.num(R.f, 2)} Hz (T = ${CB.num(1 / R.f, 2)} s)`);
+    CB.stat("sv-dr-o2", `1/${CB.sig(1 / md, 3)}`);
+    CB.stat("sv-dr-o3", `${CB.num((R.sa * 1000) / 9.81, 2)} / ${CB.num((R.peak * 1000) / 9.81, 1)} mg`);
+    CB.stat("sv-dr-o4", SVX.verdict(ok1 && ok2));
+    SVX.msg("sv-dr-msg", `설계풍 지붕 변위 ${CB.num(R.ud[9] * 1000, 1)} mm(H/${CB.sig(41 / R.ud[9], 3)}) · 사용성 풍속에서 RMS ${CB.num((R.sa * 1000) / 9.81, 2)} mg, 기준선 ${CB.num((R.lim * 1000) / 9.81, 2)} mg. ${!ok1 ? "층간 변위가 1/500을 넘습니다: 강성을 키우세요." : !ok2 ? "가속도가 기준선을 넘습니다: 감쇠(TMD)·질량·강성을 검토하세요." : "둘 다 여유가 있습니다."}`, ok1 && ok2 ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 6. 기둥 축소 누적 ---------- */
+(function () {
+  const gn = CB.range("sv-sh-n", (v) => v + "층", go), gsc = CB.range("sv-sh-sc", (v) => v.toFixed(1) + " MPa", go), gsw = CB.range("sv-sh-sw", (v) => v.toFixed(1) + " MPa", go);
+  const grc = CB.range("sv-sh-rc", (v) => (v * 100).toFixed(1) + " %", go), grw = CB.range("sv-sh-rw", (v) => (v * 100).toFixed(2) + " %", go), gphi = CB.range("sv-sh-phi", (v) => v.toFixed(1), go);
+  const gesh = CB.range("sv-sh-esh", (v) => v + " × 10⁻⁶", go), gdt = CB.range("sv-sh-dt", (v) => v + "일", go), gt = CB.seg("sv-sh-t", go);
+  const EC = 27500, NS = 200000 / 27500, CHI = 0.8;
+  const crF = (tau, p) => (tau <= 0 ? 0 : (p * Math.pow(tau, 0.6)) / (10 + Math.pow(tau, 0.6)));
+  const shF = (tau, e) => (tau <= 0 ? 0 : (e * tau) / (35 + tau));
+  function member(N, h, dsig, rho, phi, esh, dt, tEnd) {
+    const ke = 1 / (1 + (NS - 1) * rho), kc = 1 / (1 + NS * rho * (1 + CHI * phi));
+    const strain = (i, t) => { let e = 0; for (let k = i; k < N; k++) { const tl = (k + 1) * dt; if (t > tl) e += (dsig / EC) * (ke + kc * crF(t - tl, phi)); else if (t === tl) e += (dsig / EC) * ke; } return e + kc * shF(t - i * dt - 7, esh); };
+    const parts = (i, t) => { let el = 0, cr = 0; for (let k = i; k < N; k++) { const tl = (k + 1) * dt; if (t >= tl) { el += (dsig / EC) * ke; cr += (dsig / EC) * kc * crF(t - tl, phi); } } return { el, cr, sh: kc * shF(t - i * dt - 7, esh) }; };
+    const after = [], total = [];
+    for (let j = 0; j < N; j++) {
+      const Tj = (j + 1) * dt - 1e-6; let a = 0, tt = 0;
+      for (let i = 0; i <= j; i++) { const eT = strain(i, tEnd), eJ = strain(i, Tj); a += h[i] * (eT - eJ); tt += h[i] * eT; }
+      after.push(a * 1000); total.push(tt * 1000);
+    }
+    return { after, total, parts };
+  }
+  function calc() {
+    const N = gn(), h = [5, ...Array(N - 1).fill(4)], dt = gdt(), tEnd = N * dt + +gt(), phi = gphi(), esh = gesh() * 1e-6;
+    const col = member(N, h, gsc() / N, grc(), phi, esh, dt, tEnd), core = member(N, h, gsw() / N, grw(), phi, esh, dt, tEnd);
+    const diff = col.after.map((v, j) => v - core.after[j]);
+    let jm = 0; diff.forEach((d, j) => { if (Math.abs(d) > Math.abs(diff[jm])) jm = j; });
+    let pe = 0, pc = 0, ps = 0; for (let i = 0; i <= jm; i++) { const p = col.parts(i, tEnd); pe += p.el * h[i]; pc += p.cr * h[i]; ps += p.sh * h[i]; }
+    return { N, col, core, diff, jm, pe: pe * 1000, pc: pc * 1000, ps: ps * 1000 };
+  }
+  let R = calc();
+  const cv = CB.canvas("#sv-cv-sh", (ctx, W, H) => {
+    const pal = CB.palette(), N = R.N, xmax = Math.max(1, ...R.col.after, ...R.core.after) * 1.15, xmin = Math.min(0, ...R.diff) * 1.2;
+    const c = CB.chart(ctx, null, { x: [xmin, xmax], y: [0, N + 0.6], xLabel: "슬래브 타설 뒤 내려가는 양 (mm)", yLabel: "레벨(층 위 슬래브)", yTicks: N <= 12 ? Array.from({ length: N }, (_, i) => i + 1) : undefined,
+      series: [{ data: R.col.after.map((v, j) => [v, j + 1]), color: pal.compression, width: 2.6 }, { data: R.core.after.map((v, j) => [v, j + 1]), color: pal.blue, width: 2.6 }] });
+    const bh = Math.max(1.5, Math.min(10, (c.box.h / (N + 0.6)) * 0.55));
+    R.diff.forEach((d, j) => { const y = c.Y(j + 1); ctx.fillStyle = SVX.alpha(pal.accent2, j === R.jm ? 0.95 : 0.55); ctx.fillRect(Math.min(c.X(0), c.X(d)), y - bh / 2, Math.abs(c.X(d) - c.X(0)), bh); });
+    const ly = c.box.y + c.box.h - 54; SVX.text(ctx, "— 기둥", W - 22, ly, pal.compression, { size: 11, align: "right" }); SVX.text(ctx, "— 코어", W - 22, ly + 16, pal.blue, { size: 11, align: "right" }); SVX.text(ctx, "■ 차등(보정량)", W - 22, ly + 32, pal.accent2, { size: 11, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.6), minHeight: 260, maxHeight: 420 });
+  function go() {
+    R = calc(); cv.redraw();
+    const dm = R.diff[R.jm];
+    CB.stat("sv-sh-o1", `${CB.num(dm, 1)} mm (레벨 ${R.jm + 1})`);
+    CB.stat("sv-sh-o2", `${CB.num(R.col.total[R.N - 1], 1)} / ${CB.num(R.core.total[R.N - 1], 1)} mm`);
+    CB.stat("sv-sh-o3", Math.abs(dm) > 1e-6 ? `1/${CB.sig(8000 / Math.abs(dm), 3)}` : "—");
+    const tot = R.pe + R.pc + R.ps;
+    CB.stat("sv-sh-o4", tot > 0 ? `탄성 ${CB.num((R.pe / tot) * 100, 0)} · 크리프 ${CB.num((R.pc / tot) * 100, 0)} · 수축 ${CB.num((R.ps / tot) * 100, 0)} %` : "—");
+    SVX.msg("sv-sh-msg", Math.abs(dm) < 10 ? `최대 차등 축소 ${CB.num(dm, 1)} mm는 보통 마감 공차 안입니다(교육용 판단). 기둥 쪽 거푸집을 레벨마다 주황 막대만큼 높여 치면 장기적으로 바닥이 수평이 됩니다.` : `최대 차등 축소 ${CB.num(dm, 1)} mm: 커튼월 이음·엘리베이터·배관 공차를 넘기 쉬워 레벨별 거푸집 보정과 계측이 필요합니다.`, Math.abs(dm) < 10 ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 7. 온도 신축과 이음 ---------- */
+(function () {
+  const gL = CB.range("sv-th-L", (v) => v + " m", go), gj = CB.range("sv-th-j", (v) => v + "개", go), gdt = CB.range("sv-th-dt", (v) => "±" + v + " °C", go), gsh = CB.range("sv-th-sh", (v) => v + " × 10⁻⁶", go), gc = CB.range("sv-th-c", (v) => v + " mm", go), gh = CB.range("sv-th-h", (v) => v.toFixed(1) + " m", go);
+  const ALPHA = 10e-6, EC = 2.75e7;
+  function calc() {
+    const L = gL(), nj = gj(), Ls = L / (nj + 1), dT = gdt(), esh = gsh() * 1e-6, b = gc() / 1000, h = gh();
+    const dHot = ALPHA * dT * Ls / 2, dCold = (ALPHA * dT + esh) * Ls / 2, d = Math.max(dHot, dCold);
+    const EI = 0.7 * EC * b ** 4 / 12;
+    const r = CB.frame({ nodes: [[0, 0], [0, h]], members: [{ i: 0, j: 1, E: 0.7 * EC, A: b * b, I: b ** 4 / 12 }], supports: { 0: "fixed", 1: [1, 0, 1] }, settlements: [{ node: 1, dof: 0, value: d }] });
+    const V = r.ok ? Math.abs(r.reactions[0][0]) : (12 * EI * d) / h ** 3, M = r.ok ? Math.abs(r.reactions[0][2]) : (V * h) / 2;
+    const w = (ALPHA * 2 * dT + esh) * Ls * 1000 + 10;
+    return { L, nj, Ls, d, V, M, w, dT };
+  }
+  let R = calc();
+  const cv = CB.canvas("#sv-cv-th", (ctx, W, H) => {
+    const pal = CB.palette(), x0 = 24, x1 = W - 24, yTop = 58, yBot = H - 40, sx = (x1 - x0) / R.L, nseg = R.nj + 1, gap = R.nj ? 8 : 0;
+    const ex = Math.min(24, 3 + R.d * 2500);
+    for (let s = 0; s < nseg; s++) {
+      const a = x0 + s * (R.Ls * sx) + (s ? gap / 2 : 0), b = x0 + (s + 1) * (R.Ls * sx) - (s < nseg - 1 ? gap / 2 : 0), mid = (a + b) / 2;
+      ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(a, yTop); ctx.lineTo(b, yTop); ctx.stroke();
+      const ncol = Math.max(2, Math.round(R.Ls / 8) + 1);
+      for (let k = 0; k < ncol; k++) { const t = ncol === 1 ? 0.5 : k / (ncol - 1), x = a + (b - a) * t, off = ((x - mid) / ((b - a) / 2 || 1)) * ex;
+        ctx.strokeStyle = Math.abs(off) > ex * 0.8 ? pal.bad : pal.text; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(x, yBot); ctx.bezierCurveTo(x, yBot - (yBot - yTop) * 0.4, x + off, yTop + (yBot - yTop) * 0.4, x + off, yTop); ctx.stroke(); }
+      ctx.restore();
+      SVX.arrow(ctx, mid - 6, yTop - 16, a + 4, yTop - 16, pal.accent2, 2, 8); SVX.arrow(ctx, mid + 6, yTop - 16, b - 4, yTop - 16, pal.accent2, 2, 8);
+      if (s < nseg - 1) { ctx.fillStyle = SVX.alpha(pal.warn, 0.45); ctx.fillRect(b, yTop - 8, gap, 16); }
+    }
+    ctx.save(); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1; for (let x = x0; x <= x1; x += 8) { ctx.beginPath(); ctx.moveTo(x, yBot); ctx.lineTo(x - 6, yBot + 7); ctx.stroke(); } ctx.beginPath(); ctx.moveTo(x0, yBot); ctx.lineTo(x1, yBot); ctx.stroke(); ctx.restore();
+    if (W < 520) { SVX.text(ctx, `전체 ${R.L} m · 구간 ${CB.num(R.Ls, 1)} m`, W / 2, 12, pal.text, { size: 11 }); SVX.text(ctx, `끝 기둥 ${CB.num(R.d * 1000, 1)} mm (휨 과장)`, W / 2, 28, pal.text, { size: 11 }); }
+    else SVX.text(ctx, `전체 ${R.L} m · 구간 ${CB.num(R.Ls, 1)} m · 끝 기둥 ${CB.num(R.d * 1000, 1)} mm (기둥 휨 과장)`, W / 2, 18, pal.text, { size: 11.5 });
+    SVX.text(ctx, "기초", x0 + 4, yBot + 22, pal.dim, { size: 10.5, align: "left", mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.55 : 0.32), minHeight: 170, maxHeight: 250 });
+  function go() {
+    R = calc(); cv.redraw();
+    CB.stat("sv-th-o1", CB.num(R.Ls, 1) + " m");
+    CB.stat("sv-th-o2", CB.num(R.d * 1000, 1) + " mm");
+    CB.stat("sv-th-o3", `${CB.sig(R.V, 3)} kN / ${CB.sig(R.M, 3)} kN·m`);
+    CB.stat("sv-th-o4", R.nj ? CB.num(R.w, 0) + " mm" : "이음 없음");
+    SVX.msg("sv-th-msg", R.d * 1000 <= 5 ? `끝 기둥 강제 변위 ${CB.num(R.d * 1000, 1)} mm는 작아 ${R.nj ? "이 구간 길이(" + CB.num(R.Ls, 0) + " m)면 충분합니다" : "이음 없이 한 덩어리로 지을 수 있는 범위입니다"}(교육용 판단, 기둥 설계에 이 모멘트를 더해 확인).` : `끝 기둥 강제 변위 ${CB.num(R.d * 1000, 1)} mm, 모멘트 ${CB.sig(R.M, 3)} kN·m. 이음을 더해 구간을 줄이거나, 끝 기둥을 유연하게(작게·핀 접합) 하거나, 단열로 골조 온도 변화를 줄이세요.`, R.d * 1000 <= 5 ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 8. 설비 방진 ---------- */
+(function () {
+  const grpm = CB.range("sv-is-rpm", (v) => v + " rpm", go), gd = CB.range("sv-is-d", (v) => v.toFixed(1) + " mm", go), gz = CB.range("sv-is-z", (v) => v.toFixed(2), go);
+  const calc = () => { const f = grpm() / 60, fn = Math.sqrt(9810 / gd()) / (2 * Math.PI), r = f / fn, z = gz(); return { f, fn, r, z, TR: CB.dyn.TR(r, z) }; };
+  let R = calc();
+  const cv = CB.canvas("#sv-cv-is", (ctx, W, H) => {
+    const pal = CB.palette(), d = [], d0 = []; for (let r = 0.1; r <= 10.0001; r *= 1.02) { d.push([r, CB.dyn.TR(r, R.z)]); d0.push([r, CB.dyn.TR(r, 0.01)]); }
+    CB.chart(ctx, null, { x: [0.1, 10], y: [0.01, 30], logX: true, logY: true, xLabel: "진동수 비 r = f / f_n (로그)", yLabel: "전달률 TR (로그)", xFmt: (v) => String(v), yFmt: (v) => String(v),
+      bands: [{ x0: Math.SQRT2, x1: 10, color: SVX.alpha(pal.ok, 0.08) }], series: [{ data: d0, color: pal.faint, width: 1.2, dash: [4, 4] }, { data: d, color: pal.accent, width: 2.6 }],
+      hlines: [{ y: 1, color: pal.dim, label: "TR = 1" }], vlines: [{ x: Math.SQRT2, color: pal.ok, label: "√2" }], points: [{ x: CB.clamp(R.r, 0.1, 10), y: CB.clamp(R.TR, 0.01, 30), color: pal.text, r: 6 }] });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.45), minHeight: 220, maxHeight: 320 });
+  function go() {
+    R = calc(); cv.redraw();
+    CB.stat("sv-is-o1", CB.num(R.f, 1) + " Hz"); CB.stat("sv-is-o2", CB.num(R.fn, 2) + " Hz"); CB.stat("sv-is-o3", CB.num(R.TR, 3));
+    CB.stat("sv-is-o4", R.TR < 1 ? CB.num((1 - R.TR) * 100, 0) + " %" : "증폭");
+    SVX.msg("sv-is-msg", R.r < 1.25 && R.r > 0.75 ? `r = ${CB.num(R.r, 2)}: 공진 근처입니다. 받침이 오히려 진동을 ${CB.num(R.TR, 1)}배로 키웁니다.` : R.r < Math.SQRT2 ? `r = ${CB.num(R.r, 2)} < √2: 방진 효과가 없습니다. 더 부드러운 받침(큰 δ<sub>st</sub>)이 필요합니다.` : `r = ${CB.num(R.r, 2)}: 바닥으로 전해지는 힘이 ${CB.num(R.TR * 100, 1)} %로 줄었습니다.`, R.TR < 0.2 ? "ok" : R.TR > 1 ? "bad" : "");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

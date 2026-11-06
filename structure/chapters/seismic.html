@@ -1,0 +1,1043 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>내진 설계 · StructureBook</title>
+<meta name="description" content="지진에 버티는 법. 설계 응답 스펙트럼과 중요도, 연성과 반응수정계수 R(등변위·등에너지), B-10의 등가 정적 해석(V ≈ 5,000 kN)과 응답 스펙트럼 해석, 층간 변위 검토, 필로티 연층과 비틀림 비정형, 내진 상세, 푸시오버를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .sd-stack { display: grid; grid-template-columns: 1fr; }
+  .sd-stack > div { position: relative; min-width: 0; }
+  .sd-stack > div + div { border-top: 1px solid var(--border); }
+  .sd-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .sd-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .sd-msg b { color: var(--text); }
+  .sd-msg.ok { color: var(--ok); font-weight: 600; }
+  .sd-msg.bad { color: var(--bad); font-weight: 600; }
+  .sd-tbl td, .sd-tbl th { font-variant-numeric: tabular-nums; }
+  .sd-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .sd-steps { margin: 6px 0 0; }
+  .sd-steps li { margin: 4px 0; }
+  #sd-cv-spec { touch-action: pan-y; cursor: ew-resize; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="structure"></script>
+</head>
+<body data-chapter="seismic">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="sd-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="sd-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="sd-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="sd-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 08</div>
+    <h1 data-no-glossary>내진 설계</h1>
+    <p class="lead">7장에서 B-10이 설계 지진을 탄성으로 받으면 밑면 전단력이 무게의 약 25–30 %에 이른다는 것을 보았습니다. 그 힘을 모두 강도로 버티게 설계하는 나라는 없습니다. 대신 내진 설계는 "작은 지진에는 손상 없이, 드물고 큰 지진에는 크게 손상되더라도 무너지지 않게"를 목표로, 강도는 탄성 요구의 몇 분의 일만 주고 나머지는 <b>연성</b>, 곧 부서지지 않고 휘어 에너지를 흘려보내는 능력으로 버티게 합니다. 이 장은 설계 응답 스펙트럼과 중요도 계수, 반응수정계수 R의 근거(등변위·등에너지), B-10의 등가 정적 해석(밑면 전단력 <b>약 5,000 kN</b>)과 응답 스펙트럼 해석의 비교, 층간 변위 검토, 필로티 같은 비정형과 비틀림, 그리고 R이 약속한 연성을 실제로 만드는 상세까지를 계산과 시뮬레이터로 따라갑니다.</p>
+    <ul class="objectives">
+      <li>지진 피해 사례에서 내진 설계의 원칙(연성, 규칙성, 강기둥–약보, 상세)이 어떻게 나왔는지 설명한다.</li>
+      <li>설계 응답 스펙트럼(\(S_{DS}\), \(S_{D1}\), \(T_0\), \(T_S\), \(T_L\))을 그리고, 건물 주기에서 스펙트럼 가속도를 읽는다.</li>
+      <li>연성비와 반응수정계수 R, 시스템 초과강도 계수 Ω₀, 변위 증폭 계수 \(C_d\)의 뜻을 용량 곡선 위에서 설명하고 등변위·등에너지 원리로 R과 연성 요구를 연결한다.</li>
+      <li>B-10의 등가 정적 해석을 단계별로 수행한다: 근사 주기 \(T_a\), 지진 응답 계수 \(C_s\)와 상·하한, 밑면 전단력, 층 지진력의 수직 분포, 층 전단력, 전도 모멘트.</li>
+      <li>응답 스펙트럼 해석 결과를 등가 정적 해석과 비교해 조정하고, 층간 변위를 \(C_d/I_e\)로 증폭해 허용값과 비교한다.</li>
+      <li>연층(필로티)·비틀림 비정형을 계산으로 판정하고, 내진 상세·비구조 요소·푸시오버 해석의 개념을 설명한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>2017년 포항, 1층이 비어 있던 건물들</b></div>
+      <div class="o-body"><p>2017년 11월 15일 경북 포항에서 규모 5.4의 지진이 났습니다. 1년 전 경주 지진(2016년 9월, 규모 5.8)에 이어 계기 관측 이래 국내에서 두 번째로 큰 지진이었고, 다음 날로 예정되었던 대학수학능력시험이 한 주 연기되었습니다. 피해가 두드러진 건물 가운데 하나는 1층을 주차장으로 비워 두고 기둥 몇 개로 위층을 받친 <b>필로티</b> 형식의 저층 주거 건물이었습니다. 위층은 벽이 많아 단단한데 1층은 기둥뿐이니, 흔들림이 1층에 몰려 기둥이 전단으로 부서지고 철근이 휘어 나온 사례가 여럿 보고되었습니다.</p>
+        <p>이 장면은 내진 설계의 오래된 교훈과 같습니다. 1971년 미국 샌페르난도 지진, 1995년 일본 고베 지진에서도 한 층이 다른 층보다 약하거나 유연한 건물이 그 층에서 무너졌습니다. 지진 하중은 건물의 강도뿐 아니라 강성과 질량의 <b>분포</b>, 그리고 부재가 큰 변형을 견디는 <b>상세</b>에 달려 있습니다. 포항 지진 뒤 필로티 건물의 구조 설계와 검토 절차가 보강되었습니다(현행 기준과 지침 확인).</p>
+        <div class="o-chain"><span>지진 · 지반 · 중요도</span><i>→</i><span class="tool">설계 스펙트럼 · R · 등가 정적 · 응답 스펙트럼</span><i>→</i><span>밑면 전단 · 층간 변위 · 비정형 · 상세</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="lessons">
+    <h2>지진 피해에서 배운 것</h2>
+    <div class="problem"><strong>기준의 조항마다 무너진 건물이 있다</strong>
+      <p>내진 기준의 많은 조항은 실험실이 아니라 지진 현장에서 왔습니다. 어떤 건물이 왜 무너졌고 옆 건물은 왜 버텼는지를 조사한 결과가 다음 판 기준에 들어갑니다. 대표적인 사례를 확인된 사실만으로 정리해 봅니다.</p></div>
+    <div class="table-wrap"><table class="sd-tbl">
+      <thead><tr><th>지진</th><th>확인된 피해 양상</th><th>설계에 남긴 교훈</th></tr></thead>
+      <tbody>
+        <tr><td>1971 샌페르난도(미국)</td><td>새로 지은 병원 건물의 유연한 1층이 크게 손상</td><td>연층 회피, 병원 등 중요 시설의 더 높은 성능 요구</td></tr>
+        <tr><td>1985 멕시코시티(규모 약 8.0)</td><td>진앙에서 수백 km 떨어진 호수 퇴적 점토 지반 위의 중층 건물 피해 집중</td><td>지반 증폭과 지반 주기–건물 주기 공진(GeotechBook 15장)</td></tr>
+        <tr><td>1994 노스리지(미국, 규모 6.7)</td><td>강 모멘트 골조의 용접 보–기둥 접합부에서 취성 파단 발견</td><td>접합부 상세·시험 검증(10장), 주차 구조물 붕괴</td></tr>
+        <tr><td>1995 고베(일본, 규모 6.9)</td><td>6,400여 명 사망, 1981년 이전 기준의 건물 피해가 컸고 중간층 붕괴·연층 붕괴가 있었다</td><td>기존 건물 내진 진단·보강(16장), 연성 상세의 효과 확인</td></tr>
+        <tr><td>2016 경주(규모 5.8)</td><td>계기 관측 이래 국내 최대. 기와·담장·비구조 요소 피해</td><td>내진 설계 대상 확대 논의, 비구조 요소</td></tr>
+        <tr><td>2017 포항(규모 5.4)</td><td>필로티 저층 건물의 1층 기둥 손상, 외장 마감 탈락</td><td>필로티 연층 검토, 비구조 요소 고정</td></tr>
+      </tbody></table></div>
+    <p>공통점은 세 가지입니다. 첫째, 지진 하중은 정해진 크기가 아니라 <b>지반과 건물의 주기</b>가 정한다(7장). 둘째, 건물은 설계 하중보다 훨씬 큰 지진을 받으며, 그때 살아남는 것은 강도가 아니라 <b>연성</b>과 <b>규칙성</b> 덕분이다. 셋째, 연성은 계산이 아니라 <b>상세</b>가 만든다. 이 장의 순서가 그 교훈을 따릅니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="philosophy">
+    <h2>내진 설계의 철학</h2>
+    <div class="problem"><strong>모든 지진에 손상 없이 버티게 하면 안 될까</strong>
+      <p>B-10이 설계 지진을 탄성으로 버티려면 밑면 전단력 약 17,000 kN(무게의 25 %)을 강도로 가져야 합니다. 바람(밑면 약 2,000 kN, 6장)의 여덟 배입니다. 수백 년에 한 번 올 지진에 대비해 이만큼의 콘크리트와 철근을 넣는 것은 경제적이지 않고, 무겁고 강한 건물은 더 큰 지진력을 끌어들이기도 합니다.</p></div>
+    <p>그래서 내진 설계는 지진의 크기마다 다른 성능을 요구합니다. 자주 오는 작은 지진에는 구조체가 탄성에 머물러 손상이 없어야 하고(기능 유지), 설계 지진에는 손상을 받더라도 사람이 안전하게 대피할 수 있어야 하며(인명 안전), 아주 드문 최대 지진에도 무너지지는 않아야 합니다(붕괴 방지). 이것이 <span class="term">내진 설계</span><span class="en">(seismic design)</span>의 기본 철학이고, 중요한 건물일수록 같은 지진에 더 높은 성능을 요구합니다.</p>
+    <figure class="diagram" id="fig-sd-perf">
+      <svg viewBox="0 0 860 320" role="img" aria-label="지진의 재현 주기와 요구 성능 수준의 관계, 건물 중요도에 따른 성능 목표">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(150,40)">
+          <text x="-10" y="-10" class="t" style="font-weight:700">성능 목표(개념도)</text>
+          <g class="t-mono" text-anchor="middle">
+            <text x="75" y="14">기능 유지</text><text x="225" y="14">즉시 거주</text><text x="375" y="14">인명 안전</text><text x="525" y="14">붕괴 방지</text>
+          </g>
+          <rect x="0" y="24" width="600" height="200" style="fill:none;stroke:var(--border)"/>
+          <line x1="150" y1="24" x2="150" y2="224" style="stroke:var(--border)"/><line x1="300" y1="24" x2="300" y2="224" style="stroke:var(--border)"/><line x1="450" y1="24" x2="450" y2="224" style="stroke:var(--border)"/>
+          <line x1="0" y1="74" x2="600" y2="74" style="stroke:var(--border)"/><line x1="0" y1="124" x2="600" y2="124" style="stroke:var(--border)"/><line x1="0" y1="174" x2="600" y2="174" style="stroke:var(--border)"/>
+          <g class="t-mono" text-anchor="end"><text x="-8" y="54">자주(수십 년)</text><text x="-8" y="104">가끔(수백 년)</text><text x="-8" y="154">설계 지진</text><text x="-8" y="204">최대 고려 지진</text></g>
+          <line x1="40" y1="49" x2="540" y2="199" style="stroke:var(--ok);stroke-width:3"/>
+          <line x1="40" y1="99" x2="390" y2="199" style="stroke:var(--accent);stroke-width:3"/>
+          <line x1="40" y1="149" x2="240" y2="199" style="stroke:var(--accent-2);stroke-width:3"/>
+          <g style="fill:var(--ok)"><circle cx="40" cy="49" r="5"/><circle cx="207" cy="99" r="5"/><circle cx="373" cy="149" r="5"/><circle cx="540" cy="199" r="5"/></g>
+          <g style="fill:var(--accent)"><circle cx="40" cy="99" r="5"/><circle cx="215" cy="149" r="5"/><circle cx="390" cy="199" r="5"/></g>
+          <g style="fill:var(--accent-2)"><circle cx="40" cy="149" r="5"/><circle cx="240" cy="199" r="5"/></g>
+          <text x="545" y="80" class="t-mono" style="fill:var(--ok)">일반 건물</text>
+          <text x="440" y="214" class="t-mono" style="fill:var(--ok)"></text>
+          <text x="250" y="244" class="t-mono" style="fill:var(--accent-2)">중요 시설(병원·소방) →</text>
+          <text x="420" y="244" class="t-mono" style="fill:var(--accent)">← 다중 이용 시설</text>
+          <text x="300" y="268" text-anchor="middle" class="t-dim">오른쪽 아래로 갈수록 손상 허용 · 같은 지진에 중요한 건물일수록 왼쪽(더 높은 성능)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-1.</b> 지진의 크기(재현 주기)와 요구 성능의 관계(개념도). 일반 건물(초록)은 큰 지진일수록 더 많은 손상을 허용하되 최대 고려 지진에도 붕괴하지 않게, 중요 시설(주황)은 같은 지진에 한두 단계 높은 성능을 요구한다. 현행 기준이 정하는 내진 등급별 목표 성능은 KDS 41 17 00을 확인할 것.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 8.1 (설계 지진과 최대 고려 지진)</strong> <span class="term">최대 고려 지진</span><span class="en">(maximum considered earthquake, MCE)</span>은 기준이 정한 아주 긴 재현 주기(국내 기준은 2,400년 형태)의 지진동이고, <span class="term">설계 지진</span><span class="en">(design earthquake)</span>은 그 2/3 크기의 지진동이다(현행 KDS 41 17 00 확인). 2/3라는 비율은 "설계 지진에 맞춰 설계한 건물은 여유(초과강도·연성)가 있어 약 1.5배 큰 지진에도 붕괴하지 않는다"는 판단에서 나왔다. 이 장의 계산은 모두 설계 지진 기준이다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="design-spectrum">
+    <h2>설계 지진과 설계 응답 스펙트럼</h2>
+    <div class="problem"><strong>B-10이 받을 지진은 얼마나 큰가</strong>
+      <p>7장의 응답 스펙트럼은 지진 기록 하나의 것이었습니다. 설계에는 아직 오지 않은 지진이 필요합니다. 부지가 어느 지역에 있는지(지진 위험도), 땅이 어떤 지반인지(증폭), 건물이 얼마나 오래 쓰일 것인지를 합쳐, 주기마다 하나의 설계용 가속도를 정한 곡선이 설계 응답 스펙트럼입니다.</p></div>
+    <p>국내 기준의 설계 절차는 대략 다음 순서입니다(KDS 41 17 00 형태, 계수는 현행 기준 확인). ① 지진 구역에 따라 기반암의 유효 지반 가속도 \(S\)를 정한다(지진 구역 계수 × 재현 주기에 따른 위험도 계수, 예: 구역 I에서 2,400년이면 약 0.22g). ② 부지의 지반 분류(S1–S6, GeotechBook 15장)에 따라 단주기와 1초 주기의 <span class="term">지반 증폭 계수</span><span class="en">(site coefficient)</span> \(F_a\), \(F_v\)를 정한다. ③ 설계 스펙트럼 가속도를 \(S_{DS} = S \times 2.5 \times F_a \times \tfrac23\), \(S_{D1} = S \times F_v \times \tfrac23\)로 계산한다. 2.5는 짧은 주기에서 응답이 지반 가속도의 약 2.5배로 커지는 것(7장 응답 스펙트럼), 2/3는 최대 고려 지진을 설계 지진으로 바꾸는 계수다.</p>
+    <div class="callout def"><strong>원리 8.2 (설계 응답 스펙트럼)</strong> 단주기 설계 스펙트럼 가속도 \(S_{DS}\)와 주기 1초의 설계 스펙트럼 가속도 \(S_{D1}\)로 <span class="term">설계 응답 스펙트럼</span><span class="en">(design response spectrum)</span> \(S_a(T)\)(g 배수, 감쇠 5 %)를 그린다.
+      <div class="formula">$$S_a = \begin{cases} S_{DS}\left(0.4 + 0.6\,\dfrac{T}{T_0}\right) & T \lt T_0 \\[4pt] S_{DS} & T_0 \le T \le T_S \\[4pt] \dfrac{S_{D1}}{T} & T_S \lt T \le T_L \\[4pt] \dfrac{S_{D1}\,T_L}{T^2} & T \gt T_L \end{cases} \qquad T_S = \frac{S_{D1}}{S_{DS}},\quad T_0 = 0.2\,T_S$$<div class="where">\(T_0\)–\(T_S\): 가속도 일정 구간, \(T_S\)–\(T_L\): 속도 일정 구간(\(S_a \propto 1/T\)), \(T_L\) 이후: 변위 일정 구간(\(S_a \propto 1/T^2\)). \(T_L\)은 장주기 전이 주기(이 책 5 s, 기준 확인). <code>CB.dyn.designSa</code>가 이 식이다.</div></div></div>
+    <figure class="diagram" id="fig-sd-spec">
+      <svg viewBox="0 0 860 300" role="img" aria-label="설계 응답 스펙트럼의 네 구간과 T0, TS, TL, B-10의 근사 주기와 해석 주기">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(90,30)">
+          <line x1="0" y1="220" x2="700" y2="220" class="s-axis"/><line x1="0" y1="0" x2="0" y2="220" class="s-axis"/>
+          <text x="696" y="240" text-anchor="end" class="t-mono">주기 T (s)</text><text x="8" y="10" class="t-mono">S<tspan baseline-shift="sub" font-size="8">a</tspan> (g)</text>
+          <path d="M0 160 L23 40 L116 40 C 160 72, 200 96, 240 108 C 330 134, 450 154, 580 165 C 620 172, 660 180, 700 186" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <line x1="23" y1="40" x2="23" y2="220" style="stroke:var(--text-faint);stroke-dasharray:3 3"/><line x1="116" y1="40" x2="116" y2="220" style="stroke:var(--text-faint);stroke-dasharray:3 3"/><line x1="580" y1="165" x2="580" y2="220" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <g class="t-mono" text-anchor="middle"><text x="23" y="236">T₀</text><text x="116" y="236">T<tspan baseline-shift="sub" font-size="8">S</tspan></text><text x="580" y="236">T<tspan baseline-shift="sub" font-size="8">L</tspan></text></g>
+          <line x1="0" y1="40" x2="23" y2="40" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="-6" y="44" text-anchor="end" class="t-mono">S<tspan baseline-shift="sub" font-size="8">DS</tspan></text>
+          <text x="-6" y="164" text-anchor="end" class="t-mono">0.4S<tspan baseline-shift="sub" font-size="8">DS</tspan></text>
+          <text x="70" y="30" text-anchor="middle" class="t-mono" style="fill:var(--accent)">가속도 일정</text>
+          <text x="330" y="118" class="t-mono" style="fill:var(--accent)">속도 일정: S<tspan baseline-shift="sub" font-size="8">D1</tspan>/T</text>
+          <text x="600" y="156" class="t-mono" style="fill:var(--accent)">변위 일정: S<tspan baseline-shift="sub" font-size="8">D1</tspan>T<tspan baseline-shift="sub" font-size="8">L</tspan>/T²</text>
+          <circle cx="173" cy="78" r="6" style="fill:var(--accent-2)"/><circle cx="232" cy="104" r="6" style="fill:var(--ok)"/>
+          <text x="180" y="70" class="t-mono" style="fill:var(--accent-2)">T<tspan baseline-shift="sub" font-size="8">a</tspan> = 0.79 s</text>
+          <text x="240" y="96" class="t-mono" style="fill:var(--ok)">T₁ = 1.00 s</text>
+          <text x="350" y="40" class="t-dim">B-10: S<tspan baseline-shift="sub" font-size="8">DS</tspan> = 0.50g, S<tspan baseline-shift="sub" font-size="8">D1</tspan> = 0.29g</text>
+          <text x="350" y="58" class="t-dim">T<tspan baseline-shift="sub" font-size="8">S</tspan> = 0.58 s, T₀ = 0.116 s(교육용)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-2.</b> 설계 응답 스펙트럼의 모양(가로축 눈금은 개념). 짧은 주기에서는 가속도가 일정하고, \(T_S\) 이후에는 1/T로 줄어든다. B-10의 근사 주기 0.79 s와 해석 주기 1.00 s는 모두 속도 일정 구간에 있어, 주기가 길수록 설계 가속도가 작아진다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 8.1 (B-10의 설계 스펙트럼)</strong> B-10 부지는 G-10(깊고 연약한 지반, 교육용 판정 S5)이고 이 책은 \(S_{DS} = 0.50g\), \(S_{D1} = 0.29g\)를 쓴다(교육용 가정).
+      <ol class="sd-steps">
+        <li><b>역산해 보기.</b> \(S = 0.22g\)라면 \(F_a = 0.50/(0.22 \times 2.5 \times \tfrac23) = 1.36\), \(F_v = 0.29/(0.22 \times \tfrac23) = 1.98\). 연약 지반일수록 \(F_v\)가 커서 긴 주기 쪽이 크게 증폭된다(이 값은 교육용 역산이며 기준 표의 값이 아니다).</li>
+        <li><b>구간 경계.</b> \(T_S = 0.29/0.50 = 0.58\) s, \(T_0 = 0.116\) s, \(T_L = 5\) s.</li>
+        <li><b>B-10 주기의 가속도.</b> \(S_a(0.79) = 0.29/0.79 = 0.367g\), \(S_a(1.00) = 0.290g\). 2차 모드(0.34 s)는 평탄 구간 0.50g.</li>
+      </ol></div>
+    <div class="sim" id="sim-sd-spec">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>설계 응답 스펙트럼</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sd-cv-spec" aria-label="설계 응답 스펙트럼과 끌 수 있는 건물 주기 점"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시</span><div class="seg" id="sd-sp-pre"><button data-value="b10" class="on">B-10(S5)</button><button data-value="hard">단단한 지반</button><button data-value="soft">연약·강진</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">S<sub>DS</sub></i> <output id="sd-sp-ds-out"></output></span><input type="range" id="sd-sp-ds" min="0.1" max="1.2" step="0.01" value="0.5"></label>
+          <label class="ctrl"><span><i style="font-style:normal">S<sub>D1</sub></i> <output id="sd-sp-d1-out"></output></span><input type="range" id="sd-sp-d1" min="0.05" max="0.8" step="0.01" value="0.29"></label>
+          <label class="ctrl"><span><i style="font-style:normal">T<sub>L</sub></i> <output id="sd-sp-tl-out"></output></span><input type="range" id="sd-sp-tl" min="2" max="8" step="0.5" value="5"></label>
+          <label class="ctrl"><span>건물 주기 T <output id="sd-sp-T-out"></output></span><input type="range" id="sd-sp-T" min="0" max="6" step="0.01" value="0.79"></label>
+          <div class="ctrl"><span>세로축</span><div class="seg" id="sd-sp-ax"><button data-value="sa" class="on">S<sub>a</sub> (g)</button><button data-value="sd">S<sub>d</sub> (mm)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">T₀ · T<sub>S</sub></span><span class="v" id="sd-sp-t0">—</span></div>
+        <div class="stat"><span class="k">구간</span><span class="v" id="sd-sp-zone">—</span></div>
+        <div class="stat"><span class="k">S<sub>a</sub>(T)</span><span class="v" id="sd-sp-sa">—</span></div>
+        <div class="stat"><span class="k">S<sub>d</sub>(T) = S<sub>a</sub>g(T/2π)²</span><span class="v" id="sd-sp-sd">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 그래프 위를 좌우로 끌어 건물 주기를 옮겨 보세요 · B-10의 T<sub>a</sub> = 0.79 s(주황 눈금)와 T<sub>1</sub> = 1.00 s(초록 눈금)에서 S<sub>a</sub>가 20 % 넘게 다릅니다 · 세로축을 S<sub>d</sub>로 바꾸면 긴 주기 건물일수록 가속도는 작아도 변위가 커지는 것이 보입니다(면진, 9장) · 모델: 원리 8.2, CB.dyn.designSa. "단단한 지반", "연약·강진" 예시 값은 교육용입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="importance">
+    <h2>중요도와 내진 등급</h2>
+    <div class="problem"><strong>병원과 창고가 같은 지진에 같은 성능이어야 할까</strong>
+      <p>지진 직후 병원·소방서·통신 시설은 계속 작동해야 하고, 많은 사람이 모이는 건물이 무너지면 피해가 큽니다. 같은 부지, 같은 지진이라도 건물의 용도에 따라 요구 성능을 높이는 장치가 내진 등급과 중요도 계수입니다.</p></div>
+    <p>건물은 용도와 규모에 따라 <span class="term">내진 등급</span><span class="en">(seismic use group)</span>으로 나뉘고, 등급마다 <span class="term">중요도 계수</span><span class="en">(importance factor)</span> \(I_e\)와 허용 층간 변위가 정해집니다. \(I_e\)는 설계 지진력을 \(I_e\)배로 키우는 효과(\(R/I_e\)로 나눔)를 내고, 층간 변위 제한은 더 엄격해집니다. 아래 표는 KDS 41 17 00의 형태이며 값은 현행 기준을 확인해야 합니다.</p>
+    <div class="table-wrap"><table class="sd-tbl">
+      <thead><tr><th>내진 등급</th><th>대상(예)</th><th>중요도 계수 I<sub>e</sub></th><th>허용 층간 변위 Δ<sub>a</sub></th></tr></thead>
+      <tbody>
+        <tr><td>특등급</td><td>재난 시 기능을 유지해야 하는 시설(병원, 소방·방재 거점 등)</td><td>1.5</td><td>0.010 h<sub>sx</sub></td></tr>
+        <tr><td>I등급</td><td>다중 이용 시설, 일정 규모 이상의 건물</td><td class="hl">1.2</td><td class="hl">0.015 h<sub>sx</sub></td></tr>
+        <tr><td>II등급</td><td>그 밖의 일반 건물</td><td>1.0</td><td>0.020 h<sub>sx</sub></td></tr>
+      </tbody></table></div>
+    <p>B-10은 10층 업무시설로 내진 I등급을 가정합니다(\(I_e = 1.2\), \(\Delta_a = 0.015h_{sx}\), 교육용). 기준은 이 밖에도 \(S_{DS}\), \(S_{D1}\)과 내진 등급으로 <b>내진 설계 범주</b>를 정해, 범주가 높을수록 해석 방법·비정형 제한·상세 요구를 엄격하게 합니다.</p>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="ductility">
+    <h2>연성과 반응수정계수 R</h2>
+    <div class="problem"><strong>탄성 요구의 1/5만 강도로 주어도 되는 이유</strong>
+      <p>B-10의 설계 밑면 전단력은 탄성 요구(약 17,000–25,000 kN)를 R/I<sub>e</sub> = 5로 나눈 값입니다. 강도가 모자란 건물은 지진 때 항복합니다. 그런데 항복한 뒤에도 강도를 잃지 않고 계속 변형할 수 있다면, 건물은 탄성 요구만큼의 힘을 받지 않고도 지진을 견딥니다. 얼마나 줄여도 될까요?</p></div>
+    <div class="callout def"><strong>정의 8.3 (연성비, 반응수정계수, 초과강도, 변위 증폭)</strong> 구조물의 하중–변위 관계를 탄성–완전소성으로 이상화할 때
+      <div class="formula">$$\mu = \frac{\delta_{max}}{\delta_y}, \qquad R = \frac{V_e}{V_s}, \qquad \Omega_0 = \frac{V_y}{V_s}, \qquad \delta_x = \frac{C_d\,\delta_{xe}}{I_e}$$<div class="where">\(\mu\): <span class="term">연성비</span><span class="en">(ductility ratio)</span>. \(V_e\): 탄성 요구 밑면 전단력, \(V_s\): 설계 밑면 전단력(첫 항복 수준), \(V_y\): 실제 항복 강도. \(R\): <span class="term">반응수정계수</span><span class="en">(response modification coefficient)</span>, \(\Omega_0\): <span class="term">시스템 초과강도 계수</span><span class="en">(system overstrength factor)</span>, \(C_d\): <span class="term">변위 증폭 계수</span><span class="en">(deflection amplification factor)</span>. 설계 하중으로 구한 탄성 변위 \(\delta_{xe}\)에 \(C_d/I_e\)를 곱해 실제 지진의 비탄성 변위를 추정한다. B-10(이중 골조, 교육용): R = 6, Ω₀ = 2.5, C<sub>d</sub> = 5.</div></div></div>
+    <figure class="diagram" id="fig-sd-rcurve">
+      <svg viewBox="0 0 860 330" role="img" aria-label="용량 곡선 위에서 탄성 요구, 설계 강도, 실제 항복 강도와 R, 오메가0, Cd의 관계">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(90,30)">
+          <line x1="0" y1="250" x2="660" y2="250" class="s-axis"/><line x1="0" y1="0" x2="0" y2="250" class="s-axis"/>
+          <text x="656" y="270" text-anchor="end" class="t-mono">지붕 변위 δ</text><text x="8" y="10" class="t-mono">밑면 전단 V</text>
+          <line x1="0" y1="250" x2="150" y2="20" style="stroke:var(--text-faint);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <text x="156" y="22" class="t-mono">탄성 응답이라면</text>
+          <path d="M0 250 L40 189 C 60 162, 80 146, 110 140 L560 128" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <line x1="0" y1="189" x2="40" y2="189" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <line x1="0" y1="140" x2="110" y2="140" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <line x1="0" y1="20" x2="150" y2="20" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="-6" y="24" text-anchor="end" class="t-mono">V<tspan baseline-shift="sub" font-size="8">e</tspan></text>
+          <text x="-6" y="144" text-anchor="end" class="t-mono">V<tspan baseline-shift="sub" font-size="8">y</tspan></text>
+          <text x="-6" y="193" text-anchor="end" class="t-mono">V<tspan baseline-shift="sub" font-size="8">s</tspan></text>
+          <circle cx="40" cy="189" r="5" style="fill:var(--accent-2)"/><text x="48" y="206" class="t-mono" style="fill:var(--accent-2)">첫 항복(설계 강도)</text>
+          <line x1="190" y1="22" x2="190" y2="186" style="stroke:var(--accent-2);stroke-width:1.6" marker-start="url(#sd-ah-ld)" marker-end="url(#sd-ah-ld)"/>
+          <text x="198" y="100" class="t-mono" style="fill:var(--accent-2)">R = V<tspan baseline-shift="sub" font-size="8">e</tspan>/V<tspan baseline-shift="sub" font-size="8">s</tspan></text>
+          <line x1="250" y1="142" x2="250" y2="186" style="stroke:var(--ok);stroke-width:1.6" marker-start="url(#sd-ah-t)" marker-end="url(#sd-ah-t)"/>
+          <text x="258" y="170" class="t-mono" style="fill:var(--ok)">Ω₀ = V<tspan baseline-shift="sub" font-size="8">y</tspan>/V<tspan baseline-shift="sub" font-size="8">s</tspan></text>
+          <line x1="40" y1="250" x2="40" y2="189" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <line x1="300" y1="250" x2="300" y2="134" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <line x1="40" y1="290" x2="300" y2="290" style="stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#sd-ah-t)"/>
+          <g class="t-mono" text-anchor="middle"><text x="40" y="266">δ<tspan baseline-shift="sub" font-size="8">xe</tspan></text><text x="300" y="266">δ<tspan baseline-shift="sub" font-size="8">x</tspan> = C<tspan baseline-shift="sub" font-size="8">d</tspan>δ<tspan baseline-shift="sub" font-size="8">xe</tspan></text><text x="170" y="284">× C<tspan baseline-shift="sub" font-size="8">d</tspan></text></g>
+          <circle cx="300" cy="134" r="5" style="fill:var(--accent)"/>
+          <text x="310" y="120" class="t-mono" style="fill:var(--accent)">설계 지진의 예상 최대 변위</text>
+          <text x="420" y="160" class="t-dim">항복 뒤에도 강도를 유지하며</text>
+          <text x="420" y="178" class="t-dim">변형하는 능력 = 연성</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-3.</b> 용량 곡선 위의 R, Ω₀, C<sub>d</sub>(개념도, \(I_e = 1\)). 설계는 탄성 요구 \(V_e\)를 R로 나눈 \(V_s\)에서 첫 항복을 맞추고, 부재의 재료 초과강도·여러 부재의 순차 항복으로 실제 강도 \(V_y\)는 대략 Ω₀배가 된다. 설계 하중의 탄성 변위에 C<sub>d</sub>를 곱한 값이 실제 지진의 변위 추정값이다.</figcaption>
+    </figure>
+    <p>R을 얼마로 할 수 있는지는 1960년 벨레초스(A. S. Veletsos)와 뉴마크가 탄소성 1자유도계의 지진 응답을 계산해 정리한 두 가지 경험 법칙에서 출발합니다.</p>
+    <div class="callout def"><strong>원리 8.4 (등변위·등에너지 원리)</strong> 같은 지진을 받는 탄성 계와, 강도만 \(1/R\)로 줄인 탄소성 계를 비교하면
+      <div class="formula">$$\text{긴 주기(}T \gtrsim T_S\text{): } \delta_{max,inel} \approx \delta_{max,el} \Rightarrow \mu \approx R, \qquad \text{짧은 주기: } \tfrac12 F_e\delta_e \approx F_y\big(\delta_{max} - \tfrac12\delta_y\big) \Rightarrow \mu \approx \frac{R^2 + 1}{2}$$<div class="where">왼쪽이 <span class="term">등변위 원리</span><span class="en">(equal displacement rule)</span>, 오른쪽이 <span class="term">등에너지 원리</span><span class="en">(equal energy rule)</span>. 아주 짧은 주기(T → 0)에서는 강체처럼 지반과 함께 움직이므로 강도를 줄일 수 없다(R → 1). 그래서 강성이 큰 저층 건물은 같은 R에 더 큰 연성이 필요하다. 실제 R 값은 연성뿐 아니라 초과강도·여유도까지 반영해 구조 시스템마다 기준이 정한다.</div></div></div>
+    <figure class="diagram" id="fig-sd-equal">
+      <svg viewBox="0 0 860 290" role="img" aria-label="등변위 원리와 등에너지 원리의 하중 변위 그림 비교">
+        <rect x="10" y="10" width="840" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">등변위(긴 주기)</text>
+          <line x1="0" y1="220" x2="340" y2="220" class="s-axis"/><line x1="0" y1="10" x2="0" y2="220" class="s-axis"/>
+          <line x1="0" y1="220" x2="120" y2="30" style="stroke:var(--text-faint);stroke-width:1.8;stroke-dasharray:6 4"/>
+          <path d="M0 220 L40 157 L120 157" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <line x1="120" y1="30" x2="120" y2="220" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="126" y="34" class="t-mono">F<tspan baseline-shift="sub" font-size="8">e</tspan></text><text x="126" y="152" class="t-mono" style="fill:var(--accent)">F<tspan baseline-shift="sub" font-size="8">y</tspan> = F<tspan baseline-shift="sub" font-size="8">e</tspan>/R</text>
+          <g class="t-mono" text-anchor="middle"><text x="40" y="236">δ<tspan baseline-shift="sub" font-size="8">y</tspan></text><text x="120" y="236">δ<tspan baseline-shift="sub" font-size="8">e</tspan> = δ<tspan baseline-shift="sub" font-size="8">max</tspan></text></g>
+          <text x="170" y="100" class="t-dim">최대 변위가 같다</text>
+          <text x="170" y="118" class="t-mono" style="fill:var(--accent)">μ = R</text>
+        </g>
+        <g transform="translate(470,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">등에너지(짧은 주기)</text>
+          <line x1="0" y1="220" x2="340" y2="220" class="s-axis"/><line x1="0" y1="10" x2="0" y2="220" class="s-axis"/>
+          <path d="M0 220 L80 30 L80 220 Z" style="fill:var(--accent-2-soft);stroke:none"/>
+          <path d="M0 220 L27 157 L200 157 L200 220 Z" style="fill:var(--accent-soft);stroke:none"/>
+          <line x1="0" y1="220" x2="80" y2="30" style="stroke:var(--text-faint);stroke-width:1.8;stroke-dasharray:6 4"/>
+          <path d="M0 220 L27 157 L200 157" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <text x="86" y="34" class="t-mono">F<tspan baseline-shift="sub" font-size="8">e</tspan></text>
+          <g class="t-mono" text-anchor="middle"><text x="27" y="236">δ<tspan baseline-shift="sub" font-size="8">y</tspan></text><text x="80" y="236">δ<tspan baseline-shift="sub" font-size="8">e</tspan></text><text x="200" y="236">δ<tspan baseline-shift="sub" font-size="8">max</tspan></text></g>
+          <text x="210" y="100" class="t-dim">두 넓이(에너지)가 같다</text>
+          <text x="210" y="118" class="t-mono" style="fill:var(--accent)">μ = (R² + 1)/2</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-4.</b> 등변위 원리와 등에너지 원리(R = 3 예). 긴 주기 구조물은 강도를 1/3로 줄여도 최대 변위가 탄성 때와 거의 같아 연성 요구 μ ≈ 3이다. 짧은 주기 구조물은 탄성 계가 저장한 에너지(주황 삼각형)를 소성 변형으로 흡수해야 하므로 μ ≈ 5로 더 큰 연성이 필요하다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 8.2 (R과 연성 요구)</strong> R = 6인 구조물의 연성 요구를 두 원리로 추정한다.
+      <ol class="sd-steps">
+        <li><b>B-10(T = 1.0 s \(\gt T_S\) = 0.58 s).</b> 등변위: μ ≈ 6. 최대 변위는 탄성 응답(7장 예제 7.7의 지붕 약 92 mm)과 비슷하다.</li>
+        <li><b>강한 저층 건물(T = 0.2 s).</b> 등에너지: μ ≈ (36 + 1)/2 = 18.5. 이런 연성을 상세로 확보하기는 어렵다. 그래서 짧은 주기 건물은 R을 작게 하거나 강도를 더 준다.</li>
+        <li><b>변위 추정.</b> 설계 하중의 탄성 변위가 지붕 29 mm(등가 정적, 8.6절)라면 \(\delta_x = C_d\delta_{xe}/I_e = 5 \times 29/1.2 = 121\) mm. C<sub>d</sub> = 5가 R = 6보다 작은 것은 감쇠 증가와 실제 강도의 여유를 반영한 것이다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sd-rmu">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>R과 연성: 탄소성 1자유도 시간 이력</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sd-stack">
+          <div><canvas id="sd-cv-rmu-h" aria-label="탄성 응답선과 탄소성 이력 곡선"></canvas><span class="sd-cap">힘–변위: 탄성(점선) · 탄소성(청록)</span></div>
+          <div><canvas id="sd-cv-rmu-t" aria-label="탄성과 탄소성 변위 시간 이력"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>고유 주기 T <output id="sd-rm-T-out"></output></span><input type="range" id="sd-rm-T" min="0.1" max="3" step="0.01" value="1.0"></label>
+          <label class="ctrl"><span><i style="font-style:normal">강도 저감 R = F<sub>e</sub>/F<sub>y</sub></i> <output id="sd-rm-R-out"></output></span><input type="range" id="sd-rm-R" min="1" max="8" step="0.1" value="6"></label>
+          <div class="ctrl"><span>지진파</span><div class="seg" id="sd-rm-seed"><button data-value="7" class="on">A</button><button data-value="21">B</button><button data-value="45">C</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">실제 연성비 μ</span><span class="v" id="sd-rm-mu">—</span></div>
+        <div class="stat"><span class="k">등변위 · 등에너지 예측</span><span class="v" id="sd-rm-pred">—</span></div>
+        <div class="stat"><span class="k">δ<sub>inel</sub> / δ<sub>el</sub></span><span class="v" id="sd-rm-ratio">—</span></div>
+        <div class="stat"><span class="k">잔류 변위 / δ<sub>y</sub></span><span class="v" id="sd-rm-res">—</span></div>
+      </div>
+      <div class="sd-msg" id="sd-rm-msg"></div>
+      <div class="sim-note">해볼 것: T = 1.0 s에서 R을 2–6으로 바꾸면 δ<sub>inel</sub>/δ<sub>el</sub>이 1 근처에 머뭅니다(등변위) · T를 0.2 s로 줄이면 같은 R에서 연성비가 훨씬 커집니다(등에너지 쪽) · 잔류 변위는 지진 뒤 건물이 기울어 남는 정도입니다 · 모델: 교육용 인공 지진파(CB.dyn.quake)에 대해 m = 1, ζ = 5 %인 탄성 계와 탄성–완전소성 계를 중앙 차분법(Δt ≤ 0.002 s)으로 풀고, F<sub>y</sub> = (탄성 최대 힘)/R로 둡니다(페이지 내 모델). 연성비는 지진 세기와 상관없습니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="els">
+    <h2>등가 정적 해석</h2>
+    <div class="problem"><strong>지진을 정적인 옆 하중으로 바꾸기</strong>
+      <p>응답 스펙트럼 해석에는 모드 해석이 필요합니다. 규칙적이고 높지 않은 건물이라면 1차 모드가 응답을 지배하므로, 1차 모드 형상에 가까운 분포의 정적 하중을 옆에서 걸어도 충분히 비슷한 부재력을 얻습니다. 손으로 할 수 있고, 모든 내진 설계의 기준선이 되는 방법입니다.</p></div>
+    <p><span class="term">등가 정적 해석</span><span class="en">(equivalent lateral force procedure)</span>은 ① 주기를 정하고 ② 스펙트럼 가속도를 R/I<sub>e</sub>로 나눠 <span class="term">지진 응답 계수</span><span class="en">(seismic response coefficient)</span> \(C_s\)를 구하고 ③ 유효 지진 중량을 곱해 <span class="term">밑면 전단력</span><span class="en">(base shear)</span>을 구한 뒤 ④ 높이에 따라 층 지진력으로 나눈다.</p>
+    <div class="callout def"><strong>원리 8.5 (등가 정적 해석, KDS 41 17 00 형태)</strong>
+      <div class="formula">$$V = C_s W, \qquad C_s = \frac{S_{D1}}{(R/I_e)\,T} \le \frac{S_{DS}}{R/I_e}, \qquad C_s \ge \max(0.044\,S_{DS}I_e,\ 0.01)$$
+      $$F_x = C_{vx}V, \qquad C_{vx} = \frac{w_x h_x^{\,k}}{\sum_i w_i h_i^{\,k}}, \qquad k = \begin{cases}1 & T \le 0.5\text{ s}\\ 2 & T \ge 2.5\text{ s}\\ \text{직선 보간} & \end{cases}$$<div class="where">\(W\): 유효 지진 중량(고정하중 + 칸막이·창고 활하중 일부 등), \(w_x\), \(h_x\): x층 중량과 지반에서의 높이. \(T\)는 <span class="term">근사 고유 주기</span><span class="en">(approximate fundamental period)</span> \(T_a = C_t h_n^{x}\)(이 책 "기타 구조" 0.0488 \(h_n^{0.75}\))이거나, 해석 주기를 쓰되 \(C_u T_a\)(\(C_u\)는 상한 계수)를 넘지 못한다. 층 전단력 \(V_x = \sum_{i \ge x} F_i\), 전도 모멘트 \(M = \sum F_i h_i\). 지수 \(k\)는 고차 모드 때문에 긴 주기 건물의 위층 하중이 커지는 것을 반영한다. 모든 계수는 현행 기준 확인.</div></div></div>
+    <div class="callout"><strong>예제 8.3 (B-10 Y 방향 등가 정적 해석)</strong> \(W = 68{,}100\) kN(2–10층 6,900 kN, 지붕 6,000 kN), \(h_n = 41\) m, \(S_{DS} = 0.50\), \(S_{D1} = 0.29\), R = 6, \(I_e = 1.2\).
+      <ol class="sd-steps">
+        <li><b>근사 주기.</b> \(T_a = 0.0488 \times 41^{0.75} = 0.0488 \times 16.20 = 0.791\) s.</li>
+        <li><b>지진 응답 계수.</b> \(R/I_e = 5\). \(C_s = 0.29/(5 \times 0.791) = 0.0734\). 상한 \(0.50/5 = 0.100\), 하한 \(0.044 \times 0.50 \times 1.2 = 0.0264\) → \(C_s = 0.0734\).</li>
+        <li><b>밑면 전단력.</b> \(V = 0.0734 \times 68{,}100 = 4{,}995\) kN ≈ <b>5,000 kN</b>(무게의 7.3 %).</li>
+        <li><b>분포 지수.</b> \(k = 1 + (0.791 - 0.5)/2 = 1.145\).</li>
+        <li><b>층 지진력.</b> \(\sum w_i h_i^k = 2.496\times10^6\). 예: 지붕 \(6{,}000 \times 41^{1.145} = 6{,}000 \times 70.3 = 422{,}000\) → \(C_{vx} = 0.169\), \(F = 845\) kN. 아래 표.</li>
+        <li><b>전도 모멘트.</b> \(\sum F_i h_i = 145{,}200\) kN·m. 밑면 전단력의 작용 높이 \(145{,}200/4{,}995 = 29\) m(전체의 71 %).</li>
+      </ol></div>
+    <div class="table-wrap"><table class="sd-tbl">
+      <thead><tr><th>층(바닥)</th><th>h<sub>x</sub>(m)</th><th>w<sub>x</sub>(kN)</th><th>w<sub>x</sub>h<sub>x</sub><sup>k</sup></th><th>C<sub>vx</sub></th><th>F<sub>x</sub>(kN)</th><th>층 전단 V<sub>x</sub>(kN)</th></tr></thead>
+      <tbody>
+        <tr><td>지붕</td><td>41</td><td>6,000</td><td>422,034</td><td>0.169</td><td>845</td><td>845</td></tr>
+        <tr><td>10층</td><td>37</td><td>6,900</td><td>431,502</td><td>0.173</td><td>864</td><td>1,708</td></tr>
+        <tr><td>9층</td><td>33</td><td>6,900</td><td>378,507</td><td>0.152</td><td>758</td><td>2,466</td></tr>
+        <tr><td>8층</td><td>29</td><td>6,900</td><td>326,438</td><td>0.131</td><td>653</td><td>3,119</td></tr>
+        <tr><td>7층</td><td>25</td><td>6,900</td><td>275,407</td><td>0.110</td><td>551</td><td>3,671</td></tr>
+        <tr><td>6층</td><td>21</td><td>6,900</td><td>225,553</td><td>0.090</td><td>451</td><td>4,122</td></tr>
+        <tr><td>5층</td><td>17</td><td>6,900</td><td>177,068</td><td>0.071</td><td>354</td><td>4,476</td></tr>
+        <tr><td>4층</td><td>13</td><td>6,900</td><td>130,227</td><td>0.052</td><td>261</td><td>4,737</td></tr>
+        <tr><td>3층</td><td>9</td><td>6,900</td><td>85,465</td><td>0.034</td><td>171</td><td>4,908</td></tr>
+        <tr><td>2층</td><td>5</td><td>6,900</td><td>43,593</td><td>0.017</td><td>87</td><td class="hl">4,995</td></tr>
+      </tbody></table></div>
+    <figure class="diagram" id="fig-sd-els">
+      <svg viewBox="0 0 860 330" role="img" aria-label="B-10 층 지진력 분포와 층 전단력도">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(70,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">층 지진력 F<tspan baseline-shift="sub" font-size="9">x</tspan> (kN)</text>
+          <line x1="0" y1="270" x2="320" y2="270" class="s-axis"/>
+          <rect x="190" y="25" width="70" height="245" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <g style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#sd-ah-ld)">
+            <line x1="173" y1="240" x2="190" y2="240" marker-end="url(#sd-ah-ld)"/><line x1="156" y1="216" x2="190" y2="216" marker-end="url(#sd-ah-ld)"/><line x1="138" y1="192" x2="190" y2="192" marker-end="url(#sd-ah-ld)"/><line x1="119" y1="168" x2="190" y2="168" marker-end="url(#sd-ah-ld)"/><line x1="100" y1="145" x2="190" y2="145" marker-end="url(#sd-ah-ld)"/><line x1="80" y1="121" x2="190" y2="121" marker-end="url(#sd-ah-ld)"/><line x1="59" y1="97" x2="190" y2="97" marker-end="url(#sd-ah-ld)"/><line x1="38" y1="73" x2="190" y2="73" marker-end="url(#sd-ah-ld)"/><line x1="17" y1="49" x2="190" y2="49" marker-end="url(#sd-ah-ld)"/><line x1="21" y1="25" x2="190" y2="25" marker-end="url(#sd-ah-ld)"/>
+          </g>
+          <g class="t-mono" text-anchor="end"><text x="16" y="29">845</text><text x="12" y="53">864</text><text x="33" y="77">758</text><text x="54" y="101">653</text><text x="75" y="125">551</text><text x="95" y="149">451</text><text x="114" y="172">354</text><text x="133" y="196">261</text><text x="151" y="220">171</text><text x="168" y="244">87</text></g>
+          <text x="225" y="290" text-anchor="middle" class="t-mono">ΣF = 4,995 kN</text>
+        </g>
+        <g transform="translate(470,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">층 전단력 V<tspan baseline-shift="sub" font-size="9">x</tspan> (kN)</text>
+          <line x1="0" y1="270" x2="0" y2="20" class="s-axis"/><line x1="0" y1="270" x2="320" y2="270" class="s-axis"/>
+          <path d="M0 25 L50 25 L50 49 L101 49 L101 73 L146 73 L146 97 L185 97 L185 121 L217 121 L217 145 L244 145 L244 168 L265 168 L265 192 L280 192 L280 216 L290 216 L290 240 L295 240 L295 270 L0 270 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="300" y="262" class="t-mono">4,995</text><text x="56" y="40" class="t-mono">845</text><text x="152" y="88" class="t-mono">2,466</text><text x="250" y="160" class="t-mono">4,122</text>
+          <text x="160" y="295" text-anchor="middle" class="t-dim">위에서부터 층 지진력을 누적</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-5.</b> B-10 Y 방향 등가 정적 해석의 층 지진력(왼쪽)과 층 전단력(오른쪽). k = 1.145이므로 하중은 높이에 대해 직선보다 조금 위로 몰린다. 지붕 바닥의 중량이 작아 지붕 하중(845 kN)이 10층 바닥(864 kN)보다 작다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-sd-els">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-10 등가 정적 해석기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sd-cv-els" aria-label="층 지진력 막대와 층 전단력도"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>반응수정계수 R <output id="sd-el-R-out"></output></span><input type="range" id="sd-el-R" min="1" max="8" step="0.5" value="6"></label>
+          <div class="ctrl"><span><i style="font-style:normal">내진 등급 (I<sub>e</sub>)</i></span><div class="seg" id="sd-el-ie"><button data-value="1.5">특(1.5)</button><button data-value="1.2" class="on">I(1.2)</button><button data-value="1.0">II(1.0)</button></div></div>
+          <div class="ctrl"><span>주기</span><div class="seg" id="sd-el-tsrc"><button data-value="ta" class="on">T<sub>a</sub> 0.79 s</button><button data-value="t1">해석 T<sub>1</sub> 1.00 s</button><button data-value="free">직접</button></div></div>
+          <label class="ctrl"><span>주기 T(직접) <output id="sd-el-T-out"></output></span><input type="range" id="sd-el-T" min="0.1" max="4" step="0.01" value="0.79"></label>
+          <label class="ctrl"><span><i style="font-style:normal">S<sub>DS</sub> · S<sub>D1</sub> 배율</i> <output id="sd-el-s-out"></output></span><input type="range" id="sd-el-s" min="0.3" max="2" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">C<sub>s</sub> (지배)</span><span class="v" id="sd-el-cs">—</span></div>
+        <div class="stat"><span class="k">밑면 전단 V</span><span class="v" id="sd-el-V">—</span></div>
+        <div class="stat"><span class="k">k</span><span class="v" id="sd-el-k">—</span></div>
+        <div class="stat"><span class="k">전도 모멘트</span><span class="v" id="sd-el-M">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 V ≈ 4,995 kN, 층 지진력 87 … 845 kN을 확인하세요 · R을 1로 하면 C<sub>s</sub>가 상한(S<sub>DS</sub>/(R/I<sub>e</sub>))에 걸립니다 · 주기를 해석 T<sub>1</sub> = 1.00 s로 바꾸면 V가 약 3,930 kN으로 줄지만, 기준은 C<sub>u</sub>T<sub>a</sub> 이상을 쓰지 못하게 합니다 · 주기를 4 s로 늘리면 하한(0.044S<sub>DS</sub>I<sub>e</sub>)이 지배합니다 · 모델: 원리 8.5, CB.dyn.els, CB.dyn.B10의 층 중량·높이.</div>
+    </div>
+    <div class="callout site"><strong>B-10 등가 정적 해석: V ≈ 5,000 kN</strong> T = T<sub>a</sub> = 0.79 s, C<sub>s</sub> = 0.0734(상한 0.10, 하한 0.026), V = 4,995 kN, k = 1.15, 층 지진력(2층 바닥 → 지붕) 87, 171, 261, 354, 451, 551, 653, 758, 864, 845 kN, 전도 모멘트 약 145,000 kN·m. 6장의 풍하중 밑면 전단(Y 방향 약 2,000 kN 안팎)보다 두 배 이상 크므로 B-10의 횡하중 설계는 지진이 지배한다. 이 하중은 코어 전단벽과 모멘트 골조가 강성에 따라 나눠 받는다(5장 벽–골조 상호작용, 이중 골조에서 골조는 일정 비율 이상을 따로 견디도록 기준이 요구한다 — 현행 기준 확인). 전도 모멘트는 코어 벽 밑과 매트 기초·말뚝(GeotechBook)으로 전달된다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="rsa">
+    <h2>응답 스펙트럼 해석과 비교</h2>
+    <div class="problem"><strong>3,400 kN과 5,000 kN, 어느 쪽이 맞나</strong>
+      <p>7장 예제 7.7에서 B-10의 모드 해석에 설계 스펙트럼을 적용해 밑면 전단력 약 3,400 kN을 얻었습니다. 등가 정적 해석은 5,000 kN입니다. 더 "정확한" 해석이 더 작은 값을 주면 설계자는 그대로 써도 될까요?</p></div>
+    <p><span class="term">응답 스펙트럼 해석</span><span class="en">(response spectrum analysis)</span>은 모드마다 \(S_a(T_n)\)을 R/I<sub>e</sub>로 나눈 가속도로 층 지진력 \(\mathbf f_n = \Gamma_n\mathbf M\boldsymbol\phi_n S_a(T_n)g/(R/I_e)\)를 구하고, 층 전단력·층간 변위·부재력을 응답량마다 SRSS(또는 CQC)로 조합한다(7장 원리 7.11–7.12). 고차 모드의 영향과 실제 강성 분포가 반영되므로 비정형 건물과 높은 건물에서는 이 방법(또는 시간 이력 해석)이 요구된다.</p>
+    <p>그러나 해석 모델의 주기는 비구조벽 등을 빼서 길게 나오기 쉽고, 그러면 하중이 과소평가됩니다. 그래서 기준은 응답 스펙트럼 해석의 밑면 전단력이 등가 정적 해석(상한 주기를 적용한 값)의 일정 비율보다 작으면 그 비율까지 키우도록 한다(국내외 기준에서 85 % 형태가 쓰였다, 현행 KDS 41 17 00 확인).</p>
+    <div class="callout"><strong>예제 8.4 (B-10 응답 스펙트럼 해석의 조정)</strong>
+      <ol class="sd-steps">
+        <li><b>모드 밑면 전단(설계).</b> 1차 3,334 kN, 2차 622 kN, 3차 210 kN(7장 예제 7.7). SRSS \(V_{RSA} = 3{,}399\) kN.</li>
+        <li><b>비교 기준.</b> \(0.85 \times 4{,}995 = 4{,}246\) kN. \(V_{RSA} \lt 4{,}246\)이므로 조정이 필요하다.</li>
+        <li><b>조정 계수.</b> \(4{,}246/3{,}399 = 1.249\). 모든 부재력(층간 변위 검토용 변위는 기준에 따라 다를 수 있다)에 1.249를 곱한다.</li>
+        <li><b>분포 비교.</b> 조정 후 1층 층 전단 4,246 kN, 10층(지붕 아래) 층 전단 \(536 \times 1.249 = 669\) kN. 등가 정적은 845 kN이다. 등가 정적의 \(k\) 분포가 위층을 조금 더 크게 잡는다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sd-rsa">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>응답 스펙트럼 해석 vs 등가 정적 해석</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sd-cv-rsa" aria-label="층별 층 전단력 비교: 등가 정적, 응답 스펙트럼, 조정 후"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>포함할 모드 수 <output id="sd-rs-n-out"></output></span><input type="range" id="sd-rs-n" min="1" max="10" step="1" value="3"></label>
+          <label class="ctrl"><span>조정 기준 비율 <output id="sd-rs-p-out"></output></span><input type="range" id="sd-rs-p" min="0.7" max="1" step="0.05" value="0.85"></label>
+          <label class="ctrl"><span>층 강성 배율 <output id="sd-rs-k-out"></output></span><input type="range" id="sd-rs-k" min="0.3" max="2" step="0.05" value="1"></label>
+          <div class="ctrl"><span>조합</span><div class="seg" id="sd-rs-c"><button data-value="srss" class="on">SRSS</button><button data-value="abs">절댓값 합</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">T<sub>1</sub></span><span class="v" id="sd-rs-T">—</span></div>
+        <div class="stat"><span class="k">V<sub>RSA</sub> · V<sub>ELS</sub></span><span class="v" id="sd-rs-V">—</span></div>
+        <div class="stat"><span class="k">조정 계수</span><span class="v" id="sd-rs-f">—</span></div>
+        <div class="stat"><span class="k">누적 유효 질량비</span><span class="v" id="sd-rs-m">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 모드 하나만 넣으면 V<sub>RSA</sub>가 3,334 kN, 세 개면 3,398 kN으로 고차 모드의 기여는 작지만 위층 전단력에서는 상대적으로 큽니다 · 층 강성을 0.5배(균열 강성)로 낮추면 주기가 1.4 s로 길어져 V<sub>RSA</sub>가 더 작아지고 조정 계수가 커집니다 · 모델: 전단 건물(CB.dyn.B10 질량, 강성 1.2 × 10⁶ × 배율), CB.dyn.modes, S<sub>a</sub>는 CB.dyn.designSa ÷ (R/I<sub>e</sub> = 5), ELS는 T<sub>a</sub> = 0.79 s 고정(CB.dyn.els).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="drift">
+    <h2>층간 변위 제한</h2>
+    <div class="problem"><strong>무너지지 않아도 너무 휘면 안 된다</strong>
+      <p>층과 층 사이가 크게 어긋나면 칸막이벽·유리·엘리베이터 레일·배관이 부서지고, 기둥은 P–Δ 효과(4장)로 더 큰 휨을 받습니다. 강도 검토와 별도로 각 층이 얼마나 비틀어지는지를 제한합니다.</p></div>
+    <div class="callout def"><strong>원리 8.6 (설계 층간 변위)</strong> x층의 <span class="term">층간 변위</span><span class="en">(storey drift)</span>는 위아래 바닥의 증폭 변위 차이로
+      <div class="formula">$$\delta_x = \frac{C_d\,\delta_{xe}}{I_e}, \qquad \Delta_x = \delta_x - \delta_{x-1} \le \Delta_a$$<div class="where">\(\delta_{xe}\): 설계 지진력(R로 줄인 하중)에 대한 탄성 해석 변위. \(\Delta_a\): <span class="term">허용 층간 변위</span><span class="en">(allowable storey drift)</span>, 내진 I등급 \(0.015h_{sx}\)(표 8.4절, 기준 확인). 층간 변위비 \(\Delta_x/h_{sx}\)로 말하기도 한다. 층간 변위를 계산할 때는 \(C_s\) 하한 등을 적용하지 않은 하중과 해석 주기를 쓸 수 있게 하는 기준이 많다(기준 확인).</div></div></div>
+    <div class="callout"><strong>예제 8.5 (B-10의 층간 변위)</strong> 전단 건물이므로 층 탄성 변위 = 층 전단 / 층 강성.
+      <ol class="sd-steps">
+        <li><b>1층(층고 5 m).</b> \(\Delta_{xe} = 4{,}995/(1.2\times10^6) = 4.16\) mm → \(\Delta = 5 \times 4.16/1.2 = 17.3\) mm. 허용 \(0.015 \times 5{,}000 = 75\) mm. 비 0.35 %.</li>
+        <li><b>2층(층고 4 m).</b> \(\Delta_{xe} = 4{,}908/(1.2\times10^6) = 4.09\) mm → 17.0 mm, 허용 60 mm. 비 0.43 %(가장 큼).</li>
+        <li><b>판정.</b> 모든 층이 허용값의 약 30 % 이하. 교육용 B-10은 층 강성을 크게 가정해 여유가 크다. 실제 RC 건물은 균열 강성(14장)을 쓰면 변위가 두세 배로 커지고, 이 검토가 단면을 정하는 경우가 많다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sd-drift">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>층간 변위 검토</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sd-cv-drift" aria-label="층별 층간 변위비 막대와 허용 한계"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>층 강성 배율 <output id="sd-dr-k-out"></output></span><input type="range" id="sd-dr-k" min="0.1" max="2" step="0.05" value="1"></label>
+          <label class="ctrl"><span><i style="font-style:normal">변위 증폭 C<sub>d</sub></i> <output id="sd-dr-cd-out"></output></span><input type="range" id="sd-dr-cd" min="2" max="6.5" step="0.5" value="5"></label>
+          <div class="ctrl"><span>내진 등급</span><div class="seg" id="sd-dr-g"><button data-value="s">특</button><button data-value="1" class="on">I</button><button data-value="2">II</button></div></div>
+          <div class="ctrl"><span>설계 주기</span><div class="seg" id="sd-dr-t"><button data-value="ta" class="on">T<sub>a</sub></button><button data-value="t1">해석 T<sub>1</sub></button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 층간 변위비</span><span class="v" id="sd-dr-max">—</span></div>
+        <div class="stat"><span class="k">허용</span><span class="v" id="sd-dr-lim">—</span></div>
+        <div class="stat"><span class="k">지붕 변위 δ<sub>x</sub></span><span class="v" id="sd-dr-roof">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="sd-dr-ok">—</span></div>
+      </div>
+      <div class="sd-msg" id="sd-dr-msg"></div>
+      <div class="sim-note">해볼 것: 층 강성을 0.3배(심한 균열·유연한 골조)로 낮추면 층간 변위비가 1 %를 넘습니다 · 특등급으로 바꾸면 I<sub>e</sub> = 1.5가 하중을 키우고 동시에 δ<sub>x</sub> = C<sub>d</sub>δ<sub>xe</sub>/I<sub>e</sub>에서 나누어지며, 허용값은 0.010h<sub>sx</sub>로 엄격해집니다 · 모델: 등가 정적 층 지진력(CB.dyn.els, R = 6) → 전단 건물 층 탄성 변위 V<sub>x</sub>/k<sub>x</sub> → ×C<sub>d</sub>/I<sub>e</sub>. 해석 T<sub>1</sub>은 강성 배율에 따라 CB.dyn.modes로 다시 계산합니다.</div>
+    </div>
+    <div class="callout warn"><strong>P–Δ와 안정 계수</strong> 층간 변위가 커지면 위층의 중력 하중 \(P_x\)가 어긋난 만큼 추가 모멘트를 만든다. 안정 계수 \(\theta = P_x\Delta I_e/(V_x h_{sx} C_d)\)가 0.1 이하이면 무시할 수 있고, 그보다 크면 변위와 부재력을 \(1/(1-\theta)\) 형태로 증폭하며, 상한을 넘으면 구조가 불안정할 수 있어 다시 설계한다(4장, 기준 확인). B-10 1층: \(P \approx 68{,}100 + \) 활하중 일부, \(\theta \approx 68{,}100 \times 17.3 \times 1.2/(4{,}995 \times 5{,}000 \times 5) \approx 0.011\)로 작다.</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="vertical-irregularity">
+    <h2>수직 비정형과 필로티</h2>
+    <div class="problem"><strong>약한 층 하나가 건물 전체를 결정한다</strong>
+      <p>등가 정적 해석의 k 분포는 강성과 질량이 높이에 따라 고르게 변하는 건물을 가정합니다. 한 층만 유연하거나 약하면 변형이 그 층에 몰려 연성 요구가 그 층의 기둥에 집중됩니다. 다른 층은 멀쩡한데 그 층만 무너지는 "층 붕괴"입니다.</p></div>
+    <p><span class="term">비정형성</span><span class="en">(irregularity)</span>은 수직과 평면으로 나뉩니다. 수직 비정형에는 강성이 위층보다 크게 작은 <span class="term">연층</span><span class="en">(soft storey)</span>, 강도가 위층보다 작은 <span class="term">약층</span><span class="en">(weak storey)</span>, 한 층의 질량이 이웃 층보다 크게 큰 질량 비정형, 횡력 저항 요소의 크기가 급변하는 기하학적 비정형, 벽이 아래층에서 끊기거나 옮겨지는 수직 불연속이 있습니다. 1층을 주차장·로비로 비우고 위층을 벽으로 채운 <span class="term">필로티</span><span class="en">(pilotis)</span> 구조는 연층·약층·수직 불연속을 한꺼번에 가진 대표적인 예입니다.</p>
+    <figure class="diagram" id="fig-sd-irreg">
+      <svg viewBox="0 0 860 330" role="img" aria-label="연층 필로티, 질량 비정형, 수직 불연속, 평면 비틀림과 요철 비정형의 스케치">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">① 필로티(연층·약층)</text>
+          <line x1="0" y1="250" x2="170" y2="250" class="s-axis"/>
+          <rect x="20" y="40" width="130" height="150" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <g style="stroke:var(--accent);stroke-width:1"><line x1="20" y1="70" x2="150" y2="70"/><line x1="20" y1="100" x2="150" y2="100"/><line x1="20" y1="130" x2="150" y2="130"/><line x1="20" y1="160" x2="150" y2="160"/></g>
+          <g style="stroke:var(--accent);stroke-width:4"><path d="M4 250 C 6 225, 20 210, 24 190" style="fill:none"/><path d="M64 250 C 66 225, 80 210, 84 190" style="fill:none"/><path d="M124 250 C 126 225, 140 210, 144 190" style="fill:none"/></g>
+          <text x="85" y="275" text-anchor="middle" class="t-mono" style="fill:var(--bad)">변형이 1층에 집중</text>
+          <text x="85" y="120" text-anchor="middle" class="t-mono">벽이 많은 위층</text>
+        </g>
+        <g transform="translate(250,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">② 질량 · ③ 불연속</text>
+          <line x1="0" y1="250" x2="180" y2="250" class="s-axis"/>
+          <rect x="20" y="70" width="60" height="180" style="fill:none;stroke:var(--accent);stroke-width:1.6"/>
+          <rect x="20" y="100" width="60" height="22" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <text x="50" y="115" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">수조</text>
+          <rect x="105" y="60" width="16" height="120" style="fill:var(--accent);opacity:.5"/>
+          <rect x="135" y="180" width="16" height="70" style="fill:var(--accent);opacity:.5"/>
+          <line x1="96" y1="60" x2="160" y2="60" style="stroke:var(--accent);stroke-width:1.4"/><line x1="96" y1="250" x2="96" y2="60" style="stroke:var(--accent);stroke-width:1.4"/><line x1="160" y1="250" x2="160" y2="60" style="stroke:var(--accent);stroke-width:1.4"/>
+          <text x="140" y="275" text-anchor="middle" class="t-mono">벽이 옮겨짐</text><text x="50" y="275" text-anchor="middle" class="t-mono">무거운 층</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">④ 평면: 비틀림 · 요철</text>
+          <rect x="10" y="40" width="160" height="110" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <rect x="16" y="46" width="40" height="40" style="fill:var(--accent-2);opacity:.55"/>
+          <circle cx="90" cy="95" r="5" style="fill:var(--text)"/><text x="98" y="92" class="t-mono">CM</text>
+          <circle cx="50" cy="80" r="5" style="fill:none;stroke:var(--bad);stroke-width:2"/><text x="20" y="110" class="t-mono" style="fill:var(--bad)">CR</text>
+          <path d="M150 60 A 40 40 0 0 1 150 130" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#sd-ah-bad)"/>
+          <text x="90" y="170" text-anchor="middle" class="t-mono">코어가 한쪽에 → 비틀림</text>
+          <path d="M210 40 L330 40 L330 90 L270 90 L270 150 L210 150 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <circle cx="270" cy="90" r="6" style="fill:none;stroke:var(--bad);stroke-width:2"/>
+          <text x="270" y="170" text-anchor="middle" class="t-mono">L자 요철: 모서리 응력 집중</text>
+          <text x="170" y="230" text-anchor="middle" class="t-dim">CM: 질량 중심 · CR: 강성 중심</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-6.</b> 대표적인 비정형. ① 필로티: 위층은 벽이 많아 단단하고 1층은 기둥뿐이어서 변형과 손상이 1층에 집중된다. ② 한 층의 질량이 크면 그 층의 지진력이 커진다. ③ 횡력 저항 벽이 층마다 옮겨지면 하중 경로가 끊긴다. ④ 강성 중심이 질량 중심에서 벗어나면 건물이 비틀리고, L자 평면은 오목한 모서리에 힘이 몰린다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 8.7 (연층과 약층의 판정, ASCE 7 형태)</strong> 어느 층의 횡강성이 바로 위층의 70 % 미만이거나 위 세 층 평균의 80 % 미만이면 연층, 각각 60 %·70 % 미만이면 극심한 연층으로 본다. 층 강도(층 전단 저항)가 바로 위층의 80 % 미만이면 약층, 65 % 미만이면 극심한 약층이다. 비정형이 있으면 해석 방법·하중 증가·설계 범주에 따른 금지 등 추가 요구가 생긴다. 국내 기준도 같은 꼴의 판정을 두지만 수치와 조치는 현행 KDS 41 17 00을 확인할 것.</div>
+    <div class="sim" id="sim-sd-soft">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>필로티 연층: 1층 강성을 줄이면</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sd-stack">
+          <div><canvas id="sd-cv-soft" aria-label="1차 모드로 흔들리는 10층 건물과 층별 층간 변위비"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>1층 강성 / 위층 강성 <output id="sd-so-r-out"></output></span><input type="range" id="sd-so-r" min="0.1" max="1.5" step="0.01" value="1"></label>
+          <label class="ctrl"><span>1층 강도 / 위층 강도 <output id="sd-so-s-out"></output></span><input type="range" id="sd-so-s" min="0.3" max="1.5" step="0.01" value="1"></label>
+          <div class="btn-row"><button class="btn" id="sd-so-pil">필로티 예(0.3)</button><button class="btn" id="sd-so-reg">규칙(1.0)</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">T<sub>1</sub></span><span class="v" id="sd-so-T">—</span></div>
+        <div class="stat"><span class="k">1층 층간 변위비</span><span class="v" id="sd-so-d1">—</span></div>
+        <div class="stat"><span class="k">1층 / 2층 변위비</span><span class="v" id="sd-so-c">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="sd-so-j">—</span></div>
+      </div>
+      <div class="sd-msg" id="sd-so-msg"></div>
+      <div class="sim-note">해볼 것: 1층 강성을 0.3으로 줄이면 T<sub>1</sub>은 1.00 → 1.22 s로 조금 길어질 뿐인데, 1층 층간 변위는 세 배가 되어 위층의 3.5배가 됩니다 · 1층 강도를 0.6으로 낮추면(약층) 같은 지진에서 1층의 연성 요구가 급격히 커집니다(아래 메시지) · 모델: B-10 전단 건물(CB.dyn.B10)의 1층 강성만 바꿔 CB.dyn.modes → 응답 스펙트럼 해석(S<sub>a</sub>/(R/I<sub>e</sub>), SRSS) → 층간 변위 ×C<sub>d</sub>/I<sub>e</sub>. 연성 요구는 "층 요구 전단(탄성) / 층 강도"를 등변위로 본 교육용 지표(층 강도 = Ω₀ × 등가 정적 층 전단 × 강도비)입니다.</div>
+    </div>
+    <div class="callout site"><strong>B-10의 1층과 로비</strong> B-10의 1층 층고는 5 m로 위층(4 m)보다 높다. 같은 기둥이면 층 강성은 층고의 세제곱에 반비례하므로 \((4/5)^3 = 0.51\)배까지 떨어질 수 있다. 이 책의 교육용 모형은 1층 강성을 위층과 같게 두었는데, 이는 1층에서 코어 전단벽이 끊기지 않고 기초까지 이어지며 1층 기둥 단면을 키웠다는 가정이다. 로비를 넓히려고 1층 코어 벽에 큰 개구부를 내거나 외곽 벽을 없애면 강성 비가 0.7 아래로 내려가 연층이 될 수 있으므로, 실제 설계에서는 층별 강성 비를 해석으로 확인한다.</div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="torsion">
+    <h2>평면 비정형과 비틀림</h2>
+    <div class="problem"><strong>코어가 한쪽에 있으면</strong>
+      <p>바닥의 질량은 평면 가운데에 고르게 있는데 가장 단단한 코어가 한쪽 끝에 있다면, 지진 관성력(질량 중심에 작용)과 저항력(강성 중심에 모임)이 어긋나 바닥이 수평으로 돌아갑니다. 그러면 코어 반대편 끝의 기둥이 평균보다 훨씬 크게 움직입니다.</p></div>
+    <p>바닥을 평면 안에서 변형하지 않는 강막(14장)으로 보면, 층 전단 \(V\)는 <span class="term">질량 중심</span><span class="en">(center of mass)</span>에, 저항은 <span class="term">강성 중심</span><span class="en">(center of rigidity)</span>에 작용합니다. 그 거리 \(e\)가 편심이고, 바닥은 \(V\)에 의한 평행 이동과 \(Ve\)에 의한 회전을 함께 합니다. 질량 배치의 불확실성을 고려해 기준은 질량 중심을 평면 치수의 5 %만큼 옮긴 <span class="term">우발 편심</span><span class="en">(accidental eccentricity)</span>을 더하게 합니다(기준 확인).</p>
+    <div class="callout def"><strong>원리 8.8 (강막 바닥의 비틀림과 비틀림 비정형)</strong> 하중 방향(Y) 저항 요소의 강성 \(k_{yi}\)(위치 \(x_i\)), 직각 방향 요소 \(k_{xj}\)(위치 \(y_j\))에 대해
+      <div class="formula">$$x_R = \frac{\sum k_{yi}x_i}{\sum k_{yi}}, \qquad K_\theta = \sum k_{yi}(x_i - x_R)^2 + \sum k_{xj}(y_j - y_R)^2, \qquad \delta(x) = \frac{V}{\sum k_{yi}} + \frac{V e}{K_\theta}(x - x_R)$$<div class="where">\(e = x_M - x_R \pm 0.05L\). 가장자리 최대 층간 변위가 양 끝 평균의 1.2배를 넘으면 <span class="term">비틀림 비정형</span><span class="en">(torsional irregularity)</span>, 1.4배를 넘으면 극심한 비틀림 비정형이다(ASCE 7 형태, 국내 기준도 같은 꼴, 확인). 비틀림 강성 \(K_\theta\)는 저항 요소가 평면 바깥쪽에 있을수록 크다. 그래서 벽을 평면 둘레에 대칭으로 두는 것이 가장 효과적이다.</div></div></div>
+    <div class="sim" id="sim-sd-tor">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>비틀림 비정형: 코어 위치와 가장자리 변위</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sd-cv-tor" aria-label="B-10 평면과 변위·회전, 질량 중심과 강성 중심"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>코어 중심 x <output id="sd-to-x-out"></output></span><input type="range" id="sd-to-x" min="8" max="24" step="0.5" value="16"></label>
+          <label class="ctrl"><span>코어의 강성 분담 <output id="sd-to-s-out"></output></span><input type="range" id="sd-to-s" min="0" max="0.9" step="0.05" value="0.6"></label>
+          <div class="ctrl"><span>우발 편심 5 %</span><div class="seg" id="sd-to-acc"><button data-value="on" class="on">더함</button><button data-value="off">빼기</button></div></div>
+          <div class="ctrl"><span>둘레 벽(X 방향 끝)</span><div class="seg" id="sd-to-pw"><button data-value="no" class="on">없음</button><button data-value="yes">양 끝에 추가</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">강성 중심 x<sub>R</sub></span><span class="v" id="sd-to-xr">—</span></div>
+        <div class="stat"><span class="k">편심 e</span><span class="v" id="sd-to-e">—</span></div>
+        <div class="stat"><span class="k">δ<sub>max</sub> / δ<sub>avg</sub></span><span class="v" id="sd-to-r">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="sd-to-j">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 코어를 가운데(x = 16 m)에 두면 우발 편심만으로 비율이 약 1.2 근처입니다 · 코어를 x = 8 m로 옮기면 편심이 6 m를 넘고 반대편 끝(x = 32 m)의 변위가 커져 극심한 비틀림이 됩니다 · "둘레 벽"을 켜면 평면 양 끝의 벽이 비틀림 강성을 키워 비율이 줄어듭니다(x = 8 m에서 1.58 → 1.43) · 모델: 원리 8.8, 강막 바닥 1개 층. Y 방향 골조 5줄(x = 0, 8, …, 32 m)·X 방향 골조 4줄, 코어는 Y 방향 벽 두 개(코어 중심 ± 8 m)와 X 방향 벽 두 개(y = 8, 16 m)로, 층 강성 합 1.2 × 10⁶ kN/m(양 방향). 변위는 과장해 그립니다(교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="detailing">
+    <h2>내진 상세: R이 약속한 연성 만들기</h2>
+    <div class="problem"><strong>계산은 R = 6이라고 했다. 부재는 그걸 아는가</strong>
+      <p>R로 하중을 줄인 순간, 설계자는 "이 구조는 항복 뒤에도 몇 배의 변형을 견딘다"고 약속한 셈입니다. 그 약속은 해석이 아니라 철근의 배치, 갈고리의 각도, 접합부의 순서 같은 상세가 지킵니다. 상세가 없으면 같은 강도의 부재가 처음 항복하자마자 전단이나 부착으로 갑자기 부서집니다.</p></div>
+    <p>내진 상세의 원칙은 <b>어디서 항복할지 정하고(용량 설계)</b>, 그곳은 연성 있게, 나머지는 그곳이 항복할 때 생기는 힘보다 강하게 만드는 것입니다.</p>
+    <ul>
+      <li><b><span class="term">강기둥–약보</span><span class="en">(strong column–weak beam)</span>.</b> 접합부에 모이는 기둥의 휨강도 합이 보의 휨강도 합의 6/5배 이상(ΣM<sub>nc</sub> ≥ 1.2ΣM<sub>nb</sub> 형태)이 되게 해, 소성 힌지가 보 끝에 생기게 한다. 기둥에 힌지가 생기면 한 층이 통째로 기구가 된다(4장 층 붕괴 메커니즘).</li>
+      <li><b>전단은 휨보다 강하게.</b> 보·기둥의 설계 전단력을 해석 결과가 아니라 양 끝에 휨 항복(재료 초과강도 포함, 예: 철근 응력 1.25f<sub>y</sub> 형태)이 생길 때의 전단으로 정한다. 전단 파괴는 연성이 없다.</li>
+      <li><b>구속 철근.</b> 소성 힌지 구간(기둥·보 끝)에 <span class="term">후프</span><span class="en">(hoop)</span>와 갈고리를 촘촘히 둔다. 콘크리트를 가둬 압축 변형 능력을 키우고, 주근의 좌굴을 막고, 전단을 보강한다. 갈고리는 135°로 구부려 코어 콘크리트 안으로 묻는다(연장 길이 6d<sub>b</sub> 이상 형태). 90° 갈고리는 피복이 떨어지면 풀린다.</li>
+      <li><b>이음과 정착.</b> 주근 겹침 이음은 소성 힌지 구간 밖에 두고, 보 주근은 접합부를 관통하거나 충분히 정착한다.</li>
+      <li><b>전단벽 경계 요소.</b> 벽 양 끝의 압축 변형이 큰 곳은 기둥처럼 구속한다(5장).</li>
+    </ul>
+    <figure class="diagram" id="fig-sd-detail">
+      <svg viewBox="0 0 860 320" role="img" aria-label="135도 갈고리 후프와 90도 갈고리 비교, 강기둥 약보 접합부와 보 끝 소성 힌지 위치">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(50,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">기둥 단면의 후프</text>
+          <rect x="10" y="30" width="140" height="140" rx="4" style="fill:var(--surface-2,var(--bg-elev));stroke:var(--text-dim)"/>
+          <rect x="28" y="48" width="104" height="104" rx="8" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <path d="M40 48 L64 76" style="stroke:var(--accent);stroke-width:3"/><path d="M28 60 L56 84" style="stroke:var(--accent);stroke-width:3"/>
+          <g style="fill:var(--text)"><circle cx="40" cy="60" r="6"/><circle cx="80" cy="60" r="6"/><circle cx="120" cy="60" r="6"/><circle cx="40" cy="100" r="6"/><circle cx="120" cy="100" r="6"/><circle cx="40" cy="140" r="6"/><circle cx="80" cy="140" r="6"/><circle cx="120" cy="140" r="6"/></g>
+          <text x="80" y="196" text-anchor="middle" class="t-mono" style="fill:var(--ok)">135° 갈고리: 코어에 묻힘 ✓</text>
+          <rect x="190" y="30" width="140" height="140" rx="4" style="fill:var(--surface-2,var(--bg-elev));stroke:var(--text-dim)"/>
+          <rect x="208" y="48" width="104" height="104" rx="8" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <path d="M208 52 L196 52" style="stroke:var(--bad);stroke-width:3"/>
+          <g style="fill:var(--text)"><circle cx="220" cy="60" r="6"/><circle cx="260" cy="60" r="6"/><circle cx="300" cy="60" r="6"/><circle cx="220" cy="140" r="6"/><circle cx="300" cy="140" r="6"/></g>
+          <text x="260" y="196" text-anchor="middle" class="t-mono" style="fill:var(--bad)">90° 갈고리: 피복과 함께 풀림 ✗</text>
+          <text x="170" y="230" text-anchor="middle" class="t-dim">소성 힌지 구간은 후프 간격을 촘촘하게(기준의 최대 간격 확인)</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">강기둥–약보</text>
+          <rect x="150" y="20" width="40" height="230" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <rect x="10" y="110" width="320" height="40" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <circle cx="130" cy="130" r="9" style="fill:var(--accent-2)"/><circle cx="210" cy="130" r="9" style="fill:var(--accent-2)"/>
+          <text x="80" y="176" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">보 끝 소성 힌지</text>
+          <text x="250" y="176" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">(의도한 항복)</text>
+          <text x="200" y="44" class="t-mono">ΣM<tspan baseline-shift="sub" font-size="8">nc</tspan> ≥ 1.2ΣM<tspan baseline-shift="sub" font-size="8">nb</tspan></text>
+          <text x="200" y="232" class="t-mono">기둥·접합부는 탄성</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-7.</b> 내진 상세의 두 가지 핵심. 왼쪽: 후프의 135° 갈고리는 피복 콘크리트가 떨어져도 코어 안에 묻혀 구속을 유지한다. 오른쪽: 기둥을 보보다 강하게 해 소성 힌지를 보 끝에 유도한다. 수치 요구는 KDS 41 20(콘크리트구조)의 내진 상세를 확인할 것.</figcaption>
+    </figure>
+    <div class="callout tip"><strong>R과 상세는 한 쌍이다</strong> 기준의 R 값은 구조 시스템과 상세 등급(보통·중간·특수 모멘트 골조, 보통·특수 전단벽)마다 정해진다. 큰 R을 쓰려면 그에 맞는 특수 상세를 해야 하고, 상세를 줄이면 R도 줄여야 한다. B-10의 R = 6은 "중간 모멘트 골조 + 특수 전단벽"의 이중 골조라는 가정(교육용)과 짝이다.</div>
+  </section>
+
+  <!-- =============================================================== 12 -->
+  <section id="nonstructural">
+    <h2>비구조 요소</h2>
+    <div class="problem"><strong>구조는 멀쩡한데 건물을 못 쓴다</strong>
+      <p>최근 지진에서 피해액의 큰 몫은 구조체가 아니라 천장재·칸막이·외장재·설비·배관·엘리베이터에서 나왔습니다. 떨어지는 천장과 외벽 마감은 사람을 다치게 하고, 스프링클러 배관이 터지면 건물을 쓸 수 없습니다.</p></div>
+    <p><span class="term">비구조 요소</span><span class="en">(nonstructural component)</span>는 두 가지로 손상됩니다. 가속도에 민감한 것(설비 기기, 수조, 서가, 천장)은 층 가속도로 미끄러지거나 넘어지므로 <b>정착과 고정</b>이 필요하고, 변위에 민감한 것(칸막이벽, 커튼월, 배관 이음, 계단)은 층간 변위를 따라가지 못해 깨지므로 <b>변위를 흡수하는 접합</b>(슬롯, 이격, 신축 이음)이 필요합니다. 기준은 비구조 요소에 작용하는 설계 지진력을 요소의 중량, \(S_{DS}\), 설치 높이(위층일수록 가속도가 크다), 요소의 증폭·반응수정 계수로 정하는 식을 둡니다(KDS 41 17 00의 비구조 요소 조항 확인). 7장의 모드 해석으로 보면 위층 바닥의 가속도는 지반 가속도보다 크고, 바닥 위 기기의 고유 주기가 층의 주기와 맞으면 다시 증폭됩니다(층 응답 스펙트럼).</p>
+  </section>
+
+  <!-- =============================================================== 13 -->
+  <section id="pushover">
+    <h2>성능 기반 설계 맛보기: 푸시오버</h2>
+    <div class="problem"><strong>R은 평균이다. 이 건물은 어떤가</strong>
+      <p>R, Ω₀, C<sub>d</sub>는 같은 시스템의 수많은 건물에 같은 값을 주는 규정입니다. 중요한 건물이나 기존 건물의 보강(16장)에서는 그 건물의 실제 강도와 변형 능력을 직접 계산해, 정해진 지진에서 어느 성능 수준에 드는지 확인하고 싶어집니다.</p></div>
+    <p><span class="term">성능 기반 설계</span><span class="en">(performance-based design)</span>는 목표 성능(즉시 거주, 인명 안전, 붕괴 방지)을 정하고 해석으로 그 달성을 확인하는 방법입니다. 그 대표 도구인 <span class="term">푸시오버 해석</span><span class="en">(pushover analysis)</span>은 부재의 비선형 성질(소성 힌지)을 넣은 모델에 1차 모드 형태의 수평 하중을 조금씩 키워 가며 밑면 전단–지붕 변위 관계, 곧 <span class="term">용량 곡선</span><span class="en">(capacity curve)</span>을 얻습니다. 그다음 용량 곡선을 등가 1자유도계의 스펙트럼 좌표로 바꾸어 지진 요구와 겹치면 둘이 만나는 <span class="term">성능점</span><span class="en">(performance point)</span>이 나옵니다.</p>
+    <div class="callout deep"><strong>용량 곡선 → 용량 스펙트럼, 성능점</strong> 7장의 1차 모드 값을 쓴다. 밑면 전단 \(V\)와 지붕 변위 \(\delta_{roof}\)를 \(S_a = V/(M_1^* g)\), \(S_d = \delta_{roof}/(\Gamma_1\phi_{roof,1})\)로 바꾸면 가로 \(S_d\), 세로 \(S_a\)의 용량 스펙트럼이 된다. 설계 스펙트럼도 \(S_d = S_a g(T/2\pi)^2\)로 같은 좌표(가속도–변위 응답 스펙트럼, ADRS)에 그리면 원점을 지나는 직선이 주기 \(T\)를 나타낸다. 이선형으로 이상화한 용량 스펙트럼의 탄성 기울기에서 등가 주기 \(T^*\)를, 항복점에서 \(S_{ay}\)를 읽고, 탄성 요구 \(S_{ae}(T^*)\)와의 비 \(R_\mu = S_{ae}/S_{ay}\)로 연성 요구를 구한다. \(T^* \ge T_S\)이면 등변위 \(S_d = S_{de}(T^*)\), 짧으면 \(S_d = \dfrac{S_{de}}{R_\mu}\Big[1 + (R_\mu - 1)\dfrac{T_S}{T^*}\Big]\)(N2 방법, 판프의 형태). 미국 ASCE 41의 변위 계수법, ATC-40의 용량 스펙트럼법도 같은 생각을 다른 계수로 쓴다. 푸시오버는 1차 모드가 지배하는 건물에 적합하고, 높거나 비틀리는 건물은 비선형 시간 이력 해석으로 확인한다.</div>
+    <div class="callout"><strong>예제 8.6 (B-10 교육용 푸시오버)</strong> 항복 강도 \(V_y = \Omega_0 V = 2.5 \times 4{,}995 = 12{,}490\) kN(교육용 가정), 초기 강성은 등가 정적 하중 형태로 민 지붕 강성 \(K_0 = 4{,}995/0.0292 = 171{,}000\) kN/m(지붕 탄성 변위 29.2 mm).
+      <ol class="sd-steps">
+        <li><b>항복점.</b> \(\delta_y = 12{,}490/171{,}000 = 73\) mm. 스펙트럼 좌표 \(S_{ay} = 12{,}490/(5{,}889 \times 9.81) = 0.216g\), \(S_{dy} = 73/1.269 = 57.6\) mm.</li>
+        <li><b>등가 주기.</b> \(T^* = 2\pi\sqrt{0.0576/(0.216 \times 9.81)} = 1.035\) s(모드 해석 1.00 s와 비슷하다).</li>
+        <li><b>설계 지진 요구.</b> \(S_{ae} = 0.29/1.035 = 0.280g \gt S_{ay}\) → \(R_\mu = 1.30\). \(T^* \gt T_S\)이므로 \(S_d = S_{de} = 0.280 \times 9.81 \times (1.035/2\pi)^2 = 74.6\) mm, 연성 요구 \(\mu = 1.30\).</li>
+        <li><b>성능.</b> 지붕 변위 \(1.269 \times 74.6 = 95\) mm, 지붕 변위비 0.23 %. 최대 고려 지진(1.5배)이면 142 mm, 0.35 %, μ = 1.9. 교육용 B-10은 설계 강도의 2.5배를 가진다고 가정했으므로 설계 지진에서 거의 탄성에 가깝다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sd-push">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>푸시오버: 용량 곡선과 성능점(교육용)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sd-stack">
+          <div><canvas id="sd-cv-push-c" aria-label="밑면 전단과 지붕 변위의 이선형 용량 곡선"></canvas><span class="sd-cap">용량 곡선 V–δ<sub>roof</sub></span></div>
+          <div><canvas id="sd-cv-push-a" aria-label="가속도-변위 스펙트럼 좌표의 용량 스펙트럼과 요구 스펙트럼, 성능점"></canvas><span class="sd-cap">ADRS: 용량 스펙트럼 · 요구 스펙트럼</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">항복 강도 V<sub>y</sub>/V</i> <output id="sd-pu-vy-out"></output></span><input type="range" id="sd-pu-vy" min="0.8" max="4" step="0.05" value="2.5"></label>
+          <label class="ctrl"><span>강성 배율(균열) <output id="sd-pu-k-out"></output></span><input type="range" id="sd-pu-k" min="0.2" max="1.5" step="0.05" value="1"></label>
+          <label class="ctrl"><span>항복 후 강성비 α <output id="sd-pu-a-out"></output></span><input type="range" id="sd-pu-a" min="0" max="0.2" step="0.01" value="0.05"></label>
+          <label class="ctrl"><span><i style="font-style:normal">연성 능력 μ<sub>cap</sub></i> <output id="sd-pu-mu-out"></output></span><input type="range" id="sd-pu-mu" min="1.5" max="12" step="0.5" value="8"></label>
+          <label class="ctrl"><span>지진 세기(설계 지진 배) <output id="sd-pu-s-out"></output></span><input type="range" id="sd-pu-s" min="0.25" max="4" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">T*</span><span class="v" id="sd-pu-T">—</span></div>
+        <div class="stat"><span class="k">R<sub>μ</sub> · 연성 요구 μ</span><span class="v" id="sd-pu-muo">—</span></div>
+        <div class="stat"><span class="k">지붕 변위 · 변위비</span><span class="v" id="sd-pu-d">—</span></div>
+        <div class="stat"><span class="k">성능 수준</span><span class="v" id="sd-pu-lv">—</span></div>
+      </div>
+      <div class="sd-msg" id="sd-pu-msg"></div>
+      <div class="sim-note">해볼 것: 지진 세기를 1.5(최대 고려 지진 형태)로 올려도 B-10 기본값은 거의 탄성입니다 · 강도를 1.0(설계 강도 그대로, 초과강도 없음)으로 낮추면 연성 요구가 약 3.2로 커집니다 · 그 상태에서 연성 능력을 3으로 낮추면 "용량 초과"가 됩니다(상세가 나쁜 기존 건물) · 강성을 0.5배로 낮추면 주기가 길어져 가속도 요구는 줄지만 변위는 커집니다 · 모델: 페이지 내 이선형 용량 곡선(교육용), 1차 모드의 Γ<sub>1</sub> = 1.269, M*<sub>1</sub> = 5,889 t(CB.dyn.B10 모드), 요구는 CB.dyn.designSa × 세기, 성능점은 N2 방법. 성능 수준 경계(지붕 변위비 0.5 · 1.0 · 2.0 %)는 교육용 대략값입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 14 -->
+  <section id="b10-seismic">
+    <h2>B-10 내진 설계 정리</h2>
+    <p>지금까지의 계산을 B-10 Y 방향 하나로 모으면 다음과 같습니다. X 방향(받는 폭 24 m, 코어 긴 변 16 m 방향)도 같은 절차로 따로 검토하고, 두 방향 하중의 동시 작용(한 방향 100 % + 직각 방향 30 % 형태, 기준 확인)과 비틀림을 3차원 모델(14장)에서 함께 본다.</p>
+    <div class="callout site"><strong>B-10 Y 방향 내진 설계 요약(교육용)</strong> 지반 G-10(S5 교육용) → \(S_{DS} = 0.50g\), \(S_{D1} = 0.29g\), 내진 I등급 \(I_e = 1.2\), 이중 골조 R = 6, Ω₀ = 2.5, C<sub>d</sub> = 5. ① 등가 정적: \(T_a = 0.79\) s, \(C_s = 0.0734\), <b>V = 4,995 kN</b>, 층 지진력 87 … 845 kN, 전도 모멘트 145,000 kN·m. ② 응답 스펙트럼: \(T_1 = 1.00\) s, SRSS <b>3,400 kN</b> → 85 % 기준(4,246 kN)으로 조정 계수 1.25(기준 확인). ③ 층간 변위: 최대 0.43 %(2층) ≤ 1.5 % — 교육용 강성 기준이며 균열 강성으로 다시 확인. ④ 비정형: 1층 층고 5 m로 강성 비 확인 필요, 코어가 평면 중앙이라 비틀림 비율 약 1.2 안팎(우발 편심 포함). ⑤ 상세: 코어 벽 경계 요소, 골조 보 끝 후프, 강기둥–약보. ⑥ 교육용 푸시오버: 설계 지진에서 μ ≈ 1.3, 지붕 변위 약 95 mm. 이 책의 모든 계수와 계산은 학습용이며 실제 설계에는 현행 KDS 41 17 00과 관련 기준을 적용해야 한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="dynamics.html"><small>CH.07 · 구조 동역학</small>응답 스펙트럼과 모드 해석<br><span>T<sub>1</sub> = 1.00 s, 유효 질량 85 %, SRSS.</span></a>
+      <a href="isolation.html"><small>CH.09 · 면진과 제진</small>주기를 늘리고 감쇠를 더한다<br><span>설계 스펙트럼의 긴 주기 쪽으로 옮겨 가속도를 줄인다.</span></a>
+      <a href="frames.html"><small>CH.04 · 모멘트 골조</small>강기둥–약보와 P–Δ<br><span>층 붕괴 메커니즘과 안정 계수.</span></a>
+      <a href="walls.html"><small>CH.05 · 전단벽·코어·튜브</small>이중 골조의 하중 분담<br><span>벽–골조 상호작용, 경계 요소.</span></a>
+      <a href="modeling.html"><small>CH.14 · 구조 해석 모델링</small>3차원 모델·강막·우발 편심<br><span>질량 중심과 강성 중심, 균열 강성.</span></a>
+      <a href="assessment.html"><small>CH.16 · 화재·연쇄 붕괴와 보강</small>기존 건물 내진 보강<br><span>벽·가새·감쇠기 추가, 푸시오버 평가.</span></a>
+      <a href="../../geotech/chapters/dynamics.html"><small>GeotechBook · CH.15</small>지반 분류와 증폭<br><span>G-10 V<sub>s30</sub> 204 m/s, S5(교육용), 액상화.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>내진 설계는 작은 지진에 무손상, 설계 지진에 인명 안전, 최대 고려 지진에 붕괴 방지를 목표로 하며, 중요한 건물일수록 성능을 높인다(I<sub>e</sub> 1.0 · 1.2 · 1.5 형태, 기준 확인).</li>
+      <li>설계 스펙트럼: S<sub>DS</sub> = S·2.5·F<sub>a</sub>·2/3, S<sub>D1</sub> = S·F<sub>v</sub>·2/3(형태). T<sub>S</sub> = S<sub>D1</sub>/S<sub>DS</sub>, T<sub>0</sub> = 0.2T<sub>S</sub>, 평탄–1/T–1/T². B-10: 0.50g, 0.29g, T<sub>S</sub> = 0.58 s.</li>
+      <li>R = V<sub>e</sub>/V<sub>s</sub>, Ω₀ = V<sub>y</sub>/V<sub>s</sub>, δ<sub>x</sub> = C<sub>d</sub>δ<sub>xe</sub>/I<sub>e</sub>. 긴 주기는 등변위(μ ≈ R), 짧은 주기는 등에너지(μ ≈ (R² + 1)/2) — 짧은 주기 건물에 연성 요구가 크다.</li>
+      <li>등가 정적: C<sub>s</sub> = S<sub>D1</sub>/((R/I<sub>e</sub>)T) ≤ S<sub>DS</sub>/(R/I<sub>e</sub>), ≥ 0.044S<sub>DS</sub>I<sub>e</sub>. F<sub>x</sub> ∝ w<sub>x</sub>h<sub>x</sub><sup>k</sup>. B-10: T<sub>a</sub> = 0.79 s, C<sub>s</sub> = 0.0734, V ≈ 5,000 kN, k = 1.15, 전도 모멘트 약 145,000 kN·m.</li>
+      <li>응답 스펙트럼 해석은 모드별 S<sub>a</sub>/(R/I<sub>e</sub>)를 응답량마다 SRSS·CQC로 조합하고, 등가 정적의 일정 비율(85 % 형태)보다 작으면 키운다. B-10: 3,400 kN → ×1.25.</li>
+      <li>층간 변위 Δ = C<sub>d</sub>Δ<sub>e</sub>/I<sub>e</sub> ≤ 0.015h<sub>sx</sub>(I등급 형태). B-10 최대 0.43 %. 안정 계수 θ로 P–Δ를 확인한다.</li>
+      <li>비정형: 연층(강성 &lt; 위층 70 %), 약층(강도 &lt; 80 %), 비틀림(δ<sub>max</sub> &gt; 1.2δ<sub>avg</sub>) 등(ASCE 7 형태). 필로티는 변형과 손상이 1층에 몰린다(2017 포항).</li>
+      <li>연성은 상세가 만든다: 강기둥–약보, 휨보다 강한 전단, 135° 갈고리 후프와 촘촘한 구속, 힌지 구간 밖 이음. 비구조 요소는 정착(가속도)과 변위 흡수(층간 변위)로 지킨다. 푸시오버는 건물 고유의 용량 곡선으로 성능점을 확인한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. S<sub>DS</sub> = 0.60g, S<sub>D1</sub> = 0.24g인 설계 스펙트럼에서 T = 0.8 s의 S<sub>a</sub>는?</p><div class="opts">
+        <button class="opt">0.19g</button><button class="opt" data-correct>0.30g</button><button class="opt">0.48g</button><button class="opt">0.60g</button>
+      </div><div class="quiz-exp">T<sub>S</sub> = 0.24/0.60 = 0.40 s. T = 0.8 s &gt; T<sub>S</sub>이므로 S<sub>a</sub> = S<sub>D1</sub>/T = 0.24/0.8 = 0.30g.</div></div>
+      <div class="quiz-q"><p>2. 등가 정적 해석에서 R = 6, I<sub>e</sub> = 1.0, S<sub>DS</sub> = 0.5, S<sub>D1</sub> = 0.3, T = 1.0 s일 때 C<sub>s</sub>는?</p><div class="opts">
+        <button class="opt" data-correct>0.050</button><button class="opt">0.083</button><button class="opt">0.300</button><button class="opt">0.022</button>
+      </div><div class="quiz-exp">S<sub>D1</sub>/((R/I<sub>e</sub>)T) = 0.3/6 = 0.050. 상한 0.5/6 = 0.083보다 작고, 하한 0.044 × 0.5 × 1.0 = 0.022보다 크다.</div></div>
+      <div class="quiz-q"><p>3. 고유 주기가 긴 건물(T &gt; T<sub>S</sub>)의 강도를 탄성 요구의 1/4로 설계했다. 등변위 원리로 본 연성 요구는?</p><div class="opts">
+        <button class="opt">1</button><button class="opt">2.5</button><button class="opt" data-correct>4</button><button class="opt">8.5</button>
+      </div><div class="quiz-exp">긴 주기에서는 최대 변위가 탄성 때와 거의 같으므로 μ ≈ R = 4. 짧은 주기라면 등에너지로 (16 + 1)/2 = 8.5.</div></div>
+      <div class="quiz-q"><p>4. 설계 지진력에 대한 탄성 층간 변위가 6 mm, C<sub>d</sub> = 5, I<sub>e</sub> = 1.5일 때 설계 층간 변위는?</p><div class="opts">
+        <button class="opt">4 mm</button><button class="opt" data-correct>20 mm</button><button class="opt">30 mm</button><button class="opt">45 mm</button>
+      </div><div class="quiz-exp">Δ = C<sub>d</sub>Δ<sub>e</sub>/I<sub>e</sub> = 5 × 6/1.5 = 20 mm. I<sub>e</sub>가 이미 하중을 키웠으므로 변위 증폭에서는 나눈다.</div></div>
+      <div class="quiz-q"><p>5. 등가 정적 해석의 수직 분포 지수 k가 T가 길어질수록 1에서 2로 커지는 이유는?</p><div class="opts">
+        <button class="opt">긴 주기 건물은 무겁기 때문</button><button class="opt" data-correct>고차 모드 영향으로 위층의 지진력이 상대적으로 커지기 때문</button><button class="opt">밑면 전단력을 줄이기 위해</button><button class="opt">P–Δ 효과를 넣기 위해</button>
+      </div><div class="quiz-exp">k는 밑면 전단력의 크기는 바꾸지 않고 높이 방향 분포만 바꾼다. 긴 주기의 높은 건물은 고차 모드와 휨형 변형 때문에 위층 하중이 직선 분포보다 크다.</div></div>
+      <div class="quiz-q"><p>6. 응답 스펙트럼 해석의 밑면 전단력이 3,000 kN, 등가 정적 해석이 4,000 kN이고 기준 비율이 85 %일 때 조정 계수는?</p><div class="opts">
+        <button class="opt">0.75</button><button class="opt">1.00</button><button class="opt" data-correct>1.13</button><button class="opt">1.33</button>
+      </div><div class="quiz-exp">0.85 × 4,000 = 3,400 kN, 3,400/3,000 = 1.13. 부재력에 1.13을 곱한다.</div></div>
+      <div class="quiz-q"><p>7. 필로티 건물에서 1층 강성이 위층의 30 %일 때 일어나는 일로 옳은 것은?</p><div class="opts">
+        <button class="opt">1차 주기가 세 배로 길어져 지진력이 크게 준다</button><button class="opt" data-correct>층간 변위와 연성 요구가 1층에 집중된다</button><button class="opt">위층의 층간 변위가 크게 늘어난다</button><button class="opt">밑면 전단력이 세 배가 된다</button>
+      </div><div class="quiz-exp">B-10 모형에서 1층 강성을 0.3배로 하면 T<sub>1</sub>은 1.00 → 1.22 s로 조금만 길어지지만 1층 층간 변위는 세 배가 되어 위층의 약 3.5배다. 연층 비정형(70 % 미만)이다.</div></div>
+      <div class="quiz-q"><p>8. 기둥 후프의 갈고리를 135°로 구부리는 주된 이유는?</p><div class="opts">
+        <button class="opt">철근량을 줄이기 위해</button><button class="opt">시공을 쉽게 하기 위해</button><button class="opt" data-correct>피복이 떨어져도 갈고리가 코어에 묻혀 구속과 주근 좌굴 방지를 유지하기 위해</button><button class="opt">기둥의 휨강도를 키우기 위해</button>
+      </div><div class="quiz-exp">큰 변형에서 피복 콘크리트는 먼저 떨어진다. 90° 갈고리는 그때 풀려 후프가 제 역할을 잃지만, 135° 갈고리는 코어 안에 정착되어 있다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const SD = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${SD.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = SD._c || (SD._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  B: CB.dyn.B10, G: CB.dyn.g, RI: CB.dyn.B10.R / CB.dyn.B10.Ie, CD: 5, OM: 2.5,
+  TA: CB.dyn.Ta(41),
+  /** B-10 전단 건물: 층 강성 배열 → 모드 */
+  modes(k) { const sb = CB.dyn.shearBuilding(SD.B.m, k); return CB.dyn.modes(sb.K, sb.M); },
+  /** 응답 스펙트럼 해석(설계, R/Ie로 나눔): 층 전단·층간 변위(탄성) SRSS. n 모드, comb "srss" | "abs" */
+  rsa(md, k, n = md.length, comb = "srss", sc = 1) {
+    const N = SD.B.m.length, shear = [], drift = [];
+    md.slice(0, n).forEach((x) => {
+      const A = (sc * CB.dyn.designSa(x.T, SD.B.SDS, SD.B.SD1) * SD.G) / SD.RI, F = x.phi.map((p, j) => SD.B.m[j] * p * x.Gamma * A);
+      const V = F.map((_, j) => F.slice(j).reduce((a, b) => a + b, 0)); shear.push(V); drift.push(V.map((v, j) => v / k[j]));
+    });
+    const c = (arr) => Array.from({ length: N }, (_, j) => (comb === "abs" ? arr.reduce((s, r) => s + Math.abs(r[j]), 0) : CB.dyn.srss(arr.map((r) => r[j]))));
+    return { V: c(shear), d: c(drift) };
+  },
+  hs(j) { return j === 0 ? 5 : 4; },
+};
+
+/* ---------- 1. 설계 응답 스펙트럼 ---------- */
+(function () {
+  const PRE = { b10: [0.5, 0.29], hard: [0.37, 0.17], soft: [0.6, 0.45] };
+  const pre = CB.seg("sd-sp-pre", (v) => { gds.set(PRE[v][0], false); gd1.set(PRE[v][1], false); go(); });
+  const gds = CB.range("sd-sp-ds", (v) => v.toFixed(2) + "g", go), gd1 = CB.range("sd-sp-d1", (v) => v.toFixed(2) + "g", go), gtl = CB.range("sd-sp-tl", (v) => v.toFixed(1) + " s", go), gT = CB.range("sd-sp-T", (v) => v.toFixed(2) + " s", go), ax = CB.seg("sd-sp-ax", go);
+  let C = null;
+  const sa = (T) => CB.dyn.designSa(T, gds(), gd1(), gtl()), sd = (T) => sa(T) * SD.G * (T / (2 * Math.PI)) ** 2 * 1000;
+  const cv = CB.canvas("#sd-cv-spec", (ctx, W, H) => {
+    const pal = CB.palette(), isA = ax() === "sa", f = isA ? sa : sd, d = [];
+    for (let i = 0; i <= 600; i++) { const T = (6 * i) / 600; d.push([T, f(T)]); }
+    const top = Math.max(...d.map((p) => p[1])) * 1.15 || 1, T = gT(), TS = gd1() / gds(), T0 = 0.2 * TS;
+    C = CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 }, { x: [0, 6], y: [0, top], xLabel: "주기 T (s)", yLabel: isA ? "Sa (g)" : "Sd (mm)",
+      series: [{ data: d, color: pal.accent, width: 2.8, fill: SD.alpha(pal.accent, 0.07) }],
+      vlines: [{ x: T0, color: pal.faint, label: "T₀" }, { x: TS, color: pal.faint, label: "Tₛ" }, { x: gtl(), color: pal.faint, label: "TL" }, { x: SD.TA, color: pal.accent2, dash: [2, 3], label: "" }, { x: 1.005, color: pal.ok, dash: [2, 3], label: "" }],
+      points: [{ x: T, y: f(T), color: pal.accent2, r: 7 }] });
+    SD.text(ctx, `T = ${CB.num(T, 2)} s`, C.X(T) + (C.X(T) > W - 120 ? -8 : 8), C.Y(f(T)) - 14, pal.accent2, { size: 11.5, align: C.X(T) > W - 120 ? "right" : "left" });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.48), minHeight: 260, maxHeight: 340 });
+  const el = cv.canvas; let drag = false;
+  const setT = (e) => { if (!C) return; const r = el.getBoundingClientRect(), x = e.clientX - r.left, T = ((x - C.box.x) / C.box.w) * 6; gT.set(Math.max(0, Math.min(6, Math.round(T * 100) / 100))); };
+  el.addEventListener("pointerdown", (e) => { drag = true; el.setPointerCapture(e.pointerId); setT(e); });
+  el.addEventListener("pointermove", (e) => { if (drag) setT(e); });
+  el.addEventListener("pointerup", () => (drag = false)); el.addEventListener("pointercancel", () => (drag = false));
+  function go() {
+    cv.redraw();
+    const T = gT(), TS = gd1() / gds(), T0 = 0.2 * TS;
+    CB.stat("sd-sp-t0", `${CB.num(T0, 3)} · ${CB.num(TS, 2)} s`);
+    CB.stat("sd-sp-zone", T < T0 ? "상승 구간" : T <= TS ? "가속도 일정" : T <= gtl() ? "속도 일정(1/T)" : "변위 일정(1/T²)");
+    CB.stat("sd-sp-sa", CB.num(sa(T), 3) + "g"); CB.stat("sd-sp-sd", CB.num(sd(T), 1) + " mm");
+  }
+  go();
+})();
+
+/* ---------- 2. R과 연성(탄소성 1자유도) ---------- */
+(function () {
+  const gT = CB.range("sd-rm-T", (v) => v.toFixed(2) + " s", calc), gR = CB.range("sd-rm-R", (v) => v.toFixed(1), calc), seed = CB.seg("sd-rm-seed", calc);
+  const DT = 0.01; let R = null;
+  function run(ag, T, Fy) {
+    const w = (2 * Math.PI) / T, k = w * w, c = 2 * 0.05 * w, dt = Math.min(0.002, T / 30), sub = Math.max(1, Math.round(DT / dt)), h = DT / sub;
+    const a1 = 1 / (h * h) + c / (2 * h), a2 = 1 / (h * h) - c / (2 * h), b2 = 2 / (h * h);
+    let up = 0, u = 0, fs = 0, umax = 0; const U = [0], F = [0];
+    for (let i = 0; i < ag.length - 1; i++) for (let s = 0; s < sub; s++) {
+      const g = ag[i] + ((ag[i + 1] - ag[i]) * s) / sub, un = (-g - fs + b2 * u - a2 * up) / a1;
+      fs += k * (un - u); if (fs > Fy) fs = Fy; if (fs < -Fy) fs = -Fy;
+      up = u; u = un; if (Math.abs(u) > umax) umax = Math.abs(u);
+      if (s === sub - 1) { U.push(u); F.push(fs); }
+    }
+    return { U, F, umax, k, res: u };
+  }
+  function calc() {
+    const ag = CB.dyn.quake({ pga: 0.3, dur: 20, dt: DT, seed: +seed() }), T = gT(), el = run(ag, T, Infinity), Fe = el.k * el.umax, Fy = Fe / gR(), ip = run(ag, T, Fy), uy = Fy / el.k;
+    R = { el, ip, Fe, Fy, uy, mu: ip.umax / uy };
+    const Rr = gR();
+    CB.stat("sd-rm-mu", CB.num(R.mu, 2)); CB.stat("sd-rm-pred", `${CB.num(Rr, 1)} · ${CB.num((Rr * Rr + 1) / 2, 1)}`);
+    CB.stat("sd-rm-ratio", CB.num(ip.umax / el.umax, 2)); CB.stat("sd-rm-res", CB.num(Math.abs(ip.res) / uy, 2));
+    const m = document.getElementById("sd-rm-msg"), TS = 0.58;
+    if (Rr <= 1.01) { m.className = "sd-msg"; m.innerHTML = "R = 1: 탄성 설계. 항복이 없어 연성 요구 μ ≤ 1입니다."; }
+    else if (T >= TS) { m.className = "sd-msg"; m.innerHTML = `T = ${CB.num(T, 2)} s ≥ T<sub>S</sub>(0.58 s): <b>등변위</b> 쪽. 비탄성 최대 변위가 탄성의 ${CB.num(ip.umax / el.umax, 2)}배로 1 근처입니다. 지진파 하나의 결과라 흩어짐이 있습니다.`; }
+    else { m.className = R.mu > 1.5 * Rr ? "sd-msg bad" : "sd-msg"; m.innerHTML = `짧은 주기: 연성 요구 μ = ${CB.num(R.mu, 1)}로 R = ${CB.num(Rr, 1)}보다 큽니다(등에너지 예측 ${CB.num((Rr * Rr + 1) / 2, 1)}). 강한 저층 건물에 큰 R을 쓰면 위험한 이유입니다.`; }
+    hv.redraw(); tv.redraw();
+  }
+  const hv = CB.canvas("#sd-cv-rmu-h", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), xm = R.el.umax * 1.1, ym = R.Fe * 1.1, pts = R.ip.U.map((u, i) => [u, R.ip.F[i]]);
+    CB.chart(ctx, { x: 58, y: 24, w: W - 58 - 16, h: H - 24 - 44 }, { x: [-Math.max(xm, R.ip.umax * 1.1), Math.max(xm, R.ip.umax * 1.1)], y: [-ym, ym], xLabel: "변위 u (상대)", yLabel: "복원력 / 탄성 최대 힘", xTicks: [0], yTicks: [-R.Fe, -R.Fy, 0, R.Fy, R.Fe], yFmt: (v) => CB.num(v / R.Fe, 2),
+      series: [{ data: [[-R.el.umax, -R.Fe], [R.el.umax, R.Fe]], color: pal.dim, width: 1.4, dash: [5, 4] }, { data: pts, color: pal.accent, width: 1.3 }],
+      hlines: [{ y: R.Fy, color: pal.accent2, label: "Fy = Fe/R" }, { y: -R.Fy, color: pal.accent2 }], vlines: [{ x: R.el.umax, color: pal.dim, label: "" }, { x: R.ip.umax * Math.sign(R.ip.U[R.ip.U.map(Math.abs).indexOf(Math.max(...R.ip.U.map(Math.abs)))] || 1), color: pal.accent, label: "δ최대" }] });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.42), minHeight: 230, maxHeight: 300 });
+  const tv = CB.canvas("#sd-cv-rmu-t", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), m = Math.max(R.el.umax, R.ip.umax) * 1.1, e = [], p = [];
+    R.el.U.forEach((u, i) => { if (i % 2 === 0) { e.push([i * DT, u / R.uy]); p.push([i * DT, R.ip.U[i] / R.uy]); } });
+    CB.chart(ctx, { x: 58, y: 12, w: W - 58 - 16, h: H - 12 - 44 }, { x: [0, 20], y: [-m / R.uy, m / R.uy], xLabel: "시간 t (s)", yLabel: "u / δy", yFmt: (v) => CB.num(v, 0),
+      series: [{ data: e, color: pal.dim, width: 1.2 }, { data: p, color: pal.accent, width: 1.6 }], hlines: [{ y: 1, color: pal.accent2 }, { y: -1, color: pal.accent2 }] });
+    SD.text(ctx, "탄성(회색) · 탄소성(청록)", W - 18, 22, pal.dim, { size: 10.5, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.3), minHeight: 180, maxHeight: 240 });
+  calc();
+})();
+
+/* ---------- 3. 등가 정적 해석기 ---------- */
+(function () {
+  const gR = CB.range("sd-el-R", (v) => v.toFixed(1), go), ie = CB.seg("sd-el-ie", go), ts = CB.seg("sd-el-tsrc", go), gT = CB.range("sd-el-T", (v) => v.toFixed(2) + " s", () => { ts.set("free", false); go(); }), gs = CB.range("sd-el-s", (v) => "× " + v.toFixed(2), go);
+  const b = SD.B, T1 = SD.modes(b.k)[0].T;
+  let E = null;
+  function calc() {
+    const T = ts() === "ta" ? SD.TA : ts() === "t1" ? T1 : gT(), Ie = +ie(), SDS = b.SDS * gs(), SD1 = b.SD1 * gs(), RI = gR() / Ie;
+    E = CB.dyn.els({ W: b.W, SDS, SD1, R: gR(), Ie, T, w: b.w, h: b.h });
+    const c1 = SD1 / (RI * T), up = SDS / RI, lo = Math.max(0.044 * SDS * Ie, 0.01);
+    E.gov = E.Cs === up ? "상한" : E.Cs === c1 ? "식" : "하한"; E.T = T;
+  }
+  const cv = CB.canvas("#sd-cv-els", (ctx, W, H) => {
+    if (!E) return;
+    const pal = CB.palette(), narrow = W < 560, y0 = H - 30, y1 = 24, Y = (h) => y0 - (h / 41) * (y0 - y1), bx = narrow ? W * 0.36 : W * 0.3, bw = narrow ? 40 : 60;
+    ctx.fillStyle = SD.alpha(pal.accent, 0.12); ctx.strokeStyle = pal.accent; ctx.lineWidth = 1.4; ctx.fillRect(bx, Y(41), bw, y0 - Y(41)); ctx.strokeRect(bx, Y(41), bw, y0 - Y(41));
+    b.h.forEach((h) => { ctx.beginPath(); ctx.moveTo(bx, Y(h)); ctx.lineTo(bx + bw, Y(h)); ctx.stroke(); });
+    ctx.strokeStyle = pal.axis; ctx.beginPath(); ctx.moveTo(8, y0); ctx.lineTo(W - 8, y0); ctx.stroke();
+    const Fm = Math.max(...E.F), aw = bx - 60;
+    E.F.forEach((f, i) => { const L = (f / Fm) * aw; SD.arrow(ctx, bx - L, Y(b.h[i]), bx, Y(b.h[i]), pal.accent2, 2.2); if (!narrow || i % 2 === 1) SD.text(ctx, CB.sig(f, 3), bx - L - 4, Y(b.h[i]), pal.accent2, { size: 10, align: "right" }); });
+    // 층 전단력도
+    const sx = bx + bw + (narrow ? 30 : 60), sw = W - sx - (narrow ? 40 : 70), Vm = E.Vx[0];
+    ctx.strokeStyle = pal.axis; ctx.beginPath(); ctx.moveTo(sx, y1 - 6); ctx.lineTo(sx, y0); ctx.stroke();
+    const pts = [[sx, Y(41)]]; for (let i = b.h.length - 1; i >= 0; i--) { const hb = i === 0 ? 0 : b.h[i - 1], x = sx + (E.Vx[i] / Vm) * sw; pts.push([x, Y(b.h[i])], [x, Y(hb)]); } pts.push([sx, y0]);
+    ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fillStyle = SD.alpha(pal.accent, 0.15); ctx.fill(); SD.line(ctx, pts, pal.accent, 2);
+    SD.text(ctx, `${CB.sig(E.Vx[0], 4)} kN`, sx + sw + 4, y0 - 10, pal.accent, { size: 11, align: W < 400 ? "right" : "left" });
+    SD.text(ctx, "층 전단력 Vx", sx + sw / 2, 12, pal.dim, { size: 10.5, bold: false }); SD.text(ctx, "층 지진력 Fx (kN)", bx / 2 + 10, 12, pal.dim, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 300, maxHeight: 420 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("sd-el-cs", `${CB.num(E.Cs, 4)} <small>(${E.gov}, T = ${CB.num(E.T, 2)} s)</small>`); CB.stat("sd-el-V", CB.sig(E.V, 4) + " kN");
+    CB.stat("sd-el-k", CB.num(E.k, 3)); CB.stat("sd-el-M", CB.sig(E.Mot, 3) + " kN·m");
+  }
+  go();
+})();
+
+/* ---------- 4. RSA vs ELS ---------- */
+(function () {
+  const gn = CB.range("sd-rs-n", (v) => v + "개", go), gp = CB.range("sd-rs-p", (v) => Math.round(v * 100) + " %", go), gk = CB.range("sd-rs-k", (v) => "× " + v.toFixed(2), go), cm = CB.seg("sd-rs-c", go);
+  const b = SD.B, E = CB.dyn.els({ W: b.W, SDS: b.SDS, SD1: b.SD1, R: b.R, Ie: b.Ie, T: SD.TA, w: b.w, h: b.h });
+  let S = null;
+  function calc() { const k = b.k.map((x) => x * gk()), md = SD.modes(k), r = SD.rsa(md, k, gn(), cm()); const f = Math.max(1, (gp() * E.V) / r.V[0]); S = { md, r, f }; }
+  const cv = CB.canvas("#sd-cv-rsa", (ctx, W, H) => {
+    if (!S) return;
+    const pal = CB.palette(), N = b.h.length, top = Math.max(E.Vx[0], S.r.V[0] * S.f) * 1.1, step = (arr) => { const p = []; for (let j = N - 1; j >= 0; j--) { const hb = j ? b.h[j - 1] : 0; p.push([arr[j], b.h[j]], [arr[j], hb]); } return p; };
+    CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 }, { x: [0, top], y: [0, 42], xLabel: "층 전단력 (kN)", yLabel: "높이 (m)", xFmt: (v) => CB.sig(v, 2),
+      series: [{ data: step(E.Vx), color: pal.accent2, width: 2.4 }, { data: step(S.r.V), color: pal.accent, width: 2.4 }, { data: step(S.r.V.map((v) => v * S.f)), color: pal.accent, width: 1.6, dash: [6, 4] }] });
+    SD.text(ctx, "ELS(주황) · RSA(청록) · 조정 RSA(점선)", W - 20, 24, pal.dim, { size: 10.5, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.5), minHeight: 270, maxHeight: 360 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("sd-rs-T", CB.num(S.md[0].T, 3) + " s"); CB.stat("sd-rs-V", `${CB.sig(S.r.V[0], 4)} · ${CB.sig(E.V, 4)} kN`);
+    CB.stat("sd-rs-f", S.f > 1 ? CB.num(S.f, 3) : "1 (조정 불필요)"); CB.stat("sd-rs-m", CB.num(S.md.slice(0, gn()).reduce((a, x) => a + x.ratio, 0) * 100, 1) + " %");
+  }
+  go();
+})();
+
+/* ---------- 5. 층간 변위 검토 ---------- */
+(function () {
+  const gk = CB.range("sd-dr-k", (v) => "× " + v.toFixed(2), go), gcd = CB.range("sd-dr-cd", (v) => v.toFixed(1), go), gr = CB.seg("sd-dr-g", go), tsrc = CB.seg("sd-dr-t", go);
+  const b = SD.B, GR = { s: [1.5, 0.010], 1: [1.2, 0.015], 2: [1.0, 0.020] };
+  let D = null;
+  function calc() {
+    const [Ie, lim] = GR[gr()], k = b.k.map((x) => x * gk()), T = tsrc() === "ta" ? SD.TA : SD.modes(k)[0].T;
+    const E = CB.dyn.els({ W: b.W, SDS: b.SDS, SD1: b.SD1, R: b.R, Ie, T, w: b.w, h: b.h });
+    const de = E.Vx.map((v, j) => v / k[j]), dr = de.map((d) => ((gcd() * d) / Ie) * 1000), ratio = dr.map((d, j) => d / (SD.hs(j) * 1000));
+    D = { Ie, lim, T, dr, ratio, roof: dr.reduce((a, x) => a + x, 0) };
+  }
+  const cv = CB.canvas("#sd-cv-drift", (ctx, W, H) => {
+    if (!D) return;
+    const pal = CB.palette(), N = D.ratio.length, x0 = 64, x1 = W - 20, y0 = H - 40, y1 = 14, rowH = (y0 - y1) / N, top = Math.max(D.lim, ...D.ratio) * 1.15, X = (v) => x0 + (v / top) * (x1 - x0);
+    ctx.strokeStyle = pal.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
+    const tk = top > 0.03 ? 0.01 : top > 0.012 ? 0.005 : 0.0025;
+    for (let v = 0; v <= top; v += tk) { ctx.strokeStyle = pal.grid; ctx.beginPath(); ctx.moveTo(X(v), y1); ctx.lineTo(X(v), y0); ctx.stroke(); SD.text(ctx, CB.num(v * 100, v * 100 < 1 && tk < 0.005 ? 2 : 1) + "%", X(v), y0 + 12, pal.dim, { size: 10, bold: false }); }
+    D.ratio.forEach((r, j) => { const y = y0 - (j + 1) * rowH + rowH * 0.18, ok = r <= D.lim; ctx.fillStyle = SD.alpha(ok ? pal.accent : pal.bad, 0.75); ctx.fillRect(x0, y, X(r) - x0, rowH * 0.64); SD.text(ctx, `${j + 1}층`, x0 - 8, y + rowH * 0.32, pal.dim, { size: 10.5, align: "right", bold: false }); if (rowH > 16) SD.text(ctx, CB.num(D.dr[j], 1) + " mm", X(r) + 6, y + rowH * 0.32, pal.text, { size: 10, align: X(r) > x1 - 70 ? "right" : "left" }); });
+    ctx.save(); ctx.strokeStyle = pal.bad; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(X(D.lim), y1); ctx.lineTo(X(D.lim), y0); ctx.stroke(); ctx.restore();
+    SD.text(ctx, `허용 ${CB.num(D.lim * 100, 1)} %`, X(D.lim) - 4, y1 + 8, pal.bad, { size: 10.5, align: "right" });
+    SD.text(ctx, "층간 변위비 Δ/hsx", (x0 + x1) / 2, y0 + 30, pal.dim, { size: 11, bold: false });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.55), minHeight: 300, maxHeight: 400 });
+  function go() {
+    calc(); cv.redraw();
+    const mx = Math.max(...D.ratio), j = D.ratio.indexOf(mx), ok = mx <= D.lim;
+    CB.stat("sd-dr-max", `${CB.num(mx * 100, 2)} % <small>(${j + 1}층)</small>`); CB.stat("sd-dr-lim", CB.num(D.lim * 100, 1) + " % h<sub>sx</sub>");
+    CB.stat("sd-dr-roof", CB.num(D.roof, 0) + " mm"); CB.stat("sd-dr-ok", ok ? "만족" : "초과");
+    const m = document.getElementById("sd-dr-msg");
+    m.className = ok ? "sd-msg ok" : "sd-msg bad";
+    m.innerHTML = ok ? `모든 층이 허용값 이내(최대 ${CB.num((mx / D.lim) * 100, 0)} %). 설계 주기 ${CB.num(D.T, 2)} s, I<sub>e</sub> = ${D.Ie}.` : `${j + 1}층이 허용값을 넘습니다. 강성(벽·가새 추가, 단면 증가)을 키우거나 감쇠기(9장)로 변위를 줄여야 합니다.`;
+  }
+  go();
+})();
+
+/* ---------- 6. 필로티 연층 ---------- */
+(function () {
+  const gr = CB.range("sd-so-r", (v) => v.toFixed(2), calc), gs = CB.range("sd-so-s", (v) => v.toFixed(2), calc);
+  document.getElementById("sd-so-pil").addEventListener("click", () => { gr.set(0.3, false); gs.set(0.6, false); calc(); });
+  document.getElementById("sd-so-reg").addEventListener("click", () => { gr.set(1, false); gs.set(1, false); calc(); });
+  const b = SD.B, E = CB.dyn.els({ W: b.W, SDS: b.SDS, SD1: b.SD1, R: b.R, Ie: b.Ie, T: SD.TA, w: b.w, h: b.h });
+  let S = null, th = 0;
+  function calc() {
+    const k = b.k.map((x, j) => (j ? x : x * gr())), md = SD.modes(k), r = SD.rsa(md, k), dx = r.d.map((d) => (SD.CD * d) / b.Ie * 1000), ratio = dx.map((d, j) => d / (SD.hs(j) * 1000));
+    const Ve = r.V[0] * SD.RI, Vy = SD.OM * E.Vx[0] * gs(), mu = Ve / Vy;
+    S = { md, dx, ratio, mu };
+    CB.stat("sd-so-T", CB.num(md[0].T, 3) + " s"); CB.stat("sd-so-d1", CB.num(ratio[0] * 100, 2) + " %");
+    CB.stat("sd-so-c", CB.num(dx[0] / dx[1], 2) + " 배");
+    const kr = gr(), sr = gs(), soft = kr < 0.6 ? "극심한 연층" : kr < 0.7 ? "연층" : "", weak = sr < 0.65 ? "극심한 약층" : sr < 0.8 ? "약층" : "";
+    CB.stat("sd-so-j", [soft, weak].filter(Boolean).join(" · ") || "규칙");
+    const m = document.getElementById("sd-so-msg");
+    m.className = mu > 4 || soft || weak ? "sd-msg bad" : "sd-msg";
+    m.innerHTML = `1층 연성 요구(교육용 지표) μ ≈ 탄성 요구 ${CB.sig(Ve, 3)} kN / 1층 강도 ${CB.sig(Vy, 3)} kN = <b>${CB.num(mu, 2)}</b>. ${soft || weak ? "비정형 판정(ASCE 7 형태, 기준 확인): 추가 해석과 조치가 필요합니다." : "규칙적인 층입니다."}`;
+    cv.redraw();
+  }
+  const cv = CB.canvas("#sd-cv-soft", (ctx, W, H) => {
+    if (!S) return;
+    const pal = CB.palette(), narrow = W < 560, hts = [0, ...b.h], y0 = H - 30, y1 = 22, Y = (h) => y0 - (h / 41) * (y0 - y1);
+    const bxc = narrow ? W * 0.3 : W * 0.25, bw = narrow ? 50 : 80, phi = [0, ...S.md[0].phi], amp = (narrow ? 40 : 70) * Math.sin(th);
+    ctx.strokeStyle = pal.axis; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bxc - bw, y0); ctx.lineTo(bxc + bw, y0); ctx.stroke();
+    for (let j = 1; j < hts.length; j++) {
+      const xa = phi[j - 1] * amp, xb = phi[j] * amp, hpx = Y(hts[j - 1]) - Y(hts[j]);
+      [-bw / 2, 0, bw / 2].forEach((o) => { const pts = []; for (let i = 0; i <= 10; i++) { const s = i / 10; pts.push([bxc + o + xa + (xb - xa) * (3 * s * s - 2 * s * s * s), Y(hts[j - 1]) - s * hpx]); } SD.line(ctx, pts, j === 1 ? pal.bad : SD.alpha(pal.text, 0.5), j === 1 ? 2.4 : 1.2); });
+      if (j > 1) { ctx.fillStyle = SD.alpha(pal.accent, 0.15); ctx.fillRect(bxc - bw / 2 + xa, Y(hts[j]), bw, hpx); }
+      ctx.fillStyle = pal.accent; ctx.fillRect(bxc - bw / 2 - 4 + xb, Y(hts[j]) - 2, bw + 8, 4);
+    }
+    SD.text(ctx, "1차 모드(과장)", bxc, 10, pal.dim, { size: 10.5, bold: false });
+    // 층간 변위비 막대
+    const x0 = bxc + bw + (narrow ? 30 : 60), x1 = W - 16, top = Math.max(0.016, ...S.ratio) * 1.1, X = (v) => x0 + (v / top) * (x1 - x0);
+    ctx.strokeStyle = pal.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x0, y0); ctx.stroke();
+    S.ratio.forEach((r, j) => { const ya = Y(hts[j + 1]), yb = Y(hts[j]), hh = yb - ya; ctx.fillStyle = SD.alpha(r > 0.015 ? pal.bad : j === 0 ? pal.accent2 : pal.accent, 0.75); ctx.fillRect(x0, ya + hh * 0.2, X(r) - x0, hh * 0.6); if (j === 0 || !narrow) SD.text(ctx, CB.num(r * 100, 2) + "%", Math.min(X(r) + 4, x1 - 40), ya + hh / 2, pal.text, { size: 10, align: "left" }); });
+    ctx.save(); ctx.strokeStyle = pal.bad; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(X(0.015), y1); ctx.lineTo(X(0.015), y0); ctx.stroke(); ctx.restore();
+    SD.text(ctx, "허용 1.5 %", X(0.015) - 4, y0 + 12, pal.bad, { size: 10, align: "right" });
+    SD.text(ctx, "층간 변위비(RSA × Cd/Ie)", (x0 + x1) / 2, 10, pal.dim, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.55), minHeight: 300, maxHeight: 420 });
+  CB.loop(document.getElementById("sim-sd-soft"), (dt) => { th += dt * Math.PI; cv.redraw(); });
+  calc();
+})();
+
+/* ---------- 7. 비틀림 비정형 ---------- */
+(function () {
+  const gx = CB.range("sd-to-x", (v) => v.toFixed(1) + " m", go), gs = CB.range("sd-to-s", (v) => Math.round(v * 100) + " %", go), acc = CB.seg("sd-to-acc", go), pw = CB.seg("sd-to-pw", go);
+  const K = 1.2e6, LX = 32, LY = 24;
+  let R = null;
+  function calc() {
+    const s = gs(), xc = gx(), extra = pw() === "yes";
+    const ky = [0, 8, 16, 24, 32].map((x) => [x, ((1 - s) * K) / 5]).concat([[xc - 8, (s * K) / 2], [xc + 8, (s * K) / 2]]);
+    if (extra) ky.push([0, 0.15 * K], [32, 0.15 * K]);
+    const kx = [0, 8, 16, 24].map((y) => [y, ((1 - s) * K) / 4]).concat([[8, (s * K) / 2], [16, (s * K) / 2]]);
+    const Ky = ky.reduce((a, e) => a + e[1], 0), xr = ky.reduce((a, e) => a + e[0] * e[1], 0) / Ky, Kx = kx.reduce((a, e) => a + e[1], 0), yr = kx.reduce((a, e) => a + e[0] * e[1], 0) / Kx;
+    const Kt = ky.reduce((a, e) => a + e[1] * (e[0] - xr) ** 2, 0) + kx.reduce((a, e) => a + e[1] * (e[0] - yr) ** 2, 0);
+    const e0 = 16 - xr, ea = acc() === "on" ? 0.05 * LX * (e0 >= 0 ? 1 : -1) : 0, e = e0 + ea, V = 4995, d0 = V / Ky, th = (V * e) / Kt;
+    const dA = d0 + th * (0 - xr), dB = d0 + th * (LX - xr), dmax = Math.max(Math.abs(dA), Math.abs(dB)), davg = (Math.abs(dA) + Math.abs(dB)) / 2;
+    R = { ky, kx, xr, yr, e, ea, d0, th, dA, dB, ratio: dmax / davg, xc };
+  }
+  const cv = CB.canvas("#sd-cv-tor", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), sc = Math.min((W - 80) / LX, (H - 90) / LY), ox = (W - LX * sc) / 2, oy = 44 + (H - 74 - LY * sc) / 2, P = (x, y) => [ox + x * sc, oy + (LY - y) * sc];
+    const mag = (LY * sc * 0.08) / Math.max(Math.abs(R.dA), Math.abs(R.dB), 1e-9), D = (x, y) => { const dy = R.d0 + R.th * (x - R.xr), dx = -R.th * (y - R.yr); const [px, py] = P(x, y); return [px + dx * mag * 0 + 0, py - dy * mag]; };
+    // 원래 평면
+    ctx.strokeStyle = pal.faint; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2; ctx.strokeRect(ox, oy, LX * sc, LY * sc); ctx.setLineDash([]);
+    for (let x = 0; x <= 32; x += 8) SD.line(ctx, [P(x, 0), P(x, 24)], pal.grid, 1);
+    for (let y = 0; y <= 24; y += 8) SD.line(ctx, [P(0, y), P(32, y)], pal.grid, 1);
+    // 코어
+    const [cx0, cy0] = P(R.xc - 8, 16), [cx1, cy1] = P(R.xc + 8, 8); ctx.fillStyle = SD.alpha(pal.accent2, 0.35); ctx.fillRect(cx0, cy0, cx1 - cx0, cy1 - cy0);
+    if (pw() === "yes") { ctx.fillStyle = pal.accent2; [[0], [32]].forEach(([x]) => { const [a, b1] = P(x, 18), [, b2] = P(x, 6); ctx.fillRect(a - 3, b1, 6, b2 - b1); }); }
+    // 변형 평면(Y 방향 변위만, 과장)
+    const corners = [[0, 0], [32, 0], [32, 24], [0, 24]].map(([x, y]) => D(x, y));
+    ctx.beginPath(); corners.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fillStyle = SD.alpha(pal.accent, 0.1); ctx.fill(); ctx.strokeStyle = pal.accent; ctx.lineWidth = 2.2; ctx.stroke();
+    // 질량·강성 중심
+    const [mx, my] = P(16 + R.ea, 12), [rx, ry] = P(R.xr, R.yr);
+    ctx.fillStyle = pal.text; ctx.beginPath(); ctx.arc(mx, my, 5, 0, 2 * Math.PI); ctx.fill(); SD.text(ctx, "CM", mx + 10, my - 10, pal.text, { size: 11, align: "left" });
+    ctx.strokeStyle = pal.bad; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(rx, ry, 7, 0, 2 * Math.PI); ctx.stroke(); SD.text(ctx, "CR", rx - 10, ry + 14, pal.bad, { size: 11, align: "right" });
+    SD.arrow(ctx, mx, my + 46, mx, my + 10, pal.accent2, 2.4); SD.text(ctx, "V", mx + 10, my + 40, pal.accent2, { size: 11, align: "left" });
+    SD.text(ctx, `δ(x=0) ${CB.num(R.dA * 1000, 2)} mm`, ox, 14, pal.dim, { size: 10.5, align: "left", bold: false });
+    SD.text(ctx, `δ(x=32) ${CB.num(R.dB * 1000, 2)} mm`, ox + LX * sc, 14, pal.dim, { size: 10.5, align: "right", bold: false });
+    SD.text(ctx, "Y ↑  평면 32 × 24 m(위에서 본 모습, 변위 과장)", W / 2, H - 10, pal.dim, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.55), minHeight: 260, maxHeight: 380 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("sd-to-xr", CB.num(R.xr, 2) + " m"); CB.stat("sd-to-e", `${CB.num(R.e, 2)} m <small>(우발 ${CB.num(R.ea, 1)})</small>`);
+    CB.stat("sd-to-r", CB.num(R.ratio, 3)); CB.stat("sd-to-j", R.ratio > 1.4 ? "극심한 비틀림 비정형" : R.ratio > 1.2 ? "비틀림 비정형" : "규칙");
+  }
+  go();
+})();
+
+/* ---------- 8. 푸시오버 ---------- */
+(function () {
+  const gvy = CB.range("sd-pu-vy", (v) => "× " + v.toFixed(2), go), gk = CB.range("sd-pu-k", (v) => "× " + v.toFixed(2), go), ga = CB.range("sd-pu-a", (v) => v.toFixed(2), go), gmu = CB.range("sd-pu-mu", (v) => v.toFixed(1), go), gs = CB.range("sd-pu-s", (v) => "× " + v.toFixed(2), go);
+  const b = SD.B, md = SD.modes(b.k)[0], E = CB.dyn.els({ W: b.W, SDS: b.SDS, SD1: b.SD1, R: b.R, Ie: b.Ie, T: SD.TA, w: b.w, h: b.h });
+  const K0 = E.V / E.Vx.reduce((a, v) => a + v / 1.2e6, 0), G1 = md.Gamma * md.phi[md.phi.length - 1], M1 = md.Meff, TC = b.SD1 / b.SDS;
+  let P = null;
+  function calc() {
+    const K = K0 * gk(), Vy = gvy() * E.V, dy = Vy / K, du = gmu() * dy, a = ga(), Vu = Vy + a * K * (du - dy);
+    const Say = Vy / (M1 * SD.G), Sdy = dy / G1, Ts = 2 * Math.PI * Math.sqrt(Sdy / (Say * SD.G));
+    const Sae = gs() * CB.dyn.designSa(Ts, b.SDS, b.SD1), Sde = Sae * SD.G * (Ts / (2 * Math.PI)) ** 2, Ru = Math.max(1, Sae / Say);
+    const Sd = Ru <= 1 ? Sde : Ts >= TC ? Sde : (Sde / Ru) * (1 + ((Ru - 1) * TC) / Ts), mu = Sd / Sdy, roof = Sd * G1;
+    const Sa = Sd <= Sdy ? Sd / Sdy * Say : Say * (1 + a * (Sd / Sdy - 1));
+    P = { K, Vy, dy, du, Vu, Say, Sdy, Sdu: du / G1, Sau: Vu / (M1 * SD.G), Ts, Sae, Ru, Sd, Sa, mu, roof, a };
+  }
+  const cc = CB.canvas("#sd-cv-push-c", (ctx, W, H) => {
+    if (!P) return;
+    const pal = CB.palette(), xm = Math.max(P.du, P.roof) * 1.15 * 1000, ym = Math.max(P.Vu, P.Vy) * 1.25;
+    CB.chart(ctx, { x: 64, y: 28, w: W - 64 - 16, h: H - 28 - 44 }, { x: [0, xm], y: [0, ym], xLabel: "지붕 변위 (mm)", yLabel: "밑면 전단 (kN)", yFmt: (v) => CB.sig(v, 2), xFmt: (v) => CB.sig(v, 3),
+      series: [{ data: [[0, 0], [P.dy * 1000, P.Vy], [P.du * 1000, P.Vu]], color: pal.accent, width: 2.8 }],
+      hlines: [{ y: E.V, color: pal.accent2, label: "설계 V" }], vlines: [{ x: P.roof * 1000, color: P.roof > P.du ? pal.bad : pal.ok, dash: [], label: "요구" }],
+      points: [{ x: P.du * 1000, y: P.Vu, color: pal.bad, r: 4 }] });
+  }, { aspect: (W) => (W < 520 ? 0.65 : 0.34), minHeight: 200, maxHeight: 260 });
+  const ca = CB.canvas("#sd-cv-push-a", (ctx, W, H) => {
+    if (!P) return;
+    const pal = CB.palette(), dem = [], inel = [], sdmax = Math.max(P.Sdu, P.Sd) * 1.3 * 1000, mu = Math.max(1, P.mu);
+    for (let i = 1; i <= 400; i++) { const T = (6 * i) / 400, sa = gs() * CB.dyn.designSa(T, b.SDS, b.SD1), sd = sa * SD.G * (T / (2 * Math.PI)) ** 2 * 1000; dem.push([sd, sa]); const Rm = T < TC ? (mu - 1) * T / TC + 1 : mu; inel.push([(mu / Rm) * sd, sa / Rm]); }
+    const top = gs() * b.SDS * 1.15;
+    CB.chart(ctx, { x: 64, y: 28, w: W - 64 - 16, h: H - 28 - 44 }, { x: [0, sdmax], y: [0, Math.max(top, P.Sau * 1.2)], xLabel: "스펙트럼 변위 Sd (mm)", yLabel: "Sa (g)", xFmt: (v) => CB.sig(v, 3),
+      series: [{ data: dem, color: pal.accent2, width: 2.2 }, { data: mu > 1.01 ? inel : [], color: pal.accent2, width: 1.4, dash: [5, 4] }, { data: [[0, 0], [P.Sdy * 1000, P.Say], [P.Sdu * 1000, P.Sau]], color: pal.accent, width: 2.8 }, { data: [[0, 0], [sdmax, sdmax / 1000 / (SD.G * (P.Ts / (2 * Math.PI)) ** 2)]], color: pal.faint, width: 1, dash: [3, 3] }],
+      points: [{ x: P.Sd * 1000, y: P.Sa, color: P.Sd * G1 > P.du ? pal.bad : pal.ok, r: 7, label: "성능점" }] });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.4), minHeight: 230, maxHeight: 300 });
+  function go() {
+    calc(); cc.redraw(); ca.redraw();
+    const dr = P.roof / 41, over = P.roof > P.du;
+    CB.stat("sd-pu-T", CB.num(P.Ts, 3) + " s"); CB.stat("sd-pu-muo", `${CB.num(P.Ru, 2)} · ${CB.num(Math.max(P.mu, P.Sd / P.Sdy), 2)}`);
+    CB.stat("sd-pu-d", `${CB.num(P.roof * 1000, 0)} mm · ${CB.num(dr * 100, 2)} %`);
+    const lv = over ? "용량 초과" : dr <= 0.005 ? "즉시 거주" : dr <= 0.01 ? "인명 안전" : dr <= 0.02 ? "붕괴 방지" : "붕괴 방지 초과";
+    CB.stat("sd-pu-lv", lv);
+    const m = document.getElementById("sd-pu-msg");
+    m.className = over || dr > 0.02 ? "sd-msg bad" : P.mu <= 1 ? "sd-msg ok" : "sd-msg";
+    m.innerHTML = over ? `요구 변위 ${CB.num(P.roof * 1000, 0)} mm가 용량 끝(${CB.num(P.du * 1000, 0)} mm)을 넘습니다. 연성 능력(상세)을 키우거나 강도·강성을 보강해야 합니다.` : P.Ru <= 1 ? "탄성 요구가 항복 강도보다 작아 성능점이 탄성 구간에 있습니다(손상 거의 없음)." : `항복 뒤 성능점: 연성 요구 μ = ${CB.num(P.mu, 2)}(용량 μ<sub>cap</sub> = ${CB.num(gmu(), 1)}). T* ${P.Ts >= TC ? "≥" : "&lt;"} T<sub>S</sub>이므로 ${P.Ts >= TC ? "등변위" : "짧은 주기 보정(N2)"}을 적용했습니다.`;
+  }
+  go();
+})();
+</script>
+</body>
+</html>

@@ -28,6 +28,14 @@ LOCAL_BOOKS = [{
     'status': 'published', 'level': '건축·토목 2–3학년', 'stage': 'foundations', 'slug': 'geotech', 'legacyUrl': None,
     'color': '#8a5a2b', 'colorDark': '#d8a06a', 'motif': 'soil',
     'topics': ['지반 조사·분류', '유효응력·침투', '압밀·지반 개량', '전단강도·토압', '흙막이·사면', '지지력·말뚝', '액상화·암반'],
+}, {
+    'id': 'structurebook', 'code': 'STR', 'title': 'StructureBook', 'subtitle': '건축구조 교과서',
+    'headline': '하중은 어떤 길로 땅에 닿는가',
+    'description': '설계 하중과 바닥 구조, 모멘트 골조, 전단벽·코어·튜브, 풍하중, 구조 동역학과 내진 설계, 면진과 제진, 강구조·합성 구조·대공간·목구조, 해석 모델링과 사용성, 화재·연쇄 붕괴와 보강까지 — 건물을 흔들고 구조 시스템을 바꿔 보며 기준 건물 B-10의 숫자로 익히는 건축구조 교과서.',
+    'url': 'https://construction.euiyun.com/structure/', 'repo': 'https://github.com/geniuskey/construction-books', 'field': 'construction',
+    'status': 'published', 'level': '건축공학 3학년', 'stage': 'design', 'slug': 'structure', 'legacyUrl': None,
+    'color': '#0b7285', 'colorDark': '#66d9e8', 'motif': 'tower',
+    'topics': ['하중·바닥', '골조·코어', '풍하중', '구조 동역학', '내진·면진', '강·합성·대공간', '사용성·보강'],
 }]
 books = LOCAL_BOOKS
 catalog = []

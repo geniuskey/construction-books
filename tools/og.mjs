@@ -1,5 +1,5 @@
 // Copyright (c) 2026 geniuskey and ConstructionBooks contributors. MIT. Based on the MathBooks og renderer.
-// Render the 1200×630 share images: og.png (shelf home), mechanics/og.png, materials/og.png and geotech/og.png.
+// Render the 1200×630 share images: og.png (shelf home), mechanics/, materials/, geotech/ and structure/og.png.
 // Usage: node tools/og.mjs   (rerun after books, chapters or simulators change). Needs Playwright.
 // Covers use the same shelf.css and covers.js as the home page; stats are counted like shared/js/shelf.js.
 import { chromium } from 'playwright';
@@ -36,6 +36,11 @@ sandbox2.window = sandbox2;
 vm.createContext(sandbox2);
 vm.runInContext(read('geotech/js/common.js'), sandbox2);
 CB.soil = sandbox2.CB.soil;
+const sandbox3 = { ...sandbox, document: { ...sandbox.document, currentScript: { src: 'http://x/structure/js/common.js' } } };
+sandbox3.window = sandbox3;
+vm.createContext(sandbox3);
+vm.runInContext(read('structure/js/common.js'), sandbox3);
+CB.dyn = sandbox3.CB.dyn;
 
 const base = `
   html, body { margin:0; width:1200px; height:630px; overflow:hidden; }
@@ -196,9 +201,43 @@ const geoPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><sty
   <div class="art">${geoArt}</div>
 </body></html>`;
 
+// StructureBook: B-10 as a 10-storey shear building — first three mode shapes, with the design spectrum and T1.
+const strArt = (() => {
+  let s = '';
+  const b = CB.dyn.B10, { K, M } = CB.dyn.shearBuilding(b.m, b.k), md = CB.dyn.modes(K, M), cols = ['#66d9e8', '#ffa94d', '#3fcf7f'];
+  const X0 = 140, Y = (h) => 470 - h * 9.6, W = 64;
+  s += `<line x1="40" y1="${Y(0)}" x2="560" y2="${Y(0)}" stroke="#4a5670" stroke-width="3"/>`;
+  [0, 1, 2].forEach((mi) => {
+    const cx = X0 + mi * 160, phi = md[mi].phi;
+    let d = `M${cx} ${Y(0)}`; b.h.forEach((h, i) => { d += `L${(cx + phi[i] * W).toFixed(1)} ${Y(h).toFixed(1)}`; });
+    s += `<line x1="${cx}" y1="${Y(0)}" x2="${cx}" y2="${Y(41)}" stroke="#4a5670" stroke-width="2" stroke-dasharray="4 5"/>`;
+    s += `<path d="${d}" fill="none" stroke="${cols[mi]}" stroke-width="5" stroke-linejoin="round"/>`;
+    b.h.forEach((h, i) => { s += `<circle cx="${(cx + phi[i] * W).toFixed(1)}" cy="${Y(h).toFixed(1)}" r="6" fill="#0f1228" stroke="${cols[mi]}" stroke-width="3"/>`; });
+    s += `<text x="${cx}" y="${Y(0) + 34}" text-anchor="middle" fill="${cols[mi]}" font-family="monospace" font-size="19" font-weight="700">T${mi + 1} = ${md[mi].T.toFixed(2)} s</text>`;
+  });
+  s += `<text x="300" y="66" text-anchor="middle" fill="#cfd6e4" font-size="19" font-weight="700">B-10 · 10층 전단 건물의 모드 형상</text>`;
+  const e = CB.dyn.els({ W: b.W, SDS: b.SDS, SD1: b.SD1, R: b.R, Ie: b.Ie, T: CB.dyn.Ta(b.hn), w: b.w, h: b.h });
+  s += `<text x="300" y="560" text-anchor="middle" fill="#ffa94d" font-family="monospace" font-size="18" font-weight="700">밑면 전단력 V = ${Math.round(e.V / 10) * 10} kN</text>`;
+  return `<svg viewBox="0 0 600 600" width="600" height="600"><defs><clipPath id="c4"><rect x="20" y="20" width="560" height="560" rx="28"/></clipPath></defs><rect x="20" y="20" width="560" height="560" rx="28" fill="#0f1625" stroke="#26324a"/><g clip-path="url(#c4)">${s}</g></svg>`;
+})();
+const structure = books.find((b) => b.id === 'structurebook');
+const strPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>${read('shelf.css')}</style><style>${base}
+  .art { position:absolute; right:40px; top:15px; }
+</style></head><body>
+  <div class="left">
+    <div class="brand">${read('structure/favicon.svg')}<span>StructureBook</span></div>
+    <div class="eyebrow">INTERACTIVE BUILDING STRUCTURES</div>
+    <h1>하중은 어떤 길로<br><span class="soft">땅에 닿고</span><br><span class="warm">건물은 어떻게 흔들리나</span></h1>
+    <p class="lead">바닥과 골조, 코어와 튜브, 바람과 지진,<br>면진·제진과 대공간을 직접 계산하는 건축구조.</p>
+    <div class="stats"><span><b>4</b>부</span><span><b>16</b>개 장</span><span><b>${Math.floor(structure.simulators / 10) * 10}+</b>시뮬레이터</span></div>
+  </div>
+  <div class="url">construction.euiyun.com/structure/</div>
+  <div class="art">${strArt}</div>
+</body></html>`;
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
-for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png']]) {
+for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png'], [strPage, 'structure/og.png']]) {
   await page.setContent(html, { waitUntil: 'networkidle' });
   await page.addScriptTag({ content: read('shared/js/covers.js') });
   await page.evaluate(async () => {
@@ -208,4 +247,4 @@ for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [m
   await page.screenshot({ path: join(root, out) });
 }
 await browser.close();
-console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators} simulators`);
+console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators}, structure/og.png: ${structure.simulators} simulators`);

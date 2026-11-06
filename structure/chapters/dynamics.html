@@ -1,0 +1,1181 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>구조 동역학 · StructureBook</title>
+<meta name="description" content="흔들리는 건물의 수학. 1자유도 운동 방정식과 고유 주기, 감쇠와 대수 감쇠율, 공진과 동적 증폭, 지반 운동과 뉴마크 시간 적분, 응답 스펙트럼, 전단 건물의 모드 해석과 참여 질량, 모드 중첩과 SRSS, B-10의 고유 주기 1.00 s를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .dy-stack { display: grid; grid-template-columns: 1fr; }
+  .dy-stack > div { position: relative; min-width: 0; }
+  .dy-stack > div + div { border-top: 1px solid var(--border); }
+  .dy-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .dy-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .dy-msg b { color: var(--text); }
+  .dy-msg.ok { color: var(--ok); font-weight: 600; }
+  .dy-msg.bad { color: var(--bad); font-weight: 600; }
+  .dy-tbl td, .dy-tbl th { font-variant-numeric: tabular-nums; }
+  .dy-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .dy-steps { margin: 6px 0 0; }
+  .dy-steps li { margin: 4px 0; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="structure"></script>
+</head>
+<body data-chapter="dynamics">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="dy-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="dy-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="dy-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="dy-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 07</div>
+    <h1 data-no-glossary>구조 동역학</h1>
+    <p class="lead">6장까지 하중은 천천히 실렸습니다. 바람의 가스트도 정적인 압력으로 바꿔 계산했지요. 지진은 그렇게 할 수 없습니다. 땅이 1초에 한두 번씩 좌우로 움직이면 건물은 제 질량 때문에 늦게 따라가고, 그 지체가 <b>관성력</b>이 되어 기둥과 벽을 흔듭니다. 같은 지진이라도 건물이 어떤 리듬으로 흔들리기 좋아하는지, 곧 <b>고유 주기</b>에 따라 받는 힘이 몇 배씩 달라집니다. 이 장은 질량·강성·감쇠 세 가지로 된 1자유도 진동에서 출발해 공진, 지반 운동의 시간 이력과 뉴마크 수치 적분, 응답 스펙트럼을 만들고, 10층 전단 건물의 모드 해석으로 B-10의 1차 고유 주기 <b>1.00 s</b>와 참여 질량 85 %를 구합니다. 8장의 내진 설계는 모두 이 장의 결과 위에 섭니다.</p>
+    <ul class="objectives">
+      <li>건물을 질량·강성·감쇠의 1자유도계로 이상화하고 운동 방정식 \(m\ddot u + c\dot u + ku = p(t)\)을 세워 고유 진동수와 주기를 계산한다.</li>
+      <li>감쇠 자유 진동의 해를 쓰고, 측정 기록의 대수 감쇠율에서 감쇠비를 추정한다.</li>
+      <li>조화 하중의 정상 상태 응답과 동적 증폭 계수 \(R_d\), 위상각을 계산하고 공진의 조건과 감쇠의 역할을 설명한다.</li>
+      <li>지반 운동을 받는 구조물의 상대 변위 방정식을 세우고, 뉴마크 평균 가속도법으로 시간 이력을 한 단계씩 계산한다.</li>
+      <li>응답 스펙트럼(\(S_d\), 의사 속도, 의사 가속도)을 정의하고 지진 기록에서 직접 만들어 읽는다.</li>
+      <li>전단 건물의 질량·강성 행렬로 고유값 문제를 풀어 모드 형상·주기·모드 참여 계수·유효 질량을 구하고, 모드 중첩과 SRSS로 최대 응답을 추정한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>지진이 건물에 주는 힘은 "몇 g"가 아니다</b></div>
+      <div class="o-body"><p>20세기 초 내진 설계는 건물 무게의 일정 비율(예컨대 10 %)을 수평으로 미는 정적 계산이었습니다. 땅이 0.1g로 흔들리면 건물도 0.1g의 힘을 받는다는 생각이지요. 1930년대 초 비오(M. A. Biot)는 건물을 고유 주기가 다른 진동자로 보고, 같은 지진 기록이라도 진동자의 주기에 따라 최대 응답이 크게 다르다는 <b>응답 스펙트럼</b>의 개념을 내놓았습니다. 1940년 미국 임페리얼 밸리 지진의 엘센트로 기록(최대 지반 가속도 약 0.3g)처럼 강진 기록이 쌓이자, 1950년대 하우스너(G. W. Housner) 등은 여러 기록의 스펙트럼을 평균해 설계에 쓸 수 있는 모양을 제안했습니다.</p>
+        <p>계산 도구도 함께 발전했습니다. 1959년 뉴마크(N. M. Newmark)는 운동 방정식을 짧은 시간 간격마다 한 걸음씩 푸는 단계별 적분법을 발표했고, 이 방법은 지금도 구조 해석 프로그램의 시간 이력 해석에서 가장 널리 쓰입니다. 다층 건물은 고유 모드로 나누면 1자유도 진동자 여러 개의 합이 되므로, 응답 스펙트럼과 모드 해석을 묶은 <b>응답 스펙트럼 해석</b>이 오늘날 내진 설계의 표준 도구가 되었습니다.</p>
+        <div class="o-chain"><span>질량 · 강성 · 감쇠</span><i>→</i><span class="tool">운동 방정식 · 뉴마크 적분 · 고유값 문제</span><i>→</i><span>고유 주기 · 응답 스펙트럼 · 모드 응답</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="why-dynamics">
+    <h2>왜 동역학인가: 질량이 힘이 될 때</h2>
+    <div class="problem"><strong>같은 100 kN, 다른 결과</strong>
+      <p>B-10의 한 층을 옆에서 100 kN으로 천천히 밀면 층은 \(100/(1.2\times10^6)\) m, 0.08 mm 움직이고 그 자리에 멈춥니다. 그런데 같은 100 kN을 1초에 다섯 번씩 밀고 당기면 변위가 두 배 넘게 커지고, 리듬을 조금 더 빠르게 맞추면 열 배가 됩니다. 힘의 크기가 같은데 무엇이 달라졌을까요?</p></div>
+    <p>하중이 구조물의 고유한 흔들림 리듬에 비해 천천히 변하면 관성은 무시할 수 있고, 매 순간 정적 평형 \(ku = p\)가 성립합니다. 하중이 빨리 변하면 질량을 가속하는 데 힘이 들고(<span class="term">관성력</span><span class="en">(inertia force)</span> \(m\ddot u\)), 움직이는 동안 에너지가 조금씩 열로 빠져나갑니다(감쇠력). 이 둘을 더한 것이 <b>동역학</b>입니다. 건축 구조에서 동역학이 필요한 하중은 지진, 바람의 난류 성분(6장), 사람의 보행과 기계 진동(15장), 충격과 폭발입니다.</p>
+    <p>건물 한 층을 생각해 봅시다. 바닥 슬래브와 보, 그 위의 마감과 사람은 무겁고 거의 변형하지 않습니다. 기둥과 벽은 가볍지만 휘어서 바닥을 제자리로 되돌리려 합니다. 그래서 질량은 바닥에 모으고, 강성은 기둥이 담당하는 <span class="term">1자유도계</span><span class="en">(single-degree-of-freedom system, SDOF)</span>로 이상화할 수 있습니다. 자유도는 바닥의 수평 변위 \(u\) 하나입니다.</p>
+    <figure class="diagram" id="fig-dy-sdof">
+      <svg viewBox="0 0 860 330" role="img" aria-label="한 층 골조를 질량, 스프링, 감쇠기로 이상화한 1자유도계와 자유 물체도">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <!-- 골조 -->
+        <g transform="translate(40,40)">
+          <text x="0" y="12" class="t" style="font-weight:700">① 한 층 골조</text>
+          <line x1="-10" y1="240" x2="250" y2="240" class="s-axis"/>
+          <path d="M20 240 L20 240" />
+          <g style="fill:var(--text-faint)"><path d="M-10 240 l8 10 M10 240 l8 10 M30 240 l8 10 M50 240 l8 10 M170 240 l8 10 M190 240 l8 10 M210 240 l8 10 M230 240 l8 10" style="stroke:var(--text-faint);stroke-width:1.2"/></g>
+          <path d="M40 240 C 46 170, 58 110, 70 70" style="fill:none;stroke:var(--accent);stroke-width:4"/>
+          <path d="M200 240 C 206 170, 218 110, 230 70" style="fill:none;stroke:var(--accent);stroke-width:4"/>
+          <line x1="40" y1="240" x2="40" y2="70" style="stroke:var(--text-faint);stroke-width:1.4;stroke-dasharray:4 4"/>
+          <rect x="54" y="50" width="192" height="22" rx="3" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <text x="150" y="65" text-anchor="middle" class="t-mono" style="fill:var(--accent)">바닥 질량 m (강체)</text>
+          <line x1="40" y1="36" x2="68" y2="36" style="stroke:var(--accent);stroke-width:1.6" marker-end="url(#dy-ah-acc)"/>
+          <text x="40" y="28" class="t-mono" style="fill:var(--accent)">u(t)</text>
+          <line x1="246" y1="61" x2="296" y2="61" style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#dy-ah-ld)"/>
+          <text x="262" y="50" class="t-mono" style="fill:var(--accent-2)">p(t)</text>
+          <text x="120" y="160" text-anchor="middle" class="t-mono">기둥 = 스프링 k</text>
+          <text x="120" y="176" text-anchor="middle" class="t-mono">(양단 고정: Σ12EI/h³)</text>
+          <text x="120" y="270" text-anchor="middle" class="t-dim">질량은 바닥에, 강성은 기둥에</text>
+        </g>
+        <!-- 이상화 -->
+        <line x1="330" y1="160" x2="372" y2="160" style="stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#dy-ah-t)"/>
+        <g transform="translate(385,40)">
+          <text x="0" y="12" class="t" style="font-weight:700">② 질량–스프링–감쇠기</text>
+          <line x1="0" y1="80" x2="0" y2="200" style="stroke:var(--text);stroke-width:2.4"/>
+          <path d="M0 80 l-8 8 M0 100 l-8 8 M0 120 l-8 8 M0 140 l-8 8 M0 160 l-8 8 M0 180 l-8 8" style="stroke:var(--text-faint);stroke-width:1.2"/>
+          <path d="M0 110 L20 110 L26 98 L38 122 L50 98 L62 122 L74 98 L86 122 L92 110 L120 110" style="fill:none;stroke:var(--accent);stroke-width:2.2"/>
+          <text x="60" y="92" text-anchor="middle" class="t-mono" style="fill:var(--accent)">k</text>
+          <path d="M0 170 L40 170 M40 158 L40 182 M40 158 L80 158 M40 182 L80 182 M64 162 L64 178 M64 170 L120 170" style="fill:none;stroke:var(--warn);stroke-width:2.2"/>
+          <text x="60" y="200" text-anchor="middle" class="t-mono" style="fill:var(--warn)">c</text>
+          <rect x="120" y="84" width="84" height="112" rx="6" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="162" y="145" text-anchor="middle" class="t-acc">m</text>
+          <circle cx="140" cy="204" r="7" style="fill:none;stroke:var(--text-dim);stroke-width:1.4"/><circle cx="184" cy="204" r="7" style="fill:none;stroke:var(--text-dim);stroke-width:1.4"/>
+          <line x1="110" y1="212" x2="230" y2="212" class="s-axis"/>
+          <line x1="204" y1="140" x2="248" y2="140" style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#dy-ah-ld)"/>
+          <text x="214" y="130" class="t-mono" style="fill:var(--accent-2)">p(t)</text>
+          <line x1="140" y1="68" x2="180" y2="68" style="stroke:var(--accent);stroke-width:1.6" marker-end="url(#dy-ah-acc)"/>
+          <text x="140" y="60" class="t-mono" style="fill:var(--accent)">u</text>
+        </g>
+        <!-- 자유 물체도 -->
+        <g transform="translate(660,40)">
+          <text x="0" y="12" class="t" style="font-weight:700">③ 자유 물체도</text>
+          <rect x="50" y="90" width="80" height="90" rx="6" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="90" y="140" text-anchor="middle" class="t-acc">m</text>
+          <line x1="50" y1="108" x2="4" y2="108" style="stroke:var(--accent);stroke-width:2" marker-end="url(#dy-ah-acc)"/>
+          <text x="2" y="100" class="t-mono" style="fill:var(--accent)">f<tspan baseline-shift="sub" font-size="8">S</tspan> = ku</text>
+          <line x1="50" y1="162" x2="4" y2="162" style="stroke:var(--warn);stroke-width:2" marker-end="url(#dy-ah-t)"/>
+          <text x="2" y="182" class="t-mono" style="fill:var(--warn)">f<tspan baseline-shift="sub" font-size="8">D</tspan> = cu̇</text>
+          <line x1="130" y1="135" x2="176" y2="135" style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#dy-ah-ld)"/>
+          <text x="140" y="126" class="t-mono" style="fill:var(--accent-2)">p(t)</text>
+          <text x="90" y="216" text-anchor="middle" class="t-mono">Σ F = m ü</text>
+          <text x="90" y="236" text-anchor="middle" class="t-mono">p − cu̇ − ku = mü</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-1.</b> 한 층 골조의 1자유도 이상화. 바닥을 강체 질량 m으로, 기둥을 수평 스프링 k로, 에너지 손실을 점성 감쇠기 c로 나타낸다. 자유 물체도에서 뉴턴 제2법칙을 쓰면 운동 방정식이 된다. 양단이 고정된 기둥 하나의 수평 강성은 12EI/h³이다(MechanicsBook 처짐각법).</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 7.1 (1자유도 운동 방정식)</strong> 질량 \(m\), 강성 \(k\), 점성 감쇠 계수 \(c\)인 1자유도계에 외력 \(p(t)\)가 작용하면 <span class="term">운동 방정식</span><span class="en">(equation of motion)</span>은
+      <div class="formula">$$m\ddot u + c\dot u + k u = p(t)$$<div class="where">\(u\): 변위(m), \(\dot u\): 속도(m/s), \(\ddot u\): 가속도(m/s²). 단위: 질량 t = kN·s²/m, 강성 kN/m, 감쇠 계수 kN·s/m, 힘 kN. 관성력 \(f_I = m\ddot u\), 감쇠력 \(f_D = c\dot u\), 복원력 \(f_S = ku\)가 매 순간 외력과 평형을 이룬다(달랑베르 원리).</div></div></div>
+    <p>질량은 하중에서 옵니다. 지진 때 함께 흔들리는 무게, 곧 8장의 <b>유효 지진 중량</b>을 \(g\)로 나눈 값입니다. B-10 2–10층 바닥 하나의 유효 지진 중량 6,900 kN은 질량 \(6{,}900/9.81 = 703\) t입니다. 강성은 층의 기둥과 벽이 정하고(4·5장), 이 책은 B-10의 층 강성을 모든 층에서 \(1.2\times10^6\) kN/m로 둡니다(교육용 가정).</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="free-vibration">
+    <h2>자유 진동: 고유 진동수와 감쇠</h2>
+    <div class="problem"><strong>밀었다 놓으면 몇 초에 한 번 흔들리나</strong>
+      <p>B-10 한 층을 옆으로 20 mm 밀었다가 놓으면 층은 원래 자리를 지나 반대편으로 가고, 다시 돌아오기를 되풀이하며 점점 잦아듭니다. 한 번 왕복하는 데 걸리는 시간, 잦아드는 빠르기는 하중이 없을 때도 구조물이 가진 성질입니다.</p></div>
+    <p>외력이 없을 때(\(p = 0\))의 운동을 <span class="term">자유 진동</span><span class="en">(free vibration)</span>이라 합니다. 감쇠가 없으면 해는 \(u = u_0\cos\omega_n t + (\dot u_0/\omega_n)\sin\omega_n t\)로, 진폭이 줄지 않는 조화 진동입니다. 여기서 \(\omega_n = \sqrt{k/m}\)이 원 <span class="term">고유 진동수</span><span class="en">(natural frequency)</span>이고, 한 번 왕복하는 시간이 <span class="term">고유 주기</span><span class="en">(natural period)</span> \(T_n = 2\pi/\omega_n\)입니다. 강성이 클수록, 질량이 작을수록 빨리 흔들립니다.</p>
+    <div class="callout def"><strong>원리 7.2 (감쇠 자유 진동)</strong> 감쇠 계수를 <span class="term">임계 감쇠</span><span class="en">(critical damping)</span> \(c_{cr} = 2m\omega_n = 2\sqrt{km}\)에 대한 비, 곧 <span class="term">감쇠비</span><span class="en">(damping ratio)</span> \(\zeta = c/c_{cr}\)로 나타내면, \(\zeta \lt 1\)(저감쇠)일 때 초기 변위 \(u_0\)·초기 속도 \(\dot u_0\)의 해는
+      <div class="formula">$$u(t) = e^{-\zeta\omega_n t}\left[u_0\cos\omega_D t + \frac{\dot u_0 + \zeta\omega_n u_0}{\omega_D}\sin\omega_D t\right], \qquad \omega_D = \omega_n\sqrt{1-\zeta^2}$$<div class="where">\(\omega_D\): 감쇠 고유 진동수. 진폭은 포락선 \(e^{-\zeta\omega_n t}\)를 따라 줄어든다. 건물의 \(\zeta\)는 대개 0.01–0.07이므로 \(\omega_D \approx \omega_n\)(ζ = 5 %이면 0.13 % 차이)이다. \(\zeta = 1\)(임계 감쇠)이면 진동 없이 가장 빨리 제자리로 돌아오고, \(\zeta \gt 1\)(과감쇠)이면 더 느리게 돌아온다.</div></div></div>
+    <div class="callout"><strong>예제 7.1 (B-10 한 층의 고유 주기)</strong> 한 층만 떼어 낸 1자유도계: \(m = 6{,}900/9.81 = 703.4\) t, \(k = 1.2\times10^6\) kN/m, \(\zeta = 5\) %.
+      <ol class="dy-steps">
+        <li><b>고유 진동수.</b> \(\omega_n = \sqrt{1.2\times10^6/703.4} = \sqrt{1{,}706} = 41.3\) rad/s. 단위: (kN/m)/t = (kN/m)/(kN·s²/m) = 1/s².</li>
+        <li><b>주기와 진동수.</b> \(T_n = 2\pi/41.3 = 0.152\) s, \(f_n = 1/T_n = 6.57\) Hz.</li>
+        <li><b>감쇠.</b> \(c = 2\zeta m\omega_n = 2 \times 0.05 \times 703.4 \times 41.3 = 2{,}905\) kN·s/m, \(\omega_D = 41.3\sqrt{1-0.0025} = 41.25\) rad/s.</li>
+        <li><b>한 주기 뒤 진폭.</b> \(e^{-\zeta\omega_n T_D} = e^{-2\pi\zeta/\sqrt{1-\zeta^2}} = e^{-0.315} = 0.730\). 20 mm에서 시작하면 한 번 왕복 뒤 14.6 mm, 다섯 번 뒤 4.1 mm.</li>
+      </ol>
+      한 층의 주기 0.15 s는 10층 건물 전체의 주기(1.00 s, 7.11절)보다 훨씬 짧다. 층을 쌓으면 질량은 더해지고 강성은 직렬로 이어져 주기가 길어진다.</div>
+    <div class="sim" id="sim-dy-free">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>1자유도 자유 진동</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dy-stack">
+          <div><canvas id="dy-cv-free-a" aria-label="흔들리는 한 층 골조 애니메이션"></canvas><span class="dy-cap">변형 과장 표시</span></div>
+          <div><canvas id="dy-cv-free-t" aria-label="감쇠 자유 진동 변위 이력과 포락선"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>질량 m <output id="dy-fr-m-out"></output></span><input type="range" id="dy-fr-m" min="50" max="3000" step="1" value="703"></label>
+          <label class="ctrl"><span>강성 k <output id="dy-fr-k-out"></output></span><input type="range" id="dy-fr-k" min="4" max="6.8" step="0.01" value="6.08"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="dy-fr-z-out"></output></span><input type="range" id="dy-fr-z" min="0" max="150" step="0.5" value="5"></label>
+          <label class="ctrl"><span><i style="font-style:normal">초기 변위 u<sub>0</sub></i> <output id="dy-fr-u-out"></output></span><input type="range" id="dy-fr-u" min="2" max="50" step="1" value="20"></label>
+          <div class="btn-row"><button class="btn primary" id="dy-fr-play">▶ 놓기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">ω<sub>n</sub> · T<sub>n</sub></span><span class="v" id="dy-fr-w">—</span></div>
+        <div class="stat"><span class="k">f<sub>n</sub></span><span class="v" id="dy-fr-f">—</span></div>
+        <div class="stat"><span class="k">c · c<sub>cr</sub></span><span class="v" id="dy-fr-c">—</span></div>
+        <div class="stat"><span class="k">한 주기 뒤 진폭비</span><span class="v" id="dy-fr-r">—</span></div>
+      </div>
+      <div class="dy-msg" id="dy-fr-msg"></div>
+      <div class="sim-note">해볼 것: 질량을 네 배로 하면 주기가 두 배가 됩니다(T ∝ √(m/k)) · 감쇠비를 100 %로 올리면 진동 없이 돌아오고(임계 감쇠), 150 %면 오히려 더 느리게 돌아옵니다 · 강성 슬라이더는 로그 눈금(10<sup>4</sup>–6.3 × 10<sup>6</sup> kN/m)입니다 · 모델: 원리 7.2의 닫힌 해(초기 속도 0), CB.dyn.sdof. 애니메이션은 주기와 상관없이 한 주기를 약 1.5초로 보여 줍니다.</div>
+    </div>
+    <figure class="diagram" id="fig-dy-decay">
+      <svg viewBox="0 0 860 280" role="img" aria-label="감쇠 자유 진동 곡선과 포락선, 연속한 마루의 비로 정의하는 대수 감쇠율">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <line x1="0" y1="110" x2="720" y2="110" class="s-axis"/><line x1="0" y1="0" x2="0" y2="220" class="s-axis"/>
+          <text x="716" y="128" text-anchor="end" class="t-mono">t</text><text x="8" y="10" class="t-mono">u</text>
+          <path d="M0 10 C 20 10, 40 30, 60 70 S 100 200, 120 190 S 160 70, 190 60 S 230 160, 250 165 S 290 80, 320 80 S 360 140, 380 142 S 420 92, 450 94 S 490 128, 510 129 S 550 101, 580 102 S 620 120, 640 121 S 680 105, 710 106" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <path d="M0 10 C 120 46, 300 80, 450 94 S 650 104, 710 106" style="fill:none;stroke:var(--text-faint);stroke-width:1.4;stroke-dasharray:5 4"/>
+          <path d="M0 210 C 120 174, 300 140, 450 126 S 650 116, 710 114" style="fill:none;stroke:var(--text-faint);stroke-width:1.4;stroke-dasharray:5 4"/>
+          <text x="560" y="84" class="t-mono">포락선 ±u<tspan baseline-shift="sub" font-size="8">0</tspan>e<tspan baseline-shift="super" font-size="8">−ζω t</tspan></text>
+          <circle cx="190" cy="60" r="4.5" style="fill:var(--accent-2)"/><circle cx="320" cy="80" r="4.5" style="fill:var(--accent-2)"/><circle cx="450" cy="94" r="4.5" style="fill:var(--accent-2)"/>
+          <line x1="190" y1="60" x2="190" y2="110" style="stroke:var(--accent-2);stroke-width:1.6"/><line x1="320" y1="80" x2="320" y2="110" style="stroke:var(--accent-2);stroke-width:1.6"/>
+          <text x="196" y="52" class="t-mono" style="fill:var(--accent-2)">u<tspan baseline-shift="sub" font-size="8">i</tspan></text>
+          <text x="326" y="72" class="t-mono" style="fill:var(--accent-2)">u<tspan baseline-shift="sub" font-size="8">i+1</tspan></text>
+          <line x1="190" y1="30" x2="320" y2="30" style="stroke:var(--text-dim);stroke-width:1.3" marker-start="url(#dy-ah-t)" marker-end="url(#dy-ah-t)"/>
+          <text x="255" y="24" text-anchor="middle" class="t-mono">T<tspan baseline-shift="sub" font-size="8">D</tspan> = 2π/ω<tspan baseline-shift="sub" font-size="8">D</tspan></text>
+          <text x="470" y="186" class="t">δ = ln(u<tspan baseline-shift="sub" font-size="9">i</tspan>/u<tspan baseline-shift="sub" font-size="9">i+1</tspan>) = 2πζ/√(1 − ζ²) ≈ 2πζ</text>
+          <text x="470" y="206" class="t-dim">n 주기 떨어진 마루로 재면 δ = (1/n) ln(u<tspan baseline-shift="sub" font-size="8">i</tspan>/u<tspan baseline-shift="sub" font-size="8">i+n</tspan>)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-2.</b> 감쇠 자유 진동과 대수 감쇠율. 연속한 두 마루의 비는 어느 마루에서 재도 같으므로(지수 감소), 그 로그가 감쇠비를 알려 준다. 실제 건물에서는 사람이 흔들거나 기진기로 가진한 뒤 멈춘 기록, 또는 상시 미진동 기록으로 감쇠비를 추정한다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="damping">
+    <h2>감쇠의 크기와 대수 감쇠율</h2>
+    <div class="problem"><strong>건물의 감쇠는 어디서 오나</strong>
+      <p>점성 감쇠기 c는 계산을 위한 이상화입니다. 실제 건물에는 오일 댐퍼가 없는데도 흔들림은 잦아듭니다. 콘크리트의 미세 균열이 열리고 닫히는 마찰, 접합부의 미끄럼, 칸막이벽과 마감재, 기초에서 지반으로 빠져나가는 파동이 에너지를 가져갑니다. 이것을 하나의 등가 감쇠비 ζ로 묶어 계산하는데, 그 값은 계산이 아니라 <b>측정</b>으로 알아야 합니다.</p></div>
+    <div class="callout def"><strong>정의 7.3 (대수 감쇠율)</strong> 자유 진동 기록에서 \(n\) 주기 떨어진 두 마루 \(u_i\), \(u_{i+n}\)의 비의 자연 로그를 \(n\)으로 나눈 값을 <span class="term">대수 감쇠율</span><span class="en">(logarithmic decrement)</span> \(\delta\)라 한다.
+      <div class="formula">$$\delta = \frac{1}{n}\ln\frac{u_i}{u_{i+n}} = \frac{2\pi\zeta}{\sqrt{1-\zeta^2}} \quad\Longrightarrow\quad \zeta = \frac{\delta}{\sqrt{4\pi^2 + \delta^2}} \approx \frac{\delta}{2\pi}$$<div class="where">작은 감쇠(ζ ≲ 0.1)에서는 근사식의 오차가 0.5 % 미만이다. 진폭이 절반으로 줄 때까지의 주기 수 \(n_{1/2}\)로 쓰면 \(\zeta \approx 0.11/n_{1/2}\)(ln 2/2π = 0.110).</div></div></div>
+    <div class="callout"><strong>예제 7.2 (기록에서 감쇠비 읽기)</strong> 기진기를 멈춘 뒤의 지붕 가속도 기록에서 어떤 마루가 42.0 mm/s², 다섯 주기 뒤 마루가 9.2 mm/s²였다.
+      <ol class="dy-steps">
+        <li><b>대수 감쇠율.</b> \(\delta = \tfrac15\ln(42.0/9.2) = \tfrac15 \times 1.518 = 0.304\).</li>
+        <li><b>감쇠비.</b> \(\zeta = 0.304/\sqrt{39.48 + 0.092} = 0.0483\), 근사식 \(0.304/2\pi = 0.0484\). 약 4.8 %.</li>
+        <li><b>왜 다섯 주기인가.</b> 측정 잡음이 ±0.3 mm/s²라면 이웃한 두 마루(42.0, 31.0)로는 δ의 오차가 최대 약 ±0.017(ζ로 약 ±0.3 %p)이다. 다섯 주기 떨어진 마루로 재면 끝 마루가 작아 상대 오차는 커지지만 그 오차가 n = 5로 나뉘어 ±0.008(±0.13 %p)로 준다. 진폭이 잡음 수준까지 작아진 끝부분만 쓰는 것은 피한다.</li>
+      </ol>
+      가속도·속도·변위 어느 기록이든 자유 진동이면 마루 비가 같으므로 같은 δ가 나온다.</div>
+    <div class="sim" id="sim-dy-logdec">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>감쇠 측정: 기록에서 ζ 찾기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dy-cv-logdec" aria-label="잡음이 섞인 자유 진동 기록과 선택한 두 마루"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>첫 마루 i <output id="dy-ld-i-out"></output></span><input type="range" id="dy-ld-i" min="0" max="10" step="1" value="0"></label>
+          <label class="ctrl"><span>마루 간격 n <output id="dy-ld-n-out"></output></span><input type="range" id="dy-ld-n" min="1" max="12" step="1" value="1"></label>
+          <label class="ctrl"><span>측정 잡음 <output id="dy-ld-s-out"></output></span><input type="range" id="dy-ld-s" min="0" max="8" step="0.5" value="3"></label>
+          <div class="btn-row"><button class="btn" id="dy-ld-new">새 기록</button><button class="btn primary" id="dy-ld-show">정답 보기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">u<sub>i</sub> · u<sub>i+n</sub></span><span class="v" id="dy-ld-u">—</span></div>
+        <div class="stat"><span class="k">δ</span><span class="v" id="dy-ld-d">—</span></div>
+        <div class="stat"><span class="k">추정 ζ</span><span class="v" id="dy-ld-z">—</span></div>
+        <div class="stat"><span class="k">추정 T<sub>D</sub></span><span class="v" id="dy-ld-T">—</span></div>
+      </div>
+      <div class="dy-msg" id="dy-ld-msg"></div>
+      <div class="sim-note">해볼 것: n = 1로 이웃한 마루만 쓰면 잡음 때문에 추정값이 흔들립니다. n을 키우면 정답에 가까워지지만, 끝 마루가 잡음 수준까지 작아지면 다시 나빠집니다 · "새 기록"은 주기 0.3–2.5 s, 감쇠 1–10 %인 건물을 무작위로 고릅니다 · 모델: 원리 7.2의 자유 진동(초기 속도 0)에 고정 시드의 정규 잡음을 더한 교육용 기록. 마루 위치는 t = jT<sub>D</sub>.</div>
+    </div>
+    <p>측정된 감쇠비는 구조 형식과 진폭에 따라 다릅니다. 같은 건물이라도 상시 미진동(진폭이 아주 작음)에서 재면 1–2 %, 지진처럼 크게 흔들리면 균열과 마찰이 늘어 더 커지는 것이 보통입니다. 설계에서 흔히 쓰는 값은 아래 표와 같습니다(교육용 대략값, 기준과 해석 목적에 따라 다르다).</p>
+    <div class="table-wrap"><table class="dy-tbl">
+      <thead><tr><th>구조</th><th>감쇠비 ζ(대략)</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td>철근콘크리트 건물(내진 해석)</td><td class="hl">5 %</td><td>설계 응답 스펙트럼의 기본 감쇠(8장)</td></tr>
+        <tr><td>강구조 건물(용접 골조)</td><td>2–3 %</td><td>볼트 접합·칸막이가 많으면 더 크다</td></tr>
+        <tr><td>초고층 건물(풍진동 사용성 검토)</td><td>1–2 %</td><td>높을수록 작아지는 경향(측정)</td></tr>
+        <tr><td>강 보도교·강 굴뚝</td><td>0.5–1 %</td><td>보행·와류 진동이 문제(6·15장)</td></tr>
+        <tr><td>면진층·감쇠기를 단 건물</td><td>10–30 %</td><td>장치가 에너지를 흡수(9장)</td></tr>
+      </tbody></table></div>
+    <div class="callout deep"><strong>다자유도의 감쇠: 레일리 감쇠</strong> 점성 감쇠를 다자유도로 넓히면 감쇠 행렬 \(\mathbf C\)가 필요하다. 그러나 감쇠는 부재마다 잴 수 없으므로 보통 모드마다 감쇠비를 정하고, 모드 중첩에서는 그 값을 바로 쓴다. 시간 이력 해석처럼 행렬이 꼭 필요하면 <span class="term">레일리 감쇠</span><span class="en">(Rayleigh damping)</span> \(\mathbf C = a_0\mathbf M + a_1\mathbf K\)를 쓴다. 이때 모드 n의 감쇠비는 \(\zeta_n = a_0/(2\omega_n) + a_1\omega_n/2\)이므로 두 모드(예: 1차와 3차)에서 원하는 ζ가 되도록 \(a_0, a_1\)을 정한다. 그 사이 모드는 ζ가 조금 작고, 높은 모드는 크게 감쇠된다. 비선형 해석에서 강성 비례항이 지나친 감쇠를 주는 문제도 알려져 있어, 실무에서는 해석 프로그램의 설정을 확인해야 한다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="harmonic">
+    <h2>조화 하중과 공진</h2>
+    <div class="problem"><strong>리듬이 맞으면 작은 힘도 크게 흔든다</strong>
+      <p>그네를 미는 아이는 그네가 앞으로 나갈 때마다 살짝 밉니다. 힘은 작아도 박자가 그네의 고유 주기와 맞으면 진폭이 점점 커집니다. 건물 위 기계, 사람들의 뛰기, 와류(6장)처럼 일정한 박자로 반복되는 하중은 구조물의 고유 진동수와 가까울 때 정적 변위의 몇십 배까지 응답을 키울 수 있습니다.</p></div>
+    <p>진폭 \(p_0\), 원진동수 \(\omega\)의 <span class="term">조화 하중</span><span class="en">(harmonic load)</span> \(p(t) = p_0\sin\omega t\)를 받는 1자유도계의 응답은 처음 시작할 때의 과도 응답(감쇠로 사라짐)과, 하중과 같은 진동수로 계속되는 정상 상태 응답의 합입니다. 정상 상태 응답의 진폭을 정적 변위 \(u_{st} = p_0/k\)로 나눈 값이 <span class="term">동적 증폭 계수</span><span class="en">(dynamic amplification factor)</span>입니다.</p>
+    <div class="callout def"><strong>원리 7.4 (정상 상태 응답과 동적 증폭)</strong> 진동수 비 \(r = \omega/\omega_n\)일 때 정상 상태 응답은 \(u(t) = u_{st}R_d\sin(\omega t - \phi)\)이고
+      <div class="formula">$$R_d = \frac{1}{\sqrt{(1-r^2)^2 + (2\zeta r)^2}}, \qquad \tan\phi = \frac{2\zeta r}{1-r^2}$$<div class="where">\(\phi\): 응답이 하중보다 늦는 <span class="term">위상각</span><span class="en">(phase angle)</span>(0–180°). \(r \ll 1\)이면 \(R_d \to 1\)(준정적, 강성이 지배), \(r = 1\)이면 \(R_d = 1/(2\zeta)\)이고 \(\phi = 90°\)(감쇠가 지배), \(r \gg 1\)이면 \(R_d \to 1/r^2\)(질량이 지배, 응답이 하중과 반대로 움직인다). 최댓값은 \(r = \sqrt{1-2\zeta^2}\)에서 \(1/(2\zeta\sqrt{1-\zeta^2})\).</div></div></div>
+    <p>\(r = 1\) 부근에서 응답이 크게 커지는 현상이 <span class="term">공진</span><span class="en">(resonance)</span>입니다. 감쇠가 5 %이면 \(R_d = 10\), 1 %이면 50입니다. 공진에서 \(R_d\)를 정하는 것은 감쇠뿐이므로, 공진을 피할 수 없을 때는 감쇠를 키우는 것(9장의 감쇠기, TMD)이 직접적인 대책입니다. 피할 수 있다면 고유 진동수를 하중 진동수에서 멀리 옮깁니다. 강성을 키워 \(r\)을 작게 하거나(경험적으로 \(r \lt 0.7\) 정도), 반대로 아주 유연하게 해서 \(r\)을 크게 합니다(면진의 원리, 9장).</p>
+    <div class="callout"><strong>예제 7.3 (한 층 모형의 조화 가진)</strong> 예제 7.1의 한 층(\(f_n = 6.57\) Hz, ζ = 5 %)에 진폭 100 kN, 5.0 Hz의 조화 하중이 작용한다.
+      <ol class="dy-steps">
+        <li><b>정적 변위.</b> \(u_{st} = 100/(1.2\times10^6) = 8.33\times10^{-5}\) m = 0.083 mm.</li>
+        <li><b>진동수 비.</b> \(r = 5.0/6.57 = 0.761\), \(1-r^2 = 0.421\), \(2\zeta r = 0.0761\).</li>
+        <li><b>증폭.</b> \(R_d = 1/\sqrt{0.421^2 + 0.0761^2} = 1/0.428 = 2.34\) → 진폭 0.195 mm. 위상각 \(\phi = \arctan(0.0761/0.421) = 10.2°\).</li>
+        <li><b>공진이었다면.</b> 6.57 Hz로 밀면 \(R_d = 10\), 진폭 0.83 mm. 같은 100 kN이 정적일 때의 열 배다.</li>
+      </ol></div>
+    <div class="sim" id="sim-dy-res">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>공진 곡선과 위상</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dy-stack">
+          <div><canvas id="dy-cv-res" aria-label="진동수 비에 따른 동적 증폭 계수 곡선"></canvas></div>
+          <div><canvas id="dy-cv-res-w" aria-label="하중과 응답의 정상 상태 파형"></canvas><span class="dy-cap">정상 상태: 하중 p/p₀(주황) · 응답 u/u<sub>st</sub>(청록)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">진동수 비 r = ω/ω<sub>n</sub></i> <output id="dy-rs-r-out"></output></span><input type="range" id="dy-rs-r" min="0" max="3" step="0.005" value="0.76"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="dy-rs-z-out"></output></span><input type="range" id="dy-rs-z" min="0.5" max="70" step="0.5" value="5"></label>
+          <div class="ctrl"><span>세로축</span><div class="seg" id="dy-rs-ax"><button data-value="lin" class="on">선형</button><button data-value="log">로그</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">R<sub>d</sub></span><span class="v" id="dy-rs-rd">—</span></div>
+        <div class="stat"><span class="k">위상각 φ</span><span class="v" id="dy-rs-ph">—</span></div>
+        <div class="stat"><span class="k">최대 R<sub>d</sub> (r 위치)</span><span class="v" id="dy-rs-pk">—</span></div>
+        <div class="stat"><span class="k">지배 요소</span><span class="v" id="dy-rs-dom">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: r을 1에 맞추면 위상이 정확히 90°가 되어 응답이 하중보다 1/4 주기 늦습니다 · r을 2 이상으로 올리면 응답이 하중과 거의 반대로 움직이고 진폭은 1/r²로 줄어듭니다 · 감쇠를 70 %까지 올리면 봉우리가 사라집니다(ζ ≥ 1/√2) · 모델: 원리 7.4, CB.dyn.Rd. 회색 곡선은 ζ = 2, 5, 10, 20, 50 %.</div>
+    </div>
+    <div class="callout warn"><strong>공진은 "시간이 걸린다"</strong> 정상 상태 진폭에 이르려면 여러 주기가 필요하다. 감쇠가 없는 계를 공진 진동수로 밀면 진폭은 한 주기에 \(\pi u_{st}\)씩 직선으로 커진다. 감쇠가 ζ이면 대략 \(1/(2\pi\zeta)\) 주기(ζ = 5 %이면 약 3주기) 정도 지나야 정상 상태 진폭의 63 %에 닿는다. 그래서 짧고 불규칙한 지진은 "완전한 공진"을 만들지는 않지만, 지반이 특정 주기로 여러 번 흔들리면(연약 지반, GeotechBook 15장) 그 주기의 건물은 크게 응답한다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="ground-motion">
+    <h2>지반 운동을 받는 구조물</h2>
+    <div class="problem"><strong>지진은 힘이 아니라 땅의 움직임이다</strong>
+      <p>지진 때 누구도 건물을 옆에서 밀지 않습니다. 땅이 움직이고, 기초가 따라 움직이고, 위의 바닥이 늦게 따라가며 기둥이 휩니다. 외력 p(t)가 없는데 어떻게 운동 방정식을 세울까요?</p></div>
+    <p>땅의 변위를 \(u_g(t)\), 바닥의 전체(절대) 변위를 \(u^t = u_g + u\)라 하면, 기둥의 변형과 감쇠기의 늘음을 정하는 것은 땅에 대한 <span class="term">상대 변위</span><span class="en">(relative displacement)</span> \(u\)이고, 관성력을 정하는 것은 절대 가속도 \(\ddot u^t = \ddot u_g + \ddot u\)입니다. 그래서 운동 방정식은 \(m(\ddot u_g + \ddot u) + c\dot u + ku = 0\), 곧</p>
+    <div class="callout def"><strong>원리 7.5 (지반 운동의 운동 방정식)</strong>
+      <div class="formula">$$m\ddot u + c\dot u + k u = -m\,\ddot u_g(t) \quad\Longleftrightarrow\quad \ddot u + 2\zeta\omega_n\dot u + \omega_n^2 u = -\ddot u_g(t)$$<div class="where">지반 가속도 \(\ddot u_g\)는 바닥에 \(-m\ddot u_g\)라는 <span class="term">유효 지진 하중</span><span class="en">(effective earthquake force)</span>을 거는 것과 같다. 오른쪽 식에서 질량이 사라지므로, 같은 지진에 대한 상대 변위 응답은 \(\omega_n\)(주기)과 \(\zeta\)만으로 정해진다. 이것이 응답 스펙트럼이 주기와 감쇠의 함수인 이유다. 기둥이 받는 힘은 \(f_S = ku\), 밑면 전단력은 \(V_b = ku = m\omega_n^2 u\)이다.</div></div></div>
+    <figure class="diagram" id="fig-dy-ground">
+      <svg viewBox="0 0 860 300" role="img" aria-label="지반 변위, 상대 변위, 절대 변위의 관계와 유효 지진 하중">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="0" y="12" class="t" style="font-weight:700">실제: 땅이 움직인다</text>
+          <line x1="0" y1="220" x2="350" y2="220" style="stroke:var(--accent-2);stroke-width:2.4"/>
+          <line x1="60" y1="236" x2="110" y2="236" style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#dy-ah-ld)"/>
+          <text x="60" y="254" class="t-mono" style="fill:var(--accent-2)">u<tspan baseline-shift="sub" font-size="8">g</tspan>(t), ü<tspan baseline-shift="sub" font-size="8">g</tspan>(t)</text>
+          <line x1="60" y1="220" x2="60" y2="70" style="stroke:var(--text-faint);stroke-width:1.2;stroke-dasharray:4 4"/>
+          <line x1="110" y1="220" x2="110" y2="70" style="stroke:var(--text-faint);stroke-width:1.2;stroke-dasharray:4 4"/>
+          <path d="M110 220 C 114 160, 126 110, 150 80" style="fill:none;stroke:var(--accent);stroke-width:3.6"/>
+          <path d="M280 220 C 284 160, 296 110, 320 80" style="fill:none;stroke:var(--accent);stroke-width:3.6"/>
+          <rect x="134" y="60" width="204" height="22" rx="3" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <text x="236" y="75" text-anchor="middle" class="t-mono" style="fill:var(--accent)">m</text>
+          <line x1="60" y1="44" x2="110" y2="44" style="stroke:var(--accent-2);stroke-width:1.6" marker-end="url(#dy-ah-ld)"/>
+          <line x1="110" y1="44" x2="150" y2="44" style="stroke:var(--accent);stroke-width:1.6" marker-end="url(#dy-ah-acc)"/>
+          <text x="80" y="36" class="t-mono" style="fill:var(--accent-2)">u<tspan baseline-shift="sub" font-size="8">g</tspan></text>
+          <text x="124" y="36" class="t-mono" style="fill:var(--accent)">u</text>
+          <line x1="60" y1="28" x2="150" y2="28" style="stroke:var(--text-dim);stroke-width:1.2" marker-end="url(#dy-ah-t)"/>
+          <text x="160" y="32" class="t-mono">u<tspan baseline-shift="super" font-size="8">t</tspan> = u<tspan baseline-shift="sub" font-size="8">g</tspan> + u (절대)</text>
+          <text x="150" y="130" class="t-mono">기둥 변형 = u(상대)</text>
+          <text x="150" y="146" class="t-mono">관성력 = m(ü<tspan baseline-shift="sub" font-size="8">g</tspan> + ü)</text>
+        </g>
+        <text x="430" y="160" text-anchor="middle" class="t" style="font-weight:700">≡</text>
+        <g transform="translate(480,30)">
+          <text x="0" y="12" class="t" style="font-weight:700">등가: 땅은 고정, 바닥에 −mü<tspan baseline-shift="sub" font-size="9">g</tspan></text>
+          <line x1="0" y1="220" x2="330" y2="220" class="s-axis"/>
+          <path d="M0 220 l8 10 M30 220 l8 10 M60 220 l8 10 M90 220 l8 10 M200 220 l8 10 M230 220 l8 10 M260 220 l8 10 M290 220 l8 10" style="stroke:var(--text-faint);stroke-width:1.2"/>
+          <path d="M60 220 C 64 160, 76 110, 100 80" style="fill:none;stroke:var(--accent);stroke-width:3.6"/>
+          <path d="M200 220 C 204 160, 216 110, 240 80" style="fill:none;stroke:var(--accent);stroke-width:3.6"/>
+          <rect x="84" y="60" width="174" height="22" rx="3" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <line x1="258" y1="71" x2="318" y2="71" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#dy-ah-ld)"/>
+          <text x="262" y="56" class="t-mono" style="fill:var(--accent-2)">p<tspan baseline-shift="sub" font-size="8">eff</tspan> = −mü<tspan baseline-shift="sub" font-size="8">g</tspan></text>
+          <text x="80" y="160" class="t-mono">mü + cu̇ + ku = −mü<tspan baseline-shift="sub" font-size="8">g</tspan></text>
+          <text x="80" y="180" class="t-mono">밑면 전단 V<tspan baseline-shift="sub" font-size="8">b</tspan> = ku = mω²u</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-3.</b> 지반 운동과 상대 변위. 땅이 오른쪽으로 가속하면 바닥은 상대적으로 왼쪽에 남는다. 땅을 고정하고 바닥에 질량 × 지반 가속도를 반대 방향으로 거는 문제와 똑같다. 지진 하중은 "건물 무게 × 지반 가속도"가 아니라 이 방정식의 응답 ku다.</figcaption>
+    </figure>
+    <p>지반 가속도 기록은 가속도계로 잰 시계열이며, 그 최댓값이 <span class="term">최대 지반 가속도</span><span class="en">(peak ground acceleration, PGA)</span>입니다. 지진 기록은 수십 초 동안 여러 진동수가 섞인 불규칙한 파형이라 닫힌 해가 없고, 시간을 잘게 나눠 수치로 풀어야 합니다. 이 장의 시뮬레이터는 실제 기록 대신 <code>CB.dyn.quake</code>가 만드는 교육용 인공 지진파(포락선 × 0.3–8 Hz 사인파 40개의 합, 시드 고정)를 씁니다. 실제 지진 기록의 주파수 특성은 규모·거리·지반에 따라 다르며(GeotechBook 15장), 설계용 시간 이력 해석에는 설계 스펙트럼에 맞춘 기록을 여러 개 쓴다는 점을 기억하세요.</p>
+    <div class="sim" id="sim-dy-quake">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>지진 시간 이력: 1자유도 건물의 응답</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dy-stack">
+          <div><canvas id="dy-cv-qk-b" aria-label="지반과 함께 흔들리는 1자유도 건물"></canvas><span class="dy-cap">변형 과장 · 땅(주황) · 바닥(청록)</span></div>
+          <div><canvas id="dy-cv-qk-t" aria-label="지반 가속도, 상대 변위, 절대 가속도 시간 이력"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>지진파</span><div class="seg" id="dy-qk-seed"><button data-value="7" class="on">A</button><button data-value="21">B</button><button data-value="45">C</button></div></div>
+          <label class="ctrl"><span>PGA <output id="dy-qk-pga-out"></output></span><input type="range" id="dy-qk-pga" min="0.05" max="0.5" step="0.01" value="0.22"></label>
+          <label class="ctrl"><span><i style="font-style:normal">고유 주기 T<sub>n</sub></i> <output id="dy-qk-T-out"></output></span><input type="range" id="dy-qk-T" min="0.05" max="4" step="0.01" value="1.0"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="dy-qk-z-out"></output></span><input type="range" id="dy-qk-z" min="0" max="20" step="0.5" value="5"></label>
+          <label class="ctrl"><span>시각 t <output id="dy-qk-t-out"></output></span><input type="range" id="dy-qk-t" min="0" max="20" step="0.01" value="8"></label>
+          <div class="btn-row"><button class="btn primary" id="dy-qk-play">▶ 재생</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 |u|</span><span class="v" id="dy-qk-u">—</span></div>
+        <div class="stat"><span class="k">최대 |ü<sup>t</sup>|</span><span class="v" id="dy-qk-a">—</span></div>
+        <div class="stat"><span class="k">ü<sup>t</sup><sub>max</sub> / PGA</span><span class="v" id="dy-qk-amp">—</span></div>
+        <div class="stat"><span class="k">밑면 전단 / 무게</span><span class="v" id="dy-qk-v">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: T<sub>n</sub>을 0.05 s로 줄이면 건물이 땅과 한 몸처럼 움직여 절대 가속도 ≈ PGA, 상대 변위 ≈ 0입니다 · 4 s로 늘리면 바닥이 거의 제자리에 남아(절대 가속도 작음) 상대 변위 ≈ 땅의 변위가 됩니다 · 0.2–0.6 s에서는 절대 가속도가 PGA의 두세 배까지 커집니다 · 모델: 원리 7.5를 CB.dyn.newmark(평균 가속도법, Δt = 0.01 s)로 풉니다. 입력을 바꿀 때만 다시 계산하고 재생은 결과를 보여 줍니다. 지진파는 CB.dyn.quake(20 s, 교육용).</div>
+    </div>
+    <p>시뮬레이터에서 읽은 "밑면 전단 / 무게"가 바로 그 건물이 받는 지진 하중 계수입니다. 감쇠가 있으면 \(V_b = ku\)와 \(m\ddot u^t\)는 감쇠력만큼 다르지만(\(m\ddot u^t = -c\dot u - ku\)), 최댓값 근처에서는 속도가 작아 거의 같습니다. 이 차이를 무시하고 \(\omega_n^2 u_{max}\)를 가속도처럼 쓰는 것이 다음 절의 <b>의사 가속도</b>입니다.</p>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="newmark">
+    <h2>수치 해법: 뉴마크 평균 가속도법</h2>
+    <div class="problem"><strong>지진 기록은 식이 아니라 숫자 2,000개다</strong>
+      <p>0.01초마다 잰 20초짜리 지반 가속도는 2,000개의 숫자입니다. 이 하중에 대한 해를 식으로 쓸 수는 없지만, 짧은 시간 간격 Δt 안에서 가속도가 어떻게 변한다고 가정하면 한 걸음씩 다음 상태를 계산할 수 있습니다. 어떤 가정을 해야 정확하고, 어떤 Δt면 충분할까요?</p></div>
+    <p>시간 적분법은 \(t_i\)의 변위·속도·가속도 \((u_i, \dot u_i, \ddot u_i)\)를 알 때 \(t_{i+1} = t_i + \Delta t\)의 상태를 구하는 규칙입니다. 뉴마크는 한 걸음 동안의 가속도 변화를 두 개의 매개변수 \(\gamma\), \(\beta\)로 나타냈습니다. 그중 <span class="term">평균 가속도법</span><span class="en">(average acceleration method)</span>은 한 걸음 동안 가속도가 처음과 끝 값의 평균으로 일정하다고 보는 방법(\(\gamma = 1/2\), \(\beta = 1/4\))이고, 어떤 Δt에서도 해가 발산하지 않는(무조건 안정) 성질 때문에 가장 널리 쓰입니다.</p>
+    <figure class="diagram" id="fig-dy-newmark">
+      <svg viewBox="0 0 860 290" role="img" aria-label="뉴마크 평균 가속도법의 가정: 한 시간 간격 동안 가속도는 처음과 끝의 평균으로 일정">
+        <rect x="10" y="10" width="840" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <line x1="0" y1="200" x2="360" y2="200" class="s-axis"/><line x1="0" y1="0" x2="0" y2="210" class="s-axis"/>
+          <text x="6" y="10" class="t-mono">ü(τ)</text><text x="356" y="218" text-anchor="end" class="t-mono">τ</text>
+          <path d="M20 150 C 80 60, 160 40, 230 80 S 320 160, 350 120" style="fill:none;stroke:var(--text-faint);stroke-width:1.6;stroke-dasharray:5 4"/>
+          <text x="250" y="62" class="t-mono">실제 ü(t)</text>
+          <line x1="100" y1="200" x2="100" y2="74" style="stroke:var(--text-dim);stroke-width:1"/>
+          <line x1="260" y1="200" x2="260" y2="96" style="stroke:var(--text-dim);stroke-width:1"/>
+          <circle cx="100" cy="74" r="5" style="fill:var(--accent)"/><circle cx="260" cy="96" r="5" style="fill:var(--accent-2)"/>
+          <text x="92" y="66" text-anchor="end" class="t-mono" style="fill:var(--accent)">ü<tspan baseline-shift="sub" font-size="8">i</tspan></text>
+          <text x="268" y="90" class="t-mono" style="fill:var(--accent-2)">ü<tspan baseline-shift="sub" font-size="8">i+1</tspan></text>
+          <rect x="100" y="85" width="160" height="115" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.8"/>
+          <text x="180" y="150" text-anchor="middle" class="t-mono" style="fill:var(--accent)">½(ü<tspan baseline-shift="sub" font-size="8">i</tspan> + ü<tspan baseline-shift="sub" font-size="8">i+1</tspan>)</text>
+          <text x="180" y="166" text-anchor="middle" class="t-mono" style="fill:var(--accent)">로 일정하다고 가정</text>
+          <line x1="100" y1="226" x2="260" y2="226" style="stroke:var(--text-dim);stroke-width:1.3" marker-start="url(#dy-ah-t)" marker-end="url(#dy-ah-t)"/>
+          <text x="180" y="244" text-anchor="middle" class="t-mono">Δt</text>
+          <text x="100" y="216" text-anchor="middle" class="t-mono">t<tspan baseline-shift="sub" font-size="8">i</tspan></text><text x="260" y="216" text-anchor="middle" class="t-mono">t<tspan baseline-shift="sub" font-size="8">i+1</tspan></text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="0" y="10" class="t" style="font-weight:700">적분하면</text>
+          <text x="0" y="40" class="t-mono">u̇<tspan baseline-shift="sub" font-size="8">i+1</tspan> = u̇<tspan baseline-shift="sub" font-size="8">i</tspan> + (Δt/2)(ü<tspan baseline-shift="sub" font-size="8">i</tspan> + ü<tspan baseline-shift="sub" font-size="8">i+1</tspan>)</text>
+          <text x="0" y="64" class="t-mono">u<tspan baseline-shift="sub" font-size="8">i+1</tspan> = u<tspan baseline-shift="sub" font-size="8">i</tspan> + Δt u̇<tspan baseline-shift="sub" font-size="8">i</tspan> + (Δt²/4)(ü<tspan baseline-shift="sub" font-size="8">i</tspan> + ü<tspan baseline-shift="sub" font-size="8">i+1</tspan>)</text>
+          <text x="0" y="100" class="t" style="font-weight:700">+ 운동 방정식(t<tspan baseline-shift="sub" font-size="9">i+1</tspan>)</text>
+          <text x="0" y="128" class="t-mono">mü<tspan baseline-shift="sub" font-size="8">i+1</tspan> + cu̇<tspan baseline-shift="sub" font-size="8">i+1</tspan> + ku<tspan baseline-shift="sub" font-size="8">i+1</tspan> = p<tspan baseline-shift="sub" font-size="8">i+1</tspan></text>
+          <text x="0" y="164" class="t-dim">미지수 셋, 식 셋 → u<tspan baseline-shift="sub" font-size="8">i+1</tspan>부터 푼다</text>
+          <text x="0" y="190" class="t-dim">k̂ = k + 2c/Δt + 4m/Δt²(유효 강성)</text>
+          <text x="0" y="214" class="t-dim">한 걸음마다 "정적 문제" k̂ Δu = Δp̂ 하나</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-4.</b> 평균 가속도법의 가정. 한 걸음 동안 가속도를 처음과 끝 값의 평균으로 일정하게 두고 두 번 적분하면 속도·변위 갱신식이 나온다. 여기에 걸음 끝의 운동 방정식을 더하면 미지수가 풀린다. 선형 가속도법(β = 1/6)은 가속도가 직선으로 변한다고 본다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 7.6 (뉴마크 방법)</strong> 매개변수 \(\gamma\), \(\beta\)의 <span class="term">뉴마크 방법</span><span class="en">(Newmark method)</span>은
+      <div class="formula">$$\dot u_{i+1} = \dot u_i + \big[(1-\gamma)\ddot u_i + \gamma\,\ddot u_{i+1}\big]\Delta t, \qquad u_{i+1} = u_i + \Delta t\,\dot u_i + \Big[\big(\tfrac12-\beta\big)\ddot u_i + \beta\,\ddot u_{i+1}\Big]\Delta t^2$$<div class="where">평균 가속도법 \(\gamma = 1/2,\ \beta = 1/4\): 무조건 안정, 진폭 감소 없음, 주기가 조금 길어진다(\(\Delta t/T = 0.1\)에서 약 3 %). 선형 가속도법 \(\gamma = 1/2,\ \beta = 1/6\): 조금 더 정확하지만 \(\Delta t/T \le \sqrt3/\pi = 0.551\)일 때만 안정하다. 정확도를 위해 흔히 \(\Delta t \le T/10\)(그리고 지진 기록의 샘플 간격 이하)을 쓴다.</div></div></div>
+    <div class="callout deep"><strong>알고리즘: 평균 가속도법을 증분 꼴로</strong> <code>CB.dyn.newmark</code>가 하는 일이다(선형계).
+      <ol class="dy-steps">
+        <li><b>준비.</b> \(\omega_n = 2\pi/T\), \(k = m\omega_n^2\), \(c = 2\zeta m\omega_n\). 초기 가속도 \(\ddot u_0 = (p_0 - c\dot u_0 - ku_0)/m\). 지반 운동이면 \(p_i = -m\ddot u_{g,i}\).</li>
+        <li><b>유효 강성.</b> \(\hat k = k + \dfrac{2c}{\Delta t} + \dfrac{4m}{\Delta t^2}\)(선형계는 한 번만 계산).</li>
+        <li><b>걸음마다 유효 하중 증분.</b> \(\Delta\hat p_i = (p_{i+1} - p_i) + m\Big(\dfrac{4}{\Delta t}\dot u_i + 2\ddot u_i\Big) + 2c\,\dot u_i\).</li>
+        <li><b>변위·속도 증분.</b> \(\Delta u_i = \Delta\hat p_i/\hat k\), \(\Delta\dot u_i = \dfrac{2}{\Delta t}\Delta u_i - 2\dot u_i\). 갱신 \(u_{i+1} = u_i + \Delta u_i\), \(\dot u_{i+1} = \dot u_i + \Delta\dot u_i\).</li>
+        <li><b>가속도는 평형에서.</b> \(\ddot u_{i+1} = (p_{i+1} - c\dot u_{i+1} - ku_{i+1})/m\). 누적 오차가 쌓이지 않도록 갱신식 대신 운동 방정식으로 구한다. 절대 가속도는 \(\ddot u^t = \ddot u + \ddot u_g\).</li>
+        <li><b>되풀이.</b> 3–5단계를 마지막 시각까지. 비선형계(8장의 소성 골조)는 \(k\)가 걸음마다 바뀌므로 \(\hat k\)를 다시 만들고, 한 걸음 안에서 뉴턴–랩슨 반복으로 평형을 맞춘다.</li>
+      </ol></div>
+    <div class="callout"><strong>예제 7.4 (한 걸음 손계산)</strong> \(m = 1\) t, \(T = 1.0\) s(\(k = 4\pi^2 = 39.48\) kN/m), 감쇠 없음, 정지 상태에서 \(t = 0\)부터 일정한 힘 \(p = 1\) kN, \(\Delta t = 0.1\) s.
+      <ol class="dy-steps">
+        <li><b>초기.</b> \(u_0 = \dot u_0 = 0\), \(\ddot u_0 = 1/1 = 1\) m/s².</li>
+        <li><b>유효 강성.</b> \(\hat k = 39.48 + 4/0.01 = 439.5\) kN/m.</li>
+        <li><b>유효 하중.</b> \(\Delta p = 0\)(힘이 일정), \(\Delta\hat p = 0 + 1 \times (0 + 2 \times 1) = 2\) kN.</li>
+        <li><b>갱신.</b> \(\Delta u = 2/439.5 = 4.551\times10^{-3}\) m, \(\dot u_1 = (2/0.1)(4.551\times10^{-3}) - 0 = 0.0910\) m/s, \(\ddot u_1 = (1 - 39.48 \times 0.004551)/1 = 0.820\) m/s².</li>
+        <li><b>정해와 비교.</b> 정해 \(u = (p/k)(1-\cos\omega_n t)\): \(u(0.1) = 0.02533(1-\cos 0.628) = 4.838\times10^{-3}\) m. 첫 걸음 오차 −5.9 %. 두 번째 걸음은 \(0.01657\)(정해 0.01750). 최댓값은 \(2p/k = 0.0507\) m로 같게 나오지만, 마루가 오는 시각이 한 주기에 약 3 % 늦어진다. \(\Delta t = 0.02\) s면 주기 오차는 0.13 %로 준다.</li>
+      </ol></div>
+    <div class="sim" id="sim-dy-nm">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>뉴마크 방법의 정확도와 안정성</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dy-cv-nm" aria-label="계단 하중에 대한 정해와 수치해 비교"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>방법</span><div class="seg" id="dy-nm-meth"><button data-value="avg" class="on">평균 가속도(β = 1/4)</button><button data-value="lin">선형 가속도(β = 1/6)</button></div></div>
+          <label class="ctrl"><span>Δt / T <output id="dy-nm-dt-out"></output></span><input type="range" id="dy-nm-dt" min="0.01" max="0.7" step="0.005" value="0.1"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="dy-nm-z-out"></output></span><input type="range" id="dy-nm-z" min="0" max="10" step="0.5" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">걸음 수 / 주기</span><span class="v" id="dy-nm-n">—</span></div>
+        <div class="stat"><span class="k">주기 오차</span><span class="v" id="dy-nm-pe">—</span></div>
+        <div class="stat"><span class="k">5주기 뒤 위상 지연</span><span class="v" id="dy-nm-er">—</span></div>
+        <div class="stat"><span class="k">안정성</span><span class="v" id="dy-nm-st">—</span></div>
+      </div>
+      <div class="dy-msg" id="dy-nm-msg"></div>
+      <div class="sim-note">해볼 것: Δt/T를 0.1에서 0.3으로 키우면 수치해(점)가 정해(선)보다 점점 늦어집니다(주기 연장) · 선형 가속도법으로 바꾸고 Δt/T를 0.551 넘게 올리면 해가 발산합니다 · 모델: T = 1 s, m = 1 t, 계단 하중 1 kN(정적 변위 25.3 mm), 정해는 감쇠 계단 응답의 닫힌 해. 평균 가속도법은 CB.dyn.newmark, 선형 가속도법은 같은 증분 꼴을 β = 1/6으로 바꾼 페이지 내 구현입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="spectrum">
+    <h2>응답 스펙트럼</h2>
+    <div class="problem"><strong>지진 하나를 표 하나로</strong>
+      <p>설계자가 알고 싶은 것은 지진 내내의 응답 곡선이 아니라 <b>최댓값</b>입니다. 그리고 원리 7.5에서 보았듯 같은 지진에 대한 1자유도계의 응답은 주기와 감쇠만으로 정해집니다. 그렇다면 주기를 0.05 s부터 4 s까지 바꿔 가며 최대 응답을 한 번씩 계산해 두면, 어떤 건물이든 주기만 알면 최대 응답을 표에서 읽을 수 있습니다.</p></div>
+    <div class="callout def"><strong>정의 7.7 (응답 스펙트럼)</strong> 주어진 지반 가속도 \(\ddot u_g(t)\)와 감쇠비 \(\zeta\)에 대해 고유 주기 \(T_n\)인 1자유도계의 최대 상대 변위를 \(T_n\)의 함수로 그린 것을 변위 <span class="term">응답 스펙트럼</span><span class="en">(response spectrum)</span> \(S_d(T_n, \zeta) = \max_t |u(t)|\)라 한다. 여기서
+      <div class="formula">$$PS_v = \omega_n S_d, \qquad PS_a = \omega_n^2 S_d = \left(\frac{2\pi}{T_n}\right)^2 S_d, \qquad V_b = m\,PS_a = \frac{PS_a}{g}\,W$$<div class="where">\(PS_v\): <span class="term">의사 속도</span><span class="en">(pseudo-velocity)</span>, \(PS_a\): <span class="term">의사 가속도</span><span class="en">(pseudo-acceleration)</span>. "의사"는 실제 최대 속도·가속도와 같지 않고(감쇠가 작으면 가속도는 거의 같다) \(S_d\)에서 계산한 값이라는 뜻이다. 최대 밑면 전단력은 질량 × \(PS_a\), 곧 무게 × \(PS_a/g\)이고, \(PS_a/g\)가 그 건물의 <b>지진 하중 계수</b>다. 최대 변형 에너지는 \(\tfrac12 m PS_v^2\).</div></div></div>
+    <figure class="diagram" id="fig-dy-spec">
+      <svg viewBox="0 0 860 330" role="img" aria-label="진동대 위 주기가 다른 진동자들의 최대 응답을 이어 응답 스펙트럼을 만드는 개념">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(30,30)">
+          <rect x="0" y="230" width="390" height="16" rx="3" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:1.6"/>
+          <line x1="150" y1="262" x2="230" y2="262" style="stroke:var(--accent-2);stroke-width:2.2" marker-start="url(#dy-ah-ld)" marker-end="url(#dy-ah-ld)"/>
+          <text x="195" y="282" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">같은 ü<tspan baseline-shift="sub" font-size="8">g</tspan>(t)</text>
+          <g style="stroke:var(--accent);stroke-width:2.4;fill:none">
+            <path d="M40 230 L40 190"/><path d="M100 230 L102 160"/><path d="M160 230 L166 130"/><path d="M220 230 L230 110"/><path d="M280 230 L290 90"/><path d="M340 230 L346 70"/>
+          </g>
+          <g style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6">
+            <circle cx="40" cy="184" r="7"/><circle cx="102" cy="153" r="8"/><circle cx="166" cy="122" r="9"/><circle cx="230" cy="101" r="10"/><circle cx="290" cy="80" r="10"/><circle cx="346" cy="59" r="11"/>
+          </g>
+          <g class="t-mono" text-anchor="middle"><text x="40" y="214">0.1 s</text><text x="100" y="214">0.3</text><text x="160" y="214">0.5</text><text x="220" y="214">1.0</text><text x="280" y="214">2.0</text><text x="340" y="214">3.0</text></g>
+          <text x="195" y="22" text-anchor="middle" class="t-dim">진동자마다 주기 T<tspan baseline-shift="sub" font-size="8">n</tspan>, 감쇠 ζ = 5 %</text>
+          <text x="195" y="40" text-anchor="middle" class="t-dim">각자 응답을 계산해 최댓값만 남긴다</text>
+        </g>
+        <line x1="436" y1="160" x2="476" y2="160" style="stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#dy-ah-t)"/>
+        <g transform="translate(500,40)">
+          <line x1="0" y1="230" x2="320" y2="230" class="s-axis"/><line x1="0" y1="0" x2="0" y2="230" class="s-axis"/>
+          <text x="316" y="250" text-anchor="end" class="t-mono">T<tspan baseline-shift="sub" font-size="8">n</tspan> (s)</text><text x="8" y="12" class="t-mono">PS<tspan baseline-shift="sub" font-size="8">a</tspan>/g</text>
+          <line x1="0" y1="180" x2="320" y2="180" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="318" y="174" text-anchor="end" class="t-mono">PGA</text>
+          <path d="M0 180 C 12 120, 24 60, 40 50 S 70 30, 86 54 S 110 120, 140 140 S 210 182, 320 205" style="fill:none;stroke:var(--accent);stroke-width:2.8"/>
+          <g style="fill:var(--accent-2)"><circle cx="11" cy="140" r="4"/><circle cx="33" cy="58" r="4"/><circle cx="56" cy="42" r="4"/><circle cx="107" cy="114" r="4"/><circle cx="214" cy="183" r="4"/><circle cx="320" cy="205" r="4"/></g>
+          <text x="60" y="26" class="t-mono" style="fill:var(--accent)">PGA의 2–3배</text>
+          <text x="150" y="128" class="t-mono">T가 길면 가속도는 작고</text>
+          <text x="150" y="144" class="t-mono">변위 S<tspan baseline-shift="sub" font-size="8">d</tspan>는 커진다</text>
+          <text x="2" y="250" class="t-mono">T → 0: PS<tspan baseline-shift="sub" font-size="8">a</tspan> → PGA</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-5.</b> 응답 스펙트럼 만들기(개념도). 같은 진동대 위에 주기가 다른 진동자를 늘어놓고 같은 지진으로 흔든 뒤, 각자의 최대 응답을 주기 축에 찍어 잇는다. 아주 강한(짧은 주기) 진동자는 땅과 함께 움직여 PS<sub>a</sub> → PGA, 아주 유연한(긴 주기) 진동자는 제자리에 남아 S<sub>d</sub> → 최대 지반 변위.</figcaption>
+    </figure>
+    <div class="sim" id="sim-dy-spec">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>응답 스펙트럼 만들기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dy-stack">
+          <div><canvas id="dy-cv-sp-h" aria-label="현재 주기 진동자의 변위 이력과 최댓값"></canvas><span class="dy-cap" id="dy-sp-cap">진동자 응답 u(t)</span></div>
+          <div><canvas id="dy-cv-sp" aria-label="주기마다 찍히는 응답 스펙트럼"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>지진파</span><div class="seg" id="dy-sp-seed"><button data-value="7" class="on">A</button><button data-value="21">B</button><button data-value="45">C</button></div></div>
+          <label class="ctrl"><span>PGA <output id="dy-sp-pga-out"></output></span><input type="range" id="dy-sp-pga" min="0.05" max="0.5" step="0.01" value="0.22"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="dy-sp-z-out"></output></span><input type="range" id="dy-sp-z" min="0" max="20" step="0.5" value="5"></label>
+          <label class="ctrl"><span><i style="font-style:normal">진동자 주기 T<sub>n</sub></i> <output id="dy-sp-T-out"></output></span><input type="range" id="dy-sp-T" min="0" max="99" step="1" value="40"></label>
+          <div class="ctrl"><span>스펙트럼</span><div class="seg" id="dy-sp-kind"><button data-value="a" class="on">PS<sub>a</sub></button><button data-value="v">PS<sub>v</sub></button><button data-value="d">S<sub>d</sub></button></div></div>
+          <div class="btn-row"><button class="btn primary" id="dy-sp-play">▶ 스펙트럼 그리기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">S<sub>d</sub></span><span class="v" id="dy-sp-sd">—</span></div>
+        <div class="stat"><span class="k">PS<sub>v</sub></span><span class="v" id="dy-sp-sv">—</span></div>
+        <div class="stat"><span class="k">PS<sub>a</sub></span><span class="v" id="dy-sp-sa">—</span></div>
+        <div class="stat"><span class="k">PS<sub>a</sub> / PGA</span><span class="v" id="dy-sp-amp">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: ▶을 누르면 주기 0.02 s부터 4 s까지 진동자 100개의 최대 응답이 차례로 찍힙니다 · 감쇠를 0 %로 줄이면 스펙트럼이 뾰족해지고, 20 %로 늘리면 매끈하고 낮아집니다(설계 스펙트럼이 매끈한 이유 중 하나) · 점선은 8장의 B-10 설계 스펙트럼(S<sub>DS</sub> 0.50g, S<sub>D1</sub> 0.29g)으로, 지진파 하나의 들쭉날쭉한 스펙트럼과 모양을 비교해 보세요 · 모델: CB.dyn.spectrum(지진파, Δt = 0.01 s, 주기 100개, ζ). 입력을 바꿀 때만 계산하고 애니메이션은 결과를 차례로 보여 줍니다.</div>
+    </div>
+    <div class="callout"><strong>예제 7.5 (스펙트럼 읽기)</strong> 어떤 지진의 5 % 감쇠 스펙트럼에서 \(T_n = 1.0\) s의 \(PS_a = 0.29g\)를 읽었다.
+      <ol class="dy-steps">
+        <li><b>스펙트럼 변위.</b> \(S_d = PS_a/\omega_n^2 = 0.29 \times 9.81/(2\pi/1.0)^2 = 2.845/39.48 = 0.0721\) m = 72 mm.</li>
+        <li><b>의사 속도.</b> \(PS_v = \omega_n S_d = 6.283 \times 0.0721 = 0.453\) m/s.</li>
+        <li><b>밑면 전단력.</b> 질량 703.4 t(B-10 한 층 무게 6,900 kN)인 1자유도계라면 \(V_b = 703.4 \times 2.845 = 2{,}001\) kN = 0.29W. 탄성으로 버티게 하려면 무게의 29 %를 견뎌야 한다.</li>
+      </ol>
+      8장에서 이 0.29를 반응수정계수 \(R/I_e = 5\)로 나눠 설계한다. 탄성 요구의 1/5만 강도로 주고, 나머지는 연성으로 버티게 한다는 뜻이다.</div>
+    <p>실제 지진 기록의 스펙트럼은 봉우리와 골이 들쭉날쭉합니다. 설계에 쓰는 <b>설계 응답 스펙트럼</b>(8장)은 여러 지진, 여러 지반의 스펙트럼을 통계적으로 다듬어 짧은 주기는 일정 가속도, 중간 주기는 일정 속도(\(PS_a \propto 1/T\)), 긴 주기는 일정 변위(\(PS_a \propto 1/T^2\))로 단순화한 모양입니다. 응답 스펙트럼을 세 양을 한꺼번에 읽도록 로그 눈금에 그린 것을 삼선 도표(tripartite plot)라 하며, 이 세 구간이 직선으로 드러납니다.</p>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="mdof">
+    <h2>다자유도: 전단 건물과 고유 모드</h2>
+    <div class="problem"><strong>10층 건물은 10개의 리듬으로 흔들린다</strong>
+      <p>1자유도계는 한 가지 주기로만 흔들립니다. 10층 건물의 바닥은 10개이고, 각 바닥이 따로 움직일 수 있습니다. 그런데 그 움직임을 자세히 보면 아무렇게나가 아니라 몇 가지 정해진 <b>모양</b>이 섞인 것입니다. 지붕까지 한쪽으로 휘는 모양, 가운데가 반대로 꺾이는 모양, 두 번 꺾이는 모양. 그 모양과 주기를 어떻게 찾을까요?</p></div>
+    <p>층마다 질량을 바닥에 모으고, 보와 바닥이 아주 강해 바닥이 회전하지 않는다고 보면(기둥은 층마다 양단 고정처럼 휜다) 층과 층 사이는 수평 스프링 하나가 됩니다. 이것이 <span class="term">전단 건물</span><span class="en">(shear building)</span> 모형입니다. 실제 골조는 보가 휘고 기둥이 축 변형을 하므로 이보다 유연하고, 코어 벽은 휨형으로 변형하지만(5장), 전단 건물은 다자유도 동역학의 뼈대를 가장 간단하게 보여 줍니다. B-10의 동적 모형도 이 형식입니다(교육용).</p>
+    <figure class="diagram" id="fig-dy-modes">
+      <svg viewBox="0 0 860 340" role="img" aria-label="층 질량과 층 강성으로 이상화한 전단 건물과 B-10의 1, 2, 3차 모드 형상">
+        <rect x="10" y="10" width="840" height="320" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="0" y="10" class="t" style="font-weight:700">전단 건물(3층 예)</text>
+          <line x1="0" y1="270" x2="200" y2="270" class="s-axis"/>
+          <path d="M0 270 l8 10 M30 270 l8 10 M60 270 l8 10 M120 270 l8 10 M150 270 l8 10 M180 270 l8 10" style="stroke:var(--text-faint);stroke-width:1.2"/>
+          <g style="stroke:var(--accent);stroke-width:3"><line x1="40" y1="270" x2="40" y2="200"/><line x1="160" y1="270" x2="160" y2="200"/><line x1="40" y1="194" x2="40" y2="124"/><line x1="160" y1="194" x2="160" y2="124"/><line x1="40" y1="118" x2="40" y2="48"/><line x1="160" y1="118" x2="160" y2="48"/></g>
+          <g style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"><rect x="30" y="188" width="140" height="12" rx="2"/><rect x="30" y="112" width="140" height="12" rx="2"/><rect x="30" y="36" width="140" height="12" rx="2"/></g>
+          <g class="t-mono"><text x="178" y="198">m₁, u₁</text><text x="178" y="122">m₂, u₂</text><text x="178" y="46">m₃, u₃</text><text x="64" y="240">k₁</text><text x="64" y="164">k₂</text><text x="64" y="88">k₃</text></g>
+          <text x="0" y="300" class="t-mono">층 전단 V<tspan baseline-shift="sub" font-size="8">j</tspan> = k<tspan baseline-shift="sub" font-size="8">j</tspan>(u<tspan baseline-shift="sub" font-size="8">j</tspan> − u<tspan baseline-shift="sub" font-size="8">j−1</tspan>)</text>
+        </g>
+        <g transform="translate(320,30)">
+          <text x="0" y="10" class="t" style="font-weight:700">B-10 모드 형상(지붕 = 1)</text>
+          <g transform="translate(70,266)">
+            <line x1="0" y1="0" x2="0" y2="-213" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+            <path d="M0.0 0.0 L8.3 -26.0 L16.4 -46.8 L24.2 -67.6 L31.4 -88.4 L37.8 -109.2 L43.5 -130.0 L48.1 -150.8 L51.6 -171.6 L53.9 -192.4 L55.0 -213.2" style="fill:none;stroke:var(--accent);stroke-width:2.8"/>
+            <g style="fill:var(--accent)"><circle cx="8.3" cy="-26" r="3"/><circle cx="24.2" cy="-67.6" r="3"/><circle cx="37.8" cy="-109.2" r="3"/><circle cx="48.1" cy="-150.8" r="3"/><circle cx="53.9" cy="-192.4" r="3"/><circle cx="55" cy="-213.2" r="3"/></g>
+            <text x="0" y="22" text-anchor="middle" class="t-mono" style="fill:var(--accent)">1차 T₁ = 1.00 s</text>
+            <text x="0" y="38" text-anchor="middle" class="t-mono">유효 질량 85 %</text>
+          </g>
+          <g transform="translate(225,266)">
+            <line x1="0" y1="0" x2="0" y2="-213" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+            <path d="M0.0 0.0 L-24.5 -26.0 L-44.0 -46.8 L-54.6 -67.6 L-54.1 -88.4 L-42.6 -109.2 L-22.5 -130.0 L2.2 -150.8 L26.4 -171.6 L45.3 -192.4 L55.0 -213.2" style="fill:none;stroke:var(--accent-2);stroke-width:2.8"/>
+            <circle cx="1" cy="-148" r="4" style="fill:none;stroke:var(--text);stroke-width:1.4"/>
+            <text x="8" y="-142" class="t-mono">마디</text>
+            <text x="0" y="22" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">2차 T₂ = 0.34 s</text>
+            <text x="0" y="38" text-anchor="middle" class="t-mono">9 %</text>
+          </g>
+          <g transform="translate(390,266)">
+            <line x1="0" y1="0" x2="0" y2="-213" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+            <path d="M0.0 0.0 L39.4 -26.0 L57.2 -46.8 L43.9 -67.6 L6.5 -88.4 L-34.3 -109.2 L-56.5 -130.0 L-47.8 -150.8 L-13.0 -171.6 L28.9 -192.4 L55.0 -213.2" style="fill:none;stroke:var(--ok);stroke-width:2.8"/>
+            <text x="0" y="22" text-anchor="middle" class="t-mono" style="fill:var(--ok)">3차 T₃ = 0.21 s</text>
+            <text x="0" y="38" text-anchor="middle" class="t-mono">3 %</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-6.</b> 왼쪽: 전단 건물 모형. 바닥은 강체 질량, 층 사이는 수평 스프링(층 강성). 오른쪽: B-10 Y 방향 모형(층 질량 703 t, 지붕 612 t, 층 강성 1.2 × 10⁶ kN/m)의 1–3차 모드 형상. 차수가 올라갈수록 부호가 바뀌는 마디가 하나씩 늘고 주기가 짧아진다.</figcaption>
+    </figure>
+    <p>바닥 \(j\)의 평형을 쓰면 위·아래 층의 스프링이 함께 들어가므로, 운동 방정식은 행렬 꼴이 됩니다. 1층의 바닥 질량 \(m_1\)(B-10에서는 2층 바닥, 인덱스 0)에는 아래 스프링 \(k_1\)과 위 스프링 \(k_2\)가 붙습니다.</p>
+    <div class="callout def"><strong>원리 7.8 (다자유도 운동 방정식과 고유값 문제)</strong> <span class="term">다자유도계</span><span class="en">(multi-degree-of-freedom system, MDOF)</span>의 운동 방정식과 지반 운동 입력은
+      <div class="formula">$$\mathbf M\ddot{\mathbf u} + \mathbf C\dot{\mathbf u} + \mathbf K\mathbf u = -\mathbf M\boldsymbol\iota\,\ddot u_g(t), \qquad \mathbf K = \begin{bmatrix} k_1 + k_2 & -k_2 & \\ -k_2 & k_2 + k_3 & -k_3 \\ & -k_3 & k_3 \end{bmatrix}$$<div class="where">\(\mathbf M = \mathrm{diag}(m_1, m_2, \dots)\), \(\boldsymbol\iota\): 영향 벡터(모든 바닥이 지반과 같은 방향으로 1). 감쇠 없는 자유 진동에서 모든 바닥이 같은 모양으로 함께 흔들리는 해 \(\mathbf u = \boldsymbol\phi_n \sin\omega_n t\)를 찾으면 <span class="term">고유값 문제</span><span class="en">(eigenvalue problem)</span>
+      $$\mathbf K\boldsymbol\phi_n = \omega_n^2\mathbf M\boldsymbol\phi_n, \qquad \det(\mathbf K - \omega^2\mathbf M) = 0$$이 된다. 해 \(\omega_n\)이 n차 고유 진동수, \(\boldsymbol\phi_n\)이 n차 <span class="term">모드 형상</span><span class="en">(mode shape)</span>이다. \(N\)층이면 모드도 \(N\)개다.</div></div></div>
+    <div class="callout def"><strong>원리 7.9 (모드 직교성)</strong> 서로 다른 두 모드는 질량과 강성에 대해 <span class="term">모드 직교성</span><span class="en">(orthogonality of modes)</span>을 가진다.
+      <div class="formula">$$\boldsymbol\phi_m^{\mathsf T}\mathbf M\boldsymbol\phi_n = 0, \qquad \boldsymbol\phi_m^{\mathsf T}\mathbf K\boldsymbol\phi_n = 0 \qquad (m \ne n)$$<div class="where">그래서 어떤 변위든 모드의 합 \(\mathbf u = \sum_n \boldsymbol\phi_n q_n\)으로 나눌 수 있고, 각 모드 좌표 \(q_n\)은 다른 모드와 상관없는 1자유도 방정식을 따른다(감쇠도 모드마다 나뉜다고 가정하면). 다자유도 문제가 1자유도 문제 N개로 풀린다.</div></div></div>
+    <div class="callout"><strong>예제 7.6 (2층 전단 건물의 모드, 손계산)</strong> \(m_1 = m_2 = m = 703.4\) t, \(k_1 = k_2 = k = 1.2\times10^6\) kN/m.
+      <ol class="dy-steps">
+        <li><b>특성 방정식.</b> \(\det\begin{bmatrix}2k - \omega^2 m & -k \\ -k & k - \omega^2 m\end{bmatrix} = 0\). \(\lambda = \omega^2 m/k\)로 두면 \((2-\lambda)(1-\lambda) - 1 = \lambda^2 - 3\lambda + 1 = 0\), \(\lambda = (3 \mp \sqrt5)/2 = 0.382,\ 2.618\).</li>
+        <li><b>진동수.</b> \(k/m = 1{,}706\) s⁻² → \(\omega_1 = \sqrt{0.382 \times 1{,}706} = 25.5\) rad/s(\(T_1 = 0.246\) s), \(\omega_2 = \sqrt{2.618 \times 1{,}706} = 66.8\) rad/s(\(T_2 = 0.094\) s).</li>
+        <li><b>모드 형상.</b> 둘째 행 \(-k\phi_1 + (k - \omega^2 m)\phi_2 = 0\)에서 \(\phi_1/\phi_2 = 1-\lambda\): 1차 \(\boldsymbol\phi_1 = [0.618,\ 1]\), 2차 \(\boldsymbol\phi_2 = [-1.618,\ 1]\).</li>
+        <li><b>직교성 확인.</b> \(\boldsymbol\phi_1^{\mathsf T}\mathbf M\boldsymbol\phi_2 = m(0.618 \times (-1.618) + 1 \times 1) = m(-1.000 + 1) = 0\). ✓</li>
+      </ol>
+      층을 하나 더 얹으니 1차 주기가 0.152 s(한 층)에서 0.246 s로 길어졌다. 10층이면 1.00 s가 된다.</div>
+    <div class="sim" id="sim-dy-modes">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>전단 건물의 모드 형상</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dy-stack">
+          <div><canvas id="dy-cv-md" aria-label="모드 형상으로 흔들리는 전단 건물 애니메이션"></canvas></div>
+          <div><canvas id="dy-cv-md-b" aria-label="모드별 주기와 유효 질량비 막대"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>층 수 N <output id="dy-md-n-out"></output></span><input type="range" id="dy-md-n" min="2" max="15" step="1" value="10"></label>
+          <label class="ctrl"><span>층 질량 m <output id="dy-md-m-out"></output></span><input type="range" id="dy-md-m" min="100" max="1500" step="1" value="703"></label>
+          <label class="ctrl"><span>층 강성 k <output id="dy-md-k-out"></output></span><input type="range" id="dy-md-k" min="0.2" max="4" step="0.05" value="1.2"></label>
+          <label class="ctrl"><span>지붕 질량 비 <output id="dy-md-r-out"></output></span><input type="range" id="dy-md-r" min="0.2" max="3" step="0.01" value="0.87"></label>
+          <div class="ctrl"><span>보기</span><div class="seg" id="dy-md-sel"><button data-value="1" class="on">1차</button><button data-value="2">2차</button><button data-value="3">3차</button><button data-value="all">1–3차 함께</button></div></div>
+          <div class="btn-row"><button class="btn" id="dy-md-b10">B-10으로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">T<sub>1</sub> · T<sub>2</sub> · T<sub>3</sub></span><span class="v" id="dy-md-T">—</span></div>
+        <div class="stat"><span class="k">유효 질량비 1 · 2 · 3</span><span class="v" id="dy-md-e">—</span></div>
+        <div class="stat"><span class="k">누적(3개 모드)</span><span class="v" id="dy-md-c">—</span></div>
+        <div class="stat"><span class="k">Γ<sub>1</sub></span><span class="v" id="dy-md-g">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: B-10 기본값에서 T<sub>1</sub> = 1.00 s, 유효 질량비 0.85 / 0.09 / 0.03을 확인하세요 · 층 수를 늘리면 1차 유효 질량비가 조금씩 줄고(약 0.81로 수렴) 고차 모드의 몫이 커집니다 · 지붕 질량 비를 3으로 키우면(옥상 수조·기계실) 1차 주기가 길어지고 지붕이 1차 모드를 거의 혼자 맡습니다 · 모델: CB.dyn.shearBuilding + CB.dyn.modes(야코비 고유값 해석). 애니메이션은 모드마다 실제 진동수 비를 유지하되 1차 주기를 약 2초로 느리게 보여 줍니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="participation">
+    <h2>모드 참여 계수와 유효 질량</h2>
+    <div class="problem"><strong>모드 열 개가 모두 똑같이 중요한가</strong>
+      <p>지진은 모든 바닥을 같은 방향으로 미는 하중(−Mι ü<sub>g</sub>)입니다. 1차 모드처럼 모든 바닥이 한쪽으로 휘는 모양은 이 하중과 잘 맞고, 부호가 여러 번 바뀌는 고차 모드는 하중의 일부만 "받아 갑니다". 이 맞음의 정도를 숫자로 나타내면, 몇 개의 모드만 계산해도 되는지 알 수 있습니다.</p></div>
+    <div class="callout def"><strong>정의 7.10 (모드 참여 계수와 유효 모드 질량)</strong> n차 모드의 <span class="term">모드 참여 계수</span><span class="en">(modal participation factor)</span> \(\Gamma_n\)과 <span class="term">유효 모드 질량</span><span class="en">(effective modal mass)</span> \(M_n^*\)은
+      <div class="formula">$$\Gamma_n = \frac{L_n}{M_n} = \frac{\boldsymbol\phi_n^{\mathsf T}\mathbf M\boldsymbol\iota}{\boldsymbol\phi_n^{\mathsf T}\mathbf M\boldsymbol\phi_n} = \frac{\sum_j m_j\phi_{jn}}{\sum_j m_j\phi_{jn}^2}, \qquad M_n^* = \frac{L_n^2}{M_n} = \Gamma_n L_n, \qquad \sum_{n=1}^{N} M_n^* = \sum_j m_j$$<div class="where">\(\Gamma_n\)은 모드 형상의 정규화(여기서는 지붕 = 1)에 따라 달라지지만 \(\Gamma_n\boldsymbol\phi_n\)과 \(M_n^*\)는 달라지지 않는다. 유효 질량비 \(M_n^*/\sum m_j\)는 n차 모드가 밑면 전단력에 참여하는 몫이다. 내진 기준은 대개 유효 질량비의 합이 90 % 이상이 되도록 모드 수를 정하게 한다(현행 KDS 41 17 00 확인).</div></div></div>
+    <p>예제 7.6의 2층 건물에서 1차 모드 \([0.618, 1]\)의 \(\Gamma_1 = (0.618 + 1)/(0.382 + 1) = 1.171\), 유효 질량비 \(1.618^2/(1.382 \times 2) = 0.947\)입니다. 2차는 0.053이고 합은 1입니다. 층이 많아질수록 1차의 몫은 줄어 균일한 전단 건물에서는 약 81 %로 수렴합니다. 휨형 캔틸레버(코어 벽)에 가까울수록 1차 몫이 더 작아져(약 61 %) 고차 모드가 중요해집니다.</p>
+    <div class="table-wrap"><table class="dy-tbl">
+      <thead><tr><th>B-10 모드</th><th>T<sub>n</sub>(s)</th><th>f<sub>n</sub>(Hz)</th><th>Γ<sub>n</sub>(지붕 = 1)</th><th>유효 질량 M*<sub>n</sub>(t)</th><th>유효 질량비</th><th>누적</th></tr></thead>
+      <tbody>
+        <tr><td>1차</td><td class="hl">1.005</td><td>0.995</td><td>1.269</td><td>5,889</td><td class="hl">0.848</td><td>0.848</td></tr>
+        <tr><td>2차</td><td>0.338</td><td>2.96</td><td>−0.411</td><td>634</td><td>0.091</td><td>0.940</td></tr>
+        <tr><td>3차</td><td>0.206</td><td>4.86</td><td>0.232</td><td>214</td><td>0.031</td><td>0.971</td></tr>
+        <tr><td>4차</td><td>0.151</td><td>6.64</td><td>−0.151</td><td>99</td><td>0.014</td><td>0.985</td></tr>
+        <tr><td>합(10개)</td><td>—</td><td>—</td><td>—</td><td>6,942</td><td>1.000</td><td>—</td></tr>
+      </tbody></table></div>
+    <p>B-10은 2차 모드까지 94 %, 3차까지 97 %로, 모드 세 개면 90 % 조건을 넉넉히 넘습니다. 1차 모드의 유효 질량 5,889 t는 전체 6,942 t의 85 %이고, 이 질량이 지반에서 높이 약 \(\sum m_j\phi_j h_j / L_1 \approx 27\) m(전체 높이 41 m의 약 2/3)에 모여 있는 1자유도계처럼 행동합니다. 8장의 푸시오버에서 건물을 등가 1자유도계로 바꿀 때 이 값을 씁니다.</p>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="superposition">
+    <h2>모드 중첩과 SRSS</h2>
+    <div class="problem"><strong>모드별 최대값을 어떻게 합칠까</strong>
+      <p>모드마다 1자유도 진동자의 응답을 구해 더하면 건물 전체의 응답이 됩니다. 시간 이력을 모두 계산한다면 그냥 더하면 됩니다. 그런데 응답 스펙트럼으로는 모드마다 <b>최댓값</b>만 압니다. 1차가 최대인 순간에 2차도 최대일까요? 그렇지 않습니다. 그렇다면 최댓값끼리는 어떻게 합칠까요?</p></div>
+    <div class="callout def"><strong>원리 7.11 (모드 중첩)</strong> 감쇠가 모드마다 나뉜다고 가정하면 지반 운동에 대한 응답은
+      <div class="formula">$$\mathbf u(t) = \sum_{n=1}^{N}\Gamma_n\boldsymbol\phi_n D_n(t), \qquad \ddot D_n + 2\zeta_n\omega_n\dot D_n + \omega_n^2 D_n = -\ddot u_g(t)$$<div class="where">\(D_n(t)\): 주기 \(T_n\), 감쇠 \(\zeta_n\)인 1자유도계의 응답(원리 7.5와 같은 식). 모드 n의 최대 변위는 \(\Gamma_n\boldsymbol\phi_n S_d(T_n)\), 층 지진력은 \(\mathbf f_n = \Gamma_n\mathbf M\boldsymbol\phi_n PS_a(T_n)\), 밑면 전단력은 \(V_{bn} = M_n^* PS_a(T_n)\)이다. 이것이 <span class="term">모드 중첩법</span><span class="en">(modal superposition method)</span>이고, 스펙트럼으로 최댓값만 구해 조합하면 응답 스펙트럼 해석(8장)이 된다.</div></div></div>
+    <figure class="diagram" id="fig-dy-super">
+      <svg viewBox="0 0 860 320" role="img" aria-label="전체 변형 형상이 모드 형상과 모드 좌표의 곱의 합으로 나뉘는 모드 중첩 개념">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(30,26)">
+          <g transform="translate(70,226)">
+            <line x1="0" y1="0" x2="0" y2="-200" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+            <path d="M0.0 0.0 L5.5 -24.4 L10.0 -43.9 L13.2 -63.4 L16.0 -82.9 L19.5 -102.4 L25.0 -122.0 L32.8 -141.5 L41.5 -161.0 L49.1 -180.5 L53.2 -200.0" style="fill:none;stroke:var(--text);stroke-width:3"/>
+            <text x="0" y="24" text-anchor="middle" class="t-mono">u(t) 어느 순간</text>
+          </g>
+          <text x="160" y="126" text-anchor="middle" class="t" style="font-weight:700">=</text>
+          <g transform="translate(250,226)">
+            <line x1="0" y1="0" x2="0" y2="-200" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+            <path d="M0 0 L6.2 -24.4 L12.3 -43.9 L18.1 -63.4 L23.4 -82.9 L28.3 -102.4 L32.4 -122 L35.9 -141.5 L38.5 -161 L40.2 -180.5 L41.1 -200" style="fill:none;stroke:var(--accent);stroke-width:2.8"/>
+            <text x="0" y="24" text-anchor="middle" class="t-mono" style="fill:var(--accent)">Γ₁φ₁D₁(t)</text>
+          </g>
+          <text x="340" y="126" text-anchor="middle" class="t" style="font-weight:700">+</text>
+          <g transform="translate(430,226)">
+            <line x1="0" y1="0" x2="0" y2="-200" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+            <path d="M0 0 L-3.6 -24.4 L-6.5 -43.9 L-8.1 -63.4 L-8.0 -82.9 L-6.3 -102.4 L-3.3 -122 L0.3 -141.5 L3.9 -161 L6.7 -180.5 L8.1 -200" style="fill:none;stroke:var(--accent-2);stroke-width:2.8"/>
+            <text x="0" y="24" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">Γ₂φ₂D₂(t)</text>
+          </g>
+          <text x="520" y="126" text-anchor="middle" class="t" style="font-weight:700">+</text>
+          <g transform="translate(600,226)">
+            <line x1="0" y1="0" x2="0" y2="-200" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+            <path d="M0 0 L2.9 -24.4 L4.2 -43.9 L3.2 -63.4 L0.5 -82.9 L-2.5 -102.4 L-4.1 -122 L-3.5 -141.5 L-1.0 -161 L2.1 -180.5 L4.0 -200" style="fill:none;stroke:var(--ok);stroke-width:2.8"/>
+            <text x="0" y="24" text-anchor="middle" class="t-mono" style="fill:var(--ok)">Γ₃φ₃D₃(t)</text>
+          </g>
+          <text x="680" y="126" class="t" style="font-weight:700">+ …</text>
+          <text x="400" y="278" text-anchor="middle" class="t-dim">D<tspan baseline-shift="sub" font-size="8">n</tspan>(t)는 주기 T<tspan baseline-shift="sub" font-size="8">n</tspan>인 1자유도 진동자의 응답. 최대가 되는 시각은 모드마다 다르다.</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-7.</b> 모드 중첩(개념도). 어느 순간의 변형 형상은 모드 형상에 모드 좌표를 곱한 것의 합이다. 고차 모드는 형상이 꺾여 있어 변위에는 조금 기여하지만, 층간 변위·층 전단력·가속도에는 상대적으로 더 크게 기여한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 7.12 (SRSS 조합)</strong> 모드 주기가 서로 충분히 떨어져 있으면 모드 최대 응답 \(r_n\)의 최대 합은 <span class="term">SRSS</span><span class="en">(square root of the sum of squares)</span>로 추정한다.
+      <div class="formula">$$r_{max} \approx \sqrt{\sum_n r_n^2}$$<div class="where">절댓값의 합 \(\sum|r_n|\)은 모든 모드가 같은 순간 같은 부호로 최대라는 가정이라 지나치게 크다. 조합은 <b>응답량마다</b>(층간 변위, 층 전단력, 부재력) 따로 한다. 모드의 최대 변위를 먼저 조합한 뒤 그 차이로 층간 변위를 구하면 틀린다.</div></div></div>
+    <div class="callout deep"><strong>주기가 가까운 모드: CQC</strong> 평면이 대칭에 가까운 3차원 건물은 X·Y 병진 모드와 비틀림 모드의 주기가 가까운 경우가 많다. 이때 두 모드는 함께 커지고 함께 작아져 SRSS가 응답을 과소평가할 수 있다. <span class="term">CQC</span><span class="en">(complete quadratic combination)</span>는 모드 상관 계수 \(\rho_{mn}\)을 넣어 \(r_{max} \approx \sqrt{\sum_m\sum_n \rho_{mn} r_m r_n}\)으로 조합한다. 감쇠비가 같은 ζ일 때 진동수 비 \(\beta = \omega_n/\omega_m\)에 대해 \(\rho_{mn} = \dfrac{8\zeta^2(1+\beta)\beta^{3/2}}{(1-\beta^2)^2 + 4\zeta^2\beta(1+\beta)^2}\)(데어 키우레기안의 식). ζ = 5 %에서 β = 0.9이면 ρ ≈ 0.47, β = 0.7이면 약 0.07이다. 주기가 멀면 ρ → 0이 되어 SRSS와 같아지므로, 실무 프로그램은 보통 CQC를 쓴다. B-10의 Y 방향 모형은 주기 비가 0.34로 충분히 떨어져 SRSS와 CQC가 거의 같다.</div>
+    <div class="sim" id="sim-dy-sup">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-10 모드 중첩 시간 이력</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dy-stack">
+          <div><canvas id="dy-cv-sp3" aria-label="지진 중 B-10 3D 골조의 Y 방향 변형"></canvas><span class="dy-cap">B-10 Y 방향 변형(과장) · 끌어서 회전</span></div>
+          <div><canvas id="dy-cv-sp-t" aria-label="모드별 지붕 변위 기여와 합의 시간 이력"></canvas></div>
+          <div><canvas id="dy-cv-sp-b" aria-label="모드별 최대 지붕 변위와 조합 비교 막대"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>지진파</span><div class="seg" id="dy-su-seed"><button data-value="7" class="on">A</button><button data-value="21">B</button><button data-value="45">C</button></div></div>
+          <label class="ctrl"><span>PGA <output id="dy-su-pga-out"></output></span><input type="range" id="dy-su-pga" min="0.05" max="0.5" step="0.01" value="0.22"></label>
+          <label class="ctrl"><span>포함할 모드 수 <output id="dy-su-n-out"></output></span><input type="range" id="dy-su-n" min="1" max="10" step="1" value="3"></label>
+          <div class="ctrl"><span>응답량</span><div class="seg" id="dy-su-q"><button data-value="roof" class="on">지붕 변위</button><button data-value="v">밑면 전단</button></div></div>
+          <label class="ctrl"><span>시각 t <output id="dy-su-t-out"></output></span><input type="range" id="dy-su-t" min="0" max="20" step="0.01" value="6"></label>
+          <div class="btn-row"><button class="btn primary" id="dy-su-play">▶ 재생</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">시간 이력 최대(정해)</span><span class="v" id="dy-su-ex">—</span></div>
+        <div class="stat"><span class="k">SRSS</span><span class="v" id="dy-su-srss">—</span></div>
+        <div class="stat"><span class="k">절댓값 합</span><span class="v" id="dy-su-abs">—</span></div>
+        <div class="stat"><span class="k">1차 최댓값 / 정해</span><span class="v" id="dy-su-m1">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 지붕 변위는 1차 모드가 거의 다 정하지만, 밑면 전단으로 바꾸면 2·3차 모드의 몫이 눈에 띄게 커집니다 · SRSS는 정해와 몇 % 안에서 맞고, 절댓값 합은 늘 크게 나옵니다 · 모델: B-10 Y 방향 전단 건물(CB.dyn.B10), 모드마다 ζ = 5 %인 1자유도 응답 D<sub>n</sub>(t)를 CB.dyn.newmark로 계산해 원리 7.11로 더합니다(탄성, R로 줄이지 않은 값). 지진파는 CB.dyn.quake(교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="b10-modal">
+    <h2>B-10 모드 해석</h2>
+    <div class="problem"><strong>B-10은 몇 초에 한 번 흔들리나</strong>
+      <p>8장의 등가 정적 해석과 응답 스펙트럼 해석, 9장의 면진·제진, 15장의 사용성 검토가 모두 B-10의 고유 주기와 모드에서 시작합니다. 이 장의 도구로 그 값을 정리해 둡니다.</p></div>
+    <p>B-10의 Y 방향 동적 모형은 지상 10개 층의 질량(2–10층 바닥 각 703 t, 지붕 612 t)과 모든 층 같은 층 강성 \(1.2\times10^6\) kN/m로 된 전단 건물입니다(교육용 가정). 실제 B-10은 코어 전단벽과 모멘트 골조의 이중 골조이고 벽은 휨형으로 변형하므로, 실무 해석에서는 3차원 모델(14장)로 X·Y 병진과 비틀림 모드를 함께 구하고 균열을 고려한 강성을 씁니다.</p>
+    <div class="callout"><strong>예제 7.7 (B-10 모드 응답 미리 보기)</strong> 8장의 설계 스펙트럼(\(S_{DS} = 0.50g\), \(S_{D1} = 0.29g\))을 B-10 모드에 적용한다.
+      <ol class="dy-steps">
+        <li><b>스펙트럼 가속도.</b> \(T_S = S_{D1}/S_{DS} = 0.58\) s. 1차 \(T_1 = 1.005\) s \(\gt T_S\)이므로 \(S_a = 0.29/1.005 = 0.289g\). 2·3차(0.34, 0.21 s)는 평탄 구간 \(0.50g\).</li>
+        <li><b>탄성 밑면 전단.</b> \(V_{b1} = M_1^* S_a = 5{,}889 \times 0.289 \times 9.81 = 16{,}670\) kN, \(V_{b2} = 634 \times 0.50 \times 9.81 = 3{,}110\) kN, \(V_{b3} = 1{,}050\) kN.</li>
+        <li><b>설계값(R/I<sub>e</sub> = 6/1.2 = 5로 나눔).</b> 3,334, 622, 210 kN → SRSS \(\sqrt{3{,}334^2 + 622^2 + 210^2} = 3{,}398\) kN ≈ <b>3,400 kN</b>(10개 모드 모두 넣어도 3,399 kN).</li>
+        <li><b>지붕 변위(탄성).</b> 1차 \(S_d = 0.289 \times 9.81/(6.25)^2 = 0.0724\) m, 지붕 \(\Gamma_1\phi_{roof}S_d = 1.269 \times 1 \times 72.4 = 92\) mm. 2차의 몫은 \(0.411 \times 14.2 = 5.8\) mm로 작다.</li>
+      </ol>
+      등가 정적 해석(8장)은 근사 주기 0.79 s로 밑면 전단력 약 5,000 kN을 준다. 응답 스펙트럼 해석의 3,400 kN이 더 작은 이유는 ① 주기가 1.00 s로 길어 \(S_a\)가 작고, ② 유효 질량이 85 %뿐이며, ③ 고차 모드가 SRSS로 조금만 더해지기 때문이다.</div>
+    <div class="callout site"><strong>B-10 Y 방향: T₁ = 1.00 s, 유효 질량 85 %</strong> 모드 해석 결과 \(T_1 = 1.00\) s, \(T_2 = 0.34\) s, \(T_3 = 0.21\) s, 유효 질량비 0.85 / 0.09 / 0.03(누적 97 %), \(\Gamma_1 = 1.27\)(지붕 = 1). 근사 주기 식 \(T_a = 0.0488 h_n^{0.75} = 0.79\) s(8장)보다 25 % 길다. 근사식은 실제 건물의 측정 주기를 바탕으로 짧은 쪽(지진 하중이 커지는 쪽)으로 잡은 값이고, 해석 모델은 비구조벽 등의 강성을 빼서 길게 나오는 경향이 있으므로, 기준은 해석 주기를 쓰더라도 근사 주기에 상한 계수를 곱한 값을 넘지 못하게 한다(값은 현행 KDS 41 17 00 확인). 탄성 지붕 변위는 설계 스펙트럼에서 약 92 mm, R/I<sub>e</sub>로 줄인 설계 밑면 전단은 SRSS 약 3,400 kN. 지반 주기(G-10 약 0.56 s, GeotechBook 15장)는 B-10의 2차 주기 0.34 s와 1차 1.00 s 사이에 있어, 1차 공진은 피하지만 지반 주기가 강진 때 길어지면(강성 저하) 가까워질 수 있다.</div>
+    <div class="callout tip"><strong>상식으로 검산하기</strong> 해석 프로그램이 낸 주기는 늘 경험칙과 비교한다. RC 건물의 1차 주기는 대략 층수 × 0.1 s(B-10: 1.0 s), 근사 주기 식은 0.79 s. 결과가 0.3 s나 3 s라면 단위(t와 kN 혼동, 9.81배), 질량 중복, 지점 조건, 강성 저감 계수를 먼저 의심한다(14장).</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="seismic.html"><small>CH.08 · 내진 설계</small>설계 스펙트럼과 응답 스펙트럼 해석<br><span>PS<sub>a</sub>를 R/I<sub>e</sub>로 줄이고 모드를 SRSS로 조합한다.</span></a>
+      <a href="isolation.html"><small>CH.09 · 면진과 제진</small>주기 이동과 감쇠 추가<br><span>T를 늘려 PS<sub>a</sub>를 줄이고, TMD로 공진 봉우리를 깎는다.</span></a>
+      <a href="wind.html"><small>CH.06 · 풍하중과 바람의 영향</small>가스트와 와류 공진<br><span>고유 진동수와 감쇠가 풍진동과 거주성을 정한다.</span></a>
+      <a href="modeling.html"><small>CH.14 · 구조 해석 모델링</small>질량·강성 모델과 고유 주기 검산<br><span>강막, 질량 원, 균열 강성이 주기를 바꾼다.</span></a>
+      <a href="serviceability.html"><small>CH.15 · 사용성</small>바닥·보도교 진동<br><span>보행 진동수와의 공진, 가속도 한계.</span></a>
+      <a href="../../geotech/chapters/dynamics.html"><small>GeotechBook · CH.15</small>지반 응답과 지반 주기<br><span>G-10의 T = 4H/V<sub>s</sub> ≈ 0.56 s와 증폭.</span></a>
+      <a href="../../mechanics/chapters/matrix.html"><small>MechanicsBook · CH.15</small>강성 행렬<br><span>전단 건물의 K는 스프링 직렬 조립과 같다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>1자유도 운동 방정식 mü + cu̇ + ku = p(t). ω<sub>n</sub> = √(k/m), T<sub>n</sub> = 2π/ω<sub>n</sub>. 질량 t, 강성 kN/m이면 ω는 rad/s. B-10 한 층: 0.152 s.</li>
+      <li>감쇠비 ζ = c/(2mω<sub>n</sub>). 자유 진동 진폭은 e<sup>−ζω t</sup>로 준다. 대수 감쇠율 δ = (1/n)ln(u<sub>i</sub>/u<sub>i+n</sub>) ≈ 2πζ. RC 건물 설계 감쇠 5 %, 강구조 2–3 %(대략).</li>
+      <li>조화 하중의 동적 증폭 R<sub>d</sub> = 1/√((1 − r²)² + (2ζr)²). r = 1이면 1/(2ζ)이고 위상 90°. 공진 대책은 진동수를 옮기거나 감쇠를 키우는 것.</li>
+      <li>지반 운동: mü + cu̇ + ku = −mü<sub>g</sub>. 응답은 T<sub>n</sub>과 ζ만으로 정해진다. 밑면 전단 V<sub>b</sub> = ku = mω²u.</li>
+      <li>뉴마크 평균 가속도법(γ = 1/2, β = 1/4)은 무조건 안정, 주기가 조금 길어진다(Δt = T/10에서 약 3 %). 선형 가속도법은 Δt/T ≤ 0.551에서만 안정.</li>
+      <li>응답 스펙트럼 S<sub>d</sub>(T, ζ), PS<sub>v</sub> = ωS<sub>d</sub>, PS<sub>a</sub> = ω²S<sub>d</sub>. V<sub>b</sub> = (PS<sub>a</sub>/g)W. T → 0이면 PS<sub>a</sub> → PGA, 중간 주기에서 PGA의 2–3배.</li>
+      <li>다자유도: Kφ = ω²Mφ, 모드는 M·K에 직교. Γ<sub>n</sub> = φᵀMι/φᵀMφ, 유효 질량 합 = 전체 질량, 90 % 이상이 되도록 모드 수를 정한다(기준 확인).</li>
+      <li>모드 중첩 u = ΣΓ<sub>n</sub>φ<sub>n</sub>D<sub>n</sub>(t). 최댓값은 응답량마다 SRSS(주기가 가까우면 CQC). B-10: T<sub>1</sub> = 1.00, T<sub>2</sub> = 0.34, T<sub>3</sub> = 0.21 s, 유효 질량 0.85/0.09/0.03, Γ<sub>1</sub> = 1.27, 설계 RSA 밑면 전단 약 3,400 kN.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 질량 400 t, 강성 1.6 × 10⁵ kN/m인 1자유도계의 고유 주기는?</p><div class="opts">
+        <button class="opt">0.05 s</button><button class="opt" data-correct>0.31 s</button><button class="opt">2.0 s</button><button class="opt">20 s</button>
+      </div><div class="quiz-exp">\(\omega_n = \sqrt{1.6\times10^5/400} = \sqrt{400} = 20\) rad/s, \(T = 2\pi/20 = 0.314\) s. (kN/m)/t = 1/s²이므로 단위가 맞는다.</div></div>
+      <div class="quiz-q"><p>2. 강성은 그대로 두고 질량만 네 배로 늘리면 고유 주기는?</p><div class="opts">
+        <button class="opt">1/4로 준다</button><button class="opt">1/2로 준다</button><button class="opt" data-correct>2배가 된다</button><button class="opt">4배가 된다</button>
+      </div><div class="quiz-exp">\(T = 2\pi\sqrt{m/k}\)이므로 \(\sqrt4 = 2\)배. 옥상에 무거운 설비를 얹으면 주기가 길어지는 이유다.</div></div>
+      <div class="quiz-q"><p>3. 자유 진동 기록의 한 마루가 50 mm, 두 주기 뒤 마루가 25 mm였다. 감쇠비는 약?</p><div class="opts">
+        <button class="opt">2.2 %</button><button class="opt" data-correct>5.5 %</button><button class="opt">11 %</button><button class="opt">35 %</button>
+      </div><div class="quiz-exp">\(\delta = \tfrac12\ln(50/25) = 0.347\), \(\zeta \approx 0.347/2\pi = 0.055\). 진폭이 절반이 되는 데 두 주기면 ζ ≈ 0.11/2.</div></div>
+      <div class="quiz-q"><p>4. 감쇠비 2 %인 구조물을 고유 진동수와 똑같은 진동수의 조화 하중으로 오래 가진하면 정상 상태 변위는 정적 변위의 몇 배?</p><div class="opts">
+        <button class="opt">2배</button><button class="opt">10배</button><button class="opt" data-correct>25배</button><button class="opt">50배</button>
+      </div><div class="quiz-exp">r = 1에서 \(R_d = 1/(2\zeta) = 1/0.04 = 25\). 감쇠가 1 %이면 50배. 공진 응답은 감쇠만이 정한다.</div></div>
+      <div class="quiz-q"><p>5. 하중 진동수가 고유 진동수의 세 배(r = 3)이고 감쇠가 작을 때 동적 증폭 계수는 약?</p><div class="opts">
+        <button class="opt" data-correct>0.125</button><button class="opt">0.33</button><button class="opt">1.0</button><button class="opt">3.0</button>
+      </div><div class="quiz-exp">\(R_d \approx 1/|1-r^2| = 1/8 = 0.125\). 질량이 지배하는 영역으로, 응답은 하중과 거의 반대 위상이다. 면진은 이 영역을 이용한다.</div></div>
+      <div class="quiz-q"><p>6. 아주 강성이 큰(T → 0) 구조물이 지진을 받을 때 옳은 것은?</p><div class="opts">
+        <button class="opt">상대 변위가 지반 변위와 같아진다</button><button class="opt" data-correct>절대 가속도가 최대 지반 가속도와 같아진다</button><button class="opt">의사 가속도가 0이 된다</button><button class="opt">밑면 전단력이 0이 된다</button>
+      </div><div class="quiz-exp">구조물이 땅과 한 몸으로 움직이므로 \(\ddot u^t \to \ddot u_g\), 스펙트럼의 \(PS_a \to\) PGA. 밑면 전단력은 m × PGA. 아주 유연한(T → ∞) 구조물이면 상대 변위가 지반 변위와 같아진다.</div></div>
+      <div class="quiz-q"><p>7. 5 % 감쇠 스펙트럼에서 T = 0.5 s의 PS<sub>a</sub> = 0.60g였다. 스펙트럼 변위 S<sub>d</sub>는 약?</p><div class="opts">
+        <button class="opt">6 mm</button><button class="opt" data-correct>37 mm</button><button class="opt">150 mm</button><button class="opt">370 mm</button>
+      </div><div class="quiz-exp">\(S_d = PS_a (T/2\pi)^2 = 0.60 \times 9.81 \times (0.5/6.283)^2 = 5.886 \times 0.00633 = 0.0373\) m.</div></div>
+      <div class="quiz-q"><p>8. 모드별 최대 지붕 변위가 1차 30 mm, 2차 8 mm, 3차 3 mm이고 주기가 충분히 떨어져 있다. 지붕 최대 변위의 SRSS 추정값은?</p><div class="opts">
+        <button class="opt">30 mm</button><button class="opt" data-correct>31 mm</button><button class="opt">36 mm</button><button class="opt">41 mm</button>
+      </div><div class="quiz-exp">\(\sqrt{30^2 + 8^2 + 3^2} = \sqrt{973} = 31.2\) mm. 절댓값 합 41 mm는 모든 모드가 같은 순간 같은 부호로 최대라는 가정이라 과대하다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const DY = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  sans() { return getComputedStyle(document.body).getPropertyValue("--font"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${o.mono === false ? DY.sans() : DY.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = DY._c || (DY._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  sup(n) { return String(n).split("").map((d) => (d === "-" ? "⁻" : "⁰¹²³⁴⁵⁶⁷⁸⁹"[+d])).join(""); },
+  sci(x, d = 2) { if (!(x > 0)) return "0"; const e = Math.floor(Math.log10(x)); return `${(x / 10 ** e).toFixed(d)} × 10${DY.sup(e)}`; },
+  /** 양단 고정 기둥(이중 곡률) 한 개: 아래 (x0, y0)에서 위로 h, 상대 변위 d(px) */
+  column(ctx, x0, y0, h, d, color, width) {
+    const pts = []; for (let i = 0; i <= 16; i++) { const s = i / 16; pts.push([x0 + d * (3 * s * s - 2 * s * s * s), y0 - s * h]); }
+    DY.line(ctx, pts, color, width);
+  },
+  /** 한 층 골조: 바닥 중심 cx, 지면 yb, 폭 w, 높이 h, 지반 이동 g(px), 바닥 상대 변위 u(px) */
+  portal(ctx, cx, yb, w, h, g, u, pal) {
+    ctx.save(); ctx.strokeStyle = pal.accent2; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(cx - w * 0.9 + g, yb); ctx.lineTo(cx + w * 0.9 + g, yb); ctx.stroke();
+    ctx.strokeStyle = pal.faint; ctx.lineWidth = 1; for (let x = -w * 0.9; x <= w * 0.9; x += 14) { ctx.beginPath(); ctx.moveTo(cx + x + g, yb); ctx.lineTo(cx + x + g - 7, yb + 8); ctx.stroke(); } ctx.restore();
+    DY.column(ctx, cx - w / 2 + g, yb, h, u, pal.accent, 3.2); DY.column(ctx, cx + w / 2 + g, yb, h, u, pal.accent, 3.2);
+    ctx.save(); ctx.fillStyle = DY.alpha(pal.accent, 0.18); ctx.strokeStyle = pal.accent; ctx.lineWidth = 1.6;
+    ctx.fillRect(cx - w / 2 - 12 + g + u, yb - h - 14, w + 24, 16); ctx.strokeRect(cx - w / 2 - 12 + g + u, yb - h - 14, w + 24, 16); ctx.restore();
+  },
+  absMax(a) { let m = 0; for (const x of a) { const v = Math.abs(x); if (v > m) m = v; } return m; },
+  argAbsMax(a) { let m = 0, k = 0; a.forEach((x, i) => { if (Math.abs(x) > m) { m = Math.abs(x); k = i; } }); return k; },
+  /** 지반 변위(그림용): 가속도를 두 번 적분하고 선형 추세를 뺀다 */
+  groundDisp(ag, dt) {
+    const n = ag.length, v = new Array(n).fill(0), d = new Array(n).fill(0);
+    const detrend = (y) => { let sx = 0, sy = 0, sxx = 0, sxy = 0; y.forEach((yy, i) => { sx += i; sy += yy; sxx += i * i; sxy += i * yy; }); const b = (n * sxy - sx * sy) / (n * sxx - sx * sx), a = (sy - b * sx) / n; return y.map((yy, i) => yy - a - b * i); };
+    for (let i = 1; i < n; i++) v[i] = v[i - 1] + 0.5 * (ag[i] + ag[i - 1]) * dt;
+    const vv = detrend(v);
+    for (let i = 1; i < n; i++) d[i] = d[i - 1] + 0.5 * (vv[i] + vv[i - 1]) * dt;
+    return detrend(d);
+  },
+  B10modes: null,
+  b10() { if (!DY.B10modes) { const b = CB.dyn.B10, sb = CB.dyn.shearBuilding(b.m, b.k); DY.B10modes = CB.dyn.modes(sb.K, sb.M); } return DY.B10modes; },
+};
+const DY_MODE_COLORS = () => { const p = CB.palette(); return [p.accent, p.accent2, p.ok, p.warn, p.blue, p.dim, p.dim, p.dim, p.dim, p.dim]; };
+
+/* ---------- 1. 자유 진동 ---------- */
+(function () {
+  const gm = CB.range("dy-fr-m", (v) => v + " t", go), gk = CB.range("dy-fr-k", (v) => DY.sci(10 ** v) + " kN/m", go), gz = CB.range("dy-fr-z", (v) => v.toFixed(1) + " %", go), gu = CB.range("dy-fr-u", (v) => v + " mm", go);
+  let tau = 0, playing = false;
+  const par = () => { const m = gm(), k = 10 ** gk(), z = gz() / 100, s = CB.dyn.sdof(m, k, Math.min(z, 0.999)); return { m, k, z, w: s.omega, T: s.T, u0: gu() }; };
+  function resp(t, p) {
+    const { z, w, u0 } = p;
+    if (z < 1) { const wd = w * Math.sqrt(1 - z * z); return Math.exp(-z * w * t) * (u0 * Math.cos(wd * t) + ((z * w * u0) / wd) * Math.sin(wd * t)); }
+    if (z === 1) return u0 * (1 + w * t) * Math.exp(-w * t);
+    const ws = w * Math.sqrt(z * z - 1); return u0 * (Math.exp((-z * w + ws) * t) * (1 + (z * w) / ws) + Math.exp((-z * w - ws) * t) * (1 - (z * w) / ws)) / 2;
+  }
+  const NPER = 6;
+  const an = CB.canvas("#dy-cv-free-a", (ctx, W, H) => {
+    const pal = CB.palette(), p = par(), t = tau * p.T, u = resp(t, p), bw = Math.min(220, W * 0.42), hh = H * 0.55, cx = W / 2, yb = H - 26;
+    ctx.save(); ctx.strokeStyle = pal.faint; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(cx, 8); ctx.lineTo(cx, yb); ctx.stroke(); ctx.restore();
+    const sc = (bw * 0.45) / 50;
+    DY.portal(ctx, cx, yb, bw, hh, 0, u * sc, pal);
+    DY.text(ctx, `u = ${CB.num(u, 1)} mm`, cx + u * sc, yb - hh - 28, pal.accent, { size: 12 });
+    DY.text(ctx, `t = ${CB.num(t, 2)} s`, W - 12, 16, pal.dim, { size: 11, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.34), minHeight: 170, maxHeight: 230 });
+  const ch = CB.canvas("#dy-cv-free-t", (ctx, W, H) => {
+    const pal = CB.palette(), p = par(), tmax = NPER * p.T, d = [], ep = [], en = [];
+    for (let i = 0; i <= 600; i++) { const t = (tmax * i) / 600; d.push([t, resp(t, p)]); if (p.z < 1) { const e = p.u0 * Math.exp(-p.z * p.w * t) / Math.sqrt(1 - p.z * p.z); ep.push([t, e]); en.push([t, -e]); } }
+    const tf = (v) => (tmax < 0.1 ? v.toFixed(3) : tmax < 1 ? v.toFixed(2) : String(Number(v.toPrecision(3))));
+    CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 }, { x: [0, tmax], y: [-p.u0 * 1.15, p.u0 * 1.15], xLabel: "시간 t (s)", yLabel: "u (mm)", xFmt: tf,
+      series: [{ data: ep, color: pal.faint, width: 1.2, dash: [5, 4] }, { data: en, color: pal.faint, width: 1.2, dash: [5, 4] }, { data: d, color: pal.accent, width: 2.4 }],
+      hlines: [{ y: 0, color: pal.axis, dash: [] }], vlines: [{ x: tau * p.T, color: pal.accent2, dash: [], label: "" }], points: [{ x: tau * p.T, y: resp(tau * p.T, p), color: pal.accent2, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.38), minHeight: 210, maxHeight: 290 });
+  const loop = CB.loop(document.getElementById("sim-dy-free"), (dt) => { if (!playing) return; tau += dt / 1.5; if (tau >= NPER) { tau = NPER; playing = false; btn.set(false); } an.redraw(); ch.redraw(); });
+  const btn = CB.playButton("dy-fr-play", () => { if (tau >= NPER - 1e-6) tau = 0; playing = true; loop.start(); }, () => { playing = false; }, ["▶ 놓기", "■ 멈추기"]);
+  function go() {
+    an.redraw(); ch.redraw();
+    const p = par(), z = gz() / 100, ccr = 2 * p.m * p.w;
+    CB.stat("dy-fr-w", `${CB.num(p.w, 2)} rad/s · ${CB.sig(p.T, 3)} s`);
+    CB.stat("dy-fr-f", CB.sig(1 / p.T, 3) + " Hz");
+    CB.stat("dy-fr-c", `${CB.sig(z * ccr, 3)} · ${CB.sig(ccr, 3)} kN·s/m`);
+    CB.stat("dy-fr-r", z < 1 ? CB.num(Math.exp((-2 * Math.PI * z) / Math.sqrt(1 - z * z)), 3) : "진동 없음");
+    const m = document.getElementById("dy-fr-msg");
+    if (z === 0) { m.className = "dy-msg"; m.innerHTML = "<b>비감쇠</b>: 진폭이 영원히 줄지 않습니다. 실제 구조물에는 늘 어느 정도의 감쇠가 있습니다."; }
+    else if (z < 0.1) { m.className = "dy-msg"; m.innerHTML = `<b>저감쇠(건물의 보통 범위)</b>: 진폭이 절반이 되는 데 약 ${CB.num(Math.log(2) / (2 * Math.PI * z), 1)} 주기. ω<sub>D</sub>/ω<sub>n</sub> = ${CB.num(Math.sqrt(1 - z * z), 4)}.`; }
+    else if (z < 1) { m.className = "dy-msg"; m.innerHTML = "<b>큰 감쇠</b>: 감쇠기·면진 장치를 단 구조의 범위(9장). 몇 주기 안에 거의 멈춥니다."; }
+    else if (z === 1) { m.className = "dy-msg ok"; m.innerHTML = "임계 감쇠(ζ = 1): 진동 없이 가장 빨리 제자리로 돌아옵니다. 문 닫힘 장치가 이 근처로 조정됩니다."; }
+    else { m.className = "dy-msg"; m.innerHTML = "<b>과감쇠</b>(ζ &gt; 1): 진동은 없지만 임계 감쇠보다 천천히 돌아옵니다."; }
+  }
+  go();
+})();
+
+/* ---------- 2. 대수 감쇠율 측정 ---------- */
+(function () {
+  const gi = CB.range("dy-ld-i", (v) => String(v), go), gn = CB.range("dy-ld-n", (v) => String(v), go), gs = CB.range("dy-ld-s", (v) => v.toFixed(1) + " %", () => { build(); go(); });
+  let seed = 3, rec = null, show = false;
+  const NP = 14, SPP = 40;
+  function build() {
+    const r = CB.rng(seed * 7919 + 11), T = 0.3 + r() * 2.2, z = 0.01 + r() * 0.09, wn = (2 * Math.PI) / T, wd = wn * Math.sqrt(1 - z * z), TD = (2 * Math.PI) / wd, dt = TD / SPP, n = NP * SPP + 1, u0 = 100, sig = gs() / 100 * u0;
+    const nr = CB.rng(seed * 104729 + 5), gauss = () => { const a = Math.max(1e-12, nr()), b = nr(); return Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b); };
+    const t = [], u = [];
+    for (let i = 0; i < n; i++) { const tt = i * dt; t.push(tt); u.push(Math.exp(-z * wn * tt) * u0 * (Math.cos(wd * tt) + ((z * wn) / wd) * Math.sin(wd * tt)) + sig * gauss()); }
+    rec = { T, z, wn, TD, dt, t, u, u0 };
+  }
+  const cv = CB.canvas("#dy-cv-logdec", (ctx, W, H) => {
+    if (!rec) build();
+    const pal = CB.palette(), { t, u, TD, u0, z, wn } = rec, i = gi(), n = Math.min(gn(), NP - i), j = i + n, tmax = t[t.length - 1];
+    const ui = u[i * SPP], uj = u[j * SPP], ok = ui > 0 && uj > 0, fit = [];
+    if (ok) { const dl = Math.log(ui / uj) / (n * TD); for (let k = 0; k <= 200; k++) { const tt = (tmax * k) / 200; fit.push([tt, ui * Math.exp(-dl * (tt - i * TD))]); } }
+    const truth = show ? Array.from({ length: 201 }, (_, k) => { const tt = (tmax * k) / 200; return [tt, u0 * Math.exp(-z * wn * tt) / Math.sqrt(1 - z * z)]; }) : [];
+    CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 }, { x: [0, tmax], y: [-u0 * 1.15, u0 * 1.15], xLabel: "시간 t (s)", yLabel: "기록 (상대 진폭 %)",
+      series: [{ data: t.map((tt, k) => [tt, u[k]]), color: pal.accent, width: 1.6 }, { data: fit, color: pal.accent2, width: 1.6, dash: [6, 4] }, { data: truth, color: pal.ok, width: 1.6, dash: [2, 3] }],
+      hlines: [{ y: 0, color: pal.axis, dash: [] }],
+      points: [{ x: t[i * SPP], y: ui, color: pal.accent2, r: 6, label: "uᵢ" }, { x: t[j * SPP], y: uj, color: pal.accent2, r: 6, label: "uᵢ₊ₙ" }] });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.42), minHeight: 240, maxHeight: 320 });
+  function go() {
+    if (!rec) build();
+    if (gn() > NP - gi()) gn.set(NP - gi(), false);
+    cv.redraw();
+    const n = Math.min(gn(), NP - gi()), ui = rec.u[gi() * SPP], uj = rec.u[(gi() + n) * SPP];
+    CB.stat("dy-ld-u", `${CB.num(ui, 1)} · ${CB.num(uj, 1)}`);
+    CB.stat("dy-ld-T", CB.num(rec.TD, 3) + " s");
+    const m = document.getElementById("dy-ld-msg");
+    if (!(ui > 0 && uj > 0)) { CB.stat("dy-ld-d", "—"); CB.stat("dy-ld-z", "—"); m.className = "dy-msg bad"; m.innerHTML = "끝 마루가 잡음에 묻혀 0 이하로 읽혔습니다. 간격 n을 줄이거나 잡음을 낮추세요."; return; }
+    const d = Math.log(ui / uj) / n, ze = d / Math.sqrt(4 * Math.PI * Math.PI + d * d);
+    CB.stat("dy-ld-d", CB.num(d, 4)); CB.stat("dy-ld-z", CB.num(ze * 100, 2) + " %");
+    if (show) { const err = (ze - rec.z) / rec.z * 100; m.className = Math.abs(err) < 5 ? "dy-msg ok" : "dy-msg"; m.innerHTML = `정답 ζ = <b>${CB.num(rec.z * 100, 2)} %</b>, 고유 주기 ${CB.num(rec.T, 2)} s. 추정 오차 ${CB.num(err, 1)} %. 초록 점선이 참 포락선입니다.`; }
+    else { m.className = "dy-msg"; m.innerHTML = `추정 포락선(주황 점선)이 기록의 마루들을 고르게 지나도록 i와 n을 골라 보세요. 진폭이 절반이 되는 주기 수로 보면 ζ ≈ 0.11/n<sub>½</sub>.`; }
+  }
+  document.getElementById("dy-ld-new").addEventListener("click", () => { seed++; show = false; build(); go(); });
+  document.getElementById("dy-ld-show").addEventListener("click", () => { show = !show; go(); });
+  build(); go();
+})();
+
+/* ---------- 3. 공진 곡선 ---------- */
+(function () {
+  const gr = CB.range("dy-rs-r", (v) => v.toFixed(3), go), gz = CB.range("dy-rs-z", (v) => v.toFixed(1) + " %", go), ax = CB.seg("dy-rs-ax", go);
+  let th = 0;
+  const ch = CB.canvas("#dy-cv-res", (ctx, W, H) => {
+    const pal = CB.palette(), z = gz() / 100, r = gr(), log = ax() === "log", ref = [0.02, 0.05, 0.1, 0.2, 0.5], series = [];
+    const curve = (zz) => Array.from({ length: 601 }, (_, i) => { const x = (3 * i) / 600; return [x, CB.dyn.Rd(x, zz).Rd]; });
+    ref.forEach((zz) => series.push({ data: curve(zz), color: DY.alpha(pal.dim, 0.45), width: 1.1 }));
+    series.push({ data: curve(z), color: pal.accent, width: 2.8 });
+    const pk = z < Math.SQRT1_2 ? 1 / (2 * z * Math.sqrt(1 - z * z)) : 1, top = Math.min(30, Math.max(4, pk * 1.15)), rd = CB.dyn.Rd(r, z).Rd;
+    CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 }, { x: [0, 3], y: log ? [0.05, 200] : [0, top], logY: log, xLabel: "진동수 비 r = ω/ωₙ", yLabel: "동적 증폭 계수 Rd",
+      yFmt: log ? (v) => String(v) : undefined, series, hlines: [{ y: 1, color: pal.dim, label: "정적" }], vlines: [{ x: 1, color: pal.faint, label: "r = 1" }, { x: r, color: pal.accent2, dash: [] }],
+      points: [{ x: r, y: log ? Math.max(rd, 0.05) : Math.min(rd, top), color: pal.accent2, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.72 : 0.42), minHeight: 230, maxHeight: 310 });
+  const wv = CB.canvas("#dy-cv-res-w", (ctx, W, H) => {
+    const pal = CB.palette(), z = gz() / 100, r = gr(), { Rd, phase } = CB.dyn.Rd(r, z), sc = Math.max(1, Rd), x0 = 46, x1 = W - 14, ym = H / 2 + 8, A = (H / 2 - 22);
+    ctx.strokeStyle = pal.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, ym); ctx.lineTo(x1, ym); ctx.stroke();
+    const P = [], U = [];
+    for (let i = 0; i <= 300; i++) { const s = (4 * Math.PI * i) / 300, x = x0 + ((x1 - x0) * i) / 300; P.push([x, ym - A * Math.sin(s + th)]); U.push([x, ym - (A * Rd / sc) * Math.sin(s + th - phase)]); }
+    DY.line(ctx, P, pal.accent2, 2); DY.line(ctx, U, pal.accent, 2.6);
+    DY.text(ctx, sc > 1 ? `u 축척 1/${CB.num(sc, 1)}` : "같은 축척", x1, 20, pal.dim, { size: 10.5, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.42 : 0.2), minHeight: 120, maxHeight: 160 });
+  CB.loop(document.getElementById("sim-dy-res"), (dt) => { th -= dt * 2.4; wv.redraw(); });
+  function go() {
+    ch.redraw(); wv.redraw();
+    const z = gz() / 100, r = gr(), { Rd, phase } = CB.dyn.Rd(r, z);
+    CB.stat("dy-rs-rd", CB.sig(Rd, 3)); CB.stat("dy-rs-ph", CB.num((phase * 180) / Math.PI, 1) + "°");
+    CB.stat("dy-rs-pk", z < Math.SQRT1_2 ? `${CB.sig(1 / (2 * z * Math.sqrt(1 - z * z)), 3)} (r = ${CB.num(Math.sqrt(1 - 2 * z * z), 3)})` : "봉우리 없음 (1, r = 0)");
+    CB.stat("dy-rs-dom", r < 0.5 ? "강성 (준정적)" : r < 1.4 ? "감쇠 (공진 영역)" : "질량 (관성)");
+  }
+  go();
+})();
+
+/* ---------- 4. 지진 시간 이력 ---------- */
+(function () {
+  const seed = CB.seg("dy-qk-seed", calc), gp = CB.range("dy-qk-pga", (v) => v.toFixed(2) + "g", calc), gT = CB.range("dy-qk-T", (v) => v.toFixed(2) + " s", calc), gz = CB.range("dy-qk-z", (v) => v.toFixed(1) + " %", calc), gt = CB.range("dy-qk-t", (v) => v.toFixed(2) + " s", draw);
+  const DT = 0.01, G = CB.dyn.g;
+  let R = null, playing = false;
+  function calc() {
+    const ag = CB.dyn.quake({ pga: gp(), dur: 20, dt: DT, seed: +seed() }), r = CB.dyn.newmark({ T: gT(), zeta: gz() / 100, ag, dt: DT });
+    R = { ag, r, dg: DY.groundDisp(ag, DT), iu: DY.argAbsMax(r.u), ia: DY.argAbsMax(r.at) };
+    R.umax = Math.abs(R.r.u[R.iu]); R.amax = Math.abs(R.r.at[R.ia]);
+    const w = (2 * Math.PI) / gT();
+    CB.stat("dy-qk-u", `${CB.num(R.umax * 1000, 1)} mm <small>(t = ${CB.num(R.iu * DT, 2)} s)</small>`);
+    CB.stat("dy-qk-a", CB.num(R.amax / G, 3) + "g");
+    CB.stat("dy-qk-amp", CB.num(R.amax / G / gp(), 2) + " 배");
+    CB.stat("dy-qk-v", CB.num((w * w * R.umax) / G, 3) + " W");
+    draw();
+  }
+  const bv = CB.canvas("#dy-cv-qk-b", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), i = Math.min(R.ag.length - 1, Math.round(gt() / DT)), bw = Math.min(200, W * 0.36), hh = H * 0.55, cx = W / 2, yb = H - 24;
+    const big = Math.max(DY.absMax(R.dg), R.umax, 1e-6), sc = (W * 0.22) / big;
+    ctx.save(); ctx.strokeStyle = pal.faint; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(cx, 8); ctx.lineTo(cx, yb + 10); ctx.stroke(); ctx.restore();
+    DY.portal(ctx, cx, yb, bw, hh, R.dg[i] * sc, R.r.u[i] * sc, pal);
+    DY.text(ctx, `u = ${CB.num(R.r.u[i] * 1000, 1)} mm`, cx + (R.dg[i] + R.r.u[i]) * sc, yb - hh - 28, pal.accent, { size: 11.5 });
+    DY.text(ctx, `üg = ${CB.num(R.ag[i] / G, 3)}g`, 12, yb - 12, pal.accent2, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.55 : 0.3), minHeight: 160, maxHeight: 220 });
+  const tv = CB.canvas("#dy-cv-qk-t", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), t = gt(), x = 58, w = W - 58 - 14, h3 = (H - 34) / 3, dec = 2;
+    const pick = (arr, f) => { const out = []; for (let k = 0; k < arr.length; k += dec) out.push([k * DT, f(arr[k])]); return out; };
+    const ya = Math.max(gp(), R.amax / G) * 1.1, yu = Math.max(R.umax * 1000, 1e-3) * 1.15;
+    CB.chart(ctx, { x, y: 8, w, h: h3 - 14 }, { x: [0, 20], y: [-ya, ya], xTicks: [], yTicks: [-gp(), 0, gp()], yFmt: (v) => CB.num(v, 2), series: [{ data: pick(R.ag, (a) => a / G), color: pal.accent2, width: 1.2 }], vlines: [{ x: t, color: pal.text, dash: [] }] });
+    DY.text(ctx, "üg (g)", x + 6, 16, pal.accent2, { size: 10.5, align: "left" });
+    CB.chart(ctx, { x, y: 8 + h3, w, h: h3 - 14 }, { x: [0, 20], y: [-yu, yu], xTicks: [], yTicks: [-yu / 1.15, 0, yu / 1.15], yFmt: (v) => CB.num(v, 0), series: [{ data: pick(R.r.u, (u) => u * 1000), color: pal.accent, width: 1.6 }], vlines: [{ x: t, color: pal.text, dash: [] }], points: [{ x: R.iu * DT, y: R.r.u[R.iu] * 1000, color: pal.accent, r: 4.5 }] });
+    DY.text(ctx, "u (mm)", x + 6, 16 + h3, pal.accent, { size: 10.5, align: "left" });
+    CB.chart(ctx, { x, y: 8 + 2 * h3, w, h: h3 - 14 }, { x: [0, 20], y: [-ya, ya], yTicks: [-gp(), 0, gp()], yFmt: (v) => CB.num(v, 2), xLabel: "", series: [{ data: pick(R.r.at, (a) => a / G), color: pal.ok, width: 1.3 }], vlines: [{ x: t, color: pal.text, dash: [] }], points: [{ x: R.ia * DT, y: R.r.at[R.ia] / G, color: pal.ok, r: 4.5 }] });
+    DY.text(ctx, "üᵗ (g)", x + 6, 16 + 2 * h3, pal.ok, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.56), minHeight: 300, maxHeight: 420 });
+  function draw() { bv.redraw(); tv.redraw(); }
+  const loop = CB.loop(document.getElementById("sim-dy-quake"), (dt) => { if (!playing) return; let v = gt() + dt; if (v >= 20) { v = 20; playing = false; btn.set(false); } gt.set(Math.round(v * 100) / 100); });
+  const btn = CB.playButton("dy-qk-play", () => { if (gt() >= 19.99) gt.set(0); playing = true; loop.start(); }, () => { playing = false; });
+  calc();
+})();
+
+/* ---------- 5. 뉴마크 정확도 ---------- */
+(function () {
+  const meth = CB.seg("dy-nm-meth", go), gd = CB.range("dy-nm-dt", (v) => v.toFixed(3), go), gz = CB.range("dy-nm-z", (v) => v.toFixed(1) + " %", go);
+  const T = 1, m = 1, w = 2 * Math.PI, k = m * w * w, ust = 1 / k, TEND = 5;
+  function linAcc(z, dt, n) {
+    const c = 2 * z * m * w, beta = 1 / 6, gam = 0.5, u = [0], v = [0], a = [1 / m];
+    const kh = k + (gam / (beta * dt)) * c + m / (beta * dt * dt), A = m / (beta * dt) + (gam / beta) * c, B = m / (2 * beta) + dt * (gam / (2 * beta) - 1) * c;
+    for (let i = 0; i < n - 1; i++) {
+      const dp = A * v[i] + B * a[i], du = dp / kh, dv = (gam / (beta * dt)) * du - (gam / beta) * v[i] + dt * (1 - gam / (2 * beta)) * a[i];
+      u.push(u[i] + du); v.push(v[i] + dv); a.push((1 - c * v[i + 1] - k * u[i + 1]) / m);
+    }
+    return u;
+  }
+  const exact = (t, z) => { const wd = w * Math.sqrt(1 - z * z); return ust * (1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z / Math.sqrt(1 - z * z)) * Math.sin(wd * t))); };
+  function num() {
+    const dt = gd() * T, n = Math.ceil(TEND / dt) + 1, z = gz() / 100;
+    const u = meth() === "avg" ? CB.dyn.newmark({ T, zeta: z, p: new Array(n).fill(1), dt, m }).u : linAcc(z, dt, n);
+    return { dt, n, z, u };
+  }
+  const cv = CB.canvas("#dy-cv-nm", (ctx, W, H) => {
+    const pal = CB.palette(), { dt, z, u } = num(), ex = [];
+    for (let i = 0; i <= 500; i++) { const t = (TEND * i) / 500; ex.push([t, exact(t, z) / ust]); }
+    const pts = u.map((x, i) => [i * dt, x / ust]).filter(([t]) => t <= TEND + 1e-9);
+    const c = CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 }, { x: [0, TEND], y: [-0.6, 2.6], xLabel: "시간 t / T", yLabel: "u / 정적 변위", series: [{ data: ex, color: pal.dim, width: 2 }, { data: pts, color: pal.accent, width: 1.2, dash: [3, 3] }], hlines: [{ y: 1, color: pal.faint, label: "정적 변위" }] });
+    ctx.save(); ctx.beginPath(); ctx.rect(c.box.x, c.box.y, c.box.w, c.box.h); ctx.clip(); ctx.fillStyle = pal.accent;
+    pts.forEach(([t, y]) => { if (!isFinite(y)) return; const py = c.Y(Math.max(-5, Math.min(5, y))); ctx.beginPath(); ctx.arc(c.X(t), py, 3, 0, 2 * Math.PI); ctx.fill(); }); ctx.restore();
+    DY.text(ctx, "정해", c.X(0.25), c.Y(2.35), pal.dim, { size: 11, align: "left" }); DY.text(ctx, "● 수치해", c.X(0.9), c.Y(2.35), pal.accent, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 250, maxHeight: 330 });
+  function go() {
+    cv.redraw();
+    const { dt, z, u } = num(), beta = meth() === "avg" ? 0.25 : 1 / 6, Om = w * dt, cs = 1 - (Om * Om) / (2 * (1 + beta * Om * Om)), stable = cs >= -1;
+    CB.stat("dy-nm-n", CB.num(1 / gd(), 1));
+    CB.stat("dy-nm-pe", stable ? "+" + CB.num((Om / Math.acos(cs) - 1) * 100, 2) + " %" : "—");
+    CB.stat("dy-nm-er", stable ? CB.num((Om / Math.acos(cs) - 1) * 5 * 360, 0) + "° (" + CB.num((Om / Math.acos(cs) - 1) * 5, 3) + " s)" : "발산");
+    CB.stat("dy-nm-st", stable ? "안정" : "불안정");
+    const m = document.getElementById("dy-nm-msg");
+    if (!stable) { m.className = "dy-msg bad"; m.innerHTML = `Δt/T = ${CB.num(gd(), 3)} &gt; 0.551: 선형 가속도법이 불안정합니다. 걸음마다 오차가 커져 해가 발산합니다.`; }
+    else if (gd() > 0.2) { m.className = "dy-msg"; m.innerHTML = "안정하지만 부정확합니다. 주기가 눈에 띄게 늘어나 시간이 지날수록 수치해가 정해보다 늦어집니다. 지진 해석에서는 관심 있는 가장 짧은 주기의 1/10 이하로 Δt를 잡습니다."; }
+    else { m.className = "dy-msg ok"; m.innerHTML = `주기 오차가 작습니다(Δt ≤ T/5). 평균 가속도법은 진폭을 줄이지 않으므로(수치 감쇠 0) 오차는 거의 "위상"에만 있고, 주기마다 쌓입니다. 마루 높이는 맞지만 시각이 조금씩 늦어지는 것을 보세요.`; }
+  }
+  go();
+})();
+
+/* ---------- 6. 응답 스펙트럼 만들기 ---------- */
+(function () {
+  const DT = 0.01, G = CB.dyn.g, N = 100, PER = Array.from({ length: N }, (_, i) => (i === 0 ? 0 : 0.04 + ((i - 1) * 3.96) / (N - 2)));
+  const seed = CB.seg("dy-sp-seed", calc), gp = CB.range("dy-sp-pga", (v) => v.toFixed(2) + "g", calc), gz = CB.range("dy-sp-z", (v) => v.toFixed(1) + " %", calc);
+  const gi = CB.range("dy-sp-T", (v) => CB.num(PER[v], 2) + " s", () => { hist(); draw(); }), kind = CB.seg("dy-sp-kind", draw);
+  let ag = null, SP = null, H = null, rev = N, playing = false, acc = 0;
+  function calc() { ag = CB.dyn.quake({ pga: gp(), dur: 20, dt: DT, seed: +seed() }); SP = CB.dyn.spectrum(ag, DT, PER, gz() / 100); hist(); draw(); }
+  function hist() { const T = PER[gi()]; H = T > 0 ? CB.dyn.newmark({ T, zeta: gz() / 100, ag, dt: DT }).u : null; }
+  const val = (s, k) => (k === "a" ? s.PSa / G : k === "v" ? s.PSv : s.Sd * 1000);
+  const dval = (T, k) => { const sa = CB.dyn.designSa(T, 0.5, 0.29); return k === "a" ? sa : k === "v" ? (sa * G * T) / (2 * Math.PI) : ((sa * G * T * T) / (4 * Math.PI * Math.PI)) * 1000; };
+  const hv = CB.canvas("#dy-cv-sp-h", (ctx, W, Hh) => {
+    if (!SP) return;
+    const pal = CB.palette(), i = gi(), T = PER[i];
+    if (!H) { DY.text(ctx, "T = 0: 진동자가 땅과 한 몸 → PSa = PGA", W / 2, Hh / 2, pal.dim, { size: 12, mono: false }); return; }
+    const mx = Math.max(DY.absMax(H), 1e-9), k = DY.argAbsMax(H), data = [];
+    for (let j = 0; j < H.length; j += 2) data.push([j * DT, H[j] * 1000]);
+    CB.chart(ctx, { x: 58, y: 26, w: W - 58 - 14, h: Hh - 26 - 30 }, { x: [0, 20], y: [-mx * 1150, mx * 1150], yTicks: [-mx * 1000, 0, mx * 1000], yFmt: (v) => CB.num(v, v && Math.abs(v) < 10 ? 1 : 0), series: [{ data, color: pal.accent, width: 1.4 }], hlines: [{ y: mx * 1000, color: pal.accent2 }, { y: -mx * 1000, color: pal.accent2 }], points: [{ x: k * DT, y: H[k] * 1000, color: pal.accent2, r: 5 }] });
+    document.getElementById("dy-sp-cap").textContent = `T = ${CB.num(T, 2)} s 진동자 u(t) (mm) · 최대 ${CB.num(mx * 1000, 1)} mm`;
+  }, { aspect: (W) => (W < 520 ? 0.5 : 0.24), minHeight: 140, maxHeight: 190 });
+  const sv = CB.canvas("#dy-cv-sp", (ctx, W, Hh) => {
+    if (!SP) return;
+    const pal = CB.palette(), kd = kind(), shown = SP.slice(0, rev), all = SP.map((s) => val(s, kd)), des = [];
+    for (let j = 0; j <= 200; j++) { const T = (4 * j) / 200; des.push([T, dval(T, kd)]); }
+    const top = Math.max(...all, ...des.map((d) => d[1])) * 1.12 || 1;
+    const lab = kd === "a" ? "PSa (g)" : kd === "v" ? "PSv (m/s)" : "Sd (mm)";
+    const c = CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: Hh - 14 - 46 }, { x: [0, 4], y: [0, top], xLabel: "고유 주기 Tₙ (s)", yLabel: lab,
+      series: [{ data: des, color: pal.dim, width: 1.4, dash: [6, 4] }, { data: shown.map((s) => [s.T, val(s, kd)]), color: pal.accent, width: 2.2 }],
+      hlines: kd === "a" ? [{ y: gp(), color: pal.accent2, label: "PGA" }] : [], vlines: [{ x: PER[gi()], color: pal.accent2, dash: [] }] });
+    ctx.save(); ctx.fillStyle = pal.accent; shown.forEach((s) => { ctx.beginPath(); ctx.arc(c.X(s.T), c.Y(val(s, kd)), 2.4, 0, 2 * Math.PI); ctx.fill(); }); ctx.restore();
+    if (gi() < rev) { const s = SP[gi()]; ctx.fillStyle = pal.accent2; ctx.beginPath(); ctx.arc(c.X(s.T), c.Y(val(s, kd)), 6, 0, 2 * Math.PI); ctx.fill(); }
+    DY.text(ctx, "B-10 설계 스펙트럼(8장)", c.X(2.6), c.Y(dval(2.6, kd)) - 12, pal.dim, { size: 10.5, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.78 : 0.45), minHeight: 250, maxHeight: 330 });
+  function draw() {
+    hv.redraw(); sv.redraw();
+    if (!SP) return;
+    const s = SP[gi()], known = gi() < rev;
+    CB.stat("dy-sp-sd", known ? CB.num(s.Sd * 1000, 1) + " mm" : "…"); CB.stat("dy-sp-sv", known ? CB.num(s.PSv, 3) + " m/s" : "…");
+    CB.stat("dy-sp-sa", known ? CB.num(s.PSa / G, 3) + "g" : "…"); CB.stat("dy-sp-amp", known ? CB.num(s.PSa / G / gp(), 2) + " 배" : "…");
+  }
+  const loop = CB.loop(document.getElementById("sim-dy-spec"), (dt) => {
+    if (!playing) return; acc += dt * 22; if (acc < 1) return;
+    const step = Math.floor(acc); acc -= step; rev = Math.min(N, rev + step);
+    gi.set(rev - 1, false); hist(); draw();
+    if (rev >= N) { playing = false; btn.set(false); }
+  });
+  const btn = CB.playButton("dy-sp-play", () => { rev = 1; acc = 0; gi.set(0, false); hist(); playing = true; loop.start(); draw(); }, () => { playing = false; rev = N; draw(); }, ["▶ 스펙트럼 그리기", "■ 멈추기"]);
+  calc();
+})();
+
+/* ---------- 7. 전단 건물 모드 ---------- */
+(function () {
+  const gn = CB.range("dy-md-n", (v) => v + "층", calc), gm = CB.range("dy-md-m", (v) => v + " t", calc), gk = CB.range("dy-md-k", (v) => v.toFixed(2) + " × 10⁶ kN/m", calc), gr = CB.range("dy-md-r", (v) => v.toFixed(2), calc), sel = CB.seg("dy-md-sel", draw);
+  document.getElementById("dy-md-b10").addEventListener("click", () => { gn.set(10, false); gm.set(703, false); gk.set(1.2, false); gr.set(0.87, false); calc(); });
+  let MD = null, hts = [], th = 0;
+  function calc() {
+    const n = gn(), m = Array.from({ length: n }, (_, i) => (i === n - 1 ? gm() * gr() : gm())), k = new Array(n).fill(gk() * 1e6), sb = CB.dyn.shearBuilding(m, k);
+    MD = CB.dyn.modes(sb.K, sb.M); hts = [0]; for (let i = 0; i < n; i++) hts.push(hts[i] + (i === 0 ? 5 : 4));
+    const f = (i) => (MD[i] ? CB.sig(MD[i].T, 3) : "—"), e = (i) => (MD[i] ? CB.num(MD[i].ratio, 3) : "—");
+    CB.stat("dy-md-T", `${f(0)} · ${f(1)} · ${f(2)} s`); CB.stat("dy-md-e", `${e(0)} · ${e(1)} · ${e(2)}`);
+    CB.stat("dy-md-c", CB.num(MD.slice(0, 3).reduce((s, x) => s + x.ratio, 0) * 100, 1) + " %"); CB.stat("dy-md-g", CB.num(MD[0].Gamma, 3));
+    draw();
+  }
+  function bldg(ctx, cx, yb, Hpx, bw, phi, amp, color, pal, label) {
+    const htop = hts[hts.length - 1], Y = (h) => yb - (h / htop) * Hpx, xs = [0, ...phi.map((p) => p * amp)];
+    ctx.save(); ctx.strokeStyle = pal.faint; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(cx, yb); ctx.lineTo(cx, Y(htop) - 6); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.strokeStyle = pal.axis; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx - bw, yb); ctx.lineTo(cx + bw, yb); ctx.stroke(); ctx.restore();
+    for (let j = 1; j < hts.length; j++) {
+      const d = xs[j] - xs[j - 1], h = Y(hts[j - 1]) - Y(hts[j]);
+      DY.column(ctx, cx - bw / 2 + xs[j - 1], Y(hts[j - 1]), h, d, DY.alpha(pal.text, 0.55), 1.4); DY.column(ctx, cx + bw / 2 + xs[j - 1], Y(hts[j - 1]), h, d, DY.alpha(pal.text, 0.55), 1.4);
+      ctx.save(); ctx.fillStyle = DY.alpha(color, 0.85); ctx.fillRect(cx - bw / 2 - 4 + xs[j], Y(hts[j]) - 2.5, bw + 8, 5); ctx.restore();
+    }
+    DY.line(ctx, xs.map((x, j) => [cx + x, Y(hts[j])]), color, 1.6, [4, 3]);
+    if (label) DY.text(ctx, label, cx, yb + 14, color, { size: 11 });
+  }
+  const cv = CB.canvas("#dy-cv-md", (ctx, W, H) => {
+    if (!MD) return;
+    const pal = CB.palette(), cols = DY_MODE_COLORS(), s = sel(), yb = H - 26, Hpx = H - 60, list = s === "all" ? [0, 1, 2].filter((i) => MD[i]) : [Math.min(+s - 1, MD.length - 1)];
+    const slot = W / list.length, bw = Math.min(70, slot * 0.32), w1 = MD[0].omega;
+    list.forEach((mi, q) => {
+      const md = MD[mi], mx = Math.max(...md.phi.map(Math.abs)), amp = (slot * 0.26) / mx, sn = Math.sin(th * (md.omega / w1));
+      bldg(ctx, slot * (q + 0.5), yb, Hpx, bw, md.phi, amp * sn, cols[mi], pal, `${mi + 1}차 · T = ${CB.sig(md.T, 3)} s`);
+    });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 280, maxHeight: 400 });
+  const bars = CB.canvas("#dy-cv-md-b", (ctx, W, H) => {
+    if (!MD) return;
+    const pal = CB.palette(), cols = DY_MODE_COLORS(), nb = Math.min(MD.length, 6), x0 = 52, bw = (W - x0 - 14) / nb, y0 = H - 28, hpx = H - 52;
+    ctx.strokeStyle = pal.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(W - 14, y0); ctx.stroke();
+    [0, 0.5, 1].forEach((v) => { ctx.strokeStyle = pal.grid; ctx.beginPath(); ctx.moveTo(x0, y0 - v * hpx); ctx.lineTo(W - 14, y0 - v * hpx); ctx.stroke(); DY.text(ctx, String(v), x0 - 8, y0 - v * hpx, pal.dim, { size: 10, align: "right", bold: false }); });
+    for (let i = 0; i < nb; i++) {
+      const md = MD[i], h = md.ratio * hpx, x = x0 + i * bw + bw * 0.18;
+      ctx.fillStyle = DY.alpha(cols[i], i < 3 ? 0.8 : 0.4); ctx.fillRect(x, y0 - h, bw * 0.64, h);
+      DY.text(ctx, CB.num(md.ratio, 3), x + bw * 0.32, y0 - h - 9, pal.text, { size: 10.5 });
+      DY.text(ctx, `${i + 1}차`, x + bw * 0.32, y0 + 12, pal.dim, { size: 10.5, bold: false });
+    }
+    DY.text(ctx, "유효 질량비", x0 + 4, 12, pal.dim, { size: 10.5, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.5 : 0.24), minHeight: 140, maxHeight: 180 });
+  CB.loop(document.getElementById("sim-dy-modes"), (dt) => { th += dt * Math.PI; cv.redraw(); });
+  function draw() { cv.redraw(); bars.redraw(); }
+  calc();
+})();
+
+/* ---------- 8. B-10 모드 중첩 ---------- */
+(function () {
+  const seed = CB.seg("dy-su-seed", calc), gp = CB.range("dy-su-pga", (v) => v.toFixed(2) + "g", calc), gn = CB.range("dy-su-n", (v) => v + "개", combine), q = CB.seg("dy-su-q", combine), gt = CB.range("dy-su-t", (v) => v.toFixed(2) + " s", draw);
+  const DT = 0.01, b = CB.dyn.B10, MD = DY.b10(), NF = b.m.length;
+  let D = null, C = null, playing = false;
+  function calc() {
+    const ag = CB.dyn.quake({ pga: gp(), dur: 20, dt: DT, seed: +seed() });
+    D = MD.map((md) => CB.dyn.newmark({ T: md.T, zeta: 0.05, ag, dt: DT }).u);
+    combine();
+  }
+  function combine() {
+    const n = gn(), roof = q() === "roof", len = D[0].length;
+    const contrib = MD.slice(0, n).map((md, i) => D[i].map((d) => (roof ? md.Gamma * md.phi[NF - 1] * d * 1000 : md.Meff * md.omega * md.omega * d)));
+    const tot = new Array(len).fill(0); contrib.forEach((c) => c.forEach((v, k) => (tot[k] += v)));
+    const peaks = contrib.map((c) => DY.absMax(c)), ex = DY.absMax(tot), srss = CB.dyn.srss(peaks), abs = peaks.reduce((a, x) => a + x, 0);
+    const rf = new Array(len).fill(0); MD.slice(0, n).forEach((md, i) => D[i].forEach((d, k) => (rf[k] += md.Gamma * md.phi[NF - 1] * d)));
+    C = { contrib, tot, peaks, ex, srss, abs, roof, ik: DY.argAbsMax(tot), maxRoof: Math.max(1e-6, DY.absMax(rf)) };
+    const u = roof ? " mm" : " kN", f = (v) => (roof ? CB.num(v, 1) : CB.sig(v, 3)) + u;
+    CB.stat("dy-su-ex", f(ex)); CB.stat("dy-su-srss", `${f(srss)} <small>(${CB.num((srss / ex - 1) * 100, 1)} %)</small>`);
+    CB.stat("dy-su-abs", `${f(abs)} <small>(+${CB.num((abs / ex - 1) * 100, 0)} %)</small>`); CB.stat("dy-su-m1", CB.num((peaks[0] / ex) * 100, 0) + " %");
+    draw();
+  }
+  function floorDisp(k) { const n = gn(); return b.m.map((_, j) => MD.slice(0, n).reduce((s, md, i) => s + md.Gamma * md.phi[j] * D[i][k], 0)); }
+  const o3 = CB.orbit("#dy-cv-sp3", { yaw: -0.95, pitch: 0.32, dist: 105, target: [16, 12, 19], aspect: 0.62, minHeight: 240, maxHeight: 400, draw(V) {
+    if (!D) return;
+    const pal = V.P, k = Math.min(D[0].length - 1, Math.round(gt() / DT)), u = floorDisp(k);
+    const sc = 4 / (C ? C.maxRoof : 1), z = [0, ...b.h], dy = [0, ...u.map((x) => x * sc)], X = [0, 8, 16, 24, 32], Yg = [0, 8, 16, 24];
+    for (let x = 0; x <= 32; x += 8) V.line3([x, -4, 0], [x, 28, 0], { color: pal.grid, width: 1 });
+    for (let y = -4; y <= 28; y += 8) V.line3([-4, y, 0], [36, y, 0], { color: pal.grid, width: 1 });
+    for (let j = 1; j <= NF; j++) {
+      const a = dy[j], zz = z[j], lw = j === NF ? 2 : 1.2;
+      X.forEach((x) => V.line3([x, a, zz], [x, 24 + a, zz], { color: DY.alpha(pal.accent, 0.7), width: lw }));
+      Yg.forEach((y) => V.line3([0, y + a, zz], [32, y + a, zz], { color: DY.alpha(pal.accent, 0.7), width: lw }));
+      V.poly3([[8, 8 + a, zz], [24, 8 + a, zz], [24, 16 + a, zz], [8, 16 + a, zz]], { fill: pal.accent2, fillAlpha: 0.12, color: DY.alpha(pal.accent2, 0.6), width: 1 });
+    }
+    for (const x of X) for (const y of Yg) for (let j = 1; j <= NF; j++) V.line3([x, y + dy[j - 1], z[j - 1]], [x, y + dy[j], z[j]], { color: DY.alpha(pal.text, 0.5), width: 1.2 });
+    [[8, 8], [24, 8], [24, 16], [8, 16]].forEach(([x, y]) => { for (let j = 1; j <= NF; j++) V.line3([x, y + dy[j - 1], z[j - 1]], [x, y + dy[j], z[j]], { color: pal.accent2, width: 2 }); });
+    V.line3([34, 12, 41], [34, 12 + dy[NF], 41], { color: pal.accent, width: 2.5 });
+    V.text3(`지붕 ${CB.num(u[NF - 1] * 1000, 1)} mm`, [34, 12 + dy[NF], 44], { color: pal.accent, size: 12, bold: true });
+    V.text3("Y", [-6, 30, 0], { color: pal.dim, size: 11 });
+  } });
+  const tv = CB.canvas("#dy-cv-sp-t", (ctx, W, H) => {
+    if (!C) return;
+    const pal = CB.palette(), cols = DY_MODE_COLORS(), t = gt(), dec = 2, top = Math.max(C.ex, ...C.peaks) * 1.12 || 1;
+    const series = [];
+    C.contrib.slice(0, 3).forEach((c, i) => { const d = []; for (let k = 0; k < c.length; k += dec) d.push([k * DT, c[k]]); series.push({ data: d, color: DY.alpha(cols[i], 0.85), width: i ? 1.2 : 1.4 }); });
+    const td = []; for (let k = 0; k < C.tot.length; k += dec) td.push([k * DT, C.tot[k]]);
+    series.push({ data: td, color: pal.text, width: 1.6 });
+    CB.chart(ctx, { x: 58, y: 12, w: W - 58 - 14, h: H - 12 - 44 }, { x: [0, 20], y: [-top, top], xLabel: "시간 t (s)", yLabel: C.roof ? "지붕 변위 (mm)" : "밑면 전단 (kN)", yFmt: (v) => CB.sig(v, 2), series, vlines: [{ x: t, color: pal.accent2, dash: [] }], points: [{ x: C.ik * DT, y: C.tot[C.ik], color: pal.text, r: 4.5 }] });
+    DY.text(ctx, "합(굵은 선) · 1차 · 2차 · 3차", W - 16, 22, pal.dim, { size: 10.5, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.36), minHeight: 210, maxHeight: 280 });
+  const bv = CB.canvas("#dy-cv-sp-b", (ctx, W, H) => {
+    if (!C) return;
+    const pal = CB.palette(), cols = DY_MODE_COLORS(), items = C.peaks.map((p, i) => [`${i + 1}차`, p, cols[i]]).concat([["SRSS", C.srss, pal.accent], ["절댓값 합", C.abs, pal.bad], ["정해", C.ex, pal.text]]);
+    const x0 = 64, bw = (W - x0 - 12) / items.length, y0 = H - 26, hpx = H - 50, top = Math.max(...items.map((x) => x[1])) * 1.1 || 1;
+    ctx.strokeStyle = pal.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(W - 12, y0); ctx.stroke();
+    items.forEach(([lab, v, c], i) => { const h = (v / top) * hpx, x = x0 + i * bw + bw * 0.15; ctx.fillStyle = DY.alpha(c, 0.75); ctx.fillRect(x, y0 - h, bw * 0.7, h); DY.text(ctx, lab, x + bw * 0.35, y0 + 12, pal.dim, { size: W < 520 ? 9 : 10.5, bold: false }); if (bw > 34) DY.text(ctx, C.roof ? CB.num(v, 1) : CB.sig(v, 2), x + bw * 0.35, y0 - h - 9, pal.text, { size: 10 }); });
+    DY.text(ctx, "모드별 최댓값과 조합", x0 + 2, 12, pal.dim, { size: 10.5, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.5 : 0.24), minHeight: 140, maxHeight: 190 });
+  function draw() { o3.redraw(); tv.redraw(); bv.redraw(); }
+  const loop = CB.loop(document.getElementById("sim-dy-sup"), (dt) => { if (!playing) return; let v = gt() + dt; if (v >= 20) { v = 20; playing = false; btn.set(false); } gt.set(Math.round(v * 100) / 100); });
+  const btn = CB.playButton("dy-su-play", () => { if (gt() >= 19.99) gt.set(0); playing = true; loop.start(); }, () => { playing = false; });
+  calc();
+})();
+</script>
+</body>
+</html>
