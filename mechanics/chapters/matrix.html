@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>매트릭스 구조해석 · MechanicsBook</title>
+<meta name="description" content="구조 해석 프로그램의 속을 연다. 스프링 하나의 강성에서 트러스·보·골조의 부재 강성 행렬, 좌표 변환과 조립, 경계 조건과 특이 행렬, 등가 절점 하중, 모델링 실수와 검증, 기준 건물 B-10 골조의 수평 하중 해석까지 행렬 칸을 직접 채우며 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .mx-stack { display: grid; grid-template-columns: 1fr; }
+  .mx-stack > div { position: relative; min-width: 0; }
+  .mx-stack > div + div { border-top: 1px solid var(--border); }
+  .mx-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .mx-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .mx-msg b { color: var(--text); }
+  .mx-msg.ok { color: var(--ok); font-weight: 600; }
+  .mx-msg.bad { color: var(--bad); font-weight: 600; }
+  .mx-tw { margin: 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; overflow: auto; }
+  .mx-tw table { font: 12px var(--mono); width: auto; min-width: 100%; }
+  .mx-tw th, .mx-tw td { padding: 4px 7px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; border: 1px solid var(--border); }
+  .mx-tw th { color: var(--text-dim); font-weight: 600; }
+  .mx-tw td.z { color: var(--text-faint); }
+  .mx-tw td.hl { outline: 2px solid var(--accent-2); outline-offset: -2px; font-weight: 700; }
+  .mx-tw .gone { opacity: .28; text-decoration: line-through; }
+  .mx-tw td.selc { background: var(--accent-soft); font-weight: 700; color: var(--accent); }
+  .mx-checks { display: grid; gap: 6px; padding: 10px 18px; border-top: 1px solid var(--border); font-size: 14px; }
+  .mx-checks div::before { content: "✓ "; color: var(--ok); font-weight: 700; }
+  .mx-checks div.bad::before { content: "✗ "; color: var(--bad); }
+  .mx-checks div.bad { color: var(--bad); }
+  .mx-tbl td, .mx-tbl th { font-variant-numeric: tabular-nums; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="mechanics"></script>
+</head>
+<body data-chapter="matrix">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="mx-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="mx-ah-react" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="mx-ah-int" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+      <marker id="mx-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 16</div>
+    <h1 data-no-glossary>매트릭스 구조해석</h1>
+    <p class="lead">오늘 구조 설계 사무소에서 휨모멘트를 손으로 분배하는 사람은 거의 없습니다. 절점과 부재, 지점과 하중을 입력하면 프로그램이 수천 개의 연립 방정식을 몇 초 만에 풀어 줍니다. 그 속에서 일어나는 일은 놀랄 만큼 단순합니다. 부재 하나하나의 "힘과 변위의 관계"를 작은 행렬로 쓰고, 그것을 절점 번호에 맞춰 큰 행렬에 더해 넣고, 지점에서 막힌 칸을 지운 뒤, 남은 방정식 \([K]\{d\} = \{F\}\)를 풉니다. 이것이 <b>직접 강성법</b>입니다. 이 책의 모든 시뮬레이터가 쓰는 해석기(CB.frame)도 바로 이 방법입니다. 이 장에서는 스프링 하나에서 출발해 트러스·보·골조의 강성 행렬을 만들고, 행렬 칸이 채워지는 모습을 보고, 해석 결과가 맞는지 검증하는 법을 익힌 다음 기준 건물 B-10의 골조 한 줄을 풉니다.</p>
+    <ul class="objectives">
+      <li>스프링의 힘–변위 관계에서 강성 행렬을 만들고, 대칭이며 지점이 없으면 특이하다는 성질을 설명한다.</li>
+      <li>트러스 부재의 국부 강성 행렬을 좌표 변환해 전역 4 × 4 행렬로 바꾸고, 2부재 트러스를 행렬로 푼다.</li>
+      <li>보·골조 부재 강성 행렬의 각 열이 단위 변위 모양에 필요한 끝 힘이라는 것을 안다.</li>
+      <li>절점 번호에 따라 부재 행렬을 조립하고, 경계 조건을 적용해 변위·반력·부재력을 구한다.</li>
+      <li>부재 위 하중을 등가 절점 하중으로 바꾸고, 최종 부재력에 고정단 힘을 되더한다.</li>
+      <li>해석 결과를 평형·대칭·크기 감각·손계산으로 검증하고, 기준 건물 B-10 골조의 층 변위를 해석한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>손으로는 풀 수 없는 크기의 구조물</b></div>
+      <div class="o-body"><p>1950년대에 디지털 컴퓨터가 쓰이기 시작하자 항공기 날개처럼 부재가 많은 구조물을 행렬로 푸는 방법이 빠르게 발전했습니다. 처짐각법의 계수 \(4EI/L\), \(2EI/L\), \(6EI/L^2\)을 부재마다 작은 행렬로 묶고, 컴퓨터가 그것을 큰 행렬에 더해 연립 방정식을 푸는 방식은 구조물의 모양과 상관없이 같은 프로그램으로 처리할 수 있었습니다. 이 생각을 2차원·3차원 연속체로 넓힌 것이 유한요소법입니다.</p>
+        <p>프로그램은 실수하지 않지만, 입력은 사람이 합니다. 단위 하나, 지점 하나, 힌지 하나를 잘못 넣으면 프로그램은 틀린 답을 정확한 숫자로 내놓습니다. 해석 결과를 믿을 수 있는지 판단하는 힘은 이 장에서 행렬 속을 한 번 들여다본 경험과 앞 장들의 손계산 감각에서 나옵니다.</p>
+        <div class="o-chain"><span>부재 강성 행렬</span><i>→</i><span>좌표 변환·조립</span><i>→</i><span class="tool">[K]{d} = {F}</span><i>→</i><span>변위·반력·부재력과 검증</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="springs">
+    <h2>스프링 하나에서 강성 행렬로</h2>
+    <p>강성법의 모든 것은 스프링에서 시작합니다. 양 끝에 절점 1, 2가 있는 스프링(강성 \(k\))의 끝 변위가 \(u_1\), \(u_2\)이면 늘어난 길이는 \(u_2 - u_1\)이고 스프링 힘은 \(k(u_2 - u_1)\)입니다. 이 힘을 만들려면 절점 2에 \(+k(u_2 - u_1)\), 절점 1에 \(-k(u_2 - u_1)\)의 외력이 필요합니다. 행렬로 쓰면</p>
+    <div class="formula">$$\begin{Bmatrix} f_1 \\ f_2 \end{Bmatrix} = \begin{bmatrix} k & -k \\ -k & k \end{bmatrix} \begin{Bmatrix} u_1 \\ u_2 \end{Bmatrix}$$</div>
+    <div class="callout def"><strong>정의 16.1 (강성 행렬)</strong> 구조물(또는 요소)의 자유도 변위 \(\{d\}\)와 그 변위를 만드는 데 필요한 자유도 힘 \(\{F\}\) 사이의 선형 관계 \(\{F\} = [K]\{d\}\)의 계수 행렬 \([K]\)를 <span class="term">강성 행렬</span><span class="en">(stiffness matrix)</span>이라 한다. 성분 \(K_{ij}\)는 자유도 \(j\)에만 단위 변위를 주고 나머지를 0으로 묶었을 때 자유도 \(i\)에 필요한 힘이다. 강성 행렬은 <b>대칭</b>이고(상반 정리), 대각 성분은 양수이며, 지점으로 묶지 않으면 강체 운동 때문에 <b>특이 행렬</b>(행렬식 0)이다.</div>
+    <p>스프링 여러 개를 이으면 각 스프링의 \(2 \times 2\) 행렬을 해당 절점 번호의 칸에 더하기만 하면 됩니다. 이것이 <span class="term">조립</span>입니다. 공유하는 절점의 대각 칸에는 양쪽 스프링의 강성이 더해집니다.</p>
+    <figure class="diagram" id="fig-mx-spring">
+      <svg viewBox="0 0 760 290" role="img" aria-label="직렬 스프링 세 개와 조립된 강성 행렬의 띠 모양">
+        <rect x="10" y="10" width="740" height="270" rx="10" class="f-surface"/>
+        <rect x="40" y="62" width="12" height="56" style="fill:var(--surface-2);stroke:var(--text)"/>
+        <g style="fill:none;stroke-width:2.2">
+          <path d="M52 90h14l8-12 12 24 12-24 12 24 12-24 8 12h14" style="stroke:var(--accent)"/>
+          <path d="M164 90h14l8-12 12 24 12-24 12 24 12-24 8 12h14" style="stroke:var(--accent-2)"/>
+          <path d="M276 90h14l8-12 12 24 12-24 12 24 12-24 8 12h14" style="stroke:var(--ok)"/>
+        </g>
+        <circle cx="52" cy="90" r="6" class="f-elev" style="stroke:var(--text)"/><circle cx="164" cy="90" r="6" class="f-elev" style="stroke:var(--text)"/><circle cx="276" cy="90" r="6" class="f-elev" style="stroke:var(--text)"/><circle cx="388" cy="90" r="6" class="f-elev" style="stroke:var(--text)"/>
+        <text x="52" y="130" text-anchor="middle" class="t-mono">0</text><text x="164" y="130" text-anchor="middle" class="t-mono">1</text><text x="276" y="130" text-anchor="middle" class="t-mono">2</text><text x="388" y="130" text-anchor="middle" class="t-mono">3</text>
+        <text x="108" y="66" text-anchor="middle" class="t-mono" style="fill:var(--accent)">k₁</text><text x="220" y="66" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">k₂</text><text x="332" y="66" text-anchor="middle" class="t-mono" style="fill:var(--ok)">k₃</text>
+        <line x1="394" y1="90" x2="440" y2="90" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#mx-ah-load)"/><text x="446" y="94" class="t-mono" style="fill:var(--accent-2)">P</text>
+        <g transform="translate(490,40)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">조립된 [K] (4 × 4)</text>
+          <rect x="20" y="14" width="40" height="40" style="fill:var(--accent);opacity:.35"/><rect x="60" y="14" width="40" height="40" style="fill:var(--accent);opacity:.35"/>
+          <rect x="20" y="54" width="40" height="40" style="fill:var(--accent);opacity:.35"/><rect x="60" y="54" width="40" height="40" style="fill:var(--accent);opacity:.35"/>
+          <rect x="60" y="54" width="40" height="40" style="fill:var(--accent-2);opacity:.35"/><rect x="100" y="54" width="40" height="40" style="fill:var(--accent-2);opacity:.35"/>
+          <rect x="60" y="94" width="40" height="40" style="fill:var(--accent-2);opacity:.35"/><rect x="100" y="94" width="40" height="40" style="fill:var(--accent-2);opacity:.35"/>
+          <rect x="100" y="94" width="40" height="40" style="fill:var(--ok);opacity:.35"/><rect x="140" y="94" width="40" height="40" style="fill:var(--ok);opacity:.35"/>
+          <rect x="100" y="134" width="40" height="40" style="fill:var(--ok);opacity:.35"/><rect x="140" y="134" width="40" height="40" style="fill:var(--ok);opacity:.35"/>
+          <rect x="20" y="14" width="160" height="160" style="fill:none;stroke:var(--text)"/>
+          <text x="40" y="38" text-anchor="middle" class="t-mono">k₁</text><text x="80" y="78" text-anchor="middle" class="t-mono">k₁+k₂</text><text x="120" y="118" text-anchor="middle" class="t-mono">k₂+k₃</text><text x="160" y="158" text-anchor="middle" class="t-mono">k₃</text>
+          <text x="100" y="200" text-anchor="middle" class="t-dim">띠 행렬: 이웃한 절점만 0이 아니다</text>
+        </g>
+        <text x="220" y="196" text-anchor="middle" class="t">직렬: 1/k = 1/k₁ + 1/k₂ + 1/k₃</text>
+        <text x="220" y="224" text-anchor="middle" class="t-dim">절점 0을 고정 → 0행·0열을 지우고 3 × 3을 푼다</text>
+      </svg>
+      <figcaption><b>그림 16-1.</b> 직렬 스프링 세 개. 각 스프링의 2 × 2 행렬을 양 끝 절점 번호의 칸에 더하면 4 × 4 강성 행렬이 된다. 공유 절점의 대각 칸에는 두 스프링의 강성이 더해지고, 서로 닿지 않는 절점 사이의 칸은 0이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-mx-springs">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>스프링을 이어 강성 행렬 조립하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-spr" aria-label="직렬 스프링과 변위"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>k₁ <output id="mx-s-k1-out"></output></span><input type="range" id="mx-s-k1" min="10" max="200" step="5" value="100"></label>
+          <label class="ctrl"><span>k₂ <output id="mx-s-k2-out"></output></span><input type="range" id="mx-s-k2" min="10" max="200" step="5" value="50"></label>
+          <label class="ctrl"><span>k₃ <output id="mx-s-k3-out"></output></span><input type="range" id="mx-s-k3" min="10" max="200" step="5" value="100"></label>
+          <label class="ctrl"><span>끝 하중 P <output id="mx-s-p-out"></output></span><input type="range" id="mx-s-p" min="0" max="50" step="1" value="20"></label>
+          <label class="check"><input type="checkbox" id="mx-s-free"> 왼쪽 지점 없애기</label>
+        </div>
+      </div>
+      <div class="table-wrap mx-tw"><table id="mx-s-tbl"></table></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">끝 변위 u₃</span><span class="v" id="mx-s-u">—</span></div>
+        <div class="stat"><span class="k">등가 강성 P/u₃</span><span class="v" id="mx-s-k">—</span></div>
+        <div class="stat"><span class="k">det[K<sub>ff</sub>]</span><span class="v" id="mx-s-det">—</span></div>
+      </div>
+      <div class="mx-msg" id="mx-s-msg"></div>
+      <div class="sim-note">해볼 것: k₂를 작게 하면 등가 강성이 가장 약한 스프링 쪽으로 끌려갑니다 · 지점을 없애면 행렬식이 0이 되어 풀 수 없습니다(통째로 미끄러지는 강체 운동) · 모델: 강성 kN/m, 절점 0 고정, 표의 색은 칸에 기여한 스프링.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="truss-element">
+    <h2>트러스 부재: 국부 강성과 좌표 변환</h2>
+    <p>트러스 부재는 축 방향으로만 힘을 받는 스프링이고, 강성은 \(k = EA/L\)입니다. 문제는 부재가 비스듬히 놓여 있다는 것입니다. 절점 변위는 전역 좌표 \((u, v)\)로 쓰는데 부재가 느끼는 것은 축 방향 성분뿐입니다. 부재 방향의 방향 코사인을 \(c = \cos\alpha\), \(s = \sin\alpha\)라 하면 축 방향 늘음은 \(c(u_j - u_i) + s(v_j - v_i)\)입니다.</p>
+    <div class="callout def"><strong>원리 16.2 (트러스 부재의 전역 강성 행렬)</strong> 길이 \(L\), 축 강성 \(EA\), 방향 \((c, s)\)인 트러스 부재의 국부 강성 \(k' = \tfrac{EA}{L}\begin{bmatrix}1 & -1\\ -1 & 1\end{bmatrix}\)에 변환 \(d' = [T]d\)를 쓰면 \([k] = [T]^T[k'][T]\)로
+      <div class="formula">$$[k] = \frac{EA}{L}\begin{bmatrix} c^2 & cs & -c^2 & -cs \\ cs & s^2 & -cs & -s^2 \\ -c^2 & -cs & c^2 & cs \\ -cs & -s^2 & cs & s^2 \end{bmatrix} \quad (u_i, v_i, u_j, v_j)$$</div>
+      부재력은 \(N = \tfrac{EA}{L}\left[c(u_j - u_i) + s(v_j - v_i)\right]\)(인장 +).</div>
+    <figure class="diagram" id="fig-mx-truss">
+      <svg viewBox="0 0 760 280" role="img" aria-label="비스듬한 트러스 부재의 국부 좌표와 전역 좌표">
+        <rect x="10" y="10" width="740" height="260" rx="10" class="f-surface"/>
+        <line x1="120" y1="220" x2="340" y2="70" style="stroke:var(--text);stroke-width:5;stroke-linecap:round"/>
+        <circle cx="120" cy="220" r="7" class="f-elev" style="stroke:var(--text);stroke-width:2"/><circle cx="340" cy="70" r="7" class="f-elev" style="stroke:var(--text);stroke-width:2"/>
+        <text x="104" y="244" class="t" style="font-weight:700">i</text><text x="352" y="62" class="t" style="font-weight:700">j</text>
+        <line x1="60" y1="250" x2="140" y2="250" style="stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#mx-ah-int)"/><text x="146" y="254" class="t-mono">x (전역)</text>
+        <line x1="60" y1="250" x2="60" y2="180" style="stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#mx-ah-int)"/><text x="66" y="182" class="t-mono">y</text>
+        <line x1="340" y1="70" x2="398" y2="30" style="stroke:var(--accent);stroke-width:2" marker-end="url(#mx-ah-acc)"/><text x="404" y="32" class="t-mono" style="fill:var(--accent)">x′ (부재 축)</text>
+        <path d="M180 220 A 60 60 0 0 0 170 186" style="fill:none;stroke:var(--accent-2);stroke-width:1.6"/><text x="186" y="204" class="t-mono" style="fill:var(--accent-2)">α</text>
+        <line x1="340" y1="70" x2="390" y2="70" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#mx-ah-load)"/><text x="384" y="88" class="t-mono" style="fill:var(--accent-2)">u_j</text>
+        <line x1="340" y1="70" x2="340" y2="24" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#mx-ah-load)"/><text x="310" y="28" class="t-mono" style="fill:var(--accent-2)">v_j</text>
+        <g transform="translate(450,110)">
+          <text x="0" y="0" class="t" style="font-weight:700">축 방향 늘음</text>
+          <text x="0" y="28" class="t-mono">δ = c(u_j − u_i) + s(v_j − v_i)</text>
+          <text x="0" y="62" class="t" style="font-weight:700">부재력</text>
+          <text x="0" y="90" class="t-mono">N = (EA/L) δ</text>
+          <text x="0" y="124" class="t-dim">c = cos α, s = sin α</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-2.</b> 트러스 부재의 국부 축 x′와 전역 좌표 (x, y). 전역 변위를 부재 축으로 사영해 늘음을 구하고, 부재력을 다시 전역 성분으로 나누어 절점에 돌려준다. 이 두 번의 사영이 [T]<sup>T</sup>[k′][T]다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 16.1 (2부재 트러스)</strong> 절점 1 (0, 0)과 2 (8, 0)은 핀, 절점 3 (4, 3)에 60 kN이 아래로 걸린다. 두 부재 모두 \(EA = 4.2 \times 10^5\) kN(강재, 단면적 2,000 mm²), \(L = 5\) m.
+      <ol style="margin:6px 0 0">
+        <li><b>방향.</b> 부재 1→3: \(c = 0.8\), \(s = 0.6\). 부재 2→3: \(c = -0.8\), \(s = 0.6\).</li>
+        <li><b>자유 자유도만 조립.</b> 절점 3의 \((u_3, v_3)\) 칸에 두 부재의 오른쪽 아래 \(2 \times 2\) 블록을 더하면
+          <div class="formula">$$[K_{ff}] = \frac{EA}{5}\left(\begin{bmatrix} 0.64 & 0.48 \\ 0.48 & 0.36 \end{bmatrix} + \begin{bmatrix} 0.64 & -0.48 \\ -0.48 & 0.36 \end{bmatrix}\right) = \frac{EA}{5}\begin{bmatrix} 1.28 & 0 \\ 0 & 0.72 \end{bmatrix}$$</div></li>
+        <li><b>풀기.</b> \(\{F\} = \{0, -60\}\)이므로 \(u_3 = 0\), \(v_3 = -60 \times 5/(0.72 \times 4.2 \times 10^5) = -9.92 \times 10^{-4}\) m \(\approx -0.99\) mm.</li>
+        <li><b>부재력.</b> \(N_{13} = \tfrac{EA}{5}(0.6 v_3) = -50\) kN, \(N_{23} = -50\) kN(압축). 절점법으로 구한 값(3장)과 같다.</li>
+      </ol></div>
+    <p>부재가 많은 트러스에서 조립이 어떻게 진행되는지 아래에서 한 부재씩 보세요. 부재를 더할 때마다 그 부재의 \(4 \times 4\) 행렬이 양 끝 절점의 칸(<span class="term">코드 번호</span>)에 더해집니다.</p>
+    <div class="sim" id="sim-mx-truss">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>트러스 강성 행렬 조립 애니메이션</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-tr" aria-label="조립 중인 트러스"></canvas></div>
+        <div class="sim-controls">
+          <div class="btn-row"><button class="btn primary" id="mx-t-step">다음 단계 ▶</button><button class="btn" id="mx-t-reset">처음으로</button></div>
+          <div class="ctrl"><span>표시 단위</span><div class="seg" id="mx-t-unit"><button data-value="k" class="on">EA/L 배수</button><button data-value="kn">kN/m</button></div></div>
+        </div>
+      </div>
+      <div class="table-wrap mx-tw"><table id="mx-t-tbl"></table></div>
+      <div class="mx-msg" id="mx-t-msg"></div>
+      <div class="sim-note">해볼 것: 다섯 부재를 차례로 더하며 대각선 부재가 네 절점 중 어느 칸에 들어가는지 보세요 · 마지막 단계의 변위·부재력이 CB.truss 결과와 같은지 확인하세요 · 모델: 4 m × 3 m 사각형 + 대각재, 절점 0 핀·절점 1 롤러, 절점 2에 (20, −30) kN, EA = 4.2 × 10⁵ kN 모두 같음. 자유도 순서는 (u₀, v₀, u₁, v₁, …).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="frame-element">
+    <h2>보·골조 부재 강성 행렬</h2>
+    <p>보와 라멘의 부재 끝은 축 방향 이동, 직각 이동, 회전의 세 자유도를 가집니다. 양 끝이면 여섯입니다. 강성 행렬의 \(j\)번째 열은 "자유도 \(j\)만 1만큼 움직이고 나머지는 모두 묶었을 때 필요한 여섯 끝 힘"입니다. 그 값들은 이미 15장에서 만났습니다. 끝을 1 rad 돌리면 가까운 끝에 \(4EI/L\), 먼 끝에 \(2EI/L\), 양 끝에 직각 방향 힘 \(\pm 6EI/L^2\)이 필요하고, 끝을 직각으로 1만큼 밀면 \(\pm 12EI/L^3\)과 \(\pm 6EI/L^2\)가 필요합니다.</p>
+    <div class="callout def"><strong>원리 16.3 (골조 부재의 국부 강성 행렬)</strong> 국부 자유도 \((u_i, v_i, \theta_i, u_j, v_j, \theta_j)\)(\(\theta\)는 반시계 +)에 대해
+      <div class="formula">$$[k'] = \begin{bmatrix} \frac{EA}{L} & 0 & 0 & -\frac{EA}{L} & 0 & 0 \\ 0 & \frac{12EI}{L^3} & \frac{6EI}{L^2} & 0 & -\frac{12EI}{L^3} & \frac{6EI}{L^2} \\ 0 & \frac{6EI}{L^2} & \frac{4EI}{L} & 0 & -\frac{6EI}{L^2} & \frac{2EI}{L} \\ -\frac{EA}{L} & 0 & 0 & \frac{EA}{L} & 0 & 0 \\ 0 & -\frac{12EI}{L^3} & -\frac{6EI}{L^2} & 0 & \frac{12EI}{L^3} & -\frac{6EI}{L^2} \\ 0 & \frac{6EI}{L^2} & \frac{2EI}{L} & 0 & -\frac{6EI}{L^2} & \frac{4EI}{L} \end{bmatrix}$$</div>
+      전역 행렬은 \([k] = [T]^T[k'][T]\)이고, \([T]\)는 양 끝마다 \(\begin{bmatrix} c & s & 0 \\ -s & c & 0 \\ 0 & 0 & 1 \end{bmatrix}\) 블록을 대각에 놓은 \(6 \times 6\) 행렬이다. 회전 자유도는 좌표 변환에도 그대로다.</div>
+    <figure class="diagram" id="fig-mx-modes">
+      <svg viewBox="0 0 760 300" role="img" aria-label="보 요소의 네 가지 단위 변위 모양과 필요한 끝 힘">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="140" y="0" text-anchor="middle" class="t" style="font-weight:700">v_i = 1 (i단을 위로 1)</text>
+          <line x1="20" y1="70" x2="260" y2="70" style="stroke:var(--text-faint);stroke-width:1.6;stroke-dasharray:5 4"/>
+          <path d="M20 30 C 100 30 180 70 260 70" style="fill:none;stroke:var(--text);stroke-width:4"/>
+          <line x1="20" y1="100" x2="20" y2="38" style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#mx-ah-load)"/><text x="28" y="108" class="t-mono" style="fill:var(--accent-2)">12EI/L³</text>
+          <line x1="260" y1="16" x2="260" y2="62" style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#mx-ah-load)"/><text x="196" y="14" class="t-mono" style="fill:var(--accent-2)">12EI/L³</text>
+          <text x="140" y="130" text-anchor="middle" class="t-mono">양 끝 모멘트 6EI/L² (같은 방향)</text>
+        </g>
+        <g transform="translate(410,40)">
+          <text x="140" y="0" text-anchor="middle" class="t" style="font-weight:700">θ_i = 1 (i단을 반시계로 1 rad)</text>
+          <line x1="20" y1="70" x2="260" y2="70" style="stroke:var(--text-faint);stroke-width:1.6;stroke-dasharray:5 4"/>
+          <path d="M20 70 C 70 40 140 60 260 70" style="fill:none;stroke:var(--text);stroke-width:4"/>
+          <line x1="20" y1="70" x2="62" y2="46" style="stroke:var(--accent);stroke-width:1.6"/>
+          <text x="20" y="106" class="t-mono" style="fill:var(--accent-2)">M_i = 4EI/L</text>
+          <text x="260" y="106" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">M_j = 2EI/L</text>
+          <text x="140" y="130" text-anchor="middle" class="t-mono">끝 직각 힘 ±6EI/L²</text>
+        </g>
+        <text x="380" y="214" text-anchor="middle" class="t" style="font-weight:700">강성 행렬의 j번째 열 = 자유도 j만 1 움직일 때 필요한 끝 힘</text>
+        <text x="380" y="242" text-anchor="middle" class="t-dim">u_i = 1이면 ±EA/L(축 방향)만 생긴다. 축 강성과 휨 강성은 국부 좌표에서 서로 섞이지 않는다.</text>
+        <text x="380" y="266" text-anchor="middle" class="t-dim">곡선은 3차 에르미트 함수 — 하중 없는 보의 실제 처짐 모양과 같다</text>
+      </svg>
+      <figcaption><b>그림 16-3.</b> 보 요소의 단위 변위 모양. 한 자유도만 1 움직이고 나머지를 묶은 모양을 만드는 데 필요한 끝 힘이 강성 행렬의 한 열이다. 아래 시뮬레이터에서 여섯 열을 모두 볼 수 있다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-mx-columns">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>강성 행렬의 열 = 단위 변위 모양</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-col" aria-label="단위 변위 모양과 끝 힘"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>움직일 자유도</span><div class="seg" id="mx-c-dof"><button data-value="0">u_i</button><button data-value="1" class="on">v_i</button><button data-value="2">θ_i</button><button data-value="3">u_j</button><button data-value="4">v_j</button><button data-value="5">θ_j</button></div></div>
+          <label class="ctrl"><span>길이 L <output id="mx-c-l-out"></output></span><input type="range" id="mx-c-l" min="2" max="10" step="0.5" value="8"></label>
+          <label class="ctrl"><span>보 깊이 h <output id="mx-c-h-out"></output></span><input type="range" id="mx-c-h" min="300" max="1000" step="50" value="700"></label>
+        </div>
+      </div>
+      <div class="table-wrap mx-tw"><table id="mx-c-tbl"></table></div>
+      <div class="sim-note">해볼 것: L을 두 배로 하면 12EI/L³ 칸은 1/8, 6EI/L² 칸은 1/4, 4EI/L 칸은 1/2이 되는 것을 보세요 · 보 깊이를 키우면 휨 칸만 h³로 커지고 EA/L 칸은 h에 비례합니다 · 모델: 폭 400 mm 직사각형 콘크리트 보(E = 27,500 MPa), 단위 kN·m. 강조한 열이 그림의 끝 힘이다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="assembly">
+    <h2>조립과 경계 조건</h2>
+    <p>구조물 전체의 강성 행렬은 모든 부재의 전역 행렬을 절점 자유도 번호에 맞춰 더한 것입니다. 절점 \(n\)의 자유도에 \(3n, 3n+1, 3n+2\)라는 번호를 붙이면, 부재 \(ij\)의 \(6 \times 6\) 행렬은 \(\{3i, 3i+1, 3i+2, 3j, 3j+1, 3j+2\}\)의 행과 열에 더해집니다. 지점은 그 자유도의 변위를 0(또는 침하량)으로 정하는 조건입니다.</p>
+    <div class="callout def"><strong>원리 16.4 (직접 강성법)</strong>
+      <ol style="margin:6px 0 0">
+        <li>절점과 자유도에 번호를 붙인다.</li>
+        <li>부재마다 \([k']\), \([T]\), \([k] = [T]^T[k'][T]\)를 만들고 코드 번호에 따라 \([K]\)에 더한다. 부재 하중은 등가 절점 하중으로 \(\{F\}\)에 더한다.</li>
+        <li>자유도를 자유(f)와 구속(s)으로 나누어 \(\begin{bmatrix} K_{ff} & K_{fs} \\ K_{sf} & K_{ss} \end{bmatrix}\begin{Bmatrix} d_f \\ d_s \end{Bmatrix} = \begin{Bmatrix} F_f \\ F_s + R \end{Bmatrix}\)로 쓴다.</li>
+        <li>\([K_{ff}]\{d_f\} = \{F_f\} - [K_{fs}]\{d_s\}\)를 풀어 변위를, \(\{R\} = [K_{sf}]\{d_f\} + [K_{ss}]\{d_s\} - \{F_s\}\)로 반력을 구한다.</li>
+        <li>부재마다 \(\{f'\} = [k'][T]\{d\} - \{f'_{eq}\}\)로 끝 힘을 구한다.</li>
+      </ol>
+      \([K_{ff}]\)가 특이하면 구조물은 <span class="term">기구</span>(불안정)다.</div>
+    <figure class="diagram" id="fig-mx-flow">
+      <svg viewBox="0 0 760 240" role="img" aria-label="해석 프로그램의 입력에서 출력까지의 흐름">
+        <rect x="10" y="10" width="740" height="220" rx="10" class="f-surface"/>
+        <g style="font-family:var(--font)">
+          <rect x="30" y="50" width="120" height="70" rx="10" class="f-elev"/><text x="90" y="80" text-anchor="middle" class="t" style="font-weight:700">입력</text><text x="90" y="102" text-anchor="middle" class="t-dim">절점·부재·지점·하중</text>
+          <rect x="180" y="50" width="120" height="70" rx="10" class="f-elev"/><text x="240" y="80" text-anchor="middle" class="t" style="font-weight:700">부재 행렬</text><text x="240" y="102" text-anchor="middle" class="t-dim">[k′], [T], [k]</text>
+          <rect x="330" y="50" width="120" height="70" rx="10" class="f-elev"/><text x="390" y="80" text-anchor="middle" class="t" style="font-weight:700">조립</text><text x="390" y="102" text-anchor="middle" class="t-dim">[K], {F}</text>
+          <rect x="480" y="50" width="120" height="70" rx="10" class="f-acc-soft"/><text x="540" y="80" text-anchor="middle" class="t" style="font-weight:700">풀기</text><text x="540" y="102" text-anchor="middle" class="t-dim">[K_ff]{d} = {F}</text>
+          <rect x="630" y="50" width="100" height="70" rx="10" class="f-elev"/><text x="680" y="80" text-anchor="middle" class="t" style="font-weight:700">출력</text><text x="680" y="102" text-anchor="middle" class="t-dim">변위·반력·N V M</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.8"><line x1="150" y1="85" x2="178" y2="85" marker-end="url(#mx-ah-int)"/><line x1="300" y1="85" x2="328" y2="85" marker-end="url(#mx-ah-int)"/><line x1="450" y1="85" x2="478" y2="85" marker-end="url(#mx-ah-int)"/><line x1="600" y1="85" x2="628" y2="85" marker-end="url(#mx-ah-int)"/></g>
+        <path d="M680 120 V170 H90 V122" style="fill:none;stroke:var(--accent-2);stroke-width:1.8;stroke-dasharray:6 4" marker-end="url(#mx-ah-load)"/>
+        <text x="385" y="194" text-anchor="middle" class="t" style="fill:var(--accent-2);font-weight:700">검증: 평형 · 대칭 · 크기 감각 · 손계산 → 이상하면 입력부터 다시</text>
+      </svg>
+      <figcaption><b>그림 16-4.</b> 해석 프로그램의 흐름. 계산 부분(가운데)은 늘 같고, 사람이 손대는 곳은 입력과 검증이다. 결과가 이상할 때 고칠 곳은 거의 언제나 입력이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-mx-bc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>경계 조건과 특이 행렬</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-bc" aria-label="두 부재 보와 기구 모드 또는 처짐"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>절점 0 (x = 0)</span><select id="mx-b-0"><option value="none">없음</option><option value="roller">롤러</option><option value="pin" selected>핀</option><option value="fixed">고정</option></select></label>
+          <label class="ctrl"><span>절점 1 (x = 4 m)</span><select id="mx-b-1"><option value="none" selected>없음</option><option value="roller">롤러</option><option value="pin">핀</option><option value="fixed">고정</option></select></label>
+          <label class="ctrl"><span>절점 2 (x = 8 m)</span><select id="mx-b-2"><option value="none">없음</option><option value="roller" selected>롤러</option><option value="pin">핀</option><option value="fixed">고정</option></select></label>
+          <label class="check"><input type="checkbox" id="mx-b-h"> 절점 1에 힌지</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">자유 자유도</span><span class="v" id="mx-b-n">—</span></div>
+        <div class="stat"><span class="k">최소 고윳값 / 최대</span><span class="v" id="mx-b-ev">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="mx-b-k">—</span></div>
+      </div>
+      <div class="mx-msg" id="mx-b-msg"></div>
+      <div class="sim-note">해볼 것: 모든 지점을 롤러로 바꾸면 고윳값 하나가 0이 되고, 그 고유벡터가 수평으로 미끄러지는 기구 모양입니다 · 핀·롤러에 힌지를 넣으면 가운데가 꺾이는 기구가 됩니다 · 모델: 8 m 보를 두 부재로, EI = 10⁵ kN·m², EA = 10⁶ kN, 등분포 10 kN/m. [K<sub>ff</sub>]의 고윳값(야코비 방법)으로 판정한다(단위가 섞여 있으므로 비율만 본다).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="equivalent-loads">
+    <h2>등가 절점 하중</h2>
+    <p>강성법의 방정식은 절점에 걸린 힘만 다룹니다. 부재 위의 분포 하중이나 집중 하중은 어떻게 할까요? 15장의 생각을 그대로 씁니다. 먼저 부재 양 끝을 묶어 두면 하중은 고정단 힘(반력과 고정단 모멘트)을 만들 뿐 절점을 움직이지 않습니다. 이제 묶은 것을 풀면 절점에는 고정단 힘과 크기는 같고 방향이 반대인 힘이 걸린 것과 같습니다. 이것이 <span class="term">등가 절점 하중</span>입니다.</p>
+    <div class="callout def"><strong>원리 16.5 (등가 절점 하중과 최종 부재력)</strong> 부재 하중의 등가 절점 하중은 고정단 힘의 부호를 바꾼 것이다. 등분포 하중 \(w\)(아래)를 받는 수평 부재라면 양 끝에 \(-wL/2\)(아래)와 모멘트 \(\mp wL^2/12\)(반시계 +로 왼쪽 \(-\), 오른쪽 \(+\))이다. 이 하중으로 절점 변위를 구한 뒤, 부재 끝 힘은
+      <div class="formula">$$\{f'\} = [k']\{d'\} + \{f'_{\text{고정단}}\}$$</div>
+      즉 변위로 생긴 끝 힘에 고정단 힘을 <b>되더해야</b> 한다. 이 단계를 빠뜨리면 부재 안의 휨모멘트가 틀린다.</div>
+    <figure class="diagram" id="fig-mx-eq">
+      <svg viewBox="0 0 760 270" role="img" aria-label="부재 하중을 고정단 힘과 등가 절점 하중으로 나누는 그림">
+        <rect x="10" y="10" width="740" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">실제 하중</text>
+          <line x1="10" y1="70" x2="190" y2="70" style="stroke:var(--text);stroke-width:4"/>
+          <line x1="10" y1="40" x2="190" y2="40" style="stroke:var(--accent-2);stroke-width:1.2"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.2" marker-end="url(#mx-ah-load)"><line x1="10" y1="40" x2="10" y2="66"/><line x1="70" y1="40" x2="70" y2="66"/><line x1="130" y1="40" x2="130" y2="66"/><line x1="190" y1="40" x2="190" y2="66"/></g>
+          <circle cx="10" cy="70" r="5" style="fill:var(--text)"/><circle cx="190" cy="70" r="5" style="fill:var(--text)"/>
+        </g>
+        <text x="250" y="114" text-anchor="middle" class="t" style="font-weight:700;font-size:20px">=</text>
+        <g transform="translate(270,40)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">① 양 끝 고정 (고정단 힘)</text>
+          <rect x="0" y="50" width="8" height="40" style="fill:var(--surface-2);stroke:var(--text)"/><rect x="192" y="50" width="8" height="40" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <line x1="8" y1="70" x2="192" y2="70" style="stroke:var(--text);stroke-width:4"/>
+          <line x1="8" y1="40" x2="192" y2="40" style="stroke:var(--accent-2);stroke-width:1.2"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.2" marker-end="url(#mx-ah-load)"><line x1="40" y1="40" x2="40" y2="66"/><line x1="100" y1="40" x2="100" y2="66"/><line x1="160" y1="40" x2="160" y2="66"/></g>
+          <text x="100" y="120" text-anchor="middle" class="t-mono">wL/2 ↑, wL²/12 (양 끝)</text>
+          <text x="100" y="142" text-anchor="middle" class="t-dim">부재 안의 휨모멘트를 만든다</text>
+        </g>
+        <text x="490" y="114" text-anchor="middle" class="t" style="font-weight:700;font-size:20px">+</text>
+        <g transform="translate(510,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">② 등가 절점 하중</text>
+          <line x1="20" y1="70" x2="200" y2="70" style="stroke:var(--text);stroke-width:4"/>
+          <circle cx="20" cy="70" r="5" style="fill:var(--text)"/><circle cx="200" cy="70" r="5" style="fill:var(--text)"/>
+          <line x1="20" y1="30" x2="20" y2="62" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#mx-ah-load)"/><line x1="200" y1="30" x2="200" y2="62" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#mx-ah-load)"/>
+          <text x="110" y="120" text-anchor="middle" class="t-mono">−(고정단 힘)</text>
+          <text x="110" y="142" text-anchor="middle" class="t-dim">절점을 움직인다 → [K]{d} = {F}</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-5.</b> 부재 하중의 분해. ①은 절점을 움직이지 않고 부재 안에만 휨모멘트를 만들고, ②는 절점에만 걸려 강성 방정식으로 풀린다. 최종 부재력은 둘의 합이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 16.2 (1단 고정보를 강성법으로)</strong> 14장 예제 14.1의 보(L = 6 m, w = 12 kN/m, A 고정, B 롤러)를 강성법으로 풀자. 부재 하나, 자유 자유도는 B의 회전 \(\theta_B\) 하나(축 방향 하중 없음).
+      <ol style="margin:6px 0 0">
+        <li><b>강성.</b> \(K_{ff} = 4EI/L\).</li>
+        <li><b>등가 절점 하중.</b> B단 고정단 모멘트는 반시계 + 규약으로 \(-wL^2/12\)(시계)이므로 등가 하중은 \(+wL^2/12 = +36\) kN·m.</li>
+        <li><b>풀기.</b> \(\theta_B = 36 \times 6/(4EI) = 54/EI\) (반시계, 보 끝이 들려 올라가는 방향).</li>
+        <li><b>부재력.</b> A단 모멘트 = 변위에 의한 \(2EI\theta_B/L = 18\) + 고정단 \(wL^2/12 = 36\) = 54 kN·m(반시계, 절점이 부재에) → 휨모멘트 \(M_A = -54\) kN·m. 응력법의 답 \(-wL^2/8\)과 같다.</li>
+      </ol>
+      고정단 모멘트 36을 되더하지 않으면 \(M_A = -18\)이라는 엉뚱한 답이 나온다.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="modeling">
+    <h2>모델링하고 검증하기</h2>
+    <p>이제 직접 모델을 만들어 봅시다. 아래 편집기는 이 책의 해석기 CB.frame에 절점·부재·지점·하중을 그대로 넘깁니다. 화면을 눌러 절점을 놓고, 두 절점을 차례로 눌러 부재를 잇고, 지점과 하중을 붙여 보세요. 결과와 함께 <b>평형 검사</b>(모든 하중과 반력의 합이 0인가)를 늘 보여 줍니다.</p>
+    <div class="sim" id="sim-mx-editor">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>직접 모델링 에디터</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-ed" aria-label="절점과 부재를 놓는 모델링 화면"></canvas><span class="mx-cap" id="mx-e-cap">절점 모드: 빈 곳을 눌러 절점 놓기</span></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>편집 모드</span><div class="seg" id="mx-e-mode"><button data-value="node" class="on">절점</button><button data-value="member">부재</button><button data-value="support">지점</button><button data-value="load">하중</button><button data-value="del">삭제</button></div></div>
+          <div class="ctrl"><span>예시 모델</span><div class="seg" id="mx-e-pre"><button data-value="portal" class="on">문형 라멘</button><button data-value="truss">트러스</button><button data-value="cant">캔틸레버</button><button data-value="bad">불안정</button></div></div>
+          <label class="ctrl"><span>절점 하중 크기 <output id="mx-e-p-out"></output></span><input type="range" id="mx-e-p" min="10" max="100" step="5" value="50"></label>
+          <div class="ctrl"><span>보기</span><div class="seg" id="mx-e-view"><button data-value="M" class="on">M</button><button data-value="V">V</button><button data-value="N">N</button><button data-value="none">변형만</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">절점 / 부재</span><span class="v" id="mx-e-cnt">—</span></div>
+        <div class="stat"><span class="k">자유 자유도</span><span class="v" id="mx-e-dof">—</span></div>
+        <div class="stat"><span class="k">평형 검사 ΣF</span><span class="v" id="mx-e-eq">—</span></div>
+      </div>
+      <div class="mx-msg" id="mx-e-msg"></div>
+      <div class="sim-note">해볼 것: '불안정' 예시에서 대각재 하나를 이어 안정하게 만들어 보세요 · 지점 모드에서 절점을 누를 때마다 없음 → 핀 → 롤러 → 고정으로 바뀝니다 · 하중 모드에서는 없음 → 아래 → 오른쪽 순서 · 모델: 1 m 격자, 모든 부재 강재 E = 210 GPa, A = 0.01 m², I = 2 × 10⁻⁴ m⁴, 강접(트러스 예시는 축력 부재). 평형 검사는 Σ(하중 + 반력)의 x, y 성분과 원점에 대한 모멘트의 최댓값.</div>
+    </div>
+    <p>프로그램은 입력이 틀려도 성실하게 계산합니다. 그래서 결과를 받으면 다음 질문을 습관처럼 던져야 합니다.</p>
+    <div class="cards">
+      <div><b>평형이 맞는가</b>반력의 합이 하중의 합과 같은가. 프로그램은 대개 맞추지만, 하중이 엉뚱한 곳에 들어갔는지는 반력의 위치·크기로 드러난다.</div>
+      <div><b>크기가 상식적인가</b>처짐이 경간의 1/10이라거나 0.0001 mm라면 단위를 의심한다. E를 MPa로 넣고 길이를 m로 쓰면 1000배가 틀린다.</div>
+      <div><b>모양이 맞는가</b>대칭 구조·대칭 하중이면 결과도 대칭이어야 한다. 중력 하중에 보가 위로 휘면 하중 부호가 뒤집힌 것이다.</div>
+      <div><b>손계산과 맞는가</b>보 하나를 떼어 wL²/8, wL²/12 사이에 있는지, 기둥 축력이 기여 면적 × 하중과 비슷한지 확인한다.</div>
+    </div>
+    <div class="sim" id="sim-mx-check">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>입력 실수를 찾아내는 검증 체크리스트</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mx-cv-chk" aria-label="실수가 섞인 문형 라멘 해석 결과"></canvas><span class="mx-cap">휨모멘트도: 인장측</span></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>숨겨 둔 입력 실수</span><div class="seg" id="mx-k-err"><button data-value="none" class="on">없음</button><button data-value="unit">E 단위(MPa를 kN/m²로)</button><button data-value="sign">하중 부호</button><button data-value="support">지점 하나 핀</button><button data-value="release">보 끝 힌지</button></div></div>
+        </div>
+      </div>
+      <div class="mx-checks" id="mx-k-list"></div>
+      <div class="sim-note">해볼 것: 실수를 하나씩 골라 어느 검사가 잡아내는지 보세요. 평형 검사는 대부분의 실수를 통과시킵니다 · 모델: 기준 건물 B-10 큰보(400 × 700)와 기둥(700 × 700)으로 만든 8 m × 4 m 고정 문형 라멘, w<sub>u</sub> = 100 kN/m, Ec = 27,500 MPa. 의도한 설계: 기초 고정, 강접합, 중력 하중 아래 방향(교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="b10">
+    <h2>기준 건물 B-10 골조의 수평 하중 해석</h2>
+    <div class="problem"><strong>바람이 불면 꼭대기는 얼마나 움직일까</strong>
+      <p>B-10의 Y 방향 골조 한 줄(3경간 × 8 m, 10층, 높이 41 m)에 층마다 약 50 kN의 풍하중이 걸린다고 합시다. 지붕은 몇 mm 움직이고, 어느 층이 가장 많이 기울까요? 손으로는 90차 부정정, 강성법으로는 132개 자유도의 문제입니다.</p></div>
+    <figure class="diagram" id="fig-mx-b10">
+      <svg viewBox="0 0 760 330" role="img" aria-label="B-10 Y 방향 10층 골조 해석 모델">
+        <rect x="10" y="10" width="740" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(150,26)">
+          <g style="stroke:var(--text);stroke-width:2.2">
+            <path d="M0 270V20M90 270V20M180 270V20M270 270V20"/>
+            <path d="M0 236H270M0 210H270M0 184H270M0 158H270M0 132H270M0 106H270M0 80H270M0 54H270M0 28H270M0 20H270" style="stroke-width:1.4"/>
+          </g>
+          <g style="stroke:var(--text);stroke-width:2.6"><path d="M-12 272H12M78 272H102M168 272H192M258 272H282"/></g>
+          <g style="stroke:var(--accent-2);stroke-width:1.8" marker-end="url(#mx-ah-load)">
+            <line x1="-50" y1="236" x2="-6" y2="236"/><line x1="-50" y1="184" x2="-6" y2="184"/><line x1="-50" y1="132" x2="-6" y2="132"/><line x1="-50" y1="80" x2="-6" y2="80"/><line x1="-50" y1="28" x2="-6" y2="28"/>
+          </g>
+          <text x="-56" y="160" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">층마다</text><text x="-56" y="178" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">50 kN</text>
+          <text x="135" y="296" text-anchor="middle" class="t-mono">8 m × 3 = 24 m</text>
+        </g>
+        <g transform="translate(480,50)">
+          <text x="0" y="0" class="t" style="font-weight:700">모델(교육용 가정)</text>
+          <text x="0" y="28" class="t-mono">절점 44, 부재 70, 자유도 132</text>
+          <text x="0" y="52" class="t-mono">1층 5.0 m, 2–10층 4.0 m</text>
+          <text x="0" y="76" class="t-mono">기둥 1–3층 800², 4–10층 700²</text>
+          <text x="0" y="100" class="t-mono">보 400 × 700, Ec = 27,500 MPa</text>
+          <text x="0" y="124" class="t-mono">기초 고정, 코어 벽 제외</text>
+          <text x="0" y="160" class="t-dim">(그림은 층 수를 줄여 그림)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-6.</b> B-10 Y 방향 골조 한 줄의 해석 모델. 실제 건물에서는 코어 전단벽이 수평력의 대부분을 받으므로, 이 골조만의 해석은 "벽이 없다면"을 보는 교육용 계산이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-mx-b10">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-10 골조의 층 변위와 층간 변위</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view mx-stack">
+          <div><canvas id="mx-cv-b10" aria-label="10층 골조의 변형"></canvas><span class="mx-cap" id="mx-f-cap">변형 과장</span></div>
+          <div><canvas id="mx-cv-b10d" aria-label="층별 층간 변위비"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>층 풍하중 <output id="mx-f-w-out"></output></span><input type="range" id="mx-f-w" min="0" max="120" step="5" value="50"></label>
+          <label class="ctrl"><span>기둥 크기 배율 <output id="mx-f-c-out"></output></span><input type="range" id="mx-f-c" min="0.6" max="1.5" step="0.05" value="1"></label>
+          <div class="ctrl"><span>보 깊이</span><div class="seg" id="mx-f-b"><button data-value="500">500</button><button data-value="700" class="on">700</button><button data-value="900">900</button></div></div>
+          <div class="ctrl"><span>기초</span><div class="seg" id="mx-f-base"><button data-value="fixed" class="on">고정</button><button data-value="pin">핀</button></div></div>
+          <label class="check"><input type="checkbox" id="mx-f-crk"> 균열 강성(기둥 0.7, 보 0.35)</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">지붕 변위</span><span class="v" id="mx-f-top">—</span></div>
+        <div class="stat"><span class="k">최대 층간 변위비</span><span class="v" id="mx-f-dr">—</span></div>
+        <div class="stat"><span class="k">기초 전단 합</span><span class="v" id="mx-f-v">—</span></div>
+        <div class="stat"><span class="k">기초 모멘트 최대</span><span class="v" id="mx-f-m">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 균열 강성을 켜면 변위가 두 배 넘게 커집니다 · 기초를 핀으로 바꾸면 아래층 층간 변위가 크게 늘어납니다 · 보를 깊게 하는 것과 기둥을 키우는 것 중 어느 쪽이 효과적인가요 · 모델: 132자유도 강성법(CB.frame), 기초 전단 합이 하중 합과 같은지(평형) 함께 본다. 균열 계수는 해석에서 흔히 쓰는 예시값. 아래 그래프의 1/400·1/500 점선은 크기 비교용 참고선이며 기준값이 아니다(목표값은 기준·발주처마다 다르다). 교육용 값이며 설계 검토가 아니다.</div>
+    </div>
+    <div class="callout site"><strong>골조만으로 본 B-10의 바람 응답</strong> 층마다 50 kN(합계 500 kN)을 걸고 균열 전 총단면으로 풀면 지붕 변위는 약 35 mm(높이의 약 1/1,200), 층간 변위비는 2층에서 최대 약 1/790입니다. 기초 전단 합은 500 kN으로 하중과 같고(평형 검사), 바깥 기둥 둘은 ±395 kN의 축력을 주고받아 골조 전체가 넘어지려는 모멘트에 저항합니다. 철근콘크리트의 균열을 생각해 기둥 강성을 0.7배, 보 강성을 0.35배로 낮추면 지붕 변위는 약 83 mm, 최대 층간 변위비는 약 1/330으로 커집니다. 실제 B-10에서는 강성이 훨씬 큰 코어 벽이 수평력 대부분을 가져가므로(14장의 강성 비례 분배) 골조의 몫은 이보다 작습니다. 모두 교육용 값입니다.</div>
+    <div class="callout warn"><strong>해석은 모델의 답이다</strong> 강성법은 입력한 모델을 정확히 풉니다. 그러나 모델은 늘 현실의 단순화입니다. 강접합으로 가정한 접합부가 실제로는 조금 돌고, 균열로 강성이 줄고, 바닥 슬래브가 보와 함께 일하고, 기초 아래 지반이 스프링처럼 움직입니다. 좋은 해석자는 가정을 바꿔 보며 결과가 얼마나 흔들리는지(민감도)를 확인하고, 중요한 숫자는 손계산으로 크기를 다시 맞춰 봅니다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="slope-deflection.html"><small>CH.15 · 처짐각법과 모멘트 분배법</small>강성 행렬의 성분은 처짐각 식<br><span>4EI/L, 2EI/L, 6EI/L²와 고정단 모멘트가 그대로 들어간다.</span></a>
+      <a href="indeterminate.html"><small>CH.14 · 부정정 구조와 응력법</small>유연도 행렬과 강성 행렬<br><span>둘은 서로의 역행렬이다. 미지수를 힘으로 둘지 변위로 둘지의 차이.</span></a>
+      <a href="truss.html"><small>CH.03 · 트러스</small>절점법을 행렬로<br><span>트러스 강성법의 부재력은 절점법의 답과 같다.</span></a>
+      <a href="https://math.euiyun.com/linear/chapters/elimination.html"><small>LINEARBOOK · 연립방정식과 가우스 소거</small>[K]{d} = {F}를 푸는 법<br><span>가우스 소거와 LU 분해, 피벗이 0이면 특이 행렬.</span></a>
+      <a href="https://math.euiyun.com/numerical/chapters/iterative.html"><small>NUMERICALBOOK · 반복 해법</small>큰 희소 행렬을 푸는 법<br><span>자유도가 수십만이면 반복법과 희소 저장을 쓴다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>강성 행렬 [K]는 변위와 힘을 잇는 계수 행렬이다. K<sub>ij</sub>는 자유도 j만 1 움직일 때 i에 필요한 힘이고, [K]는 대칭이며 지점이 없으면 특이하다.</li>
+      <li>트러스 부재: [k] = (EA/L)[c² cs; cs s²] 블록 구조, N = (EA/L)[c(u<sub>j</sub> − u<sub>i</sub>) + s(v<sub>j</sub> − v<sub>i</sub>)].</li>
+      <li>골조 부재의 국부 행렬에는 EA/L, 12EI/L³, 6EI/L², 4EI/L, 2EI/L이 들어가고, 전역 행렬은 [T]<sup>T</sup>[k′][T]다.</li>
+      <li>직접 강성법: 부재 행렬을 코드 번호에 따라 조립 → 지점 자유도를 나눔 → [K<sub>ff</sub>]{d<sub>f</sub>} = {F<sub>f</sub>} − [K<sub>fs</sub>]{d<sub>s</sub>}를 풂 → 반력과 부재력. [K<sub>ff</sub>]가 특이하면 기구다.</li>
+      <li>부재 하중은 고정단 힘의 부호를 바꾼 등가 절점 하중으로 넣고, 부재력에는 고정단 힘을 되더한다.</li>
+      <li>결과는 평형·크기·대칭·손계산으로 검증한다. 평형 검사는 단위 실수나 잘못된 지점을 잡지 못한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 강성 100 kN/m와 50 kN/m인 스프링을 직렬로 이으면 등가 강성은?</p><div class="opts">
+        <button class="opt">150 kN/m</button><button class="opt">75 kN/m</button><button class="opt" data-correct>약 33.3 kN/m</button><button class="opt">50 kN/m</button>
+      </div><div class="quiz-exp">직렬은 유연도가 더해진다: \(1/k = 1/100 + 1/50 = 3/100\) → \(k = 33.3\) kN/m. 병렬이면 강성이 더해져 150 kN/m다.</div></div>
+      <div class="quiz-q"><p>2. 지점을 하나도 넣지 않은 구조물의 강성 행렬이 풀리지 않는 이유는?</p><div class="opts">
+        <button class="opt">비대칭이라서</button><button class="opt" data-correct>힘 없이 일어나는 강체 운동이 있어 행렬이 특이하기 때문</button><button class="opt">대각 성분이 음수라서</button><button class="opt">하중이 없어서</button>
+      </div><div class="quiz-exp">통째로 미끄러지거나 도는 강체 운동은 아무 힘도 필요 없다. 그 변위 벡터에 대해 \([K]\{d\} = 0\)이므로 \([K]\)의 고윳값 하나가 0, 곧 특이 행렬이다.</div></div>
+      <div class="quiz-q"><p>3. 수평(α = 0)으로 놓인 트러스 부재의 전역 강성 행렬에서 v 자유도에 해당하는 칸은?</p><div class="opts">
+        <button class="opt">EA/L</button><button class="opt" data-correct>모두 0</button><button class="opt">12EI/L³</button><button class="opt">−EA/L</button>
+      </div><div class="quiz-exp">\(c = 1\), \(s = 0\)이므로 \(s^2\), \(cs\) 칸이 모두 0이다. 트러스 부재는 축에 직각인 이동에 저항하지 않는다. 그래서 절점이 직선 위에 놓인 트러스는 불안정하다.</div></div>
+      <div class="quiz-q"><p>4. 골조 부재 강성 행렬의 4EI/L 칸이 뜻하는 것은?</p><div class="opts">
+        <button class="opt">끝을 위로 1만큼 밀 때의 힘</button><button class="opt" data-correct>먼 끝을 묶고 한 끝을 1 rad 돌리는 데 필요한 모멘트</button><button class="opt">부재를 1만큼 늘이는 힘</button><button class="opt">먼 끝으로 전달되는 모멘트</button>
+      </div><div class="quiz-exp">15장의 강성 계수와 같다. 먼 끝에 생기는 모멘트는 \(2EI/L\)이고, 그 비 1/2이 전달률이다.</div></div>
+      <div class="quiz-q"><p>5. 등분포 하중을 받는 보를 강성법으로 푼 뒤 부재의 끝 모멘트를 구할 때 반드시 해야 하는 일은?</p><div class="opts">
+        <button class="opt">하중을 두 배로 한다</button><button class="opt" data-correct>변위로 구한 끝 힘에 고정단 힘을 되더한다</button><button class="opt">강성 행렬을 다시 조립한다</button><button class="opt">반력을 0으로 둔다</button>
+      </div><div class="quiz-exp">등가 절점 하중은 하중 효과의 일부(절점을 움직이는 부분)일 뿐이다. 부재 안의 효과는 고정단 힘이 갖고 있으므로 \(\{f'\} = [k']\{d'\} + \{f'_{고정단}\}\)이다. 예제 16.2에서 빠뜨리면 −54가 아니라 −18이 나온다.</div></div>
+      <div class="quiz-q"><p>6. 길이를 m, 힘을 kN으로 입력하면서 콘크리트 E를 27,500(MPa 값)으로 넣었다. 처짐은?</p><div class="opts">
+        <button class="opt">정확하다</button><button class="opt">1000배 작게 나온다</button><button class="opt" data-correct>1000배 크게 나온다</button><button class="opt">부호만 바뀐다</button>
+      </div><div class="quiz-exp">kN·m 단위계에서 E는 kN/m²이어야 하므로 \(2.75 \times 10^7\)을 넣어야 한다. 27,500을 넣으면 강성이 1/1000이 되어 처짐이 1000배가 된다. 평형 검사는 이 실수를 잡지 못한다.</div></div>
+      <div class="quiz-q"><p>7. 해석 결과에서 반력의 합이 하중의 합과 정확히 같았다. 이것으로 확인할 수 있는 것은?</p><div class="opts">
+        <button class="opt">입력에 실수가 없다</button><button class="opt">처짐이 정확하다</button><button class="opt" data-correct>전체 평형이 맞는다는 것뿐, 단위·지점·힌지 실수는 따로 확인해야 한다</button><button class="opt">부재 크기가 적절하다</button>
+      </div><div class="quiz-exp">강성법은 어떤 입력이든 평형을 만족하는 답을 낸다. E 단위, 지점 종류, 힌지 위치를 잘못 넣어도 평형은 맞는다. 크기 감각·대칭·손계산 검사가 함께 필요하다.</div></div>
+      <div class="quiz-q"><p>8. 10층 골조(기초 고정, 절점 44개, 그중 기초 4개)의 강성법 자유 자유도 수는?</p><div class="opts">
+        <button class="opt">44</button><button class="opt">90</button><button class="opt" data-correct>120</button><button class="opt">132</button>
+      </div><div class="quiz-exp">기초 4개를 뺀 40개 절점이 각각 3 자유도(수평·연직·회전)를 가지므로 120개다. 전체 강성 행렬은 132 × 132이고, 기초의 12 자유도를 지운다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const MXX = {
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  fmt(v, d = 1) { return Math.abs(v) < 1e-9 ? "0" : CB.num(v, d); },
+  det(A) { return CB.mat.det(A); },
+};
+
+/* ---------- 1. 스프링 조립 ---------- */
+(function () {
+  const g = [1, 2, 3].map((i) => CB.range("mx-s-k" + i, (v) => v + " kN/m", go)), gp = CB.range("mx-s-p", (v) => v + " kN", go), free = CB.check("mx-s-free", go);
+  let st;
+  function solve() {
+    const k = g.map((f) => f()), K = Array.from({ length: 4 }, () => [0, 0, 0, 0]), own = Array.from({ length: 4 }, () => [[], [], [], []]);
+    k.forEach((kk, e) => { [[e, e, kk], [e, e + 1, -kk], [e + 1, e, -kk], [e + 1, e + 1, kk]].forEach(([i, j, v]) => { K[i][j] += v; own[i][j].push(e); }); });
+    const fdofs = free() ? [0, 1, 2, 3] : [1, 2, 3], Kff = fdofs.map((i) => fdofs.map((j) => K[i][j])), F = fdofs.map((i) => (i === 3 ? gp() : 0));
+    const det = MXX.det(Kff), u = Math.abs(det) > 1e-9 ? CB.solve(Kff, F) : null;
+    st = { k, K, own, fdofs, det, u };
+  }
+  solve();
+  const cv = CB.canvas("#mx-cv-spr", (ctx, W, H) => {
+    const pal = CB.palette(), { k, u } = st, cols = [pal.accent, pal.accent2, pal.ok];
+    const x0 = 40, seg = (W - 120) / 3, y = H / 2, sc = u ? Math.min(30 / Math.max(1e-9, Math.abs(u[u.length - 1])), 400) : 0;
+    const disp = [0, ...(u ? (free() ? u.slice(1) : u) : [0, 0, 0])].map((v, i) => (free() && u ? u[i] : v));
+    const X = [0, 1, 2, 3].map((i) => x0 + i * seg + (u ? disp[i] * sc : 0));
+    if (!free()) { ctx.fillStyle = pal.surface; ctx.strokeStyle = pal.text; ctx.fillRect(x0 - 14, y - 24, 10, 48); ctx.strokeRect(x0 - 14, y - 24, 10, 48); }
+    for (let e = 0; e < 3; e++) {
+      const a = X[e], b = X[e + 1], n = 8; ctx.save(); ctx.strokeStyle = cols[e]; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(a, y);
+      for (let q = 1; q < n; q++) ctx.lineTo(a + ((b - a) * q) / n, y + (q % 2 ? -10 : 10)); ctx.lineTo(b, y); ctx.stroke(); ctx.restore();
+      MXX.text(ctx, `k${"₁₂₃"[e]} = ${k[e]}`, (a + b) / 2, y - 26, cols[e], { size: 11.5 });
+    }
+    X.forEach((x, i) => { ctx.fillStyle = pal.bg; ctx.strokeStyle = pal.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); MXX.text(ctx, String(i), x, y + 24, pal.dim, { size: 11 }); });
+    if (gp() > 0) MXX.arrow(ctx, X[3] + 8, y, X[3] + 52, y, pal.accent2, 2.4, 10);
+    if (u) MXX.text(ctx, `u = ${disp.map((v) => (v * 1000).toFixed(0)).join(", ")} mm`, W / 2, H - 14, pal.dim, { size: 11.5 });
+  }, { aspect: (W) => (W < 520 ? 0.45 : 0.28), minHeight: 150, maxHeight: 220 });
+  function go() {
+    solve(); cv.redraw();
+    const { K, own, fdofs, det, u, k } = st, cols = ["var(--accent-soft)", "var(--accent-2-soft)", "color-mix(in srgb, var(--ok) 18%, transparent)"];
+    let html = "<thead><tr><th>[K]</th>" + [0, 1, 2, 3].map((j) => `<th class="${fdofs.includes(j) ? "" : "gone"}">u${j}</th>`).join("") + "</tr></thead><tbody>";
+    for (let i = 0; i < 4; i++) html += `<tr><th class="${fdofs.includes(i) ? "" : "gone"}">u${i}</th>` + [0, 1, 2, 3].map((j) => {
+      const o = own[i][j], bg = o.length === 1 ? cols[o[0]] : o.length > 1 ? `linear-gradient(90deg, ${cols[o[0]]} 50%, ${cols[o[1]]} 50%)` : "";
+      return `<td class="${K[i][j] === 0 ? "z" : ""} ${fdofs.includes(i) && fdofs.includes(j) ? "" : "gone"}" style="${bg ? "background:" + bg : ""}">${K[i][j]}</td>`;
+    }).join("") + "</tr>";
+    document.getElementById("mx-s-tbl").innerHTML = html + "</tbody>";
+    const msg = document.getElementById("mx-s-msg");
+    CB.stat("mx-s-det", CB.sig(det));
+    if (!u) { CB.stat("mx-s-u", "—"); CB.stat("mx-s-k", "—"); msg.className = "mx-msg bad"; msg.innerHTML = "det[K<sub>ff</sub>] = 0: 지점이 없어 스프링 전체가 힘 없이 미끄러질 수 있습니다. 강성 행렬이 특이해 풀 수 없습니다."; return; }
+    const un = u[u.length - 1], keq = 1 / (1 / k[0] + 1 / k[1] + 1 / k[2]);
+    CB.stat("mx-s-u", (un * 1000).toFixed(1) + " mm"); CB.stat("mx-s-k", gp() ? CB.num(gp() / un, 1) + " kN/m" : "—");
+    msg.className = "mx-msg"; msg.innerHTML = `0행·0열(지점)을 지운 3 × 3을 풀었습니다. 직렬 공식 1/(1/k₁ + 1/k₂ + 1/k₃) = <b>${keq.toFixed(1)} kN/m</b>와 같습니다.`;
+  }
+  go();
+})();
+
+/* ---------- 2. 트러스 조립 ---------- */
+(function () {
+  const nodes = [[0, 0], [4, 0], [4, 3], [0, 3]], bars = [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]], EA = 4.2e5;
+  const sup = [0, 1, 3], F = [0, 0, 0, 0, 20, -30, 0, 0];
+  const unit = CB.seg("mx-t-unit", go);
+  let step = 0;
+  const kOf = (e) => { const [i, j] = bars[e], dx = nodes[j][0] - nodes[i][0], dy = nodes[j][1] - nodes[i][1], L = Math.hypot(dx, dy), c = dx / L, s = dy / L; const base = [[c * c, c * s, -c * c, -c * s], [c * s, s * s, -c * s, -s * s], [-c * c, -c * s, c * c, c * s], [-c * s, -s * s, c * s, s * s]]; return { L, c, s, base, dofs: [2 * i, 2 * i + 1, 2 * j, 2 * j + 1] }; };
+  const ref = CB.truss({ nodes, bars, supports: { 0: "pin", 1: "roller" }, loads: [{ node: 2, fx: 20, fy: -30 }], EA });
+  function state() {
+    const K = Array.from({ length: 8 }, () => new Array(8).fill(0)), own = Array.from({ length: 8 }, () => new Array(8).fill(-1));
+    for (let e = 0; e < Math.min(step, 5); e++) { const m = kOf(e); m.dofs.forEach((a, p) => m.dofs.forEach((b, q) => { K[a][b] += (EA / m.L) * m.base[p][q]; if (Math.abs(m.base[p][q]) > 1e-12) own[a][b] = e; })); }
+    return { K, own };
+  }
+  const cv = CB.canvas("#mx-cv-tr", (ctx, W, H) => {
+    const pal = CB.palette(), s = Math.min((W - 140) / 4, (H - 110) / 3), ox = (W - 4 * s) / 2 - 10, oy = H - 40, X = (x) => ox + x * s, Y = (y) => oy - y * s;
+    const solved = step >= 7, d = solved ? ref.d : null, amp = solved ? 0.4 / Math.max(...ref.d.map((v) => Math.hypot(v[0], v[1]))) : 0;
+    bars.forEach(([i, j], e) => {
+      const on = e < step, cur = e === step - 1 && step <= 5;
+      ctx.save(); ctx.strokeStyle = on ? (solved ? (ref.N[e] > 0 ? pal.tension : pal.compression) : cur ? pal.accent2 : pal.text) : pal.faint; ctx.setLineDash(on ? [] : [4, 4]); ctx.lineWidth = cur ? 4 : on ? 2.6 : 1.4;
+      ctx.beginPath(); ctx.moveTo(X(nodes[i][0]), Y(nodes[i][1])); ctx.lineTo(X(nodes[j][0]), Y(nodes[j][1])); ctx.stroke(); ctx.restore();
+      const mx = (X(nodes[i][0]) + X(nodes[j][0])) / 2, my = (Y(nodes[i][1]) + Y(nodes[j][1])) / 2;
+      MXX.text(ctx, solved ? CB.num(ref.N[e], 1) : `부재 ${e}`, mx + (e === 4 ? 16 : 0), my - (e === 4 ? 10 : 0), on ? pal.text : pal.faint, { size: 11 });
+    });
+    if (solved) { ctx.save(); ctx.strokeStyle = pal.accent; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.6; bars.forEach(([i, j]) => { ctx.beginPath(); ctx.moveTo(X(nodes[i][0] + amp * d[i][0]), Y(nodes[i][1] + amp * d[i][1])); ctx.lineTo(X(nodes[j][0] + amp * d[j][0]), Y(nodes[j][1] + amp * d[j][1])); ctx.stroke(); }); ctx.restore(); }
+    nodes.forEach(([x, y], n) => { ctx.fillStyle = pal.bg; ctx.strokeStyle = pal.text; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(X(x), Y(y), 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); MXX.text(ctx, String(n), X(x) - 14, Y(y) - 12, pal.dim, { size: 11 }); });
+    [[0, false], [1, true]].forEach(([n, roll]) => { const x = X(nodes[n][0]), y = Y(nodes[n][1]); ctx.save(); ctx.fillStyle = pal.surface; ctx.strokeStyle = pal.text; ctx.beginPath(); ctx.moveTo(x, y + 5); ctx.lineTo(x - 9, y + 19); ctx.lineTo(x + 9, y + 19); ctx.closePath(); ctx.fill(); ctx.stroke(); if (roll) { ctx.beginPath(); ctx.arc(x, y + 23, 3, 0, Math.PI * 2); ctx.stroke(); } ctx.restore(); });
+    const x2 = X(4), y2 = Y(3); MXX.arrow(ctx, x2, y2, x2 + 40, y2, pal.accent2, 2.2); MXX.arrow(ctx, x2, y2 - 46, x2, y2 - 6, pal.accent2, 2.2);
+    MXX.text(ctx, "20 kN", x2 + 46, y2 + 12, pal.accent2, { size: 11, align: "left" }); MXX.text(ctx, "30 kN", x2 + 10, y2 - 46, pal.accent2, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.55), minHeight: 220, maxHeight: 340 });
+  function go() {
+    cv.redraw();
+    const { K, own } = state(), cols = ["var(--accent-soft)", "var(--accent-2-soft)", "color-mix(in srgb, var(--ok) 18%, transparent)", "color-mix(in srgb, var(--warn) 18%, transparent)", "color-mix(in srgb, var(--bad) 14%, transparent)"];
+    const names = ["u₀", "v₀", "u₁", "v₁", "u₂", "v₂", "u₃", "v₃"], bc = step >= 6, f = (v) => (unit() === "k" ? (Math.abs(v) < 1e-6 ? "0" : (v / (EA / 5)).toFixed(3)) : CB.sig(v));
+    const cur = step >= 1 && step <= 5 ? kOf(step - 1).dofs : [];
+    let html = `<thead><tr><th>${unit() === "k" ? "÷ EA/5" : "kN/m"}</th>${names.map((n, j) => `<th class="${bc && sup.includes(j) ? "gone" : ""}">${n}</th>`).join("")}<th>F</th></tr></thead><tbody>`;
+    for (let i = 0; i < 8; i++) {
+      html += `<tr><th class="${bc && sup.includes(i) ? "gone" : ""}">${names[i]}</th>`;
+      for (let j = 0; j < 8; j++) html += `<td class="${K[i][j] === 0 ? "z" : ""} ${cur.includes(i) && cur.includes(j) ? "hl" : ""} ${bc && (sup.includes(i) || sup.includes(j)) ? "gone" : ""}" style="${own[i][j] >= 0 ? "background:" + cols[own[i][j]] : ""}">${f(K[i][j])}</td>`;
+      html += `<td class="${bc && sup.includes(i) ? "gone" : ""}">${F[i]}</td></tr>`;
+    }
+    document.getElementById("mx-t-tbl").innerHTML = html + "</tbody>";
+    const msg = document.getElementById("mx-t-msg");
+    if (step === 0) msg.innerHTML = "자유도 8개(절점 4 × 2)의 빈 행렬에서 시작합니다. '다음 단계'로 부재를 하나씩 더하세요.";
+    else if (step <= 5) { const m = kOf(step - 1); msg.innerHTML = `부재 ${step - 1} (절점 ${bars[step - 1][0]}→${bars[step - 1][1]}, L = ${m.L} m, c = ${m.c.toFixed(2)}, s = ${m.s.toFixed(2)})의 4 × 4 행렬을 코드 번호 (${m.dofs.map((d) => names[d]).join(", ")}) 칸에 더했습니다(주황 테두리).`; }
+    else if (step === 6) msg.innerHTML = "경계 조건: 절점 0 핀(u₀, v₀), 절점 1 롤러(v₁)의 행과 열을 지웁니다. 남은 5 × 5를 풉니다.";
+    else { const dd = ref.d; msg.className = "mx-msg ok"; msg.innerHTML = `풀었습니다: 절점 2 변위 (${(dd[2][0] * 1000).toFixed(3)}, ${(dd[2][1] * 1000).toFixed(3)}) mm, 부재력(인장 +) ${ref.N.map((n) => CB.num(n, 1)).join(", ")} kN — CB.truss와 같은 계산입니다.`; return; }
+    msg.className = "mx-msg";
+  }
+  document.getElementById("mx-t-step").addEventListener("click", () => { step = Math.min(7, step + 1); go(); });
+  document.getElementById("mx-t-reset").addEventListener("click", () => { step = 0; go(); });
+  go();
+})();
+
+/* ---------- 3. 강성 행렬의 열 ---------- */
+(function () {
+  const dof = CB.seg("mx-c-dof", go), gl = CB.range("mx-c-l", (v) => v.toFixed(1) + " m", go), gh = CB.range("mx-c-h", (v) => v + " mm", go);
+  const E = 2.75e7;
+  function k() { const L = gl(), h = gh() / 1000, A = 0.4 * h, I = (0.4 * h ** 3) / 12, a = (E * A) / L, b = (12 * E * I) / L ** 3, c = (6 * E * I) / L ** 2, d4 = (4 * E * I) / L, d2 = (2 * E * I) / L;
+    return [[a, 0, 0, -a, 0, 0], [0, b, c, 0, -b, c], [0, c, d4, 0, -c, d2], [-a, 0, 0, a, 0, 0], [0, -b, -c, 0, b, -c], [0, c, d2, 0, -c, d4]]; }
+  const cv = CB.canvas("#mx-cv-col", (ctx, W, H) => {
+    const pal = CB.palette(), j = +dof(), K = k(), col = K.map((r) => r[j]);
+    const x0 = 70, x1 = W - 70, y = H / 2 + 6, Lp = x1 - x0, amp = Math.min(46, H * 0.22);
+    const d = [0, 0, 0, 0, 0, 0]; d[j] = 1;
+    // 모양: 축 방향은 늘음, 직각·회전은 에르미트(회전은 1 rad 대신 보기 좋게 축척)
+    ctx.save(); ctx.strokeStyle = pal.faint; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.restore();
+    const rot = 0.35 * Lp;
+    const shape = (xi) => { const N1 = 1 - 3 * xi * xi + 2 * xi ** 3, N2 = xi - 2 * xi * xi + xi ** 3, N3 = 3 * xi * xi - 2 * xi ** 3, N4 = -xi * xi + xi ** 3; return d[1] * amp * N1 + d[2] * rot * N2 + d[4] * amp * N3 + d[5] * rot * N4; };
+    const ax = (xi) => (d[0] ? (1 - xi) * 30 : 0) + (d[3] ? xi * 30 : 0);
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.beginPath();
+    for (let q = 0; q <= 60; q++) { const xi = q / 60, xx = x0 + xi * Lp + ax(xi), yy = y - Math.max(-amp * 1.4, Math.min(amp * 1.4, shape(xi))); q ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
+    ctx.stroke(); ctx.restore();
+    // 끝 힘 화살표
+    const ends = [[x0 + ax(0), y - shape(0), col.slice(0, 3)], [x1 + ax(1), y - shape(1), col.slice(3)]];
+    const mx = Math.max(...col.map(Math.abs)) || 1;
+    ends.forEach(([ex, ey, f], side) => {
+      if (Math.abs(f[0]) > 1e-9 * mx) { const s = Math.sign(f[0]); MXX.arrow(ctx, ex - s * 44, ey, ex - s * 6, ey, pal.accent2, 2.4); MXX.text(ctx, CB.sig(f[0]), ex - s * 50, ey - 12, pal.accent2, { size: 11 }); }
+      if (Math.abs(f[1]) > 1e-9 * mx) { const s = Math.sign(f[1]); MXX.arrow(ctx, ex, ey + s * 44, ex, ey + s * 6, pal.accent2, 2.4); MXX.text(ctx, CB.sig(f[1]) + " kN", ex + (side ? -8 : 8), ey + s * 54, pal.accent2, { size: 11, align: side ? "right" : "left" }); }
+      if (Math.abs(f[2]) > 1e-9 * mx) { const ccw = f[2] > 0; ctx.save(); ctx.strokeStyle = pal.accent; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(ex, ey, 18, ccw ? 0.75 * Math.PI : 0.25 * Math.PI, ccw ? -0.75 * Math.PI : 1.75 * Math.PI, ccw); ctx.stroke(); ctx.restore(); MXX.text(ctx, CB.sig(f[2]) + " kN·m", ex + (side ? -26 : 26), ey - 30, pal.accent, { size: 11, align: side ? "right" : "left" }); }
+    });
+    MXX.text(ctx, ["u_i = 1 (축 방향)", "v_i = 1", "θ_i = 1 rad(그림은 축척)", "u_j = 1 (축 방향)", "v_j = 1", "θ_j = 1 rad(그림은 축척)"][j] + " · 나머지 자유도 0", W / 2, 16, pal.dim, { size: 11.5, mono: false });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.34), minHeight: 200, maxHeight: 280 });
+  function go() {
+    cv.redraw();
+    const K = k(), j = +dof(), names = ["u_i", "v_i", "θ_i", "u_j", "v_j", "θ_j"];
+    let html = `<thead><tr><th>[k′] (kN, m)</th>${names.map((n, c) => `<th${c === j ? ' style="color:var(--accent)"' : ""}>${n}</th>`).join("")}</tr></thead><tbody>`;
+    K.forEach((r, i) => { html += `<tr><th>${names[i]}</th>${r.map((v, c) => `<td class="${v === 0 ? "z" : ""} ${c === j ? "selc" : ""}">${v === 0 ? "0" : CB.sig(v)}</td>`).join("")}</tr>`; });
+    document.getElementById("mx-c-tbl").innerHTML = html + "</tbody>";
+  }
+  go();
+})();
+
+/* ---------- 4. 경계 조건과 특이 행렬 ---------- */
+(function () {
+  const sel = [0, 1, 2].map((i) => document.getElementById("mx-b-" + i)), hinge = CB.check("mx-b-h", go);
+  sel.forEach((s) => s.addEventListener("change", go));
+  const nodes = [[0, 0], [4, 0], [8, 0]], DOF = { none: [0, 0, 0], roller: [0, 1, 0], pin: [1, 1, 0], fixed: [1, 1, 1] };
+  let st;
+  function solve() {
+    const members = [{ i: 0, j: 1, E: 1, A: 1e6, I: 1e5, hinge: [false, hinge()] }, { i: 1, j: 2, E: 1, A: 1e6, I: 1e5 }];
+    const supports = {}; sel.forEach((s, n) => { if (s.value !== "none") supports[n] = s.value; });
+    const r = CB.frame({ nodes, members, supports, memberLoads: [0, 1].map((m) => ({ member: m, w: [0, -10] })) });
+    // [K_ff]를 직접 조립해 고윳값을 본다(힌지는 응축된 부재 행렬 kc를 쓴다)
+    const K = Array.from({ length: 9 }, () => new Array(9).fill(0));
+    const kl = (L, rel) => { const a = 1e6 / L, b = (12e5) / L ** 3, c = 6e5 / L ** 2, d4 = 4e5 / L, d2 = 2e5 / L; let k = [[a, 0, 0, -a, 0, 0], [0, b, c, 0, -b, c], [0, c, d4, 0, -c, d2], [-a, 0, 0, a, 0, 0], [0, -b, -c, 0, b, -c], [0, c, d2, 0, -c, d4]];
+      if (rel) { const kk = k[5][5]; k = k.map((row, i) => row.map((v, j) => v - (k[i][5] * k[5][j]) / kk)); } return k; };
+    members.forEach((m, e) => { const k = kl(4, e === 0 && hinge()), dofs = [m.i * 3, m.i * 3 + 1, m.i * 3 + 2, m.j * 3, m.j * 3 + 1, m.j * 3 + 2]; dofs.forEach((a, p) => dofs.forEach((b, q) => { K[a][b] += k[p][q]; })); });
+    const free = []; for (let d = 0; d < 9; d++) { const n = Math.floor(d / 3); if (!DOF[sel[n].value][d % 3]) free.push(d); }
+    // 힌지 쪽 회전이 남는 절점 1의 회전은 강성이 남아 있으므로 그대로 둔다
+    const Kff = free.map((a) => free.map((b) => K[a][b]));
+    const eg = free.length ? CB.mat.eigSym(Kff) : { values: [], vectors: [] };
+    st = { r, free, eg };
+  }
+  solve();
+  const pl = CB.plane("#mx-cv-bc", { x: [-1.2, 9.2], y: [-1.7, 1.5], aspect: (W) => (W < 520 ? 0.5 : 0.3), minHeight: 170, maxHeight: 250, grid: false, axes: false,
+    draw(P) {
+      const pal = P.P, { r, free, eg } = st;
+      CB.drawFrame(P, r, { reactions: r.ok, deformed: r.ok ? "auto" : false, deformPx: 22, loadPx: 22, loadLabels: false, reactionPx: 24 });
+      if (!r.ok && eg.values.length) {
+        const v = eg.vectors[eg.vectors.length - 1], dx = [0, 0, 0], dy = [0, 0, 0];
+        free.forEach((d, i) => { const n = Math.floor(d / 3), q = d % 3; if (q === 0) dx[n] = v[i]; if (q === 1) dy[n] = v[i]; });
+        const m = Math.max(1e-9, ...dx.map(Math.abs), ...dy.map(Math.abs)), s = 0.9 / m;
+        P.ctx.save(); P.ctx.strokeStyle = pal.bad; P.ctx.lineWidth = 2.4; P.ctx.setLineDash([6, 4]); P.ctx.beginPath();
+        nodes.forEach(([x, y], n) => { const px = P.X(x + s * dx[n]), py = P.Y(y + s * dy[n]); n ? P.ctx.lineTo(px, py) : P.ctx.moveTo(px, py); }); P.ctx.stroke(); P.ctx.restore();
+        P.text("기구 모드(고윳값 0의 고유벡터)", 4, 0, { color: pal.bad, size: 12, bold: true, align: "center", dy: -50 });
+      }
+    } });
+  function go() {
+    solve(); pl.redraw();
+    const { r, free, eg } = st, vals = eg.values, ratio = vals.length ? Math.abs(vals[vals.length - 1]) / Math.abs(vals[0]) : 0;
+    CB.stat("mx-b-n", free.length + "개"); const sup = (n) => String(n).split("").map((c) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[+c] || (c === "-" ? "⁻" : c)).join(""), ex = ratio > 0 ? Math.floor(Math.log10(ratio)) : 0;
+    CB.stat("mx-b-ev", !vals.length ? "—" : ratio < 1e-12 ? "≈ 0" : `${(ratio / 10 ** ex).toFixed(1)} × 10${sup(ex)}`);
+    CB.stat("mx-b-k", r.ok ? "안정" : "기구(특이)");
+    const msg = document.getElementById("mx-b-msg");
+    msg.className = "mx-msg" + (r.ok ? " ok" : " bad");
+    msg.innerHTML = r.ok ? `[K<sub>ff</sub>] (${free.length} × ${free.length})가 정칙입니다. 가장 작은 고윳값도 0에서 충분히 멉니다. 점선은 처짐(과장).` : "가장 작은 고윳값이 사실상 0입니다. 그 고유벡터(빨간 점선)대로 움직이는 데 힘이 들지 않으므로 지점이나 부재를 더해야 합니다.";
+  }
+  go();
+})();
+
+/* ---------- 5. 모델링 에디터 ---------- */
+(function () {
+  const mode = CB.seg("mx-e-mode", () => { pick = -1; caption(); pl.redraw(); }), view = CB.seg("mx-e-view", () => pl.redraw()), gp = CB.range("mx-e-p", (v) => v + " kN", () => { loads.forEach((l) => { l.fx = Math.sign(l.fx) * gp(); l.fy = Math.sign(l.fy) * gp(); }); go(); });
+  const pre = CB.seg("mx-e-pre", (v) => { preset(v); go(); });
+  let nodes = [], members = [], supports = {}, loads = [], pick = -1, r = null;
+  const SUP = ["none", "pin", "roller", "fixed"];
+  function preset(v) {
+    pick = -1;
+    if (v === "portal") { nodes = [[2, 0], [2, 4], [10, 4], [10, 0]]; members = [[0, 1, false], [1, 2, false], [2, 3, false]]; supports = { 0: "fixed", 3: "fixed" }; loads = [{ node: 1, fx: gp(), fy: 0 }, { node: 2, fx: 0, fy: -gp() }]; }
+    else if (v === "truss") { nodes = [[1, 0], [5, 0], [9, 0], [3, 3], [7, 3]]; members = [[0, 1, true], [1, 2, true], [3, 4, true], [0, 3, true], [3, 1, true], [1, 4, true], [4, 2, true]]; supports = { 0: "pin", 2: "roller" }; loads = [{ node: 1, fx: 0, fy: -gp() }]; }
+    else if (v === "cant") { nodes = [[2, 3], [6, 3], [10, 3]]; members = [[0, 1, false], [1, 2, false]]; supports = { 0: "fixed" }; loads = [{ node: 2, fx: 0, fy: -gp() }]; }
+    else { nodes = [[2, 0], [2, 4], [8, 4], [8, 0]]; members = [[0, 1, true], [1, 2, true], [2, 3, true]]; supports = { 0: "pin", 3: "pin" }; loads = [{ node: 1, fx: gp(), fy: 0 }]; }
+  }
+  preset("portal");
+  function solve() {
+    if (!nodes.length || !members.length) { r = null; return; }
+    const used = new Set(members.flatMap(([a, b]) => [a, b]));
+    if (nodes.some((_, i) => !used.has(i))) { r = { ok: false, reason: "lonely" }; return; }
+    r = CB.frame({ nodes, members: members.map(([i, j, t]) => ({ i, j, E: 2.1e8, A: 0.01, I: 2e-4, truss: t })), supports, loads: loads.map((l) => ({ ...l })) });
+  }
+  const near = (x, y, P, rad = 16) => { let b = -1, bd = rad; nodes.forEach(([nx, ny], i) => { const d = Math.hypot(P.X(nx) - P.X(x), P.Y(ny) - P.Y(y)); if (d < bd) { bd = d; b = i; } }); return b; };
+  const pl = CB.plane("#mx-cv-ed", { x: [-0.5, 12.5], y: [-1.5, 7.5], aspect: (W) => (W < 520 ? 0.85 : 0.6), minHeight: 260, maxHeight: 440, gridStep: 1, axes: false,
+    draw(P) {
+      const pal = P.P;
+      if (r && r.ok) CB.drawFrame(P, r, { diagram: view() === "none" ? null : view(), deformed: "auto", deformPx: 22, reactions: true, loadPx: 34, reactionPx: 26, diagramPx: 36 });
+      else if (r && r.model) CB.drawFrame(P, r, { reactions: false, loadPx: 34 });
+      else { members.forEach(([a, b]) => P.line(nodes[a][0], nodes[a][1], nodes[b][0], nodes[b][1], { color: pal.text, width: 3 })); }
+      nodes.forEach(([x, y], i) => { P.dot(x, y, { r: i === pick ? 7 : 4.5, color: i === pick ? pal.accent2 : pal.text }); P.text(String(i), x, y, { color: pal.dim, size: 10.5, dx: -10, dy: -12 }); });
+    },
+    onPointer(x, y, ph) {
+      if (ph !== "down") return;
+      const P = pl.P, m = mode(), n = near(x, y, P);
+      if (m === "node") { if (n < 0) nodes.push([Math.round(x), Math.round(y)]); }
+      else if (m === "member") {
+        if (n < 0) return;
+        if (pick < 0) pick = n; else { if (n !== pick && !members.some(([a, b]) => (a === pick && b === n) || (a === n && b === pick))) members.push([pick, n, false]); pick = -1; }
+      } else if (m === "support") { if (n < 0) return; const cur = supports[n] || "none", nx = SUP[(SUP.indexOf(cur) + 1) % 4]; if (nx === "none") delete supports[n]; else supports[n] = nx; }
+      else if (m === "load") { if (n < 0) return; const i = loads.findIndex((l) => l.node === n); if (i < 0) loads.push({ node: n, fx: 0, fy: -gp() }); else if (loads[i].fy) loads[i] = { node: n, fx: gp(), fy: 0 }; else loads.splice(i, 1); }
+      else if (m === "del" && n >= 0) {
+        members = members.filter(([a, b]) => a !== n && b !== n).map(([a, b, t]) => [a > n ? a - 1 : a, b > n ? b - 1 : b, t]);
+        const ns = {}; Object.entries(supports).forEach(([k, v]) => { k = +k; if (k !== n) ns[k > n ? k - 1 : k] = v; }); supports = ns;
+        loads = loads.filter((l) => l.node !== n).map((l) => ({ ...l, node: l.node > n ? l.node - 1 : l.node })); nodes.splice(n, 1);
+      }
+      go();
+    } });
+  function caption() { document.getElementById("mx-e-cap").textContent = { node: "절점 모드: 빈 곳을 눌러 절점 놓기", member: "부재 모드: 두 절점을 차례로 누르기", support: "지점 모드: 절점을 누를 때마다 지점 바꾸기", load: "하중 모드: 절점을 누를 때마다 하중 바꾸기", del: "삭제 모드: 절점을 눌러 지우기" }[mode()]; }
+  function go() {
+    solve(); pl.redraw(); caption();
+    CB.stat("mx-e-cnt", `${nodes.length} / ${members.length}`);
+    const fixedN = Object.values(supports).reduce((s, v) => s + CB.SUPPORTS[v].reduce((a, b) => a + b, 0), 0);
+    CB.stat("mx-e-dof", String(Math.max(0, 3 * nodes.length - fixedN)));
+    const msg = document.getElementById("mx-e-msg");
+    if (!r) { CB.stat("mx-e-eq", "—"); msg.className = "mx-msg"; msg.textContent = "절점과 부재를 놓아 모델을 만드세요."; return; }
+    if (!r.ok) { CB.stat("mx-e-eq", "—"); msg.className = "mx-msg bad"; msg.textContent = r.reason === "lonely" ? "부재에 연결되지 않은 절점이 있습니다. 부재로 잇거나 지우세요." : "강성 행렬이 특이합니다: 기구(불안정)입니다. 지점을 더하거나 대각재를 넣어 보세요."; return; }
+    let fx = 0, fy = 0, mz = 0;
+    loads.forEach((l) => { const [x, y] = nodes[l.node]; fx += l.fx; fy += l.fy; mz += x * l.fy - y * l.fx; });
+    r.reactions.forEach((R, n) => { if (!R) return; const [x, y] = nodes[n]; fx += R[0]; fy += R[1]; mz += x * R[1] - y * R[0] + R[2]; });
+    const err = Math.max(Math.abs(fx), Math.abs(fy), Math.abs(mz));
+    CB.stat("mx-e-eq", err < 1e-6 ? "0 ✓" : CB.sig(err));
+    msg.className = "mx-msg ok"; msg.innerHTML = `풀었습니다. 최대 변위 ${(r.maxAbs("disp") * 1000).toFixed(2)} mm, 최대 |M| ${CB.num(r.maxAbs("M"), 1)} kN·m, 최대 |N| ${CB.num(r.maxAbs("N"), 1)} kN.`;
+  }
+  go();
+})();
+
+/* ---------- 6. 검증 체크리스트 ---------- */
+(function () {
+  const err = CB.seg("mx-k-err", go);
+  const Ec = 2.75e7, Ib = 0.01143, Ic = 0.02, L = 8, h = 4, w = 100;
+  let r;
+  function solve() {
+    const e = err(), E = e === "unit" ? 27500 : Ec;
+    r = CB.frame({ nodes: [[0, 0], [0, h], [L, h], [L, 0]], members: [{ i: 0, j: 1, E, A: 0.49, I: Ic }, { i: 1, j: 2, E, A: 0.28, I: Ib, hinge: [false, e === "release"] }, { i: 3, j: 2, E, A: 0.49, I: Ic }],
+      supports: { 0: "fixed", 3: e === "support" ? "pin" : "fixed" }, memberLoads: [{ member: 1, w: [0, e === "sign" ? w : -w] }] });
+  }
+  solve();
+  const pl = CB.plane("#mx-cv-chk", { x: [-3, 11], y: [-1.8, 7.2], aspect: (W) => (W < 520 ? 0.72 : 0.46), minHeight: 230, maxHeight: 340, grid: false, axes: false,
+    draw(P) { CB.drawFrame(P, r, { diagram: "M", deformed: "auto", deformPx: 20, reactions: true, loadPx: 26, loadLabels: false, reactionPx: 24, diagramPx: 34 }); } });
+  function go() {
+    solve(); pl.redraw();
+    let fx = 0, fy = 0; r.reactions.forEach((R) => { if (R) { fx += R[0]; fy += R[1]; } }); fy += (err() === "sign" ? 1 : -1) * w * L;
+    const mid = r.sample(1).find((p) => Math.abs(p.s - L / 2) < 0.1) || r.sample(1)[30], defl = mid.uy, Lr = L / Math.max(1e-9, Math.abs(defl));
+    const m1 = r.ends[1].M1, m2 = r.ends[1].M2, mm = mid.M, sym = Math.abs(m1 - m2) / Math.max(1, Math.abs(m1) + Math.abs(m2));
+    const base = [r.reactions[0][2], r.reactions[3][2]];
+    const checks = [
+      [Math.abs(fx) < 1e-6 && Math.abs(fy) < 1e-6, `평형: ΣR<sub>x</sub> = ${CB.num(fx, 3)}, ΣR<sub>y</sub> + 하중 = ${CB.num(fy, 3)} kN`],
+      [Lr > 150 && Lr < 1e6, `처짐 크기: 보 가운데 ${CB.num(defl * 1000, 3)} mm (L/${Math.round(Lr).toLocaleString("en-US")}) — 상식 범위는 대략 L/300 – L/50,000`],
+      [defl < 0, `처짐 방향: 중력 하중인데 보가 ${defl < 0 ? "아래로" : "위로"} 휜다`],
+      [sym < 0.01, `대칭: 대칭 구조·대칭 하중이면 보 양 끝 모멘트가 같아야 한다 (${CB.num(m1, 1)} / ${CB.num(m2, 1)} kN·m)`],
+      [Math.abs(base[0]) > 1 && Math.abs(base[1]) > 1, `설계 의도: 고정 기초라면 두 기초 모두 모멘트가 있어야 한다 (${CB.num(base[0], 1)} / ${CB.num(base[1], 1)} kN·m)`],
+      [Math.abs(m1) > 0.04 * w * L * L && Math.abs(m2) > 0.04 * w * L * L, `손계산 범위: 강접 보 끝 모멘트는 0과 wL²/12(533) 사이, 0에 가까우면 힌지를 의심 (${CB.num(Math.abs(m1), 0)} / ${CB.num(Math.abs(m2), 0)})`],
+    ];
+    document.getElementById("mx-k-list").innerHTML = checks.map(([ok, t]) => `<div class="${ok ? "" : "bad"}">${t}</div>`).join("");
+  }
+  go();
+})();
+
+/* ---------- 7. B-10 골조 ---------- */
+(function () {
+  const Ec = 2.75e7, gw = CB.range("mx-f-w", (v) => v + " kN", go), gc = CB.range("mx-f-c", (v) => v.toFixed(2) + "×", go), gb = CB.seg("mx-f-b", go), base = CB.seg("mx-f-base", go), crk = CB.check("mx-f-crk", go);
+  const H = [0, 5]; for (let k = 2; k <= 10; k++) H.push(5 + 4 * (k - 1));
+  const id = (c, lev) => lev * 4 + c;
+  let F;
+  function solve() {
+    const nodes = [], members = [], supports = {}, loads = [], hb = +gb() / 1000, Ib = (0.4 * hb ** 3) / 12 * (crk() ? 0.35 : 1);
+    for (let lev = 0; lev <= 10; lev++) for (let c = 0; c < 4; c++) nodes.push([8 * c, H[lev]]);
+    for (let lev = 1; lev <= 10; lev++) {
+      const s = (lev <= 3 ? 0.8 : 0.7) * gc(), Ic = (s ** 4 / 12) * (crk() ? 0.7 : 1);
+      for (let c = 0; c < 4; c++) members.push({ i: id(c, lev - 1), j: id(c, lev), E: Ec, A: s * s, I: Ic });
+      for (let c = 0; c < 3; c++) members.push({ i: id(c, lev), j: id(c + 1, lev), E: Ec, A: 0.4 * hb, I: Ib });
+      if (gw()) loads.push({ node: id(0, lev), fx: gw() });
+    }
+    for (let c = 0; c < 4; c++) supports[id(c, 0)] = base();
+    const r = CB.frame({ nodes, members, supports, loads });
+    const ux = H.map((_, lev) => (r.ok ? r.d[id(0, lev)][0] : 0)), drift = [];
+    for (let lev = 1; lev <= 10; lev++) drift.push((ux[lev] - ux[lev - 1]) / (H[lev] - H[lev - 1]));
+    F = { r, ux, drift };
+  }
+  solve();
+  const pl = CB.plane("#mx-cv-b10", { x: [-12, 36], y: [-2, 44], aspect: (W) => (W < 520 ? 1.05 : 0.78), minHeight: 300, maxHeight: 460, grid: false, axes: false,
+    draw(P) {
+      if (!F.r.ok) return;
+      const md = F.r.maxAbs("disp") || 1, k = 6 / md;
+      CB.drawFrame(P, F.r, { deformed: k, loadPx: 30, loadLabels: false, reactions: false, memberWidth: 2 });
+      P.text(`변형 × ${CB.sig(k)}`, 34, 43, { color: P.P.dim, size: 11, align: "right" });
+    } });
+  const ch = CB.canvas("#mx-cv-b10d", (ctx, W, Hh) => {
+    const pal = CB.palette(), data = [], dm = Math.max(...F.drift.map(Math.abs), 1e-6);
+    F.drift.forEach((d, i) => { data.push([d * 1000, i + 0.5]); });
+    const steps = []; F.drift.forEach((d, i) => { steps.push([d * 1000, i], [d * 1000, i + 1]); });
+    CB.chart(ctx, null, { x: [0, Math.max(dm * 1000 * 1.25, 1.5)], y: [0, 10], xLabel: "층간 변위비 (× 10⁻³)", yLabel: "층", yTicks: [0, 2, 4, 6, 8, 10],
+      series: [{ data: steps, color: pal.accent, width: 2.4 }], vlines: [{ x: 2.5, color: pal.warn, label: "1/400" }, { x: 2.0, color: pal.dim, label: "1/500" }] });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.4), minHeight: 220, maxHeight: 300 });
+  function go() {
+    solve(); pl.redraw(); ch.redraw();
+    if (!F.r.ok) return;
+    const top = F.ux[10], dmax = Math.max(...F.drift), at = F.drift.indexOf(dmax) + 1, R = [0, 1, 2, 3].map((c) => F.r.reactions[id(c, 0)]);
+    CB.stat("mx-f-top", `${CB.num(top * 1000, 1)} mm <small>H/${top > 0 ? Math.round(41 / top).toLocaleString("en-US") : "—"}</small>`);
+    CB.stat("mx-f-dr", dmax > 0 ? `1/${Math.round(1 / dmax)} <small>${at}층</small>` : "—");
+    CB.stat("mx-f-v", CB.num(-R.reduce((s, v) => s + v[0], 0), 1) + " kN");
+    CB.stat("mx-f-m", CB.num(Math.max(...R.map((v) => Math.abs(v[2]))), 1) + " kN·m");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

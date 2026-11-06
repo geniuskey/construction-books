@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>구조물과 하중 · MechanicsBook</title>
+<meta name="description" content="구조물은 하중을 땅까지 옮기는 길이다. 하중 경로, 고정·활·풍·지진·적설 하중의 크기 감각, 집중·분포·면 하중과 합력, 기여 면적과 기여 폭, 하중 조합과 계수 하중, 이상화와 모델링, 기준 건물 B-10과 보도교 T-36을 직접 계산하며 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .ld-stack { display: grid; grid-template-columns: 1fr; }
+  .ld-stack > div { position: relative; min-width: 0; }
+  .ld-stack > div + div { border-top: 1px solid var(--border); }
+  .ld-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .ld-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .ld-msg b { color: var(--text); }
+  .ld-msg.ok { color: var(--ok); font-weight: 600; }
+  .ld-msg.bad { color: var(--bad); font-weight: 600; }
+  .ld-legend { display: flex; flex-wrap: wrap; gap: 4px 2px; padding: 8px 18px; border-top: 1px solid var(--border); }
+  .ld-tbl td, .ld-tbl th { font-variant-numeric: tabular-nums; }
+  .ld-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .ld-map td:first-child { white-space: nowrap; font-family: var(--mono); font-size: 13px; color: var(--accent); }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="mechanics"></script>
+</head>
+<body data-chapter="loads">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="ld-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="ld-ah-react" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="ld-ah-int" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+      <marker id="ld-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="ld-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 01</div>
+    <h1 data-no-glossary>구조물과 하중</h1>
+    <p class="lead">10층 사무실 책상 위에 놓인 커피잔의 무게는 어디로 갈까요? 책상 다리를 지나 바닥 슬래브로, 슬래브에서 보로, 보에서 기둥으로, 기둥에서 한 층씩 내려가 기초로, 마지막에는 땅으로 갑니다. 구조물이 하는 일은 결국 하나, <b>하중을 땅까지 안전하게 옮기는 것</b>입니다. 이 장에서는 구조역학 전체의 재료가 되는 하중을 다룹니다. 어떤 하중이 얼마나 걸리는지 감을 잡고, 넓게 퍼진 하중을 한 점의 힘으로 바꾸고, 바닥의 어느 부분이 어느 기둥으로 가는지 나누고, 불확실성을 감안해 하중을 키워 더하는 법을 배웁니다. 그리고 이 책 전체에서 계산할 두 가상 구조물, 10층 업무시설 B-10과 36 m 트러스 보도교 T-36을 처음 만납니다.</p>
+    <ul class="objectives">
+      <li>슬래브 → 보 → 기둥 → 기초로 이어지는 <b>하중 경로</b>를 따라가고, 기둥 하나가 받는 축력을 층마다 쌓아 계산한다.</li>
+      <li>고정·활·풍·지진·적설·온도 하중을 구별하고, 사람·물·눈·자동차의 무게를 kN/m²로 바꿔 크기를 비교한다.</li>
+      <li>집중 하중(kN), 분포 하중(kN/m), 면 하중(kN/m²)을 구별하고, 분포 하중의 합력과 작용점을 넓이와 도심으로 구한다.</li>
+      <li>기여 면적과 기여 폭으로 바닥 하중을 기둥과 보에 나누고, 1방향·2방향 가정의 차이를 설명한다.</li>
+      <li>계수 하중과 하중 조합(1.4D, 1.2D + 1.6L 등)의 뜻을 알고, 어느 조합이 지배하는지 판단한다.</li>
+      <li>실제 구조물을 선·점·지점 기호로 이상화하고, 기준 건물 B-10과 보도교 T-36의 기본 숫자를 안다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>무너져 보고서야 알던 하중</b></div>
+      <div class="o-body"><p>오랫동안 건물과 다리의 크기는 앞선 구조물의 경험으로 정했습니다. 버틴 것은 따라 짓고, 무너진 것은 피했습니다. 경험이 없는 새로운 규모와 재료 앞에서 이 방식은 위험했습니다. 19세기 철도 교량과 20세기 고층 건물이 늘어나면서 기술자들은 하중을 먼저 정하고 그 하중으로 부재를 계산하는 방식으로 옮겨 갔고, 사람·눈·바람·지진의 크기를 정리한 하중 기준이 생겨났습니다. 우리나라에서도 건축물의 하중은 건축구조기준(KDS 41)의 "건축물 설계하중(KDS 41 12 00)"에 정리되어 있습니다.</p>
+        <p>오늘날 구조 설계는 늘 같은 순서로 시작합니다. 어떤 하중이 어디에 얼마나 걸리는지 정하고(이 장), 그 하중이 구조물 속을 어떻게 흐르는지 계산하고(2–6장), 그 힘을 재료가 견디는지 확인합니다(7장 이후). 첫 단추인 하중을 잘못 잡으면 아무리 정교한 해석도 소용이 없습니다.</p>
+        <div class="o-chain"><span>용도·지역·형태</span><i>→</i><span>하중의 종류와 크기</span><i>→</i><span class="tool">기여 면적·하중 조합</span><i>→</i><span>부재에 걸리는 계수 하중</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="load-path">
+    <h2>구조물이 하는 일: 하중을 땅까지</h2>
+    <div class="problem"><strong>커피잔의 여행</strong>
+      <p>B-10의 10층 사무실 바닥 한가운데에 사람 다섯 명이 모여 서 있습니다. 이 사람들의 무게는 결국 땅이 받아야 합니다. 그 사이에서 어떤 부재가, 어떤 순서로 이 무게를 넘겨받을까요? 1층 기둥은 몇 층 분량의 무게를 받고 있을까요?</p></div>
+    <p>건물의 무게는 보이지 않는 길을 따라 흐릅니다. 바닥 위의 하중은 먼저 <b>슬래브</b>가 받아 휨으로 버티며 주변의 <b>보</b>로 넘기고, 보는 다시 휨으로 버티며 양 끝의 <b>기둥</b>으로 넘깁니다. 기둥은 위층에서 내려온 힘에 자기 층의 몫을 더해 아래층 기둥으로 넘기고, 맨 아래 기둥은 <b>기초</b>를 통해 넓은 면적으로 힘을 퍼뜨려 <b>지반</b>에 전합니다. 이 순서를 <span class="term">하중 경로</span><span class="en">(load path)</span>라고 합니다.</p>
+    <div class="callout def"><strong>정의 1.1 (구조물과 하중 경로)</strong> <span class="term">구조물</span><span class="en">(structure)</span>은 외부에서 작용하는 하중을 부재들의 내력으로 받아 지점(최종적으로는 지반)까지 전달하는 부재의 집합이다. 하중이 작용점에서 지반에 이르기까지 차례로 거쳐 가는 부재와 연결의 사슬을 <span class="term">하중 경로</span>라 하며, 하중 경로의 어느 한 고리가 끊기면 구조물 전체가 위험해진다.</div>
+    <p>하중 경로를 따라갈수록 부재가 받는 힘은 커집니다. 바닥 1 m²에 걸린 수 kN의 하중이 보 하나에는 수백 kN으로, 1층 기둥 하나에는 수천 kN으로 모입니다. 설계자는 이 경로가 끊기지 않고 이어지는지, 각 고리가 모인 힘을 견디는지를 확인합니다. 무너진 구조물의 상당수는 부재 자체보다 부재와 부재를 잇는 연결, 곧 경로의 고리에서 끊어졌습니다.</p>
+    <figure class="diagram" id="fig-ld-path">
+      <svg viewBox="0 0 760 340" role="img" aria-label="슬래브에서 보, 기둥, 기초, 지반으로 이어지는 하중 경로 단면도">
+        <rect x="10" y="10" width="740" height="320" rx="10" class="f-surface"/>
+        <rect x="40" y="276" width="440" height="40" style="fill:color-mix(in srgb, var(--accent-2) 12%, transparent);stroke:none"/>
+        <text x="60" y="302" class="t-dim">지반</text>
+        <rect x="70" y="70" width="390" height="12" class="f-elev" style="stroke:var(--text)"/>
+        <rect x="70" y="160" width="390" height="12" class="f-elev" style="stroke:var(--text)"/>
+        <rect x="110" y="82" width="20" height="26" style="fill:var(--surface-2);stroke:var(--text)"/><rect x="400" y="82" width="20" height="26" style="fill:var(--surface-2);stroke:var(--text)"/>
+        <rect x="110" y="172" width="20" height="26" style="fill:var(--surface-2);stroke:var(--text)"/><rect x="400" y="172" width="20" height="26" style="fill:var(--surface-2);stroke:var(--text)"/>
+        <rect x="104" y="82" width="32" height="194" style="fill:none;stroke:var(--text);stroke-width:1.2;opacity:.0"/>
+        <rect x="112" y="108" width="16" height="52" style="fill:var(--surface-2);stroke:var(--text)"/><rect x="402" y="108" width="16" height="52" style="fill:var(--surface-2);stroke:var(--text)"/>
+        <rect x="112" y="198" width="16" height="66" style="fill:var(--surface-2);stroke:var(--text)"/><rect x="402" y="198" width="16" height="66" style="fill:var(--surface-2);stroke:var(--text)"/>
+        <rect x="88" y="264" width="64" height="14" style="fill:var(--surface-2);stroke:var(--text)"/><rect x="378" y="264" width="64" height="14" style="fill:var(--surface-2);stroke:var(--text)"/>
+        <g style="stroke:var(--accent-2);stroke-width:1.6" marker-end="url(#ld-ah-load)"><line x1="230" y1="40" x2="230" y2="66"/><line x1="265" y1="40" x2="265" y2="66"/><line x1="300" y1="40" x2="300" y2="66"/></g>
+        <text x="265" y="34" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">사람·가구 (kN/m²)</text>
+        <path d="M265 90 Q200 96 150 96" style="fill:none;stroke:var(--accent);stroke-width:2.2" marker-end="url(#ld-ah-acc)"/><path d="M265 90 Q330 96 380 96" style="fill:none;stroke:var(--accent);stroke-width:2.2" marker-end="url(#ld-ah-acc)"/>
+        <text x="265" y="118" text-anchor="middle" class="t-dim">① 슬래브 → 보</text>
+        <line x1="138" y1="116" x2="138" y2="152" style="stroke:var(--accent);stroke-width:2.2" marker-end="url(#ld-ah-acc)"/><line x1="392" y1="116" x2="392" y2="152" style="stroke:var(--accent);stroke-width:2.2" marker-end="url(#ld-ah-acc)"/>
+        <text x="146" y="140" class="t-dim">② 보 → 기둥</text>
+        <line x1="138" y1="204" x2="138" y2="256" style="stroke:var(--accent);stroke-width:3.2" marker-end="url(#ld-ah-acc)"/><line x1="392" y1="204" x2="392" y2="256" style="stroke:var(--accent);stroke-width:3.2" marker-end="url(#ld-ah-acc)"/>
+        <text x="146" y="236" class="t-dim">③ 기둥(층마다 누적)</text>
+        <g style="stroke:var(--ok);stroke-width:1.8" marker-end="url(#ld-ah-react)"><line x1="100" y1="318" x2="100" y2="284"/><line x1="120" y1="318" x2="120" y2="284"/><line x1="140" y1="318" x2="140" y2="284"/></g>
+        <text x="160" y="306" class="t-dim">④ 기초 → 지반(반력)</text>
+        <g transform="translate(500,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">모이는 힘의 크기(B-10, 계수 하중)</text>
+          <text x="0" y="34" class="t-mono">바닥 1 m²</text><text x="230" y="34" text-anchor="end" class="t-mono" style="fill:var(--accent)">11.8 kN</text>
+          <text x="0" y="62" class="t-mono">큰보 G1 1 m</text><text x="230" y="62" text-anchor="end" class="t-mono" style="fill:var(--accent)">100 kN</text>
+          <text x="0" y="90" class="t-mono">G1 한쪽 끝(반력)</text><text x="230" y="90" text-anchor="end" class="t-mono" style="fill:var(--accent)">400 kN</text>
+          <text x="0" y="118" class="t-mono">한 층 몫(기둥 C1)</text><text x="230" y="118" text-anchor="end" class="t-mono" style="fill:var(--accent)">≈ 850 kN</text>
+          <text x="0" y="146" class="t-mono">1층 기둥 C1</text><text x="230" y="146" text-anchor="end" class="t-mono" style="fill:var(--accent-2);font-weight:700">≈ 9,000 kN</text>
+          <line x1="0" y1="162" x2="230" y2="162" class="s-axis"/>
+          <text x="0" y="186" class="t-dim">하중 경로를 내려갈수록</text>
+          <text x="0" y="206" class="t-dim">힘이 모여 커진다.</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 1-1.</b> 하중 경로. 바닥의 면 하중은 슬래브에서 보로(①), 보에서 기둥으로(②), 기둥을 따라 층마다 쌓이며 아래로(③), 기초를 거쳐 지반으로(④) 간다. 오른쪽 숫자는 기준 건물 B-10의 교육용 어림이다.</figcaption>
+    </figure>
+    <p>아래 시뮬레이터는 B-10을 3차원으로 보여 줍니다. 끌어서 돌려 보고, 기둥 하나를 골라 그 기둥이 받는 바닥 면적(색칠된 부분)과 층별 축력을 확인하세요. 아래층으로 갈수록 받치는 바닥의 수가 늘어나 축력이 계단처럼 커집니다.</p>
+    <div class="sim" id="sim-ld-b10">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-10의 하중 경로 따라가기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ld-cv-b10" aria-label="기준 건물 B-10의 3차원 골조와 선택한 기둥의 기여 면적"></canvas><span class="ld-cap">끌어서 돌리기</span></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>기둥</span><div class="seg" id="ld-b-col"><button data-value="int" class="on">내부 C1</button><button data-value="edge">외곽</button><button data-value="corner">모서리</button></div></div>
+          <label class="ctrl"><span>살펴볼 층 <output id="ld-b-st-out"></output></span><input type="range" id="ld-b-st" min="1" max="10" step="1" value="1"></label>
+          <label class="check"><input type="checkbox" id="ld-b-flow" checked> 하중 흐름 애니메이션</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기여 면적</span><span class="v" id="ld-b-a">—</span></div>
+        <div class="stat"><span class="k">받치는 바닥 수</span><span class="v" id="ld-b-n">—</span></div>
+        <div class="stat"><span class="k">계수 축력 N<sub>u</sub></span><span class="v" id="ld-b-nu">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-b-msg"></div>
+      <div class="sim-note">해볼 것: 1층과 10층의 내부 기둥 축력을 비교하세요 · 같은 층에서 내부·외곽·모서리 기둥의 축력이 면적에 거의 비례하는지 보세요 · 모델: 바닥 계수 하중 1.2D + 1.6L = 11.8 kN/m²(슬래브·마감, 지붕층도 같다고 단순화) + 큰보 자중 1.2 × 4.7 kN/m × 기여 보 길이 + 기둥 자중 1.2 × 15.4 kN/m(800 × 800 mm). 코어 벽이 받는 몫과 활하중 저감은 무시한 교육용 어림입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="load-types">
+    <h2>하중의 종류와 크기 감각</h2>
+    <p>구조물에 걸리는 하중은 원인과 성격에 따라 나눕니다. 언제나 같은 크기로 걸려 있는지, 시간에 따라 바뀌는지, 방향이 연직인지 수평인지에 따라 다루는 방법이 다릅니다.</p>
+    <div class="callout def"><strong>정의 1.2 (하중의 분류)</strong>
+      <ul style="margin:6px 0 0">
+        <li><span class="term">고정하중</span><span class="en">(dead load, D)</span>: 구조물 자신과 마감재·설비처럼 늘 같은 자리에 같은 크기로 있는 무게. 재료의 단위중량 × 부피로 비교적 정확히 계산한다.</li>
+        <li><span class="term">활하중</span><span class="en">(live load, L)</span>: 사람·가구·물품·차량처럼 용도에 따라 놓였다 치워졌다 하는 무게. 실제 값의 변동이 커서 기준이 용도별 대표값(kN/m²)을 정한다.</li>
+        <li><b>환경 하중</b>: 적설 하중 S, <span class="term">풍하중</span><span class="en">(wind load, W)</span>, <span class="term">지진 하중</span><span class="en">(earthquake load, E)</span>. 지역·지형·높이·구조 형식에 따라 크기가 달라진다. 풍하중과 지진 하중은 주로 수평으로 작용한다.</li>
+        <li><b>변형이 만드는 하중</b>: 온도 변화, 콘크리트의 건조 수축과 크리프, 지점 침하. 스스로는 힘이 아니지만 변형이 구속되면 힘이 생긴다(7장·14장).</li>
+      </ul></div>
+    <figure class="diagram" id="fig-ld-types">
+      <svg viewBox="0 0 760 320" role="img" aria-label="건물에 작용하는 여러 하중: 고정, 활, 적설, 풍, 지진, 온도, 지점 침하">
+        <rect x="10" y="10" width="740" height="300" rx="10" class="f-surface"/>
+        <rect x="40" y="262" width="680" height="34" style="fill:color-mix(in srgb, var(--accent-2) 10%, transparent)"/>
+        <rect x="250" y="80" width="200" height="182" class="f-elev" style="stroke:var(--text);stroke-width:1.6"/>
+        <line x1="250" y1="140" x2="450" y2="140" class="s-line"/><line x1="250" y1="200" x2="450" y2="200" class="s-line"/>
+        <path d="M240 80 L460 80" style="stroke:var(--text);stroke-width:3"/>
+        <g style="stroke:var(--accent-2);stroke-width:1.6" marker-end="url(#ld-ah-load)"><line x1="280" y1="44" x2="280" y2="76"/><line x1="320" y1="44" x2="320" y2="76"/><line x1="360" y1="44" x2="360" y2="76"/><line x1="400" y1="44" x2="400" y2="76"/><line x1="440" y1="44" x2="440" y2="76"/></g>
+        <text x="360" y="36" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">적설 S</text>
+        <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#ld-ah-load)"><line x1="300" y1="160" x2="300" y2="196"/><line x1="340" y1="168" x2="340" y2="196"/><line x1="380" y1="160" x2="380" y2="196"/></g>
+        <circle cx="300" cy="154" r="5" style="fill:none;stroke:var(--accent-2);stroke-width:1.4"/><circle cx="380" cy="154" r="5" style="fill:none;stroke:var(--accent-2);stroke-width:1.4"/>
+        <text x="410" y="186" class="t-mono" style="fill:var(--accent-2)">활 L</text>
+        <path d="M262 132 h176" style="stroke:var(--text-dim);stroke-width:5;opacity:.45"/><text x="350" y="124" text-anchor="middle" class="t-mono">고정 D (자중·마감)</text>
+        <g style="stroke:var(--accent);stroke-width:1.8" marker-end="url(#ld-ah-acc)"><line x1="140" y1="100" x2="244" y2="100"/><line x1="160" y1="150" x2="244" y2="150"/><line x1="178" y1="200" x2="244" y2="200"/><line x1="192" y1="245" x2="244" y2="245"/></g>
+        <text x="60" y="70" class="t-mono" style="fill:var(--accent)">풍 W</text><text x="100" y="70" class="t-dim">(위로 갈수록 큼)</text>
+        <path d="M470 130 q10 -10 20 0 t20 0 t20 0" style="fill:none;stroke:var(--accent);stroke-width:1.6"/>
+        <line x1="470" y1="160" x2="540" y2="160" style="stroke:var(--accent);stroke-width:1.6" marker-start="url(#ld-ah-acc)" marker-end="url(#ld-ah-acc)"/>
+        <text x="552" y="150" class="t-mono" style="fill:var(--accent)">지진 E</text><text x="552" y="168" class="t-dim">(지반이 흔들려 생기는 관성력)</text>
+        <path d="M250 262 q100 14 200 0" style="fill:none;stroke:var(--warn);stroke-width:2;stroke-dasharray:5 4"/>
+        <line x1="450" y1="262" x2="450" y2="284" style="stroke:var(--warn);stroke-width:1.6" marker-end="url(#ld-ah-dim)"/>
+        <text x="470" y="286" class="t-mono" style="fill:var(--warn)">지점 침하</text>
+        <text x="552" y="222" class="t-mono" style="fill:var(--warn)">온도 ΔT</text><text x="552" y="240" class="t-dim">(늘고 줄려는 변형의 구속)</text>
+        <path d="M470 230 h60" style="stroke:var(--warn);stroke-width:1.6" marker-start="url(#ld-ah-dim)" marker-end="url(#ld-ah-dim)"/>
+      </svg>
+      <figcaption><b>그림 1-2.</b> 구조물에 걸리는 여러 하중. 고정·활·적설 하중은 주로 연직, 풍하중과 지진 하중은 주로 수평으로 작용한다. 온도와 지점 침하는 변형을 일으키고, 변형이 막히면 힘이 된다.</figcaption>
+    </figure>
+    <p>하중의 크기는 단위중량과 용도별 대표값으로 감을 잡습니다. 아래 표의 값은 교육용 대표값입니다. 실제 설계에서는 현행 기준(KDS 41 12 00)의 표를 확인합니다.</p>
+    <div class="table-wrap"><table class="ld-tbl">
+      <thead><tr><th>재료의 단위중량</th><th>값 (kN/m³)</th><th>용도별 활하중 예</th><th>값 (kN/m²)</th></tr></thead>
+      <tbody>
+        <tr><td>철근콘크리트</td><td class="hl">24</td><td>주거(주택·아파트 거실)</td><td>2.0</td></tr>
+        <tr><td>무근 콘크리트</td><td>23</td><td>사무실</td><td class="hl">2.5</td></tr>
+        <tr><td>강재</td><td>77–78.5</td><td>교실</td><td>3.0</td></tr>
+        <tr><td>물</td><td>9.81 ≈ 10</td><td>집회장(이동 좌석)</td><td>5.0</td></tr>
+        <tr><td>흙(다진 상태)</td><td>16–20</td><td>도서관 서고</td><td>7.5</td></tr>
+        <tr><td>목재(건조)</td><td>4–8</td><td>승용차 주차장</td><td>3.0</td></tr>
+      </tbody></table></div>
+    <p>바람은 공기의 운동 에너지가 벽에 부딪혀 만드는 압력입니다. 공기의 밀도를 \(\rho \approx 1.22\) kg/m³라 하면 풍속 \(V\)의 바람이 가진 <b>속도압</b>은</p>
+    <div class="formula">$$q = \tfrac{1}{2}\rho V^2 \quad\Rightarrow\quad V = 30\ \text{m/s}:\ q \approx 0.55\ \text{kN/m}^2, \qquad V = 40\ \text{m/s}:\ q \approx 0.98\ \text{kN/m}^2$$<div class="where">실제 풍하중은 높이·지형에 따른 풍속 보정, 건물 모양에 따른 압력 계수(바람을 맞는 면은 밀고 뒷면과 지붕은 빨아들인다), 돌풍 효과를 곱해 정한다. 풍속이 두 배면 압력은 네 배다.</div></div>
+    <p>지진 하중은 성격이 다릅니다. 땅이 흔들리면 건물은 제자리에 머무르려는 관성 때문에 흔들림을 따라가지 못하고, 그 차이가 층마다 수평 관성력(질량 × 가속도)으로 나타납니다. 그래서 무거운 건물일수록 지진 하중이 커지고, 건물의 강성과 고유 주기, 지반 조건에 따라 크기가 크게 달라집니다. 지진과 바람에 대한 자세한 이야기는 건축구조 교과서에서 다룹니다.</p>
+    <div class="sim" id="sim-ld-sense">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>사람·물·눈·자동차는 몇 kN/m²일까</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ld-cv-sense" aria-label="여러 하중을 면 하중으로 바꾼 막대 그래프"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>사람 밀도 <output id="ld-s-ppl-out"></output></span><input type="range" id="ld-s-ppl" min="0" max="6" step="0.5" value="2"></label>
+          <label class="ctrl"><span>고인 물 깊이 <output id="ld-s-wat-out"></output></span><input type="range" id="ld-s-wat" min="0" max="50" step="1" value="10"></label>
+          <label class="ctrl"><span>쌓인 눈 깊이 <output id="ld-s-snow-out"></output></span><input type="range" id="ld-s-snow" min="0" max="150" step="5" value="50"></label>
+          <div class="ctrl"><span>눈의 상태</span><div class="seg" id="ld-s-snowt"><button data-value="1" class="on">갓 내린 눈</button><button data-value="3">젖은 눈</button></div></div>
+          <label class="ctrl"><span>승용차 질량 <output id="ld-s-car-out"></output></span><input type="range" id="ld-s-car" min="1000" max="2500" step="100" value="1600"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">가장 큰 하중</span><span class="v" id="ld-s-max">—</span></div>
+        <div class="stat"><span class="k">사무실 활하중 대비</span><span class="v" id="ld-s-ratio">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 사람 밀도를 1 m²당 4명(만원 지하철 수준)으로 올려 사무실 활하중 2.5 kN/m²와 비교하세요 · 젖은 눈 1 m가 지붕에 얼마나 무거운지 보세요 · 모델: 사람 1명 70 kg, 물 9.81 kN/m³, 눈 단위중량 1(갓 내린 눈)·3 kN/m³(젖은 눈, 교육용 어림), 승용차는 바닥 면적 2.5 m × 5.0 m에 고르게 펼친 값. g = 9.81 m/s².</div>
+    </div>
+    <div class="callout warn"><strong>대표값은 평균이 아니다</strong> 사무실 활하중 2.5 kN/m²는 사람이 1 m²에 3–4명 서 있는 하중과 비슷합니다. 실제 사무실의 평균 하중은 이보다 훨씬 작지만, 기준의 활하중은 구조물의 수명 동안 드물게 나타날 수 있는 큰 값을 대표하도록 정한 것입니다. 반대로 서고나 창고처럼 무거운 물건이 쌓이는 곳은 대표값이 훨씬 큽니다. 용도가 바뀌면(사무실을 서고로) 구조 검토를 다시 해야 하는 이유입니다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="distributed">
+    <h2>집중·분포·면 하중과 합력</h2>
+    <p>하중은 작용하는 범위에 따라 세 가지로 이상화합니다. 기둥이 보 위에 얹히거나 바퀴가 바닥을 누르는 것처럼 좁은 면적에 걸리는 하중은 한 점에 걸린다고 보고 <span class="term">집중 하중</span>(kN)이라 합니다. 보의 자중이나 벽의 무게처럼 길이를 따라 퍼진 하중은 <span class="term">분포 하중</span>(kN/m), 바닥 위 사람과 가구처럼 넓이에 퍼진 하중은 <span class="term">면 하중</span><span class="en">(area load)</span>(kN/m²)입니다. 면 하중에 폭(m)을 곱하면 분포 하중이 되고, 분포 하중에 길이를 곱하면 힘이 됩니다.</p>
+    <div class="callout def"><strong>원리 1.3 (분포 하중의 합력)</strong> 구간 \([a, b]\)에 걸린 분포 하중 \(w(x)\)의 <span class="term">합력</span><span class="en">(resultant)</span>은 하중 그림의 넓이와 같고, 그 작용점은 하중 그림의 도심을 지난다.
+      <div class="formula">$$R = \int_a^b w(x)\,dx, \qquad \bar{x} = \frac{1}{R}\int_a^b x\,w(x)\,dx.$$</div>
+      전체 평형(반력 계산)에서는 분포 하중을 이 합력 하나로 바꿔도 결과가 같다. 그러나 부재 내부의 단면력과 처짐은 분포 그대로 계산해야 한다.</div>
+    <figure class="diagram" id="fig-ld-resultant">
+      <svg viewBox="0 0 760 270" role="img" aria-label="직사각형, 삼각형, 사다리꼴 분포 하중의 합력과 작용점">
+        <rect x="10" y="10" width="740" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(30,0)">
+          <text x="100" y="36" text-anchor="middle" class="t" style="font-weight:700">등분포</text>
+          <rect x="20" y="90" width="160" height="50" class="f-acc2-soft"/>
+          <line x1="20" y1="160" x2="180" y2="160" style="stroke:var(--text);stroke-width:4"/>
+          <line x1="100" y1="50" x2="100" y2="86" style="stroke:var(--accent-2);stroke-width:2;stroke-dasharray:6 3" marker-end="url(#ld-ah-load)"/>
+          <text x="108" y="66" class="t-mono" style="fill:var(--accent-2)">R = wL</text>
+          <line x1="20" y1="186" x2="100" y2="186" class="s-line" marker-start="url(#ld-ah-dim)" marker-end="url(#ld-ah-dim)"/><text x="60" y="206" text-anchor="middle" class="t-mono">L/2</text>
+          <text x="100" y="240" text-anchor="middle" class="t-dim">넓이 = wL, 가운데</text>
+        </g>
+        <g transform="translate(270,0)">
+          <text x="100" y="36" text-anchor="middle" class="t" style="font-weight:700">삼각형</text>
+          <path d="M20 140 L180 90 L180 140z" class="f-acc2-soft"/>
+          <line x1="20" y1="160" x2="180" y2="160" style="stroke:var(--text);stroke-width:4"/>
+          <line x1="127" y1="50" x2="127" y2="106" style="stroke:var(--accent-2);stroke-width:2;stroke-dasharray:6 3" marker-end="url(#ld-ah-load)"/>
+          <text x="135" y="66" class="t-mono" style="fill:var(--accent-2)">R = wL/2</text>
+          <line x1="20" y1="186" x2="127" y2="186" class="s-line" marker-start="url(#ld-ah-dim)" marker-end="url(#ld-ah-dim)"/><text x="74" y="206" text-anchor="middle" class="t-mono">2L/3</text>
+          <text x="100" y="240" text-anchor="middle" class="t-dim">큰 쪽에서 L/3</text>
+        </g>
+        <g transform="translate(510,0)">
+          <text x="100" y="36" text-anchor="middle" class="t" style="font-weight:700">사다리꼴 = 직사각형 + 삼각형</text>
+          <path d="M20 140 L20 118 L180 86 L180 140z" class="f-acc2-soft"/>
+          <line x1="20" y1="118" x2="180" y2="118" class="s-line" style="stroke-dasharray:3 3"/>
+          <line x1="20" y1="160" x2="180" y2="160" style="stroke:var(--text);stroke-width:4"/>
+          <line x1="113" y1="50" x2="113" y2="102" style="stroke:var(--accent-2);stroke-width:2;stroke-dasharray:6 3" marker-end="url(#ld-ah-load)"/>
+          <text x="10" y="112" class="t-mono" style="fill:var(--accent-2)">w₁</text><text x="186" y="88" class="t-mono" style="fill:var(--accent-2)">w₂</text>
+          <text x="100" y="206" text-anchor="middle" class="t-mono">x̄ = L(w₁ + 2w₂) / 3(w₁ + w₂)</text>
+          <text x="100" y="240" text-anchor="middle" class="t-dim">두 조각의 합력을 다시 합성</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 1-3.</b> 분포 하중의 합력은 넓이, 작용점은 도심이다. 삼각형 분포의 합력은 큰 쪽에서 L/3에 걸린다. 사다리꼴은 직사각형과 삼각형으로 나눠 각각의 합력을 구한 뒤 모멘트로 합성한다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 1.1 (사다리꼴 분포 하중)</strong> 경간 8 m 단순보에 왼쪽 \(w_1 = 10\) kN/m에서 오른쪽 \(w_2 = 30\) kN/m로 선형으로 커지는 하중이 걸린다.
+      <ol style="margin:6px 0 0">
+        <li><b>합력.</b> 직사각형 \(10 \times 8 = 80\) kN(\(x = 4\) m) + 삼각형 \(\tfrac12 \times 20 \times 8 = 80\) kN(\(x = 16/3 \approx 5.33\) m). \(R = 160\) kN.</li>
+        <li><b>작용점.</b> \(\bar{x} = (80 \times 4 + 80 \times 5.333)/160 = 4.667\) m. 공식 \(L(w_1 + 2w_2)/3(w_1 + w_2) = 8 \times 70/120 = 4.667\) m와 같다.</li>
+        <li><b>반력.</b> \(\Sigma M_A = 0\): \(8R_B = 160 \times 4.667\) → \(R_B = 93.3\) kN, \(R_A = 66.7\) kN.</li>
+        <li><b>주의.</b> 반력은 합력 하나로 구해도 맞지만, 최대 휨모멘트는 분포 하중 그대로 계산하면 약 161 kN·m(\(x \approx 4.3\) m), 합력 하나를 한 점에 걸면 311 kN·m로 거의 두 배다. 합력은 전체 평형용이다.</li>
+      </ol></div>
+    <div class="sim" id="sim-ld-resultant">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>분포 하중의 모양을 바꾸며 합력 찾기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view ld-stack">
+          <div><canvas id="ld-cv-res" aria-label="세 점을 끌어 모양을 바꾸는 분포 하중과 합력"></canvas><span class="ld-cap">세 점을 위아래로 끌기</span></div>
+          <div><canvas id="ld-cv-res2" aria-label="분포 하중과 합력 하중의 휨모멘트 비교"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>모양 프리셋</span><div class="seg" id="ld-r-pre"><button data-value="u" class="on">등분포</button><button data-value="t">삼각형</button><button data-value="z">사다리꼴</button><button data-value="v">V자</button></div></div>
+          <label class="check"><input type="checkbox" id="ld-r-cmp" checked> 합력 하나로 바꾼 휨모멘트(점선)</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">합력 R</span><span class="v" id="ld-r-r">—</span></div>
+        <div class="stat"><span class="k">작용점 x̄</span><span class="v" id="ld-r-x">—</span></div>
+        <div class="stat"><span class="k">반력 R<sub>A</sub> · R<sub>B</sub></span><span class="v" id="ld-r-ab">—</span></div>
+        <div class="stat"><span class="k">M<sub>max</sub> 분포 / 합력</span><span class="v" id="ld-r-m">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 어떤 모양이든 두 경우의 반력이 같은지 확인하세요 · 그런데 휨모멘트는 왜 다를까요? · 모델: 경간 8 m 단순보, 0 m·4 m·8 m의 세 값 사이를 직선으로 잇는 분포 하중(0–30 kN/m), CB.beam으로 계산.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="tributary">
+    <h2>기여 면적과 기여 폭</h2>
+    <div class="problem"><strong>바닥을 나눠 갖는 기둥들</strong>
+      <p>B-10의 한 층 바닥 768 m²(32 m × 24 m)는 기둥 20개가 나눠 받칩니다. 그런데 모든 기둥이 똑같이 768/20 = 38.4 m²씩 받는 것은 아닙니다. 건물 가운데의 기둥과 모서리의 기둥은 각각 얼마를 받을까요?</p></div>
+    <p>바닥 하중이 가장 가까운 지지 부재로 간다고 보면, 이웃 기둥과의 중간선으로 바닥을 나눌 수 있습니다. 이렇게 나눈 조각이 그 기둥의 <span class="term">기여 면적</span><span class="en">(tributary area)</span>입니다. 경간이 모두 8 m인 B-10에서 내부 기둥은 8 m × 8 m = 64 m², 외곽(변) 기둥은 8 m × 4 m = 32 m², 모서리 기둥은 4 m × 4 m = 16 m²를 받습니다.</p>
+    <div class="callout def"><strong>정의 1.4 (기여 면적과 기여 폭)</strong> 지지 부재 사이의 중간선(또는 슬래브의 하중 분담선)으로 나눈 바닥 중 한 부재가 받는다고 보는 부분을 그 부재의 <span class="term">기여 면적</span>이라 한다. 보에서는 보 양쪽 기여 면적의 폭을 <span class="term">기여 폭</span><span class="en">(tributary width)</span>이라 하며, 면 하중 \(q\)(kN/m²) × 기여 폭 \(b\)(m) = 보의 분포 하중 \(w\)(kN/m)이다.</div>
+    <p>보의 기여 폭에는 가정이 하나 숨어 있습니다. 슬래브가 한 방향으로만 휘어 하중을 나른다고 보는 <b>1방향 가정</b>에서는, 나란한 두 보 사이 슬래브의 하중이 절반씩 두 보로 가고 직각 방향의 보는 받지 않습니다. 정사각형에 가까운 슬래브는 실제로 두 방향으로 휘므로(<b>2방향 슬래브</b>), 모서리에서 45°로 그은 선으로 나눠 네 변의 보가 삼각형·사다리꼴 모양으로 나눠 받는다고 봅니다. 1방향 가정은 한 방향 보를 크게 어림하는 대신 계산이 단순합니다.</p>
+    <figure class="diagram" id="fig-ld-trib">
+      <svg viewBox="0 0 760 330" role="img" aria-label="B-10 평면의 기둥 기여 면적과 보의 1방향, 2방향 하중 분담">
+        <rect x="10" y="10" width="740" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="160" y="-12" text-anchor="middle" class="t" style="font-weight:700">(a) 기둥의 기여 면적</text>
+          <rect x="0" y="0" width="320" height="240" class="f-elev" style="stroke:var(--border)"/>
+          <g class="s-line" style="stroke:var(--text-dim)"><line x1="80" y1="0" x2="80" y2="240"/><line x1="160" y1="0" x2="160" y2="240"/><line x1="240" y1="0" x2="240" y2="240"/><line x1="0" y1="80" x2="320" y2="80"/><line x1="0" y1="160" x2="320" y2="160"/></g>
+          <rect x="40" y="120" width="80" height="80" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5"/>
+          <rect x="120" y="200" width="80" height="40" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:1.5"/>
+          <rect x="280" y="0" width="40" height="40" style="fill:color-mix(in srgb, var(--ok) 18%, transparent);stroke:var(--ok);stroke-width:1.5"/>
+          <g style="fill:var(--text)"><circle cx="80" cy="160" r="5"/><circle cx="160" cy="240" r="5"/><circle cx="320" cy="0" r="5"/></g>
+          <text x="80" y="146" text-anchor="middle" class="t-mono" style="fill:var(--accent)">64 m²</text>
+          <text x="160" y="226" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">32 m²</text>
+          <text x="282" y="56" class="t-mono" style="fill:var(--ok)">16 m²</text>
+          <text x="40" y="262" class="t-dim">내부 · 외곽 · 모서리 (경간 8 m)</text>
+        </g>
+        <g transform="translate(410,40)">
+          <text x="160" y="-12" text-anchor="middle" class="t" style="font-weight:700">(b) 보의 분담: 1방향 vs 2방향</text>
+          <rect x="0" y="0" width="150" height="150" class="f-elev" style="stroke:var(--border)"/>
+          <rect x="0" y="40" width="150" height="80" style="fill:var(--accent-soft);stroke:none"/>
+          <line x1="0" y1="80" x2="150" y2="80" style="stroke:var(--accent);stroke-width:4"/>
+          <line x1="0" y1="0" x2="150" y2="0" style="stroke:var(--text-dim);stroke-width:2"/><line x1="0" y1="150" x2="150" y2="150" style="stroke:var(--text-dim);stroke-width:2"/>
+          <text x="75" y="172" text-anchor="middle" class="t-mono">1방향: 폭 b = 8 m</text>
+          <text x="75" y="192" text-anchor="middle" class="t-dim">균일 w = q·b</text>
+          <g transform="translate(180,0)">
+            <rect x="0" y="0" width="150" height="150" class="f-elev" style="stroke:var(--border)"/>
+            <path d="M0 80 L40 40 L110 40 L150 80 L110 120 L40 120z" style="fill:none"/>
+            <path d="M0 80 L75 5 L150 80 L75 155z" style="fill:none"/>
+            <path d="M0 80 L37.5 42.5 L112.5 42.5 L150 80z" style="fill:none"/>
+            <path d="M0 80 L40 40 L110 40 L150 80 L110 120 L40 120 Z" style="fill:none"/>
+            <path d="M0 80 L40 40 L110 40 L150 80Z" style="fill:none"/>
+            <path d="M0 80 L75 5 L150 80 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/>
+            <path d="M0 80 L75 155 L150 80 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/>
+            <line x1="0" y1="80" x2="150" y2="80" style="stroke:var(--accent);stroke-width:4"/>
+            <text x="75" y="172" text-anchor="middle" class="t-mono">2방향: 45° 분담선</text>
+            <text x="75" y="192" text-anchor="middle" class="t-dim">삼각형 하중(가운데 q·L)</text>
+          </g>
+          <text x="165" y="226" text-anchor="middle" class="t-dim">정사각형 슬래브에서 보 하나가 받는 넓이:</text>
+          <text x="165" y="246" text-anchor="middle" class="t-mono">1방향 64 m² · 2방향 32 m²</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 1-4.</b> (a) 기둥 사이 중간선으로 나눈 기여 면적. (b) 8 m × 8 m 슬래브 양쪽에 걸친 보의 분담. 1방향 가정은 직각 방향 보의 몫까지 한 방향 보에 주므로 이 보에는 보수적이다. 이 책은 교육용으로 B-10 큰보 G1에 1방향 기여 폭 8 m를 쓴다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 1.2 (큰보 G1의 하중)</strong> B-10의 바닥 하중은 고정하중 \(D = 0.21 \times 24 + 1.5 = 6.54 \approx 6.5\) kN/m²(슬래브 자중 + 마감·천장·설비), 활하중 \(L = 2.5\) kN/m²(사무실)이다. 큰보 G1(400 × 700 mm, 경간 8 m)에 기여 폭 8 m를 쓰면
+      <ol style="margin:6px 0 0">
+        <li><b>보 자중.</b> 슬래브와 겹치지 않는 웨브 부분만: \(0.4 \times (0.7 - 0.21) \times 24 = 4.7\) kN/m.</li>
+        <li><b>고정하중.</b> \(w_D = 6.5 \times 8 + 4.7 = 56.7\) kN/m.</li>
+        <li><b>활하중.</b> \(w_L = 2.5 \times 8 = 20\) kN/m.</li>
+        <li><b>2방향 가정이라면.</b> 양쪽 슬래브에서 삼각형 하중이 와 가운데 최댓값이 \(q \times 8\)이 된다. 같은 단순보로 보면 최대 휨모멘트가 1방향 가정의 2/3로 줄어든다(아래 시뮬레이터).</li>
+      </ol></div>
+    <div class="sim" id="sim-ld-trib">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-10 평면에서 기여 면적 나누기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ld-cv-trib" aria-label="B-10 평면도와 선택한 부재의 기여 면적"></canvas><span class="ld-cap">기둥 또는 보를 누르기</span></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>고를 부재</span><div class="seg" id="ld-t-mode"><button data-value="col" class="on">기둥</button><button data-value="b1">보(1방향)</button><button data-value="b2">보(2방향)</button></div></div>
+          <div class="ctrl"><span>바닥 하중 q</span><div class="seg" id="ld-t-q"><button data-value="11.8" class="on">계수 11.8</button><button data-value="9">사용 9.0</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기여 면적</span><span class="v" id="ld-t-a">—</span></div>
+        <div class="stat"><span class="k">한 층 하중</span><span class="v" id="ld-t-p">—</span></div>
+        <div class="stat"><span class="k">보: 최대 w · M<sub>max</sub></span><span class="v" id="ld-t-m">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-t-msg"></div>
+      <div class="sim-note">해볼 것: 기둥 모드에서 가운데·변·모서리 기둥을 차례로 눌러 보세요 · 같은 보를 1방향과 2방향으로 바꿔 하중 그림과 M<sub>max</sub>를 비교하세요 · 모델: 경간 8 m 격자, 보는 단순보로 보고 바닥 하중만 계산(보 자중 제외). 코어도 바닥으로 취급한 교육용 단순화.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="combinations">
+    <h2>하중 조합과 계수 하중</h2>
+    <p>하중의 값에는 불확실성이 있습니다. 고정하중은 비교적 정확하지만 활하중과 바람은 훨씬 들쭉날쭉합니다. 또 최대 활하중과 최대 풍하중과 최대 지진이 한꺼번에 올 가능성은 낮습니다. 그래서 오늘날의 강도 설계는 하중마다 <b>하중 계수</b>를 곱해 키우고, 동시에 올 법한 조합만 더해 여러 경우를 만든 뒤 가장 불리한 경우로 설계합니다.</p>
+    <div class="callout def"><strong>정의 1.5 (계수 하중과 하중 조합)</strong> 하중 \(Q_i\)에 하중 계수 \(\gamma_i\)를 곱해 더한 \(U = \sum \gamma_i Q_i\)를 <span class="term">계수 하중</span><span class="en">(factored load)</span>이라 하고, 동시에 작용할 수 있는 하중의 묶음과 그 계수를 <span class="term">하중 조합</span><span class="en">(load combination)</span>이라 한다. 강도 설계에서는 모든 조합 중 가장 불리한 \(U\)에 대해 부재의 설계 강도 \(\phi R_n\)(공칭 강도 × 강도 감소 계수)이 \(\phi R_n \ge U\)를 만족하도록 한다.</div>
+    <p>건축구조기준에서 널리 쓰는 기본 조합 두 가지는 다음과 같습니다(계수와 조합의 전체 목록은 현행 KDS 41을 확인).</p>
+    <div class="formula">$$U = 1.4D, \qquad U = 1.2D + 1.6L$$<div class="where">고정하중만 있을 때와 고정 + 활하중일 때. 활하중의 계수(1.6)가 고정하중의 계수(1.2)보다 큰 것은 불확실성이 더 크기 때문이다. 바람·지진·적설이 들어가는 조합은 그 하중의 계수를 키우고 함께 오는 활하중의 계수를 낮춘다.</div></div>
+    <p>조합은 "더하는 쪽"만 있는 것이 아닙니다. 가벼운 강재 지붕에 바람이 위로 빨아들이는 힘이 걸리면, 고정하중은 오히려 들림을 막아 주는 이로운 하중입니다. 이때는 고정하중을 작게(예: 0.9D) 잡아야 불리한 경우가 됩니다. 그래서 하중 조합에는 늘 "고정하중을 줄인 조합"이 함께 있습니다.</p>
+    <div class="callout"><strong>예제 1.3 (B-10 바닥과 큰보 G1의 계수 하중)</strong>
+      <ol style="margin:6px 0 0">
+        <li><b>바닥.</b> \(1.4D = 1.4 \times 6.5 = 9.1\) kN/m², \(1.2D + 1.6L = 7.8 + 4.0 = 11.8\) kN/m² → 11.8 kN/m²가 지배한다.</li>
+        <li><b>큰보 G1.</b> \(1.4 \times 56.7 = 79.4\) kN/m, \(1.2 \times 56.7 + 1.6 \times 20 = 68.0 + 32.0 = 100.0\) kN/m → \(w_u \approx 100\) kN/m. 사용 하중(계수 없이)은 \(56.7 + 20 = 76.7\) kN/m로 처짐·균열 검토에 쓴다.</li>
+        <li><b>언제 1.4D가 지배할까.</b> \(1.4D \gt 1.2D + 1.6L\) ⇔ \(L \lt 0.125D\). 활하중이 고정하중의 1/8보다 작을 때다. 무거운 지붕 슬래브나 매우 무거운 마감이 있는 곳에서 생긴다.</li>
+      </ol></div>
+    <div class="sim" id="sim-ld-combo">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>어느 하중 조합이 지배할까</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ld-cv-combo" aria-label="하중 조합별 계수 하중 막대 그래프"></canvas></div>
+        <div class="sim-controls">
+          <div class="btn-row"><button class="btn" data-ldpre="6.5,2.5,0">B-10 바닥</button><button class="btn" data-ldpre="0.5,1.0,-1.2">가벼운 강재 지붕</button><button class="btn" data-ldpre="8,0.5,0">무거운 지붕 슬래브</button></div>
+          <label class="ctrl"><span>고정하중 D <output id="ld-c-d-out"></output></span><input type="range" id="ld-c-d" min="0" max="12" step="0.1" value="6.5"></label>
+          <label class="ctrl"><span>활하중 L <output id="ld-c-l-out"></output></span><input type="range" id="ld-c-l" min="0" max="10" step="0.1" value="2.5"></label>
+          <label class="ctrl"><span>풍압 W (아래 +, 들림 −) <output id="ld-c-w-out"></output></span><input type="range" id="ld-c-w" min="-2" max="2" step="0.05" value="0"></label>
+          <label class="ctrl"><span><span>풍하중 계수 γ<sub>W</sub> (교육용)</span> <output id="ld-c-g-out"></output></span><input type="range" id="ld-c-g" min="0.8" max="1.6" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 하향 U</span><span class="v" id="ld-c-max">—</span></div>
+        <div class="stat"><span class="k">최소 U(들림)</span><span class="v" id="ld-c-min">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-c-msg"></div>
+      <div class="sim-note">해볼 것: '가벼운 강재 지붕'에서 0.9D + γ<sub>W</sub>W가 음수(들림)가 되는 것을 보세요 · L을 D의 1/8보다 작게 하면 1.4D가 지배합니다 · 모델: ① 1.4D ② 1.2D + 1.6L ③ 1.2D + 1.0L + γ<sub>W</sub>W ④ 0.9D + γ<sub>W</sub>W. ③·④의 계수와 형태는 원리를 보이기 위한 교육용이며, 실제 풍하중 계수와 조합은 기준 판에 따라 다르므로 현행 KDS 41을 따릅니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="modeling">
+    <h2>모델링: 실제 구조물을 선과 점으로</h2>
+    <p>계산하려면 실제 구조물을 단순한 그림으로 바꿔야 합니다. 이 과정이 <span class="term">이상화</span><span class="en">(idealization)</span>입니다. 폭과 높이가 있는 부재는 단면 도심을 지나는 <b>선</b>으로, 부재가 만나는 곳은 <b>절점</b>으로, 구조물을 붙잡는 곳은 롤러·핀·고정의 <b>지점 기호</b>로, 퍼진 하중은 집중·분포 하중으로 바꿉니다. 이 모델이 실제와 얼마나 닮았는지가 해석 결과의 신뢰도를 정합니다.</p>
+    <div class="callout def"><strong>정의 1.6 (구조 모델)</strong> 부재를 축선으로, 연결을 강절점(회전도 함께 전달) 또는 핀 절점(회전 자유)으로, 지지를 구속하는 변위의 종류로, 하중을 작용점·방향·크기로 나타낸 단순화된 그림을 <span class="term">구조 모델</span><span class="en">(structural model)</span>이라 한다. 같은 구조물도 확인하려는 거동에 따라 다른 모델을 쓸 수 있다.</div>
+    <figure class="diagram" id="fig-ld-ideal">
+      <svg viewBox="0 0 760 320" role="img" aria-label="실제 연결 상세와 이상화된 구조 모델 기호의 대응">
+        <rect x="10" y="10" width="740" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(30,30)">
+          <text x="80" y="10" text-anchor="middle" class="t" style="font-weight:700">고무 받침 위 PC 보</text>
+          <rect x="0" y="40" width="160" height="26" class="f-elev" style="stroke:var(--text)"/>
+          <rect x="16" y="66" width="22" height="8" style="fill:var(--text-dim)"/><rect x="122" y="66" width="22" height="8" style="fill:var(--text-dim)"/>
+          <rect x="6" y="74" width="42" height="40" style="fill:var(--surface-2);stroke:var(--text)"/><rect x="112" y="74" width="42" height="40" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <text x="80" y="140" text-anchor="middle" class="t-dim">↓ 이상화</text>
+          <line x1="20" y1="170" x2="140" y2="170" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M20 170l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M140 170l-9 12h18z" class="f-elev" style="stroke:var(--text)"/><circle cx="135" cy="185" r="3" class="f-elev" style="stroke:var(--text)"/><circle cx="145" cy="185" r="3" class="f-elev" style="stroke:var(--text)"/>
+          <text x="80" y="220" text-anchor="middle" class="t-mono" style="fill:var(--accent)">단순보 (핀 + 롤러)</text>
+          <text x="80" y="240" text-anchor="middle" class="t-dim">회전·늘어남을 막지 않음</text>
+        </g>
+        <g transform="translate(215,30)">
+          <text x="80" y="10" text-anchor="middle" class="t" style="font-weight:700">웨브만 볼트로 이은 강재 보</text>
+          <rect x="0" y="30" width="22" height="80" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <rect x="30" y="40" width="130" height="8" class="f-elev" style="stroke:var(--text)"/><rect x="30" y="80" width="130" height="8" class="f-elev" style="stroke:var(--text)"/><rect x="30" y="48" width="130" height="32" style="fill:none;stroke:var(--text);stroke-dasharray:2 2"/>
+          <rect x="22" y="52" width="16" height="24" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <circle cx="32" cy="58" r="2" style="fill:var(--text)"/><circle cx="32" cy="70" r="2" style="fill:var(--text)"/>
+          <text x="80" y="140" text-anchor="middle" class="t-dim">↓ 이상화</text>
+          <line x1="20" y1="170" x2="140" y2="170" style="stroke:var(--text);stroke-width:4"/>
+          <circle cx="20" cy="170" r="6" class="f-elev" style="stroke:var(--text);stroke-width:2"/>
+          <text x="80" y="220" text-anchor="middle" class="t-mono" style="fill:var(--accent)">핀 접합</text>
+          <text x="80" y="240" text-anchor="middle" class="t-dim">전단력은 전달, 모멘트는 거의 0</text>
+        </g>
+        <g transform="translate(400,30)">
+          <text x="80" y="10" text-anchor="middle" class="t" style="font-weight:700">한 몸으로 친 RC 보·기둥</text>
+          <rect x="10" y="30" width="34" height="100" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <rect x="44" y="40" width="116" height="34" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <path d="M18 40 V124 M36 40 V124 M50 46 H156 M50 68 H156" style="stroke:var(--tension);stroke-width:1.6"/>
+          <path d="M36 46 Q44 46 50 46" style="stroke:var(--tension);stroke-width:1.6;fill:none"/>
+          <text x="80" y="150" text-anchor="middle" class="t-dim">↓ 이상화</text>
+          <line x1="27" y1="170" x2="140" y2="170" style="stroke:var(--text);stroke-width:4"/><line x1="27" y1="170" x2="27" y2="230" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M27 170 h14 v-14" style="fill:none;stroke:var(--accent);stroke-width:1.5"/>
+          <text x="96" y="214" text-anchor="middle" class="t-mono" style="fill:var(--accent)">강절점</text>
+          <text x="96" y="234" text-anchor="middle" class="t-dim">직각이 그대로 유지</text>
+        </g>
+        <g transform="translate(585,30)">
+          <text x="70" y="10" text-anchor="middle" class="t" style="font-weight:700">기초에 묻힌 기둥</text>
+          <rect x="52" y="30" width="36" height="80" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <rect x="20" y="110" width="100" height="26" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <rect x="0" y="136" width="140" height="10" style="fill:color-mix(in srgb, var(--accent-2) 16%, transparent)"/>
+          <text x="70" y="166" text-anchor="middle" class="t-dim">↓ 이상화</text>
+          <line x1="70" y1="180" x2="70" y2="226" style="stroke:var(--text);stroke-width:4"/>
+          <line x1="50" y1="226" x2="90" y2="226" style="stroke:var(--text);stroke-width:2.6"/>
+          <g class="s-line"><line x1="54" y1="226" x2="48" y2="234"/><line x1="62" y1="226" x2="56" y2="234"/><line x1="70" y1="226" x2="64" y2="234"/><line x1="78" y1="226" x2="72" y2="234"/><line x1="86" y1="226" x2="80" y2="234"/></g>
+          <text x="70" y="256" text-anchor="middle" class="t-mono" style="fill:var(--accent)">고정 지점(근사)</text>
+          <text x="70" y="276" text-anchor="middle" class="t-dim">지반이 무르면 회전 스프링</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 1-5.</b> 연결 상세와 이상화. 같은 보라도 어떻게 붙어 있느냐에 따라 모델이 달라지고, 모델이 바뀌면 단면력이 달라진다(4장 예제 4.5). 실제 연결은 완전한 핀도 완전한 고정도 아닌 그 사이에 있다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ld-model">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>이 장면은 어떤 모델일까</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view ld-stack">
+          <div><canvas id="ld-cv-mod" aria-label="실제 장면 그림"></canvas><span class="ld-cap" id="ld-m-cap">장면</span></div>
+          <div><canvas id="ld-cv-mod2" aria-label="고른 모델의 휨모멘트도"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>장면</span><div class="seg" id="ld-m-scene"><button data-value="0" class="on">PC 보</button><button data-value="1">발코니</button><button data-value="2">굳센 벽 사이 보</button><button data-value="3">강재 작은보</button><button data-value="4">2경간 데크</button></div></div>
+          <div class="ctrl"><span>내가 고른 모델</span><div class="seg" id="ld-m-model"><button data-value="simple" class="on">단순보</button><button data-value="cant">캔틸레버</button><button data-value="fixed">양단 고정</button><button data-value="cont">2경간 연속</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">고른 모델의 M<sub>max</sub> (+)</span><span class="v" id="ld-m-mp">—</span></div>
+        <div class="stat"><span class="k">M<sub>min</sub> (−)</span><span class="v" id="ld-m-mn">—</span></div>
+      </div>
+      <div class="ld-msg" id="ld-m-msg"></div>
+      <div class="sim-note">해볼 것: 장면마다 모델을 골라 피드백을 확인하고, 틀린 모델을 고르면 휨모멘트가 얼마나 달라지는지 보세요 · 모델: 장면별 경간·하중은 교육용 값, CB.beam으로 계산. 실제 연결은 완전한 핀과 완전한 고정 사이에 있습니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="reference">
+    <h2>기준 구조물 B-10과 T-36, 그리고 이 책의 지도</h2>
+    <p>이 책은 장마다 다른 예를 들지 않고, 두 가상 구조물을 처음부터 끝까지 계산합니다. 하나는 10층 철근콘크리트 업무시설 <b>B-10</b>, 다른 하나는 36 m 강 트러스 보도교 <b>T-36</b>입니다. 같은 구조물을 장마다 새로운 도구로 다시 보면, 도구 사이의 관계와 각 도구의 한계가 함께 보입니다. 두 구조물의 숫자는 모두 교육용 가정이며 실제 건물·교량의 값이 아닙니다.</p>
+    <figure class="diagram" id="fig-ld-b10">
+      <svg viewBox="0 0 760 320" role="img" aria-label="기준 건물 B-10의 평면과 단면 개요">
+        <rect x="10" y="10" width="740" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(40,50)">
+          <text x="160" y="-18" text-anchor="middle" class="t" style="font-weight:700">B-10 평면 (32 m × 24 m)</text>
+          <rect x="0" y="0" width="320" height="240" class="f-elev" style="stroke:var(--text)"/>
+          <rect x="80" y="80" width="160" height="80" style="fill:color-mix(in srgb, var(--text-dim) 18%, transparent);stroke:var(--text);stroke-width:2.4"/>
+          <text x="160" y="124" text-anchor="middle" class="t-mono">코어 16 × 8 m</text>
+          <g class="s-line" style="stroke-dasharray:4 3"><line x1="80" y1="0" x2="80" y2="240"/><line x1="160" y1="0" x2="160" y2="240"/><line x1="240" y1="0" x2="240" y2="240"/><line x1="0" y1="80" x2="320" y2="80"/><line x1="0" y1="160" x2="320" y2="160"/></g>
+          <g style="fill:var(--text)">
+            <rect x="-5" y="-5" width="10" height="10"/><rect x="75" y="-5" width="10" height="10"/><rect x="155" y="-5" width="10" height="10"/><rect x="235" y="-5" width="10" height="10"/><rect x="315" y="-5" width="10" height="10"/>
+            <rect x="-5" y="75" width="10" height="10"/><rect x="75" y="75" width="10" height="10"/><rect x="155" y="75" width="10" height="10"/><rect x="235" y="75" width="10" height="10"/><rect x="315" y="75" width="10" height="10"/>
+            <rect x="-5" y="155" width="10" height="10"/><rect x="75" y="155" width="10" height="10"/><rect x="155" y="155" width="10" height="10"/><rect x="235" y="155" width="10" height="10"/><rect x="315" y="155" width="10" height="10"/>
+            <rect x="-5" y="235" width="10" height="10"/><rect x="75" y="235" width="10" height="10"/><rect x="155" y="235" width="10" height="10"/><rect x="235" y="235" width="10" height="10"/><rect x="315" y="235" width="10" height="10"/>
+          </g>
+          <line x1="0" y1="160" x2="80" y2="160" style="stroke:var(--accent);stroke-width:4"/><text x="40" y="152" text-anchor="middle" class="t-mono" style="fill:var(--accent)">G1</text>
+          <text x="40" y="258" text-anchor="middle" class="t-mono">8.0</text><text x="120" y="258" text-anchor="middle" class="t-mono">8.0</text><text x="200" y="258" text-anchor="middle" class="t-mono">8.0</text><text x="280" y="258" text-anchor="middle" class="t-mono">8.0</text>
+        </g>
+        <g transform="translate(440,40)">
+          <text x="140" y="-8" text-anchor="middle" class="t" style="font-weight:700">B-10 단면 (지상 41 m)</text>
+          <rect x="40" y="10" width="200" height="220" class="f-elev" style="stroke:var(--text)"/>
+          <g class="s-line"><line x1="40" y1="34" x2="240" y2="34"/><line x1="40" y1="56" x2="240" y2="56"/><line x1="40" y1="78" x2="240" y2="78"/><line x1="40" y1="100" x2="240" y2="100"/><line x1="40" y1="122" x2="240" y2="122"/><line x1="40" y1="144" x2="240" y2="144"/><line x1="40" y1="166" x2="240" y2="166"/><line x1="40" y1="188" x2="240" y2="188"/><line x1="40" y1="203" x2="240" y2="203"/></g>
+          <rect x="40" y="230" width="200" height="34" style="fill:color-mix(in srgb, var(--accent-2) 14%, transparent);stroke:var(--text);stroke-dasharray:4 3"/>
+          <text x="140" y="252" text-anchor="middle" class="t-mono">지하 2층</text>
+          <text x="250" y="22" class="t-mono">RF</text><text x="250" y="222" class="t-mono">1F 5.0 m</text><text x="250" y="122" class="t-mono">2–10F</text><text x="250" y="138" class="t-mono">각 4.0 m</text>
+          <text x="140" y="290" text-anchor="middle" class="t-dim">RC 모멘트 골조 + 코어 전단벽</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 1-6.</b> 기준 건물 B-10의 평면과 단면. 경간은 X·Y 모두 8.0 m, 가운데 두 경간 × 한 경간에 엘리베이터·계단 코어가 있다. 큰보 G1(400 × 700 mm)과 1층 내부 기둥 C1(800 × 800 mm)을 여러 장에서 계산한다.</figcaption>
+    </figure>
+    <div class="callout site"><strong>B-10 한눈에</strong> 지상 10층·지하 2층 RC 업무시설. 콘크리트 fck = 30 MPa(Ec ≈ 27,500 MPa), 철근 SD500(fy = 500 MPa), 슬래브 210 mm. 바닥 D ≈ 6.5 kN/m², L = 2.5 kN/m², 계수 하중 11.8 kN/m². 큰보 G1의 \(w_u \approx 100\) kN/m(사용 76.7 kN/m), 1층 내부 기둥 C1의 계수 축력 약 9,000 kN. 수평 하중으로는 Y 방향 골조 한 줄에 층마다 풍하중 약 50 kN을 쓴다(교육용 가정).</div>
+    <figure class="diagram" id="fig-ld-t36">
+      <svg viewBox="0 0 760 260" role="img" aria-label="기준 교량 T-36 프랫 트러스 입면과 치수">
+        <rect x="10" y="10" width="740" height="240" rx="10" class="f-surface"/>
+        <text x="380" y="36" text-anchor="middle" class="t" style="font-weight:700">T-36 입면: 프랫 트러스, 6 패널 × 6.0 m, 높이 4.5 m</text>
+        <g style="stroke:var(--text);stroke-width:3;stroke-linecap:round">
+          <line x1="80" y1="190" x2="680" y2="190"/><line x1="180" y1="115" x2="580" y2="115"/>
+          <line x1="80" y1="190" x2="180" y2="115"/><line x1="580" y1="115" x2="680" y2="190"/>
+          <line x1="180" y1="115" x2="180" y2="190"/><line x1="280" y1="115" x2="280" y2="190"/><line x1="380" y1="115" x2="380" y2="190"/><line x1="480" y1="115" x2="480" y2="190"/><line x1="580" y1="115" x2="580" y2="190"/>
+          <line x1="180" y1="115" x2="280" y2="190"/><line x1="280" y1="115" x2="380" y2="190"/><line x1="480" y1="115" x2="380" y2="190"/><line x1="580" y1="115" x2="480" y2="190"/>
+        </g>
+        <g style="fill:var(--bg-elev);stroke:var(--text);stroke-width:1.6"><circle cx="80" cy="190" r="4"/><circle cx="180" cy="190" r="4"/><circle cx="280" cy="190" r="4"/><circle cx="380" cy="190" r="4"/><circle cx="480" cy="190" r="4"/><circle cx="580" cy="190" r="4"/><circle cx="680" cy="190" r="4"/><circle cx="180" cy="115" r="4"/><circle cx="280" cy="115" r="4"/><circle cx="380" cy="115" r="4"/><circle cx="480" cy="115" r="4"/><circle cx="580" cy="115" r="4"/></g>
+        <path d="M80 194l-10 16h20z" class="f-elev" style="stroke:var(--text)"/><path d="M680 194l-10 13h20z" class="f-elev" style="stroke:var(--text)"/><circle cx="675" cy="211" r="3" class="f-elev" style="stroke:var(--text)"/><circle cx="685" cy="211" r="3" class="f-elev" style="stroke:var(--text)"/>
+        <line x1="80" y1="232" x2="680" y2="232" class="s-line" marker-start="url(#ld-ah-dim)" marker-end="url(#ld-ah-dim)"/><text x="380" y="228" text-anchor="middle" class="t-mono">36.0 m</text>
+        <line x1="700" y1="115" x2="700" y2="190" class="s-line" marker-start="url(#ld-ah-dim)" marker-end="url(#ld-ah-dim)"/><text x="708" y="156" class="t-mono">4.5</text>
+        <line x1="180" y1="98" x2="280" y2="98" class="s-line" marker-start="url(#ld-ah-dim)" marker-end="url(#ld-ah-dim)"/><text x="230" y="92" text-anchor="middle" class="t-mono">6.0</text>
+        <g style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#ld-ah-load)"><line x1="180" y1="150" x2="180" y2="184"/><line x1="280" y1="150" x2="280" y2="184"/><line x1="380" y1="150" x2="380" y2="184"/><line x1="480" y1="150" x2="480" y2="184"/><line x1="580" y1="150" x2="580" y2="184"/></g>
+        <text x="116" y="160" class="t-mono" style="fill:var(--accent-2)">60 kN</text>
+        <text x="80" y="176" text-anchor="middle" class="t-mono">A</text><text x="680" y="176" text-anchor="middle" class="t-mono">G</text>
+      </svg>
+      <figcaption><b>그림 1-7.</b> 기준 교량 T-36. 바닥판이 하현에 있는 하로교로, 트러스 한 면이 하현 패널 절점마다 사용 하중 60 kN을 받는다. 3장에서 모든 부재력을 계산하고, 6장에서 관리 차량이 지나갈 때의 영향선을, 13장에서 상현재의 좌굴을 검토한다.</figcaption>
+    </figure>
+    <div class="callout site"><strong>T-36 한눈에</strong> 단경간 강 프랫 트러스 보도교, 지간 36 m(6 패널 × 6.0 m), 높이 4.5 m, 폭 3.0 m. 강재 SM355(항복강도 355 MPa, E = 210,000 MPa). 트러스 한 면에 고정하중 4 kN/m + 군중 하중 4 kN/m² × 1.5 m = 6 kN/m, 합계 10 kN/m → 패널 절점 하중 60 kN, 반력 150 kN. 관리 차량은 축하중 40 kN + 40 kN, 축간 3.0 m(교육용 가정).</div>
+    <div class="sim" id="sim-ld-t36">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>T-36의 하중에서 패널 절점 하중까지</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ld-cv-t36" aria-label="T-36 트러스와 부재력"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>군중 하중 q <output id="ld-x-q-out"></output></span><input type="range" id="ld-x-q" min="0" max="6" step="0.25" value="4"></label>
+          <label class="ctrl"><span>고정하중(트러스 한 면) <output id="ld-x-d-out"></output></span><input type="range" id="ld-x-d" min="1" max="8" step="0.5" value="4"></label>
+          <label class="ctrl"><span>보도 폭 <output id="ld-x-b-out"></output></span><input type="range" id="ld-x-b" min="2" max="5" step="0.25" value="3"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">한 면 하중 w</span><span class="v" id="ld-x-w">—</span></div>
+        <div class="stat"><span class="k">패널 절점 P</span><span class="v" id="ld-x-p">—</span></div>
+        <div class="stat"><span class="k">반력</span><span class="v" id="ld-x-r">—</span></div>
+        <div class="stat"><span class="k">상현재 최대 압축</span><span class="v" id="ld-x-c">—</span></div>
+      </div>
+      <div class="ld-legend"><span class="key tension">인장</span><span class="key compression">압축</span><span class="key load">하중</span><span class="key reaction">반력</span></div>
+      <div class="sim-note">해볼 것: 기본값(4 kN/m², 4 kN/m, 3 m)에서 패널 절점 60 kN, 상현재 −360 kN이 되는지 확인하세요 · 폭을 넓히면 어느 부재가 가장 빨리 커지는지 보세요 · 모델: w = 고정하중 + q × 폭/2, P = 6 m × w, 하현 내부 절점 5곳에 P, CB.truss로 계산. 부재 위 숫자는 kN(인장 +).</div>
+    </div>
+    <p>아래 표는 두 구조물에 대해 이 책이 장마다 묻는 질문입니다.</p>
+    <div class="table-wrap"><table class="ld-map">
+      <thead><tr><th>장</th><th>B-10 / T-36에 묻는 질문</th></tr></thead>
+      <tbody>
+        <tr><td>02 평형</td><td>보 하나의 반력, 타워크레인은 왜 넘어지지 않나</td></tr>
+        <tr><td>03 트러스</td><td>T-36의 모든 부재력, 어느 부재가 인장이고 어느 부재가 압축인가</td></tr>
+        <tr><td>04 보</td><td>큰보 G1의 전단력도·휨모멘트도, 지점 조건에 따른 차이</td></tr>
+        <tr><td>06 영향선</td><td>관리 차량이 T-36을 지날 때 가장 위험한 순간</td></tr>
+        <tr><td>07–10 응력·단면</td><td>G1과 C1의 응력, T-36 하현재의 단면적</td></tr>
+        <tr><td>11–13 처짐·좌굴</td><td>G1의 처짐, T-36 상현재와 C1의 좌굴</td></tr>
+        <tr><td>14–16 부정정</td><td>연속보 G1의 실제 휨모멘트, B-10 골조 한 줄의 수평 하중 해석</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="equilibrium.html"><small>CH.02 · 힘의 평형과 지점</small>하중이 정해지면 반력이 나온다<br><span>자유물체도와 평형 방정식으로 지점이 받는 힘을 구한다.</span></a>
+      <a href="beam-forces.html"><small>CH.04 · 보의 전단력과 휨모멘트</small>계수 하중 100 kN/m의 큰보 G1<br><span>이 장의 기여 폭과 하중 조합이 4장 휨모멘트도의 입력이다.</span></a>
+      <a href="truss.html"><small>CH.03 · 트러스</small>T-36의 패널 절점 하중 60 kN<br><span>군중 하중과 고정하중이 트러스 부재력으로 바뀐다.</span></a>
+      <a href="https://semi.euiyun.com/infra/chapters/build.html"><small>INFRABOOK · 팹 건설과 경제학</small>공장 바닥은 사무실보다 훨씬 무겁다<br><span>무거운 장비가 놓이는 반도체 팹의 바닥과 진동 요구.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>구조물은 하중을 지반까지 옮기는 길이다. 하중은 슬래브 → 보 → 기둥 → 기초 → 지반의 하중 경로를 따라가며 모여 커진다(B-10: 바닥 11.8 kN/m² → 1층 기둥 약 9,000 kN).</li>
+      <li>하중은 고정(D), 활(L), 환경(적설 S, 풍 W, 지진 E), 변형(온도·침하)으로 나뉜다. 활하중 대표값은 사무실 2.5, 주거 2.0, 서고 7.5 kN/m² 같은 용도별 값이다.</li>
+      <li>면 하중(kN/m²) × 폭 = 분포 하중(kN/m), 분포 하중 × 길이 = 힘(kN). 분포 하중의 합력은 넓이, 작용점은 도심이며, 합력은 전체 평형에만 쓴다.</li>
+      <li>기여 면적은 지지 부재 사이 중간선으로 나눈 바닥이다(B-10: 내부 64, 외곽 32, 모서리 16 m²). 보의 분포 하중은 면 하중 × 기여 폭이며, 2방향 슬래브는 45° 선으로 나눈다.</li>
+      <li>강도 설계는 하중에 계수를 곱해 조합하고(1.4D, 1.2D + 1.6L 등) 가장 불리한 조합을 쓴다. 들림처럼 고정하중이 이로운 경우에는 고정하중을 줄인 조합이 지배한다.</li>
+      <li>이상화는 부재를 선, 연결을 강절점·핀, 지지를 지점 기호로 바꾸는 일이다. 모델이 바뀌면 단면력이 바뀌므로 모델이 실제와 닮았는지 늘 확인한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 일반적인 건물의 연직 하중 경로로 옳은 순서는?</p><div class="opts">
+        <button class="opt">기둥 → 보 → 슬래브 → 기초</button><button class="opt" data-correct>슬래브 → 보 → 기둥 → 기초 → 지반</button><button class="opt">슬래브 → 기둥 → 보 → 지반</button><button class="opt">보 → 슬래브 → 기초 → 기둥</button>
+      </div><div class="quiz-exp">바닥 하중은 슬래브가 먼저 받아 보로, 보가 기둥으로, 기둥이 층마다 쌓아 기초로, 기초가 지반으로 전한다. 경로의 한 고리라도 끊기면 위험하다.</div></div>
+      <div class="quiz-q"><p>2. 폭 4 m에 걸쳐 면 하중 5 kN/m²가 작용하는 바닥을 받치는 보(1방향 가정)의 분포 하중은?</p><div class="opts">
+        <button class="opt">1.25 kN/m</button><button class="opt">9 kN/m</button><button class="opt" data-correct>20 kN/m</button><button class="opt">20 kN</button>
+      </div><div class="quiz-exp">면 하중 × 기여 폭 = \(5 \times 4 = 20\) kN/m. 단위가 kN/m²에서 m를 곱해 kN/m가 되는 것을 확인하자.</div></div>
+      <div class="quiz-q"><p>3. 길이 6 m에서 0부터 12 kN/m까지 선형으로 커지는 삼각형 분포 하중의 합력과 작용점은?</p><div class="opts">
+        <button class="opt">72 kN, 가운데</button><button class="opt" data-correct>36 kN, 큰 쪽에서 2 m</button><button class="opt">36 kN, 작은 쪽에서 2 m</button><button class="opt">72 kN, 큰 쪽에서 2 m</button>
+      </div><div class="quiz-exp">넓이 \(\tfrac12 \times 6 \times 12 = 36\) kN, 도심은 큰 쪽에서 \(L/3 = 2\) m(작은 쪽에서 4 m)다.</div></div>
+      <div class="quiz-q"><p>4. 경간 8 m 격자의 내부 기둥 기여 면적과, 그 기둥이 바닥 10개를 받칠 때 바닥 하중 11.8 kN/m²에 의한 축력은?</p><div class="opts">
+        <button class="opt">32 m², 약 3,800 kN</button><button class="opt" data-correct>64 m², 약 7,550 kN</button><button class="opt">64 m², 약 755 kN</button><button class="opt">16 m², 약 1,890 kN</button>
+      </div><div class="quiz-exp">\(8 \times 8 = 64\) m², 한 층 \(64 \times 11.8 = 755\) kN, 10개 층이면 약 7,550 kN이다. 여기에 보·기둥 자중을 더하면 B-10의 1층 C1 축력(약 9,000 kN)이 된다.</div></div>
+      <div class="quiz-q"><p>5. D = 6.5 kN/m², L = 2.5 kN/m²인 바닥에서 지배하는 계수 하중은?</p><div class="opts">
+        <button class="opt">1.4D = 9.1 kN/m²</button><button class="opt" data-correct>1.2D + 1.6L = 11.8 kN/m²</button><button class="opt">D + L = 9.0 kN/m²</button><button class="opt">1.6D + 1.2L = 13.4 kN/m²</button>
+      </div><div class="quiz-exp">두 기본 조합 중 큰 값 11.8 kN/m²가 지배한다. D + L = 9.0은 계수를 곱하지 않은 사용 하중으로 처짐 검토에 쓴다. 1.6D + 1.2L은 기준에 없는 조합이다.</div></div>
+      <div class="quiz-q"><p>6. 가벼운 강재 지붕을 바람이 위로 빨아들일 때(들림), 고정하중을 작게 잡은 조합(예: 0.9D)을 쓰는 이유는?</p><div class="opts">
+        <button class="opt">고정하중을 정확히 모르기 때문에 아무렇게나 줄인다</button><button class="opt" data-correct>고정하중이 들림을 막는 이로운 하중이라, 작을수록 불리하기 때문</button><button class="opt">바람과 고정하중은 동시에 작용하지 않기 때문</button><button class="opt">강재는 가벼워서 고정하중이 없기 때문</button>
+      </div><div class="quiz-exp">하중 조합은 늘 "가장 불리한 경우"를 찾는다. 들림에 대해서는 무게가 버팀이 되므로 실제보다 가벼울 가능성을 반영해 고정하중 계수를 1보다 작게 잡는다.</div></div>
+      <div class="quiz-q"><p>7. 분포 하중을 합력 하나로 바꿔 계산했을 때 결과가 원래와 같은 것은?</p><div class="opts">
+        <button class="opt" data-correct>지점 반력</button><button class="opt">최대 휨모멘트</button><button class="opt">처짐 곡선</button><button class="opt">모든 단면의 전단력</button>
+      </div><div class="quiz-exp">합력은 같은 합력과 같은 모멘트를 주므로 구조물 전체의 평형, 곧 반력은 같다. 그러나 부재 내부에서는 하중이 퍼진 방식이 다르므로 단면력과 처짐이 달라진다(예제 1.1: 161 vs 311 kN·m).</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 그리기 도우미(픽셀 좌표) ---------- */
+const LDX = {
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  // B-10 공통 숫자(교육용)
+  B10: { qu: 11.8, qs: 9.0, beamSelf: 4.7, colSelf: 0.8 * 0.8 * 24, levels: [0, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41] },
+};
+
+/* ---------- 1. B-10 하중 경로(3D) ---------- */
+(function () {
+  const xs = [0, 8, 16, 24, 32], ys = [0, 8, 16, 24], LV = LDX.B10.levels;
+  const COLS = { int: { p: [8, 16], A: 64, beams: 16, rect: [4, 12, 12, 20], label: "내부 C1" }, edge: { p: [16, 0], A: 32, beams: 12, rect: [12, 0, 20, 4], label: "외곽" }, corner: { p: [0, 0], A: 16, beams: 8, rect: [0, 0, 4, 4], label: "모서리" } };
+  const col = CB.seg("ld-b-col", () => { v.redraw(); readout(); });
+  const st = CB.range("ld-b-st", (k) => `${k}층`, () => { v.redraw(); readout(); });
+  const flow = CB.check("ld-b-flow", () => { if (flow()) loop.start(); v.redraw(); });
+  let phase = 0;
+  function axial(c, s) { // 층 s 기둥의 계수 축력 성분
+    const n = 11 - s, slab = LDX.B10.qu * c.A * n, beam = 1.2 * LDX.B10.beamSelf * c.beams * n, colw = 1.2 * LDX.B10.colSelf * (41 - LV[s - 1]);
+    return { n, slab, beam, colw, total: slab + beam + colw };
+  }
+  const v = CB.orbit("#ld-cv-b10", {
+    yaw: -0.85, pitch: 0.38, dist: 100, target: [16, 12, 19], aspect: (W) => (W < 520 ? 1.3 : 0.68), maxHeight: 520,
+    draw(V) {
+      const P = V.P, c = COLS[col()], s = st(), [cx, cy] = c.p, r = c.rect, ctx = V.ctx;
+      // 지면
+      V.poly3([[-4, -4, 0], [36, -4, 0], [36, 28, 0], [-4, 28, 0]], { fill: P.accent2, fillAlpha: 0.08, color: P.border, width: 1 });
+      // 바닥판(먼 것부터)
+      const slabs = [];
+      for (let k = 1; k <= 10; k++) slabs.push({ k, pts: [[0, 0, LV[k]], [32, 0, LV[k]], [32, 24, LV[k]], [0, 24, LV[k]]] });
+      slabs.sort((a, b) => V.depth(b.pts) - V.depth(a.pts)).forEach((f) => {
+        V.poly3(f.pts, { fill: P.surface, fillAlpha: 0.32, color: P.border, width: 1 });
+        if (f.k >= s) V.poly3([[r[0], r[1], LV[f.k] + 0.05], [r[2], r[1], LV[f.k] + 0.05], [r[2], r[3], LV[f.k] + 0.05], [r[0], r[3], LV[f.k] + 0.05]], { fill: P.accent, fillAlpha: 0.38, color: P.accent, width: 1.2 });
+      });
+      // 코어 윤곽
+      [[8, 8], [24, 8], [24, 16], [8, 16]].forEach((q, i, a) => { const n = a[(i + 1) % 4]; V.line3([q[0], q[1], 0], [q[0], q[1], 41], { color: P.dim, width: 1, dash: [3, 3] }); V.line3([q[0], q[1], 41], [n[0], n[1], 41], { color: P.dim, width: 1, dash: [3, 3] }); });
+      // 기둥
+      xs.forEach((x) => ys.forEach((y) => { if (x === cx && y === cy) return; V.line3([x, y, 0], [x, y, 41], { color: P.dim, width: 1.4 }); }));
+      V.line3([cx, cy, 0], [cx, cy, 41], { color: P.text, width: 2.2 });
+      V.line3([cx, cy, LV[s - 1]], [cx, cy, LV[s]], { color: P.accent2, width: 5 });
+      // 기초
+      V.poly3([[cx - 1.6, cy - 1.6, -0.2], [cx + 1.6, cy - 1.6, -0.2], [cx + 1.6, cy + 1.6, -0.2], [cx - 1.6, cy + 1.6, -0.2]], { fill: P.text, fillAlpha: 0.5, color: P.text, width: 1 });
+      // 하중 흐름 점(지붕 → 기초)
+      if (flow()) for (let q = 0; q < 6; q++) { const t = (phase + q / 6) % 1, z = 41 * (1 - t); V.dot3([cx, cy, z], { color: z >= LV[s - 1] ? P.accent2 : P.ok, r: 4 }); }
+      V.text3(c.label + ` · ${s}층`, [cx, cy, LV[s - 1] + (LV[s] - LV[s - 1]) / 2], { color: P.accent2, bold: true, dx: 52, size: 12 });
+      // 오른쪽 위: 층별 축력 막대
+      const w = V.w, h = V.h, narrow = w < 520, bw = narrow ? Math.min(130, w * 0.4) : Math.min(150, w * 0.32), bh = narrow ? Math.min(120, h * 0.27) : Math.min(170, h * 0.42), bx = w - bw - 12, by = narrow ? h - bh - 36 : 14;
+      ctx.save(); ctx.fillStyle = P.elev; ctx.globalAlpha = 0.88; ctx.fillRect(bx - 8, by - 6, bw + 16, bh + 30); ctx.globalAlpha = 1;
+      ctx.strokeStyle = P.border; ctx.strokeRect(bx - 8, by - 6, bw + 16, bh + 30);
+      const Nmax = axial(COLS.int, 1).total, rowH = bh / 10;
+      for (let k = 10; k >= 1; k--) {
+        const a = axial(c, k), yy = by + (10 - k) * rowH, len = (a.total / Nmax) * (bw - 46);
+        ctx.fillStyle = k === s ? P.accent2 : P.accent; ctx.globalAlpha = k === s ? 1 : 0.55; ctx.fillRect(bx + 30, yy + 1, len, rowH - 3); ctx.globalAlpha = 1;
+        ctx.fillStyle = P.dim; ctx.font = "10px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(k + "F", bx + 24, yy + rowH / 2);
+      }
+      ctx.fillStyle = P.text; ctx.textAlign = "left"; ctx.font = "600 10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.fillText("층별 N_u (kN)", bx, by + bh + 14);
+      ctx.restore();
+    },
+  });
+  const loop = CB.loop(document.getElementById("sim-ld-b10"), (dt) => { if (!flow()) return; phase = (phase + dt * 0.25) % 1; v.redraw(); });
+  function readout() {
+    const c = COLS[col()], s = st(), a = axial(c, s);
+    CB.stat("ld-b-a", `${c.A} m²`);
+    CB.stat("ld-b-n", `${a.n}개`);
+    CB.stat("ld-b-nu", `${CB.sig(a.total, 4)} kN`);
+    document.getElementById("ld-b-msg").innerHTML = `바닥 ${CB.sig(a.slab, 4)} kN(= 11.8 × ${c.A} × ${a.n}) + 보 자중 ${CB.sig(a.beam, 3)} kN + 기둥 자중 ${CB.sig(a.colw, 3)} kN · 한 층 몫 약 <b>${CB.sig((a.slab + a.beam) / a.n, 3)} kN</b>`;
+  }
+  readout();
+})();
+
+/* ---------- 2. 하중 크기 감각 ---------- */
+(function () {
+  const g = 9.81 / 1000; // kg → kN
+  const ppl = CB.range("ld-s-ppl", (v) => `${v}명/m²`, draw), wat = CB.range("ld-s-wat", (v) => `${v} cm`, draw);
+  const snow = CB.range("ld-s-snow", (v) => `${v} cm`, draw), car = CB.range("ld-s-car", (v) => `${v} kg`, draw);
+  const snowT = CB.seg("ld-s-snowt", draw);
+  const items = () => [
+    { k: "사람", v: ppl() * 70 * g, note: `${ppl()}명/m² × 70 kg` },
+    { k: "고인 물", v: (wat() / 100) * 9.81, note: `${wat()} cm × 9.81 kN/m³` },
+    { k: "쌓인 눈", v: (snow() / 100) * Number(snowT()), note: `${snow()} cm × ${snowT()} kN/m³` },
+    { k: "승용차", v: (car() * g) / 12.5, note: `${car()} kg ÷ 12.5 m²` },
+  ];
+  const refs = [{ y: 2.0, t: "주거 2.0" }, { y: 2.5, t: "사무실 2.5" }, { y: 5.0, t: "집회 5.0" }, { y: 7.5, t: "서고 7.5" }];
+  const cv = CB.canvas("#ld-cv-sense", (ctx, W, H) => {
+    const P = CB.palette(), it = items(), top = Math.max(8, ...it.map((d) => d.v)) * 1.12;
+    const padL = 74, padR = 18, padT = 16, padB = 40, bh = (H - padT - padB) / it.length;
+    const X = (v) => padL + (v / top) * (W - padL - padR);
+    ctx.save(); ctx.font = "11px " + getComputedStyle(document.body).getPropertyValue("--mono");
+    refs.forEach((r, i) => { if (r.y > top) return; ctx.strokeStyle = P.faint; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(X(r.y), padT - 4); ctx.lineTo(X(r.y), H - padB); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = P.dim; ctx.textAlign = "center"; ctx.fillText(r.t, X(r.y), H - padB + 12 + (i % 2) * 13); });
+    it.forEach((d, i) => {
+      const y = padT + i * bh + bh * 0.18, hh = bh * 0.64;
+      ctx.fillStyle = d.v > 2.5 ? P.accent2 : P.accent; ctx.fillRect(X(0), y, Math.max(1, X(d.v) - X(0)), hh);
+      ctx.fillStyle = P.text; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.font = "600 12px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.fillText(d.k, padL - 10, y + hh / 2);
+      ctx.font = "600 11.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "left";
+      const label = `${CB.num(d.v, 2)} kN/m²`, tx = X(d.v) + 6;
+      ctx.fillStyle = P.text; ctx.fillText(label, Math.min(tx, W - padR - 90), y + hh / 2 - 7);
+      ctx.fillStyle = P.dim; ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.fillText(d.note, Math.min(tx, W - padR - 90), y + hh / 2 + 8);
+    });
+    ctx.strokeStyle = P.axis; ctx.beginPath(); ctx.moveTo(X(0), padT - 4); ctx.lineTo(X(0), H - padB); ctx.stroke();
+    ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.55), minHeight: 260, maxHeight: 380 });
+  function draw() {
+    cv.redraw();
+    const it = items(), m = it.reduce((a, b) => (b.v > a.v ? b : a));
+    CB.stat("ld-s-max", `${m.k} ${CB.num(m.v, 2)} kN/m²`);
+    CB.stat("ld-s-ratio", `${(m.v / 2.5).toFixed(2)} 배`);
+  }
+  draw();
+})();
+
+/* ---------- 3. 분포 하중의 합력 ---------- */
+(function () {
+  const L = 8, S = 10; // y 좌표 1 = 10 kN/m
+  const pts = [{ x: 0, y: 2, lock: "x", snap: 0.05 }, { x: 4, y: 2, lock: "x", snap: 0.05 }, { x: 8, y: 2, lock: "x", snap: 0.05 }];
+  pts.forEach((p) => { p.constrain = (q) => { q.y = CB.clamp(q.y, 0, 3); }; });
+  const PRE = { u: [2, 2, 2], t: [0, 1.5, 3], z: [1, 2, 3], v: [3, 0, 3] };
+  CB.seg("ld-r-pre", (k) => { PRE[k].forEach((y, i) => { pts[i].y = y; }); update(); });
+  const cmp = CB.check("ld-r-cmp", update);
+  let b, b2, R = 0, xbar = 0;
+  const wv = () => pts.map((p) => p.y * S);
+  function solve() {
+    const [w0, w1, w2] = wv();
+    R = ((w0 + w1) / 2) * 4 + ((w1 + w2) / 2) * 4;
+    // 두 사다리꼴의 도심
+    const tc = (a, c, x0) => (a + c > 1e-9 ? x0 + (4 * (a + 2 * c)) / (3 * (a + c)) : x0 + 2);
+    const A1 = ((w0 + w1) / 2) * 4, A2 = ((w1 + w2) / 2) * 4;
+    xbar = R > 1e-9 ? (A1 * tc(w0, w1, 0) + A2 * tc(w1, w2, 4)) / R : 4;
+    const loads = [{ type: "lin", w1: w0, w2: w1, a: 0, b: 4 }, { type: "lin", w1: w1, w2: w2, a: 4, b: 8 }];
+    b = CB.beam({ L, EI: 1e5, supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }], loads });
+    b2 = CB.beam({ L, EI: 1e5, supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }], loads: R > 1e-9 ? [{ type: "point", P: R, a: CB.clamp(xbar, 0.001, L - 0.001) }] : [] });
+  }
+  solve();
+  const pl = CB.plane("#ld-cv-res", {
+    x: [-0.9, 8.9], y: [-1.3, 3.9], grid: false, axes: false, points: pts, aspect: (W) => (W < 520 ? 0.62 : 0.4), minHeight: 200, maxHeight: 300,
+    draw(P, api) {
+      const pal = P.P, [w0, w1, w2] = wv();
+      pts.forEach((p) => { p.color = pal.accent2; p.r = 7; });
+      // 하중 그림
+      P.poly([[0, 0.15], [0, pts[0].y + 0.15], [4, pts[1].y + 0.15], [8, pts[2].y + 0.15], [8, 0.15]], { fill: CB.color("accent-2-soft"), color: pal.accent2, width: 1.6 });
+      for (let k = 0; k <= 16; k++) { const x = k / 2, y = x <= 4 ? pts[0].y + ((pts[1].y - pts[0].y) * x) / 4 : pts[1].y + ((pts[2].y - pts[1].y) * (x - 4)) / 4; if (y > 0.12) P.arrow(x, y + 0.15, x, 0.08, { color: pal.accent2, width: 1.3, head: 6 }); }
+      P.line(0, 0, L, 0, { color: pal.text, width: 5 });
+      // 지점
+      const ctx = P.ctx;
+      [[0, false], [L, true]].forEach(([x, roll]) => { const px = P.X(x), py = P.Y(0); ctx.save(); ctx.strokeStyle = pal.text; ctx.fillStyle = pal.surface; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px, py + 3); ctx.lineTo(px - 9, py + 17); ctx.lineTo(px + 9, py + 17); ctx.closePath(); ctx.fill(); ctx.stroke(); if (roll) { ctx.beginPath(); ctx.arc(px - 4, py + 20.5, 3, 0, 7); ctx.arc(px + 4, py + 20.5, 3, 0, 7); ctx.stroke(); } ctx.restore(); });
+      // 합력
+      if (R > 1e-6) { P.arrow(xbar, 3.75, xbar, Math.max(0.2, (xbar <= 4 ? pts[0].y + ((pts[1].y - pts[0].y) * xbar) / 4 : pts[1].y + ((pts[2].y - pts[1].y) * (xbar - 4)) / 4) + 0.2), { color: pal.text, width: 2.6, dash: [6, 4] }); P.text(`R = ${CB.num(R, 1)} kN`, xbar, 3.55, { color: pal.text, bold: true, align: xbar > 6 ? "right" : "left", dx: xbar > 6 ? -10 : 10 }); }
+      P.line(xbar, -0.35, xbar, -0.75, { color: pal.dim, width: 1 }); P.text(`x̄ = ${xbar.toFixed(2)} m`, xbar, -0.95, { color: pal.dim, size: 11, align: "center" });
+      [0, 1, 2].forEach((i) => P.text(`${CB.num(wv()[i], 0)}`, pts[i].x, pts[i].y + 0.15, { color: pal.accent2, size: 11, dx: i === 2 ? -14 : 12, dy: -12, align: i === 2 ? "right" : "left" }));
+    },
+    onDrag() { update(); },
+  });
+  const ch = CB.canvas("#ld-cv-res2", (ctx, W, H) => {
+    const pal = CB.palette(), s1 = b.sample(200), s2 = b2.sample(200);
+    const series = [{ data: s1.map((p) => [p.x, p.M]), color: pal.accent, width: 2.4, fill: CB.color("accent-soft") }];
+    if (cmp()) series.push({ data: s2.map((p) => [p.x, p.M]), color: pal.text, width: 1.6, dash: [6, 4] });
+    const hi = Math.max(1, ...s1.map((p) => p.M), ...(cmp() ? s2.map((p) => p.M) : [0]));
+    CB.chart(ctx, null, { x: [0, L], y: [0, hi * 1.12], xLabel: "x (m)", yLabel: "M (kN·m)", series });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.36), minHeight: 190, maxHeight: 280 });
+  function update() {
+    solve(); pl.redraw(); ch.redraw();
+    CB.stat("ld-r-r", `${CB.num(R, 1)} kN`); CB.stat("ld-r-x", `${xbar.toFixed(2)} m`);
+    CB.stat("ld-r-ab", `${CB.num(b.reactions[0].R, 1)} · ${CB.num(b.reactions[1].R, 1)} kN`);
+    CB.stat("ld-r-m", `${CB.num(b.extremes().Mmax.v, 0)} / ${CB.num(R > 1e-6 ? b2.extremes().Mmax.v : 0, 0)}`);
+  }
+  update();
+})();
+
+/* ---------- 4. 기여 면적 ---------- */
+(function () {
+  const BX = 32, BY = 24;
+  const mode = CB.seg("ld-t-mode", () => { if (mode() !== "col" && sel.type !== "beam") sel = { type: "beam", a: [0, 16], b: [8, 16] }; if (mode() === "col" && sel.type !== "col") sel = { type: "col", p: [8, 16] }; update(); });
+  const qsel = CB.seg("ld-t-q", update);
+  let sel = { type: "col", p: [8, 16] }, map = null, lastArea = 0;
+  function colTrib(p) { const [x, y] = p; return [Math.max(0, x - 4), Math.max(0, y - 4), Math.min(BX, x + 4), Math.min(BY, y + 4)]; }
+  // 보 하나의 분담: 1방향(X 방향 보만 받음, 폭 ±4) 또는 2방향(양쪽 패널의 45° 삼각형)
+  function beamInfo(a, bb) {
+    const horiz = a[1] === bb[1], len = 8;
+    const sides = [];
+    if (horiz) { if (a[1] > 0) sides.push(-1); if (a[1] < BY) sides.push(1); } else { if (a[0] > 0) sides.push(-1); if (a[0] < BX) sides.push(1); }
+    return { horiz, len, sides };
+  }
+  const cv = CB.canvas("#ld-cv-trib", (ctx, W, H) => {
+    const P = CB.palette(), q = Number(qsel()), m = mode();
+    const planH = H * 0.66, s = Math.min((W - 60) / BX, (planH - 30) / BY), ox = (W - BX * s) / 2, oy = 16;
+    const X = (x) => ox + x * s, Y = (y) => oy + (BY - y) * s;
+    map = { X, Y, s, ox, oy };
+    ctx.save();
+    ctx.fillStyle = P.elev; ctx.fillRect(X(0), Y(BY), BX * s, BY * s);
+    ctx.fillStyle = CB.color("text-dim"); ctx.globalAlpha = 0.12; ctx.fillRect(X(8), Y(16), 16 * s, 8 * s); ctx.globalAlpha = 1;
+    ctx.fillStyle = P.dim; ctx.font = "10.5px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "center"; ctx.fillText("코어", X(16), Y(12) + 4);
+    // 선택 부재의 기여 영역
+    const info = sel.type === "beam" ? beamInfo(sel.a, sel.b) : null;
+    ctx.fillStyle = CB.color("accent-soft"); ctx.strokeStyle = P.accent; ctx.lineWidth = 1.5;
+    let area = 0;
+    if (sel.type === "col") { const r = colTrib(sel.p); ctx.fillRect(X(r[0]), Y(r[3]), (r[2] - r[0]) * s, (r[3] - r[1]) * s); ctx.strokeRect(X(r[0]), Y(r[3]), (r[2] - r[0]) * s, (r[3] - r[1]) * s); area = (r[2] - r[0]) * (r[3] - r[1]); }
+    else {
+      const [a, bb] = [sel.a, sel.b];
+      info.sides.forEach((sg) => {
+        ctx.beginPath();
+        if (m === "b1") {
+          if (!info.horiz) return; // 1방향: 직각 방향 보는 바닥 하중을 받지 않는다
+          ctx.rect(X(Math.min(a[0], bb[0])), Y(a[1] + (sg > 0 ? 4 : 0)), 8 * s, 4 * s); area += 32;
+        } else {
+          if (info.horiz) { const y0 = a[1], x0 = Math.min(a[0], bb[0]); ctx.moveTo(X(x0), Y(y0)); ctx.lineTo(X(x0 + 8), Y(y0)); ctx.lineTo(X(x0 + 4), Y(y0 + sg * 4)); }
+          else { const x0 = a[0], y0 = Math.min(a[1], bb[1]); ctx.moveTo(X(x0), Y(y0)); ctx.lineTo(X(x0), Y(y0 + 8)); ctx.lineTo(X(x0 + sg * 4), Y(y0 + 4)); }
+          ctx.closePath(); area += 16;
+        }
+        ctx.fill(); ctx.stroke();
+      });
+    }
+    // 격자(보)와 2방향 분담선
+    ctx.strokeStyle = P.dim; ctx.lineWidth = 1.2;
+    for (let x = 0; x <= BX; x += 8) { ctx.beginPath(); ctx.moveTo(X(x), Y(0)); ctx.lineTo(X(x), Y(BY)); ctx.stroke(); }
+    for (let y = 0; y <= BY; y += 8) { ctx.beginPath(); ctx.moveTo(X(0), Y(y)); ctx.lineTo(X(BX), Y(y)); ctx.stroke(); }
+    if (m === "b2") { ctx.strokeStyle = P.faint; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; for (let x = 0; x < BX; x += 8) for (let y = 0; y < BY; y += 8) { ctx.beginPath(); ctx.moveTo(X(x), Y(y)); ctx.lineTo(X(x + 8), Y(y + 8)); ctx.moveTo(X(x + 8), Y(y)); ctx.lineTo(X(x), Y(y + 8)); ctx.stroke(); } ctx.setLineDash([]); }
+    if (sel.type === "beam") { ctx.strokeStyle = P.accent2; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(X(sel.a[0]), Y(sel.a[1])); ctx.lineTo(X(sel.b[0]), Y(sel.b[1])); ctx.stroke(); }
+    for (let x = 0; x <= BX; x += 8) for (let y = 0; y <= BY; y += 8) { const on = sel.type === "col" && sel.p[0] === x && sel.p[1] === y; ctx.fillStyle = on ? P.accent2 : P.text; ctx.fillRect(X(x) - (on ? 6 : 4), Y(y) - (on ? 6 : 4), on ? 12 : 8, on ? 12 : 8); }
+    // 아래: 보 하중 그림(보 모드)
+    const gy = planH + 8, gh = H - gy - 26, gx0 = Math.max(60, ox), gx1 = Math.min(W - 24, ox + BX * s), GX = (t) => gx0 + (t / 8) * (gx1 - gx0);
+    ctx.fillStyle = P.dim; ctx.font = "11px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.textAlign = "left";
+    if (sel.type === "beam") {
+      const n = info.sides.length, wpk = m === "b1" ? (info.horiz ? q * 4 * n : 0) : q * 4 * n;
+      const wAt = (t) => (m === "b1" ? wpk : wpk * (1 - Math.abs(t - 4) / 4));
+      const base = gy + gh - 12, hmax = gh - 26, wmax = q * 8;
+      ctx.fillStyle = CB.color("accent-2-soft"); ctx.strokeStyle = P.accent2; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(GX(0), base);
+      for (let k = 0; k <= 40; k++) { const t = (8 * k) / 40; ctx.lineTo(GX(t), base - (wAt(t) / wmax) * hmax); } ctx.lineTo(GX(8), base); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = P.text; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(GX(0), base + 3); ctx.lineTo(GX(8), base + 3); ctx.stroke();
+      LDX.text(ctx, `최대 w = ${CB.num(wpk, 1)} kN/m (${m === "b1" ? "균일" : "삼각형"})`, (GX(0) + GX(8)) / 2, gy + 6, P.accent2, { size: 11.5 });
+    } else LDX.text(ctx, W < 520 ? "보를 누르면 하중 그림이 여기에" : "보 모드에서 보를 누르면 보에 걸리는 하중 그림이 여기에 그려집니다", W / 2, gy + gh / 2, P.dim, { mono: false, size: 12 });
+    ctx.restore();
+    lastArea = area;
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.72), minHeight: 300, maxHeight: 520 });
+  cv.canvas.style.cursor = "pointer";
+  cv.canvas.addEventListener("click", (e) => {
+    if (!map) return;
+    const r = cv.canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+    const x = (px - map.ox) / map.s, y = BY - (py - map.oy) / map.s;
+    if (x < -2 || x > BX + 2 || y < -2 || y > BY + 2) return;
+    if (mode() === "col") sel = { type: "col", p: [CB.clamp(Math.round(x / 8) * 8, 0, BX), CB.clamp(Math.round(y / 8) * 8, 0, BY)] };
+    else {
+      const gxL = CB.clamp(Math.round(x / 8) * 8, 0, BX), gyL = CB.clamp(Math.round(y / 8) * 8, 0, BY);
+      const dH = Math.abs(y - gyL), dV = Math.abs(x - gxL);
+      if (dH <= dV) { const x0 = CB.clamp(Math.floor(x / 8) * 8, 0, BX - 8); sel = { type: "beam", a: [x0, gyL], b: [x0 + 8, gyL] }; }
+      else { const y0 = CB.clamp(Math.floor(y / 8) * 8, 0, BY - 8); sel = { type: "beam", a: [gxL, y0], b: [gxL, y0 + 8] }; }
+    }
+    update();
+  });
+  function update() {
+    cv.redraw();
+    const q = Number(qsel()), m = mode(), A = lastArea;
+    CB.stat("ld-t-a", `${CB.num(A, 0)} m²`);
+    CB.stat("ld-t-p", `${CB.sig(A * q, 3)} kN`);
+    const msg = document.getElementById("ld-t-msg");
+    if (sel.type === "beam") {
+      const info = beamInfo(sel.a, sel.b), n = info.sides.length;
+      const wpk = m === "b1" ? (info.horiz ? q * 4 * n : 0) : q * 4 * n, M = m === "b1" ? (wpk * 64) / 8 : (wpk * 64) / 12;
+      CB.stat("ld-t-m", wpk ? `${CB.num(wpk, 1)} · ${CB.num(M, 0)} kN·m` : "0");
+      msg.className = "ld-msg";
+      msg.innerHTML = m === "b1" ? (info.horiz ? `1방향: 기여 폭 ${4 * n} m, w = q × b = ${q} × ${4 * n} = <b>${CB.num(wpk, 1)} kN/m</b>, 단순보 M<sub>max</sub> = wL²/8` : "1방향 가정에서는 슬래브가 X 방향 보로만 하중을 보내므로 이 Y 방향 보는 바닥 하중을 받지 않습니다.") :
+        `2방향: 양쪽 45° 삼각형(각 16 m²), 가운데 최대 w = ${CB.num(wpk, 1)} kN/m, 단순보 M<sub>max</sub> = w<sub>max</sub>L²/12 (1방향 같은 보의 2/3)`;
+    } else {
+      CB.stat("ld-t-m", "—");
+      const kind = A >= 64 ? "내부 기둥" : A >= 32 ? "외곽 기둥" : "모서리 기둥";
+      msg.className = "ld-msg"; msg.innerHTML = `${kind}: 기여 면적 ${A} m² × ${q} kN/m² = <b>${CB.sig(A * q, 3)} kN</b> (한 층)`;
+    }
+  }
+  update();
+})();
+
+/* ---------- 5. 하중 조합 ---------- */
+(function () {
+  const gd = CB.range("ld-c-d", (v) => v.toFixed(1) + " kN/m²", draw), gl = CB.range("ld-c-l", (v) => v.toFixed(1) + " kN/m²", draw);
+  const gw = CB.range("ld-c-w", (v) => CB.num(v, 2) + " kN/m²", draw), gg = CB.range("ld-c-g", (v) => v.toFixed(2), draw);
+  document.querySelectorAll("#sim-ld-combo [data-ldpre]").forEach((b) => b.addEventListener("click", () => { const [d, l, w] = b.dataset.ldpre.split(",").map(Number); gd.set(d, false); gl.set(l, false); gw.set(w, false); draw(); }));
+  const combos = () => { const D = gd(), L = gl(), W = gw(), g = gg(); return [
+    { k: "1.4D", v: 1.4 * D }, { k: "1.2D + 1.6L", v: 1.2 * D + 1.6 * L }, { k: "1.2D + 1.0L + γW·W", v: 1.2 * D + L + g * W }, { k: "0.9D + γW·W", v: 0.9 * D + g * W } ]; };
+  const cv = CB.canvas("#ld-cv-combo", (ctx, W, H) => {
+    const P = CB.palette(), c = combos(), lo = Math.min(-1, ...c.map((d) => d.v)), hi = Math.max(1, ...c.map((d) => d.v));
+    const padL = 18, padR = 18, padT = 26, padB = 56, n = c.length, bw = (W - padL - padR) / n;
+    const Y = (v) => padT + ((hi - v) / (hi - lo)) * (H - padT - padB);
+    const max = c.reduce((a, b) => (b.v > a.v ? b : a)), min = c.reduce((a, b) => (b.v < a.v ? b : a));
+    ctx.save();
+    ctx.strokeStyle = P.axis; ctx.beginPath(); ctx.moveTo(padL, Y(0)); ctx.lineTo(W - padR, Y(0)); ctx.stroke();
+    c.forEach((d, i) => {
+      const x = padL + i * bw + bw * 0.2, w = bw * 0.6;
+      ctx.fillStyle = d === max ? P.accent2 : d.v < 0 ? P.bad : P.accent; ctx.globalAlpha = d === max || (d === min && d.v < 0) ? 1 : 0.55;
+      ctx.fillRect(x, Math.min(Y(0), Y(d.v)), w, Math.abs(Y(d.v) - Y(0))); ctx.globalAlpha = 1;
+      LDX.text(ctx, `${CB.num(d.v, 2)}`, x + w / 2, d.v >= 0 ? Y(d.v) - 10 : Y(d.v) + 12, d.v < 0 ? P.bad : P.text, { size: 12 });
+      ctx.fillStyle = P.dim; ctx.font = "11px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "center"; ctx.textBaseline = "top";
+      const lines = d.k.split(" + "); lines.forEach((t, j) => ctx.fillText((j ? "+ " : "") + t, x + w / 2, H - padB + 8 + j * 13));
+    });
+    ctx.fillStyle = P.dim; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.font = "11px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.fillText("U (kN/m²), 아래 방향 +", padL, 6);
+    ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 360 });
+  function draw() {
+    cv.redraw();
+    const c = combos(), max = c.reduce((a, b) => (b.v > a.v ? b : a)), min = c.reduce((a, b) => (b.v < a.v ? b : a));
+    CB.stat("ld-c-max", `${CB.num(max.v, 2)} kN/m²`); CB.stat("ld-c-min", `${CB.num(min.v, 2)} kN/m²`);
+    const msg = document.getElementById("ld-c-msg");
+    msg.className = "ld-msg" + (min.v < 0 ? " bad" : "");
+    msg.innerHTML = min.v < 0 ? `${min.k} = ${CB.num(min.v, 2)} kN/m² — 지붕이 들립니다. 고정하중만으로는 붙잡을 수 없으니 앵커·접합부가 위 방향 힘을 받도록 설계해야 합니다.` : `하향으로는 <b>${max.k}</b>가 지배합니다(${CB.num(max.v, 2)} kN/m²).${gl() < 0.125 * gd() ? " L < D/8 이라 1.4D가 커졌습니다." : ""}`;
+  }
+  draw();
+})();
+
+/* ---------- 6. 이상화 ---------- */
+(function () {
+  const SC = [
+    { cap: "공장에서 만든 PC 보가 양 끝 고무 받침 위에 얹혀 있다", ans: "simple", L: 10, w: 30, why: "받침은 보의 회전과 늘어남을 막지 못한다. 양 끝 모멘트가 0인 단순보다." },
+    { cap: "벽에서 1.8 m 튀어나온 RC 발코니 슬래브(폭 1 m 띠)", ans: "cant", L: 1.8, w: 9, why: "한쪽만 벽·바닥 슬래브에 붙어 있고 끝은 자유롭다. 캔틸레버이며 위쪽에 철근이 필요하다." },
+    { cap: "두꺼운 RC 벽 두 개 사이에 한 몸으로 친 짧은 보", ans: "fixed", L: 6, w: 40, why: "벽이 보보다 훨씬 굳세어 보 끝의 회전을 거의 막는다. 양단 고정에 가깝다." },
+    { cap: "큰보 옆면에 웨브만 볼트로 이은 강재 작은보", ans: "simple", L: 8, w: 20, why: "웨브 볼트 접합은 전단력은 전달하지만 회전은 거의 막지 못한다. 핀으로 보는 단순보다." },
+    { cap: "기둥 세 개 위에 끊지 않고 이어 친 2경간 데크 보", ans: "cont", L: 12, w: 15, why: "가운데 지점을 지나며 보가 이어져 있으므로 2경간 연속보다. 가운데 지점 위에 음의 모멘트가 생긴다." },
+  ];
+  const scene = CB.seg("ld-m-scene", update), model = CB.seg("ld-m-model", update);
+  let b;
+  function solve() {
+    const s = SC[Number(scene())], m = model();
+    const loads = [{ type: "udl", w: s.w, a: 0, b: s.L }];
+    const sup = m === "cant" ? [{ x: 0, type: "fixed" }] : m === "fixed" ? [{ x: 0, type: "fixed" }, { x: s.L, type: "fixed" }] : m === "cont" ? [{ x: 0, type: "pin" }, { x: s.L / 2, type: "roller" }, { x: s.L, type: "roller" }] : [{ x: 0, type: "pin" }, { x: s.L, type: "roller" }];
+    b = CB.beam({ L: s.L, EI: 1e5, supports: sup, loads });
+  }
+  solve();
+  const sc = CB.canvas("#ld-cv-mod", (ctx, W, H) => {
+    const P = CB.palette(), k = Number(scene()), cx = W / 2, by = H * 0.5, bw = Math.min(W * 0.7, 460), x0 = cx - bw / 2, x1 = cx + bw / 2;
+    ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = P.text;
+    const box = (x, y, w, h, f) => { ctx.fillStyle = f || P.surface; ctx.fillRect(x, y, w, h); ctx.strokeRect(x, y, w, h); };
+    const ground = (y) => { ctx.fillStyle = CB.color("accent-2-soft"); ctx.fillRect(16, y, W - 32, H - y - 8); };
+    if (k === 0) { ground(by + 70); box(x0 - 20, by + 18, 50, 52); box(x1 - 30, by + 18, 50, 52); ctx.fillStyle = P.dim; ctx.fillRect(x0 - 6, by + 12, 22, 6); ctx.fillRect(x1 - 16, by + 12, 22, 6); box(x0 - 10, by - 18, bw + 20, 30, P.elev); LDX.text(ctx, "고무 받침", x0 + 5, by + 92, P.dim, { mono: false, size: 11 }); }
+    if (k === 1) { box(x0 - 40, by - 90, 40, 180); box(x0, by - 8, bw * 0.55, 16, P.elev); ctx.strokeStyle = P.tension; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(x0 - 30, by - 3); ctx.lineTo(x0 + bw * 0.53, by - 3); ctx.stroke(); ctx.setLineDash([]); LDX.text(ctx, "벽·바닥", x0 - 20, by - 100, P.dim, { mono: false, size: 11 }); LDX.text(ctx, "1.8 m", x0 + bw * 0.27, by + 24, P.dim, { size: 11 }); }
+    if (k === 2) { box(x0 - 50, by - 90, 50, 190); box(x1, by - 90, 50, 190); box(x0, by - 20, bw, 40, P.elev); LDX.text(ctx, "두꺼운 RC 벽", x0 - 25, by - 100, P.dim, { mono: false, size: 11 }); LDX.text(ctx, "두꺼운 RC 벽", x1 + 25, by - 100, P.dim, { mono: false, size: 11 }); }
+    if (k === 3) { box(x0 - 34, by - 60, 22, 120, P.surface); box(x1 + 12, by - 60, 22, 120, P.surface); box(x0, by - 22, bw, 8, P.elev); box(x0, by + 14, bw, 8, P.elev); ctx.strokeRect(x0, by - 14, bw, 28); ctx.fillStyle = CB.color("accent-soft"); ctx.fillRect(x0 - 12, by - 10, 18, 20); ctx.fillRect(x1 - 6, by - 10, 18, 20); ctx.fillStyle = P.text; [x0 - 3, x1 + 3].forEach((x) => { ctx.beginPath(); ctx.arc(x, by - 4, 2, 0, 7); ctx.arc(x, by + 5, 2, 0, 7); ctx.fill(); }); LDX.text(ctx, "큰보(단면)", x0 - 23, by - 70, P.dim, { mono: false, size: 11 }); LDX.text(ctx, "웨브 볼트", cx, by + 40, P.dim, { mono: false, size: 11 }); }
+    if (k === 4) { ground(by + 80); [x0, cx, x1].forEach((x) => box(x - 12, by + 10, 24, 70)); box(x0 - 16, by - 10, bw + 32, 20, P.elev); }
+    // 하중 화살표
+    const s = SC[k], lx0 = k === 1 ? x0 : x0, lx1 = k === 1 ? x0 + bw * 0.55 : x1, ly = k === 0 ? by - 18 : k === 3 ? by - 22 : by - (k === 2 ? 20 : k === 4 ? 10 : 8);
+    for (let q = 0; q <= 10; q++) { const x = lx0 + ((lx1 - lx0) * q) / 10; LDX.arrow(ctx, x, ly - 26, x, ly - 2, P.accent2, 1.3, 6); }
+    LDX.text(ctx, `${s.w} kN/m, 경간 ${s.L} m`, (lx0 + lx1) / 2, ly - 36, P.accent2, { size: 11.5 });
+    ctx.restore();
+    document.getElementById("ld-m-cap").textContent = s.cap;
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.38), minHeight: 200, maxHeight: 280 });
+  const ch = CB.canvas("#ld-cv-mod2", (ctx, W, H) => { if (b.ok) CB.beamDiagrams(ctx, W, H, b, { keys: ["M"] }); }, { aspect: (W) => (W < 520 ? 0.55 : 0.3), minHeight: 170, maxHeight: 240 });
+  function update() {
+    solve(); sc.redraw(); ch.redraw();
+    const s = SC[Number(scene())], ok = model() === s.ans, e = b.extremes();
+    CB.stat("ld-m-mp", e.Mmax.v > 0.05 ? `${CB.num(e.Mmax.v, 1)} kN·m` : "0");
+    CB.stat("ld-m-mn", e.Mmin.v < -0.05 ? `${CB.num(e.Mmin.v, 1)} kN·m` : "0");
+    const msg = document.getElementById("ld-m-msg");
+    msg.className = "ld-msg " + (ok ? "ok" : "bad");
+    msg.textContent = ok ? `맞습니다. ${s.why}` : `다시 생각해 보세요. 보 끝이 어떻게 붙어 있는지(회전을 막는가, 끝이 자유로운가, 중간 지점이 있는가)를 보세요.`;
+  }
+  update();
+})();
+
+/* ---------- 7. T-36 패널 절점 하중 ---------- */
+(function () {
+  const gq = CB.range("ld-x-q", (v) => v.toFixed(2) + " kN/m²", update), gd = CB.range("ld-x-d", (v) => v.toFixed(1) + " kN/m", update), gb = CB.range("ld-x-b", (v) => v.toFixed(2) + " m", update);
+  const nodes = [], bars = [];
+  for (let k = 0; k <= 6; k++) nodes.push([6 * k, 0]);
+  for (let k = 1; k <= 5; k++) nodes.push([6 * k, 4.5]);
+  const tp = (k) => 6 + k;
+  for (let k = 0; k < 6; k++) bars.push([k, k + 1]);
+  for (let k = 1; k < 5; k++) bars.push([tp(k), tp(k + 1)]);
+  for (let k = 1; k <= 5; k++) bars.push([k, tp(k)]);
+  bars.push([0, tp(1)], [tp(5), 6], [tp(1), 2], [tp(2), 3], [tp(4), 3], [tp(5), 4]);
+  let t, w = 0, Pn = 0;
+  function solve() { w = gd() + (gq() * gb()) / 2; Pn = 6 * w; t = CB.truss({ nodes, bars, supports: { 0: "pin", 6: "roller" }, loads: [1, 2, 3, 4, 5].map((n) => ({ node: n, fy: -Pn })), EA: 1e6 }); }
+  solve();
+  const pl = CB.plane("#ld-cv-t36", { x: [-3.5, 39.5], y: [-5.0, 6.6], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.55 : 0.36), minHeight: 200, maxHeight: 320,
+    draw(P) {
+      if (!t.ok) return;
+      CB.drawFrame(P, t, { axialColors: true, reactions: true, loads: false, memberLabels: (m) => (Math.abs(t.N[m]) < 0.05 ? "0" : CB.num(t.N[m], 0)) });
+      // 바닥판 하중: 하현 절점에 매달린 화살표
+      [1, 2, 3, 4, 5].forEach((n) => { const x = P.X(nodes[n][0]), y = P.Y(0); LDX.arrow(P.ctx, x, y + 6, x, y + 32, P.P.accent2, 2.2, 8); });
+      LDX.text(P.ctx, `P = ${CB.num(Pn, 1)} kN`, P.X(18), P.Y(0) + 44, P.P.accent2, { size: 11.5 });
+    } });
+  function update() {
+    solve(); pl.redraw();
+    CB.stat("ld-x-w", `${CB.num(w, 2)} kN/m`); CB.stat("ld-x-p", `${CB.num(Pn, 1)} kN`);
+    CB.stat("ld-x-r", `${CB.num(t.reactions[0][1], 1)} kN`); CB.stat("ld-x-c", `${CB.num(Math.min(...t.N), 1)} kN`);
+  }
+  update();
+})();
+</script>
+</body>
+</html>

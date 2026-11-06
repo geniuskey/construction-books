@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>부정정 구조와 응력법 · MechanicsBook</title>
+<meta name="description" content="지점 하나를 더하면 평형 방정식만으로는 풀 수 없다. 부정정 차수, 여유력과 적합 조건, 응력법(유연도법), 1단 고정보와 연속보, 3연모멘트식, 지점 침하와 온도, 강성에 따른 힘의 분배, 여유도와 대체 하중 경로를 직접 풀며 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .fx-stack { display: grid; grid-template-columns: 1fr; }
+  .fx-stack > div { position: relative; min-width: 0; }
+  .fx-stack > div + div { border-top: 1px solid var(--border); }
+  .fx-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .fx-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .fx-msg b { color: var(--text); }
+  .fx-msg.ok { color: var(--ok); font-weight: 600; }
+  .fx-msg.bad { color: var(--bad); font-weight: 600; }
+  .fx-legend { display: flex; flex-wrap: wrap; gap: 4px 2px; padding: 8px 18px; border-top: 1px solid var(--border); }
+  .fx-legend .k3 { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; font-size: 13.5px; color: var(--text-dim); }
+  .fx-legend .k3 i { width: 16px; height: 4px; border-radius: 2px; display: inline-block; }
+  .fx-tbl td, .fx-tbl th { font-variant-numeric: tabular-nums; }
+  .fx-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .fx-sel { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font-size: 14px; }
+  .fx-sel select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); min-width: 0; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="mechanics"></script>
+</head>
+<body data-chapter="indeterminate">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="fx-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="fx-ah-react" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="fx-ah-int" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+      <marker id="fx-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 14</div>
+    <h1 data-no-glossary>부정정 구조와 응력법</h1>
+    <p class="lead">단순보에 지점을 하나 더 받치면 보는 덜 휘고 덜 처집니다. 그런데 계산은 갑자기 막힙니다. 반력은 네 개인데 평형 방정식은 세 개뿐이라, 힘의 평형만으로는 반력을 하나로 정할 수 없기 때문입니다. 이런 구조를 <b>부정정 구조</b>라 합니다. 부족한 방정식은 "구조물은 끊어지거나 지점에서 떨어지지 않는다"는 변형의 조건, 곧 <b>적합 조건</b>에서 얻습니다. 실제 건물의 보와 기둥, 연속 다리, 라멘은 거의 모두 부정정입니다. 이 장에서는 여분의 힘(여유력)을 하나 골라 떼어 냈다가 변형이 맞도록 되돌려 놓는 <b>응력법</b>으로 부정정 구조를 풀고, 부정정 구조가 정정 구조와 무엇이 다른지 — 지점 침하에 응력이 생기고, 강한 쪽이 힘을 더 받고, 부재 하나가 끊어져도 버틸 수 있다는 것 — 를 숫자로 확인합니다.</p>
+    <ul class="objectives">
+      <li>보·라멘·트러스의 부정정 차수를 세고, 차수가 0 이상이어도 불안정할 수 있는 경우를 구별한다.</li>
+      <li>여유력을 골라 기본 구조물(정정)을 만들고, 적합 조건 \(\delta_{10} + f_{11}X_1 = 0\)으로 여유력을 구한다.</li>
+      <li>1단 고정보와 2경간 연속보를 응력법으로 풀고, 3연모멘트식으로 기준 건물 B-10의 4경간 큰보를 푼다.</li>
+      <li>지점 침하와 온도 변화가 정정 구조에서는 응력을 만들지 않지만 부정정 구조에서는 만든다는 것을 계산으로 보인다.</li>
+      <li>부정정 구조에서 힘이 강성에 비례해 나뉜다는 것을 교차보와 스프링으로 설명한다.</li>
+      <li>여유도와 대체 하중 경로의 뜻을 알고, 정정 구조와 부정정 구조의 장단점을 비교한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>지점이 많은 다리를 평형만으로 풀려던 시대</b></div>
+      <div class="o-body"><p>19세기 철도가 퍼지면서 강을 여러 경간으로 건너는 다리가 늘었습니다. 경간마다 보를 따로 놓는 대신 여러 지점 위로 한 줄의 보를 이어 놓으면 재료가 훨씬 덜 듭니다. 문제는 계산이었습니다. 지점이 셋 이상인 연속보는 평형 방정식만으로는 반력이 정해지지 않습니다. 프랑스의 클라페이롱이 1857년에 연속보의 지점 모멘트를 잇는 <b>3연모멘트식</b>을 발표했고, 영국의 맥스웰(1864)과 독일의 모어(1874) 등이 "변형이 서로 맞아야 한다"는 조건으로 부정정 트러스를 푸는 방법을 정리했습니다. 오늘날 응력법(유연도법)이라 부르는 방법의 뿌리입니다.</p>
+        <p>오늘의 구조 해석 프로그램은 16장의 강성법으로 수천 개의 미지수를 한꺼번에 풀지만, 그 결과가 맞는지 판단하는 감각은 이 장에서 나옵니다. 연속보 중간 지점의 반력이 왜 단순보 두 개일 때보다 큰지, 기초가 1 cm 가라앉으면 보에 무슨 일이 생기는지, 왜 다리 한쪽 끝에는 굴러가는 받침을 두는지가 모두 적합 조건의 이야기입니다.</p>
+        <div class="o-chain"><span>평형 방정식이 모자람</span><i>→</i><span>여유력을 떼어 내고 변형 계산</span><i>→</i><span class="tool">적합 조건으로 여유력 결정</span><i>→</i><span>연속보·라멘·침하·온도</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="degree">
+    <h2>부정정 차수: 미지수와 방정식의 수</h2>
+    <div class="problem"><strong>반력 넷, 방정식 셋</strong>
+      <p>B-10 입구 캐노피의 캔틸레버(4장 예제 4.4) 끝에 기둥을 하나 세워 받치면 고정단의 반력 셋(수평력·연직력·모멘트)에 기둥 반력 하나가 더해져 미지수가 넷이 됩니다. 평면 구조물의 평형 방정식은 \(\Sigma F_x = \Sigma F_y = \Sigma M = 0\) 셋뿐입니다. 미지수 하나는 어디서 구할까요?</p></div>
+    <p>평면 구조물 전체에 대해 쓸 수 있는 독립 평형 방정식은 세 개입니다. 반력 성분이 세 개보다 많으면 그 여분은 평형만으로는 정해지지 않습니다. 내부 힌지가 있으면 "힌지에서 \(M = 0\)"이라는 조건이 하나씩 더해지므로 여분이 줄어듭니다(4장의 게르버보). 이 여분의 개수가 <span class="term">부정정 차수</span>입니다.</p>
+    <div class="callout def"><strong>정의 14.1 (부정정 차수)</strong> 평면 구조물에서 평형 조건만으로 정해지지 않는 미지 힘의 개수를 <span class="term">부정정 차수</span><span class="en">(degree of static indeterminacy)</span> \(n\)이라 한다.
+      <ul style="margin:6px 0 0">
+        <li><b>곧은 보:</b> \(n = r - 3 - c\) (\(r\): 반력 성분 수, \(c\): 내부 힌지 수).</li>
+        <li><b>라멘(골조):</b> \(n = (3m + r) - (3j + c)\) (\(m\): 부재 수, \(j\): 절점 수, \(c\): 힌지가 풀어 주는 조건 수).</li>
+        <li><b>트러스:</b> \(n = m + r - 2j\) (3장의 판별식).</li>
+      </ul>
+      \(n = 0\)이면 <span class="term">정정</span>, \(n \gt 0\)이면 \(n\)차 <span class="term">부정정</span>, \(n \lt 0\)이면 반드시 불안정이다. 단, \(n \ge 0\)은 안정의 <b>필요조건</b>일 뿐이다. 반력이 모두 한 점을 지나거나 모두 나란하면 \(n \ge 0\)이어도 <span class="term">기하학적 불안정</span>이다.</div>
+    <figure class="diagram" id="fig-fx-degree">
+      <svg viewBox="0 0 760 356" role="img" aria-label="여섯 가지 구조물과 각각의 부정정 차수">
+        <rect x="10" y="10" width="740" height="336" rx="10" class="f-surface"/>
+        <g transform="translate(30,30)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">(a) 단순보 · n = 0</text>
+          <line x1="20" y1="44" x2="180" y2="44" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <path d="M20 44l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M180 44l-9 12h18z" class="f-elev" style="stroke:var(--text)"/><circle cx="175" cy="60" r="3" class="f-elev" style="stroke:var(--text)"/><circle cx="185" cy="60" r="3" class="f-elev" style="stroke:var(--text)"/>
+          <text x="100" y="92" text-anchor="middle" class="t-mono">r = 3 → 3 − 3 = 0</text>
+        </g>
+        <g transform="translate(270,30)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">(b) 1단 고정보 · n = 1</text>
+          <rect x="8" y="24" width="10" height="40" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <line x1="18" y1="44" x2="180" y2="44" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <path d="M180 44l-9 12h18z" class="f-elev" style="stroke:var(--text)"/><circle cx="175" cy="60" r="3" class="f-elev" style="stroke:var(--text)"/><circle cx="185" cy="60" r="3" class="f-elev" style="stroke:var(--text)"/>
+          <text x="100" y="92" text-anchor="middle" class="t-mono">r = 4 → 4 − 3 = 1</text>
+        </g>
+        <g transform="translate(510,30)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">(c) 2경간 연속보 · n = 1</text>
+          <line x1="20" y1="44" x2="180" y2="44" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <path d="M20 44l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M100 44l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M180 44l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <text x="100" y="92" text-anchor="middle" class="t-mono">r = 4(핀 + 롤러 2)</text>
+        </g>
+        <g transform="translate(30,180)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">(d) 양단 고정보 · n = 3</text>
+          <rect x="8" y="24" width="10" height="40" style="fill:var(--surface-2);stroke:var(--text)"/><rect x="182" y="24" width="10" height="40" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <line x1="18" y1="44" x2="182" y2="44" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <text x="100" y="92" text-anchor="middle" class="t-mono">r = 6 (연직 하중만: 2)</text>
+        </g>
+        <g transform="translate(270,180)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">(e) 고정 문형 라멘 · n = 3</text>
+          <path d="M40 120V30H160V120" style="fill:none;stroke:var(--text);stroke-width:4;stroke-linejoin:round"/>
+          <line x1="22" y1="122" x2="58" y2="122" style="stroke:var(--text);stroke-width:2.4"/><line x1="142" y1="122" x2="178" y2="122" style="stroke:var(--text);stroke-width:2.4"/>
+          <text x="100" y="146" text-anchor="middle" class="t-mono">9 + 6 − 12 = 3</text>
+        </g>
+        <g transform="translate(510,180)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">(f) 핀 지점 라멘 · n = 1</text>
+          <path d="M40 120V30H160V120" style="fill:none;stroke:var(--text);stroke-width:4;stroke-linejoin:round"/>
+          <path d="M40 120l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M160 120l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <text x="100" y="152" text-anchor="middle" class="t-mono">9 + 4 − 12 = 1</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-1.</b> 여섯 구조물의 부정정 차수. 차수는 "떼어 내도 구조물이 서 있는 힘(여유력)의 최대 개수"이기도 하다. 연직 하중만 받는 보는 수평 반력이 0이므로 수평 성분을 빼고 세는 경우가 많다.</figcaption>
+    </figure>
+    <p>아래에서 지점과 힌지를 바꿔 보세요. 계산된 차수와 함께, 강성법 해석기(16장)가 실제로 풀리는지(안정인지)도 표시합니다. 롤러만 셋 둔 보는 \(n = 0\)인데도 수평으로 미끄러지는 기구라서 풀리지 않습니다.</p>
+    <div class="sim" id="sim-fx-degree">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>지점과 힌지를 바꾸며 부정정 차수 세기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-deg" aria-label="지점과 힌지를 고른 보와 반력"></canvas></div>
+        <div class="sim-controls">
+          <div class="fx-sel">
+            <label for="fx-d-a">왼쪽 A</label><select id="fx-d-a"><option value="none">없음</option><option value="roller">롤러</option><option value="pin" selected>핀</option><option value="fixed">고정</option></select>
+            <label for="fx-d-b">가운데 B</label><select id="fx-d-b"><option value="none">없음</option><option value="roller" selected>롤러</option><option value="pin">핀</option></select>
+            <label for="fx-d-c">오른쪽 C</label><select id="fx-d-c"><option value="none">없음</option><option value="roller" selected>롤러</option><option value="pin">핀</option><option value="fixed">고정</option></select>
+          </div>
+          <div class="ctrl"><span>내부 힌지</span><div class="seg" id="fx-d-h"><button data-value="0" class="on">0개</button><button data-value="1">1개</button><button data-value="2">2개</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">r (반력 성분)</span><span class="v" id="fx-d-r">—</span></div>
+        <div class="stat"><span class="k">n = r − 3 − c</span><span class="v" id="fx-d-n">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="fx-d-k">—</span></div>
+      </div>
+      <div class="fx-msg" id="fx-d-msg"></div>
+      <div class="sim-note">해볼 것: A·B·C를 모두 롤러로 두고 n = 0인데 불안정인 것을 보세요 · 2경간 연속보(핀·롤러·롤러)에 힌지를 하나 넣으면 정정이 됩니다 · A를 고정, C를 없음으로 하면 캔틸레버입니다 · 모델: 길이 20 m, 가운데 지점 10 m, 힌지 위치 6 m·14 m, 등분포 10 kN/m. 판정은 강성 행렬의 피벗으로 한다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="compatibility">
+    <h2>여유력과 적합 조건</h2>
+    <p>1단 고정보(왼쪽 고정, 오른쪽 롤러)를 생각해 봅시다. 미지 반력은 넷, 차수는 1입니다. 응력법의 생각은 단순합니다. 반력 하나를 골라 <b>떼어 내면</b> 남은 구조물은 정정이 되어 풀 수 있습니다. 떼어 낸 반력은 모르는 하중 \(X\)로 다시 걸어 둡니다. 원래 구조물에서 그 반력이 있던 점은 움직이지 않았으므로, \(X\)는 "그 점의 변위를 0으로 되돌리는 크기"여야 합니다.</p>
+    <div class="callout def"><strong>정의 14.2 (여유력·기본 구조물·적합 조건)</strong> 부정정 구조물에서 떼어 내도 구조물이 안정하게 남는 반력이나 단면력을 <span class="term">여유력</span><span class="en">(redundant)</span>이라 하고, 여유력을 모두 떼어 낸 정정 구조물을 <span class="term">기본 구조물</span><span class="en">(primary structure)</span>이라 한다. 원래 구조물에서 여유력 방향의 변위(또는 회전)가 가져야 할 값, 보통 0을 나타내는 조건을 <span class="term">적합 조건</span><span class="en">(compatibility condition)</span>이라 한다.</div>
+    <figure class="diagram" id="fig-fx-force">
+      <svg viewBox="0 0 760 300" role="img" aria-label="1단 고정보를 캔틸레버의 하중 처짐과 여유력 처짐의 합으로 나눈 그림">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(20,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">원래 구조물</text>
+          <rect x="10" y="32" width="10" height="44" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <line x1="20" y1="54" x2="200" y2="54" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <path d="M200 54l-9 12h18z" class="f-elev" style="stroke:var(--text)"/><circle cx="195" cy="70" r="3" class="f-elev" style="stroke:var(--text)"/><circle cx="205" cy="70" r="3" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="20" y1="24" x2="200" y2="24" style="stroke:var(--accent-2);stroke-width:1.4"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#fx-ah-load)"><line x1="40" y1="24" x2="40" y2="50"/><line x1="80" y1="24" x2="80" y2="50"/><line x1="120" y1="24" x2="120" y2="50"/><line x1="160" y1="24" x2="160" y2="50"/><line x1="200" y1="24" x2="200" y2="50"/></g>
+          <text x="110" y="16" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">w</text>
+          <text x="110" y="112" text-anchor="middle" class="t-dim">B에서 처짐 = 0</text>
+        </g>
+        <text x="258" y="100" text-anchor="middle" class="t" style="font-weight:700;font-size:22px">=</text>
+        <g transform="translate(272,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">기본 구조물 + 하중</text>
+          <rect x="10" y="32" width="10" height="44" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <line x1="20" y1="54" x2="200" y2="54" style="stroke:var(--text-faint);stroke-width:2;stroke-dasharray:5 4"/>
+          <path d="M20 54 Q120 62 200 100" style="fill:none;stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <line x1="20" y1="24" x2="200" y2="24" style="stroke:var(--accent-2);stroke-width:1.4"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#fx-ah-load)"><line x1="40" y1="24" x2="40" y2="50"/><line x1="80" y1="24" x2="80" y2="52"/><line x1="120" y1="24" x2="120" y2="58"/><line x1="160" y1="24" x2="160" y2="70"/><line x1="200" y1="24" x2="200" y2="88"/></g>
+          <line x1="214" y1="56" x2="214" y2="98" style="stroke:var(--accent);stroke-width:1.6" marker-start="url(#fx-ah-acc)" marker-end="url(#fx-ah-acc)"/>
+          <text x="222" y="84" class="t-mono" style="fill:var(--accent)">δ₁₀</text>
+          <text x="110" y="134" text-anchor="middle" class="t-mono">δ₁₀ = wL⁴/8EI (↓)</text>
+        </g>
+        <text x="520" y="100" text-anchor="middle" class="t" style="font-weight:700;font-size:22px">+</text>
+        <g transform="translate(532,40)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">기본 구조물 + X₁</text>
+          <rect x="6" y="64" width="10" height="44" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <line x1="16" y1="86" x2="196" y2="86" style="stroke:var(--text-faint);stroke-width:2;stroke-dasharray:5 4"/>
+          <path d="M16 86 Q116 80 196 44" style="fill:none;stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <line x1="196" y1="130" x2="196" y2="54" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#fx-ah-react)"/>
+          <text x="186" y="142" text-anchor="end" class="t-mono" style="fill:var(--ok)">X₁ = R_B</text>
+          <text x="100" y="166" text-anchor="middle" class="t-mono">f₁₁X₁ = X₁L³/3EI (↑)</text>
+        </g>
+        <text x="380" y="250" text-anchor="middle" class="t" style="font-weight:700">적합 조건: δ_B = δ₁₀ + f₁₁X₁ = 0  →  X₁ = −δ₁₀/f₁₁ = 3wL/8</text>
+        <text x="380" y="272" text-anchor="middle" class="t-dim">처짐은 위 방향을 +로 잰다. δ₁₀ = −wL⁴/8EI, f₁₁ = +L³/3EI</text>
+      </svg>
+      <figcaption><b>그림 14-2.</b> 응력법의 중첩. 원래의 1단 고정보는 롤러 반력을 떼어 낸 캔틸레버(기본 구조물)에 하중을 건 경우와 여유력 X₁을 건 경우의 합이다. 두 경우의 B점 처짐을 더해 0이 되도록 X₁을 정한다. 처짐 공식은 11장에서 유도한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 14.3 (응력법, 유연도법)</strong> \(n\)차 부정정 구조물에서 여유력 \(X_1, \dots, X_n\)을 골라 기본 구조물을 만든다. 기본 구조물에 실제 하중만 걸었을 때 여유력 \(i\) 방향의 변위를 \(\delta_{i0}\), 여유력 \(j\)에 단위 힘을 걸었을 때 \(i\) 방향 변위를 \(f_{ij}\)(<span class="term">유연도 계수</span>)라 하면, 중첩과 적합 조건에서
+      <div class="formula">$$\sum_{j=1}^{n} f_{ij} X_j = \Delta_i - \delta_{i0} \quad (i = 1, \dots, n), \qquad \text{행렬로 } [F]\{X\} = \{\Delta\} - \{\delta_0\}$$<div class="where">\(\Delta_i\)는 원래 구조물에서 그 점의 실제 변위(지점이면 0, 침하가 있으면 그 값). 맥스웰-베티 상반 정리(12장)에 따라 \(f_{ij} = f_{ji}\)이므로 유연도 행렬 \([F]\)는 대칭이다.</div></div>
+      여유력을 구한 뒤의 단면력·반력은 중첩으로 얻는다: \(M = M_0 + \sum_j m_j X_j\) (\(M_0\): 기본 구조물의 하중 모멘트, \(m_j\): 단위 여유력의 모멘트).</div>
+    <div class="callout"><strong>예제 14.1 (1단 고정보, 등분포 하중)</strong> 경간 \(L = 6\) m, 왼쪽 A 고정, 오른쪽 B 롤러, 등분포 하중 \(w = 12\) kN/m, \(EI\) 일정.
+      <ol style="margin:6px 0 0">
+        <li><b>여유력.</b> B의 롤러 반력 \(X_1 = R_B\)(위 +)를 고른다. 기본 구조물은 A에 고정된 캔틸레버다.</li>
+        <li><b>기본 구조물의 처짐.</b> 등분포 하중에 의한 끝 처짐 \(\delta_{10} = -wL^4/(8EI) = -12 \times 1296/(8EI) = -1944/EI\). 끝에 위 방향 단위 힘을 걸면 \(f_{11} = L^3/(3EI) = 72/EI\).</li>
+        <li><b>적합 조건.</b> \(-1944/EI + (72/EI)X_1 = 0\) → \(X_1 = R_B = 27\) kN \(= 3wL/8\).</li>
+        <li><b>나머지는 평형.</b> \(R_A = wL - R_B = 72 - 27 = 45\) kN, \(M_A = R_B L - wL^2/2 = 162 - 216 = -54\) kN·m \(= -wL^2/8\).</li>
+        <li><b>양의 최대 모멘트.</b> B에서 \(u\)만큼 떨어진 곳의 \(M = R_B u - wu^2/2\)은 \(u = R_B/w = 2.25\) m(A에서 3.75 m)에서 최대 \(9wL^2/128 = 30.4\) kN·m.</li>
+      </ol>
+      검산: A의 고정단 모멘트 대신 A의 회전을 여유력으로 골라도(아래 시뮬레이터) 같은 답이 나온다.</div>
+    <div class="sim" id="sim-fx-redundant">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>여유력을 골라 적합 조건 맞추기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view fx-stack">
+          <div><canvas id="fx-cv-red" aria-label="여유력을 건 기본 구조물의 변형"></canvas><span class="fx-cap" id="fx-r-cap">기본 구조물: 캔틸레버</span></div>
+          <div><canvas id="fx-cv-red2" aria-label="여유력과 적합 조건의 어긋남 그래프"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>여유력 선택</span><div class="seg" id="fx-r-mode"><button data-value="rb" class="on">B 반력 R<sub>B</sub></button><button data-value="ma">A 모멘트 M<sub>A</sub></button></div></div>
+          <label class="ctrl"><span>여유력 크기 X <output id="fx-r-x-out"></output></span><input type="range" id="fx-r-x" min="0" max="60" step="0.25" value="10"></label>
+          <div class="btn-row"><button class="btn primary" id="fx-r-solve">적합 조건 맞추기</button><button class="btn" id="fx-r-zero">X = 0</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">δ₁₀ (하중만)</span><span class="v" id="fx-r-d0">—</span></div>
+        <div class="stat"><span class="k">f₁₁ (단위 X)</span><span class="v" id="fx-r-f">—</span></div>
+        <div class="stat"><span class="k">어긋남 δ₁₀ + f₁₁X</span><span class="v" id="fx-r-gap">—</span></div>
+        <div class="stat"><span class="k">X* = −δ₁₀/f₁₁</span><span class="v" id="fx-r-xs">—</span></div>
+      </div>
+      <div class="fx-msg" id="fx-r-msg"></div>
+      <div class="sim-note">해볼 것: X를 움직여 어긋남이 0이 되는 곳을 찾으세요 · 여유력을 M<sub>A</sub>로 바꾸면 기본 구조물이 단순보가 되고, 적합 조건은 "A의 회전 = 0"이 됩니다. 두 방법의 최종 반력이 같은지 확인하세요 · 모델: 예제 14.1(L = 6 m, w = 12 kN/m, EI = 10⁵ kN·m², 교육용). 변형은 X = 0일 때를 기준으로 같은 배율로 그린다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="continuous">
+    <h2>연속보와 3연모멘트식</h2>
+    <p>2경간 연속보는 차수 1이므로 가운데 지점 반력 \(R_B\)를 여유력으로 고르면 기본 구조물은 경간 \(2L\)인 단순보가 됩니다. 단순보 한가운데의 처짐과 한가운데 단위 힘에 의한 처짐은 11장의 공식으로 바로 씁니다.</p>
+    <div class="callout"><strong>예제 14.2 (같은 두 경간, 등분포 하중)</strong> 경간 \(L = 8\) m 두 개, 전체에 \(w = 10\) kN/m.
+      <ol style="margin:6px 0 0">
+        <li><b>기본 구조물.</b> 경간 \(2L = 16\) m 단순보. 가운데 처짐 \(\delta_{10} = -5w(2L)^4/(384EI)\), 가운데 위 방향 단위 힘에 의한 처짐 \(f_{11} = (2L)^3/(48EI)\).</li>
+        <li><b>적합 조건.</b> \(R_B = -\delta_{10}/f_{11} = \dfrac{5w(2L)^4/384}{(2L)^3/48} = \dfrac{5}{8}w(2L) = 1.25wL = 100\) kN.</li>
+        <li><b>평형.</b> \(R_A = R_C = (2wL - R_B)/2 = 0.375wL = 30\) kN.</li>
+        <li><b>지점 모멘트.</b> \(M_B = R_A L - wL^2/2 = 240 - 320 = -80\) kN·m \(= -wL^2/8\). 경간 최대는 A에서 \(0.375L = 3\) m 떨어진 곳의 \(+9wL^2/128 = 45\) kN·m.</li>
+      </ol>
+      경간마다 단순보로 따로 놓았다면 가운데 지점 반력은 \(wL = 80\) kN, 경간 최대 모멘트는 \(wL^2/8 = 80\) kN·m였다. 연속성 덕분에 경간 모멘트가 45로 줄고, 대신 지점 위에 −80이 생긴다.</div>
+    <figure class="diagram" id="fig-fx-twospan">
+      <svg viewBox="0 0 760 300" role="img" aria-label="2경간 연속보와 두 단순보의 휨모멘트 비교">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <line x1="80" y1="70" x2="680" y2="70" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+        <path d="M80 70l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M380 70l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M680 70l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+        <line x1="80" y1="44" x2="680" y2="44" style="stroke:var(--accent-2);stroke-width:1.4"/>
+        <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#fx-ah-load)"><line x1="80" y1="44" x2="80" y2="66"/><line x1="155" y1="44" x2="155" y2="66"/><line x1="230" y1="44" x2="230" y2="66"/><line x1="305" y1="44" x2="305" y2="66"/><line x1="380" y1="44" x2="380" y2="66"/><line x1="455" y1="44" x2="455" y2="66"/><line x1="530" y1="44" x2="530" y2="66"/><line x1="605" y1="44" x2="605" y2="66"/><line x1="680" y1="44" x2="680" y2="66"/></g>
+        <line x1="80" y1="126" x2="80" y2="96" style="stroke:var(--ok);stroke-width:2.2" marker-end="url(#fx-ah-react)"/><text x="80" y="140" text-anchor="middle" class="t-mono" style="fill:var(--ok)">0.375wL</text>
+        <line x1="380" y1="126" x2="380" y2="96" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#fx-ah-react)"/><text x="380" y="140" text-anchor="middle" class="t-mono" style="fill:var(--ok)">1.25wL</text>
+        <line x1="680" y1="126" x2="680" y2="96" style="stroke:var(--ok);stroke-width:2.2" marker-end="url(#fx-ah-react)"/><text x="680" y="140" text-anchor="middle" class="t-mono" style="fill:var(--ok)">0.375wL</text>
+        <line x1="80" y1="210" x2="680" y2="210" class="s-axis"/>
+        <path d="M80 210 Q230 330 380 210 Q530 330 680 210" style="fill:none;stroke:var(--text-faint);stroke-width:1.6;stroke-dasharray:6 4"/>
+        <path d="M80 210 Q184 300 290 222 Q340 186 380 170 Q420 186 470 222 Q576 300 680 210" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.2"/>
+        <text x="380" y="162" text-anchor="middle" class="t-mono" style="fill:var(--accent)">−wL²/8 (지점 B)</text>
+        <text x="190" y="276" text-anchor="middle" class="t-mono" style="fill:var(--accent)">+9wL²/128</text>
+        <text x="600" y="276" text-anchor="middle" class="t-mono" style="fill:var(--text-dim)">점선: 단순보 둘(wL²/8)</text>
+      </svg>
+      <figcaption><b>그림 14-3.</b> 2경간 연속보(실선)와 경간마다 따로 놓은 단순보(점선)의 휨모멘트도(인장측). 연속보는 가운데 지점이 전체 하중의 5/8을 받고, 경간 모멘트가 wL²/8에서 9wL²/128로 줄어드는 대신 지점 위에 −wL²/8이 생긴다.</figcaption>
+    </figure>
+    <p>경간이 셋 이상이면 여유력도 여럿이라 연립 방정식이 됩니다. 이때 중간 지점의 반력 대신 <b>중간 지점 위 휨모멘트</b>를 여유력으로 고르면 식이 특히 깔끔해집니다. 지점마다 보를 잘라 힌지를 넣으면 기본 구조물은 단순보의 줄이 되고, 적합 조건은 "지점 양쪽 보의 처짐각이 같다(보가 꺾이지 않는다)"가 됩니다.</p>
+    <div class="callout def"><strong>원리 14.4 (3연모멘트식)</strong> 연속보의 이웃한 세 지점 \(A, B, C\)(높이 같음)의 지점 모멘트 \(M_A, M_B, M_C\)(새깅 +)와 경간 \(L_1 = AB\), \(L_2 = BC\) 사이에는, \(EI\)가 일정할 때
+      <div class="formula">$$M_A L_1 + 2M_B (L_1 + L_2) + M_C L_2 = -\frac{6 A_1 \bar{a}_1}{L_1} - \frac{6 A_2 \bar{b}_2}{L_2}$$<div class="where">\(A_1, A_2\): 각 경간을 단순보로 보았을 때의 휨모멘트도 넓이, \(\bar a_1\): \(A_1\)의 도심에서 A까지 거리, \(\bar b_2\): \(A_2\)의 도심에서 C까지 거리. 등분포 하중 \(w\)이면 \(6A\bar a/L = wL^3/4\), 경간 가운데 집중 하중 \(P\)이면 \(3PL^2/8\).</div></div>
+      이 식을 중간 지점마다 하나씩 쓰면 미지 지점 모멘트와 같은 개수의 방정식이 된다.</div>
+    <div class="callout site"><strong>4경간 연속 큰보 G1</strong> 기준 건물 B-10의 큰보 G1은 X 방향으로 8 m × 4경간이 이어집니다. 기둥의 휨 강성을 무시하고 모든 경간에 \(w_u = 100\) kN/m가 걸린 연속보로 보면, 끝 지점 모멘트가 0이므로 3연모멘트식 세 개는 \(q = wL^2/2 = 3200\) kN·m로
+      <div class="formula">$$4M_1 + M_2 = -q, \quad M_1 + 4M_2 + M_3 = -q, \quad M_2 + 4M_3 = -q$$</div>
+      대칭(\(M_1 = M_3\))을 쓰면 \(M_1 = -3q/14 = -686\) kN·m, \(M_2 = -q/7 = -457\) kN·m입니다(\(-0.107wL^2\), \(-0.071wL^2\)). 반력은 끝 지점 314 kN, 첫째 중간 지점 914 kN, 가운데 지점 743 kN로, 단순보로 보았을 때(끝 400, 중간 800)와 크게 다릅니다. 기둥이 보의 회전을 일부 막는 실제 골조는 15장의 방법으로 풉니다. 모든 값은 교육용입니다.</div>
+    <p>연속보의 진짜 재미는 하중이 한 경간에만 있을 때 나타납니다. 왼쪽 경간을 누르면 보가 가운데 지점을 지렛대 삼아 오른쪽 경간을 들어 올리려 하므로, 오른쪽 끝 지점에는 아래로 잡아당기는 반력(들림)이 생길 수 있습니다. 집중 하중을 끌어 보세요.</p>
+    <div class="sim" id="sim-fx-twospan">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>2경간 연속보 위로 하중 끌기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view fx-stack">
+          <div><canvas id="fx-cv-two" aria-label="집중 하중을 끌 수 있는 2경간 연속보"></canvas><span class="fx-cap">P 손잡이를 좌우로 끌기</span></div>
+          <div><canvas id="fx-cv-two2" aria-label="연속보와 단순보 둘의 휨모멘트도"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>첫 경간 L₁ <output id="fx-t-l-out"></output></span><input type="range" id="fx-t-l" min="4" max="12" step="0.5" value="8"></label>
+          <label class="ctrl"><span>집중 하중 P <output id="fx-t-p-out"></output></span><input type="range" id="fx-t-p" min="0" max="200" step="5" value="100"></label>
+          <label class="ctrl"><span>등분포 w <output id="fx-t-w-out"></output></span><input type="range" id="fx-t-w" min="0" max="30" step="1" value="0"></label>
+          <label class="check"><input type="checkbox" id="fx-t-cmp" checked> 단순보 둘(점선) 겹쳐 보기</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">R<sub>A</sub></span><span class="v" id="fx-t-ra">—</span></div>
+        <div class="stat"><span class="k">R<sub>B</sub></span><span class="v" id="fx-t-rb">—</span></div>
+        <div class="stat"><span class="k">R<sub>C</sub></span><span class="v" id="fx-t-rc">—</span></div>
+        <div class="stat"><span class="k">M<sub>B</sub></span><span class="v" id="fx-t-mb">—</span></div>
+      </div>
+      <div class="fx-msg" id="fx-t-msg"></div>
+      <div class="sim-note">해볼 것: P를 첫 경간 가운데에 두고 R<sub>C</sub>가 음수(들림)가 되는 것을 보세요 · 등분포 하중만 두고 L₁ = 8 m이면 R<sub>B</sub> = 1.25wL인지 확인하세요 · 모델: 전체 길이 16 m(L₂ = 16 − L₁), 핀·롤러·롤러, EI 일정. 들림 반력은 실제 지점에 앵커가 있어야 생긴다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="settlement">
+    <h2>지점 침하와 온도: 부정정 구조에서만 생기는 힘</h2>
+    <div class="problem"><strong>기초가 1 cm 가라앉으면</strong>
+      <p>B-10의 기둥 하나가 이웃 기둥보다 기초가 1 cm 더 가라앉았다고 합시다. 하중은 그대로입니다. 그 위의 큰보는 아무 일 없을까요? 다리의 강재가 한여름에 30 °C 더워져 늘어나면요?</p></div>
+    <p>정정 구조물은 지점이 움직이거나 부재가 늘어나도 <b>강체처럼 따라 움직일 뿐</b>이라 힘이 생기지 않습니다. 평형 방정식이 반력을 하나로 정해 주는데, 그 식에는 변위가 들어 있지 않기 때문입니다. 부정정 구조물은 다릅니다. 여분의 지점이 움직이려는 변형을 붙잡으므로, 적합 조건의 우변 \(\Delta_i\)가 0이 아니게 되고 그만큼의 여유력이 생깁니다.</p>
+    <div class="callout def"><strong>원리 14.5 (강제 변위에 의한 단면력)</strong> 지점 침하, 온도 변화, 제작 오차처럼 하중 없이 주어지는 변형을 <span class="term">강제 변위</span>라 한다. 정정 구조물에서 강제 변위는 단면력을 만들지 않는다. 부정정 구조물에서는 원리 14.3의 \(\{\Delta\}\)에 강제 변위를 넣어 여유력을 구하며, 그 크기는 구조물의 <b>강성(EI)에 비례</b>한다. 대표적인 결과:
+      <div class="formula">$$\text{양단 고정보, 한쪽 끝 침하 } \Delta: \; M = \frac{6EI\Delta}{L^2}; \qquad \text{2경간 연속보, 가운데 침하 } \Delta: \; M_B = \frac{3EI\Delta}{L^2}; \qquad \text{양단 고정 봉, 온도 } \Delta T: \; N = -EA\alpha\Delta T.$$</div></div>
+    <figure class="diagram" id="fig-fx-settle">
+      <svg viewBox="0 0 760 300" role="img" aria-label="지점 침하에 대한 정정 게르버보와 부정정 연속보의 반응">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(30,0)">
+          <text x="160" y="36" text-anchor="middle" class="t" style="font-weight:700">(a) 정정: 힌지를 넣은 보</text>
+          <line x1="20" y1="80" x2="300" y2="80" style="stroke:var(--text-faint);stroke-width:2;stroke-dasharray:5 4"/>
+          <path d="M20 80 L196 108 L300 80" style="fill:none;stroke:var(--text);stroke-width:4;stroke-linejoin:round"/>
+          <circle cx="196" cy="108" r="5" class="f-elev" style="stroke:var(--text);stroke-width:2"/>
+          <path d="M20 80l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M160 102l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M300 80l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="140" y1="82" x2="140" y2="102" style="stroke:var(--accent-2);stroke-width:1.6" marker-end="url(#fx-ah-load)"/><text x="132" y="96" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">Δ</text>
+          <text x="160" y="160" text-anchor="middle" class="t-dim">조각들이 힌지에서 꺾이며 따라 내려간다</text>
+          <text x="160" y="184" text-anchor="middle" class="t-mono" style="fill:var(--ok)">추가 휨모멘트 = 0</text>
+        </g>
+        <g transform="translate(400,0)">
+          <text x="160" y="36" text-anchor="middle" class="t" style="font-weight:700">(b) 부정정: 연속보</text>
+          <line x1="20" y1="80" x2="300" y2="80" style="stroke:var(--text-faint);stroke-width:2;stroke-dasharray:5 4"/>
+          <path d="M20 80 Q90 112 160 108 Q230 112 300 80" style="fill:none;stroke:var(--text);stroke-width:4"/>
+          <path d="M20 80l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M160 108l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M300 80l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="140" y1="82" x2="140" y2="104" style="stroke:var(--accent-2);stroke-width:1.6" marker-end="url(#fx-ah-load)"/><text x="132" y="96" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">Δ</text>
+          <line x1="20" y1="196" x2="300" y2="196" class="s-axis"/>
+          <path d="M20 196 L160 240 L300 196" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="160" y="262" text-anchor="middle" class="t-mono" style="fill:var(--accent)">+3EIΔ/L² (새깅, 인장측 = 아래)</text>
+          <text x="160" y="160" text-anchor="middle" class="t-dim">보가 휘어야 따라갈 수 있다 → 휨모멘트</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-4.</b> 가운데 지점이 Δ만큼 가라앉을 때. 정정 구조(a)는 힌지에서 꺾여 강체처럼 따라가므로 힘이 생기지 않는다. 부정정 연속보(b)는 휘어야만 지점을 따라갈 수 있어서, 하중이 없어도 지점 위에 새깅 모멘트 3EIΔ/L²(아래 그림, 인장측인 보 아래쪽에 그림)이 생기고 가운데 지점 반력은 줄어든다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 14.3 (G1과 같은 2경간 연속보의 침하)</strong> 경간 \(L = 8\) m 두 개, \(EI = 3.14 \times 10^5\) kN·m²(G1 단면, 균열 전), 가운데 지점이 \(\Delta = 10\) mm 침하.
+      <ol style="margin:6px 0 0">
+        <li><b>기본 구조물.</b> 가운데 반력 \(X\)(위 +)를 떼어 낸 16 m 단순보. 하중이 없으므로 \(\delta_{10} = 0\), \(f_{11} = (2L)^3/(48EI)\).</li>
+        <li><b>적합 조건.</b> 가운데 처짐이 \(-\Delta\)여야 하므로 \(f_{11}X = -\Delta\) → \(X = -48EI\Delta/(2L)^3 = -6EI\Delta/L^3 = -6 \times 3.14 \times 10^5 \times 0.01/512 = -36.8\) kN. 하중이 없으니 가운데 지점이 보를 <b>아래로 끌어당기는</b> 힘이다.</li>
+        <li><b>휨모멘트.</b> \(M_B = R_A L = 18.4 \times 8 = +147\) kN·m \(= 3EI\Delta/L^2\). 보 아래 섬유가 인장이다.</li>
+      </ol>
+      하중 \(w_u = 100\) kN/m로 생긴 \(M_B = -800\) kN·m(\(-wL^2/8\))에 이것을 더하면 \(-653\) kN·m. 지점 모멘트는 줄고 경간 모멘트는 늘어난다. 강성이 두 배인 보라면 같은 침하에 두 배의 모멘트가 생긴다. 튼튼하게 만든다고 침하에 안전해지지 않는다는 뜻이다.</div>
+    <div class="sim" id="sim-fx-settle">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>지점 침하가 만드는 휨모멘트</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view fx-stack">
+          <div><canvas id="fx-cv-set" aria-label="지점이 침하한 2경간 보의 변형"></canvas><span class="fx-cap">변형 과장</span></div>
+          <div><canvas id="fx-cv-set2" aria-label="침하 전후의 휨모멘트도"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>가운데 B 침하 <output id="fx-s-b-out"></output></span><input type="range" id="fx-s-b" min="0" max="30" step="0.5" value="10"></label>
+          <label class="ctrl"><span>오른쪽 C 침하 <output id="fx-s-c-out"></output></span><input type="range" id="fx-s-c" min="0" max="30" step="0.5" value="0"></label>
+          <label class="check"><input type="checkbox" id="fx-s-load" checked> 계수 하중 100 kN/m</label>
+          <label class="check"><input type="checkbox" id="fx-s-hinge"> 힌지를 넣어 정정으로(B에서 2 m)</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">M<sub>B</sub></span><span class="v" id="fx-s-mb">—</span></div>
+        <div class="stat"><span class="k">침하에 의한 변화</span><span class="v" id="fx-s-dm">—</span></div>
+        <div class="stat"><span class="k">R<sub>B</sub></span><span class="v" id="fx-s-rb">—</span></div>
+      </div>
+      <div class="fx-legend"><span class="key moment">침하 있음</span><span class="k3"><i style="background:var(--text-dim)"></i>침하 없음(점선)</span></div>
+      <div class="sim-note">해볼 것: 하중을 끄고 Δ<sub>B</sub>만 주어 M<sub>B</sub> = 3EIΔ/L²(10 mm → 147 kN·m)을 확인하세요 · 힌지를 켜면 침하를 아무리 줘도 휨모멘트도가 그대로입니다 · Δ<sub>B</sub> = Δ<sub>C</sub>로 두 지점을 같이 내리면 어떻게 될까요 · 모델: 8 m × 2, EI = 3.14 × 10⁵ kN·m², 핀·롤러·롤러, 교육용.</div>
+    </div>
+    <p>온도도 같은 이야기입니다. 길이 \(L\)인 봉이 \(\Delta T\)만큼 더워지면 자유롭게는 \(\alpha \Delta T L\)만큼 늘어납니다(7장). 양 끝이 막혀 있으면 그 늘음을 도로 눌러 줄여야 하므로 축력 \(N = -EA\alpha\Delta T\)가 생깁니다. 길이와 상관없다는 점에 주의하세요. 보의 위아래 온도가 다르면(햇볕 받는 지붕 슬래브) 곡률 \(\alpha\Delta T/h\)가 생기고, 양단 고정보에서는 휨모멘트 \(EI\alpha\Delta T/h\)가 됩니다.</p>
+    <div class="callout site"><strong>T-36의 한쪽 끝은 왜 굴러가나</strong> 보도교 T-36은 한쪽 끝이 핀, 다른 끝이 롤러(신축 받침)인 정정 트러스라서 온도가 바뀌어도 늘고 줄 뿐 힘이 생기지 않습니다. 만약 양 끝을 모두 핀으로 묶으면 지간 36 m가 30 °C 더워질 때 자유 팽창 \(1.2 \times 10^{-5} \times 30 \times 36 = 13\) mm를 지점이 막게 됩니다. 하현재를 12·13장과 같은 H-200×200×8×12(A ≈ 6,208 mm²)로 가정하고, 하현재만 막힌다고 단순화하면 지점 수평 반력과 하현재 압축력이 약 \(EA\alpha\Delta T = 2.1 \times 10^8 \times 0.006208 \times 1.2 \times 10^{-5} \times 30 \approx 469\) kN — 보행자 하중으로 생기는 하현재 중앙 인장력 320 kN보다 큽니다. 다리 끝의 신축 이음과 받침은 이 힘을 만들지 않으려고 있는 장치입니다(단면적은 교육용 가정).</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="stiffness">
+    <h2>강한 쪽이 더 받는다: 강성에 따른 힘의 분배</h2>
+    <p>정정 구조에서 힘의 흐름은 기하학(지점의 위치)만으로 정해집니다. 부정정 구조에서는 여러 길이 한 점에서 같은 변위를 가져야 하므로, 하중은 <b>강성이 큰 길로 더 많이</b> 흐릅니다. 나란히 놓인 두 스프링을 함께 누르면 각 스프링이 받는 힘은 \(F_i = k_i \delta\), 곧 강성에 비례합니다. 구조물의 부재도 마찬가지입니다.</p>
+    <div class="callout def"><strong>원리 14.6 (강성 비례 분배)</strong> 한 점에서 같은 변위 \(\delta\)를 공유하는 \(n\)개의 하중 경로가 있고, 경로 \(i\)의 강성(그 점에 단위 변위를 주는 데 드는 힘)이 \(k_i\)이면, 그 점의 하중 \(P\)는
+      <div class="formula">$$P_i = \frac{k_i}{\sum_j k_j} P, \qquad \delta = \frac{P}{\sum_j k_j}$$</div>
+      로 나뉜다. 단순보 가운데의 강성은 \(k = 48EI/L^3\)이므로 짧은 보일수록 \(L^3\)에 반비례해 훨씬 많이 받는다.</div>
+    <figure class="diagram" id="fig-fx-cross">
+      <svg viewBox="0 0 760 300" role="img" aria-label="교차하는 두 보가 집중 하중을 강성 비로 나눠 받는 평면도">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <text x="140" y="0" text-anchor="middle" class="t" style="font-weight:700">평면도</text>
+          <line x1="40" y1="120" x2="240" y2="120" style="stroke:var(--accent);stroke-width:10;stroke-linecap:round;opacity:.85"/>
+          <line x1="140" y1="20" x2="140" y2="220" style="stroke:var(--accent-2);stroke-width:5;stroke-linecap:round;opacity:.85"/>
+          <circle cx="140" cy="120" r="8" style="fill:var(--accent-2)"/>
+          <text x="152" y="112" class="t-mono" style="fill:var(--accent-2)">P</text>
+          <rect x="30" y="110" width="10" height="20" class="f-elev" style="stroke:var(--text)"/><rect x="240" y="110" width="10" height="20" class="f-elev" style="stroke:var(--text)"/>
+          <rect x="130" y="10" width="20" height="10" class="f-elev" style="stroke:var(--text)"/><rect x="130" y="220" width="20" height="10" class="f-elev" style="stroke:var(--text)"/>
+          <text x="40" y="150" class="t-mono">보 1: L₁ (짧다)</text><text x="152" y="210" class="t-mono">보 2: L₂</text>
+        </g>
+        <g transform="translate(400,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">적합 조건: 교점의 처짐이 같다</text>
+          <text x="0" y="40" class="t-mono">P₁L₁³/48EI₁ = P₂L₂³/48EI₂ ,  P₁ + P₂ = P</text>
+          <text x="0" y="76" class="t-mono">P₁/P = k₁/(k₁ + k₂),  k = 48EI/L³</text>
+          <text x="0" y="124" class="t">L₁ = 6 m, L₂ = 8 m, EI 같음</text>
+          <text x="0" y="148" class="t-mono" style="fill:var(--accent)">P₁/P = 8³/(6³ + 8³) = 512/728 = 70 %</text>
+          <rect x="0" y="170" width="210" height="20" style="fill:var(--accent);opacity:.8"/><rect x="210" y="170" width="89" height="20" style="fill:var(--accent-2);opacity:.8"/>
+          <text x="105" y="185" text-anchor="middle" class="t-mono" style="fill:#fff">보 1 70 %</text><text x="254" y="185" text-anchor="middle" class="t-mono" style="fill:#fff">30 %</text>
+          <text x="0" y="226" class="t-dim">경간이 4/3배일 뿐인데 분담은 2.4배 차이</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-5.</b> 두 보가 가운데에서 겹쳐 집중 하중을 받는 교차보. 교점에서 처짐이 같아야 한다는 적합 조건 하나로 분담이 정해지고, 짧은 보가 L³에 반비례해 대부분을 가져간다. 직사각형 2방향 슬래브에서 짧은 방향이 하중을 더 많이 받는 것과 같은 원리다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fx-share">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>교차하는 두 보의 하중 분담</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-share" aria-label="교차보의 평면도와 하중 분담 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>보 1 경간 L₁ <output id="fx-c-l1-out"></output></span><input type="range" id="fx-c-l1" min="3" max="12" step="0.5" value="6"></label>
+          <label class="ctrl"><span>보 2 경간 L₂ <output id="fx-c-l2-out"></output></span><input type="range" id="fx-c-l2" min="3" max="12" step="0.5" value="8"></label>
+          <label class="ctrl"><span>강성 비 EI₂/EI₁ <output id="fx-c-r-out"></output></span><input type="range" id="fx-c-r" min="0.25" max="4" step="0.05" value="1"></label>
+          <label class="ctrl"><span>교점 하중 P <output id="fx-c-p-out"></output></span><input type="range" id="fx-c-p" min="0" max="300" step="10" value="100"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">보 1 분담 P₁</span><span class="v" id="fx-c-p1">—</span></div>
+        <div class="stat"><span class="k">보 2 분담 P₂</span><span class="v" id="fx-c-p2">—</span></div>
+        <div class="stat"><span class="k">교점 처짐 δ</span><span class="v" id="fx-c-d">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 두 경간을 같게 하면 50 : 50입니다 · L₂를 L₁의 2배로 하면 보 2는 1/9만 받습니다 · 보 2를 깊게(EI₂ 증가) 만들어 분담을 되찾으려면 얼마나 키워야 할까요 · 모델: 단순 지지된 두 보가 경간 가운데에서 맞닿음, k = 48EI/L³, EI₁ = 3.14 × 10⁵ kN·m²(G1), 비틀림 무시.</div>
+    </div>
+    <p>같은 원리가 건물 전체에서 일어납니다. B-10에는 기둥과 보로 된 골조와 함께 코어 전단벽이 있습니다. 수평력(바람, 지진)이 오면 바닥 슬래브가 층마다 골조와 벽의 변위를 같게 묶으므로, 훨씬 강한 코어 벽이 수평력의 대부분을 가져갑니다(16장, StructureBook). 반대로 강한 부재는 원하지 않는 힘도 끌어당깁니다. 창문 사이의 짧은 기둥(단주)이 지진 때 전단 파괴되는 일이 잦은 이유가 바로 "짧아서 강하다"는 것입니다.</p>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="redundancy">
+    <h2>여유도: 부재 하나가 끊어질 때</h2>
+    <p>부정정 차수의 영어 이름 redundancy는 "여분"이라는 뜻입니다. 정정 구조물은 부재나 지점 하나만 잃어도 기구가 되어 무너지지만, \(n\)차 부정정 구조물은 이론적으로 최대 \(n\)개의 구속을 잃어도 서 있을 수 있습니다. 끊어진 부재가 나르던 힘이 다른 길로 돌아가기 때문입니다. 이것을 <span class="term">대체 하중 경로</span><span class="en">(alternate load path)</span>라 합니다.</p>
+    <div class="callout def"><strong>정의 14.7 (여유도와 연쇄 붕괴)</strong> 구조물의 일부가 손상되어도 하중을 다른 경로로 전달해 전체 붕괴를 막는 능력을 <span class="term">여유도</span><span class="en">(redundancy)</span> 또는 강건성이라 한다. 국부 손상이 이웃 부재의 과부하로 이어져 손상 범위보다 훨씬 큰 붕괴로 번지는 현상을 <span class="term">연쇄 붕괴</span><span class="en">(progressive collapse)</span>라 한다.</div>
+    <p>1968년 영국 런던의 22층 아파트 로넌 포인트에서는 한 층의 가스 폭발로 바깥벽 패널 하나가 떨어져 나가자 그 위층들이 받칠 곳을 잃고 건물 한 모서리가 맨 위층부터 아래까지 무너졌습니다. 패널끼리 이어 주는 연결이 약해 하중이 돌아갈 길이 없었던 것입니다. 이 사고 이후 여러 나라의 기준이 "부재 하나를 잃어도 버티는" 연결과 대체 경로를 요구하게 되었습니다. 다만 여유도는 공짜가 아닙니다. 대체 경로의 부재가 늘어난 힘을 견딜 만큼 강해야 하고, 연결부가 그 힘을 전달할 수 있어야 합니다.</p>
+    <figure class="diagram" id="fig-fx-paths">
+      <svg viewBox="0 0 760 270" role="img" aria-label="교차 대각재가 있는 트러스에서 부재 하나가 끊어질 때 힘이 다른 대각재로 돌아가는 그림">
+        <rect x="10" y="10" width="740" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">교차 대각재 패널 (n = 1)</text>
+          <rect x="60" y="30" width="180" height="120" style="fill:none;stroke:var(--text);stroke-width:3"/>
+          <line x1="60" y1="150" x2="240" y2="30" style="stroke:var(--tension);stroke-width:3.5"/>
+          <line x1="60" y1="30" x2="240" y2="150" style="stroke:var(--compression);stroke-width:3.5"/>
+          <line x1="240" y1="30" x2="290" y2="30" style="stroke:var(--accent-2);stroke-width:2.4" marker-start="url(#fx-ah-load)"/>
+          <text x="150" y="180" text-anchor="middle" class="t-dim">두 대각재가 수평력을 반씩 나눈다</text>
+        </g>
+        <g transform="translate(400,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">하나가 끊어지면 (n = 0)</text>
+          <rect x="60" y="30" width="180" height="120" style="fill:none;stroke:var(--text);stroke-width:3"/>
+          <line x1="60" y1="150" x2="240" y2="30" style="stroke:var(--tension);stroke-width:6"/>
+          <line x1="60" y1="30" x2="140" y2="83" style="stroke:var(--compression);stroke-width:3;stroke-dasharray:5 4;opacity:.5"/>
+          <path d="M146 80l12 10M150 92l10-14" style="stroke:var(--bad);stroke-width:2.4"/>
+          <line x1="240" y1="30" x2="290" y2="30" style="stroke:var(--accent-2);stroke-width:2.4" marker-start="url(#fx-ah-load)"/>
+          <text x="150" y="180" text-anchor="middle" class="t-dim">남은 대각재가 전부 받는다(약 2배)</text>
+          <text x="150" y="200" text-anchor="middle" class="t-mono" style="fill:var(--text-dim)">하나 더 잃으면 기구 → 붕괴</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-6.</b> 교차 대각재를 가진 패널은 1차 부정정이다. 대각재 하나가 끊어져도(오른쪽) 정정 트러스로 남아 하중을 나르지만, 남은 대각재의 힘이 두 배 가까이 늘어난다. 여유도는 "남은 길이 늘어난 힘을 견딜 수 있을 때"에만 의미가 있다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fx-remove">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>부재를 끊어 보는 부정정 트러스</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-rem" aria-label="부재를 눌러 끊을 수 있는 트러스"></canvas><span class="fx-cap">부재를 눌러 끊기·잇기</span></div>
+        <div class="sim-controls">
+          <div class="btn-row"><button class="btn" id="fx-m-reset">모두 잇기</button><button class="btn" id="fx-m-pratt">한 방향 대각재만(정정)</button><button class="btn" id="fx-m-rand">무작위 하나 끊기</button></div>
+          <label class="check"><input type="checkbox" id="fx-m-lab" checked> 부재력 숫자 보기</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">부재 수 m</span><span class="v" id="fx-m-m">—</span></div>
+        <div class="stat"><span class="k">n = m + r − 2j</span><span class="v" id="fx-m-n">—</span></div>
+        <div class="stat"><span class="k">최대 |N|</span><span class="v" id="fx-m-nmax">—</span></div>
+      </div>
+      <div class="fx-msg" id="fx-m-msg"></div>
+      <div class="fx-legend"><span class="key tension">인장</span><span class="key compression">압축</span><span class="key load">하중 40 kN × 3</span></div>
+      <div class="sim-note">해볼 것: 대각재를 하나씩 끊으며 최대 부재력이 얼마나 커지는지 보세요 · n = 0이 된 뒤 하나 더 끊으면 기구가 됩니다 · 현재(하현재)를 끊으면 어떻게 될까요 · 모델: 지간 16 m(4 m × 4 패널), 높이 4 m, 모든 패널에 교차 대각재, 핀·롤러, EA 일정(축력만).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="compare">
+    <h2>정정과 부정정, 무엇을 고를까</h2>
+    <p>같은 보라도 양 끝을 어떻게 붙이느냐에 따라 휨모멘트와 처짐이 크게 달라집니다. B-10 큰보 G1(경간 8 m, 사용 하중 76.7 kN/m, EI = 3.14 × 10⁵ kN·m²)을 세 가지로 받쳐 보면 최대 처짐은 단순보 13.0 mm, 1단 고정보 5.4 mm, 양단 고정보 2.6 mm입니다. 양단 고정보는 단순보보다 다섯 배 덜 처집니다.</p>
+    <div class="table-wrap"><table class="fx-tbl">
+      <thead><tr><th>등분포 하중 w, 경간 L</th><th>최대 +M</th><th>최대 −M</th><th>최대 처짐</th></tr></thead>
+      <tbody>
+        <tr><td>단순보 (정정)</td><td class="hl">wL²/8</td><td>0</td><td>5wL⁴/384EI</td></tr>
+        <tr><td>1단 고정보 (1차)</td><td>9wL²/128</td><td class="hl">wL²/8</td><td>≈ wL⁴/185EI</td></tr>
+        <tr><td>양단 고정보 (연직 하중 2차)</td><td>wL²/24</td><td class="hl">wL²/12</td><td>wL⁴/384EI</td></tr>
+      </tbody></table></div>
+    <div class="sim" id="sim-fx-compare">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>세 가지 지지 조건의 처짐과 휨모멘트</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-cmp" aria-label="단순보, 1단 고정보, 양단 고정보의 처짐과 휨모멘트"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경간 L <output id="fx-p-l-out"></output></span><input type="range" id="fx-p-l" min="4" max="12" step="0.25" value="8"></label>
+          <label class="ctrl"><span>하중 w <output id="fx-p-w-out"></output></span><input type="range" id="fx-p-w" min="10" max="120" step="0.1" value="76.7"></label>
+          <label class="ctrl"><span>EI 배율 <output id="fx-p-e-out"></output></span><input type="range" id="fx-p-e" min="0.25" max="2" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">단순보 δ</span><span class="v" id="fx-p-d1">—</span></div>
+        <div class="stat"><span class="k">1단 고정 δ</span><span class="v" id="fx-p-d2">—</span></div>
+        <div class="stat"><span class="k">양단 고정 δ</span><span class="v" id="fx-p-d3">—</span></div>
+      </div>
+      <div class="fx-legend"><span class="k3"><i style="background:var(--accent)"></i>단순보</span><span class="k3"><i style="background:var(--accent-2)"></i>1단 고정보</span><span class="k3"><i style="background:var(--ok)"></i>양단 고정보</span><span class="k3"><i style="background:var(--text-dim)"></i>L/360(점선)</span></div>
+      <div class="sim-note">해볼 것: 경간을 8 m에서 12 m로 늘리면 처짐이 (1.5)⁴ ≈ 5배가 되는지 보세요 · 단순보가 L/360을 넘는 경간에서도 양단 고정보는 여유가 있습니다 · 모델: G1 기준(EI = 3.14 × 10⁵ kN·m², 균열 전 총단면), 사용 하중 76.7 kN/m. 실제 RC 보는 균열로 강성이 줄어 더 처진다(ConcreteBook).</div>
+    </div>
+    <div class="cards">
+      <div><b>부정정의 장점</b>휨모멘트와 처짐이 작아 같은 단면으로 더 긴 경간을 덮는다. 부재 하나가 손상되어도 대체 경로가 있다. 이음이 적어 일체로 만들기 쉽다(철근콘크리트 골조).</div>
+      <div><b>부정정의 단점</b>지점 침하·온도·크리프·건조수축 같은 강제 변위에 응력이 생긴다. 해석에 부재 강성이 필요하고 계산이 복잡하다. 강성이 큰 곳으로 의도하지 않은 힘이 몰릴 수 있다.</div>
+      <div><b>정정을 고르는 곳</b>지반이 약해 침하가 예상될 때, 온도 변화가 큰 긴 다리, 공장에서 만들어 현장에서 얹는 프리캐스트 부재. 대신 받침·힌지의 신뢰성이 전체 안전을 좌우한다.</div>
+    </div>
+    <div class="callout warn"><strong>여유력의 계산은 강성에 달려 있다</strong> 정정 구조의 반력은 하중과 치수만으로 정해지지만, 부정정 구조의 힘은 부재의 EI·EA 비에 따라 바뀝니다. 철근콘크리트 부재는 균열이 생기면 강성이 줄어들어 힘의 분포도 달라집니다. 해석 결과를 그대로 믿기보다, 강성 가정을 바꿔 결과가 얼마나 민감한지 함께 보는 것이 좋은 습관입니다(16장).</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="slope-deflection.html"><small>CH.15 · 처짐각법과 모멘트 분배법</small>미지수를 힘 대신 회전으로<br><span>여유력이 많은 라멘은 절점 회전을 미지수로 두는 편이 짧다.</span></a>
+      <a href="matrix.html"><small>CH.16 · 매트릭스 구조해석</small>컴퓨터가 푸는 부정정 구조<br><span>유연도 행렬 대신 강성 행렬로, 수천 차 부정정도 한꺼번에.</span></a>
+      <a href="deflection.html"><small>CH.11 · 보의 처짐</small>적합 조건의 재료는 처짐 공식<br><span>δ₁₀와 f₁₁은 모두 처짐 계산에서 나온다.</span></a>
+      <a href="energy.html"><small>CH.12 · 에너지 방법</small>단위하중법과 상반 정리<br><span>유연도 계수를 구하고 [F]가 대칭인 이유를 준다.</span></a>
+      <a href="https://math.euiyun.com/linear/chapters/elimination.html"><small>LINEARBOOK · 연립방정식과 가우스 소거</small>[F]{X} = {Δ} − {δ₀}<br><span>여유력이 여럿이면 연립 1차 방정식을 푼다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>평형 방정식만으로 정해지지 않는 힘의 개수가 부정정 차수다. 보는 n = r − 3 − c, 라멘은 n = 3m + r − 3j − c, 트러스는 n = m + r − 2j. n ≥ 0은 안정의 필요조건일 뿐이다.</li>
+      <li>응력법은 여유력을 떼어 낸 정정 기본 구조물에서 변위를 계산하고, 적합 조건 δ₁₀ + f₁₁X₁ = Δ₁로 여유력을 정한다. 여유력이 여럿이면 대칭 유연도 행렬의 연립 방정식이 된다.</li>
+      <li>1단 고정보(등분포): R<sub>B</sub> = 3wL/8, M<sub>A</sub> = −wL²/8. 같은 2경간 연속보: 가운데 반력 1.25wL, M<sub>B</sub> = −wL²/8. 3연모멘트식으로 여러 경간의 지점 모멘트를 구한다.</li>
+      <li>지점 침하·온도 같은 강제 변위는 정정 구조에는 힘을 만들지 않고, 부정정 구조에는 강성에 비례하는 힘을 만든다. 2경간 연속보의 가운데 침하 Δ는 M<sub>B</sub> = 3EIΔ/L².</li>
+      <li>부정정 구조에서 하중은 강성에 비례해 나뉜다. 단순보 가운데 강성은 48EI/L³이라 짧은 부재가 훨씬 많이 받는다.</li>
+      <li>여유도는 부재 하나를 잃어도 하중이 다른 경로로 돌아가는 능력이다. 대신 남은 경로는 늘어난 힘을 견뎌야 한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 한쪽 끝이 고정되고 다른 끝이 롤러로 받쳐진 보(1단 고정보)의 부정정 차수는?</p><div class="opts">
+        <button class="opt">0</button><button class="opt" data-correct>1</button><button class="opt">2</button><button class="opt">3</button>
+      </div><div class="quiz-exp">반력 성분은 고정단 3개 + 롤러 1개 = 4개, 평형 방정식은 3개이므로 \(n = 4 - 3 = 1\)이다.</div></div>
+      <div class="quiz-q"><p>2. 같은 경간 L 두 개의 연속보 전체에 등분포 하중 w가 걸릴 때 가운데 지점 반력은?</p><div class="opts">
+        <button class="opt">wL</button><button class="opt">0.75wL</button><button class="opt" data-correct>1.25wL</button><button class="opt">2wL</button>
+      </div><div class="quiz-exp">가운데 반력을 여유력으로 두면 \(R_B = \dfrac{5w(2L)^4/384}{(2L)^3/48} = 1.25wL\). 전체 하중 \(2wL\)의 5/8이다. 단순보 둘이었다면 \(wL\)이었다.</div></div>
+      <div class="quiz-q"><p>3. 응력법에서 평형 방정식으로 모자란 식은 무엇으로 채우는가?</p><div class="opts">
+        <button class="opt">에너지 보존</button><button class="opt" data-correct>여유력 방향의 변위가 실제 값(보통 0)과 같다는 적합 조건</button><button class="opt">재료의 항복 조건</button><button class="opt">부재력의 대칭 조건</button>
+      </div><div class="quiz-exp">원래 구조물에서 떼어 낸 지점은 움직이지 않으므로, 기본 구조물의 그 점 변위(하중에 의한 것 + 여유력에 의한 것)의 합이 0이어야 한다. 이것이 적합 조건이다.</div></div>
+      <div class="quiz-q"><p>4. 지점이 1 cm 침하해도 휨모멘트가 생기지 않는 구조는?</p><div class="opts">
+        <button class="opt">2경간 연속보</button><button class="opt">양단 고정보</button><button class="opt" data-correct>힌지로 정정이 된 게르버보</button><button class="opt">고정 지점 문형 라멘</button>
+      </div><div class="quiz-exp">정정 구조는 강제 변위를 강체 운동으로 받아들인다. 반력이 평형만으로 정해지고 그 식에 변위가 들어 있지 않기 때문이다. 나머지는 모두 부정정이다.</div></div>
+      <div class="quiz-q"><p>5. 양단 고정보의 한쪽 끝이 Δ만큼 침하할 때 생기는 끝 모멘트 6EIΔ/L²는 보를 두 배 깊게(I가 8배) 만들면?</p><div class="opts">
+        <button class="opt">1/8로 준다</button><button class="opt">그대로다</button><button class="opt" data-correct>8배로 커진다</button><button class="opt">2배로 커진다</button>
+      </div><div class="quiz-exp">강제 변위에 의한 힘은 강성 \(EI\)에 비례한다. 단면을 키운다고 침하에 안전해지지 않는다. 대신 응력은 \(M/S\)이고 \(S\)는 4배이므로 응력은 2배로 는다.</div></div>
+      <div class="quiz-q"><p>6. 경간 6 m와 8 m인 두 단순보(EI 같음)가 가운데에서 교차해 집중 하중 P를 받는다. 짧은 보가 받는 몫은 약?</p><div class="opts">
+        <button class="opt">43 %</button><button class="opt">57 %</button><button class="opt" data-correct>70 %</button><button class="opt">100 %</button>
+      </div><div class="quiz-exp">교점 처짐이 같으므로 분담은 강성 \(48EI/L^3\)에 비례한다: \(8^3/(6^3 + 8^3) = 512/728 \approx 0.70\).</div></div>
+      <div class="quiz-q"><p>7. 3연모멘트식을 같은 두 경간(양 끝 단순 지지, 등분포 w)에 쓰면 가운데 지점 모멘트는?</p><div class="opts">
+        <button class="opt" data-correct>−wL²/8</button><button class="opt">−wL²/12</button><button class="opt">−wL²/10</button><button class="opt">0</button>
+      </div><div class="quiz-exp">\(0 + 2M_B(2L) + 0 = -2 \times wL^3/4\) → \(4M_B L = -wL^3/2\) → \(M_B = -wL^2/8\). 예제 14.2의 응력법 결과와 같다.</div></div>
+      <div class="quiz-q"><p>8. 절점 10개, 반력 성분 3개인 트러스에 부재가 21개 있다. 부정정 차수는?</p><div class="opts">
+        <button class="opt">1</button><button class="opt">2</button><button class="opt" data-correct>4</button><button class="opt">11</button>
+      </div><div class="quiz-exp">\(n = m + r - 2j = 21 + 3 - 20 = 4\). 이 장의 '부재를 끊어 보는 트러스'가 이 경우다. 네 개를 알맞게 끊으면 정정, 하나 더 끊으면 기구가 된다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 그리기 도우미(픽셀 좌표) ---------- */
+const FXX = {
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  // 보 한 줄의 M 그래프를 그리고 점선 비교 곡선을 겹친다(양(+)을 위로)
+  mchart(ctx, W, H, series, L, o = {}) {
+    const pal = CB.palette(), all = series.flatMap((s) => s.data.map((p) => p[1]));
+    const lo = Math.min(0, ...all), hi = Math.max(0, ...all), pad = (hi - lo) * 0.14 || 1;
+    return CB.chart(ctx, null, { x: [0, L], y: [lo - pad, hi + pad], xLabel: o.xLabel || "x (m)", yLabel: o.yLabel || "M (kN·m)", series, hlines: [{ y: 0, color: pal.axis, dash: [] }], vlines: o.vlines || [] });
+  },
+};
+
+/* ---------- 1. 부정정 차수 ---------- */
+(function () {
+  const L = 20, mid = 10, R = { none: 0, roller: 1, pin: 2, fixed: 3 };
+  const selA = document.getElementById("fx-d-a"), selB = document.getElementById("fx-d-b"), selC = document.getElementById("fx-d-c");
+  const hinge = CB.seg("fx-d-h", go);
+  [selA, selB, selC].forEach((s) => s.addEventListener("change", go));
+  let b;
+  function solve() {
+    const sup = [];
+    if (selA.value !== "none") sup.push({ x: 0, type: selA.value });
+    if (selB.value !== "none") sup.push({ x: mid, type: selB.value });
+    if (selC.value !== "none") sup.push({ x: L, type: selC.value });
+    const h = +hinge(), hinges = h === 0 ? [] : h === 1 ? [6] : [6, 14];
+    b = CB.beam({ L, EI: 1e5, supports: sup, hinges, nodes: [mid], loads: [{ type: "udl", w: 10, a: 0, b: L }] });
+    return { r: R[selA.value] + R[selB.value] + R[selC.value], c: hinges.length };
+  }
+  let cnt = solve();
+  const pl = CB.plane("#fx-cv-deg", { x: [-1.6, L + 1.6], y: [-1.7, 1.3], aspect: (W) => (W < 520 ? 0.52 : 0.3), minHeight: 180, maxHeight: 260, grid: false, axes: false,
+    draw(P) {
+      CB.drawFrame(P, b.frame, { reactions: b.ok, loadPx: 26, loadLabels: false, reactionPx: 26, deformed: b.ok ? "auto" : false, deformPx: 14 });
+      if (!b.ok) P.text("기구: 해석 불가", L / 2, 0, { color: P.P.bad, size: 13, bold: true, align: "center", dy: -46 });
+    } });
+  function go() {
+    cnt = solve(); pl.redraw();
+    const n = cnt.r - 3 - cnt.c;
+    CB.stat("fx-d-r", String(cnt.r));
+    CB.stat("fx-d-n", `${cnt.r} − 3 − ${cnt.c} = ${String(n).replace("-", "−")}`);
+    const kind = !b.ok ? "불안정" : n === 0 ? "정정" : n + "차 부정정";
+    CB.stat("fx-d-k", kind);
+    const msg = document.getElementById("fx-d-msg");
+    if (!b.ok && n >= 0) { msg.className = "fx-msg bad"; msg.innerHTML = "n ≥ 0이지만 <b>기하학적으로 불안정</b>합니다. 반력이 모두 나란하거나(롤러만), 힌지 때문에 한 조각이 받칠 곳을 잃었습니다."; }
+    else if (!b.ok) { msg.className = "fx-msg bad"; msg.innerHTML = "n &lt; 0: 반력이 평형에 필요한 수보다 적어 <b>반드시 불안정</b>합니다."; }
+    else if (n === 0) { msg.className = "fx-msg ok"; msg.textContent = "평형 방정식만으로 반력이 하나로 정해지는 정정 구조입니다."; }
+    else { msg.className = "fx-msg"; msg.innerHTML = `여유력 <b>${n}</b>개를 떼어 내면 정정 기본 구조물이 됩니다. 반력을 구하려면 적합 조건 ${n}개가 더 필요합니다.`; }
+  }
+  go();
+})();
+
+/* ---------- 2. 여유력과 적합 조건 ---------- */
+(function () {
+  const L = 6, w = 12, EI = 1e5;
+  const mode = CB.seg("fx-r-mode", () => { setRange(); go(); });
+  const gX = CB.range("fx-r-x", (v) => v.toFixed(2) + (mode() === "rb" ? " kN" : " kN·m"), go);
+  function setRange() { gX.el.max = mode() === "rb" ? 60 : 100; gX.set(mode() === "rb" ? 10 : 20, false); }
+  function primary(X) {
+    if (mode() === "rb") return CB.beam({ L, EI, supports: [{ x: 0, type: "fixed" }], loads: [{ type: "udl", w, a: 0, b: L }, { type: "point", P: -X, a: L }] });
+    return CB.beam({ L, EI, supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }], loads: [{ type: "udl", w, a: 0, b: L }, { type: "moment", M: X, a: 0 }] });
+  }
+  const gapOf = (b) => (mode() === "rb" ? b.frame.d[1][1] : b.frame.d[0][2]);
+  let b, d0, f11, xs, md0;
+  function solve() {
+    const b0 = primary(0), b1 = primary(1);
+    d0 = gapOf(b0); f11 = gapOf(b1) - d0; xs = -d0 / f11; md0 = b0.frame.maxAbs("disp");
+    b = primary(gX());
+  }
+  solve();
+  const pl = CB.plane("#fx-cv-red", { x: [-1.2, 7.4], y: [-1.7, 1.4], aspect: (W) => (W < 520 ? 0.56 : 0.34), minHeight: 190, maxHeight: 280, grid: false, axes: false,
+    draw(P) {
+      const pal = P.P, k = 40 / (md0 * P.unit);
+      CB.drawFrame(P, b.frame, { deformed: k, loadPx: 34, loadLabels: true, reactions: false });
+      const ctx = P.ctx;
+      if (mode() === "rb") {
+        // 떼어 낸 롤러의 원래 자리(점선)와 어긋남
+        const x = P.X(L), y = P.Y(0), v = b.frame.d[1][1] * k * P.unit;
+        ctx.save(); ctx.strokeStyle = pal.faint; ctx.setLineDash([3, 3]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x, y + 3); ctx.lineTo(x - 9, y + 16); ctx.lineTo(x + 9, y + 16); ctx.closePath(); ctx.stroke(); ctx.restore();
+        if (Math.abs(v) > 2) { FXX.arrow(ctx, x + 22, y, x + 22, y - v, pal.accent, 1.6, 7); }
+        if (Math.abs(v) > 2) FXX.text(ctx, `δ_B = ${CB.num(b.frame.d[1][1] * 1000, 2)} mm`, x - 8, y + Math.max(30, -v + 18), pal.accent, { align: "right", size: 11.5 });
+        else FXX.text(ctx, "δ_B = 0 ✓", x + 4, y - 28, pal.ok, { size: 12 });
+      } else {
+        const th = b.frame.d[0][2], x = P.X(0), y = P.Y(0);
+        ctx.save(); ctx.strokeStyle = pal.accent; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]);
+        const ang = Math.atan(th * k), len = 70; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len * Math.cos(ang), y - len * Math.sin(ang)); ctx.stroke(); ctx.restore();
+        FXX.text(ctx, Math.abs(th) < 1e-7 ? "θ_A = 0 ✓" : `θ_A = ${CB.num(th * 1000, 3)} × 10⁻³ rad`, x + 30, y + 30, Math.abs(th) < 1e-7 ? pal.ok : pal.accent, { align: "left", size: 11.5 });
+      }
+    } });
+  const ch = CB.canvas("#fx-cv-red2", (ctx, W, H) => {
+    const pal = CB.palette(), mx = +gX.el.max, s = mode() === "rb" ? 1000 : 1000, data = [[0, d0 * s], [mx, (d0 + f11 * mx) * s]];
+    const lo = Math.min(data[0][1], data[1][1], 0), hi = Math.max(data[0][1], data[1][1], 0), pad = (hi - lo) * 0.12;
+    const c = CB.chart(ctx, null, { x: [0, mx], y: [lo - pad, hi + pad], xLabel: mode() === "rb" ? "여유력 X = R_B (kN)" : "여유력 X = |M_A| (kN·m)", yLabel: mode() === "rb" ? "B 처짐 (mm)" : "A 회전 (10⁻³ rad)",
+      series: [{ data, color: pal.accent, width: 2.4 }], hlines: [{ y: 0, color: pal.ok, dash: [], label: "적합 조건" }], vlines: [{ x: xs, color: pal.ok, label: "X*" }],
+      points: [{ x: gX(), y: (d0 + f11 * gX()) * s, color: pal.accent2, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.36), minHeight: 200, maxHeight: 280 });
+  document.getElementById("fx-r-solve").addEventListener("click", () => gX.set(+xs.toFixed(2)));
+  document.getElementById("fx-r-zero").addEventListener("click", () => gX.set(0));
+  function go() {
+    solve(); pl.redraw(); ch.redraw();
+    const rb = mode() === "rb", u = rb ? " mm" : " ×10⁻³ rad", s = 1000;
+    document.getElementById("fx-r-cap").textContent = rb ? "기본 구조물: 캔틸레버 + 끝의 위 방향 X" : "기본 구조물: 단순보 + A의 모멘트 X";
+    CB.stat("fx-r-d0", CB.num(d0 * s, 3) + u);
+    CB.stat("fx-r-f", CB.num(f11 * s, 4) + u + (rb ? "/kN" : "/kN·m"));
+    const gap = d0 + f11 * gX();
+    CB.stat("fx-r-gap", CB.num(gap * s, 3) + u);
+    CB.stat("fx-r-xs", CB.num(xs, 2) + (rb ? " kN" : " kN·m"));
+    const msg = document.getElementById("fx-r-msg"), ok = Math.abs(gX() - xs) < 0.13;
+    msg.className = "fx-msg" + (ok ? " ok" : "");
+    msg.innerHTML = ok ? (rb ? `적합 조건 만족: R<sub>B</sub> = ${CB.num(xs, 2)} kN = 3wL/8 → R<sub>A</sub> = ${CB.num(w * L - xs, 1)} kN, M<sub>A</sub> = ${CB.num(xs * L - (w * L * L) / 2, 1)} kN·m` : `적합 조건 만족: M<sub>A</sub> = −${CB.num(xs, 2)} kN·m = −wL²/8 → R<sub>B</sub> = ${CB.num((w * L) / 2 - xs / L, 2)} kN (R<sub>B</sub> 방법과 같다)`)
+      : `어긋남이 0이 아닙니다. 원래 구조물에서는 ${rb ? "B가 롤러 위에 있어 처짐이 0" : "A가 고정되어 회전이 0"}이어야 합니다. X를 ${gap * f11 > 0 ? "줄여" : "늘려"} 보세요.`;
+  }
+  setRange(); go();
+})();
+
+/* ---------- 3. 2경간 연속보 위로 하중 끌기 ---------- */
+(function () {
+  const Lt = 16, EI = 1e5;
+  const gl = CB.range("fx-t-l", (v) => v.toFixed(1) + " m", () => { H.x = CB.clamp(H.x, 0.2, Lt - 0.2); go(); });
+  const gp = CB.range("fx-t-p", (v) => v + " kN", go), gw = CB.range("fx-t-w", (v) => v + " kN/m", go), cmp = CB.check("fx-t-cmp", go);
+  const H = { x: 4, y: 0, label: "P", snap: 0.1, lock: "y" };
+  let b, s1, s2;
+  function solve() {
+    const L1 = gl(), loads = [];
+    if (gp() > 0) loads.push({ type: "point", P: gp(), a: H.x });
+    if (gw() > 0) loads.push({ type: "udl", w: gw(), a: 0, b: Lt });
+    b = CB.beam({ L: Lt, EI, supports: [{ x: 0, type: "pin" }, { x: L1, type: "roller" }, { x: Lt, type: "roller" }], loads });
+    // 비교: 경간마다 단순보
+    const sl = (a0, a1) => { const ld = []; if (gp() > 0 && H.x > a0 && H.x < a1) ld.push({ type: "point", P: gp(), a: H.x - a0 }); if (gw() > 0) ld.push({ type: "udl", w: gw(), a: 0, b: a1 - a0 }); return CB.beam({ L: a1 - a0, EI, supports: [{ x: 0, type: "pin" }, { x: a1 - a0, type: "roller" }], loads: ld.length ? ld : [{ type: "udl", w: 0, a: 0, b: a1 - a0 }] }); };
+    s1 = sl(0, L1); s2 = sl(L1, Lt);
+  }
+  solve();
+  const pl = CB.plane("#fx-cv-two", { x: [-1.1, Lt + 1.1], y: [-1.9, 1.4], aspect: (W) => (W < 520 ? 0.56 : 0.32), minHeight: 190, maxHeight: 280, grid: false, axes: false, points: [H],
+    draw(P) {
+      H.y = P.iy(P.Y(0) - 52); H.color = P.P.accent2; H.label = `P ${gp()} kN`; H.hidden = gp() === 0;
+      if (b.ok) CB.drawFrame(P, b.frame, { reactions: true, loadPx: 46, loadLabels: false, reactionPx: 30, deformed: "auto", deformPx: 16 });
+    },
+    onDrag() { H.x = CB.clamp(H.x, 0.2, Lt - 0.2); go(); } });
+  const ch = CB.canvas("#fx-cv-two2", (ctx, W, Hh) => {
+    const pal = CB.palette(), pts = b.sample(320), L1 = gl();
+    const series = [{ data: pts.map((p) => [p.x, p.M]), color: pal.accent, width: 2.4, fill: CB.color("accent-soft") }];
+    if (cmp()) {
+      series.push({ data: s1.sample(120).map((p) => [p.x, p.M]), color: pal.text, width: 1.5, dash: [6, 4] });
+      series.push({ data: s2.sample(120).map((p) => [p.x + L1, p.M]), color: pal.text, width: 1.5, dash: [6, 4] });
+    }
+    FXX.mchart(ctx, W, Hh, series, Lt, { vlines: [{ x: L1, color: pal.faint, label: "B" }] });
+  }, { aspect: (W) => (W < 520 ? 0.66 : 0.36), minHeight: 210, maxHeight: 300 });
+  function go() {
+    solve(); pl.redraw(); ch.redraw();
+    const R = b.reactions, f = (v) => CB.num(v, 1) + " kN";
+    CB.stat("fx-t-ra", f(R[0].R)); CB.stat("fx-t-rb", f(R[1].R)); CB.stat("fx-t-rc", f(R[2].R));
+    CB.stat("fx-t-mb", CB.num(b.at(gl()).M, 1) + " kN·m");
+    const msg = document.getElementById("fx-t-msg"), up = R.find((r) => r.R < -0.05);
+    msg.className = "fx-msg" + (up ? " bad" : "");
+    msg.innerHTML = up ? `지점 ${up.x === 0 ? "A" : up.x === Lt ? "C" : "B"}의 반력이 <b>${CB.num(up.R, 1)} kN</b>으로 음수입니다. 보가 지점에서 들리려 하므로 앵커로 붙잡아야 합니다.` :
+      `가운데 반력 R<sub>B</sub> = ${CB.num(R[1].R, 1)} kN. 경간마다 단순보였다면 ${CB.num(s1.reactions[1].R + s2.reactions[0].R, 1)} kN입니다.`;
+  }
+  go();
+})();
+
+/* ---------- 4. 지점 침하 ---------- */
+(function () {
+  const S = 8, Lt = 16, EI = 3.14e5, w = 100;
+  const gb = CB.range("fx-s-b", (v) => v.toFixed(1) + " mm", go), gc = CB.range("fx-s-c", (v) => v.toFixed(1) + " mm", go);
+  const load = CB.check("fx-s-load", go), hinge = CB.check("fx-s-hinge", go);
+  let b, b0;
+  function make(db, dc) {
+    const settle = [];
+    if (db) settle.push({ x: S, dy: -db / 1000 });
+    if (dc) settle.push({ x: Lt, dy: -dc / 1000 });
+    return CB.beam({ L: Lt, EI, supports: [{ x: 0, type: "pin" }, { x: S, type: "roller" }, { x: Lt, type: "roller" }], hinges: hinge() ? [S + 2] : [], settle, loads: load() ? [{ type: "udl", w, a: 0, b: Lt }] : [{ type: "udl", w: 0, a: 0, b: Lt }] });
+  }
+  function solve() { b = make(gb(), gc()); b0 = make(0, 0); }
+  solve();
+  const pl = CB.plane("#fx-cv-set", { x: [-1.1, Lt + 1.1], y: [-1.9, 1.3], aspect: (W) => (W < 520 ? 0.52 : 0.3), minHeight: 180, maxHeight: 260, grid: false, axes: false,
+    draw(P) {
+      if (!b.ok) return;
+      const k = 34 / (0.03 * P.unit); // 30 mm → 34 px로 고정 배율
+      CB.drawFrame(P, b.frame, { reactions: true, loadPx: 24, loadLabels: false, reactionPx: 26, deformed: k });
+    } });
+  const ch = CB.canvas("#fx-cv-set2", (ctx, W, Hh) => {
+    const pal = CB.palette();
+    const series = [{ data: b.sample(320).map((p) => [p.x, p.M]), color: pal.accent, width: 2.4, fill: CB.color("accent-soft") },
+      { data: b0.sample(320).map((p) => [p.x, p.M]), color: pal.text, width: 1.5, dash: [6, 4] }];
+    FXX.mchart(ctx, W, Hh, series, Lt, { vlines: hinge() ? [{ x: S + 2, color: pal.warn, label: "힌지" }] : [] });
+  }, { aspect: (W) => (W < 520 ? 0.66 : 0.36), minHeight: 210, maxHeight: 300 });
+  function go() {
+    solve(); pl.redraw(); ch.redraw();
+    const mb = b.at(S).M, m0 = b0.at(S).M;
+    CB.stat("fx-s-mb", CB.num(mb, 1) + " kN·m");
+    CB.stat("fx-s-dm", (mb - m0 >= 0 ? "+" : "") + CB.num(mb - m0, 1) + " kN·m");
+    CB.stat("fx-s-rb", CB.num(b.reactions[1].R, 1) + " kN");
+  }
+  go();
+})();
+
+/* ---------- 5. 교차보 ---------- */
+(function () {
+  const EI1 = 3.14e5;
+  const g1 = CB.range("fx-c-l1", (v) => v.toFixed(1) + " m", go), g2 = CB.range("fx-c-l2", (v) => v.toFixed(1) + " m", go);
+  const gr = CB.range("fx-c-r", (v) => v.toFixed(2), go), gp = CB.range("fx-c-p", (v) => v + " kN", go);
+  const calc = () => { const k1 = (48 * EI1) / g1() ** 3, k2 = (48 * EI1 * gr()) / g2() ** 3, P = gp(); return { k1, k2, P1: (P * k1) / (k1 + k2), P2: (P * k2) / (k1 + k2), d: P / (k1 + k2) }; };
+  const cv = CB.canvas("#fx-cv-share", (ctx, W, H) => {
+    const pal = CB.palette(), c = calc(), L1 = g1(), L2 = g2();
+    const wide = W >= 560, planW = wide ? W * 0.55 : W, planH = wide ? H : H * 0.66;
+    const s = Math.min((planW - 70) / 12.5, (planH - 60) / 12.5), cx = planW / 2, cy = planH / 2 + 6;
+    // 평면도: 선 굵기 ∝ 분담
+    const t1 = 3 + 14 * (c.P1 / Math.max(1, gp())), t2 = 3 + 14 * (c.P2 / Math.max(1, gp()));
+    ctx.save(); ctx.lineCap = "round";
+    ctx.strokeStyle = pal.accent; ctx.lineWidth = t1; ctx.beginPath(); ctx.moveTo(cx - (L1 / 2) * s, cy); ctx.lineTo(cx + (L1 / 2) * s, cy); ctx.stroke();
+    ctx.strokeStyle = pal.accent2; ctx.lineWidth = t2; ctx.beginPath(); ctx.moveTo(cx, cy - (L2 / 2) * s); ctx.lineTo(cx, cy + (L2 / 2) * s); ctx.stroke();
+    ctx.restore();
+    // 지점(작은 사각형)과 반력
+    const sup = (x, y, R, col) => { ctx.save(); ctx.fillStyle = pal.surface; ctx.strokeStyle = pal.text; ctx.lineWidth = 1.4; ctx.fillRect(x - 6, y - 6, 12, 12); ctx.strokeRect(x - 6, y - 6, 12, 12); ctx.restore(); FXX.text(ctx, CB.num(R, 1), x, y + (y > cy ? 18 : -18), col, { size: 11 }); };
+    sup(cx - (L1 / 2) * s, cy, c.P1 / 2, pal.ok); sup(cx + (L1 / 2) * s, cy, c.P1 / 2, pal.ok);
+    sup(cx, cy - (L2 / 2) * s, c.P2 / 2, pal.ok); sup(cx, cy + (L2 / 2) * s, c.P2 / 2, pal.ok);
+    ctx.fillStyle = pal.accent2; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
+    FXX.text(ctx, `보 1  L₁ = ${L1} m`, cx - (L1 / 2) * s, cy + 24, pal.accent, { align: "left", size: 11.5 });
+    FXX.text(ctx, `보 2  L₂ = ${L2} m`, cx + 12, cy + (L2 / 2) * s - 22, pal.accent2, { align: "left", size: 11.5 });
+    FXX.text(ctx, "평면도(선 굵기 ∝ 분담, 초록 = 지점 반력 kN)", 10, 14, pal.dim, { align: "left", size: 11, mono: false });
+    // 분담 막대
+    const bx = wide ? planW + 20 : 20, bw = wide ? W - planW - 40 : W - 40, by = wide ? H * 0.32 : planH + 26, bh = 26;
+    const f1 = c.P1 / Math.max(1e-9, gp() || 1);
+    ctx.fillStyle = pal.accent; ctx.fillRect(bx, by, bw * (gp() ? f1 : 0.5), bh);
+    ctx.fillStyle = pal.accent2; ctx.fillRect(bx + bw * (gp() ? f1 : 0.5), by, bw * (gp() ? 1 - f1 : 0.5), bh);
+    FXX.text(ctx, `보 1 ${(f1 * 100).toFixed(0)} %`, bx, by - 12, pal.accent, { align: "left", size: 12 });
+    FXX.text(ctx, `${((1 - f1) * 100).toFixed(0)} % 보 2`, bx + bw, by - 12, pal.accent2, { align: "right", size: 12 });
+    FXX.text(ctx, `k₁ = 48EI₁/L₁³ = ${CB.sig(c.k1)} kN/m`, bx, by + bh + 22, pal.accent, { align: "left", size: 11.5 });
+    FXX.text(ctx, `k₂ = 48EI₂/L₂³ = ${CB.sig(c.k2)} kN/m`, bx, by + bh + 42, pal.accent2, { align: "left", size: 11.5 });
+  }, { aspect: (W) => (W < 560 ? 1.05 : 0.5), minHeight: 300, maxHeight: 420 });
+  function go() {
+    cv.redraw(); const c = calc();
+    CB.stat("fx-c-p1", CB.num(c.P1, 1) + " kN"); CB.stat("fx-c-p2", CB.num(c.P2, 1) + " kN"); CB.stat("fx-c-d", CB.num(c.d * 1000, 2) + " mm");
+  }
+  go();
+})();
+
+/* ---------- 6. 부재를 끊어 보는 트러스 ---------- */
+(function () {
+  const nodes = [], bars = [];
+  for (let k = 0; k <= 4; k++) nodes.push([4 * k, 0]);
+  for (let k = 0; k <= 4; k++) nodes.push([4 * k, 4]);
+  for (let k = 0; k < 4; k++) bars.push([k, k + 1]);          // 하현 0–3
+  for (let k = 0; k < 4; k++) bars.push([5 + k, 6 + k]);      // 상현 4–7
+  for (let k = 0; k <= 4; k++) bars.push([k, 5 + k]);         // 수직재 8–12
+  for (let k = 0; k < 4; k++) { bars.push([k, 6 + k]); bars.push([k + 1, 5 + k]); } // 대각재 13–20
+  const removed = new Set(), lab = CB.check("fx-m-lab", go);
+  let t, act, full;
+  function solveSet(set) {
+    const a = bars.map((_, i) => i).filter((i) => !set.has(i));
+    return { a, r: CB.truss({ nodes, bars: a.map((i) => bars[i]), supports: { 0: "pin", 4: "roller" }, loads: [1, 2, 3].map((n) => ({ node: n, fy: -40 })), EA: 1e6 }) };
+  }
+  full = solveSet(new Set()).r;
+  function solve() { const s = solveSet(removed); act = s.a; t = s.r; }
+  solve();
+  const pl = CB.plane("#fx-cv-rem", { x: [-2.2, 18.2], y: [-2.8, 6], aspect: (W) => (W < 520 ? 0.72 : 0.46), minHeight: 230, maxHeight: 360, grid: false, axes: false,
+    draw(P) {
+      const pal = P.P, ctx = P.ctx;
+      removed.forEach((i) => { const [a, c] = bars[i]; ctx.save(); ctx.strokeStyle = pal.faint; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(P.X(nodes[a][0]), P.Y(nodes[a][1])); ctx.lineTo(P.X(nodes[c][0]), P.Y(nodes[c][1])); ctx.stroke();
+        const mx = (P.X(nodes[a][0]) + P.X(nodes[c][0])) / 2, my = (P.Y(nodes[a][1]) + P.Y(nodes[c][1])) / 2; ctx.setLineDash([]); ctx.strokeStyle = pal.bad; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(mx - 5, my - 5); ctx.lineTo(mx + 5, my + 5); ctx.moveTo(mx + 5, my - 5); ctx.lineTo(mx - 5, my + 5); ctx.stroke(); ctx.restore(); });
+      CB.drawFrame(P, t, { axialColors: t.ok, reactions: t.ok, loadPx: 30, reactionPx: 26, memberLabels: t.ok && lab() ? (mi) => (Math.abs(t.N[mi]) < 0.05 ? "0" : CB.num(t.N[mi], 0)) : null });
+      if (!t.ok) P.text("기구 — 붕괴", 8, 2, { color: pal.bad, size: 15, bold: true, align: "center" });
+    },
+    onPointer(x, y, ph) {
+      if (ph !== "down") return;
+      const P = pl.P; let best = -1, bd = 14;
+      bars.forEach(([a, c], i) => {
+        const x1 = P.X(nodes[a][0]), y1 = P.Y(nodes[a][1]), x2 = P.X(nodes[c][0]), y2 = P.Y(nodes[c][1]), px = P.X(x), py = P.Y(y);
+        const L2 = (x2 - x1) ** 2 + (y2 - y1) ** 2, u = CB.clamp(((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / L2, 0, 1);
+        const d = Math.hypot(px - (x1 + u * (x2 - x1)), py - (y1 + u * (y2 - y1))); if (d < bd) { bd = d; best = i; }
+      });
+      if (best < 0) return;
+      removed.has(best) ? removed.delete(best) : removed.add(best);
+      go();
+    } });
+  document.getElementById("fx-m-reset").addEventListener("click", () => { removed.clear(); go(); });
+  document.getElementById("fx-m-pratt").addEventListener("click", () => { removed.clear(); [14, 16, 17, 19].forEach((i) => removed.add(i)); go(); });
+  document.getElementById("fx-m-rand").addEventListener("click", () => { const live = bars.map((_, i) => i).filter((i) => !removed.has(i) && i >= 13); if (live.length) removed.add(live[Math.floor(Math.random() * live.length)]); go(); });
+  function go() {
+    solve(); pl.redraw();
+    const m = act.length, n = m + 3 - 2 * nodes.length;
+    CB.stat("fx-m-m", String(m)); CB.stat("fx-m-n", String(n).replace("-", "−"));
+    const msg = document.getElementById("fx-m-msg");
+    if (!t.ok) { CB.stat("fx-m-nmax", "—"); msg.className = "fx-msg bad"; msg.innerHTML = n < 0 ? "부재가 모자라 <b>기구</b>가 되었습니다. 남은 부재로는 하중을 땅까지 나를 길이 없습니다." : "n ≥ 0인데도 <b>기구</b>입니다. 한 패널에서 대각재가 모두 사라지면 그 패널이 평행사변형으로 찌그러집니다."; return; }
+    const nmax = Math.max(...t.N.map(Math.abs)), n0 = Math.max(...full.N.map(Math.abs));
+    CB.stat("fx-m-nmax", CB.num(nmax, 1) + " kN");
+    msg.className = "fx-msg" + (n === 0 ? " ok" : "");
+    msg.innerHTML = `${n === 0 ? "정정 트러스입니다. 부재를 하나만 더 잃어도 무너집니다. " : n + "차 부정정: 부재 " + n + "개까지는 잃어도 설 수 있습니다(알맞게 고르면). "}최대 부재력은 모두 이었을 때(${CB.num(n0, 1)} kN)의 <b>${(nmax / n0).toFixed(2)}배</b>입니다.`;
+  }
+  go();
+})();
+
+/* ---------- 7. 세 가지 지지 조건 비교 ---------- */
+(function () {
+  const EI0 = 3.14e5;
+  const gl = CB.range("fx-p-l", (v) => v.toFixed(2) + " m", go), gw = CB.range("fx-p-w", (v) => v + " kN/m", go), ge = CB.range("fx-p-e", (v) => v.toFixed(2) + "×", go);
+  const kinds = [["pin", "roller"], ["fixed", "roller"], ["fixed", "fixed"]];
+  let bs = [];
+  function solve() { const L = gl(), w = gw(), EI = EI0 * ge(); bs = kinds.map(([a, c]) => CB.beam({ L, EI, supports: [{ x: 0, type: a }, { x: L, type: c }], loads: [{ type: "udl", w, a: 0, b: L }] })); }
+  solve();
+  const cv = CB.canvas("#fx-cv-cmp", (ctx, W, H) => {
+    const pal = CB.palette(), cols = [pal.accent, pal.accent2, pal.ok], L = gl();
+    const pts = bs.map((b) => b.sample(160));
+    const gap = 34, h1 = (H - 8 - 24 - gap) / 2;
+    const vs = pts.flat().map((p) => p.v * 1000), lim = (L / 360) * 1000;
+    const r1 = CB.chart(ctx, { x: 64, y: 8, w: W - 80, h: h1 }, { x: [0, L], y: [Math.min(...vs, -lim) * 1.15, Math.max(...vs, 0) + 0.5], yLabel: "처짐 v (mm)",
+      series: pts.map((p, i) => ({ data: p.map((q) => [q.x, q.v * 1000]), color: cols[i], width: 2.2 })), hlines: [{ y: -lim, color: pal.dim, label: "−L/360" }, { y: 0, color: pal.axis, dash: [] }] });
+    const ms = pts.flat().map((p) => p.M), lo = Math.min(...ms), hi = Math.max(...ms), pad = (hi - lo) * 0.12;
+    CB.chart(ctx, { x: 64, y: 8 + h1 + gap, w: W - 80, h: h1 }, { x: [0, L], y: [lo - pad, hi + pad], yLabel: "M (kN·m)",
+      series: pts.map((p, i) => ({ data: p.map((q) => [q.x, q.M]), color: cols[i], width: 2.2 })), hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    ctx.save(); ctx.fillStyle = pal.dim; ctx.font = "12px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("x (m)", 54, H - 2); ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 1.05 : 0.62), minHeight: 320, maxHeight: 480 });
+  function go() {
+    solve(); cv.redraw();
+    const L = gl();
+    ["fx-p-d1", "fx-p-d2", "fx-p-d3"].forEach((id, i) => { const d = -bs[i].extremes().vmin.v; CB.stat(id, `${CB.num(d * 1000, 1)} mm <small>L/${Math.round(L / d)}</small>`); });
+  }
+  go();
+})();
+</script>
+</body>
+</html>

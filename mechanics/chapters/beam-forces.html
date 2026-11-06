@@ -1,0 +1,926 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>보의 전단력과 휨모멘트 · MechanicsBook</title>
+<meta name="description" content="보를 가상으로 잘라 속의 힘을 본다. 단면력과 부호 규약, 단면법, 하중–전단력–휨모멘트의 미분·적분 관계, 넓이법으로 SFD·BMD 그리기, 캔틸레버·내민보·게르버보, 기준 건물 B-10 큰보의 휨모멘트까지 하중을 끌어 놓으며 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .bf-stack { display: grid; grid-template-columns: 1fr; }
+  .bf-stack > div { position: relative; min-width: 0; }
+  .bf-stack > div + div { border-top: 1px solid var(--border); }
+  .bf-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .bf-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .bf-msg b { color: var(--text); }
+  .bf-msg.ok { color: var(--ok); font-weight: 600; }
+  .bf-msg.bad { color: var(--bad); font-weight: 600; }
+  .bf-legend { display: flex; flex-wrap: wrap; gap: 4px 2px; padding: 8px 18px; border-top: 1px solid var(--border); }
+  .bf-tbl td, .bf-tbl th { font-variant-numeric: tabular-nums; }
+  .bf-tbl td.hl { color: var(--accent); font-weight: 700; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="mechanics"></script>
+</head>
+<body data-chapter="beam-forces">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="bf-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="bf-ah-react" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="bf-ah-int" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+      <marker id="bf-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 04</div>
+    <h1 data-no-glossary>보의 전단력과 휨모멘트</h1>
+    <p class="lead">사무실 바닥을 받치는 보는 겉으로는 가만히 있지만, 속에서는 쉬지 않고 힘을 주고받고 있습니다. 보의 어느 곳을 가상으로 잘라 보아도 잘린 면 양쪽은 서로를 밀고, 끌고, 비틀어 돌리며 평형을 지킵니다. 이 속의 힘이 <b>단면력</b>이고, 보에서는 그중 <b>전단력</b>과 <b>휨모멘트</b>가 주인공입니다. 단면력이 보의 길이를 따라 어떻게 변하는지 그린 그림, 전단력도와 휨모멘트도는 구조 설계의 지도입니다. 어디가 가장 위험한지, 철근을 어디에 넣어야 하는지, 단면을 얼마나 키워야 하는지가 모두 이 그림에서 나옵니다. 이 장에서는 보를 잘라 단면력을 직접 꺼내 보고, 하중·전단력·휨모멘트가 미분과 적분으로 이어진다는 사실을 이용해 그림을 빠르게 그리는 법을 익힙니다.</p>
+    <ul class="objectives">
+      <li>보를 가상으로 잘라 자유물체도를 그리고, 평형 조건으로 잘린 면의 전단력 \(V\)와 휨모멘트 \(M\)을 구한다.</li>
+      <li>이 책의 부호 규약(새깅이 \(+\))을 쓰고, 보 아래 그래프와 구조물 위 인장측 그림의 차이를 설명한다.</li>
+      <li>단순보·캔틸레버·내민보에서 \(V(x)\)와 \(M(x)\)를 구간별 식으로 세우고 최댓값과 그 위치를 찾는다.</li>
+      <li>\(dV/dx = -w\), \(dM/dx = V\)를 유도하고, 집중 하중·집중 모멘트가 그림을 어떻게 뛰게 하는지 안다.</li>
+      <li>전단력도의 넓이로 휨모멘트도를 빠르게 그리고, 반곡점을 찾는다.</li>
+      <li>내부 힌지가 있는 게르버보를 풀고, 지점 조건에 따라 기준 건물 B-10 큰보의 휨모멘트가 어떻게 달라지는지 비교한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>보의 크기를 감으로 정하던 시대</b></div>
+      <div class="o-body"><p>갈릴레이는 1638년 『두 새로운 과학』에서 벽에 박힌 막대, 곧 캔틸레버가 끝에 매단 무게를 얼마나 버티는지 계산하려 했습니다. 그의 답은 막대 속 힘이 퍼지는 방식을 잘못 가정해 정확하지 않았지만, "보가 부러지는 곳은 벽에 붙은 단면이고, 그 단면이 견뎌야 하는 것은 무게 × 팔 길이"라는 핵심은 옳았습니다. 그 뒤 18–19세기에 쿨롱과 나비에 등을 거치며 단면의 응력과 휨모멘트를 잇는 보 이론이 정리되었고, 보를 경험과 감이 아니라 계산으로 설계하는 시대가 열렸습니다.</p>
+        <p>오늘날 구조 설계 프로그램이 내놓는 결과의 첫 장도 결국 휨모멘트도입니다. 철근콘크리트 보에서는 휨모멘트가 양(+)인 곳의 아래쪽과 음(−)인 곳의 위쪽에 철근을 넣고, 강재 보에서는 최대 휨모멘트로 단면 크기를 고릅니다. 다리의 이음 위치, 크레인으로 부재를 들어 올리는 고리 위치, 발코니가 버틸 수 있는 하중도 이 장의 그림에서 정해집니다.</p>
+        <div class="o-chain"><span>하중과 지점</span><i>→</i><span>자르고 평형 세우기</span><i>→</i><span class="tool">전단력도·휨모멘트도</span><i>→</i><span>단면 크기·철근 위치·처짐</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="cut">
+    <h2>보를 자르면 보이는 힘</h2>
+    <div class="problem"><strong>톱으로 자른 큰보</strong>
+      <p>기준 건물 B-10의 큰보 G1(경간 8.0 m)을 왼쪽 기둥에서 3 m 떨어진 곳에서 가상으로 자른다고 해 봅시다. 잘린 두 조각은 각각 그대로 떨어지거나 돌아 버릴 것입니다. 원래의 보처럼 가만히 있으려면 잘린 면에서 무엇이, 얼마나 버티고 있어야 할까요?</p></div>
+    <p>구조물 전체가 평형이면 그 일부도 평형입니다. 그래서 보를 어디서 자르든 잘린 한 조각에 대해 평형 방정식 세 개(\(\Sigma F_x = 0\), \(\Sigma F_y = 0\), \(\Sigma M = 0\))가 성립해야 합니다. 조각에 걸린 하중과 반력만으로는 이 식이 맞지 않으므로, 잘린 면에는 다른 조각이 가하는 힘이 반드시 있습니다. 2차원 부재라면 그 힘은 세 가지로 충분합니다. 축 방향으로 미는 힘이나 당기는 힘(<span class="term">축력</span> \(N\)), 면을 따라 엇갈리게 하는 힘(<span class="term">전단력</span> \(V\)), 면을 돌리려는 우력(<span class="term">휨모멘트</span> \(M\))입니다.</p>
+    <div class="callout def"><strong>정의 4.1 (단면력)</strong> 부재를 한 단면에서 가상으로 자를 때, 잘린 면에서 한쪽 조각이 다른 조각에 가하는 힘의 합력을 그 단면의 <span class="term">단면력</span><span class="en">(internal force)</span>이라 한다. 평면 부재의 단면력은 축력 \(N\), 전단력 \(V\), 휨모멘트 \(M\)의 세 성분이며, 잘린 두 면에는 작용·반작용으로 크기가 같고 방향이 반대인 단면력이 걸린다.</div>
+    <p>단면력을 구하는 방법은 단 하나, <span class="term">단면법</span><span class="en">(method of sections)</span>입니다. 원하는 곳을 자르고, 한쪽 조각의 자유물체도를 그리고, 평형 방정식을 풉니다. 어느 쪽 조각을 써도 답은 같으므로 하중이 적은 쪽을 고르면 계산이 짧아집니다. 연직 하중만 받는 수평 보에서는 축력이 0이므로 \(V\)와 \(M\)만 남습니다.</p>
+    <figure class="diagram" id="fig-bf-cut">
+      <svg viewBox="0 0 760 320" role="img" aria-label="등분포 하중을 받는 단순보를 잘라 두 조각으로 나눈 자유물체도">
+        <rect x="10" y="10" width="740" height="300" rx="10" class="f-surface"/>
+        <g>
+          <line x1="90" y1="78" x2="670" y2="78" style="stroke:var(--text);stroke-width:5;stroke-linecap:round"/>
+          <path d="M90 78l-12 20h24z" class="f-elev" style="stroke:var(--text);stroke-width:1.5"/><line x1="72" y1="99" x2="108" y2="99" class="s-line"/>
+          <path d="M670 78l-12 16h24z" class="f-elev" style="stroke:var(--text);stroke-width:1.5"/><circle cx="663" cy="98" r="3.5" class="f-elev" style="stroke:var(--text)"/><circle cx="677" cy="98" r="3.5" class="f-elev" style="stroke:var(--text)"/><line x1="652" y1="103" x2="688" y2="103" class="s-line"/>
+          <line x1="90" y1="36" x2="670" y2="36" style="stroke:var(--accent-2);stroke-width:1.5"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.5" marker-end="url(#bf-ah-load)">
+            <line x1="90" y1="36" x2="90" y2="72"/><line x1="148" y1="36" x2="148" y2="72"/><line x1="206" y1="36" x2="206" y2="72"/><line x1="264" y1="36" x2="264" y2="72"/><line x1="322" y1="36" x2="322" y2="72"/><line x1="380" y1="36" x2="380" y2="72"/><line x1="438" y1="36" x2="438" y2="72"/><line x1="496" y1="36" x2="496" y2="72"/><line x1="554" y1="36" x2="554" y2="72"/><line x1="612" y1="36" x2="612" y2="72"/><line x1="670" y1="36" x2="670" y2="72"/>
+          </g>
+          <text x="380" y="28" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">w (kN/m)</text>
+          <line x1="307" y1="22" x2="307" y2="118" style="stroke:var(--text-dim);stroke-width:1.4;stroke-dasharray:6 4"/>
+          <text x="316" y="120" class="t-dim">절단 a–a (x)</text>
+          <text x="90" y="124" text-anchor="middle" class="t-mono">A</text><text x="670" y="124" text-anchor="middle" class="t-mono">B</text>
+        </g>
+        <g>
+          <line x1="80" y1="228" x2="288" y2="228" style="stroke:var(--text);stroke-width:5;stroke-linecap:round"/>
+          <line x1="80" y1="196" x2="288" y2="196" style="stroke:var(--accent-2);stroke-width:1.4"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#bf-ah-load)"><line x1="80" y1="196" x2="80" y2="222"/><line x1="132" y1="196" x2="132" y2="222"/><line x1="184" y1="196" x2="184" y2="222"/><line x1="236" y1="196" x2="236" y2="222"/><line x1="288" y1="196" x2="288" y2="222"/></g>
+          <line x1="80" y1="292" x2="80" y2="240" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#bf-ah-react)"/><text x="94" y="290" class="t-mono" style="fill:var(--ok)">R_A</text>
+          <line x1="300" y1="200" x2="300" y2="262" style="stroke:var(--text);stroke-width:2.6" marker-end="url(#bf-ah-int)"/><text x="306" y="276" class="t" style="font-weight:700">V</text>
+          <path d="M288 248 A 26 26 0 1 0 288 208" style="fill:none;stroke:var(--accent);stroke-width:2.4" marker-end="url(#bf-ah-acc)"/><text x="244" y="202" class="t-acc">M</text>
+          <text x="184" y="306" text-anchor="middle" class="t-dim">왼쪽 조각 (0 ≤ x)</text>
+        </g>
+        <g>
+          <line x1="352" y1="228" x2="680" y2="228" style="stroke:var(--text);stroke-width:5;stroke-linecap:round"/>
+          <line x1="352" y1="196" x2="680" y2="196" style="stroke:var(--accent-2);stroke-width:1.4"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#bf-ah-load)"><line x1="352" y1="196" x2="352" y2="222"/><line x1="418" y1="196" x2="418" y2="222"/><line x1="484" y1="196" x2="484" y2="222"/><line x1="550" y1="196" x2="550" y2="222"/><line x1="616" y1="196" x2="616" y2="222"/><line x1="680" y1="196" x2="680" y2="222"/></g>
+          <line x1="680" y1="292" x2="680" y2="240" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#bf-ah-react)"/><text x="694" y="290" class="t-mono" style="fill:var(--ok)">R_B</text>
+          <line x1="340" y1="262" x2="340" y2="200" style="stroke:var(--text);stroke-width:2.6" marker-end="url(#bf-ah-int)"/><text x="318" y="194" class="t" style="font-weight:700">V</text>
+          <path d="M352 248 A 26 26 0 1 1 352 208" style="fill:none;stroke:var(--accent);stroke-width:2.4" marker-end="url(#bf-ah-acc)"/><text x="384" y="202" class="t-acc">M</text>
+          <text x="516" y="306" text-anchor="middle" class="t-dim">오른쪽 조각 (x ≤ L)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-1.</b> 단순보를 절단 a–a에서 자른 두 조각의 자유물체도. 잘린 면에는 작용·반작용으로 크기가 같고 방향이 반대인 전단력 V와 휨모멘트 M이 걸린다. 그림의 방향이 이 책의 양(+)의 방향이다(왼쪽 조각의 오른쪽 면에서 V는 아래, M은 반시계).</figcaption>
+    </figure>
+    <p>아래 시뮬레이터에서 절단 위치를 옮겨 보세요. 위 줄은 보 전체, 아래 줄은 잘라 벌린 두 조각입니다. 왼쪽 조각에서 \(\Sigma F_y = 0\)으로 \(V\)를, 잘린 면에 대한 \(\Sigma M = 0\)으로 \(M\)을 구합니다. 오른쪽 조각으로 구해도 같은 값이 나오는지 숫자로 확인할 수 있습니다.</p>
+    <div class="sim" id="sim-bf-cut">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>보를 잘라 단면력 꺼내기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bf-cv-cut" aria-label="단순보와 잘린 두 조각의 자유물체도"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>절단 위치 x <output id="bf-cx-out"></output></span><input type="range" id="bf-cx" min="0.1" max="7.9" step="0.05" value="3"></label>
+          <label class="ctrl"><span>등분포 하중 w <output id="bf-cw-out"></output></span><input type="range" id="bf-cw" min="0" max="40" step="1" value="20"></label>
+          <label class="ctrl"><span>집중 하중 P <output id="bf-cp-out"></output></span><input type="range" id="bf-cp" min="0" max="120" step="5" value="60"></label>
+          <label class="ctrl"><span>P의 위치 a <output id="bf-ca-out"></output></span><input type="range" id="bf-ca" min="0.5" max="7.5" step="0.5" value="5"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">R<sub>A</sub></span><span class="v" id="bf-c-ra">—</span></div>
+        <div class="stat"><span class="k">V(x)</span><span class="v" id="bf-c-v">—</span></div>
+        <div class="stat"><span class="k">M(x)</span><span class="v" id="bf-c-m">—</span></div>
+      </div>
+      <div class="bf-msg" id="bf-c-msg"></div>
+      <div class="sim-note">해볼 것: x를 P의 바로 왼쪽과 오른쪽에 두고 V가 얼마나 뛰는지 보세요 · w = 0, P만 두고 V가 상수인 것을 확인하세요 · 모델: 경간 8 m 단순보, 조각 평형 \(\Sigma F_y\)·\(\Sigma M\) = 0. 화살표는 실제 방향, 숫자는 부호 규약의 값입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="sign">
+    <h2>부호 규약: 웃으면 양(+)</h2>
+    <p>잘린 면의 두 쪽에는 같은 크기의 단면력이 반대 방향으로 걸리므로, "위쪽이 +" 같은 고정된 방향으로는 부호를 정할 수 없습니다. 그래서 단면력의 부호는 힘의 방향이 아니라 <b>부재를 어떻게 변형시키는가</b>로 정합니다.</p>
+    <div class="callout def"><strong>정의 4.2 (보의 부호 규약)</strong> 부재 축을 왼쪽(\(i\)단)에서 오른쪽(\(j\)단)으로 볼 때,
+      <ul style="margin:6px 0 0">
+        <li><b>축력 \(N\)</b>: 부재를 늘이면(인장) \(+\).</li>
+        <li><b>전단력 \(V\)</b>: 미소 요소의 왼쪽 면을 위로, 오른쪽 면을 아래로 미는 쌍이면 \(+\). 요소가 시계 방향으로 돌려는 모양이다.</li>
+        <li><b>휨모멘트 \(M\)</b>: 요소를 아래로 볼록하게(새깅, 웃는 입) 휘게 하면 \(+\). 이때 아래 섬유가 늘어나 인장을 받는다. 위로 볼록한 호깅(찡그린 입)은 \(-\).</li>
+      </ul></div>
+    <figure class="diagram" id="fig-bf-sign">
+      <svg viewBox="0 0 760 250" role="img" aria-label="양과 음의 전단력과 휨모멘트를 미소 요소로 그린 부호 규약">
+        <rect x="10" y="10" width="740" height="230" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="60" y="0" text-anchor="middle" class="t" style="font-weight:700">+V</text>
+          <path d="M30 40h60v50h-60z" transform="skewY(8) translate(0,-6)" class="f-acc-soft"/>
+          <line x1="18" y1="100" x2="18" y2="50" style="stroke:var(--text);stroke-width:2.2" marker-end="url(#bf-ah-int)"/>
+          <line x1="104" y1="40" x2="104" y2="96" style="stroke:var(--text);stroke-width:2.2" marker-end="url(#bf-ah-int)"/>
+          <text x="60" y="140" text-anchor="middle" class="t-dim">왼쪽 면 ↑, 오른쪽 면 ↓</text>
+        </g>
+        <g transform="translate(220,40)">
+          <text x="60" y="0" text-anchor="middle" class="t" style="font-weight:700">−V</text>
+          <path d="M30 40h60v50h-60z" transform="skewY(-8) translate(0,10)" class="f-acc2-soft"/>
+          <line x1="18" y1="44" x2="18" y2="96" style="stroke:var(--text);stroke-width:2.2" marker-end="url(#bf-ah-int)"/>
+          <line x1="104" y1="100" x2="104" y2="50" style="stroke:var(--text);stroke-width:2.2" marker-end="url(#bf-ah-int)"/>
+          <text x="60" y="140" text-anchor="middle" class="t-dim">왼쪽 면 ↓, 오른쪽 면 ↑</text>
+        </g>
+        <g transform="translate(400,40)">
+          <text x="70" y="0" text-anchor="middle" class="t" style="font-weight:700">+M (새깅)</text>
+          <path d="M20 46 Q70 72 120 46 L120 86 Q70 112 20 86z" class="f-acc-soft"/>
+          <path d="M14 96 A 22 22 0 0 1 14 40" style="fill:none;stroke:var(--accent);stroke-width:2.2" marker-end="url(#bf-ah-acc)"/>
+          <path d="M126 96 A 22 22 0 0 0 126 40" style="fill:none;stroke:var(--accent);stroke-width:2.2" marker-end="url(#bf-ah-acc)"/>
+          <text x="70" y="128" text-anchor="middle" class="t-mono" style="fill:var(--tension)">아래 섬유 인장</text>
+          <text x="70" y="146" text-anchor="middle" class="t-dim">웃는 입 ⌣</text>
+        </g>
+        <g transform="translate(580,40)">
+          <text x="70" y="0" text-anchor="middle" class="t" style="font-weight:700">−M (호깅)</text>
+          <path d="M20 60 Q70 34 120 60 L120 100 Q70 74 20 100z" class="f-acc2-soft"/>
+          <path d="M14 42 A 22 22 0 0 0 14 98" style="fill:none;stroke:var(--accent);stroke-width:2.2" marker-end="url(#bf-ah-acc)"/>
+          <path d="M126 42 A 22 22 0 0 1 126 98" style="fill:none;stroke:var(--accent);stroke-width:2.2" marker-end="url(#bf-ah-acc)"/>
+          <text x="70" y="128" text-anchor="middle" class="t-mono" style="fill:var(--tension)">위 섬유 인장</text>
+          <text x="70" y="146" text-anchor="middle" class="t-dim">찡그린 입 ⌢</text>
+        </g>
+        <text x="380" y="222" text-anchor="middle" class="t-dim">부호는 힘의 방향이 아니라 요소가 변형되는 모양으로 정한다</text>
+      </svg>
+      <figcaption><b>그림 4-2.</b> 미소 요소로 본 단면력의 부호. 양(+)의 휨모멘트는 요소를 아래로 볼록하게 휘게 해 아래 섬유를 늘인다. 철근콘크리트 보에서 양의 휨모멘트 구간 아래쪽, 음의 휨모멘트 구간 위쪽에 주철근을 넣는 이유다.</figcaption>
+    </figure>
+    <p>이 규약을 그림 4-1에 맞추면 "왼쪽 조각의 오른쪽 면에서 \(V\)는 아래, \(M\)은 반시계"가 양의 방향입니다. 따라서 왼쪽 조각의 평형에서 바로 다음 두 규칙이 나옵니다.</p>
+    <div class="formula">$$V(x) = \big(\text{단면 왼쪽의 위 방향 힘의 합}\big), \qquad M(x) = \big(\text{단면 왼쪽 힘들이 단면에 대해 만드는 시계 방향 모멘트의 합}\big)$$<div class="where">왼쪽의 반력은 위로 향하면 \(V\)를 키우고, 아래로 향한 하중은 \(V\)를 줄인다. 왼쪽의 위로 향한 힘은 단면을 축으로 시계 방향 모멘트를 만들어 \(M\)을 키운다.</div></div>
+    <div class="callout tip"><strong>두 가지 그림 방향</strong> 이 책은 휨모멘트도를 두 가지 방식으로 그립니다. 보 <b>아래에 따로 그리는 그래프</b>(SFD·BMD)에서는 수학 그래프처럼 양(+)을 위로 그리고 축에 부호를 적습니다. 라멘처럼 부재가 여러 방향으로 놓인 <b>구조물 위에 겹쳐 그릴 때</b>는 휨모멘트를 <b>인장측</b>에 그립니다. 새깅인 보라면 보 아래쪽에 그림이 생기므로 철근을 넣을 쪽이 한눈에 보입니다. 교과서와 프로그램마다 관습이 다르니 그림을 읽을 때는 늘 부호와 방향을 먼저 확인하세요.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="sections">
+    <h2>단면법으로 V(x)와 M(x) 식 세우기</h2>
+    <p>절단 위치를 \(x\)라는 변수로 두면 단면력은 \(x\)의 함수가 됩니다. 하중이 바뀌는 곳(집중 하중, 분포 하중의 시작과 끝, 지점)마다 자유물체도의 모양이 바뀌므로 구간을 나눠 식을 세웁니다. 이 식을 그래프로 그린 것이 <span class="term">전단력도</span><span class="en">(shear force diagram, SFD)</span>와 <span class="term">휨모멘트도</span><span class="en">(bending moment diagram, BMD)</span>입니다.</p>
+    <div class="callout"><strong>예제 4.1 (집중 하중을 받는 단순보)</strong> 경간 \(L\)인 단순보 AB의 A에서 \(a\)만큼 떨어진 곳에 집중 하중 \(P\)가 걸린다(\(b = L - a\)).
+      <ol style="margin:6px 0 0">
+        <li><b>반력.</b> \(\Sigma M_A = 0\): \(R_B L - P a = 0\)이므로 \(R_B = Pa/L\). \(\Sigma F_y = 0\)에서 \(R_A = P - R_B = Pb/L\).</li>
+        <li><b>구간 1 (\(0 \lt x \lt a\)).</b> 왼쪽 조각에는 \(R_A\)만 있다. \(V = R_A = Pb/L\), \(M = R_A x = Pbx/L\).</li>
+        <li><b>구간 2 (\(a \lt x \lt L\)).</b> 왼쪽 조각에 \(R_A\)와 \(P\)가 있다. \(V = R_A - P = -Pa/L\), \(M = R_A x - P(x - a) = Pa(L - x)/L\).</li>
+        <li><b>최댓값.</b> \(M\)은 하중점에서 가장 크다: \(M_{max} = Pab/L\). 하중이 가운데(\(a = b = L/2\))면 \(M_{max} = PL/4\).</li>
+      </ol>
+      수치: \(L = 8\) m, \(P = 100\) kN, \(a = 3\) m이면 \(R_A = 62.5\) kN, \(R_B = 37.5\) kN, \(M_{max} = 100 \times 3 \times 5/8 = 187.5\) kN·m.</div>
+    <div class="callout"><strong>예제 4.2 (등분포 하중을 받는 단순보)</strong> 경간 \(L\) 전체에 등분포 하중 \(w\) (kN/m, 아래 방향).
+      <ol style="margin:6px 0 0">
+        <li><b>반력.</b> 대칭이므로 \(R_A = R_B = wL/2\).</li>
+        <li><b>단면력.</b> 왼쪽 조각에는 \(R_A\)와, 길이 \(x\)에 걸친 분포 하중의 합력 \(wx\)(작용점은 단면에서 \(x/2\))가 있다.
+          <div class="formula">$$V(x) = \frac{wL}{2} - wx, \qquad M(x) = \frac{wL}{2}x - wx\cdot\frac{x}{2} = \frac{w x (L - x)}{2}.$$</div></li>
+        <li><b>최댓값.</b> \(V = 0\)인 \(x = L/2\)에서 \(M_{max} = wL^2/8\). 지점에서 \(|V|_{max} = wL/2\).</li>
+      </ol></div>
+    <div class="callout site"><strong>큰보 G1을 단순보로 보면</strong> 기준 건물 B-10의 큰보 G1은 경간 8.0 m, 계수 하중 \(w_u = 1.2D + 1.6L \approx 100\) kN/m입니다. 단순보라고 가정하면 반력은 \(100 \times 8/2 = 400\) kN, 최대 휨모멘트는 \(100 \times 8^2/8 = 800\) kN·m입니다. 실제 G1은 기둥과 한 몸으로 이어진 연속보라서 이보다 작은 양의 모멘트와 지점 위 음의 모멘트를 나눠 갖습니다. 이 장 끝의 시뮬레이터에서 비교하고, 14–15장에서 정확히 풉니다.</div>
+    <figure class="diagram" id="fig-bf-basic">
+      <svg viewBox="0 0 760 340" role="img" aria-label="집중 하중과 등분포 하중을 받는 단순보의 전단력도와 휨모멘트도">
+        <rect x="10" y="10" width="740" height="320" rx="10" class="f-surface"/>
+        <g transform="translate(30,0)">
+          <text x="160" y="34" text-anchor="middle" class="t" style="font-weight:700">(a) 집중 하중 P</text>
+          <line x1="40" y1="80" x2="300" y2="80" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <path d="M40 80l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M300 80l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="137" y1="44" x2="137" y2="76" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#bf-ah-load)"/><text x="146" y="54" class="t-mono" style="fill:var(--accent-2)">P</text>
+          <text x="86" y="110" text-anchor="middle" class="t-mono">a</text><text x="218" y="110" text-anchor="middle" class="t-mono">b</text>
+          <line x1="40" y1="170" x2="300" y2="170" class="s-axis"/>
+          <path d="M40 170V136H137V196H300V170" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:2"/>
+          <text x="88" y="130" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">+Pb/L</text><text x="218" y="214" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">−Pa/L</text>
+          <text x="8" y="174" class="t-mono">V</text>
+          <line x1="40" y1="250" x2="300" y2="250" class="s-axis"/>
+          <path d="M40 250L137 300L300 250" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="137" y="318" text-anchor="middle" class="t-mono" style="fill:var(--accent)">Pab/L</text>
+          <text x="8" y="254" class="t-mono">M</text>
+        </g>
+        <g transform="translate(400,0)">
+          <text x="160" y="34" text-anchor="middle" class="t" style="font-weight:700">(b) 등분포 하중 w</text>
+          <line x1="40" y1="80" x2="300" y2="80" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <path d="M40 80l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M300 80l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="40" y1="52" x2="300" y2="52" style="stroke:var(--accent-2);stroke-width:1.4"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#bf-ah-load)"><line x1="40" y1="52" x2="40" y2="76"/><line x1="92" y1="52" x2="92" y2="76"/><line x1="144" y1="52" x2="144" y2="76"/><line x1="196" y1="52" x2="196" y2="76"/><line x1="248" y1="52" x2="248" y2="76"/><line x1="300" y1="52" x2="300" y2="76"/></g>
+          <line x1="40" y1="170" x2="300" y2="170" class="s-axis"/>
+          <path d="M40 170V132L300 208V170" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:2"/>
+          <text x="58" y="126" class="t-mono" style="fill:var(--accent-2)">+wL/2</text><text x="282" y="226" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">−wL/2</text>
+          <line x1="40" y1="250" x2="300" y2="250" class="s-axis"/>
+          <path d="M40 250Q170 350 300 250" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="170" y="318" text-anchor="middle" class="t-mono" style="fill:var(--accent)">wL²/8 (x = L/2)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-3.</b> 두 기본 경우의 SFD와 BMD. 이 그림은 휨모멘트를 보 아래쪽(인장측)에 그렸다. 집중 하중 아래에서 전단력은 계단처럼 뛰고 휨모멘트는 꺾이며, 등분포 하중 아래에서 전단력은 직선, 휨모멘트는 포물선이다.</figcaption>
+    </figure>
+    <p>이제 직접 하중을 놓아 봅시다. 손잡이를 끌어 집중 하중과 분포 하중의 위치를 바꾸고, 지점 형식을 바꾸면 아래의 SFD·BMD가 바로 다시 그려집니다. 보 아래 그래프는 양(+)을 위로 그렸습니다.</p>
+    <div class="sim" id="sim-bf-builder">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>하중을 끌어 놓고 SFD·BMD 그리기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view bf-stack">
+          <div><canvas id="bf-cv-bld" aria-label="하중을 끌어 놓을 수 있는 보"></canvas><span class="bf-cap">손잡이를 좌우로 끌기</span></div>
+          <div><canvas id="bf-cv-bld-d" aria-label="전단력도와 휨모멘트도"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>보 형식</span><div class="seg" id="bf-b-type"><button data-value="simple" class="on">단순보</button><button data-value="cant">캔틸레버</button><button data-value="over">내민보</button><button data-value="fixed">양단 고정</button></div></div>
+          <label class="check"><input type="checkbox" id="bf-b-p1on" checked> 집중 하중 P₁</label>
+          <label class="ctrl"><span>P₁ <output id="bf-b-p1-out"></output></span><input type="range" id="bf-b-p1" min="0" max="100" step="5" value="50"></label>
+          <label class="check"><input type="checkbox" id="bf-b-p2on"> 집중 하중 P₂</label>
+          <label class="ctrl"><span>P₂ <output id="bf-b-p2-out"></output></span><input type="range" id="bf-b-p2" min="0" max="100" step="5" value="30"></label>
+          <label class="check"><input type="checkbox" id="bf-b-won" checked> 분포 하중 w</label>
+          <label class="ctrl"><span>w <output id="bf-b-w-out"></output></span><input type="range" id="bf-b-w" min="0" max="30" step="1" value="10"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">반력</span><span class="v" id="bf-b-r">—</span></div>
+        <div class="stat"><span class="k">M<sub>max</sub> (+), kN·m</span><span class="v" id="bf-b-mp">—</span></div>
+        <div class="stat"><span class="k">M<sub>min</sub> (−), kN·m</span><span class="v" id="bf-b-mn">—</span></div>
+        <div class="stat"><span class="k">|V|<sub>max</sub></span><span class="v" id="bf-b-v">—</span></div>
+      </div>
+      <div class="bf-legend"><span class="key load">하중</span><span class="key reaction">반력</span><span class="key shear">전단력 V</span><span class="key moment">휨모멘트 M</span></div>
+      <div class="sim-note">해볼 것: 단순보에서 P₁을 가운데로 끌면 M<sub>max</sub> = PL/4가 되는지 보세요 · 같은 하중으로 캔틸레버를 고르면 음의 모멘트가 얼마나 커지는지 비교하세요 · 양단 고정은 14장의 부정정 보를 미리 본 것입니다 · 모델: 경간 10 m(내민보는 지점 0 m·7.5 m), 강성법(CB.beam)으로 계산.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="relations">
+    <h2>하중·전단력·휨모멘트의 관계</h2>
+    <div class="problem"><strong>매번 자르지 않고 그릴 수는 없을까</strong>
+      <p>예제 4.1과 4.2에서는 구간마다 자유물체도를 다시 그렸습니다. 하중이 다섯 개, 분포 하중이 세 구간인 보라면 같은 일을 여러 번 반복해야 합니다. 세 그래프 사이에 일정한 규칙이 있다면 자르지 않고도 그릴 수 있지 않을까요?</p></div>
+    <p>분포 하중 \(w(x)\)를 받는 보에서 길이 \(dx\)인 아주 짧은 요소를 떼어 내 봅시다(그림 4-4). 왼쪽 면에는 \(V\), \(M\)이, 오른쪽 면에는 조금 달라진 \(V + dV\), \(M + dM\)이 양의 방향으로 걸리고, 위에서는 \(w\,dx\)가 내리누릅니다.</p>
+    <figure class="diagram" id="fig-bf-element">
+      <svg viewBox="0 0 760 270" role="img" aria-label="길이 dx인 미소 요소에 걸린 분포 하중과 단면력">
+        <rect x="10" y="10" width="740" height="250" rx="10" class="f-surface"/>
+        <rect x="270" y="110" width="220" height="60" class="f-acc-soft"/>
+        <line x1="270" y1="64" x2="490" y2="64" style="stroke:var(--accent-2);stroke-width:1.5"/>
+        <g style="stroke:var(--accent-2);stroke-width:1.5" marker-end="url(#bf-ah-load)"><line x1="280" y1="64" x2="280" y2="104"/><line x1="325" y1="64" x2="325" y2="104"/><line x1="370" y1="64" x2="370" y2="104"/><line x1="415" y1="64" x2="415" y2="104"/><line x1="460" y1="64" x2="460" y2="104"/></g>
+        <text x="380" y="54" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">w(x) dx</text>
+        <line x1="250" y1="176" x2="250" y2="112" style="stroke:var(--text);stroke-width:2.4" marker-end="url(#bf-ah-int)"/><text x="230" y="150" text-anchor="end" class="t" style="font-weight:700">V</text>
+        <line x1="510" y1="106" x2="510" y2="170" style="stroke:var(--text);stroke-width:2.4" marker-end="url(#bf-ah-int)"/><text x="546" y="158" class="t" style="font-weight:700">V + dV</text>
+        <path d="M262 186 A 34 34 0 0 1 262 96" style="fill:none;stroke:var(--accent);stroke-width:2.2" marker-end="url(#bf-ah-acc)"/><text x="196" y="102" class="t-acc">M</text>
+        <path d="M498 186 A 34 34 0 0 0 498 96" style="fill:none;stroke:var(--accent);stroke-width:2.2" marker-end="url(#bf-ah-acc)"/><text x="540" y="96" class="t-acc">M + dM</text>
+        <line x1="270" y1="214" x2="490" y2="214" class="s-line" marker-start="url(#bf-ah-int)" marker-end="url(#bf-ah-int)"/><text x="380" y="236" text-anchor="middle" class="t-mono">dx</text>
+        <text x="610" y="70" class="t-dim">ΣF_y = 0</text><text x="610" y="90" class="t-mono">V − w dx − (V+dV) = 0</text>
+        <text x="610" y="130" class="t-dim">ΣM(오른쪽 면) = 0</text><text x="610" y="150" class="t-mono">−M − V dx + w dx²/2</text><text x="610" y="168" class="t-mono">  + (M+dM) = 0</text>
+      </svg>
+      <figcaption><b>그림 4-4.</b> 길이 dx인 미소 요소의 평형. 연직 방향 평형에서 dV = −w dx, 오른쪽 면에 대한 모멘트 평형에서 dx²의 항을 버리면 dM = V dx가 나온다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 4.3 (하중–전단력–휨모멘트 관계)</strong> 분포 하중 \(w(x)\)(아래 방향 \(+\))를 받는 보의 구간에서
+      <div class="formula">$$\frac{dV}{dx} = -w(x), \qquad \frac{dM}{dx} = V(x), \qquad \frac{d^2M}{dx^2} = -w(x).$$</div>
+      적분하면 두 점 \(x_1 \lt x_2\) 사이에서
+      <div class="formula">$$V_2 - V_1 = -\int_{x_1}^{x_2} w\,dx \;(\text{하중 그림의 넓이}), \qquad M_2 - M_1 = \int_{x_1}^{x_2} V\,dx \;(\text{전단력도의 넓이}).$$</div>
+      집중 하중 \(P\)(아래 방향)가 걸린 점에서 \(V\)는 \(P\)만큼 뚝 떨어지고, 시계 방향 집중 모멘트 \(C\)가 걸린 점에서 \(M\)은 \(C\)만큼 뛰어오른다.</div>
+    <p>이 관계는 미적분의 기본 정리 그대로입니다. 휨모멘트도의 <b>기울기</b>가 그 점의 전단력이고, 전단력도의 <b>넓이</b>가 휨모멘트의 변화입니다. 여기서 실전에서 가장 많이 쓰는 결론이 나옵니다.</p>
+    <ul>
+      <li><b>\(V = 0\)인 곳에서 \(M\)이 극값이다.</b> 최대 휨모멘트를 찾으려면 전단력이 부호를 바꾸는 점을 찾으면 된다(집중 하중 아래에서 부호가 바뀌면 그 점).</li>
+      <li><b>하중이 없는 구간에서 \(V\)는 상수, \(M\)은 직선이다.</b> 등분포 하중 구간에서 \(V\)는 직선, \(M\)은 2차 곡선이고, 선형 분포 하중이면 각각 2차·3차 곡선이다.</li>
+      <li><b>\(M\)의 볼록한 방향은 하중 방향을 따른다.</b> 아래 방향 하중(\(w \gt 0\))이면 \(d^2M/dx^2 \lt 0\)이라 휨모멘트도는 위로 볼록하다(그래프 기준).</li>
+    </ul>
+    <figure class="diagram" id="fig-bf-shapes">
+      <svg viewBox="0 0 760 310" role="img" aria-label="하중 모양에 따른 전단력도와 휨모멘트도의 차수">
+        <rect x="10" y="10" width="740" height="290" rx="10" class="f-surface"/>
+        <text x="60" y="80" class="t-mono">w</text><text x="60" y="170" class="t-mono">V</text><text x="60" y="260" class="t-mono">M</text>
+        <g transform="translate(100,0)">
+          <text x="90" y="36" text-anchor="middle" class="t" style="font-weight:700">하중 없음</text>
+          <line x1="20" y1="80" x2="160" y2="80" class="s-axis"/>
+          <line x1="20" y1="170" x2="160" y2="170" class="s-axis"/><path d="M20 150H160" style="stroke:var(--accent-2);stroke-width:2.2"/><text x="90" y="142" text-anchor="middle" class="t-mono">상수</text>
+          <line x1="20" y1="270" x2="160" y2="270" class="s-axis"/><path d="M20 266L160 226" style="stroke:var(--accent);stroke-width:2.2"/><text x="90" y="226" text-anchor="middle" class="t-mono">1차(직선)</text>
+        </g>
+        <g transform="translate(320,0)">
+          <text x="90" y="36" text-anchor="middle" class="t" style="font-weight:700">등분포 w</text>
+          <path d="M20 80V62H160V80" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:1.6"/>
+          <line x1="20" y1="170" x2="160" y2="170" class="s-axis"/><path d="M20 140L160 196" style="stroke:var(--accent-2);stroke-width:2.2"/><text x="120" y="146" text-anchor="middle" class="t-mono">1차</text>
+          <line x1="20" y1="270" x2="160" y2="270" class="s-axis"/><path d="M20 268Q90 196 160 262" style="fill:none;stroke:var(--accent);stroke-width:2.2"/><text x="90" y="222" text-anchor="middle" class="t-mono">2차</text>
+        </g>
+        <g transform="translate(540,0)">
+          <text x="90" y="36" text-anchor="middle" class="t" style="font-weight:700">삼각형 분포</text>
+          <path d="M20 80L160 54V80z" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:1.6"/>
+          <line x1="20" y1="170" x2="160" y2="170" class="s-axis"/><path d="M20 144Q100 150 160 200" style="fill:none;stroke:var(--accent-2);stroke-width:2.2"/><text x="80" y="140" text-anchor="middle" class="t-mono">2차</text>
+          <line x1="20" y1="270" x2="160" y2="270" class="s-axis"/><path d="M20 268C70 206 120 214 160 264" style="fill:none;stroke:var(--accent);stroke-width:2.2"/><text x="96" y="214" text-anchor="middle" class="t-mono">3차</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-5.</b> 하중 그림을 한 번 적분하면 전단력도, 한 번 더 적분하면 휨모멘트도가 된다. 그래서 하중의 차수가 n이면 V는 n+1차, M은 n+2차 곡선이다(그래프는 양(+)을 위로).</figcaption>
+    </figure>
+    <p>세 그래프를 한 화면에 쌓아 보면 관계가 더 분명해집니다. 아래 시뮬레이터의 커서를 옮기면, 전단력도 위에는 기울기가 \(-w(x)\)인 접선이, 휨모멘트도 위에는 기울기가 \(V(x)\)인 접선이 그려집니다. 칠해진 넓이는 0부터 \(x\)까지의 적분입니다.</p>
+    <div class="sim" id="sim-bf-calculus">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>기울기와 넓이로 잇는 세 그래프</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bf-cv-calc" aria-label="하중, 전단력, 휨모멘트 그래프와 커서"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>하중 모양</span><div class="seg" id="bf-k-case"><button data-value="udl" class="on">등분포</button><button data-value="tri">삼각형</button><button data-value="mix">부분 + 집중</button></div></div>
+          <label class="ctrl"><span>커서 x <output id="bf-k-x-out"></output></span><input type="range" id="bf-k-x" min="0" max="10" step="0.02" value="3"></label>
+          <div class="btn-row"><button class="btn primary" id="bf-k-play">▶ 커서 움직이기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">w(x)</span><span class="v" id="bf-k-w">—</span></div>
+        <div class="stat"><span class="k">V(x) = dM/dx</span><span class="v" id="bf-k-v">—</span></div>
+        <div class="stat"><span class="k">M(x) = ∫V</span><span class="v" id="bf-k-m">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 커서를 V = 0인 곳에 두면 M의 접선이 수평이 되는지 보세요 · '부분 + 집중'에서 집중 하중을 지날 때 V는 뛰고 M은 꺾이는 것을 확인하세요 · 모델: 경간 10 m 단순보, 접선은 길이 ±1.2 m.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="area-method">
+    <h2>넓이법으로 빠르게 그리기</h2>
+    <p>원리 4.3을 쓰면 단면법 없이도 SFD와 BMD를 왼쪽에서 오른쪽으로 한 번에 그릴 수 있습니다. 현장 기술자가 손으로 휨모멘트도를 그리는 방법이 바로 이것입니다.</p>
+    <ol>
+      <li><b>반력을 구한다.</b> 전체 자유물체도의 평형 방정식으로.</li>
+      <li><b>전단력도를 그린다.</b> 왼쪽 끝 0에서 출발해, 위 방향 힘(반력)에서는 그만큼 올라가고 아래 방향 집중 하중에서는 내려가며, 분포 하중 구간에서는 하중의 넓이만큼 비스듬히 내려간다. 오른쪽 끝에서 다시 0이 되면 맞게 그린 것이다.</li>
+      <li><b>휨모멘트도를 그린다.</b> 단순 지지된 끝에서 0으로 출발해 전단력도의 넓이를 차례로 더한다. 전단력이 0이 되는 곳이 극값, 휨모멘트가 0이 되는 곳이 <span class="term">반곡점</span>이다.</li>
+    </ol>
+    <div class="callout"><strong>예제 4.3 (내민보)</strong> 길이 10 m인 보가 A(\(x = 0\), 핀)와 B(\(x = 8\) m, 롤러)에 지지되어 2 m가 내밀어져 있다. 전체에 등분포 하중 \(w = 10\) kN/m, 끝 C(\(x = 10\) m)에 집중 하중 \(P = 20\) kN이 걸린다.
+      <ol style="margin:6px 0 0">
+        <li><b>반력.</b> \(\Sigma M_A = 0\): \(8R_B = 10 \times 10 \times 5 + 20 \times 10 = 700\) → \(R_B = 87.5\) kN. \(R_A = 100 + 20 - 87.5 = 32.5\) kN.</li>
+        <li><b>전단력도.</b> \(V(0^+) = 32.5\). 기울기 −10으로 내려가 \(x = 3.25\) m에서 0, \(V(8^-) = 32.5 - 80 = -47.5\) kN. B에서 \(+87.5\) 뛰어 \(V(8^+) = 40\) kN, 다시 내려가 \(V(10^-) = 20\) kN, 끝에서 \(P\)로 0.</li>
+        <li><b>휨모멘트도(넓이).</b> 0–3.25 m 삼각형 넓이 \(\tfrac12 \times 3.25 \times 32.5 = 52.8\) → \(M_{max} = 52.8\) kN·m (\(x = 3.25\) m). 3.25–8 m 넓이 \(\tfrac12 \times 4.75 \times (-47.5) = -112.8\) → \(M_B = -60.0\) kN·m. 8–10 m 사다리꼴 넓이 \(\tfrac12(40 + 20) \times 2 = 60\) → \(M_C = 0\). 끝에서 0으로 닫혔으니 맞다.</li>
+        <li><b>반곡점.</b> 0–8 m 구간에서 \(M(x) = 32.5x - 5x^2 = 0\) → \(x = 6.5\) m. 이 점을 지나면 보 위쪽이 인장을 받는다.</li>
+      </ol></div>
+    <div class="sim" id="sim-bf-area">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>전단력도의 넓이 = 휨모멘트의 변화</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bf-cv-area" aria-label="예제 4.3 내민보의 전단력도 넓이와 휨모멘트 변화"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>시작 x₁ <output id="bf-a1-out"></output></span><input type="range" id="bf-a1" min="0" max="10" step="0.05" value="0"></label>
+          <label class="ctrl"><span>끝 x₂ <output id="bf-a2-out"></output></span><input type="range" id="bf-a2" min="0" max="10" step="0.05" value="3.25"></label>
+          <div class="btn-row"><button class="btn" data-pair="0,3.25">0 → 3.25</button><button class="btn" data-pair="3.25,8">3.25 → 8</button><button class="btn" data-pair="8,10">8 → 10</button><button class="btn" data-pair="0,6.5">0 → 반곡점</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">∫V dx (넓이)</span><span class="v" id="bf-a-int">—</span></div>
+        <div class="stat"><span class="k">M(x₂) − M(x₁)</span><span class="v" id="bf-a-dm">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 버튼으로 예제 4.3의 세 넓이를 차례로 확인하세요 · x₁, x₂를 지점 B(8 m)의 양쪽에 두어도 넓이와 M의 변화가 같은지 보세요. 전단력의 뜀은 넓이를 바꾸지 않습니다 · 모델: 예제 4.3, 넓이는 사다리꼴 수치 적분.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="cantilever">
+    <h2>캔틸레버와 내민보</h2>
+    <p><span class="term">캔틸레버</span><span class="en">(cantilever)</span>는 한쪽 끝만 고정되고 다른 끝은 허공에 뜬 보입니다. 발코니, 건물 입구의 캐노피, 타워크레인의 지브가 모두 캔틸레버입니다. 자유단에서 출발해 고정단 쪽으로 자르면 반력을 구하지 않고도 단면력을 바로 쓸 수 있습니다. 하중이 아래로 걸리면 단면의 왼쪽(고정단 쪽)이 아니라 오른쪽 조각만 보면 되고, 휨모멘트는 전 구간에서 음(호깅)이며 고정단에서 가장 큽니다.</p>
+    <div class="formula">$$\text{자유단 집중 하중 } P: \; M(x) = -P(L - x), \; M_{A} = -PL; \qquad \text{등분포 } w: \; M(x) = -\frac{w (L - x)^2}{2}, \; M_{A} = -\frac{wL^2}{2}.$$<div class="where">고정단 A를 \(x = 0\)으로 둔다. 같은 하중 \(wL\)이라도 캔틸레버의 최대 휨모멘트는 단순보(\(wL^2/8\))의 4배다.</div></div>
+    <div class="callout"><strong>예제 4.4 (입구 캐노피)</strong> B-10의 주 출입구 위에 길이 3.0 m인 강재 캐노피 보를 벽에서 내민다. 교육용 가정으로 고정하중과 적설을 합친 등분포 하중 4 kN/m, 끝에 매단 안내판 2 kN을 둔다.
+      <ol style="margin:6px 0 0">
+        <li><b>고정단 전단력.</b> \(V_A = 4 \times 3 + 2 = 14\) kN.</li>
+        <li><b>고정단 휨모멘트.</b> \(M_A = -\left(4 \times 3 \times 1.5 + 2 \times 3\right) = -(18 + 6) = -24\) kN·m. 위 섬유가 인장이다.</li>
+        <li><b>벽이 받는 힘.</b> 벽에는 14 kN의 아래 방향 힘과 24 kN·m의 우력이 전달된다. 캔틸레버의 정착부(벽 속 앵커, 뒤쪽 보)가 이 우력을 버텨야 한다.</li>
+      </ol></div>
+    <p><span class="term">내민보</span><span class="en">(overhanging beam)</span>는 지점 밖으로 보가 튀어나온 형식입니다. 지점 사이에는 양의 휨모멘트, 지점 위에는 내민 부분이 만드는 음의 휨모멘트가 생기므로, 지점 위치를 잘 고르면 둘이 서로를 줄여 줍니다. 공장에서 만든 프리캐스트 콘크리트 부재나 말뚝을 크레인으로 들어 올릴 때 고리 위치를 정하는 문제가 정확히 이것입니다.</p>
+    <figure class="diagram" id="fig-bf-cant">
+      <svg viewBox="0 0 760 290" role="img" aria-label="캔틸레버와 대칭 내민보의 휨모멘트도">
+        <rect x="10" y="10" width="740" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(30,0)">
+          <text x="160" y="34" text-anchor="middle" class="t" style="font-weight:700">(a) 캔틸레버, 등분포 w</text>
+          <rect x="34" y="56" width="10" height="64" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <line x1="44" y1="88" x2="300" y2="88" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <line x1="44" y1="62" x2="300" y2="62" style="stroke:var(--accent-2);stroke-width:1.4"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#bf-ah-load)"><line x1="70" y1="62" x2="70" y2="84"/><line x1="128" y1="62" x2="128" y2="84"/><line x1="186" y1="62" x2="186" y2="84"/><line x1="244" y1="62" x2="244" y2="84"/><line x1="300" y1="62" x2="300" y2="84"/></g>
+          <line x1="44" y1="190" x2="300" y2="190" class="s-axis"/>
+          <path d="M44 190V130Q170 182 300 190z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="52" y="124" class="t-mono" style="fill:var(--accent)">−wL²/2</text>
+          <text x="172" y="226" text-anchor="middle" class="t-dim">위쪽(인장측)에 그린 호깅 모멘트</text>
+        </g>
+        <g transform="translate(400,0)">
+          <text x="160" y="34" text-anchor="middle" class="t" style="font-weight:700">(b) 대칭 내민보, a ≈ 0.207 L</text>
+          <line x1="30" y1="88" x2="310" y2="88" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <path d="M88 88l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M252 88l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="30" y1="62" x2="310" y2="62" style="stroke:var(--accent-2);stroke-width:1.4"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#bf-ah-load)"><line x1="30" y1="62" x2="30" y2="84"/><line x1="86" y1="62" x2="86" y2="84"/><line x1="142" y1="62" x2="142" y2="84"/><line x1="198" y1="62" x2="198" y2="84"/><line x1="254" y1="62" x2="254" y2="84"/><line x1="310" y1="62" x2="310" y2="84"/></g>
+          <line x1="30" y1="190" x2="310" y2="190" class="s-axis"/>
+          <path d="M30 190Q59 190 88 166Q170 268 252 166Q281 190 310 190" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="88" y="158" text-anchor="middle" class="t-mono" style="fill:var(--accent)">−M</text><text x="170" y="236" text-anchor="middle" class="t-mono" style="fill:var(--accent)">+M (같은 크기)</text>
+          <text x="170" y="260" text-anchor="middle" class="t-dim">위아래 최대값이 같아지는 지점 위치</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-6.</b> 캔틸레버와 대칭 내민보의 휨모멘트도(인장측). 내민 길이를 a = L/(2 + 2√2) ≈ 0.207 L로 두면 지점 위 음의 모멘트와 가운데 양의 모멘트가 wL²/46.6으로 같아진다. 양 끝 지지 단순보(wL²/8)의 약 1/6이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-bf-overhang">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>부재를 들어 올릴 고리는 어디에 걸까</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view bf-stack">
+          <div><canvas id="bf-cv-ov" aria-label="대칭 내민보와 인장측 휨모멘트도"></canvas><span class="bf-cap">휨모멘트도: 인장측</span></div>
+          <div><canvas id="bf-cv-ov2" aria-label="내민 길이에 따른 최대 휨모멘트"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>내민 길이 a <output id="bf-ov-a-out"></output></span><input type="range" id="bf-ov-a" min="0" max="4.5" step="0.01" value="1"></label>
+          <div class="btn-row"><button class="btn" id="bf-ov-best">최적 a로</button><button class="btn" id="bf-ov-end">양 끝 지지</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">가운데 M (+)</span><span class="v" id="bf-ov-mp">—</span></div>
+        <div class="stat"><span class="k">지점 위 M (−)</span><span class="v" id="bf-ov-mn">—</span></div>
+        <div class="stat"><span class="k">max|M| / (wL²/8)</span><span class="v" id="bf-ov-r">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: a를 0에서 키우며 두 곡선이 만나는 점을 찾으세요 · a가 너무 크면 이번에는 내민 부분의 음의 모멘트가 커집니다 · 모델: 길이 10 m, 자중 10 kN/m의 부재를 두 점으로 지지(인양). 최적점 a = L/(2 + 2√2).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="gerber">
+    <h2>내부 힌지와 게르버보</h2>
+    <p>보 중간에 회전이 자유로운 연결, 곧 <span class="term">내부 힌지</span><span class="en">(internal hinge)</span>를 넣으면 그 점에서는 휨모멘트를 전달할 수 없으므로 \(M = 0\)이라는 조건이 하나 더 생깁니다. 지점이 많아 평형 방정식만으로는 풀 수 없는 연속보도 힌지를 알맞게 넣으면 정정 구조가 됩니다. 1866년 독일의 하인리히 게르버가 특허를 낸 이 방식은 <span class="term">게르버보</span><span class="en">(Gerber beam)</span>라는 이름으로 남았고, 1890년에 완공된 스코틀랜드의 포스교도 양쪽으로 뻗은 캔틸레버 사이에 짧은 경간을 매단 같은 원리의 다리입니다.</p>
+    <figure class="diagram" id="fig-bf-gerber">
+      <svg viewBox="0 0 760 290" role="img" aria-label="힌지 두 개를 가진 3경간 게르버보를 매단 경간과 내민보로 나눈 그림">
+        <rect x="10" y="10" width="740" height="270" rx="10" class="f-surface"/>
+        <text x="380" y="36" text-anchor="middle" class="t" style="font-weight:700">3경간 게르버보 = 내민보 2개 + 매단 경간</text>
+        <line x1="60" y1="90" x2="700" y2="90" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+        <path d="M60 90l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M273 90l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M487 90l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M700 90l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+        <circle cx="332" cy="90" r="6" class="f-elev" style="stroke:var(--text);stroke-width:2"/><circle cx="428" cy="90" r="6" class="f-elev" style="stroke:var(--text);stroke-width:2"/>
+        <text x="332" y="72" text-anchor="middle" class="t-mono">힌지</text><text x="428" y="72" text-anchor="middle" class="t-mono">힌지</text>
+        <line x1="60" y1="190" x2="340" y2="190" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+        <path d="M60 190l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M273 190l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+        <line x1="420" y1="190" x2="700" y2="190" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+        <path d="M487 190l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M700 190l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+        <line x1="336" y1="150" x2="424" y2="150" style="stroke:var(--accent);stroke-width:4;stroke-linecap:round"/>
+        <line x1="336" y1="156" x2="336" y2="186" style="stroke:var(--ok);stroke-width:2" marker-start="url(#bf-ah-react)"/><line x1="424" y1="156" x2="424" y2="186" style="stroke:var(--ok);stroke-width:2" marker-start="url(#bf-ah-react)"/>
+        <text x="380" y="138" text-anchor="middle" class="t-acc">매단 경간(단순보)</text>
+        <text x="190" y="232" text-anchor="middle" class="t-dim">내민보 ①: 매단 경간의 반력을 끝에서 받는다</text>
+        <text x="570" y="232" text-anchor="middle" class="t-dim">내민보 ②</text>
+        <text x="380" y="262" text-anchor="middle" class="t-dim">힌지 → 휨모멘트 0, 매단 경간부터 풀고 그 반력을 내민보에 하중으로 건다</text>
+      </svg>
+      <figcaption><b>그림 4-7.</b> 게르버보는 매단 경간(가운데)을 먼저 단순보로 풀고, 그 반력을 양쪽 내민보 끝에 하중으로 건 다음 내민보를 푼다. 각 조각이 정정이므로 지점이 조금 가라앉거나 온도가 바뀌어도 추가 응력이 생기지 않는다.</figcaption>
+    </figure>
+    <p>게르버보의 장점은 계산이 쉽다는 것만이 아닙니다. 지반이 고르지 않아 지점 하나가 조금 내려앉아도 정정 구조는 힘의 분포가 바뀌지 않습니다(14장의 부정정 연속보는 바뀝니다). 대신 힌지 하나가 망가지면 매단 경간이 떨어지므로 여유도가 작습니다. 힌지를 <b>연속보의 반곡점</b>에 두면 흥미로운 일이 생깁니다. 반곡점에서는 원래 휨모멘트가 0이었으므로 힌지를 넣어도 아무것도 바뀌지 않고, 게르버보와 연속보의 휨모멘트도가 겹칩니다.</p>
+    <div class="sim" id="sim-bf-gerber">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>힌지를 옮겨 보는 3경간 게르버보</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view bf-stack">
+          <div><canvas id="bf-cv-gb" aria-label="힌지가 있는 3경간 보"></canvas></div>
+          <div><canvas id="bf-cv-gb2" aria-label="게르버보와 연속보의 휨모멘트도"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>힌지 배치</span><div class="seg" id="bf-g-mode"><button data-value="mid" class="on">가운데 경간에 2개</button><button data-value="side">양쪽 경간에 1개씩</button><button data-value="cont">힌지 없음</button></div></div>
+          <label class="ctrl"><span>지점에서 힌지까지 e <output id="bf-g-e-out"></output></span><input type="range" id="bf-g-e" min="0.5" max="4.5" step="0.01" value="2"></label>
+          <label class="check"><input type="checkbox" id="bf-g-cmp" checked> 연속보(점선) 겹쳐 보기</label>
+          <div class="btn-row"><button class="btn" id="bf-g-inf">반곡점에 두기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">구조</span><span class="v" id="bf-g-deg">—</span></div>
+        <div class="stat"><span class="k">M<sub>max</sub> (+)</span><span class="v" id="bf-g-mp">—</span></div>
+        <div class="stat"><span class="k">M<sub>min</sub> (−)</span><span class="v" id="bf-g-mn">—</span></div>
+      </div>
+      <div class="bf-msg" id="bf-g-msg"></div>
+      <div class="sim-note">해볼 것: '반곡점에 두기'를 누르면 두 휨모멘트도가 겹치는 것을 보세요 · e를 크게 하면 매단 경간이 짧아지고 지점 위 음의 모멘트가 커집니다 · 모델: 경간 10 m × 3, 등분포 10 kN/m. 연속보 가운데 경간의 반곡점은 지점에서 (1 − √0.2)L/2 ≈ 2.76 m.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="g1">
+    <h2>기준 건물 B-10의 큰보 G1</h2>
+    <div class="problem"><strong>같은 보, 다른 모멘트</strong>
+      <p>큰보 G1에 걸리는 하중은 같아도 양 끝이 기둥에 어떻게 붙어 있느냐에 따라 휨모멘트도가 완전히 달라집니다. 단순보라고 보고 800 kN·m로 설계하면 안전할까요, 낭비일까요? 지점 위에서 위쪽을 당기는 음의 모멘트는 어떻게 될까요?</p></div>
+    <p>양 끝이 완전히 고정된 보(양단 고정보)는 부정정 구조라 이 장의 방법만으로는 풀 수 없지만, 결과는 잘 알려져 있습니다. 등분포 하중에서 고정단 모멘트는 \(-wL^2/12\), 가운데 모멘트는 \(+wL^2/24\)입니다. 두 값의 크기를 더하면 \(wL^2/12 + wL^2/24 = wL^2/8\)로 단순보의 최대 모멘트와 같습니다. 이것은 우연이 아닙니다. 지점 모멘트는 휨모멘트도 전체를 아래로 끌어내릴 뿐 포물선의 깊이 \(wL^2/8\)은 그대로입니다. 연속보도 마찬가지로, 각 경간의 휨모멘트도는 "단순보의 포물선"을 지점 모멘트를 잇는 직선만큼 내린 모양입니다.</p>
+    <div class="callout"><strong>예제 4.5 (지점 조건에 따른 G1의 휨모멘트)</strong> \(w_u = 100\) kN/m, \(L = 8\) m.
+      <div class="table-wrap"><table class="bf-tbl">
+        <thead><tr><th>지점 조건</th><th>지점 위 M (kN·m)</th><th>경간 중앙 부근 M (kN·m)</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>단순보</td><td>0</td><td class="hl">+800</td><td>wL²/8</td></tr>
+          <tr><td>양단 고정</td><td class="hl">−533</td><td>+267</td><td>−wL²/12, +wL²/24</td></tr>
+          <tr><td>4경간 연속보, 둘째 경간</td><td>−686 / −457</td><td>+233</td><td>모든 경간 재하, 14장</td></tr>
+        </tbody></table></div>
+      어느 경우든 경간 안의 "단순보 포물선 깊이"는 800 kN·m로 같다. 실제 설계에서는 활하중을 경간마다 엇갈려 놓는 배치(6장, 14장)까지 따져 각 단면의 최댓값을 찾는다.</div>
+    <div class="sim" id="sim-bf-g1">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-10 큰보 G1의 휨모멘트 비교</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view bf-stack">
+          <div><canvas id="bf-cv-g1" aria-label="지점 조건을 바꾼 큰보 G1"></canvas></div>
+          <div><canvas id="bf-cv-g1d" aria-label="큰보 G1의 전단력도와 휨모멘트도"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>지점 조건</span><div class="seg" id="bf-g1-sup"><button data-value="simple" class="on">단순보</button><button data-value="fixed">양단 고정</button><button data-value="cont">4경간 연속</button></div></div>
+          <div class="ctrl"><span>하중 조합</span><div class="seg" id="bf-g1-combo"><button data-value="u" class="on">1.2D + 1.6L</button><button data-value="d">1.4D</button><button data-value="s">D + L (사용)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">하중 w</span><span class="v" id="bf-g1-w">—</span></div>
+        <div class="stat"><span class="k">M<sub>max</sub> (+)</span><span class="v" id="bf-g1-mp">—</span></div>
+        <div class="stat"><span class="k">M<sub>min</sub> (−)</span><span class="v" id="bf-g1-mn">—</span></div>
+        <div class="stat"><span class="k">|V|<sub>max</sub></span><span class="v" id="bf-g1-v">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 세 지점 조건에서 둘째 경간의 (지점 M 평균의 크기 + 경간 M)이 모두 wL²/8에 가까운지 확인하세요 · 하중 조합에 따라 값이 비례해서 바뀝니다 · 모델: D = 56.7 kN/m, L = 20 kN/m(기여 폭 8 m 단순화), 연속보는 경간 8 m × 4, 모든 경간 같은 하중. 교육용 값이며 설계값이 아닙니다.</div>
+    </div>
+    <div class="callout warn"><strong>정정 해석의 한계</strong> 이 장에서 푼 보는 모두 평형 방정식만으로 풀리는 정정 구조였습니다. 실제 건물의 보는 대부분 기둥·슬래브와 한 몸인 부정정 구조이고, 그 휨모멘트는 부재의 강성(EI)에 따라 달라집니다. 단면력도의 모양을 읽는 감각은 그대로 쓰이지만, 숫자는 14–16장의 방법으로 구해야 합니다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="bending.html"><small>CH.09 · 휨응력과 전단응력</small>최대 휨모멘트가 단면을 정한다<br><span>σ = M/S로 응력을 확인하고 단면계수가 큰 단면을 고른다.</span></a>
+      <a href="deflection.html"><small>CH.11 · 보의 처짐</small>휨모멘트도를 두 번 적분하면 처짐<br><span>EI v″ = M. 이 장의 그림이 처짐 계산의 출발점이다.</span></a>
+      <a href="influence.html"><small>CH.06 · 영향선과 이동 하중</small>하중이 움직이면 최댓값도 움직인다<br><span>다리 위 차량처럼 위치가 바뀌는 하중의 가장 나쁜 배치.</span></a>
+      <a href="slope-deflection.html"><small>CH.15 · 처짐각법과 모멘트 분배법</small>연속보와 라멘의 휨모멘트<br><span>큰보 G1의 지점 모멘트를 강성으로 나눠 구한다.</span></a>
+      <a href="https://math.euiyun.com/calculus/chapters/fundamental.html"><small>CALCULUSBOOK · 미적분의 기본 정리</small>넓이 함수의 기울기는 원래 함수<br><span>M = ∫V, V = dM/dx는 기본 정리 그 자체다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>보를 가상으로 자르면 잘린 면에 단면력(축력 N, 전단력 V, 휨모멘트 M)이 나타난다. 한쪽 조각의 평형으로 구하는 것이 단면법이다.</li>
+      <li>부호는 변형 모양으로 정한다. 새깅(아래로 볼록, 아래 섬유 인장)이 양의 휨모멘트다. V(x)는 단면 왼쪽 위 방향 힘의 합, M(x)는 단면 왼쪽 힘들의 시계 방향 모멘트 합이다.</li>
+      <li>dV/dx = −w, dM/dx = V. 전단력도의 넓이가 휨모멘트의 변화이고, V = 0인 곳에서 M이 극값이다. 집중 하중은 V를, 집중 모멘트는 M을 계단처럼 뛰게 한다.</li>
+      <li>단순보: 가운데 집중 하중 PL/4, 등분포 wL²/8. 캔틸레버: 고정단에서 −PL, −wL²/2. 대칭 내민보는 a ≈ 0.207 L에서 최대 |M|이 가장 작다.</li>
+      <li>내부 힌지에서 M = 0. 게르버보는 연속보에 힌지를 넣어 만든 정정 구조이며, 힌지를 연속보의 반곡점에 두면 휨모멘트도가 같아진다.</li>
+      <li>지점 모멘트는 휨모멘트도를 끌어내릴 뿐 경간 안 포물선의 깊이 wL²/8은 그대로다. B-10 큰보 G1은 단순보로 800 kN·m, 실제 연속보로는 지점과 경간이 나눠 갖는다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 경간 L인 단순보 전체에 등분포 하중 w가 걸릴 때 최대 휨모멘트는?</p><div class="opts">
+        <button class="opt">wL²/2</button><button class="opt" data-correct>wL²/8</button><button class="opt">wL²/12</button><button class="opt">wL/4</button>
+      </div><div class="quiz-exp">\(M(x) = wx(L-x)/2\)는 \(x = L/2\)에서 최대이고 그 값은 \(wL^2/8\)이다. \(wL^2/2\)는 같은 길이 캔틸레버의 고정단 모멘트, \(wL^2/12\)는 양단 고정보의 지점 모멘트다.</div></div>
+      <div class="quiz-q"><p>2. 휨모멘트가 극값(최대·최소)이 되는 곳은 어디인가?</p><div class="opts">
+        <button class="opt">하중이 가장 큰 곳</button><button class="opt" data-correct>전단력이 0이 되거나 부호가 바뀌는 곳</button><button class="opt">항상 경간 중앙</button><button class="opt">지점 바로 위</button>
+      </div><div class="quiz-exp">\(dM/dx = V\)이므로 \(V = 0\)인 곳에서 \(M\)의 기울기가 0이다. 집중 하중 아래에서 \(V\)가 양에서 음으로 뛰면 그 점이 극값이다. 하중이 대칭일 때만 경간 중앙이다.</div></div>
+      <div class="quiz-q"><p>3. 아래 방향 집중 하중 P가 걸린 점을 왼쪽에서 오른쪽으로 지날 때 전단력도는?</p><div class="opts">
+        <button class="opt">P만큼 위로 뛴다</button><button class="opt" data-correct>P만큼 아래로 뛴다</button><button class="opt">기울기가 P만큼 바뀐다</button><button class="opt">변하지 않는다</button>
+      </div><div class="quiz-exp">\(V\)는 단면 왼쪽의 위 방향 힘의 합이다. 하중점을 지나면 왼쪽에 아래 방향 힘 \(P\)가 더해지므로 \(V\)가 \(P\)만큼 줄어든다. 휨모멘트도는 이 점에서 꺾인다.</div></div>
+      <div class="quiz-q"><p>4. 길이 3 m 캔틸레버의 끝에 10 kN이 걸린다. 고정단의 휨모멘트는?</p><div class="opts">
+        <button class="opt">+30 kN·m</button><button class="opt" data-correct>−30 kN·m (위 섬유 인장)</button><button class="opt">−15 kN·m</button><button class="opt">0</button>
+      </div><div class="quiz-exp">\(M_A = -PL = -10 \times 3 = -30\) kN·m. 캔틸레버는 위로 볼록하게 휘므로(호깅) 음의 모멘트이고, 위 섬유가 인장을 받는다. 철근콘크리트 캔틸레버의 주철근이 위쪽에 들어가는 이유다.</div></div>
+      <div class="quiz-q"><p>5. 보의 내부 힌지 위치에서 반드시 0인 단면력은?</p><div class="opts">
+        <button class="opt">전단력</button><button class="opt">축력</button><button class="opt" data-correct>휨모멘트</button><button class="opt">반력</button>
+      </div><div class="quiz-exp">힌지는 회전이 자유로워 모멘트를 전달하지 못한다. 힘(전단력, 축력)은 전달한다. 이 조건 \(M = 0\)이 방정식 하나를 더해 주므로 게르버보를 정정으로 풀 수 있다.</div></div>
+      <div class="quiz-q"><p>6. 휨모멘트도의 어떤 점에서의 기울기는 무엇과 같은가?</p><div class="opts">
+        <button class="opt">그 점의 하중 세기</button><button class="opt" data-correct>그 점의 전단력</button><button class="opt">그 점의 처짐</button><button class="opt">반력의 합</button>
+      </div><div class="quiz-exp">\(dM/dx = V\). 반대로 전단력도의 기울기는 \(-w\)다. 미소 요소의 모멘트 평형에서 나온 관계다.</div></div>
+      <div class="quiz-q"><p>7. 길이 L인 균일한 프리캐스트 보를 두 고리로 들어 올릴 때 최대 |M|을 가장 작게 하는 고리 위치(끝에서 거리)는?</p><div class="opts">
+        <button class="opt">0 (양 끝)</button><button class="opt">L/4</button><button class="opt" data-correct>약 0.207 L</button><button class="opt">L/3</button>
+      </div><div class="quiz-exp">지점 위 음의 모멘트 \(wa^2/2\)와 가운데 양의 모멘트 \(w(L-2a)^2/8 - wa^2/2\)가 같아지는 \(a = L/(2+2\sqrt2) \approx 0.207L\)이다. 이때 \(|M|_{max} = wL^2/46.6\)으로 양 끝 지지의 약 1/6이다.</div></div>
+      <div class="quiz-q"><p>8. B-10 큰보 G1(L = 8 m, w<sub>u</sub> = 100 kN/m)을 양단 고정보로 보면 지점 위 휨모멘트는 약 얼마인가?</p><div class="opts">
+        <button class="opt">−800 kN·m</button><button class="opt" data-correct>−533 kN·m</button><button class="opt">−267 kN·m</button><button class="opt">0</button>
+      </div><div class="quiz-exp">\(-wL^2/12 = -100 \times 64/12 \approx -533\) kN·m이고 가운데는 \(+wL^2/24 \approx +267\) kN·m다. 두 크기의 합 800 kN·m는 단순보의 \(wL^2/8\)과 같다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 그리기 도우미(픽셀 좌표) ---------- */
+const BFX = {
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  // 화면에서 반시계(ccw = true) 또는 시계 방향으로 도는 모멘트 화살표
+  arc(ctx, cx, cy, ccw, color, r = 18) {
+    const t0 = ccw ? 0.75 * Math.PI : 0.25 * Math.PI, t1 = ccw ? -0.75 * Math.PI : 1.75 * Math.PI;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.arc(cx, cy, r, t0, t1, ccw); ctx.stroke();
+    const ex = cx + r * Math.cos(t1), ey = cy + r * Math.sin(t1), tx = ccw ? Math.sin(t1) : -Math.sin(t1), ty = ccw ? -Math.cos(t1) : Math.cos(t1), h = 8;
+    ctx.beginPath(); ctx.moveTo(ex + tx * h * 0.6, ey + ty * h * 0.6); ctx.lineTo(ex - tx * h * 0.4 - ty * h * 0.5, ey - ty * h * 0.4 + tx * h * 0.5); ctx.lineTo(ex - tx * h * 0.4 + ty * h * 0.5, ey - ty * h * 0.4 - tx * h * 0.5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  beam(ctx, x0, x1, y, color, width = 5) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.restore(); },
+  pin(ctx, x, y, roller) {
+    const pal = CB.palette(), s = 11;
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.fillStyle = pal.surface; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, y + 3); ctx.lineTo(x - s * 0.8, y + 3 + s * (roller ? 0.95 : 1.2)); ctx.lineTo(x + s * 0.8, y + 3 + s * (roller ? 0.95 : 1.2)); ctx.closePath(); ctx.fill(); ctx.stroke();
+    let base = y + 3 + s * 1.2;
+    if (roller) { [-s * 0.45, s * 0.45].forEach((d) => { ctx.beginPath(); ctx.arc(x + d, y + 3 + s * 0.95 + 3.2, 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }); base = y + 3 + s * 0.95 + 6.4; }
+    ctx.beginPath(); ctx.moveTo(x - s, base); ctx.lineTo(x + s, base); ctx.stroke();
+    ctx.restore();
+  },
+  udl(ctx, x0, x1, y, color, len = 24, step = 18) {
+    if (x1 - x0 < 2) return;
+    const n = Math.max(2, Math.round((x1 - x0) / step) + 1);
+    for (let k = 0; k < n; k++) { const x = x0 + ((x1 - x0) * k) / (n - 1); BFX.arrow(ctx, x, y - len, x, y - 3, color, 1.4, 6); }
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x0, y - len); ctx.lineTo(x1, y - len); ctx.stroke(); ctx.restore();
+  },
+};
+
+/* ---------- 1. 보를 잘라 단면력 꺼내기 ---------- */
+(function () {
+  const L = 8;
+  let b;
+  const gw = CB.range("bf-cw", (v) => v + " kN/m", update);
+  const gP = CB.range("bf-cp", (v) => v + " kN", update);
+  const ga = CB.range("bf-ca", (v) => v.toFixed(1) + " m", update);
+  const gx = CB.range("bf-cx", (v) => v.toFixed(2) + " m", update);
+  function solve() {
+    b = CB.beam({ L, EI: 3e5, supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }], loads: [{ type: "udl", w: gw(), a: 0, b: L }, { type: "point", P: gP(), a: ga() }] });
+  }
+  solve();
+  const cv = CB.canvas("#bf-cv-cut", draw, { aspect: (W) => (W < 520 ? 0.95 : 0.62), maxHeight: 460, minHeight: 280 });
+  function update() { solve(); cv.redraw(); readout(); }
+  function draw(ctx, W, H) {
+    const pal = CB.palette(), m = Math.max(56, Math.min(80, W * 0.1)), sx = (W - 2 * m) / L, X = (x) => m + x * sx;
+    const y1 = Math.round(H * 0.25), y2 = Math.round(H * 0.72), gap = Math.max(54, Math.min(80, W * 0.1));
+    const x = gx(), w = gw(), P = gP(), a = ga();
+    const RA = b.reactions[0].R, RB = b.reactions[1].R, f = b.at(x, -1);
+    // 위 줄: 보 전체
+    BFX.beam(ctx, X(0), X(L), y1, pal.text);
+    BFX.pin(ctx, X(0), y1, false); BFX.pin(ctx, X(L), y1, true);
+    if (w > 0) BFX.udl(ctx, X(0), X(L), y1, pal.accent2, 22, 20);
+    if (P > 0) { BFX.arrow(ctx, X(a), y1 - 52, X(a), y1 - 3, pal.accent2, 2.6, 10); BFX.text(ctx, `P = ${P} kN`, X(a), y1 - 62, pal.accent2); }
+    if (w > 0) BFX.text(ctx, `w = ${w} kN/m`, X(L * 0.18), y1 - 32, pal.accent2);
+    BFX.arrow(ctx, X(0), y1 + 62, X(0), y1 + 26, pal.ok, 2.4); BFX.text(ctx, CB.num(RA, 1), X(0) + 24, y1 + 56, pal.ok, { align: "left" });
+    BFX.arrow(ctx, X(L), y1 + 62, X(L), y1 + 26, pal.ok, 2.4); BFX.text(ctx, CB.num(RB, 1), X(L) - 24, y1 + 56, pal.ok, { align: "right" });
+    ctx.save(); ctx.strokeStyle = pal.dim; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(X(x), y1 - 40); ctx.lineTo(X(x), y1 + 30); ctx.stroke(); ctx.restore();
+    BFX.text(ctx, "✂ 절단", X(x), y1 + 40, pal.dim, { mono: false });
+    // 아래 줄: 잘라 벌린 두 조각
+    const XL = (s) => X(s) - gap / 2, XR = (s) => X(s) + gap / 2;
+    BFX.beam(ctx, XL(0), XL(x), y2, pal.text); BFX.beam(ctx, XR(x), XR(L), y2, pal.text);
+    if (w > 0) { BFX.udl(ctx, XL(0), XL(x), y2, pal.accent2, 20, 20); BFX.udl(ctx, XR(x), XR(L), y2, pal.accent2, 20, 20); }
+    if (P > 0) { const left = a < x, px = left ? XL(a) : XR(a); BFX.arrow(ctx, px, y2 - 44, px, y2 - 3, pal.accent2, 2.4, 9); }
+    BFX.arrow(ctx, XL(0), y2 + 54, XL(0), y2 + 6, pal.ok, 2.4); BFX.arrow(ctx, XR(L), y2 + 54, XR(L), y2 + 6, pal.ok, 2.4);
+    // 분포 하중 합력(왼쪽 조각)
+    if (w > 0 && x > 0.4) { ctx.save(); ctx.setLineDash([4, 3]); BFX.arrow(ctx, XL(x / 2), y2 - 64, XL(x / 2), y2 - 24, pal.accent2, 1.6, 7); ctx.restore(); BFX.text(ctx, `wx = ${CB.num(w * x, 0)}`, XL(x / 2), y2 - 74, pal.accent2, { size: 11 }); }
+    // 단면력: 왼쪽 조각의 오른쪽 면(+V ↓, +M 반시계), 오른쪽 조각의 왼쪽 면은 반대
+    const V = f.V, M = f.M, fl = XL(x), fr = XR(x), vlen = 30;
+    const vdir = V >= 0 ? 1 : -1;
+    if (Math.abs(V) > 1e-6) {
+      BFX.arrow(ctx, fl + 6, y2 - vdir * vlen, fl + 6, y2 + vdir * vlen, pal.text, 2.4, 9);
+      BFX.arrow(ctx, fr - 6, y2 + vdir * vlen, fr - 6, y2 - vdir * vlen, pal.text, 2.4, 9);
+    }
+    if (Math.abs(M) > 1e-6) { BFX.arc(ctx, fl - 14, y2, M > 0, pal.accent, 15); BFX.arc(ctx, fr + 14, y2, M < 0, pal.accent, 15); }
+    BFX.text(ctx, `V = ${CB.num(V, 1)} kN`, fl - 6, y2 + 50, pal.text, { align: "right", size: 11.5 });
+    BFX.text(ctx, `M = ${CB.num(M, 1)} kN·m`, fl - 6, y2 + 68, pal.accent, { align: "right", size: 11.5 });
+    BFX.text(ctx, "왼쪽 조각", (XL(0) + XL(x)) / 2, y2 - 92, pal.dim, { mono: false, size: 11.5 });
+    BFX.text(ctx, "오른쪽 조각", (XR(x) + XR(L)) / 2, y2 - 92, pal.dim, { mono: false, size: 11.5 });
+  }
+  function readout() {
+    const x = gx(), w = gw(), P = gP(), a = ga(), f = b.at(x, -1), RA = b.reactions[0].R;
+    CB.stat("bf-c-ra", CB.num(RA, 1) + " kN");
+    CB.stat("bf-c-v", CB.num(f.V, 1) + " kN");
+    CB.stat("bf-c-m", CB.num(f.M, 1) + " kN·m");
+    const pl = a < x ? P : 0;
+    const sumF = RA - w * x - pl - f.V, sumM = RA * x - (w * x * x) / 2 - pl * (x - a) - f.M;
+    const msg = document.getElementById("bf-c-msg");
+    msg.innerHTML = `왼쪽 조각: ΣF<sub>y</sub> = R<sub>A</sub> − wx${pl ? " − P" : ""} − V = <b>${CB.num(RA, 1)} − ${CB.num(w * x, 1)}${pl ? " − " + P : ""} − (${CB.num(f.V, 1)}) = ${CB.num(sumF, 2)}</b> · ΣM<sub>절단면</sub> = R<sub>A</sub>x − wx²/2${pl ? " − P(x−a)" : ""} − M = <b>${CB.num(sumM, 2)}</b>`;
+  }
+  readout();
+})();
+
+/* ---------- 2. 하중을 끌어 놓고 SFD·BMD ---------- */
+(function () {
+  const L = 10;
+  const getType = CB.seg("bf-b-type", () => { clampHandles(); update(); });
+  const on1 = CB.check("bf-b-p1on", update), on2 = CB.check("bf-b-p2on", update), onw = CB.check("bf-b-won", update);
+  const gp1 = CB.range("bf-b-p1", (v) => v + " kN", update), gp2 = CB.range("bf-b-p2", (v) => v + " kN", update), gw = CB.range("bf-b-w", (v) => v + " kN/m", update);
+  const H = { p1: { x: 3, y: 0, label: "P₁", snap: 0.1, lock: "y" }, p2: { x: 7, y: 0, label: "P₂", snap: 0.1, lock: "y" }, wa: { x: 1, y: 0, label: "a", snap: 0.1, lock: "y" }, wb: { x: 6, y: 0, label: "b", snap: 0.1, lock: "y" } };
+  const pts = [H.p1, H.p2, H.wa, H.wb];
+  let b;
+  const supportsOf = (t) => t === "cant" ? [{ x: 0, type: "fixed" }] : t === "over" ? [{ x: 0, type: "pin" }, { x: 7.5, type: "roller" }] : t === "fixed" ? [{ x: 0, type: "fixed" }, { x: L, type: "fixed" }] : [{ x: 0, type: "pin" }, { x: L, type: "roller" }];
+  function clampHandles() { pts.forEach((p) => { p.x = CB.clamp(p.x, 0, L); }); if (H.wb.x < H.wa.x) [H.wa.x, H.wb.x] = [H.wb.x, H.wa.x]; }
+  function solve() {
+    const loads = [];
+    if (on1()) loads.push({ type: "point", P: gp1(), a: H.p1.x });
+    if (on2()) loads.push({ type: "point", P: gp2(), a: H.p2.x });
+    if (onw() && H.wb.x - H.wa.x > 0.05) loads.push({ type: "udl", w: gw(), a: H.wa.x, b: H.wb.x });
+    b = CB.beam({ L, EI: 2e5, supports: supportsOf(getType()), loads });
+  }
+  solve();
+  const pl = CB.plane("#bf-cv-bld", {
+    x: [-1.1, L + 1.1], y: [-1.9, 1.4], aspect: (W) => (W < 520 ? 0.56 : 0.32), minHeight: 190, maxHeight: 280, grid: false, axes: false, points: pts,
+    draw(P, api) {
+      const pal = P.P;
+      H.p1.hidden = !on1(); H.p2.hidden = !on2(); H.wa.hidden = H.wb.hidden = !onw();
+      const yTail = P.iy(P.Y(0) - 52), yMid = P.iy(P.Y(0) - 22);
+      H.p1.y = H.p2.y = yTail; H.wa.y = H.wb.y = yMid;
+      pts.forEach((p) => { p.color = pal.accent2; p.r = 7; });
+      H.p1.label = `P₁ ${gp1()} kN`; H.p2.label = `P₂ ${gp2()} kN`; H.wa.label = `w ${gw()} kN/m`; H.wb.label = "";
+      if (b.ok) CB.drawFrame(P, b.frame, { reactions: true, loadPx: 46, supportSize: 12, loadLabels: false });
+      // 눈금(반력 화살표 아래)
+      for (let x = 0; x <= L; x += 2) P.text(x + " m", x, 0, { color: pal.faint, size: 10, align: "center", dy: 74 });
+    },
+    onDrag() { clampHandles(); update(false); },
+  });
+  const dg = CB.canvas("#bf-cv-bld-d", (ctx, w, h) => { if (b.ok) CB.beamDiagrams(ctx, w, h, b, { keys: ["V", "M"] }); }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 400 });
+  function update() { solve(); pl.redraw(); dg.redraw(); readout(); }
+  function readout() {
+    if (!b.ok) return;
+    const e = b.extremes();
+    CB.stat("bf-b-r", b.reactions.map((r) => r.type === "fixed" ? `R ${CB.num(r.R, 1)} kN, M ${CB.num(r.M, 1)}` : `${CB.num(r.R, 1)} kN`).join(" · "));
+    CB.stat("bf-b-mp", e.Mmax.v > 0.05 ? `${CB.num(e.Mmax.v, 1)} <small>x = ${e.Mmax.x.toFixed(2)}</small>` : "—");
+    CB.stat("bf-b-mn", e.Mmin.v < -0.05 ? `${CB.num(e.Mmin.v, 1)} <small>x = ${e.Mmin.x.toFixed(2)}</small>` : "—");
+    CB.stat("bf-b-v", `${CB.num(Math.abs(e.Vabs.v), 1)} kN`);
+  }
+  readout();
+})();
+
+/* ---------- 3. 기울기와 넓이로 잇는 세 그래프 ---------- */
+(function () {
+  const L = 10;
+  const cases = {
+    udl: { loads: [{ type: "udl", w: 10, a: 0, b: L }], w: (x) => 10, pts: [] },
+    tri: { loads: [{ type: "lin", w1: 0, w2: 20, a: 0, b: L }], w: (x) => 2 * x, pts: [] },
+    mix: { loads: [{ type: "udl", w: 12, a: 0, b: 6 }, { type: "point", P: 30, a: 8 }], w: (x) => (x <= 6 ? 12 : 0), pts: [8] },
+  };
+  let cur = "udl", b, playing = false;
+  const gx = CB.range("bf-k-x", (v) => v.toFixed(2) + " m", () => { cv.redraw(); readout(); });
+  CB.seg("bf-k-case", (v) => { cur = v; solve(); cv.redraw(); readout(); });
+  function solve() { b = CB.beam({ L, EI: 1e5, supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }], loads: cases[cur].loads }); }
+  solve();
+  const cv = CB.canvas("#bf-cv-calc", (ctx, W, Hh) => {
+    const pal = CB.palette(), c = cases[cur], x = gx(), pts = b.sample(300);
+    const padL = 64, padR = 16, gap = 28, rowH = (Hh - 8 - 24 - 2 * gap) / 3;
+    const box = (i) => ({ x: padL, y: 8 + i * (rowH + gap), w: W - padL - padR, h: rowH });
+    // 하중 행
+    const wmax = Math.max(...pts.map((p) => c.w(p.x)), 1);
+    const r0 = CB.chart(ctx, box(0), { x: [0, L], y: [0, wmax * 1.35], yLabel: "w (kN/m)", series: [{ data: pts.map((p) => [p.x, c.w(p.x)]), color: pal.accent2, width: 2, fill: CB.color("accent-2-soft") }] });
+    c.pts.forEach((a) => { BFX.arrow(ctx, r0.X(a), r0.box.y + 2, r0.X(a), r0.Y(0) - 2, pal.accent2, 2.4, 9); BFX.text(ctx, "30 kN", r0.X(a) + 26, r0.box.y + 10, pal.accent2, { size: 11 }); });
+    // 0..x 넓이(하중)
+    ctx.save(); ctx.fillStyle = CB.color("accent-2-soft"); ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.moveTo(r0.X(0), r0.Y(0));
+    pts.filter((p) => p.x <= x).forEach((p) => ctx.lineTo(r0.X(p.x), r0.Y(c.w(p.x)))); ctx.lineTo(r0.X(x), r0.Y(c.w(x))); ctx.lineTo(r0.X(x), r0.Y(0)); ctx.closePath(); ctx.fill(); ctx.restore();
+    // V 행
+    const vs = pts.map((p) => p.V), vlo = Math.min(0, ...vs), vhi = Math.max(0, ...vs), vp = (vhi - vlo) * 0.15;
+    const r1 = CB.chart(ctx, box(1), { x: [0, L], y: [vlo - vp, vhi + vp], yLabel: "V (kN)", series: [{ data: pts.map((p) => [p.x, p.V]), color: pal.accent2, width: 2.2 }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    ctx.save(); ctx.fillStyle = CB.color("accent-soft"); ctx.beginPath(); ctx.moveTo(r1.X(0), r1.Y(0)); pts.filter((p) => p.x <= x).forEach((p) => ctx.lineTo(r1.X(p.x), r1.Y(p.V))); ctx.lineTo(r1.X(x), r1.Y(b.at(x, -1).V)); ctx.lineTo(r1.X(x), r1.Y(0)); ctx.closePath(); ctx.fill(); ctx.restore();
+    // M 행
+    const ms = pts.map((p) => p.M), mlo = Math.min(0, ...ms), mhi = Math.max(0, ...ms), mp = (mhi - mlo) * 0.15;
+    const r2 = CB.chart(ctx, box(2), { x: [0, L], y: [mlo - mp, mhi + mp], yLabel: "M (kN·m)", series: [{ data: pts.map((p) => [p.x, p.M]), color: pal.accent, width: 2.4 }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    // 접선
+    const f = b.at(x, -1), wx = c.w(x), d = 1.2;
+    const tan = (r, x0, y0, slope, color) => { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(r.X(Math.max(0, x0 - d)), r.Y(y0 - slope * Math.min(d, x0))); ctx.lineTo(r.X(Math.min(L, x0 + d)), r.Y(y0 + slope * Math.min(d, L - x0))); ctx.stroke(); ctx.restore(); };
+    tan(r1, x, f.V, -wx, pal.text); tan(r2, x, f.M, f.V, pal.text);
+    [r0, r1, r2].forEach((r) => { ctx.save(); ctx.strokeStyle = pal.dim; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(r.X(x), r.box.y); ctx.lineTo(r.X(x), r.box.y + r.box.h); ctx.stroke(); ctx.restore(); });
+    ctx.fillStyle = pal.text; [[r1, f.V], [r2, f.M]].forEach(([r, v]) => { ctx.beginPath(); ctx.arc(r.X(x), r.Y(v), 4.5, 0, Math.PI * 2); ctx.fill(); });
+    BFX.text(ctx, `기울기 = −w = ${CB.num(-wx, 1)}`, Math.min(W - 90, r1.X(x) + 70), r1.box.y + 10, pal.text, { size: 11 });
+    BFX.text(ctx, `기울기 = V = ${CB.num(f.V, 1)}`, Math.min(W - 90, r2.X(x) + 70), r2.box.y + 10, pal.text, { size: 11 });
+    ctx.save(); ctx.fillStyle = pal.dim; ctx.font = "12px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.textAlign = "right"; ctx.fillText("x (m)", padL - 10, Hh - 4); ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 1.25 : 0.78), minHeight: 380, maxHeight: 600 });
+  function readout() {
+    const x = gx(), f = b.at(x, -1);
+    CB.stat("bf-k-w", CB.num(cases[cur].w(x), 1) + " kN/m");
+    CB.stat("bf-k-v", CB.num(f.V, 1) + " kN");
+    CB.stat("bf-k-m", CB.num(f.M, 1) + " kN·m");
+  }
+  readout();
+  const loop = CB.loop(document.getElementById("sim-bf-calculus"), (dt) => { if (!playing) return; let v = gx() + dt * 1.2; if (v > L) v = 0; gx.set(v); });
+  CB.playButton("bf-k-play", () => { playing = true; loop.start(); }, () => { playing = false; }, ["▶ 커서 움직이기", "■ 멈추기"]);
+})();
+
+/* ---------- 4. 넓이 = 휨모멘트의 변화 (예제 4.3) ---------- */
+(function () {
+  const b = CB.beam({ L: 10, EI: 1e5, supports: [{ x: 0, type: "pin" }, { x: 8, type: "roller" }], loads: [{ type: "udl", w: 10, a: 0, b: 10 }, { type: "point", P: 20, a: 10 }] });
+  const pts = b.sample(400);
+  const g1 = CB.range("bf-a1", (v) => v.toFixed(2) + " m", go), g2 = CB.range("bf-a2", (v) => v.toFixed(2) + " m", go);
+  document.querySelectorAll("#sim-bf-area [data-pair]").forEach((btn) => btn.addEventListener("click", () => { const [a, c] = btn.dataset.pair.split(",").map(Number); g1.set(a, false); g2.set(c, false); go(); }));
+  const area = (a, c) => { const lo = Math.min(a, c), hi = Math.max(a, c), n = 2000, h = (hi - lo) / n; let s = 0; for (let k = 0; k < n; k++) { const x = lo + (k + 0.5) * h; s += b.at(x, 1).V * h; } return a <= c ? s : -s; };
+  const Mx = (x) => (x >= 10 ? 0 : b.at(x, 1).M);
+  const cv = CB.canvas("#bf-cv-area", (ctx, W, Hh) => {
+    const pal = CB.palette(), a = g1(), c = g2(), lo = Math.min(a, c), hi = Math.max(a, c);
+    const res = CB.beamDiagrams(ctx, W, Hh, b, { keys: ["V", "M"], points: pts, labels: true });
+    const rV = res.rows[0], rM = res.rows[1];
+    // 넓이 칠하기(부호별 색)
+    ["pos", "neg"].forEach((sgn) => {
+      ctx.save(); ctx.fillStyle = sgn === "pos" ? CB.color("accent-soft") : CB.color("accent-2-soft"); ctx.globalAlpha = 1;
+      ctx.strokeStyle = sgn === "pos" ? pal.accent : pal.accent2; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(rV.X(lo), rV.Y(0));
+      for (let k = 0; k <= 300; k++) { const x = lo + ((hi - lo) * k) / 300, v = b.at(x, 1).V, vv = sgn === "pos" ? Math.max(0, v) : Math.min(0, v); ctx.lineTo(rV.X(x), rV.Y(vv)); }
+      ctx.lineTo(rV.X(hi), rV.Y(0)); ctx.closePath(); ctx.globalAlpha = 0.85; ctx.fill(); ctx.restore();
+    });
+    // M의 두 점과 ΔM 표시
+    const m1 = Mx(a), m2 = Mx(c);
+    [[a, m1], [c, m2]].forEach(([x, m]) => { ctx.fillStyle = pal.text; ctx.beginPath(); ctx.arc(rM.X(x), rM.Y(m), 4.5, 0, Math.PI * 2); ctx.fill(); });
+    ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 1.4; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(rM.X(a), rM.Y(m1)); ctx.lineTo(rM.X(c), rM.Y(m1)); ctx.lineTo(rM.X(c), rM.Y(m2)); ctx.stroke(); ctx.restore();
+    BFX.text(ctx, `ΔM = ${CB.num(m2 - m1, 1)}`, rM.X(c) + (rM.X(c) > W - 90 ? -50 : 50), (rM.Y(m1) + rM.Y(m2)) / 2, pal.text, { size: 11.5 });
+    [a, c].forEach((x) => { ctx.save(); ctx.strokeStyle = pal.dim; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(rV.X(x), rV.box.y); ctx.lineTo(rV.X(x), rM.box.y + rM.box.h); ctx.stroke(); ctx.restore(); });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.6), minHeight: 300, maxHeight: 460 });
+  function go() {
+    cv.redraw();
+    const a = g1(), c = g2();
+    CB.stat("bf-a-int", CB.num(area(a, c), 1) + " kN·m");
+    CB.stat("bf-a-dm", CB.num(Mx(c) - Mx(a), 1) + " kN·m");
+  }
+  go();
+})();
+
+/* ---------- 5. 인양 고리 위치(대칭 내민보) ---------- */
+(function () {
+  const L = 10, w = 10, best = L / (2 + 2 * Math.SQRT2);
+  const ga = CB.range("bf-ov-a", (v) => v.toFixed(2) + " m", go);
+  document.getElementById("bf-ov-best").addEventListener("click", () => ga.set(+best.toFixed(2)));
+  document.getElementById("bf-ov-end").addEventListener("click", () => ga.set(0));
+  let b;
+  function solve() { const a = ga(); b = CB.beam({ L, EI: 1e5, supports: [{ x: a, type: "pin" }, { x: L - a, type: "roller" }], loads: [{ type: "udl", w, a: 0, b: L }] }); }
+  const mPos = (a) => Math.max(0, (w * (L - 2 * a) ** 2) / 8 - (w * a * a) / 2), mNeg = (a) => (w * a * a) / 2;
+  solve();
+  const pl = CB.plane("#bf-cv-ov", { x: [-0.9, L + 0.9], y: [-1.9, 1.3], aspect: (W) => (W < 520 ? 0.55 : 0.32), minHeight: 180, maxHeight: 270, grid: false, axes: false,
+    draw(P) { if (b.ok) CB.drawFrame(P, b.frame, { diagram: "M", diagramPx: 44, loadPx: 30, loadLabels: true }); } });
+  const ch = CB.canvas("#bf-cv-ov2", (ctx, W, Hh) => {
+    const pal = CB.palette(), a = ga(), data = [], neg = [];
+    for (let k = 0; k <= 200; k++) { const x = (4.5 * k) / 200; data.push([x, mPos(x)]); neg.push([x, mNeg(x)]); }
+    const c = CB.chart(ctx, null, { x: [0, 4.5], y: [0, (w * L * L) / 8 * 1.05], xLabel: "내민 길이 a (m)", yLabel: "|M| (kN·m)",
+      series: [{ data, color: pal.accent, width: 2.4 }, { data: neg, color: pal.accent2, width: 2.4 }],
+      vlines: [{ x: best, color: pal.ok, label: "a = 0.207L" }, { x: a, color: pal.text, dash: [] }] });
+    BFX.text(ctx, "가운데 +M", c.X(0.5) + 34, c.Y(mPos(0.5)) - 12, pal.accent, { size: 11 });
+    BFX.text(ctx, "지점 위 −M", c.X(3.9), c.Y(mNeg(3.9)) - 14, pal.accent2, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.42), minHeight: 220, maxHeight: 320 });
+  function go() {
+    solve(); pl.redraw(); ch.redraw();
+    const a = ga(), mp = mPos(a), mn = mNeg(a);
+    CB.stat("bf-ov-mp", CB.num(mp, 1) + " kN·m"); CB.stat("bf-ov-mn", CB.num(-mn, 1) + " kN·m");
+    CB.stat("bf-ov-r", (Math.max(mp, mn) / ((w * L * L) / 8)).toFixed(3));
+  }
+  go();
+})();
+
+/* ---------- 6. 3경간 게르버보 ---------- */
+(function () {
+  const S = 10, L = 3 * S, w = 10, inflect = ((1 - Math.sqrt(0.2)) / 2) * S;
+  const ge = CB.range("bf-g-e", (v) => v.toFixed(2) + " m", go);
+  const mode = CB.seg("bf-g-mode", go), cmp = CB.check("bf-g-cmp", go);
+  document.getElementById("bf-g-inf").addEventListener("click", () => { if (mode() === "cont") mode.set("mid", false); ge.set(+inflect.toFixed(2)); });
+  const sup = [{ x: 0, type: "pin" }, { x: S, type: "roller" }, { x: 2 * S, type: "roller" }, { x: L, type: "roller" }];
+  const cont = CB.beam({ L, EI: 1e5, supports: sup, loads: [{ type: "udl", w, a: 0, b: L }] });
+  const contPts = cont.sample(360);
+  let b;
+  function hinges() { const e = ge(), m = mode(); return m === "mid" ? [S + e, 2 * S - e] : m === "side" ? [S - e, 2 * S + e] : []; }
+  function solve() { b = CB.beam({ L, EI: 1e5, supports: sup, hinges: hinges(), loads: [{ type: "udl", w, a: 0, b: L }] }); }
+  solve();
+  const pl = CB.plane("#bf-cv-gb", { x: [-1.4, L + 1.4], y: [-1.5, 1.2], aspect: (W) => (W < 520 ? 0.48 : 0.26), minHeight: 160, maxHeight: 240, grid: false, axes: false,
+    draw(P) { if (b.ok) CB.drawFrame(P, b.frame, { reactions: true, loadPx: 26, loadLabels: false, reactionPx: 26 }); } });
+  const ch = CB.canvas("#bf-cv-gb2", (ctx, W, Hh) => {
+    const pal = CB.palette();
+    if (!b.ok) return;
+    const pts = b.sample(360);
+    const series = [{ data: pts.map((p) => [p.x, p.M]), color: pal.accent, width: 2.4, fill: CB.color("accent-soft") }];
+    if (cmp()) series.push({ data: contPts.map((p) => [p.x, p.M]), color: pal.text, width: 1.6, dash: [6, 4] });
+    const all = pts.map((p) => p.M).concat(cmp() ? contPts.map((p) => p.M) : []);
+    const lo = Math.min(...all), hi = Math.max(...all), pad = (hi - lo) * 0.12;
+    const c = CB.chart(ctx, null, { x: [0, L], y: [lo - pad, hi + pad], xLabel: "x (m)", yLabel: "M (kN·m)", series, hlines: [{ y: 0, color: pal.axis, dash: [] }], vlines: hinges().map((h) => ({ x: h, color: pal.warn, label: "힌지" })) });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.38), minHeight: 220, maxHeight: 320 });
+  function go() {
+    solve(); pl.redraw(); ch.redraw();
+    const msg = document.getElementById("bf-g-msg");
+    if (!b.ok) { CB.stat("bf-g-deg", "불안정"); msg.className = "bf-msg bad"; msg.textContent = "이 배치는 기구(mechanism)가 되어 서 있을 수 없습니다."; return; }
+    const e = b.extremes();
+    CB.stat("bf-g-deg", mode() === "cont" ? "2차 부정정" : "정정");
+    CB.stat("bf-g-mp", CB.num(e.Mmax.v, 1) + " kN·m");
+    CB.stat("bf-g-mn", CB.num(e.Mmin.v, 1) + " kN·m");
+    const near = mode() === "mid" && Math.abs(ge() - inflect) < 0.06;
+    msg.className = "bf-msg" + (near ? " ok" : "");
+    msg.innerHTML = mode() === "cont" ? "힌지 없는 연속보: 지점 B·C 위 M = −0.1wL² = <b>−100 kN·m</b>. 부정정 구조라 14–15장의 방법으로 푼 값입니다." :
+      near ? "힌지가 연속보의 반곡점(2.76 m)에 있습니다. 두 휨모멘트도가 겹칩니다." :
+      `힌지 위치 M = 0. 연속보의 지점 M(−100 kN·m)과 비교해 보세요. 가운데 경간 반곡점은 지점에서 ${inflect.toFixed(2)} m입니다.`;
+  }
+  go();
+})();
+
+/* ---------- 7. B-10 큰보 G1 ---------- */
+(function () {
+  const Lspan = 8, D = 56.7, Lv = 20;
+  const sup = CB.seg("bf-g1-sup", go), combo = CB.seg("bf-g1-combo", go);
+  const wOf = () => (combo() === "u" ? 1.2 * D + 1.6 * Lv : combo() === "d" ? 1.4 * D : D + Lv);
+  let b;
+  function solve() {
+    const w = wOf(), s = sup();
+    if (s === "cont") b = CB.beam({ L: 4 * Lspan, EI: 3.14e5, supports: [0, 1, 2, 3, 4].map((k) => ({ x: k * Lspan, type: k ? "roller" : "pin" })), loads: [{ type: "udl", w, a: 0, b: 4 * Lspan }] });
+    else b = CB.beam({ L: Lspan, EI: 3.14e5, supports: s === "fixed" ? [{ x: 0, type: "fixed" }, { x: Lspan, type: "fixed" }] : [{ x: 0, type: "pin" }, { x: Lspan, type: "roller" }], loads: [{ type: "udl", w, a: 0, b: Lspan }] });
+  }
+  solve();
+  const pl = CB.plane("#bf-cv-g1", { x: [-1.2, 9.2], y: [-1.5, 1.2], aspect: (W) => (W < 520 ? 0.48 : 0.26), minHeight: 160, maxHeight: 240, grid: false, axes: false,
+    draw(P) {
+      if (!b.ok) return;
+      CB.drawFrame(P, b.frame, { reactions: sup() !== "cont", loadPx: 26, reactionPx: 26 });
+      if (sup() === "cont") P.text("경간 8 m × 4 (둘째 경간 = G1)", b.L / 2, 0, { color: P.P.dim, size: 11.5, align: "center", dy: 44 });
+    } });
+  const dg = CB.canvas("#bf-cv-g1d", (ctx, w, h) => {
+    if (!b.ok) return;
+    const res = CB.beamDiagrams(ctx, w, h, b, { keys: ["V", "M"] });
+    if (sup() === "cont") res.rows.forEach((r) => { ctx.save(); ctx.fillStyle = CB.color("accent-2-soft"); ctx.globalAlpha = 0.5; ctx.fillRect(r.X(8), r.box.y, r.X(16) - r.X(8), r.box.h); ctx.restore(); });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 400 });
+  function go() {
+    solve();
+    pl.view({ x: sup() === "cont" ? [-2.5, 34.5] : [-1.2, 9.2] });
+    dg.redraw();
+    const e = b.extremes();
+    CB.stat("bf-g1-w", CB.num(wOf(), 1) + " kN/m");
+    CB.stat("bf-g1-mp", CB.num(e.Mmax.v, 0) + " kN·m");
+    CB.stat("bf-g1-mn", e.Mmin.v < -0.5 ? CB.num(e.Mmin.v, 0) + " kN·m" : "0");
+    CB.stat("bf-g1-v", CB.num(Math.abs(e.Vabs.v), 0) + " kN");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

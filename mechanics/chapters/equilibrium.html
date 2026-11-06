@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>힘의 평형과 지점 · MechanicsBook</title>
+<meta name="description" content="힘을 벡터로 분해하고 합성하며, 모멘트와 우력, 바리뇽 정리, 평형 방정식, 자유물체도 그리는 법, 롤러·핀·고정 지점과 반력, 정정·부정정·불안정의 판별을 익히고 타워크레인과 옹벽의 전도 안전을 직접 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .eq-stack { display: grid; grid-template-columns: 1fr; }
+  .eq-stack > div { position: relative; min-width: 0; }
+  .eq-stack > div + div { border-top: 1px solid var(--border); }
+  .eq-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .eq-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .eq-msg b { color: var(--text); }
+  .eq-msg.ok { color: var(--ok); font-weight: 600; }
+  .eq-msg.bad { color: var(--bad); font-weight: 600; }
+  .eq-legend { display: flex; flex-wrap: wrap; gap: 4px 2px; padding: 8px 18px; border-top: 1px solid var(--border); }
+  .eq-cands { display: flex; flex-wrap: wrap; gap: 6px; }
+  .eq-cands button { font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); cursor: pointer; }
+  .eq-cands button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .eq-tbl td, .eq-tbl th { font-variant-numeric: tabular-nums; }
+  .eq-tbl td.hl { color: var(--accent); font-weight: 700; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="mechanics"></script>
+</head>
+<body data-chapter="equilibrium">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="eq-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="eq-ah-react" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="eq-ah-int" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+      <marker id="eq-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="eq-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 02</div>
+    <h1 data-no-glossary>힘의 평형과 지점</h1>
+    <p class="lead">건물은 움직이지 않습니다. 그 당연한 사실이 구조역학의 가장 강력한 도구입니다. 움직이지 않는다는 것은 구조물에 걸린 모든 힘이 서로 상쇄되어 <b>합력도 0, 회전시키려는 모멘트도 0</b>이라는 뜻입니다. 이 장에서는 힘을 벡터로 다루는 법, 회전 효과인 모멘트를 계산하는 법, 그리고 평형 방정식 세 개로 구조물을 붙잡고 있는 지점의 힘(반력)을 구하는 법을 배웁니다. 마지막으로 지점을 어떻게 두느냐에 따라 구조물이 평형 방정식만으로 풀리는지(정정), 식이 모자라는지(부정정), 아예 서 있을 수 없는지(불안정)를 가려내고, 타워크레인과 옹벽이 넘어지지 않는 조건을 직접 계산합니다.</p>
+    <ul class="objectives">
+      <li>힘을 성분으로 분해하고 여러 힘의 합력과, 그것을 상쇄하는 평형력을 구한다.</li>
+      <li>모멘트를 "힘 × 수직 거리"와 "\(xF_y - yF_x\)" 두 방식으로 계산하고, 우력과 힘의 평행 이동을 설명한다.</li>
+      <li>평면 구조물의 평형 방정식 \(\Sigma F_x = \Sigma F_y = \Sigma M = 0\)을 세우고 자유물체도를 바르게 그린다.</li>
+      <li>롤러·핀·고정 지점이 막는 변위와 반력의 종류를 알고, 경사 하중을 받는 보의 반력을 구한다.</li>
+      <li>반력 수와 조건식 수, 반력의 배치로 정정·부정정·불안정을 판별한다.</li>
+      <li>평형을 전도 문제에 적용해 타워크레인의 균형추와 옹벽의 전도·활동 안전율을 계산한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>지레의 법칙에서 지점 반력까지</b></div>
+      <div class="o-body"><p>아르키메데스는 지레가 수평으로 멈춰 있으려면 양쪽의 "무게 × 받침점까지의 거리"가 같아야 한다는 지레의 법칙을 남겼습니다. 오늘날의 말로 하면 받침점에 대한 모멘트의 평형입니다. 1586년 네덜란드의 스테빈은 삼각 기둥에 걸친 구슬 목걸이가 저절로 돌지 않는다는(영구 기관은 없다는) 논증으로 경사면 위 힘의 평형을 설명했고, 이것은 힘을 평행사변형으로 합성·분해하는 생각으로 이어졌습니다.</p>
+        <p>지레와 평행사변형, 두 생각을 합치면 평면 위 물체의 평형 조건 세 개가 나옵니다. 다리의 받침이 받는 힘, 크레인이 넘어지지 않는 균형추의 무게, 옹벽이 흙을 버티는 조건이 모두 이 세 식에서 나옵니다. 구조 해석 프로그램이 가장 먼저 확인하는 것도 반력의 합이 하중의 합과 같은지입니다.</p>
+        <div class="o-chain"><span>힘의 벡터·모멘트</span><i>→</i><span>자유물체도</span><i>→</i><span class="tool">ΣF<sub>x</sub> = ΣF<sub>y</sub> = ΣM = 0</span><i>→</i><span>반력·안정 판별·전도 검토</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="vectors">
+    <h2>힘은 벡터다: 분해와 합성</h2>
+    <div class="problem"><strong>두 줄로 드는 짐</strong>
+      <p>크레인 두 대가 줄 두 개로 무거운 보를 함께 들어 올립니다. 한 줄은 30 kN으로 오른쪽 위를, 다른 줄은 40 kN으로 왼쪽 위를 당깁니다. 두 줄이 보에 주는 힘을 합치면 얼마이고 어느 방향일까요? 30 + 40 = 70 kN일까요?</p></div>
+    <p>힘은 크기만이 아니라 <b>방향</b>과 <b>작용선</b>을 가진 양입니다. 그래서 크기를 그냥 더할 수 없고, 화살표를 이어 붙이는 벡터 덧셈을 해야 합니다. 계산은 힘을 서로 직각인 두 성분으로 나누면 쉬워집니다. 크기 \(F\), 수평축과 이루는 각 \(\theta\)인 힘의 성분은</p>
+    <div class="formula">$$F_x = F\cos\theta, \qquad F_y = F\sin\theta, \qquad F = \sqrt{F_x^2 + F_y^2}, \qquad \tan\theta = \frac{F_y}{F_x}.$$</div>
+    <div class="callout def"><strong>정의 2.1 (합력과 평형력)</strong> 한 점에 작용하는 여러 힘 \(\mathbf{F}_1, \mathbf{F}_2, \dots\)의 <span class="term">합력</span> \(\mathbf{R} = \sum \mathbf{F}_i\)는 성분별 합 \(R_x = \sum F_{x,i}\), \(R_y = \sum F_{y,i}\)로 구한다. 두 힘의 합력은 두 힘을 이웃한 변으로 하는 평행사변형의 대각선이다(<span class="term">평행사변형 법칙</span>). 합력과 크기가 같고 방향이 반대인 힘 \(-\mathbf{R}\)을 <span class="term">평형력</span><span class="en">(equilibrant)</span>이라 하며, 평형력을 더하면 합력이 0이 된다.</div>
+    <figure class="diagram" id="fig-eq-vector">
+      <svg viewBox="0 0 760 290" role="img" aria-label="힘의 성분 분해와 두 힘의 평행사변형 합성">
+        <rect x="10" y="10" width="740" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <text x="120" y="0" text-anchor="middle" class="t" style="font-weight:700">(a) 성분으로 분해</text>
+          <line x1="20" y1="200" x2="260" y2="200" class="s-axis"/><line x1="40" y1="220" x2="40" y2="20" class="s-axis"/>
+          <line x1="40" y1="200" x2="220" y2="70" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#eq-ah-load)"/>
+          <line x1="40" y1="200" x2="220" y2="200" style="stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4" marker-end="url(#eq-ah-acc)"/>
+          <line x1="220" y1="200" x2="220" y2="70" style="stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4" marker-end="url(#eq-ah-acc)"/>
+          <path d="M80 200 A 40 40 0 0 0 72 177" style="fill:none;stroke:var(--text-dim);stroke-width:1.4"/>
+          <text x="88" y="190" class="t-mono">θ</text>
+          <text x="140" y="120" class="t-mono" style="fill:var(--accent-2)">F</text>
+          <text x="130" y="218" class="t-mono" style="fill:var(--accent)">F_x = F cos θ</text>
+          <text x="228" y="140" class="t-mono" style="fill:var(--accent)">F_y = F sin θ</text>
+        </g>
+        <g transform="translate(400,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">(b) 평행사변형으로 합성</text>
+          <circle cx="150" cy="200" r="5" style="fill:var(--text)"/>
+          <line x1="150" y1="200" x2="246" y2="128" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#eq-ah-load)"/>
+          <line x1="150" y1="200" x2="54" y2="72" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#eq-ah-load)"/>
+          <line x1="246" y1="128" x2="150" y2="0" style="stroke:var(--text-dim);stroke-width:1.4;stroke-dasharray:5 4"/>
+          <line x1="54" y1="72" x2="150" y2="0" style="stroke:var(--text-dim);stroke-width:1.4;stroke-dasharray:5 4"/>
+          <line x1="150" y1="200" x2="150" y2="8" style="stroke:var(--text);stroke-width:3.2" marker-end="url(#eq-ah-int)"/>
+          <text x="212" y="182" class="t-mono" style="fill:var(--accent-2)">30 kN</text><text x="54" y="150" class="t-mono" style="fill:var(--accent-2)">40 kN</text>
+          <text x="160" y="60" class="t" style="font-weight:700">R = 50 kN</text>
+          <text x="150" y="232" text-anchor="middle" class="t-dim">두 줄이 직각이면 √(30² + 40²) = 50 kN</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-1.</b> (a) 힘의 성분. (b) 두 힘의 합력은 평행사변형의 대각선이다. 두 줄이 서로 직각이면 30 kN과 40 kN의 합력은 70 kN이 아니라 50 kN이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 2.1 (두 줄의 합력)</strong> 줄 1은 30 kN으로 수평에서 37° 위(오른쪽), 줄 2는 40 kN으로 수평에서 127° 방향(왼쪽 위)을 당긴다(두 줄은 직각).
+      <ol style="margin:6px 0 0">
+        <li><b>성분.</b> \(\cos 37^\circ \approx 0.8\), \(\sin 37^\circ \approx 0.6\)으로 두면 줄 1: \((24, 18)\) kN, 줄 2: \((-24, 32)\) kN.</li>
+        <li><b>합.</b> \(R_x = 24 - 24 = 0\), \(R_y = 18 + 32 = 50\) kN. 합력은 바로 위로 50 kN.</li>
+        <li><b>해석.</b> 보의 무게가 50 kN이면 두 줄이 정확히 들고 있는 것이다. 두 줄의 각도가 벌어질수록 같은 무게를 들기 위한 줄의 힘은 커진다. 줄을 수평에 가깝게 벌리면 줄의 힘이 무한히 커지는 이유다.</li>
+      </ol></div>
+    <div class="sim" id="sim-eq-vector">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>두 힘의 합력과 평형력</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="eq-cv-vec" aria-label="끌 수 있는 두 힘 벡터와 합력"></canvas><span class="eq-cap">화살표 끝을 끌기 · 한 칸 = 10 kN</span></div>
+        <div class="sim-controls">
+          <label class="check"><input type="checkbox" id="eq-v-par" checked> 평행사변형 보기</label>
+          <label class="check"><input type="checkbox" id="eq-v-cmp" checked> 합력의 성분 보기</label>
+          <label class="check"><input type="checkbox" id="eq-v-eqb"> 평형력 −R 보기</label>
+          <div class="btn-row"><button class="btn" id="eq-v-ex">예제 2.1로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">F₁</span><span class="v" id="eq-v-f1">—</span></div>
+        <div class="stat"><span class="k">F₂</span><span class="v" id="eq-v-f2">—</span></div>
+        <div class="stat"><span class="k">R = F₁ + F₂</span><span class="v" id="eq-v-r">—</span></div>
+        <div class="stat"><span class="k">(R<sub>x</sub>, R<sub>y</sub>)</span><span class="v" id="eq-v-rc">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 두 힘을 같은 방향으로 놓으면 크기가 그대로 더해지고, 반대 방향이면 빼진다는 것을 확인하세요 · 두 힘의 각을 벌릴수록 합력이 줄어드는 것을 보세요 · 모델: 한 점에 작용하는 두 힘의 벡터 합, 각도는 +x축에서 반시계 방향.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="moment">
+    <h2>모멘트와 우력</h2>
+    <p>문을 열 때 손잡이를 경첩에서 먼 곳에 다는 이유, 볼트를 풀 때 긴 렌치를 쓰는 이유는 같습니다. 힘이 물체를 돌리는 효과는 힘의 크기뿐 아니라 <b>회전 중심에서 힘의 작용선까지의 거리</b>에 비례합니다. 이 회전 효과가 <span class="term">모멘트</span><span class="en">(moment)</span>입니다.</p>
+    <div class="callout def"><strong>정의 2.2 (점에 대한 모멘트)</strong> 점 \(O\)에 대한 힘 \(\mathbf{F}\)의 모멘트는 힘의 크기와 \(O\)에서 작용선까지의 수직 거리 \(d\)의 곱이다.
+      <div class="formula">$$M_O = F d = x F_y - y F_x$$<div class="where">\((x, y)\)는 \(O\)에서 본 작용점(작용선 위 아무 점)의 좌표. 이 책에서 반시계 방향이 \(+\)이다. 단위는 kN·m(또는 N·m).</div></div></div>
+    <p>두 번째 식 \(xF_y - yF_x\)는 힘을 두 성분으로 나눠 각 성분의 모멘트를 더한 것입니다. "한 힘의 모멘트는 그 성분들의 모멘트의 합과 같다"는 이 성질을 <span class="term">바리뇽 정리</span><span class="en">(Varignon's theorem)</span>라 합니다. 수직 거리를 찾기 어려울 때는 성분으로 나누는 편이 훨씬 빠릅니다.</p>
+    <figure class="diagram" id="fig-eq-moment">
+      <svg viewBox="0 0 760 280" role="img" aria-label="렌치에 비스듬히 건 힘의 수직 거리와 성분 분해로 본 모멘트">
+        <rect x="10" y="10" width="740" height="260" rx="10" class="f-surface"/>
+        <polygon points="120,140 132,119 156,119 168,140 156,161 132,161" class="f-elev" style="stroke:var(--text);stroke-width:2"/>
+        <circle cx="144" cy="140" r="4" style="fill:var(--text)"/><text x="132" y="186" class="t-mono">O (볼트)</text>
+        <rect x="150" y="133" width="300" height="14" rx="7" style="fill:var(--surface-2);stroke:var(--text)"/>
+        <circle cx="420" cy="140" r="5" style="fill:var(--accent-2)"/>
+        <line x1="420" y1="140" x2="500" y2="40" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#eq-ah-load)"/>
+        <text x="506" y="44" class="t-mono" style="fill:var(--accent-2)">F</text>
+        <line x1="340" y1="240" x2="540" y2="-10" style="stroke:var(--text-dim);stroke-width:1.2;stroke-dasharray:6 5"/>
+        <line x1="144" y1="140" x2="342" y2="232" style="stroke:var(--accent);stroke-width:2.2"/>
+        <text x="236" y="210" class="t-mono" style="fill:var(--accent)">d (수직 거리)</text>
+        <path d="M330 226 l7 -7 l7 5" style="fill:none;stroke:var(--accent);stroke-width:1.4"/>
+        <line x1="420" y1="140" x2="420" y2="40" style="stroke:var(--accent);stroke-width:1.8;stroke-dasharray:5 4" marker-end="url(#eq-ah-acc)"/>
+        <line x1="420" y1="140" x2="500" y2="140" style="stroke:var(--accent);stroke-width:1.8;stroke-dasharray:5 4" marker-end="url(#eq-ah-acc)"/>
+        <text x="390" y="70" class="t-mono" style="fill:var(--accent)">F_y</text><text x="470" y="160" class="t-mono" style="fill:var(--accent)">F_x</text>
+        <line x1="144" y1="250" x2="420" y2="250" class="s-line" marker-start="url(#eq-ah-dim)" marker-end="url(#eq-ah-dim)"/><text x="282" y="244" text-anchor="middle" class="t-mono">x</text>
+        <g transform="translate(560,70)">
+          <text x="0" y="0" class="t" style="font-weight:700">같은 답, 두 가지 길</text>
+          <text x="0" y="30" class="t-mono">M = F · d</text>
+          <text x="0" y="56" class="t-mono">M = x·F_y − y·F_x</text>
+          <text x="0" y="82" class="t-dim">(여기서 y = 0이라</text>
+          <text x="0" y="100" class="t-dim">  M = x·F_y 만 남는다)</text>
+          <text x="0" y="132" class="t-dim">F_x는 작용선이 O를</text>
+          <text x="0" y="150" class="t-dim">지나므로 돌리지 못한다.</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-2.</b> 렌치에 비스듬히 건 힘의 모멘트. 볼트 O에서 작용선까지의 수직 거리 d로 계산해도, 힘을 성분으로 나눠 x·F<sub>y</sub> − y·F<sub>x</sub>로 계산해도 같다(바리뇽 정리). 손잡이 방향 성분 F<sub>x</sub>는 볼트를 돌리지 못한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-eq-wrench">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>렌치로 보는 모멘트: 힘 × 수직 거리</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="eq-cv-wr" aria-label="렌치, 힘, 작용선과 수직 거리"></canvas><span class="eq-cap">손잡이 위 점을 끌기</span></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>힘 F <output id="eq-w-f-out"></output></span><input type="range" id="eq-w-f" min="50" max="500" step="10" value="250"></label>
+          <label class="ctrl"><span>손잡이와 이루는 각 θ <output id="eq-w-t-out"></output></span><input type="range" id="eq-w-t" min="0" max="180" step="1" value="60"></label>
+          <label class="ctrl"><span>목표 토크 <output id="eq-w-g-out"></output></span><input type="range" id="eq-w-g" min="20" max="150" step="5" value="100"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">작용점 x</span><span class="v" id="eq-w-x">—</span></div>
+        <div class="stat"><span class="k">수직 거리 d</span><span class="v" id="eq-w-d">—</span></div>
+        <div class="stat"><span class="k">M = F·d</span><span class="v" id="eq-w-m">—</span></div>
+      </div>
+      <div class="eq-msg" id="eq-w-msg"></div>
+      <div class="sim-note">해볼 것: θ = 90°일 때 모멘트가 가장 크고, θ = 0°(손잡이 방향으로 당김)면 0인 것을 확인하세요 · 목표 토크에 닿는 가장 작은 힘은 언제인가요? · 모델: M = x·F<sub>y</sub> − y·F<sub>x</sub> = xF sin θ (반시계 +), 단위 N·m.</div>
+    </div>
+    <p>크기가 같고 방향이 반대인 나란한 두 힘을 <span class="term">우력</span><span class="en">(couple)</span>이라 합니다. 우력의 합력은 0이라 물체를 밀어 옮기지는 못하고 돌리기만 합니다. 우력의 모멘트는 두 힘 사이의 거리 \(d\)에 대해 \(Fd\)이고, <b>어느 점에 대해 계산해도 같습니다</b>. 그래서 우력은 위치와 상관없는 "순수한 회전 효과"로, 보 위의 집중 모멘트나 고정 지점의 반력 모멘트가 이런 것입니다.</p>
+    <div class="callout def"><strong>원리 2.3 (힘의 평행 이동)</strong> 점 \(A\)에 작용하는 힘 \(\mathbf{F}\)는, 다른 점 \(B\)에 작용하는 같은 힘 \(\mathbf{F}\)와 우력 \(M = \mathbf{F}\)의 \(B\)에 대한 모멘트의 합으로 바꿔 놓을 수 있다. 거꾸로 힘 하나와 우력 하나는 작용선을 옮긴 힘 하나로 합칠 수 있다.</div>
+    <figure class="diagram" id="fig-eq-couple">
+      <svg viewBox="0 0 760 230" role="img" aria-label="우력과 힘을 평행 이동해 힘과 우력으로 바꾸는 그림">
+        <rect x="10" y="10" width="740" height="210" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="110" y="10" text-anchor="middle" class="t" style="font-weight:700">(a) 우력: 합력 0, 모멘트 Fd</text>
+          <rect x="20" y="90" width="180" height="16" rx="4" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="40" y1="160" x2="40" y2="110" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#eq-ah-load)"/>
+          <line x1="180" y1="36" x2="180" y2="86" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#eq-ah-load)"/>
+          <text x="48" y="150" class="t-mono" style="fill:var(--accent-2)">F</text><text x="150" y="50" class="t-mono" style="fill:var(--accent-2)">F</text>
+          <line x1="40" y1="180" x2="180" y2="180" class="s-line" marker-start="url(#eq-ah-dim)" marker-end="url(#eq-ah-dim)"/><text x="110" y="174" text-anchor="middle" class="t-mono">d</text>
+        </g>
+        <g transform="translate(300,30)">
+          <text x="200" y="10" text-anchor="middle" class="t" style="font-weight:700">(b) 힘을 옮기면 우력이 따라붙는다</text>
+          <rect x="10" y="90" width="160" height="16" rx="4" class="f-elev" style="stroke:var(--text)"/>
+          <circle cx="30" cy="98" r="4" style="fill:var(--text)"/><text x="18" y="126" class="t-mono">B</text><text x="146" y="126" class="t-mono">A</text>
+          <line x1="150" y1="40" x2="150" y2="86" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#eq-ah-load)"/><text x="158" y="54" class="t-mono" style="fill:var(--accent-2)">F</text>
+          <text x="200" y="102" text-anchor="middle" class="t" style="font-weight:700">=</text>
+          <rect x="230" y="90" width="160" height="16" rx="4" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="250" y1="40" x2="250" y2="86" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#eq-ah-load)"/><text x="258" y="54" class="t-mono" style="fill:var(--accent-2)">F</text>
+          <path d="M250 136 A 26 26 0 1 1 276 110" style="fill:none;stroke:var(--accent);stroke-width:2.2" marker-end="url(#eq-ah-acc)"/>
+          <text x="292" y="150" class="t-mono" style="fill:var(--accent)">M = F·(AB) 시계</text>
+          <text x="200" y="180" text-anchor="middle" class="t-dim">A의 아래 방향 힘을 B로 옮기면 B를 축으로 시계 방향 우력이 함께 생긴다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-3.</b> (a) 우력은 합력이 0이고 어디서 재도 모멘트가 Fd다. (b) 힘의 작용선을 옮기려면 원래 위치가 만들던 모멘트만큼 우력을 더해야 한다. 캔틸레버 끝의 하중이 고정단에 "힘 + 모멘트"로 전달되는 원리다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 2.2 (바리뇽 정리로 모멘트 구하기)</strong> 렌치의 볼트 O에서 0.30 m 떨어진 손잡이 위 점에 400 N의 힘이 손잡이와 60°를 이루며 걸린다.
+      <ol style="margin:6px 0 0">
+        <li><b>수직 거리로.</b> \(d = 0.30 \sin 60^\circ = 0.260\) m, \(M = 400 \times 0.260 = 104\) N·m.</li>
+        <li><b>성분으로.</b> 손잡이에 직각인 성분 \(F_y = 400 \sin 60^\circ = 346.4\) N, 나란한 성분 \(F_x = 200\) N. \(M = 0.30 \times 346.4 - 0 \times 200 = 104\) N·m.</li>
+        <li>같은 답이다. 100 N·m를 넘기려면 힘을 손잡이에 직각으로 걸거나 손잡이 끝을 잡으면 된다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="equations">
+    <h2>평형 방정식</h2>
+    <p>정지해 있는 물체는 밀려 움직이지도(병진), 돌지도(회전) 않습니다. 평면 위에서 움직일 수 있는 방향은 x 방향 이동, y 방향 이동, 회전의 세 가지이므로 이를 막는 조건도 세 개입니다.</p>
+    <div class="callout def"><strong>원리 2.4 (평면 강체의 평형 조건)</strong> 평면 안의 힘을 받는 물체가 평형이면
+      <div class="formula">$$\Sigma F_x = 0, \qquad \Sigma F_y = 0, \qquad \Sigma M_O = 0$$<div class="where">모멘트 식의 기준점 \(O\)는 어디로 잡아도 된다. 합력이 0이면 모든 점에 대한 모멘트가 같기 때문이다. 같은 이유로 "모멘트 식 두 개 + 힘 식 한 개"(두 기준점을 잇는 선이 그 힘 방향에 수직이 아닐 것)나 "한 직선 위에 있지 않은 세 점에 대한 모멘트 식"도 같은 조건이다.</div></div>
+      평면 문제에서 독립인 평형 방정식은 세 개를 넘지 않는다. 그러므로 미지수가 셋을 넘는 문제는 평형만으로 풀 수 없다.</div>
+    <p>실전의 요령은 <b>미지수가 많이 모이는 점을 모멘트 기준점으로 잡는 것</b>입니다. 기준점을 지나는 힘은 모멘트 식에서 사라지므로, 미지수 하나짜리 식을 바로 얻습니다. 단순보의 반력을 구할 때 한쪽 지점에 대해 모멘트를 잡는 이유입니다.</p>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="fbd">
+    <h2>자유물체도 그리는 법</h2>
+    <p>평형 방정식을 세우기 전에 반드시 그리는 그림이 <span class="term">자유물체도</span><span class="en">(free-body diagram, FBD)</span>입니다. 관심 있는 물체를 주변에서 떼어 내고, 떼어 낸 자리마다 주변이 그 물체에 가하던 힘을 화살표로 그려 넣습니다. 구조역학의 실수 대부분은 계산이 아니라 이 그림에서 나옵니다.</p>
+    <ol>
+      <li><b>떼어 낼 물체를 정한다.</b> 구조물 전체, 부재 하나, 절점 하나, 잘린 조각 하나.</li>
+      <li><b>경계를 따라 돌며 접촉을 모두 힘으로 바꾼다.</b> 지점은 반력으로(다음 절), 잘린 면은 단면력으로, 줄은 줄 방향의 인장으로.</li>
+      <li><b>하중을 그린다.</b> 자중·집중 하중·분포 하중(필요하면 합력으로).</li>
+      <li><b>미지수의 방향은 가정한다.</b> 모르는 힘은 양의 방향으로 그려 두고 계산 결과가 음수면 반대 방향이다.</li>
+      <li><b>치수와 좌표를 적는다.</b> 모멘트 팔 길이를 읽을 수 있어야 한다.</li>
+    </ol>
+    <figure class="diagram" id="fig-eq-fbd">
+      <svg viewBox="0 0 760 280" role="img" aria-label="단순보에서 지점을 반력으로 바꾼 자유물체도">
+        <rect x="10" y="10" width="740" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(30,30)">
+          <text x="150" y="10" text-anchor="middle" class="t" style="font-weight:700">(a) 실제 구조</text>
+          <line x1="30" y1="110" x2="290" y2="110" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <path d="M30 110l-10 16h20z" class="f-elev" style="stroke:var(--text)"/><line x1="14" y1="127" x2="46" y2="127" class="s-line"/>
+          <path d="M290 110l-10 13h20z" class="f-elev" style="stroke:var(--text)"/><circle cx="285" cy="126" r="3" class="f-elev" style="stroke:var(--text)"/><circle cx="295" cy="126" r="3" class="f-elev" style="stroke:var(--text)"/><line x1="274" y1="131" x2="306" y2="131" class="s-line"/>
+          <line x1="96" y1="50" x2="128" y2="106" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#eq-ah-load)"/>
+          <text x="66" y="48" class="t-mono" style="fill:var(--accent-2)">P = 50 kN</text>
+          <path d="M128 106 m-26 0 a 26 26 0 0 1 13 -22" style="fill:none;stroke:var(--text-dim);stroke-width:1.2"/><text x="84" y="96" class="t-mono">60°</text>
+          <line x1="30" y1="160" x2="128" y2="160" class="s-line" marker-start="url(#eq-ah-dim)" marker-end="url(#eq-ah-dim)"/><text x="79" y="178" text-anchor="middle" class="t-mono">3 m</text>
+          <line x1="128" y1="160" x2="290" y2="160" class="s-line" marker-start="url(#eq-ah-dim)" marker-end="url(#eq-ah-dim)"/><text x="209" y="178" text-anchor="middle" class="t-mono">5 m</text>
+          <text x="30" y="96" text-anchor="middle" class="t-mono">A</text><text x="290" y="96" text-anchor="middle" class="t-mono">B</text>
+        </g>
+        <g transform="translate(400,30)">
+          <text x="150" y="10" text-anchor="middle" class="t" style="font-weight:700">(b) 자유물체도</text>
+          <line x1="30" y1="110" x2="290" y2="110" style="stroke:var(--text);stroke-width:4;stroke-linecap:round"/>
+          <line x1="96" y1="50" x2="128" y2="106" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#eq-ah-load)"/>
+          <line x1="-14" y1="110" x2="24" y2="110" style="stroke:var(--ok);stroke-width:2.6;stroke-dasharray:6 3" marker-end="url(#eq-ah-react)"/><text x="-12" y="100" class="t-mono" style="fill:var(--ok)">A_x</text>
+          <line x1="30" y1="170" x2="30" y2="118" style="stroke:var(--ok);stroke-width:2.6;stroke-dasharray:6 3" marker-end="url(#eq-ah-react)"/><text x="38" y="166" class="t-mono" style="fill:var(--ok)">A_y</text>
+          <line x1="290" y1="170" x2="290" y2="118" style="stroke:var(--ok);stroke-width:2.6;stroke-dasharray:6 3" marker-end="url(#eq-ah-react)"/><text x="248" y="166" class="t-mono" style="fill:var(--ok)">B_y</text>
+          <text x="150" y="210" text-anchor="middle" class="t-dim">핀 A → 두 성분, 롤러 B → 면에 수직인 한 성분</text>
+          <text x="150" y="232" text-anchor="middle" class="t-dim">모르는 방향은 + 로 가정하고 부호로 확인</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-4.</b> 단순보(a)의 자유물체도(b). 지점 기호를 지우고 그 자리에 지점이 막던 방향의 반력을 그린다. 하중의 경사 성분 때문에 핀 A에는 수평 반력도 생긴다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-eq-fbd">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>자유물체도 완성하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="eq-cv-fbd" aria-label="자유물체도를 그리는 구조물"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>구조물</span><div class="seg" id="eq-f-st"><button data-value="0" class="on">단순보 + 경사 하중</button><button data-value="1">캔틸레버</button><button data-value="2">벽 브래킷</button></div></div>
+          <div class="ctrl"><span>그려 넣을 반력(눌러서 고르기)</span><div class="eq-cands" id="eq-f-cands"></div></div>
+          <div class="btn-row"><button class="btn primary" id="eq-f-chk">확인</button><button class="btn" id="eq-f-clr">지우기</button></div>
+        </div>
+      </div>
+      <div class="eq-msg" id="eq-f-msg">지점 기호를 지운 자리에 필요한 반력을 골라 넣고 '확인'을 누르세요.</div>
+      <div class="eq-legend"><span class="key load">하중</span><span class="key reaction">반력</span></div>
+      <div class="sim-note">해볼 것: 세 구조물 모두 반력 개수가 3개인지 세어 보세요 · 롤러에 수평 반력을 넣거나 자유단에 반력을 넣으면 왜 틀릴까요? · 모델: 맞히면 CB.frame으로 푼 반력의 값과 방향을 보여 줍니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="supports">
+    <h2>지점의 종류와 반력</h2>
+    <p>지점은 구조물이 움직이려는 방향을 막는 장치이고, 막는 방향마다 하나씩 반력이 생깁니다. <b>막는 변위 하나 = 반력 하나</b>가 지점을 이해하는 열쇠입니다.</p>
+    <div class="callout def"><strong>정의 2.5 (지점과 반력)</strong> 구조물의 변위를 구속해 하중을 지지하는 경계를 <span class="term">지점</span><span class="en">(support)</span>, 지점이 구조물에 가하는 힘을 <span class="term">반력</span><span class="en">(reaction)</span>이라 한다. 지점은 구속하는 변위에 따라 다음과 같이 이상화한다.</div>
+    <div class="table-wrap"><table class="eq-tbl">
+      <thead><tr><th>지점</th><th>막는 변위</th><th>반력</th><th>개수</th><th>실제 예</th></tr></thead>
+      <tbody>
+        <tr><td><span class="term">롤러</span><span class="en">(roller)</span></td><td>면에 수직인 이동</td><td>면에 수직인 힘 1개</td><td>1</td><td>교량의 가동 받침, 온도 신축을 허용하는 받침</td></tr>
+        <tr><td><span class="term">핀</span><span class="en">(pin, hinge)</span></td><td>두 방향 이동</td><td>두 성분의 힘</td><td>2</td><td>교량의 고정 받침, 핀으로 이은 트러스 지점</td></tr>
+        <tr><td><span class="term">고정 지점</span><span class="en">(fixed support)</span></td><td>두 방향 이동 + 회전</td><td>두 성분의 힘 + 모멘트</td><td>3</td><td>기초에 깊이 묻힌 기둥, 벽에서 뻗은 캔틸레버</td></tr>
+        <tr><td>슬라이더(가이드)</td><td>한 방향 이동 + 회전</td><td>힘 1개 + 모멘트</td><td>2</td><td>대칭면의 모델링</td></tr>
+        <tr><td>스프링 지점</td><td>이동을 일부만 막음</td><td>변위에 비례하는 힘</td><td>—</td><td>무른 지반 위 기초, 탄성 받침</td></tr>
+      </tbody></table></div>
+    <figure class="diagram" id="fig-eq-supports">
+      <svg viewBox="0 0 760 230" role="img" aria-label="롤러, 핀, 고정 지점의 기호와 반력">
+        <rect x="10" y="10" width="740" height="210" rx="10" class="f-surface"/>
+        <g transform="translate(70,40)">
+          <text x="60" y="0" text-anchor="middle" class="t" style="font-weight:700">롤러 (1)</text>
+          <line x1="0" y1="60" x2="120" y2="60" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M60 60l-12 16h24z" class="f-elev" style="stroke:var(--text)"/><circle cx="54" cy="80" r="4" class="f-elev" style="stroke:var(--text)"/><circle cx="66" cy="80" r="4" class="f-elev" style="stroke:var(--text)"/><line x1="40" y1="86" x2="80" y2="86" class="s-line"/>
+          <line x1="60" y1="150" x2="60" y2="96" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#eq-ah-react)"/><text x="68" y="140" class="t-mono" style="fill:var(--ok)">R_y</text>
+          <text x="60" y="176" text-anchor="middle" class="t-dim">수평·회전 자유</text>
+        </g>
+        <g transform="translate(320,40)">
+          <text x="60" y="0" text-anchor="middle" class="t" style="font-weight:700">핀 (2)</text>
+          <line x1="0" y1="60" x2="120" y2="60" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M60 60l-12 20h24z" class="f-elev" style="stroke:var(--text)"/><line x1="40" y1="81" x2="80" y2="81" class="s-line"/>
+          <line x1="60" y1="150" x2="60" y2="92" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#eq-ah-react)"/><text x="68" y="140" class="t-mono" style="fill:var(--ok)">R_y</text>
+          <line x1="-10" y1="110" x2="46" y2="110" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#eq-ah-react)"/><text x="-8" y="100" class="t-mono" style="fill:var(--ok)">R_x</text>
+          <text x="60" y="176" text-anchor="middle" class="t-dim">회전 자유</text>
+        </g>
+        <g transform="translate(560,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">고정 (3)</text>
+          <line x1="40" y1="30" x2="40" y2="100" style="stroke:var(--text);stroke-width:3"/>
+          <g class="s-line"><line x1="40" y1="36" x2="30" y2="44"/><line x1="40" y1="50" x2="30" y2="58"/><line x1="40" y1="64" x2="30" y2="72"/><line x1="40" y1="78" x2="30" y2="86"/><line x1="40" y1="92" x2="30" y2="100"/></g>
+          <line x1="40" y1="64" x2="160" y2="64" style="stroke:var(--text);stroke-width:4"/>
+          <line x1="60" y1="140" x2="60" y2="74" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#eq-ah-react)"/><text x="68" y="136" class="t-mono" style="fill:var(--ok)">R_y</text>
+          <line x1="120" y1="88" x2="60" y2="88" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#eq-ah-react)"/><text x="104" y="104" class="t-mono" style="fill:var(--ok)">R_x</text>
+          <path d="M66 36 A 26 26 0 1 0 84 64" style="fill:none;stroke:var(--ok);stroke-width:2.2" marker-end="url(#eq-ah-react)"/><text x="88" y="34" class="t-mono" style="fill:var(--ok)">M</text>
+          <text x="80" y="176" text-anchor="middle" class="t-dim">이동·회전 모두 막음</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-5.</b> 지점 기호와 반력. 괄호 안 숫자가 반력의 개수다. 롤러는 굴러갈 수 있는 면에 수직인 힘 하나, 핀은 회전만 허용해 힘 두 성분, 고정 지점은 아무것도 허용하지 않아 힘 두 성분과 모멘트를 낸다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 2.3 (경사 하중을 받는 단순보)</strong> 그림 2-4의 보(경간 8 m, A 핀, B 롤러)에 A에서 3 m 떨어진 점에 50 kN이 수평과 60°를 이루며 오른쪽 아래로 걸린다.
+      <ol style="margin:6px 0 0">
+        <li><b>하중 성분.</b> \(P_x = 50\cos 60^\circ = 25\) kN(→), \(P_y = 50\sin 60^\circ = 43.30\) kN(↓).</li>
+        <li><b>\(\Sigma M_A = 0\).</b> \(8B_y - 43.30 \times 3 = 0\) → \(B_y = 16.24\) kN(↑). 수평 성분의 작용선은 A를 지나므로 모멘트가 없다.</li>
+        <li><b>\(\Sigma F_y = 0\).</b> \(A_y = 43.30 - 16.24 = 27.06\) kN(↑).</li>
+        <li><b>\(\Sigma F_x = 0\).</b> \(A_x + 25 = 0\) → \(A_x = -25\) kN. 가정한 →의 반대, 곧 ← 25 kN.</li>
+        <li><b>검산.</b> B에 대한 모멘트: \(-8A_y + 43.30 \times 5 = -216.5 + 216.5 = 0\). 맞다.</li>
+      </ol></div>
+    <div class="callout"><strong>예제 2.4 (캔틸레버의 고정단 반력)</strong> 길이 4 m 캔틸레버(A 고정)에 등분포 하중 5 kN/m와, 끝에 연직에서 30° 기운 10 kN(오른쪽 아래)이 걸린다.
+      <ol style="margin:6px 0 0">
+        <li><b>하중.</b> 분포 하중 합력 20 kN(A에서 2 m), 끝 하중 \(P_x = 10\sin 30^\circ = 5\) kN(→), \(P_y = 10\cos 30^\circ = 8.66\) kN(↓).</li>
+        <li><b>반력.</b> \(A_x = -5\) kN(←), \(A_y = 20 + 8.66 = 28.66\) kN(↑).</li>
+        <li><b>고정단 모멘트.</b> \(\Sigma M_A = 0\): \(M_A - 20 \times 2 - 8.66 \times 4 = 0\) → \(M_A = 74.64\) kN·m(반시계). 하중이 시계 방향으로 돌리려 하므로 벽이 반시계 방향 우력으로 붙잡는다.</li>
+      </ol></div>
+    <div class="sim" id="sim-eq-react">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>경사 하중을 끌어 반력 구하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="eq-cv-re" aria-label="경사 하중과 반력이 표시된 단순보"></canvas><span class="eq-cap">하중의 꼬리와 작용점을 끌기 · 한 칸 = 20 kN</span></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>B 지점</span><div class="seg" id="eq-r-b"><button data-value="roller" class="on">롤러</button><button data-value="pin">핀(부정정)</button></div></div>
+          <div class="btn-row"><button class="btn" id="eq-r-ex">예제 2.3으로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">하중 P (각도)</span><span class="v" id="eq-r-p">—</span></div>
+        <div class="stat"><span class="k">A<sub>x</sub>, A<sub>y</sub></span><span class="v" id="eq-r-a">—</span></div>
+        <div class="stat"><span class="k">B<sub>x</sub>, B<sub>y</sub></span><span class="v" id="eq-r-bv">—</span></div>
+      </div>
+      <div class="eq-msg" id="eq-r-msg"></div>
+      <div class="sim-note">해볼 것: 하중을 연직으로 세우면 수평 반력이 사라지는지 보세요 · B를 핀으로 바꾸면 수평 반력을 A와 B가 나눠 갖는데, 그 비율은 평형만으로는 정해지지 않습니다(부재의 늘어남으로 정해짐) · 모델: 경간 8 m, CB.frame 강성법, 반력 화살표는 실제 방향.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="determinacy">
+    <h2>정정·부정정·불안정</h2>
+    <div class="problem"><strong>지점 하나를 더 두면 더 튼튼할까</strong>
+      <p>단순보의 롤러를 핀으로 바꾸면 반력이 4개가 되어 평형 방정식 3개로는 풀 수 없습니다. 반대로 롤러 두 개로만 받치면 반력이 2개뿐이라 보가 옆으로 미끄러집니다. 반력의 "개수"만 맞으면 언제나 괜찮을까요?</p></div>
+    <p>평면 구조물 전체의 평형 방정식은 3개입니다. 내부 힌지가 있으면 "힌지에서 \(M = 0\)"이라는 조건식이 하나씩 더해집니다. 반력의 개수 \(r\)와 조건식의 개수를 비교하면 구조물의 성격이 갈립니다.</p>
+    <div class="callout def"><strong>정의 2.6 (외적 정정 판별)</strong> 반력의 수를 \(r\), 평형 방정식과 조건식의 수를 \(3 + c\)(\(c\)는 내부 힌지 조건의 수)라 하면
+      <ul style="margin:6px 0 0">
+        <li>\(r \lt 3 + c\): <span class="term">불안정</span><span class="en">(unstable)</span>. 지지가 모자라 구조물이 움직인다(기구, mechanism).</li>
+        <li>\(r = 3 + c\): 배치가 적절하면 <span class="term">정정</span><span class="en">(statically determinate)</span>. 평형 방정식만으로 반력이 정해진다.</li>
+        <li>\(r \gt 3 + c\): 배치가 적절하면 <span class="term">부정정</span><span class="en">(statically indeterminate)</span>이고, \(r - (3 + c)\)를 부정정 차수라 한다. 변형의 적합 조건이 더 필요하다(14장).</li>
+      </ul>
+      개수가 충분해도 반력의 작용선이 모두 평행하거나 한 점에서 만나면 그 방향의 이동이나 그 점에 대한 회전을 막지 못한다. 이것을 <span class="term">기하학적 불안정</span>이라 한다.</div>
+    <figure class="diagram" id="fig-eq-stab">
+      <svg viewBox="0 0 760 300" role="img" aria-label="정정, 부정정, 개수 부족 불안정, 기하학적 불안정의 예">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">정정 (r = 3)</text>
+          <line x1="40" y1="40" x2="260" y2="40" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M40 40l-10 15h20z" class="f-elev" style="stroke:var(--text)"/><path d="M260 40l-10 12h20z" class="f-elev" style="stroke:var(--text)"/><circle cx="255" cy="56" r="3" class="f-elev" style="stroke:var(--text)"/><circle cx="265" cy="56" r="3" class="f-elev" style="stroke:var(--text)"/>
+          <text x="150" y="86" text-anchor="middle" class="t-dim">핀 2 + 롤러 1</text>
+        </g>
+        <g transform="translate(400,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">3차 부정정 (r = 6)</text>
+          <line x1="40" y1="40" x2="260" y2="40" style="stroke:var(--text);stroke-width:4"/>
+          <line x1="40" y1="20" x2="40" y2="60" style="stroke:var(--text);stroke-width:3"/><line x1="260" y1="20" x2="260" y2="60" style="stroke:var(--text);stroke-width:3"/>
+          <g class="s-line"><line x1="40" y1="26" x2="30" y2="34"/><line x1="40" y1="40" x2="30" y2="48"/><line x1="40" y1="54" x2="30" y2="62"/><line x1="260" y1="26" x2="270" y2="34"/><line x1="260" y1="40" x2="270" y2="48"/><line x1="260" y1="54" x2="270" y2="62"/></g>
+          <text x="150" y="86" text-anchor="middle" class="t-dim">양단 고정: 3 + 3</text>
+        </g>
+        <g transform="translate(30,170)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">불안정: 개수 부족 (r = 2)</text>
+          <line x1="40" y1="40" x2="260" y2="40" style="stroke:var(--bad);stroke-width:4"/>
+          <path d="M40 40l-10 12h20z" class="f-elev" style="stroke:var(--text)"/><circle cx="35" cy="56" r="3" class="f-elev" style="stroke:var(--text)"/><circle cx="45" cy="56" r="3" class="f-elev" style="stroke:var(--text)"/>
+          <path d="M260 40l-10 12h20z" class="f-elev" style="stroke:var(--text)"/><circle cx="255" cy="56" r="3" class="f-elev" style="stroke:var(--text)"/><circle cx="265" cy="56" r="3" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="120" y1="20" x2="190" y2="20" style="stroke:var(--bad);stroke-width:2" marker-end="url(#eq-ah-int)"/>
+          <text x="150" y="86" text-anchor="middle" class="t-dim">롤러 2개: 옆으로 미끄러진다</text>
+        </g>
+        <g transform="translate(400,170)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">기하학적 불안정 (r = 3)</text>
+          <line x1="40" y1="40" x2="260" y2="40" style="stroke:var(--bad);stroke-width:4"/>
+          <path d="M40 40l-10 15h20z" class="f-elev" style="stroke:var(--text)"/>
+          <path d="M260 40l16 -10v20z" class="f-elev" style="stroke:var(--text)"/><circle cx="279" cy="34" r="3" class="f-elev" style="stroke:var(--text)"/><circle cx="279" cy="46" r="3" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="40" y1="40" x2="260" y2="40" style="stroke:var(--ok);stroke-width:1;stroke-dasharray:4 3"/>
+          <path d="M200 70 A 60 60 0 0 1 230 30" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#eq-ah-int)"/>
+          <text x="150" y="86" text-anchor="middle" class="t-dim">B의 수평 반력이 A를 지나 A 둘레 회전을 못 막음</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-6.</b> 지점 배치에 따른 판별. 반력 개수가 3보다 적으면 불안정, 많으면 부정정이다. 개수가 3이라도 반력의 작용선이 한 점(여기서는 A)을 지나면 그 점 둘레의 회전을 막지 못해 불안정하다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 2.5 (판별해 보기)</strong>
+      <ol style="margin:6px 0 0">
+        <li>핀 + 롤러: \(r = 3\), 조건식 3 → 정정(단순보).</li>
+        <li>고정 + 롤러: \(r = 4\) → 1차 부정정(1단 고정보). 4장 예제 4.5의 양단 고정보는 \(r = 6\) → 3차 부정정(수평 하중이 없으면 실질적으로 2개만 남지만 판별은 그대로).</li>
+        <li>고정 + 롤러 + 내부 힌지 하나: \(r = 4\), 조건식 \(3 + 1 = 4\) → 정정(게르버보, 4장).</li>
+        <li>핀 + 롤러 + 내부 힌지 하나: \(r = 3 \lt 4\) → 불안정. 힌지에서 꺾여 무너진다.</li>
+      </ol></div>
+    <div class="sim" id="sim-eq-stab">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>지점을 바꿔 판별하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="eq-cv-stab" aria-label="지점을 고른 보와 판별 결과"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>왼쪽 지점 A</span><div class="seg" id="eq-s-a"><button data-value="none">없음</button><button data-value="roller">롤러</button><button data-value="pin" class="on">핀</button><button data-value="fixed">고정</button></div></div>
+          <div class="ctrl"><span>오른쪽 지점 B</span><div class="seg" id="eq-s-b"><button data-value="none">없음</button><button data-value="roller" class="on">롤러</button><button data-value="rollerV">수직면 롤러</button><button data-value="pin">핀</button><button data-value="fixed">고정</button></div></div>
+          <label class="check"><input type="checkbox" id="eq-s-h"> 가운데 내부 힌지</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">반력 수 r</span><span class="v" id="eq-s-r">—</span></div>
+        <div class="stat"><span class="k">조건식 3 + c</span><span class="v" id="eq-s-c">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="eq-s-v">—</span></div>
+      </div>
+      <div class="eq-msg" id="eq-s-msg"></div>
+      <div class="sim-note">해볼 것: 핀 + 수직면 롤러(r = 3)가 왜 불안정인지 그림 2-6과 비교하세요 · 고정 + 롤러에 힌지를 넣으면 정정(게르버보)이 됩니다 · 모델: 경간 8 m, 등분포 10 kN/m. 판정은 개수 비교와 강성 행렬(CB.frame)의 특이성 검사를 함께 씁니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="overturning">
+    <h2>평형의 응용: 넘어지지 않는 조건</h2>
+    <p>지면에 그냥 놓인 물체는 땅을 밀 수만 있고 당길 수는 없습니다. 바깥으로 기울게 하는 모멘트가 커져 받침 면의 한쪽 모서리에 대한 모멘트 평형이 깨지면 물체는 그 모서리를 축으로 넘어집니다. 이 <span class="term">전도</span><span class="en">(overturning)</span>를 막는 계산은 평형 방정식 하나, 모서리에 대한 모멘트입니다.</p>
+    <div class="callout def"><strong>정의 2.7 (전도 안전율)</strong> 회전축이 될 받침 면 모서리에 대해, 물체를 제자리에 붙잡는 하중의 모멘트 합을 <b>저항 모멘트</b> \(M_r\), 넘어뜨리려는 하중의 모멘트 합을 <b>전도 모멘트</b> \(M_o\)라 할 때
+      <div class="formula">$$FS_{전도} = \frac{M_r}{M_o}$$<div class="where">\(FS \gt 1\)이면 평형이 유지되고, 하중과 재료의 불확실성을 생각해 1보다 충분히 큰 값(흔히 1.5–2.0, 구조물과 기준에 따라 다름)을 요구한다.</div></div></div>
+    <figure class="diagram" id="fig-eq-crane">
+      <svg viewBox="0 0 760 320" role="img" aria-label="타워크레인의 하중, 균형추, 기초 모서리에 대한 전도 모멘트">
+        <rect x="10" y="10" width="740" height="300" rx="10" class="f-surface"/>
+        <rect x="40" y="276" width="680" height="24" style="fill:color-mix(in srgb, var(--accent-2) 12%, transparent)"/>
+        <rect x="310" y="250" width="100" height="26" style="fill:var(--surface-2);stroke:var(--text)"/>
+        <rect x="350" y="70" width="20" height="180" class="f-elev" style="stroke:var(--text);stroke-width:1.6"/>
+        <path d="M350 80 L370 100 M370 80 L350 100 M350 120 L370 140 M370 120 L350 140 M350 160 L370 180 M370 160 L350 180 M350 200 L370 220 M370 200 L350 220" class="s-line"/>
+        <rect x="370" y="62" width="330" height="10" class="f-elev" style="stroke:var(--text)"/><rect x="180" y="62" width="170" height="10" class="f-elev" style="stroke:var(--text)"/>
+        <rect x="190" y="72" width="50" height="40" style="fill:var(--surface-2);stroke:var(--text)"/><text x="215" y="130" text-anchor="middle" class="t-mono">균형추 W_c</text>
+        <line x1="600" y1="72" x2="600" y2="170" class="s-line"/><rect x="580" y="170" width="40" height="28" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+        <line x1="600" y1="200" x2="600" y2="236" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#eq-ah-load)"/><text x="610" y="226" class="t-mono" style="fill:var(--accent-2)">하중 W</text>
+        <line x1="215" y1="112" x2="215" y2="150" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#eq-ah-load)"/>
+        <circle cx="410" cy="276" r="5" style="fill:var(--bad)"/><text x="418" y="296" class="t-mono" style="fill:var(--bad)">앞 모서리</text>
+        <circle cx="310" cy="276" r="5" style="fill:var(--warn)"/><text x="244" y="296" class="t-mono" style="fill:var(--warn)">뒤 모서리</text>
+        <line x1="410" y1="40" x2="600" y2="40" class="s-line" marker-start="url(#eq-ah-dim)" marker-end="url(#eq-ah-dim)"/><text x="505" y="34" text-anchor="middle" class="t-mono">r − a (팔)</text>
+        <line x1="360" y1="250" x2="360" y2="20" style="stroke:var(--text-dim);stroke-width:1;stroke-dasharray:3 4"/>
+        <text x="460" y="120" class="t-dim">앞으로 넘어짐: 앞 모서리에 대해</text><text x="460" y="138" class="t-mono">W(r−a) + 지브 자중 ≤ 저항/FS</text>
+        <text x="60" y="180" class="t-dim">하중이 없을 때 뒤로 넘어짐:</text><text x="60" y="198" class="t-mono">균형추가 너무 무거우면 위험</text>
+      </svg>
+      <figcaption><b>그림 2-7.</b> 자립형 타워크레인의 전도. 하중을 들면 앞 모서리를 축으로, 하중이 없을 때는 균형추 때문에 뒤 모서리를 축으로 넘어지려 한다. 균형추는 두 조건 사이의 범위에서 골라야 한다. 기초 반폭 a.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 2.6 (교육용 크레인의 허용 하중)</strong> 가상의 자립형 크레인: 마스트(자중 400 kN)는 기초 가운데, 기초 폭 6 m(반폭 \(a = 3\) m), 앞쪽 지브 자중 60 kN(중심에서 25 m), 뒤쪽 지브 30 kN(−8 m), 균형추 \(W_c = 200\) kN(−10 m).
+      <ol style="margin:6px 0 0">
+        <li><b>앞 모서리(+3 m)에 대한 저항 모멘트.</b> \(400 \times 3 + 30 \times 11 + 200 \times 13 = 1200 + 330 + 2600 = 4130\) kN·m.</li>
+        <li><b>전도 모멘트.</b> 앞 지브 \(60 \times 22 = 1320\) kN·m + 하중 \(W(r - 3)\).</li>
+        <li><b>허용 하중(FS = 1.5).</b> \(1320 + W(r - 3) \le 4130/1.5 = 2753\) → 반경 40 m에서 \(W \le 38.7\) kN, 20 m에서 \(W \le 84.3\) kN. 멀리 뻗을수록 들 수 있는 무게가 줄어드는 크레인 하중표의 원리다.</li>
+        <li><b>하중이 없을 때 뒤로.</b> 뒤 모서리(−3 m)에 대해 전도 \(200 \times 7 + 30 \times 5 = 1550\), 저항 \(400 \times 3 + 60 \times 28 = 2880\) → \(FS = 1.86\). 균형추를 너무 무겁게 하면 이 값이 1 근처로 떨어진다.</li>
+      </ol></div>
+    <div class="sim" id="sim-eq-crane">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>타워크레인은 왜 넘어지지 않을까</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view eq-stack">
+          <div><canvas id="eq-cv-cr" aria-label="타워크레인과 하중, 균형추"></canvas></div>
+          <div><canvas id="eq-cv-cr2" aria-label="반경에 따른 허용 하중 곡선"></canvas><span class="eq-cap">하중표(FS 1.5)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>매단 하중 W <output id="eq-c-w-out"></output></span><input type="range" id="eq-c-w" min="0" max="200" step="5" value="40"></label>
+          <label class="ctrl"><span>작업 반경 r <output id="eq-c-r-out"></output></span><input type="range" id="eq-c-r" min="6" max="45" step="0.5" value="30"></label>
+          <label class="ctrl"><span><span>균형추 W<sub>c</sub></span> <output id="eq-c-c-out"></output></span><input type="range" id="eq-c-c" min="0" max="400" step="10" value="200"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">앞쪽 FS</span><span class="v" id="eq-c-ff">—</span></div>
+        <div class="stat"><span class="k">무부하 뒤쪽 FS</span><span class="v" id="eq-c-fb">—</span></div>
+        <div class="stat"><span class="k">이 반경의 허용 하중</span><span class="v" id="eq-c-al">—</span></div>
+      </div>
+      <div class="eq-msg" id="eq-c-msg"></div>
+      <div class="sim-note">해볼 것: 균형추를 늘리면 허용 하중 곡선이 위로 올라가지만, 무부하 뒤쪽 FS가 떨어집니다. 두 조건을 모두 만족하는 범위를 찾으세요 · 모델: 예제 2.6의 교육용 가상 크레인(기초에 앵커 없음, 바람·동적 효과 무시). 실제 크레인은 제조사 하중표와 기초 설계를 따릅니다.</div>
+    </div>
+    <p>옹벽은 반대로 흙이 미는 힘에 맞서 넘어지지 않아야 하는 구조물입니다. 높이 \(H\)인 벽 뒤의 흙은 깊이에 비례해 커지는 삼각형 압력으로 벽을 밀고, 그 합력 \(P = \tfrac12 K\gamma H^2\)은 바닥에서 \(H/3\) 높이에 걸립니다(\(K\)는 흙의 성질에 따른 토압 계수, 지반공학에서 다룬다). 벽의 무게가 앞굽(앞쪽 바닥 모서리)에 대해 만드는 모멘트가 이 토압의 모멘트보다 충분히 커야 합니다. 바닥이 미끄러지지 않으려면 바닥의 마찰력도 충분해야 합니다.</p>
+    <div class="callout"><strong>예제 2.7 (중력식 옹벽, 폭 1 m 띠)</strong> 높이 3 m, 두께 1.5 m인 콘크리트 벽(24 kN/m³), 흙의 단위중량 18 kN/m³, 토압 계수 \(K = 1/3\), 바닥 마찰 계수 0.5(모두 교육용 가정).
+      <ol style="margin:6px 0 0">
+        <li><b>벽 무게.</b> \(W = 24 \times 3 \times 1.5 = 108\) kN, 앞굽에서 0.75 m.</li>
+        <li><b>토압.</b> \(P = \tfrac12 \times \tfrac13 \times 18 \times 3^2 = 27\) kN, 바닥에서 1 m.</li>
+        <li><b>전도.</b> \(FS = (108 \times 0.75)/(27 \times 1) = 81/27 = 3.0\).</li>
+        <li><b>활동.</b> \(FS = 0.5 \times 108 / 27 = 2.0\). 흔히 쓰는 기준값(전도 2.0, 활동 1.5 이상; 기준 확인)을 넘는다.</li>
+      </ol></div>
+    <div class="sim" id="sim-eq-wall">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>옹벽의 전도와 활동</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="eq-cv-wall" aria-label="옹벽 단면, 토압 분포와 합력"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>벽 높이 H <output id="eq-l-h-out"></output></span><input type="range" id="eq-l-h" min="1.5" max="6" step="0.1" value="3"></label>
+          <label class="ctrl"><span>벽 두께 B <output id="eq-l-b-out"></output></span><input type="range" id="eq-l-b" min="0.5" max="3" step="0.05" value="1.5"></label>
+          <label class="ctrl"><span>토압 계수 K <output id="eq-l-k-out"></output></span><input type="range" id="eq-l-k" min="0.2" max="0.6" step="0.01" value="0.33"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">전도 FS</span><span class="v" id="eq-l-fo">—</span></div>
+        <div class="stat"><span class="k">활동 FS</span><span class="v" id="eq-l-fs">—</span></div>
+        <div class="stat"><span class="k">합력 위치 (앞굽에서)</span><span class="v" id="eq-l-x">—</span></div>
+      </div>
+      <div class="eq-msg" id="eq-l-msg"></div>
+      <div class="sim-note">해볼 것: 높이를 2배로 하면 토압 모멘트가 8배(H³)가 되는 것을 확인하세요 · 바닥 반력의 합력이 가운데 1/3 밖으로 나가면 뒤쪽 바닥이 들뜹니다(10장 단면의 핵) · 모델: 직사각형 콘크리트 벽(24 kN/m³), 흙 18 kN/m³, 바닥 마찰 계수 0.5, 수압·뒤채움 위 하중 무시. 교육용이며 실제 옹벽은 지반공학의 토압 이론과 기준을 따릅니다.</div>
+    </div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="truss.html"><small>CH.03 · 트러스</small>절점마다 ΣF<sub>x</sub> = ΣF<sub>y</sub> = 0<br><span>평형 방정식을 절점 하나에 적용하면 트러스의 부재력이 나온다.</span></a>
+      <a href="beam-forces.html"><small>CH.04 · 보의 전단력과 휨모멘트</small>잘린 조각의 평형<br><span>자유물체도를 잘린 면까지 넓히면 단면력이 된다.</span></a>
+      <a href="indeterminate.html"><small>CH.14 · 부정정 구조와 응력법</small>평형만으로 모자랄 때<br><span>부정정 차수만큼 변형의 적합 조건을 더한다.</span></a>
+      <a href="https://math.euiyun.com/linear/"><small>LINEARBOOK · 선형대수</small>평형 방정식은 연립 일차 방정식<br><span>방정식이 모자라거나 남는 것은 계수와 해의 존재 문제와 같다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>힘은 크기·방향·작용선을 가진 벡터다. 성분 \(F_x = F\cos\theta\), \(F_y = F\sin\theta\)로 나눠 더하고, 합력의 반대가 평형력이다.</li>
+      <li>모멘트는 힘 × 수직 거리 \(Fd\) = \(xF_y - yF_x\)(바리뇽 정리), 반시계가 \(+\)이다. 우력은 합력이 0이고 어디서 재도 모멘트가 같으며, 힘을 옮기면 우력이 따라붙는다.</li>
+      <li>평면 강체의 평형은 \(\Sigma F_x = \Sigma F_y = \Sigma M = 0\) 세 식이다. 미지수가 모이는 점을 모멘트 기준점으로 잡는다.</li>
+      <li>자유물체도는 물체를 떼어 내고 접촉을 모두 힘으로 바꾼 그림이다. 모르는 힘은 양의 방향으로 가정하고 부호로 실제 방향을 읽는다.</li>
+      <li>지점은 막는 변위마다 반력을 하나씩 낸다: 롤러 1, 핀 2, 고정 3. 반력 수가 3 + c보다 적으면 불안정, 같으면 정정, 많으면 부정정이며, 반력이 평행하거나 한 점에 모이면 기하학적으로 불안정하다.</li>
+      <li>전도는 받침 모서리에 대한 모멘트 평형 문제다. 크레인은 하중을 들 때 앞으로, 무부하일 때 뒤로 넘어지지 않아야 하고, 옹벽은 전도와 활동을 함께 검토한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 서로 직각인 30 kN과 40 kN의 합력은?</p><div class="opts">
+        <button class="opt">70 kN</button><button class="opt">10 kN</button><button class="opt" data-correct>50 kN</button><button class="opt">35 kN</button>
+      </div><div class="quiz-exp">\(\sqrt{30^2 + 40^2} = 50\) kN. 힘은 벡터라 크기를 그대로 더하지 않는다. 같은 방향일 때만 70 kN, 반대 방향이면 10 kN이다.</div></div>
+      <div class="quiz-q"><p>2. 볼트에서 0.4 m 떨어진 렌치 손잡이에 200 N을 손잡이 방향(θ = 0°)으로 당기면 볼트에 걸리는 모멘트는?</p><div class="opts">
+        <button class="opt">80 N·m</button><button class="opt">40 N·m</button><button class="opt" data-correct>0</button><button class="opt">500 N·m</button>
+      </div><div class="quiz-exp">작용선이 볼트를 지나므로 수직 거리가 0이다. \(M = xF\sin\theta = 0\). 볼트를 돌리려면 손잡이에 직각 성분이 있어야 한다.</div></div>
+      <div class="quiz-q"><p>3. 우력에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">합력이 두 힘의 합과 같다</button><button class="opt" data-correct>합력이 0이고, 어느 점에 대해 재도 모멘트가 같다</button><button class="opt">작용점에 따라 모멘트가 달라진다</button><button class="opt">물체를 한 방향으로 밀어 옮긴다</button>
+      </div><div class="quiz-exp">크기가 같고 반대인 두 힘이라 합력은 0이다. 모멘트는 두 힘 사이 거리 \(d\)에만 의존하는 \(Fd\)로, 기준점과 무관하다.</div></div>
+      <div class="quiz-q"><p>4. 핀 지점이 구조물에 줄 수 있는 반력은?</p><div class="opts">
+        <button class="opt">연직력 하나</button><button class="opt" data-correct>두 방향의 힘(수평·연직 성분)</button><button class="opt">두 방향의 힘과 모멘트</button><button class="opt">모멘트 하나</button>
+      </div><div class="quiz-exp">핀은 이동을 두 방향 모두 막고 회전은 허용하므로 힘 두 성분을 낸다. 모멘트까지 내는 것은 고정 지점이다.</div></div>
+      <div class="quiz-q"><p>5. 경간 8 m 단순보(A 핀, B 롤러)에서 A로부터 2 m 지점에 연직 하중 40 kN이 걸린다. B의 반력은?</p><div class="opts">
+        <button class="opt">30 kN</button><button class="opt" data-correct>10 kN</button><button class="opt">20 kN</button><button class="opt">40 kN</button>
+      </div><div class="quiz-exp">\(\Sigma M_A = 0\): \(8B_y = 40 \times 2\) → \(B_y = 10\) kN, \(A_y = 30\) kN. 하중에 가까운 지점이 더 많이 받는다.</div></div>
+      <div class="quiz-q"><p>6. 한쪽 끝은 고정, 다른 끝은 롤러로 지지된 보(내부 힌지 없음)는?</p><div class="opts">
+        <button class="opt">정정</button><button class="opt" data-correct>1차 부정정</button><button class="opt">불안정</button><button class="opt">3차 부정정</button>
+      </div><div class="quiz-exp">반력 \(3 + 1 = 4\)개, 평형 방정식 3개 → 4 − 3 = 1차 부정정이다. 중간에 힌지를 넣으면 조건식이 하나 늘어 정정(게르버보)이 된다.</div></div>
+      <div class="quiz-q"><p>7. 핀 하나와 롤러 하나로 받친 수평 보인데 롤러가 수직 벽에 붙어 수평 반력만 낸다. 이 구조는?</p><div class="opts">
+        <button class="opt">정정</button><button class="opt">1차 부정정</button><button class="opt" data-correct>불안정(기하학적)</button><button class="opt">반력 개수가 모자라 불안정</button>
+      </div><div class="quiz-exp">반력은 3개지만 롤러의 수평 반력 작용선이 핀을 지난다. 세 반력이 모두 핀을 지나므로 핀 둘레의 회전을 막을 수 없다. 개수가 아니라 배치 때문에 불안정하다.</div></div>
+      <div class="quiz-q"><p>8. 같은 단면의 옹벽 높이를 2배로 하면 토압이 앞굽에 만드는 전도 모멘트는 몇 배가 되나?</p><div class="opts">
+        <button class="opt">2배</button><button class="opt">4배</button><button class="opt" data-correct>8배</button><button class="opt">16배</button>
+      </div><div class="quiz-exp">합력 \(P \propto H^2\), 팔 길이 \(H/3 \propto H\)이므로 모멘트 \(\propto H^3\)이다. 높은 옹벽일수록 바닥을 넓혀야 하는 이유다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 그리기 도우미(픽셀 좌표) ---------- */
+const EQX = {
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9, dash) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width; if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  arc(ctx, cx, cy, ccw, color, r = 18, dash) { // 화면에서 반시계(ccw) 또는 시계 방향 모멘트 화살표
+    const t0 = ccw ? 0.75 * Math.PI : 0.25 * Math.PI, t1 = ccw ? -0.75 * Math.PI : 1.75 * Math.PI;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.2; if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.arc(cx, cy, r, t0, t1, ccw); ctx.stroke(); ctx.setLineDash([]);
+    const ex = cx + r * Math.cos(t1), ey = cy + r * Math.sin(t1), tx = ccw ? Math.sin(t1) : -Math.sin(t1), ty = ccw ? -Math.cos(t1) : Math.cos(t1), h = 8;
+    ctx.beginPath(); ctx.moveTo(ex + tx * h * 0.6, ey + ty * h * 0.6); ctx.lineTo(ex - tx * h * 0.4 - ty * h * 0.5, ey - ty * h * 0.4 + tx * h * 0.5); ctx.lineTo(ex - tx * h * 0.4 + ty * h * 0.5, ey - ty * h * 0.4 - tx * h * 0.5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  deg: (rad) => ((rad * 180) / Math.PI),
+};
+
+/* ---------- 1. 두 힘의 합력 ---------- */
+(function () {
+  const S = 10; // 한 칸 = 10 kN
+  const pts = [{ x: 4, y: 1, label: "F₁", snap: 0.1 }, { x: -1, y: 3, label: "F₂", snap: 0.1 }];
+  const par = CB.check("eq-v-par", () => pl.redraw()), cmp = CB.check("eq-v-cmp", () => pl.redraw()), eqb = CB.check("eq-v-eqb", () => pl.redraw());
+  document.getElementById("eq-v-ex").addEventListener("click", () => { pts[0].x = 2.4; pts[0].y = 1.8; pts[1].x = -2.4; pts[1].y = 3.2; pl.redraw(); readout(); });
+  const pl = CB.plane("#eq-cv-vec", {
+    x: [-6.5, 6.5], y: null, cy: 1.2, gridStep: 1, aspect: (W) => (W < 520 ? 0.85 : 0.6), maxHeight: 460, points: pts,
+    draw(P, api) {
+      const pal = P.P, [a, b] = api.points, rx = a.x + b.x, ry = a.y + b.y;
+      a.color = b.color = pal.accent2;
+      if (par()) { P.line(a.x, a.y, rx, ry, { color: pal.dim, dash: [5, 4], width: 1.3 }); P.line(b.x, b.y, rx, ry, { color: pal.dim, dash: [5, 4], width: 1.3 }); }
+      if (cmp()) { P.arrow(0, 0, rx, 0, { color: pal.accent, width: 1.8, dash: [6, 4] }); P.arrow(rx, 0, rx, ry, { color: pal.accent, width: 1.8, dash: [6, 4] }); P.text("R_x", rx / 2, 0, { color: pal.accent, dy: 14, align: "center", size: 11 }); P.text("R_y", rx, ry / 2, { color: pal.accent, dx: 8, size: 11 }); }
+      if (eqb()) { P.arrow(0, 0, -rx, -ry, { color: pal.ok, width: 2.6, dash: [7, 4] }); P.text("−R (평형력)", -rx, -ry, { color: pal.ok, dx: 8, dy: 12, size: 11.5, bold: true }); }
+      P.arrow(0, 0, a.x, a.y, { color: pal.accent2, width: 3 }); P.arrow(0, 0, b.x, b.y, { color: pal.accent2, width: 3 });
+      P.arrow(0, 0, rx, ry, { color: pal.text, width: 3.6, label: "R" });
+      P.dot(0, 0, { r: 4.5, color: pal.text });
+    },
+    onDrag() { readout(); },
+  });
+  const fmtF = (x, y) => `${CB.num(Math.hypot(x, y) * S, 1)} kN ∠${CB.num(EQX.deg(Math.atan2(y, x)), 0)}°`;
+  function readout() {
+    const [a, b] = pts, rx = a.x + b.x, ry = a.y + b.y;
+    CB.stat("eq-v-f1", fmtF(a.x, a.y)); CB.stat("eq-v-f2", fmtF(b.x, b.y)); CB.stat("eq-v-r", fmtF(rx, ry));
+    CB.stat("eq-v-rc", `(${CB.num(rx * S, 1)}, ${CB.num(ry * S, 1)})`);
+  }
+  readout();
+})();
+
+/* ---------- 2. 렌치의 모멘트 ---------- */
+(function () {
+  const gF = CB.range("eq-w-f", (v) => v + " N", go), gT = CB.range("eq-w-t", (v) => v + "°", go), gG = CB.range("eq-w-g", (v) => v + " N·m", go);
+  const hp = { x: 0.3, y: 0, lock: "y", snap: 0.01, constrain: (p) => { p.x = CB.clamp(p.x, 0.05, 0.45); } };
+  const SC = 0.2 / 500; // 500 N → 0.2 m 길이로 그림
+  const pl = CB.plane("#eq-cv-wr", {
+    x: [-0.16, 0.6], y: [-0.27, 0.31], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.85 : 0.62), maxHeight: 440, points: [hp],
+    draw(P) {
+      const pal = P.P, ctx = P.ctx, F = gF(), th = (gT() * Math.PI) / 180, x = hp.x, fx = F * Math.cos(th), fy = F * Math.sin(th);
+      hp.color = pal.accent2;
+      // 손잡이와 볼트
+      ctx.save(); ctx.fillStyle = pal.surface; ctx.strokeStyle = pal.text; ctx.lineWidth = 1.5;
+      const hh = P.unit * 0.022; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(P.X(-0.02), P.Y(0) - hh / 2, P.X(0.47) - P.X(-0.02), hh, hh / 2) : ctx.rect(P.X(-0.02), P.Y(0) - hh / 2, P.X(0.47) - P.X(-0.02), hh); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); for (let k = 0; k < 6; k++) { const a = (k * Math.PI) / 3; const px = P.X(0) + P.unit * 0.04 * Math.cos(a), py = P.Y(0) + P.unit * 0.04 * Math.sin(a); k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.closePath(); ctx.fillStyle = pal.elev; ctx.fill(); ctx.stroke(); ctx.restore();
+      P.dot(0, 0, { r: 3.5, color: pal.text }); P.text("O", 0, 0, { color: pal.text, dx: -12, dy: 16, bold: true });
+      // 작용선과 수직 거리
+      const ux = Math.cos(th), uy = Math.sin(th);
+      P.line(x - ux * 2, -uy * 2, x + ux * 2, uy * 2, { color: pal.faint, dash: [6, 5], width: 1.2 });
+      const t = -(x * ux), fxp = x + t * ux, fyp = t * uy; // 원점에서 작용선에 내린 수선의 발
+      if (Math.abs(Math.sin(th)) > 1e-3) {
+        P.line(0, 0, fxp, fyp, { color: pal.accent, width: 2.4 });
+        P.text(`d = ${(x * Math.abs(Math.sin(th))).toFixed(3)} m`, fxp / 2, fyp / 2, { color: pal.accent, dx: 10, dy: -8, size: 11.5, bold: true });
+      }
+      // 성분과 힘
+      P.arrow(x, 0, x + fx * SC, 0, { color: pal.accent, width: 1.6, dash: [5, 4] }); P.arrow(x, 0, x, fy * SC, { color: pal.accent, width: 1.6, dash: [5, 4] });
+      P.arrow(x, 0, x + fx * SC, fy * SC, { color: pal.accent2, width: 3.2, label: `${F} N` });
+      // 회전 방향 표시
+      const M = x * fy;
+      if (Math.abs(M) > 0.5) { const c = P.X(0), cy = P.Y(0); ctx.save(); ctx.globalAlpha = 0.9; ctx.restore(); EQX.arc(ctx, c, cy, M > 0, pal.ok, 30); }
+    },
+    onDrag() { go(); },
+  });
+  function go() {
+    pl.redraw();
+    const F = gF(), th = (gT() * Math.PI) / 180, x = hp.x, d = x * Math.abs(Math.sin(th)), M = x * F * Math.sin(th);
+    CB.stat("eq-w-x", `${x.toFixed(2)} m`); CB.stat("eq-w-d", `${d.toFixed(3)} m`); CB.stat("eq-w-m", `${CB.num(M, 1)} N·m`);
+    const msg = document.getElementById("eq-w-msg"), goal = gG();
+    msg.className = "eq-msg" + (Math.abs(M) >= goal ? " ok" : "");
+    msg.innerHTML = `바리뇽: x·F<sub>y</sub> − y·F<sub>x</sub> = ${x.toFixed(2)} × ${CB.num(F * Math.sin(th), 1)} − 0 × ${CB.num(F * Math.cos(th), 1)} = <b>${CB.num(M, 1)} N·m</b> · ` + (Math.abs(M) >= goal ? `목표 ${goal} N·m에 닿았습니다.` : `목표 ${goal} N·m까지 ${CB.num(goal - Math.abs(M), 1)} N·m 모자랍니다.`);
+  }
+  go();
+})();
+
+/* ---------- 3. 자유물체도 완성하기 ---------- */
+(function () {
+  const S = [
+    { name: "단순보", model: { nodes: [[0, 0], [8, 0]], members: [{ i: 0, j: 1 }], supports: { 0: "pin", 1: "roller" }, memberLoads: [{ member: 0, P: [25, -43.30], a: 3 }] },
+      cands: [["A수평", 0, 0], ["A수직", 0, 1], ["A모멘트", 0, 2], ["B수평", 1, 0], ["B수직", 1, 1], ["B모멘트", 1, 2]], ok: ["A수평", "A수직", "B수직"], names: ["A", "B"] },
+    { name: "캔틸레버", model: { nodes: [[0, 0], [4, 0]], members: [{ i: 0, j: 1 }], supports: { 0: "fixed" }, memberLoads: [{ member: 0, w: [0, -5] }], loads: [{ node: 1, fx: 5, fy: -8.66 }] },
+      cands: [["A수평", 0, 0], ["A수직", 0, 1], ["A모멘트", 0, 2], ["B수직", 1, 1], ["B모멘트", 1, 2]], ok: ["A수평", "A수직", "A모멘트"], names: ["A", "B"] },
+    { name: "벽 브래킷", model: { nodes: [[0, 0], [0, 3], [2.5, 3]], members: [{ i: 0, j: 1 }, { i: 1, j: 2 }], supports: { 0: "pin", 1: "rollerV" }, loads: [{ node: 2, fy: -20 }] },
+      cands: [["A수평", 0, 0], ["A수직", 0, 1], ["A모멘트", 0, 2], ["B수평", 1, 0], ["B수직", 1, 1], ["B모멘트", 1, 2]], ok: ["A수평", "A수직", "B수평"], names: ["A", "B", "C"] },
+  ];
+  let k = 0, chosen = new Set(), solved = false, r = null;
+  const box = document.getElementById("eq-f-cands"), msg = document.getElementById("eq-f-msg");
+  function buildCands() {
+    box.innerHTML = S[k].cands.map(([t]) => `<button type="button" data-c="${t}">${t.replace("수평", " 수평 반력").replace("수직", " 수직 반력").replace("모멘트", " 모멘트")}</button>`).join("");
+    box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { const c = b.dataset.c; chosen.has(c) ? chosen.delete(c) : chosen.add(c); b.classList.toggle("on", chosen.has(c)); solved = false; pl.redraw(); }));
+  }
+  CB.seg("eq-f-st", (v) => { k = Number(v); chosen.clear(); solved = false; r = CB.frame(Object.assign({ E: 2e8, A: 0.01, I: 1e-4 }, S[k].model)); buildCands(); msg.className = "eq-msg"; msg.textContent = "지점 기호를 지운 자리에 필요한 반력을 골라 넣고 '확인'을 누르세요."; pl.view({ x: k === 2 ? [-2.2, 4.2] : k === 1 ? [-1.6, 5.4] : [-1.6, 9.6], y: k === 2 ? [-1.6, 4.4] : [-2.4, 2.6] }); });
+  r = CB.frame(Object.assign({ E: 2e8, A: 0.01, I: 1e-4 }, S[0].model));
+  const pl = CB.plane("#eq-cv-fbd", {
+    x: [-1.6, 9.6], y: [-2.4, 2.6], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.75 : 0.5), minHeight: 230, maxHeight: 380,
+    draw(P) {
+      const pal = P.P, ctx = P.ctx, m = S[k].model;
+      // 지점은 흐리게만(떼어 낸 자리)
+      ctx.save(); ctx.globalAlpha = 0.18; CB.drawFrame(P, r, { loads: false, reactions: false }); ctx.restore();
+      CB.drawFrame(P, r, { supports: false, reactions: false, loadPx: 40 });
+      const nodes = m.nodes;
+      S[k].names.forEach((nm, n) => P.text(nm, nodes[n][0], nodes[n][1], { color: pal.dim, dx: n === 1 && k === 2 ? -16 : -12, dy: -14, bold: true }));
+      // 고른 미지 반력(점선) 또는 정답일 때 실제 반력
+      S[k].cands.forEach(([t, n, d]) => {
+        if (!chosen.has(t)) return;
+        const x = P.X(nodes[n][0]), y = P.Y(nodes[n][1]), R = solved && r.reactions[n] ? r.reactions[n][d] : null, col = solved ? pal.ok : pal.ok;
+        const dash = solved ? null : [6, 4], lab = t.replace("수평", "_x").replace("수직", "_y").replace("모멘트", "_M");
+        if (d === 0) { const s = solved ? Math.sign(R) || 1 : 1; EQX.arrow(ctx, x - s * 58, y + 14, x - s * 14, y + 14, col, 2.4, 9, dash); EQX.text(ctx, solved ? `${CB.num(Math.abs(R), 1)} kN` : lab, x - s * 64, y + 14, col, { align: s > 0 ? "right" : "left", size: 11.5 }); }
+        if (d === 1) { const s = solved ? Math.sign(R) || 1 : 1; EQX.arrow(ctx, x, y + s * 62, x, y + s * 14, col, 2.4, 9, dash); EQX.text(ctx, solved ? `${CB.num(Math.abs(R), 1)} kN` : lab, x + 10, y + s * 56, col, { align: "left", size: 11.5 }); }
+        if (d === 2) { const ccw = solved ? R > 0 : true; EQX.arc(ctx, x, y, ccw, col, 24, dash); EQX.text(ctx, solved ? `${CB.num(Math.abs(R), 1)} kN·m` : lab, x + 30, y - 26, col, { align: "left", size: 11.5 }); }
+      });
+    },
+  });
+  buildCands();
+  document.getElementById("eq-f-chk").addEventListener("click", () => {
+    const ok = S[k].ok, right = ok.every((c) => chosen.has(c)) && chosen.size === ok.length;
+    const extra = [...chosen].filter((c) => !ok.includes(c)), miss = ok.filter((c) => !chosen.has(c));
+    solved = right; pl.redraw();
+    msg.className = "eq-msg " + (right ? "ok" : "bad");
+    msg.innerHTML = right ? `맞습니다. 반력 3개, 평형 방정식 3개 → 정정입니다. 그림의 값은 CB.frame으로 푼 실제 반력입니다.` :
+      `${miss.length ? `빠진 반력: ${miss.join(", ")}. ` : ""}${extra.length ? `없어야 할 반력: ${extra.join(", ")} (그 지점은 그 방향을 막지 않거나, 지점이 아닌 자유단입니다).` : ""}`;
+  });
+  document.getElementById("eq-f-clr").addEventListener("click", () => { chosen.clear(); solved = false; buildCands(); pl.redraw(); msg.className = "eq-msg"; msg.textContent = "지점 기호를 지운 자리에 필요한 반력을 골라 넣고 '확인'을 누르세요."; });
+})();
+
+/* ---------- 4. 경사 하중과 반력 ---------- */
+(function () {
+  const L = 8, S = 20; // 한 칸 = 20 kN
+  const app = { x: 3, y: 0, lock: "y", snap: 0.1, constrain: (p) => { p.x = CB.clamp(p.x, 0.2, L - 0.2); } };
+  const tail = { x: 3 - 1.25, y: 2.165, snap: 0.05 };
+  let vec = [app.x - tail.x, app.y - tail.y], r;
+  const bsup = CB.seg("eq-r-b", go);
+  document.getElementById("eq-r-ex").addEventListener("click", () => { app.x = 3; vec = [50 * Math.cos(Math.PI / 3) / S, -50 * Math.sin(Math.PI / 3) / S]; tail.x = app.x - vec[0]; tail.y = -vec[1]; go(); });
+  function solve() {
+    const P = [vec[0] * S, vec[1] * S];
+    r = CB.frame({ nodes: [[0, 0], [L, 0]], members: [{ i: 0, j: 1 }], E: 2e8, A: 0.01, I: 1e-4, supports: { 0: "pin", 1: bsup() }, memberLoads: [{ member: 0, P, a: app.x }] });
+  }
+  solve();
+  const pl = CB.plane("#eq-cv-re", {
+    x: [-1.4, L + 1.4], y: [-2.3, 3.4], grid: true, gridStep: 1, axes: false, aspect: (W) => (W < 520 ? 0.72 : 0.5), minHeight: 230, maxHeight: 380, points: [tail, app],
+    draw(P, api) {
+      const pal = P.P;
+      tail.color = pal.accent2; app.color = pal.text; app.r = 6;
+      if (r.ok) CB.drawFrame(P, r, { loads: false, reactions: true, reactionPx: 36 });
+      P.arrow(tail.x, tail.y, app.x, app.y, { color: pal.accent2, width: 3.2 });
+      const m = Math.hypot(vec[0], vec[1]) * S;
+      P.text(`${CB.num(m, 1)} kN`, tail.x, tail.y, { color: pal.accent2, bold: true, dx: 14, dy: -14 });
+      P.text("A", 0, 0, { color: pal.dim, dx: -16, dy: -12, bold: true }); P.text("B", L, 0, { color: pal.dim, dx: 10, dy: -12, bold: true });
+    },
+    onDrag(p) {
+      if (p === app) { tail.x = app.x - vec[0]; tail.y = -vec[1]; }
+      else { if (tail.y < 0.25) tail.y = 0.25; vec = [app.x - tail.x, app.y - tail.y]; }
+      go(false);
+    },
+  });
+  function go() {
+    solve(); pl.redraw();
+    const P = [vec[0] * S, vec[1] * S], m = Math.hypot(...P), ang = EQX.deg(Math.atan2(-P[1], P[0]));
+    CB.stat("eq-r-p", `${CB.num(m, 1)} kN, 수평에서 ${CB.num(ang, 0)}° 아래`);
+    if (!r.ok) return;
+    const A = r.reactions[0], B = r.reactions[1];
+    CB.stat("eq-r-a", `${CB.num(A[0], 2)}, ${CB.num(A[1], 2)}`); CB.stat("eq-r-bv", `${CB.num(B[0], 2)}, ${CB.num(B[1], 2)}`);
+    const msg = document.getElementById("eq-r-msg");
+    msg.className = "eq-msg";
+    msg.innerHTML = bsup() === "roller" ? `ΣM<sub>A</sub> = 0 → B<sub>y</sub> = ${CB.num(-P[1], 2)} × ${app.x.toFixed(1)} / 8 = <b>${CB.num(B[1], 2)} kN</b> · ΣF<sub>x</sub> = 0 → A<sub>x</sub> = −P<sub>x</sub> = <b>${CB.num(A[0], 2)} kN</b>` :
+      `B도 핀: 수평 반력 −P<sub>x</sub> = ${CB.num(-P[0], 1)} kN을 A ${CB.num(A[0], 1)}, B ${CB.num(B[0], 1)}로 나눕니다. 이 나눔은 평형이 아니라 보의 늘어남(적합 조건)으로 정해졌습니다 → 1차 부정정.`;
+  }
+  go();
+})();
+
+/* ---------- 5. 지점을 바꿔 판별하기 ---------- */
+(function () {
+  const L = 8, sa = CB.seg("eq-s-a", go), sb = CB.seg("eq-s-b", go), hg = CB.check("eq-s-h", go);
+  const CNT = { none: 0, roller: 1, rollerV: 1, pin: 2, fixed: 3 };
+  let r, verdict = "";
+  function solve() {
+    const supports = {}; if (sa() !== "none") supports[0] = sa(); if (sb() !== "none") supports[2] = sb();
+    r = CB.frame({ nodes: [[0, 0], [L / 2, 0], [L, 0]], members: [{ i: 0, j: 1, hinge: [false, hg()] }, { i: 1, j: 2 }], E: 2e8, A: 0.01, I: 1e-4, supports, memberLoads: [{ member: 0, w: [0, -10] }, { member: 1, w: [0, -10] }] });
+  }
+  solve();
+  const pl = CB.plane("#eq-cv-stab", { x: [-1.6, L + 1.6], y: [-2.2, 2.2], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.62 : 0.4), minHeight: 200, maxHeight: 300,
+    draw(P) {
+      const pal = P.P, ctx = P.ctx;
+      if (r.ok) CB.drawFrame(P, r, { reactions: true, loadPx: 26, loadLabels: false, reactionPx: 30 });
+      else {
+        ctx.save(); ctx.globalAlpha = 0.9; CB.drawFrame(P, r, { loadPx: 26, loadLabels: false, memberColor: () => pal.bad }); ctx.restore();
+        const ux = (sa() === "pin" || sa() === "fixed" ? 1 : 0) + (sb() === "pin" || sb() === "fixed" || sb() === "rollerV" ? 1 : 0);
+        const hint = ux === 0 ? "옆으로 미끄러짐" : hg() ? "힌지에서 꺾임 또는 회전" : "지점 둘레로 회전";
+        EQX.text(ctx, `기구(mechanism): ${hint}`, P.X(L / 2), P.Y(1.65), pal.bad, { mono: false, size: 13 });
+        if (ux === 0) EQX.arrow(ctx, P.X(L / 2) - 50, P.Y(0.9), P.X(L / 2) + 50, P.Y(0.9), pal.bad, 2.4);
+      }
+    } });
+  function go() {
+    solve(); pl.redraw();
+    const rr = CNT[sa()] + CNT[sb()], c = hg() ? 1 : 0, eqn = 3 + c, deg = rr - eqn;
+    CB.stat("eq-s-r", String(rr)); CB.stat("eq-s-c", String(eqn));
+    const msg = document.getElementById("eq-s-msg");
+    if (!r.ok) { verdict = deg < 0 ? "불안정(개수 부족)" : "불안정(기하학적)"; msg.className = "eq-msg bad"; msg.innerHTML = deg < 0 ? `반력 ${rr}개 < 조건식 ${eqn}개: 움직임을 다 막지 못합니다.` : `반력은 ${rr}개로 충분하지만 배치가 나빠 기구가 됩니다. 반력의 작용선이 한 점에 모이거나 모두 평행하지 않은지 보세요.`; }
+    else { verdict = deg === 0 ? "정정" : `${deg}차 부정정`; msg.className = "eq-msg ok"; msg.innerHTML = deg === 0 ? "평형 방정식만으로 반력이 정해집니다. 그림의 반력은 그 값입니다." : `반력이 ${deg}개 남습니다. 그림의 반력은 부재 강성까지 써서(CB.frame) 구한 값으로, 평형만으로는 정해지지 않습니다.`; }
+    CB.stat("eq-s-v", verdict);
+  }
+  go();
+})();
+
+/* ---------- 6. 타워크레인 ---------- */
+(function () {
+  const a = 3, Wm = 400, Wj = 60, xj = 25, Wk = 30, xk = -8, xc = -10, FSreq = 1.5;
+  const gW = CB.range("eq-c-w", (v) => v + " kN", go), gR = CB.range("eq-c-r", (v) => v + " m", go), gC = CB.range("eq-c-c", (v) => v + " kN", go);
+  const Mres = (Wc) => Wm * a + Wk * (a - xk) + Wc * (a - xc);
+  const allow = (r, Wc) => Math.max(0, (Mres(Wc) / FSreq - Wj * (xj - a)) / (r - a));
+  const fsF = (W, r, Wc) => Mres(Wc) / (Wj * (xj - a) + W * (r - a));
+  const fsB = (Wc) => (Wm * a + Wj * (xj + a)) / Math.max(1e-9, Wc * (-xc - a) + Wk * (-xk - a));
+  const cv = CB.canvas("#eq-cv-cr", (ctx, W, H) => {
+    const P = CB.palette(), Wl = gW(), r = gR(), Wc = gC(), fs = fsF(Wl, r, Wc), fb = fsB(Wc);
+    const x0 = -14, x1 = 48, s = (W - 30) / (x1 - x0), X = (x) => 15 + (x - x0) * s, gy = H - 30, zs = Math.min(s * 0.62, (gy - 36) / 42), Z = (z) => gy - z * zs;
+    const tilt = fs < 1 ? 0.06 : fb < 1 ? -0.06 : 0, pivot = fs < 1 ? a : -a;
+    ctx.save();
+    ctx.fillStyle = CB.color("accent-2-soft"); ctx.fillRect(0, gy, W, H - gy);
+    ctx.translate(X(pivot), gy); ctx.rotate(-tilt); ctx.translate(-X(pivot), -gy);
+    ctx.fillStyle = P.surface; ctx.strokeStyle = P.text; ctx.lineWidth = 1.5;
+    ctx.fillRect(X(-a), gy - 14, 2 * a * s, 14); ctx.strokeRect(X(-a), gy - 14, 2 * a * s, 14);
+    const mastTop = Z(42);
+    ctx.fillStyle = P.elev; ctx.fillRect(X(-0.8), mastTop, 1.6 * s, gy - 14 - mastTop); ctx.strokeRect(X(-0.8), mastTop, 1.6 * s, gy - 14 - mastTop);
+    ctx.beginPath(); for (let z = mastTop; z < gy - 20; z += 14) { ctx.moveTo(X(-0.8), z); ctx.lineTo(X(0.8), z + 14); } ctx.stroke();
+    ctx.fillStyle = P.elev; ctx.fillRect(X(-12), mastTop - 6, (45.5 + 12) * s, 6); ctx.strokeRect(X(-12), mastTop - 6, (45.5 + 12) * s, 6);
+    ctx.fillStyle = P.surface; const cwH = Math.max(6, (Wc / 400) * 42); ctx.fillRect(X(xc) - 14, mastTop, 28, cwH); ctx.strokeRect(X(xc) - 14, mastTop, 28, cwH);
+    ctx.strokeStyle = P.dim; ctx.beginPath(); ctx.moveTo(X(r), mastTop); ctx.lineTo(X(r), mastTop + 70); ctx.stroke();
+    const lh = 10 + Math.min(30, (Wl / 200) * 30); ctx.fillStyle = CB.color("accent-2-soft"); ctx.strokeStyle = P.accent2; ctx.fillRect(X(r) - 14, mastTop + 70, 28, lh); ctx.strokeRect(X(r) - 14, mastTop + 70, 28, lh);
+    ctx.restore();
+    EQX.text(ctx, `W = ${Wl} kN`, X(r), mastTop + 70 + lh + 12, P.accent2, { size: 11.5 });
+    EQX.text(ctx, `W_c = ${Wc} kN`, X(xc), mastTop + cwH + 14, P.text, { size: 11 });
+    ctx.fillStyle = P.bad; ctx.beginPath(); ctx.arc(X(a), gy, 4, 0, 7); ctx.fill(); ctx.fillStyle = P.warn; ctx.beginPath(); ctx.arc(X(-a), gy, 4, 0, 7); ctx.fill();
+    if (fs < 1 || fb < 1) EQX.text(ctx, fs < 1 ? "앞으로 넘어집니다!" : "뒤로 넘어집니다!", W / 2, 18, P.bad, { mono: false, size: 14 });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 220, maxHeight: 340 });
+  const ch = CB.canvas("#eq-cv-cr2", (ctx, W, H) => {
+    const P = CB.palette(), Wc = gC(), data = [];
+    for (let r = 6; r <= 45; r += 0.5) data.push([r, allow(r, Wc)]);
+    const c = CB.chart(ctx, null, { x: [6, 45], y: [0, Math.max(60, Math.min(600, allow(6, Wc) * 1.05))], xLabel: "작업 반경 r (m)", yLabel: "허용 W (kN)", series: [{ data, color: P.accent, width: 2.4, fill: CB.color("accent-soft") }], points: [{ x: gR(), y: gW(), color: fsF(gW(), gR(), Wc) >= FSreq ? P.ok : P.bad, r: 6 }] });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.36), minHeight: 190, maxHeight: 280 });
+  function go() {
+    cv.redraw(); ch.redraw();
+    const Wl = gW(), r = gR(), Wc = gC(), fs = fsF(Wl, r, Wc), fb = fsB(Wc);
+    CB.stat("eq-c-ff", fs.toFixed(2)); CB.stat("eq-c-fb", fb > 99 ? "∞" : fb.toFixed(2)); CB.stat("eq-c-al", `${CB.num(allow(r, Wc), 1)} kN`);
+    const msg = document.getElementById("eq-c-msg");
+    const ok = fs >= FSreq && fb >= FSreq;
+    msg.className = "eq-msg " + (ok ? "ok" : "bad");
+    msg.innerHTML = ok ? `안전: 앞쪽 FS ${fs.toFixed(2)} ≥ 1.5, 무부하 뒤쪽 FS ${fb.toFixed(2)} ≥ 1.5` : fs < FSreq ? `앞쪽 FS ${fs.toFixed(2)} < 1.5: 하중을 줄이거나 반경을 줄이세요.` : `무부하 뒤쪽 FS ${fb.toFixed(2)} < 1.5: 균형추가 너무 무겁습니다.`;
+  }
+  go();
+})();
+
+/* ---------- 7. 옹벽 ---------- */
+(function () {
+  const gc = 24, gs = 18, mu = 0.5;
+  const gH = CB.range("eq-l-h", (v) => v.toFixed(1) + " m", go), gB = CB.range("eq-l-b", (v) => v.toFixed(2) + " m", go), gK = CB.range("eq-l-k", (v) => v.toFixed(2), go);
+  const calc = () => { const H = gH(), B = gB(), K = gK(), W = gc * H * B, P = 0.5 * K * gs * H * H, Mr = W * B / 2, Mo = P * H / 3; return { H, B, K, W, P, Mr, Mo, fo: Mr / Mo, fs: (mu * W) / P, xr: (Mr - Mo) / W }; };
+  const cv = CB.canvas("#eq-cv-wall", (ctx, W, Hc) => {
+    const P = CB.palette(), c = calc(), s = Math.min((W - 80) / 9, (Hc - 50) / 6.6), gy = Hc - 30, x0 = W * 0.36;
+    const X = (x) => x0 + x * s, Y = (y) => gy - y * s;
+    ctx.save();
+    // 흙(뒤쪽) — 벽 뒷면은 x = B
+    ctx.fillStyle = CB.color("accent-2-soft"); ctx.fillRect(X(c.B), Y(c.H), W - X(c.B), c.H * s); ctx.fillRect(0, gy, W, Hc - gy);
+    ctx.fillStyle = P.surface; ctx.strokeStyle = P.text; ctx.lineWidth = 1.6; ctx.fillRect(X(0), Y(c.H), c.B * s, c.H * s); ctx.strokeRect(X(0), Y(c.H), c.B * s, c.H * s);
+    // 토압 삼각형(벽 뒷면에)
+    const pmax = c.K * gs * c.H, ps = Math.min(60, 40 + c.H * 2) / Math.max(1e-9, pmax) * 1;
+    ctx.fillStyle = CB.color("accent-soft"); ctx.strokeStyle = P.accent; ctx.beginPath(); ctx.moveTo(X(c.B), Y(c.H)); ctx.lineTo(X(c.B) + pmax * ps, Y(0)); ctx.lineTo(X(c.B), Y(0)); ctx.closePath(); ctx.fill(); ctx.stroke();
+    for (let k = 1; k <= 5; k++) { const z = (c.H * k) / 6, p = c.K * gs * (c.H - z); EQX.arrow(ctx, X(c.B) + p * ps, Y(z), X(c.B) + 2, Y(z), P.accent, 1.2, 6); }
+    // 합력
+    EQX.arrow(ctx, X(c.B) + pmax * ps + 30, Y(c.H / 3), X(c.B) + 4, Y(c.H / 3), P.accent2, 3, 10);
+    EQX.text(ctx, `P = ${CB.num(c.P, 1)} kN`, X(c.B) + pmax * ps + 34, Y(c.H / 3) - 14, P.accent2, { align: "left", size: 11.5 });
+    EQX.arrow(ctx, X(c.B / 2), Y(c.H / 2) - 20, X(c.B / 2), Y(c.H / 2) + 30, P.text, 3, 10);
+    EQX.text(ctx, `W = ${CB.num(c.W, 0)} kN`, X(c.B / 2), Y(c.H / 2) - 32, P.text, { size: 11.5 });
+    // 앞굽과 바닥 합력 위치, 가운데 1/3
+    ctx.fillStyle = P.bad; ctx.beginPath(); ctx.arc(X(0), gy, 4.5, 0, 7); ctx.fill(); EQX.text(ctx, "앞굽", X(0) - 18, gy + 14, P.bad, { size: 11, mono: false });
+    ctx.strokeStyle = P.ok; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(X(c.B / 3), gy + 4); ctx.lineTo(X((2 * c.B) / 3), gy + 4); ctx.stroke();
+    const inside = c.xr >= c.B / 3 && c.xr <= (2 * c.B) / 3;
+    if (c.xr > -c.B && c.xr < 2 * c.B) { ctx.fillStyle = inside ? P.ok : P.bad; ctx.beginPath(); ctx.moveTo(X(c.xr), gy + 6); ctx.lineTo(X(c.xr) - 6, gy + 16); ctx.lineTo(X(c.xr) + 6, gy + 16); ctx.closePath(); ctx.fill(); }
+    EQX.text(ctx, "가운데 1/3", X(c.B / 2), gy + 24, P.ok, { size: 10.5, mono: false });
+    ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.52), minHeight: 260, maxHeight: 400 });
+  function go() {
+    cv.redraw();
+    const c = calc();
+    CB.stat("eq-l-fo", c.fo.toFixed(2)); CB.stat("eq-l-fs", c.fs.toFixed(2)); CB.stat("eq-l-x", `${CB.num(c.xr, 2)} m / B ${c.B.toFixed(2)} m`);
+    const msg = document.getElementById("eq-l-msg"), ok = c.fo >= 2 && c.fs >= 1.5;
+    msg.className = "eq-msg " + (ok ? "ok" : "bad");
+    msg.innerHTML = `전도: M<sub>r</sub> = ${CB.num(c.Mr, 1)}, M<sub>o</sub> = ${CB.num(c.Mo, 1)} kN·m → FS ${c.fo.toFixed(2)} ${c.fo >= 2 ? "≥" : "<"} 2.0 · 활동: ${mu} × ${CB.num(c.W, 0)} / ${CB.num(c.P, 1)} = ${c.fs.toFixed(2)} ${c.fs >= 1.5 ? "≥" : "<"} 1.5` + (c.xr < c.B / 3 ? " · 바닥 합력이 가운데 1/3 밖(앞굽 쪽): 뒤쪽 바닥이 들뜹니다." : "");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>보의 처짐 · MechanicsBook</title>
+<meta name="description" content="튼튼해도 처지면 못 쓴다. 곡률과 탄성 곡선 방정식 EI v″ = M, 이중 적분법과 경계 조건, 모멘트-면적법, 공액보법, 중첩법과 처짐 공식표, 처짐 제한과 경간·춤의 영향, 기준 건물 B-10 큰보의 처짐까지 하중을 바꾸며 직접 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .df-stack { display: grid; grid-template-columns: 1fr; }
+  .df-stack > div { position: relative; min-width: 0; }
+  .df-stack > div + div { border-top: 1px solid var(--border); }
+  .df-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .df-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .df-msg b { color: var(--text); }
+  .df-msg.ok { color: var(--ok); font-weight: 600; }
+  .df-msg.bad { color: var(--bad); font-weight: 600; }
+  .df-legend { display: flex; flex-wrap: wrap; gap: 4px 2px; padding: 8px 18px; border-top: 1px solid var(--border); }
+  .df-tbl td, .df-tbl th { font-variant-numeric: tabular-nums; }
+  .df-tbl td:nth-child(2), .df-tbl td:nth-child(3) { white-space: nowrap; }
+  .df-lab { font-style: normal; }
+  .df-sw { display: inline-block; width: 14px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="mechanics"></script>
+</head>
+<body data-chapter="deflection">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="df-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="df-ah-int" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text)"/></marker>
+      <marker id="df-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="df-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 11</div>
+    <h1 data-no-glossary>보의 처짐</h1>
+    <p class="lead">보가 부러지지 않는다고 해서 쓸 수 있는 보는 아닙니다. 바닥이 몇 센티미터만 내려앉아도 그 위의 칸막이벽에 금이 가고, 문이 끼어 닫히지 않으며, 평지붕에는 빗물이 고입니다. 사람이 걸을 때마다 출렁이는 바닥은 아무리 튼튼해도 불안합니다. 그래서 구조 설계는 강도와 함께 <b>강성</b>, 곧 얼마나 덜 휘는가를 따로 확인합니다. 이 장에서는 4장의 휨모멘트도에서 출발합니다. 휨모멘트를 휨 강성 \(EI\)로 나누면 보가 얼마나 굽는지(곡률)가 나오고, 곡률을 두 번 적분하면 처짐 곡선이 나옵니다. 이 한 줄의 관계를 손으로 푸는 네 가지 방법(이중 적분법, 모멘트-면적법, 공액보법, 중첩법)을 차례로 익히고, 경간과 춤이 처짐을 얼마나 크게 바꾸는지 직접 확인합니다.</p>
+    <ul class="objectives">
+      <li>곡률 \(\kappa = M/EI\)를 평면 유지 가정에서 유도하고, 탄성 곡선 방정식 \(EI\,v'' = M\)의 부호와 가정을 설명한다.</li>
+      <li>이중 적분법으로 단순보·캔틸레버의 처짐 곡선을 구하고, 경계 조건과 연속 조건으로 적분 상수를 정한다.</li>
+      <li>모멘트-면적법의 두 정리로 기울기 변화와 접선 편차를 구한다.</li>
+      <li>공액보의 지점 변환을 알고, 공액보의 전단력과 휨모멘트로 실제 보의 기울기와 처짐을 구한다.</li>
+      <li>처짐 공식표와 중첩법으로 여러 하중이 걸린 보와 양단 고정보의 처짐을 구한다.</li>
+      <li>흔히 쓰는 처짐 제한(L/360 등)으로 사용성을 검토하고, 경간 \(L^4\)·춤 \(h^3\)의 영향을 수치로 설명한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>무너지지는 않지만 쓸 수 없는 건물</b></div>
+      <div class="o-body"><p>보가 하중을 받아 어떤 곡선으로 휘는지는 18세기 수학자들의 큰 숙제였습니다. 야코프 베르누이는 휜 막대의 곡률이 그 단면의 휨모멘트에 비례한다는 생각을 내놓았고, 오일러는 이 관계로 여러 지지 조건의 탄성 곡선을 풀었습니다. 오늘날 공학에서 쓰는 '오일러–베르누이 보 이론'이 이 장의 출발점입니다.</p>
+        <p>처짐과 흔들림은 지금도 구조물이 사용자에게 외면받는 흔한 이유입니다. 2000년 6월 런던 밀레니엄 브리지는 개통 직후 보행자들의 걸음에 다리가 옆으로 흔들려 이틀 만에 닫혔고, 감쇠 장치를 단 뒤 2002년에 다시 열렸습니다. 다리는 안전했지만 사람들이 건널 수 없었습니다. 강도만큼이나 "얼마나 휘고 흔들리는가"를 계산해야 하는 이유입니다.</p>
+        <div class="o-chain"><span>휨모멘트도</span><i>→</i><span>곡률 M/EI</span><i>→</i><span class="tool">처짐 곡선 v(x)</span><i>→</i><span>사용성 검토·부정정 해석</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="why">
+    <h2>처짐은 왜 중요한가</h2>
+    <div class="problem"><strong>금이 간 칸막이벽</strong>
+      <p>새로 지은 사무실 바닥 위에 벽돌 칸막이벽을 쌓았더니 몇 달 뒤 벽 가운데에 대각선 금이 갔습니다. 바닥 슬래브와 보는 계산대로 강도를 충분히 갖췄습니다. 무엇을 놓쳤을까요?</p></div>
+    <p>보가 처지면 그 위에 얹힌 것들도 함께 끌려 내려갑니다. 칸막이벽, 유리창, 마감재처럼 변형을 잘 견디지 못하는 <span class="term">비구조 요소</span><span class="en">(nonstructural element)</span>는 보보다 먼저 손상됩니다. 처짐이 일으키는 문제는 크게 네 가지입니다.</p>
+    <ul>
+      <li><b>손상</b>: 칸막이벽·마감·창호의 균열, 문과 창의 끼임, 배관 이음의 파손.</li>
+      <li><b>기능</b>: 바닥의 기울어짐, 기계 장비의 정렬 불량, 평지붕의 물고임(물이 고이면 무게가 늘어 더 처지고, 더 처지면 물이 더 고인다).</li>
+      <li><b>외관과 불안감</b>: 눈에 보이는 처짐은 구조가 안전해도 사용자를 불안하게 한다.</li>
+      <li><b>진동</b>: 강성이 낮은 바닥과 다리는 고유 진동수가 낮아 걸음이나 기계에 쉽게 흔들린다.</li>
+    </ul>
+    <figure class="diagram" id="fig-df-why">
+      <svg viewBox="0 0 760 290" role="img" aria-label="처진 보 위의 칸막이벽 균열과 평지붕 물고임">
+        <rect x="10" y="10" width="740" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(30,0)">
+          <text x="170" y="36" text-anchor="middle" class="t" style="font-weight:700">(a) 칸막이벽의 균열</text>
+          <rect x="70" y="70" width="200" height="88" class="f-elev" style="stroke:var(--text-dim)"/>
+          <path d="M150 90L166 112L158 126L176 148" style="fill:none;stroke:var(--bad);stroke-width:2"/>
+          <path d="M40 168Q170 196 300 168" style="fill:none;stroke:var(--text);stroke-width:6;stroke-linecap:round"/>
+          <path d="M40 168H300" style="stroke:var(--text-dim);stroke-width:1.2;stroke-dasharray:5 4"/>
+          <path d="M40 168l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M300 168l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="170" y1="168" x2="170" y2="182" style="stroke:var(--accent);stroke-width:1.6" marker-end="url(#df-ah-acc)"/>
+          <text x="184" y="194" class="t-mono" style="fill:var(--accent)">δ</text>
+          <text x="170" y="226" text-anchor="middle" class="t-dim">벽 아래가 처지면 벽 속에 인장이 생겨 금이 간다</text>
+          <text x="170" y="246" text-anchor="middle" class="t-dim">(벽은 보보다 훨씬 작은 변형에도 갈라진다)</text>
+        </g>
+        <g transform="translate(400,0)">
+          <text x="160" y="36" text-anchor="middle" class="t" style="font-weight:700">(b) 평지붕의 물고임</text>
+          <path d="M30 120Q160 158 290 120" style="fill:none;stroke:var(--text);stroke-width:6;stroke-linecap:round"/>
+          <path d="M78 132Q160 156 242 132Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4"/>
+          <path d="M30 120l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M290 120l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <text x="160" y="104" text-anchor="middle" class="t-mono" style="fill:var(--accent)">고인 물</text>
+          <g transform="translate(40,184)">
+            <rect x="0" y="0" width="70" height="26" rx="6" class="f-elev"/><text x="35" y="17" text-anchor="middle" class="t-dim">처짐</text>
+            <rect x="96" y="0" width="70" height="26" rx="6" class="f-elev"/><text x="131" y="17" text-anchor="middle" class="t-dim">물 고임</text>
+            <rect x="192" y="0" width="70" height="26" rx="6" class="f-elev"/><text x="227" y="17" text-anchor="middle" class="t-dim">하중 증가</text>
+            <line x1="72" y1="13" x2="92" y2="13" class="s-line" marker-end="url(#df-ah-dim)"/><line x1="168" y1="13" x2="188" y2="13" class="s-line" marker-end="url(#df-ah-dim)"/>
+            <path d="M227 28Q131 70 35 28" style="fill:none;stroke:var(--bad);stroke-width:1.4" marker-end="url(#df-ah-dim)"/>
+            <text x="131" y="66" text-anchor="middle" class="t-mono" style="fill:var(--bad)">되먹임</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-1.</b> 처짐이 일으키는 사용성 문제. (a) 보가 처지면 강성이 높은 벽이 그 변형을 따라가지 못해 갈라진다. (b) 평지붕이 처지면 물이 고이고, 고인 물의 무게가 처짐을 더 키우는 되먹임이 생긴다.</figcaption>
+    </figure>
+    <p>처짐을 정하는 것은 하중과 경간, 그리고 부재의 <span class="term">휨 강성</span><span class="en">(flexural rigidity)</span> \(EI\)입니다. \(E\)는 재료가, \(I\)는 단면의 모양이 정합니다(8장). 아래 시뮬레이터에서 지점과 하중, 단면을 바꿔 보세요. 휨모멘트도 아래에 처짐도가 함께 그려지고, 위 그림의 변형은 눈에 보이도록 과장해서 그렸습니다.</p>
+    <div class="sim" id="sim-df-curve">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>하중·지점·단면을 바꾸면 처짐 곡선은</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view df-stack">
+          <div><canvas id="df-cv-curve" aria-label="보와 과장된 처짐 곡선"></canvas><span class="df-cap">변형은 과장해서 그림</span></div>
+          <div><canvas id="df-cv-curve-d" aria-label="휨모멘트도와 처짐도"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>지점</span><div class="seg" id="df-c-sup"><button data-value="simple" class="on">단순보</button><button data-value="cant">캔틸레버</button><button data-value="prop">1단 고정</button><button data-value="fixed">양단 고정</button></div></div>
+          <div class="ctrl"><span>하중</span><div class="seg" id="df-c-load"><button data-value="udl" class="on">등분포 w</button><button data-value="pt">집중 P</button></div></div>
+          <label class="ctrl"><span>w <output id="df-c-w-out"></output></span><input type="range" id="df-c-w" min="0" max="100" step="1" value="40"></label>
+          <label class="ctrl"><span>P <output id="df-c-p-out"></output></span><input type="range" id="df-c-p" min="0" max="400" step="10" value="150"></label>
+          <label class="ctrl"><span>P의 위치 a <output id="df-c-a-out"></output></span><input type="range" id="df-c-a" min="0.5" max="8" step="0.1" value="4"></label>
+          <label class="ctrl"><span>단면</span><select id="df-c-sec"><option value="g1">RC 400×700 (B-10 G1)</option><option value="rc36">RC 300×600</option><option value="h600">H-600×200×11×17</option><option value="h400">H-400×200×8×13</option></select></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 처짐 δ</span><span class="v" id="df-c-d">—</span></div>
+        <div class="stat"><span class="k">L/δ</span><span class="v" id="df-c-ld">—</span></div>
+        <div class="stat"><span class="k">EI</span><span class="v" id="df-c-ei">—</span></div>
+        <div class="stat"><span class="k">끝 기울기 |θ|<sub>max</sub></span><span class="v" id="df-c-th">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 같은 하중에서 지점을 단순보 → 양단 고정으로 바꾸면 처짐이 1/5이 되는지 보세요 · 처짐이 가장 큰 곳과 휨모멘트가 0인 곳(반곡점)을 비교하세요 · 모델: 경간 8 m, 강성법(CB.beam)으로 계산한 탄성 처짐. 콘크리트 단면은 균열 전 총단면(E<sub>c</sub> = 27,500 MPa), 강재는 E = 210,000 MPa.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="elastic-curve">
+    <h2>곡률과 탄성 곡선 방정식</h2>
+    <p>휨모멘트를 받은 보의 짧은 조각을 보면, 평면이던 두 단면이 서로 기울어져 조각이 원호처럼 굽습니다(그림 11-2). 이 원호의 반지름 \(\rho\)를 <span class="term">곡률 반지름</span>, 그 역수 \(\kappa = 1/\rho\)를 <span class="term">곡률</span><span class="en">(curvature)</span>이라 합니다. 9장의 휨 이론에서 쓰는 가정, 곧 <b>휜 뒤에도 단면은 평면으로 남는다</b>는 가정 아래에서 중립축에서 \(y\)만큼 떨어진 섬유의 변형률은</p>
+    <div class="formula">$$\varepsilon(y) = -\frac{y}{\rho} = -\kappa\,y$$<div class="where">\(y\)는 중립축에서 위쪽이 \(+\). 새깅(\(\kappa \gt 0\))이면 아래 섬유(\(y \lt 0\))가 늘어나고 위 섬유가 줄어든다.</div></div>
+    <p>훅의 법칙 \(\sigma = E\varepsilon\)로 응력을 구하고, 단면 전체의 응력이 만드는 모멘트를 더하면 \(M = -\int \sigma y\,dA = E\kappa\int y^2\,dA = E I \kappa\)입니다. 휨모멘트가 클수록, 휨 강성이 작을수록 보는 더 많이 굽습니다.</p>
+    <figure class="diagram" id="fig-df-curvature">
+      <svg viewBox="0 0 760 300" role="img" aria-label="휨을 받아 원호로 굽은 보 조각과 곡률 반지름, 섬유 변형률 분포">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <g>
+          <line x1="270" y1="40" x2="169.1" y2="229.8" style="stroke:var(--text-dim);stroke-width:1.2;stroke-dasharray:4 4"/>
+          <line x1="270" y1="40" x2="370.9" y2="229.8" style="stroke:var(--text-dim);stroke-width:1.2;stroke-dasharray:4 4"/>
+          <path d="M192.5 185.7A165 165 0 0 0 347.5 185.7L370.9 229.8A215 215 0 0 1 169.1 229.8Z" class="f-acc-soft"/>
+          <path d="M180.8 207.8A190 190 0 0 0 359.2 207.8" style="fill:none;stroke:var(--text);stroke-width:1.4;stroke-dasharray:7 4"/>
+          <circle cx="270" cy="40" r="4" style="fill:var(--text)"/><text x="282" y="44" class="t-mono">곡률 중심 O</text>
+          <text x="208" y="118" class="t-acc">ρ</text>
+          <text x="374" y="210" class="t-mono">중립축</text>
+          <text x="270" y="176" text-anchor="middle" class="t-dim" style="fill:var(--compression)">위 섬유: 줄어듦(압축)</text>
+          <text x="270" y="280" text-anchor="middle" class="t-dim" style="fill:var(--tension)">아래 섬유: 늘어남(인장)</text>
+          <text x="110" y="232" text-anchor="middle" class="t-dim">M</text><text x="430" y="232" text-anchor="middle" class="t-dim">M</text>
+          <path d="M146 214A18 18 0 1 1 146 250" style="fill:none;stroke:var(--accent);stroke-width:2" marker-end="url(#df-ah-acc)"/>
+          <path d="M394 214A18 18 0 1 0 394 250" style="fill:none;stroke:var(--accent);stroke-width:2" marker-end="url(#df-ah-acc)"/>
+        </g>
+        <g transform="translate(500,40)">
+          <text x="110" y="10" text-anchor="middle" class="t" style="font-weight:700">단면의 변형률 ε = −κy</text>
+          <line x1="110" y1="30" x2="110" y2="210" class="s-axis"/>
+          <line x1="40" y1="120" x2="200" y2="120" class="s-axis"/>
+          <path d="M110 30L60 30L160 210L110 210Z" style="fill:none"/>
+          <path d="M110 30H62L110 120Z" style="fill:var(--compression);opacity:.25"/>
+          <path d="M110 210H158L110 120Z" style="fill:var(--tension);opacity:.25"/>
+          <line x1="62" y1="30" x2="158" y2="210" style="stroke:var(--text);stroke-width:2"/>
+          <text x="56" y="26" text-anchor="end" class="t-mono" style="fill:var(--compression)">−</text><text x="164" y="214" class="t-mono" style="fill:var(--tension)">+</text>
+          <text x="204" y="124" class="t-mono">ε</text><text x="118" y="44" class="t-mono">y</text>
+          <text x="110" y="240" text-anchor="middle" class="t-dim">중립축에서 0, 거리에 비례</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-2.</b> 양(+)의 휨모멘트(왼쪽 면 시계, 오른쪽 면 반시계)를 받아 아래로 볼록하게 굽은 보 조각. 곡률 중심은 보 위쪽에 있고, 곡률 반지름 ρ가 작을수록 많이 굽은 것이다. 단면이 평면으로 남으면 섬유 변형률은 중립축에서의 거리 y에 비례한다.</figcaption>
+    </figure>
+    <p>이제 보의 축을 따라 처짐 \(v(x)\)(위쪽 \(+\))를 정의합니다. 곡선 \(v(x)\)의 곡률은 정확히는 \(v''/(1+v'^2)^{3/2}\)이지만, 건물과 다리의 보에서 기울기 \(v'\)는 1/100 rad 정도라 \(v'^2\)는 1보다 훨씬 작습니다. 그래서 \(\kappa \approx v''\)로 둡니다.</p>
+    <div class="callout def"><strong>원리 11.1 (탄성 곡선 방정식)</strong> 선형 탄성 재료로 된 곧은 보가 작은 변형을 할 때, 처짐 곡선 \(v(x)\)(위쪽 \(+\))는
+      <div class="formula">$$EI\,\frac{d^2 v}{dx^2} = M(x)$$</div>
+      를 만족한다. 이 곡선을 <span class="term">탄성 곡선</span><span class="en">(elastic curve)</span>이라 한다. \(\theta = dv/dx\)는 처짐각(기울기, rad)이다. 4장의 관계 \(dM/dx = V\), \(dV/dx = -w\)와 합치면 \(EI\,v''' = V\), \(EI\,v'''' = -w\)이다.</div>
+    <p>이 책의 부호 규약에서는 새깅(\(M \gt 0\))이 아래로 볼록, 곧 \(v'' \gt 0\)이므로 식에 빼기 부호가 없습니다. 처짐을 아래쪽 \(+\)로 잡는 교과서는 \(EI\,v'' = -M\)으로 씁니다. 어느 쪽이든 물리는 같으니 자기 규약을 정하고 끝까지 지키면 됩니다. 이 장의 결과는 <b>처짐 크기</b> \(\delta = |v|\)로 적습니다.</p>
+    <div class="callout tip"><strong>가정을 기억하기</strong> 원리 11.1은 (1) 선형 탄성, (2) 작은 처짐과 작은 기울기, (3) 평면 유지(전단 변형 무시)를 가정합니다. 경간에 비해 춤이 큰 깊은 보(경간/춤 약 4 이하)에서는 전단 변형이 처짐에 보태지고(12장), 콘크리트 보는 균열과 크리프 때문에 \(EI\)가 시간에 따라 바뀝니다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="double-integration">
+    <h2>이중 적분법과 경계 조건</h2>
+    <p>원리 11.1은 2계 미분방정식이므로, \(M(x)\)를 알면 두 번 적분해 처짐을 얻습니다. 적분할 때마다 상수가 하나씩 생기고, 이 상수는 지점이 처짐과 기울기를 어떻게 붙잡는지, 곧 <span class="term">경계 조건</span><span class="en">(boundary condition)</span>으로 정합니다.</p>
+    <div class="formula">$$EI\,\theta(x) = \int M\,dx + C_1, \qquad EI\,v(x) = \iint M\,dx\,dx + C_1 x + C_2$$</div>
+    <figure class="diagram" id="fig-df-bc">
+      <svg viewBox="0 0 760 250" role="img" aria-label="지점별 경계 조건과 연속 조건">
+        <rect x="10" y="10" width="740" height="230" rx="10" class="f-surface"/>
+        <g transform="translate(30,30)">
+          <text x="70" y="10" text-anchor="middle" class="t" style="font-weight:700">핀·롤러</text>
+          <line x1="20" y1="70" x2="130" y2="70" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M40 70l-10 16h20z" class="f-elev" style="stroke:var(--text)"/>
+          <path d="M40 70Q85 60 130 46" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="70" y="124" text-anchor="middle" class="t-mono">v = 0</text><text x="70" y="144" text-anchor="middle" class="t-dim">θ는 자유</text><text x="70" y="164" text-anchor="middle" class="t-dim">M = 0 (끝 지점)</text>
+        </g>
+        <g transform="translate(210,30)">
+          <text x="70" y="10" text-anchor="middle" class="t" style="font-weight:700">고정단</text>
+          <rect x="18" y="40" width="10" height="60" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <line x1="28" y1="70" x2="130" y2="70" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M28 70Q90 72 130 92" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="70" y="124" text-anchor="middle" class="t-mono">v = 0, θ = 0</text><text x="70" y="144" text-anchor="middle" class="t-dim">접선이 수평으로 시작</text>
+        </g>
+        <g transform="translate(390,30)">
+          <text x="70" y="10" text-anchor="middle" class="t" style="font-weight:700">자유단</text>
+          <line x1="10" y1="70" x2="120" y2="70" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M10 70Q80 74 120 96" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="70" y="124" text-anchor="middle" class="t-mono">M = 0, V = 0</text><text x="70" y="144" text-anchor="middle" class="t-dim">(하중이 없을 때)</text><text x="70" y="164" text-anchor="middle" class="t-dim">v, θ는 미지</text>
+        </g>
+        <g transform="translate(570,30)">
+          <text x="70" y="10" text-anchor="middle" class="t" style="font-weight:700">구간의 경계</text>
+          <path d="M10 64Q70 96 130 64" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+          <line x1="70" y1="28" x2="70" y2="74" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#df-ah-load)"/>
+          <text x="70" y="124" text-anchor="middle" class="t-mono">v, θ 연속</text><text x="70" y="144" text-anchor="middle" class="t-dim">하중점에서 곡선은</text><text x="70" y="164" text-anchor="middle" class="t-dim">끊기거나 꺾이지 않는다</text>
+        </g>
+        <text x="380" y="226" text-anchor="middle" class="t-dim">미지 상수의 개수 = 구간 수 × 2 = 경계 조건 + 연속 조건의 개수</text>
+      </svg>
+      <figcaption><b>그림 11-3.</b> 경계 조건과 연속 조건. 지점은 처짐(v)이나 기울기(θ)를 붙잡고, 자유단은 힘(M, V)이 0이라는 조건을 준다. 하중이 바뀌어 구간을 나눈 점에서는 왼쪽과 오른쪽의 처짐과 기울기가 같아야 한다. 내부 힌지에서만 기울기가 꺾일 수 있다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 11.1 (등분포 하중을 받는 단순보)</strong> 경간 \(L\), 등분포 하중 \(w\). 4장에서 \(M(x) = \tfrac{wL}{2}x - \tfrac{w}{2}x^2\).
+      <ol style="margin:6px 0 0">
+        <li><b>한 번 적분.</b> \(EI\,\theta = \tfrac{wL}{4}x^2 - \tfrac{w}{6}x^3 + C_1\).</li>
+        <li><b>두 번 적분.</b> \(EI\,v = \tfrac{wL}{12}x^3 - \tfrac{w}{24}x^4 + C_1 x + C_2\).</li>
+        <li><b>경계 조건.</b> \(v(0) = 0\)에서 \(C_2 = 0\). \(v(L) = 0\)에서 \(\tfrac{wL^4}{12} - \tfrac{wL^4}{24} + C_1 L = 0\), 곧 \(C_1 = -\tfrac{wL^3}{24}\).</li>
+        <li><b>결과.</b> \(v(x) = -\dfrac{w x}{24EI}\left(L^3 - 2Lx^2 + x^3\right)\). 가운데에서 \(\delta_{max} = \dfrac{5wL^4}{384EI}\), 지점의 처짐각 \(|\theta_A| = \dfrac{wL^3}{24EI}\).</li>
+      </ol>
+      수치: B-10 큰보 G1을 단순보로 보고 사용 하중 \(w = 76.7\) kN/m, \(L = 8\) m, \(EI = 3.14 \times 10^5\) kN·m²이면 \(\delta = 5 \times 76.7 \times 8^4 / (384 \times 3.14\times10^5) = 0.0130\) m = 13.0 mm, \(|\theta_A| = 76.7 \times 8^3/(24 \times 3.14\times10^5) = 5.21 \times 10^{-3}\) rad.</div>
+    <div class="callout"><strong>예제 11.2 (끝에 집중 하중을 받는 캔틸레버)</strong> 고정단 A를 \(x = 0\), 자유단에 \(P\). \(M(x) = -P(L - x)\).
+      <ol style="margin:6px 0 0">
+        <li>\(EI\,\theta = -P\left(Lx - \tfrac{x^2}{2}\right) + C_1\), 고정단에서 \(\theta(0) = 0\)이므로 \(C_1 = 0\).</li>
+        <li>\(EI\,v = -P\left(\tfrac{Lx^2}{2} - \tfrac{x^3}{6}\right) + C_2\), \(v(0) = 0\)이므로 \(C_2 = 0\).</li>
+        <li>자유단에서 \(\delta = \dfrac{PL^3}{3EI}\), \(|\theta| = \dfrac{PL^2}{2EI}\). 고정단 하나가 두 경계 조건을 모두 준다.</li>
+      </ol></div>
+    <p>하중이 여러 구간에 나뉘어 있으면 구간마다 상수가 두 개씩 생깁니다. 예를 들어 집중 하중 하나가 걸린 단순보는 두 구간, 상수 네 개이며, 지점 두 곳의 \(v = 0\)과 하중점의 연속 조건 두 개(\(v\), \(\theta\))로 풉니다. 아래 시뮬레이터에서는 적분 상수 \(C_1\)을 직접 맞춰 봅니다. \(C_2\)는 세 경우 모두 \(v(0) = 0\)에서 0입니다.</p>
+    <div class="sim" id="sim-df-integrate">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>적분 상수를 맞혀라: M/EI → θ → v</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="df-cv-int" aria-label="곡률, 기울기, 처짐 그래프"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>보</span><div class="seg" id="df-i-case"><button data-value="udl" class="on">단순보·등분포</button><button data-value="pt">단순보·집중</button><button data-value="cant">캔틸레버·끝 하중</button></div></div>
+          <label class="ctrl"><span>적분 상수 C₁/EI = θ(0) <output id="df-i-c-out"></output></span><input type="range" id="df-i-c" min="-6" max="6" step="0.01" value="0"></label>
+          <label class="check"><input type="checkbox" id="df-i-ans"> 정답 곡선(점선) 보기</label>
+          <div class="btn-row"><button class="btn primary" id="df-i-solve">경계 조건으로 풀기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">v(L)</span><span class="v" id="df-i-vl">—</span></div>
+        <div class="stat"><span class="k">θ(0)</span><span class="v" id="df-i-t0">—</span></div>
+        <div class="stat"><span class="k">최대 처짐</span><span class="v" id="df-i-dm">—</span></div>
+      </div>
+      <div class="df-msg" id="df-i-msg"></div>
+      <div class="sim-note">해볼 것: 단순보에서 슬라이더로 v(L) = 0이 되는 C₁을 찾고 버튼의 답과 비교하세요 · 캔틸레버에서는 C₁ ≠ 0이면 고정단에서 기울기가 생겨 경계 조건이 깨집니다 · 모델: L = 8 m, EI = 3.14 × 10⁵ kN·m², 단순보 등분포 76.7 kN/m, 집중 100 kN(a = 3 m), 캔틸레버 끝 하중 50 kN. θ = C₁/EI + ∫M/EI dx, v = ∫θ dx를 수치 적분.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="moment-area">
+    <h2>모멘트-면적법</h2>
+    <div class="problem"><strong>한 점의 처짐만 알고 싶다면</strong>
+      <p>캔틸레버 끝의 처짐 하나만 필요할 때도 이중 적분법은 처짐 곡선 전체를 구해야 합니다. 휨모멘트도의 넓이를 이용하면 원하는 점의 기울기와 처짐을 곧바로 얻을 수 있지 않을까요?</p></div>
+    <p>원리 11.1을 \(d\theta/dx = M/EI\)로 쓰고 두 점 A와 B 사이에서 적분하면, 휨모멘트도를 \(EI\)로 나눈 <span class="term">M/EI도</span>의 넓이와 1차 모멘트가 곧바로 기울기와 처짐의 정보가 됩니다. 이 방법은 19세기 후반 모어(O. Mohr)와 그린(C. E. Greene)이 정리한 것으로 알려진 <span class="term">모멘트-면적법</span><span class="en">(moment-area method)</span>입니다.</p>
+    <div class="callout def"><strong>원리 11.2 (모멘트-면적 정리)</strong> 탄성 곡선 위의 두 점 A, B(\(x_A \lt x_B\))에 대하여
+      <ol style="margin:6px 0 0">
+        <li><b>제1정리.</b> 두 점의 기울기 차이는 그 사이 M/EI도의 넓이와 같다.
+          <div class="formula">$$\theta_B - \theta_A = \int_{x_A}^{x_B} \frac{M}{EI}\,dx$$</div></li>
+        <li><b>제2정리.</b> A에서 그은 접선으로부터 B점까지의 연직 거리(<span class="term">접선 편차</span> \(t_{B/A}\))는 그 사이 M/EI도의 넓이의 B점에 대한 1차 모멘트와 같다.
+          <div class="formula">$$t_{B/A} = v_B - \big[v_A + \theta_A (x_B - x_A)\big] = \int_{x_A}^{x_B} (x_B - x)\,\frac{M}{EI}\,dx = A_{M/EI}\,\bar{x}_B$$</div>
+          여기서 \(\bar{x}_B\)는 넓이 도심에서 B까지의 거리다.</li>
+      </ol></div>
+    <figure class="diagram" id="fig-df-ma">
+      <svg viewBox="0 0 760 320" role="img" aria-label="모멘트-면적법의 두 정리: 탄성 곡선의 접선과 M/EI도의 넓이">
+        <rect x="10" y="10" width="740" height="300" rx="10" class="f-surface"/>
+        <text x="60" y="44" class="t" style="font-weight:700">탄성 곡선</text>
+        <line x1="80" y1="70" x2="680" y2="70" class="s-axis"/>
+        <path d="M80 70C220 70 380 160 680 230" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+        <circle cx="240" cy="92" r="4.5" style="fill:var(--text)"/><text x="232" y="84" text-anchor="end" class="t-mono">A</text>
+        <circle cx="560" cy="196" r="4.5" style="fill:var(--text)"/><text x="572" y="190" class="t-mono">B</text>
+        <line x1="200" y1="80" x2="640" y2="168" style="stroke:var(--text-dim);stroke-width:1.4;stroke-dasharray:6 4"/>
+        <text x="646" y="164" class="t-mono">A의 접선</text>
+        <line x1="560" y1="152" x2="560" y2="192" style="stroke:var(--accent-2);stroke-width:2" marker-start="url(#df-ah-load)" marker-end="url(#df-ah-load)"/>
+        <text x="552" y="176" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">t_B/A</text>
+        <line x1="520" y1="186" x2="620" y2="214" style="stroke:var(--text-dim);stroke-width:1.4;stroke-dasharray:6 4"/>
+        <text x="624" y="226" class="t-mono">B의 접선</text>
+        <path d="M612 170A54 54 0 0 1 616 203" style="fill:none;stroke:var(--accent);stroke-width:1.6"/><text x="626" y="192" class="t-mono" style="fill:var(--accent)">θ_B − θ_A</text>
+        <text x="60" y="240" class="t" style="font-weight:700">M/EI</text>
+        <line x1="80" y1="258" x2="680" y2="258" class="s-axis"/>
+        <path d="M80 258L80 302L680 258Z" style="fill:none;stroke:var(--accent);stroke-width:1.6"/>
+        <path d="M240 258L240 290.3L560 266.8L560 258Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.2"/>
+        <circle cx="370" cy="268" r="3.5" style="fill:var(--accent-2)"/>
+        <line x1="370" y1="246" x2="560" y2="246" style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#df-ah-load)"/>
+        <line x1="370" y1="250" x2="370" y2="264" style="stroke:var(--accent-2);stroke-width:1;stroke-dasharray:2 2"/>
+        <text x="466" y="240" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">x̄_B</text>
+        <text x="590" y="290" class="t-mono" style="fill:var(--accent)">넓이 A_M/EI (음)</text>
+      </svg>
+      <figcaption><b>그림 11-4.</b> 모멘트-면적법. A와 B 사이 M/EI도의 넓이가 두 접선이 이루는 각(θ<sub>B</sub> − θ<sub>A</sub>)이고, 그 넓이를 B점에 대해 1차 모멘트로 잡은 값(넓이 × 도심에서 B까지 거리)이 A의 접선에서 B까지의 거리 t<sub>B/A</sub>다. 그림은 휨모멘트가 음(호깅)인 캔틸레버 구간이라 넓이가 음이고, B의 접선이 더 아래로 기울며 B가 A의 접선 아래에 있다. 처짐은 과장했다.</figcaption>
+    </figure>
+    <p>모멘트-면적법은 접선 방향을 아는 점, 곧 고정단이나 대칭인 보의 가운데(기울기 0)에서 출발할 때 특히 빠릅니다.</p>
+    <div class="callout"><strong>예제 11.3 (등분포 하중 캔틸레버의 끝 처짐)</strong> 고정단 A(\(x = 0\))에서 \(\theta_A = 0\), \(v_A = 0\)이므로 끝 B의 처짐이 곧 \(t_{B/A}\)다. \(M/EI = -w(L-x)^2/(2EI)\)는 고정단에서 \(-wL^2/(2EI)\)인 2차 곡선이다.
+      <ol style="margin:6px 0 0">
+        <li><b>넓이.</b> 꼭짓점이 B에 있는 2차 곡선의 넓이는 바깥 직사각형의 1/3: \(A = -\tfrac13 \cdot \tfrac{wL^2}{2EI}\cdot L = -\tfrac{wL^3}{6EI}\). 제1정리로 \(\theta_B = -\tfrac{wL^3}{6EI}\).</li>
+        <li><b>1차 모멘트.</b> 이 넓이의 도심은 고정단에서 \(L/4\), 곧 B에서 \(\bar x_B = 3L/4\). \(t_{B/A} = A\,\bar x_B = -\tfrac{wL^3}{6EI}\cdot\tfrac{3L}{4} = -\tfrac{wL^4}{8EI}\).</li>
+        <li><b>수치.</b> 4장 예제 4.4의 캐노피(\(L = 3\) m, \(w = 4\) kN/m)를 \(EI = 1.0 \times 10^4\) kN·m²인 강재 보로 만들면 등분포 하중만으로 \(\delta = 4 \times 3^4/(8 \times 10^4) = 4.05 \times 10^{-3}\) m = 4.1 mm.</li>
+      </ol></div>
+    <div class="sim" id="sim-df-ma">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>M/EI도의 넓이와 1차 모멘트로 읽는 처짐</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view df-stack">
+          <div><canvas id="df-cv-ma" aria-label="탄성 곡선과 두 점의 접선"></canvas><span class="df-cap">v (mm) · 접선</span></div>
+          <div><canvas id="df-cv-ma2" aria-label="M/EI도와 칠한 넓이"></canvas><span class="df-cap">M/EI (10⁻³/m)</span></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>하중</span><div class="seg" id="df-m-load"><button data-value="pt" class="on">집중 100 kN</button><button data-value="udl">등분포 50 kN/m</button></div></div>
+          <label class="ctrl"><span>P의 위치 a <output id="df-m-a-out"></output></span><input type="range" id="df-m-a" min="0.5" max="7.5" step="0.1" value="5"></label>
+          <label class="ctrl"><span>점 A의 위치 <output id="df-m-xa-out"></output></span><input type="range" id="df-m-xa" min="0" max="8" step="0.05" value="0"></label>
+          <label class="ctrl"><span>점 B의 위치 <output id="df-m-xb-out"></output></span><input type="range" id="df-m-xb" min="0" max="8" step="0.05" value="4"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">넓이 ∫M/EI</span><span class="v" id="df-m-area">—</span></div>
+        <div class="stat"><span class="k">θ<sub>B</sub> − θ<sub>A</sub></span><span class="v" id="df-m-dth">—</span></div>
+        <div class="stat"><span class="k">∫(x<sub>B</sub> − x)M/EI</span><span class="v" id="df-m-mom">—</span></div>
+        <div class="stat"><span class="k">t<sub>B/A</sub></span><span class="v" id="df-m-t">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: A를 지점(0 m)에, B를 반대쪽 지점(8 m)에 두면 t<sub>B/A</sub>에서 θ<sub>A</sub>를 구할 수 있습니다(v<sub>B</sub> = 0이므로 θ<sub>A</sub> = −t<sub>B/A</sub>/L) · 두 쌍의 값이 늘 같은지 확인하세요 · 모델: 경간 8 m 단순보, EI = 3.14 × 10⁵ kN·m², M/EI를 촘촘히 수치 적분.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="conjugate">
+    <h2>공액보법</h2>
+    <p>4장에서 하중 \(w\)를 두 번 적분하면 휨모멘트가 된다는 것을 보았습니다(\(M'' = -w\)). 그런데 처짐도 \(M/EI\)를 두 번 적분해서 얻습니다(\(v'' = M/EI\)). 두 식은 모양이 같습니다. 그렇다면 <b>\(M/EI\)를 하중처럼 얹은 가상의 보</b>를 만들어 그 휨모멘트를 구하면, 그것이 곧 원래 보의 처짐이 되지 않을까요? 이 가상의 보가 <span class="term">공액보</span><span class="en">(conjugate beam)</span>입니다.</p>
+    <div class="callout def"><strong>원리 11.3 (공액보)</strong> 실제 보와 길이가 같고, \(M/EI\)를 분포 하중으로 받는 보를 공액보라 한다. \(M/EI\)가 양이면 위 방향 하중으로 얹는다. 지점을 아래 표처럼 바꾸면 공액보의 전단력 \(\bar V\)와 휨모멘트 \(\bar M\)은
+      <div class="formula">$$\bar V(x) = \theta(x), \qquad \bar M(x) = v(x)$$</div>
+      로 실제 보의 기울기와 처짐과 같다.</div>
+    <figure class="diagram" id="fig-df-conj">
+      <svg viewBox="0 0 760 300" role="img" aria-label="실제 보 지점을 공액보 지점으로 바꾸는 규칙">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <text x="200" y="38" text-anchor="middle" class="t" style="font-weight:700">실제 보</text><text x="560" y="38" text-anchor="middle" class="t" style="font-weight:700">공액보</text>
+        <line x1="380" y1="50" x2="380" y2="270" style="stroke:var(--border);stroke-width:1.4"/>
+        <g transform="translate(0,58)">
+          <text x="40" y="22" class="t-dim">핀·롤러 끝</text><text x="140" y="22" class="t-mono">v = 0, θ ≠ 0</text>
+          <path d="M300 18l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <path d="M540 18l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <text x="580" y="22" class="t-mono">M̄ = 0, V̄ ≠ 0 → 핀·롤러</text>
+        </g>
+        <g transform="translate(0,108)">
+          <text x="40" y="22" class="t-dim">고정단</text><text x="140" y="22" class="t-mono">v = 0, θ = 0</text>
+          <rect x="296" y="4" width="8" height="32" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <line x1="520" y1="20" x2="556" y2="20" style="stroke:var(--text);stroke-width:4"/>
+          <text x="580" y="22" class="t-mono">M̄ = 0, V̄ = 0 → 자유단</text>
+        </g>
+        <g transform="translate(0,158)">
+          <text x="40" y="22" class="t-dim">자유단</text><text x="140" y="22" class="t-mono">v ≠ 0, θ ≠ 0</text>
+          <line x1="270" y1="20" x2="306" y2="20" style="stroke:var(--text);stroke-width:4"/>
+          <rect x="536" y="4" width="8" height="32" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <text x="580" y="22" class="t-mono">M̄ ≠ 0, V̄ ≠ 0 → 고정단</text>
+        </g>
+        <g transform="translate(0,208)">
+          <text x="40" y="22" class="t-dim">중간 지점</text><text x="140" y="22" class="t-mono">v = 0, θ 연속</text>
+          <line x1="270" y1="20" x2="330" y2="20" style="stroke:var(--text);stroke-width:4"/><path d="M300 20l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="510" y1="20" x2="570" y2="20" style="stroke:var(--text);stroke-width:4"/><circle cx="540" cy="20" r="5.5" class="f-elev" style="stroke:var(--text);stroke-width:2"/>
+          <text x="580" y="22" class="t-mono">M̄ = 0, V̄ 연속 → 내부 힌지</text>
+        </g>
+        <text x="380" y="282" text-anchor="middle" class="t-dim">내부 힌지(θ가 꺾임, v 연속)는 반대로 공액보의 중간 지점이 된다</text>
+      </svg>
+      <figcaption><b>그림 11-5.</b> 공액보의 지점 변환. 실제 보에서 0인 양(v 또는 θ)은 공액보에서 0이 되어야 하는 단면력(M̄ 또는 V̄)으로 바뀐다. 실제 보가 정정이면 공액보도 정정이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 11.4 (가운데 집중 하중 단순보)</strong> M/EI도는 가운데 높이 \(PL/(4EI)\)인 삼각형이다. 공액보는 같은 단순보이고, 이 삼각형 하중을 위 방향으로 받는다.
+      <ol style="margin:6px 0 0">
+        <li><b>공액보 반력.</b> 전체 하중 \(\tfrac12 \cdot L \cdot \tfrac{PL}{4EI} = \tfrac{PL^2}{8EI}\)의 절반씩, 곧 각 지점에서 \(\tfrac{PL^2}{16EI}\)(아래 방향). 공액보의 \(\bar V(0) = -\tfrac{PL^2}{16EI}\)이므로 \(\theta_A = -\tfrac{PL^2}{16EI}\).</li>
+        <li><b>공액보 가운데 휨모멘트.</b> 왼쪽 절반에 대해 \(\bar M = -\tfrac{PL^2}{16EI}\cdot\tfrac{L}{2} + \tfrac{PL^2}{16EI}\cdot\tfrac{L}{6} = -\tfrac{PL^3}{48EI}\). 곧 \(\delta = \tfrac{PL^3}{48EI}\).</li>
+      </ol></div>
+    <div class="sim" id="sim-df-conj">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>실제 보의 처짐 = 공액보의 휨모멘트</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view df-stack">
+          <div><canvas id="df-cv-cj1" aria-label="실제 보와 처짐"></canvas><span class="df-cap">실제 보</span></div>
+          <div><canvas id="df-cv-cj2" aria-label="M/EI 하중을 받는 공액보"></canvas><span class="df-cap">공액보 · 하중 = M/EI</span></div>
+          <div><canvas id="df-cv-cj3" aria-label="실제 기울기와 처짐, 공액보의 전단력과 휨모멘트 비교"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>실제 보</span><div class="seg" id="df-j-case"><button data-value="simple" class="on">단순보</button><button data-value="cant">캔틸레버</button><button data-value="over">내민보</button></div></div>
+          <div class="ctrl"><span>하중</span><div class="seg" id="df-j-load"><button data-value="pt" class="on">집중 P</button><button data-value="udl">등분포 w</button></div></div>
+          <label class="ctrl"><span>P의 위치 a <output id="df-j-a-out"></output></span><input type="range" id="df-j-a" min="0.5" max="10" step="0.1" value="5"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">θ<sub>A</sub> / V̄<sub>A</sub></span><span class="v" id="df-j-th">—</span></div>
+        <div class="stat"><span class="k">최대 |v| / |M̄|</span><span class="v" id="df-j-v">—</span></div>
+      </div>
+      <div class="df-legend"><span class="key moment">실제 θ, v</span><span class="key load">공액보 V̄, M̄ (점선)</span></div>
+      <div class="sim-note">해볼 것: 캔틸레버를 고르면 공액보의 고정단이 반대쪽(실제 자유단)으로 옮겨 가는 것을 보세요 · 내민보에서는 실제 중간 지점이 공액보의 힌지가 됩니다 · 모델: 경간 10 m(내민보 지점 0·7 m), EI = 3.14 × 10⁵ kN·m², P = 100 kN, w = 20 kN/m. 공액보 하중은 M/EI를 80개 직선 구간으로 근사.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="superposition">
+    <h2>중첩법과 처짐 공식표</h2>
+    <p>원리 11.1은 선형 방정식입니다. 하중이 두 배면 \(M\)도 두 배, 처짐도 두 배이고, 두 하중이 함께 걸린 처짐은 각각의 처짐을 더한 것과 같습니다. 이것이 <span class="term">중첩의 원리</span><span class="en">(principle of superposition)</span>입니다. 그래서 자주 쓰는 경우의 처짐을 표로 만들어 두면, 복잡한 하중도 표의 값을 더해서 풀 수 있습니다. 단, 재료가 선형 탄성이고 처짐이 작아 평형을 처음 모양에서 세울 수 있을 때에만 성립합니다(13장의 좌굴처럼 축력이 처짐에 영향을 주면 깨집니다).</p>
+    <div class="table-wrap"><table class="df-tbl">
+      <thead><tr><th>보와 하중</th><th>최대 처짐 δ</th><th>끝 처짐각 |θ|</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td>단순보, 등분포 w</td><td>5wL⁴/384EI</td><td>wL³/24EI</td><td>가운데</td></tr>
+        <tr><td>단순보, 가운데 집중 P</td><td>PL³/48EI</td><td>PL²/16EI</td><td>가운데</td></tr>
+        <tr><td>단순보, 집중 P (a ≥ b)</td><td>Pb(L² − b²)<sup>3/2</sup>/(9√3 LEI)</td><td>θ<sub>A</sub> = Pab(L + b)/6LEI</td><td>x = √((L² − b²)/3)</td></tr>
+        <tr><td>단순보, B단 모멘트 M<sub>0</sub></td><td>가운데 M<sub>0</sub>L²/16EI</td><td>θ<sub>A</sub> = M<sub>0</sub>L/6EI, θ<sub>B</sub> = M<sub>0</sub>L/3EI</td><td>최대는 0.0642 M<sub>0</sub>L²/EI</td></tr>
+        <tr><td>캔틸레버, 끝 집중 P</td><td>PL³/3EI</td><td>PL²/2EI</td><td>자유단</td></tr>
+        <tr><td>캔틸레버, 등분포 w</td><td>wL⁴/8EI</td><td>wL³/6EI</td><td>자유단</td></tr>
+        <tr><td>캔틸레버, 끝 모멘트 M<sub>0</sub></td><td>M<sub>0</sub>L²/2EI</td><td>M<sub>0</sub>L/EI</td><td>자유단</td></tr>
+        <tr><td>양단 고정, 등분포 w</td><td>wL⁴/384EI</td><td>0</td><td>단순보의 1/5</td></tr>
+        <tr><td>양단 고정, 가운데 집중 P</td><td>PL³/192EI</td><td>0</td><td>단순보의 1/4</td></tr>
+        <tr><td>1단 고정·1단 핀, 등분포 w</td><td>≈ wL⁴/185EI</td><td>핀단 wL³/48EI</td><td>핀단에서 0.42L</td></tr>
+      </tbody></table></div>
+    <p class="caption" style="font-size:14px;color:var(--text-dim)">표 11-1. 자주 쓰는 처짐 공식(선형 탄성, 일정한 EI). a는 A단에서 하중까지, b = L − a.</p>
+    <p>중첩법의 진짜 힘은 부정정 보에서 드러납니다. 양단 고정보는 "단순보 + 양 끝에 걸린 미지의 모멘트"로 나눌 수 있습니다. 끝 모멘트가 지점의 기울기를 정확히 0으로 되돌려 놓는다는 조건(적합 조건)을 세우면 그 크기가 나옵니다. 14장의 응력법이 바로 이 생각입니다.</p>
+    <figure class="diagram" id="fig-df-super">
+      <svg viewBox="0 0 760 270" role="img" aria-label="양단 고정보를 단순보와 끝 모멘트 두 개의 합으로 나눈 그림">
+        <rect x="10" y="10" width="740" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(20,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">양단 고정보</text>
+          <rect x="16" y="30" width="8" height="40" style="fill:var(--surface-2);stroke:var(--text)"/><rect x="196" y="30" width="8" height="40" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <line x1="24" y1="50" x2="196" y2="50" style="stroke:var(--text);stroke-width:4"/>
+          <line x1="24" y1="26" x2="196" y2="26" style="stroke:var(--accent-2);stroke-width:1.3"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.3" marker-end="url(#df-ah-load)"><line x1="34" y1="26" x2="34" y2="45"/><line x1="76" y1="26" x2="76" y2="45"/><line x1="118" y1="26" x2="118" y2="45"/><line x1="160" y1="26" x2="160" y2="45"/></g>
+          <path d="M24 50C60 52 80 62 110 62S160 52 196 50" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="110" y="104" text-anchor="middle" class="t-mono">δ = wL⁴/384EI</text>
+        </g>
+        <text x="246" y="96" text-anchor="middle" class="t" style="font-size:22px">=</text>
+        <g transform="translate(266,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">단순보 + 등분포</text>
+          <line x1="20" y1="50" x2="200" y2="50" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M20 50l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M200 50l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <line x1="20" y1="26" x2="200" y2="26" style="stroke:var(--accent-2);stroke-width:1.3"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.3" marker-end="url(#df-ah-load)"><line x1="30" y1="26" x2="30" y2="45"/><line x1="74" y1="26" x2="74" y2="45"/><line x1="118" y1="26" x2="118" y2="45"/><line x1="162" y1="26" x2="162" y2="45"/></g>
+          <path d="M20 50Q110 100 200 50" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="110" y="104" text-anchor="middle" class="t-mono">5wL⁴/384EI ↓</text>
+        </g>
+        <text x="496" y="96" text-anchor="middle" class="t" style="font-size:22px">+</text>
+        <g transform="translate(516,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">단순보 + 끝 모멘트</text>
+          <line x1="20" y1="50" x2="200" y2="50" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M20 50l-9 14h18z" class="f-elev" style="stroke:var(--text)"/><path d="M200 50l-9 14h18z" class="f-elev" style="stroke:var(--text)"/>
+          <path d="M33 62A16 16 0 1 0 33 38" style="fill:none;stroke:var(--accent-2);stroke-width:2" marker-end="url(#df-ah-load)"/>
+          <path d="M187 62A16 16 0 1 1 187 38" style="fill:none;stroke:var(--accent-2);stroke-width:2" marker-end="url(#df-ah-load)"/>
+          <path d="M20 50Q110 14 200 50" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="110" y="104" text-anchor="middle" class="t-mono">2 × (wL²/12)L²/16EI ↑</text>
+        </g>
+        <text x="380" y="196" text-anchor="middle" class="t-mono">5wL⁴/384 − wL⁴/96 = (5 − 4) wL⁴/384</text>
+        <text x="380" y="222" text-anchor="middle" class="t-dim">끝 모멘트 wL²/12는 단순보의 끝 기울기 wL³/24EI를 0으로 되돌리는 크기다</text>
+      </svg>
+      <figcaption><b>그림 11-6.</b> 중첩법으로 구한 양단 고정보의 처짐. 등분포 하중을 받는 단순보의 처짐에서, 호깅을 일으키는 끝 모멘트 두 개(왼쪽 반시계, 오른쪽 시계)가 만드는 위 방향 처짐을 빼면 단순보의 1/5이 남는다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 11.5 (양단 고정보의 처짐)</strong> 끝 모멘트 \(M_0\)가 양 끝에 걸린 단순보의 끝 기울기는 표 11-1에서 \(M_0L/(3EI) + M_0L/(6EI) = M_0L/(2EI)\)이다. 이것이 등분포 하중의 끝 기울기 \(wL^3/(24EI)\)를 지워야 하므로 \(M_0 = wL^2/12\). 가운데 처짐은 \(\tfrac{5wL^4}{384EI} - 2\cdot\tfrac{(wL^2/12)L^2}{16EI} = \tfrac{5wL^4 - 4wL^4}{384EI} = \tfrac{wL^4}{384EI}\). B-10 G1(사용 하중 76.7 kN/m)이 양 끝에서 완전히 고정되어 있다면 \(\delta = 76.7\times 8^4/(384 \times 3.14\times10^5) = 2.6\) mm로 단순보(13.0 mm)의 1/5이다.</div>
+    <div class="sim" id="sim-df-super">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>중첩으로 처짐 조립하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="df-cv-sup" aria-label="하중별 처짐 곡선과 그 합"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><em class="df-lab"><i class="df-sw" id="df-s-c1"></i>등분포 w</em> <output id="df-s-w-out"></output></span><input type="range" id="df-s-w" min="0" max="100" step="0.1" value="40"></label>
+          <label class="ctrl"><span><em class="df-lab"><i class="df-sw" id="df-s-c2"></i>집중 P</em> <output id="df-s-p-out"></output></span><input type="range" id="df-s-p" min="0" max="300" step="5" value="100"></label>
+          <label class="ctrl"><span>P의 위치 a <output id="df-s-a-out"></output></span><input type="range" id="df-s-a" min="0.5" max="7.5" step="0.1" value="2.5"></label>
+          <label class="ctrl"><span><em class="df-lab"><i class="df-sw" id="df-s-c3"></i>끝 모멘트 M<sub>A</sub></em> <output id="df-s-ma-out"></output></span><input type="range" id="df-s-ma" min="-600" max="600" step="0.1" value="0"></label>
+          <label class="ctrl"><span><em class="df-lab"><i class="df-sw" id="df-s-c4"></i>끝 모멘트 M<sub>B</sub></em> <output id="df-s-mb-out"></output></span><input type="range" id="df-s-mb" min="-600" max="600" step="0.1" value="0"></label>
+          <div class="btn-row"><button class="btn" id="df-s-fix">양단 고정보 만들기</button><button class="btn" id="df-s-reset">초기화</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">가운데 처짐: 성분의 합</span><span class="v" id="df-s-sum">—</span></div>
+        <div class="stat"><span class="k">한꺼번에 푼 값</span><span class="v" id="df-s-dir">—</span></div>
+        <div class="stat"><span class="k">끝 기울기 θ<sub>A</sub></span><span class="v" id="df-s-th">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: '양단 고정보 만들기'를 누르면 끝 모멘트가 −wL²/12가 되어 θ<sub>A</sub> = 0이 됩니다 · 끝 모멘트는 단면력 부호(호깅이 −)로 넣습니다 · 모델: 경간 8 m 단순보, EI = 3.14 × 10⁵ kN·m². 가는 선은 성분, 굵은 선은 합, 점선은 모든 하중을 한꺼번에 강성법으로 푼 결과.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="limits">
+    <h2>처짐 제한과 경간·춤의 영향</h2>
+    <p>처짐이 얼마까지 괜찮은지는 무엇을 떠받치고 있느냐에 달려 있습니다. 설계 기준은 경간 \(L\)에 대한 비율로 처짐 한도를 정해 두는데, 콘크리트구조 설계기준(KDS 14 20)의 처짐 표와 같은 계열의 기준에서 <b>흔히 쓰는</b> 값은 다음과 같습니다. 하중의 종류(활하중만인지, 장기 처짐을 포함하는지)와 지지하는 비구조 요소의 종류에 따라 적용 조건이 달라지므로 실제 설계에서는 <b>현행 기준을 확인</b>해야 합니다.</p>
+    <div class="table-wrap"><table class="df-tbl">
+      <thead><tr><th>부재와 조건(예)</th><th>처짐 한도</th><th>8 m 경간이면</th></tr></thead>
+      <tbody>
+        <tr><td>평지붕, 손상되기 쉬운 비구조 요소를 지지하지 않음(활하중 즉시 처짐)</td><td>L/180</td><td>44 mm</td></tr>
+        <tr><td>바닥, 손상되기 쉬운 비구조 요소를 지지하지 않음(활하중 즉시 처짐)</td><td>L/360</td><td>22 mm</td></tr>
+        <tr><td>손상되기 쉬운 비구조 요소를 지지(부착 후 장기 처짐 포함)</td><td>L/480</td><td>17 mm</td></tr>
+        <tr><td>손상될 염려가 적은 비구조 요소를 지지(부착 후 장기 처짐 포함)</td><td>L/240</td><td>33 mm</td></tr>
+      </tbody></table></div>
+    <p>처짐 공식을 보면 처짐을 키우는 요인이 한눈에 보입니다. 등분포 하중에서 \(\delta \propto wL^4/(EI)\)이므로 같은 하중으로 <b>경간이 두 배가 되면 처짐은 16배</b>, 처짐 비율 \(L/\delta\)는 8배 나빠집니다. 반대로 직사각형 단면의 \(I = bh^3/12\)이므로 <b>춤 \(h\)를 두 배로 하면 처짐은 1/8</b>입니다. 폭을 두 배로 하면 1/2에 그칩니다. 그래서 경간이 길수록 보는 깊어지고, 실무에서는 처짐을 따로 계산하지 않아도 되는 최소 춤을 "경간/춤" 비율로 정해 두기도 합니다.</p>
+    <div class="formula">$$\frac{\delta}{L} = \frac{5}{384}\,\frac{wL^3}{EI} \quad\Rightarrow\quad \frac{L}{\delta} \propto \frac{EI}{wL^3}$$</div>
+    <div class="sim" id="sim-df-span">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>경간이 두 배면 처짐은 몇 배일까</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="df-cv-span" aria-label="기준 보와 경간·춤을 바꾼 보의 처짐 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경간 배율 L/L₀ <output id="df-p-k-out"></output></span><input type="range" id="df-p-k" min="1" max="2.5" step="0.05" value="2"></label>
+          <label class="ctrl"><span>춤 배율 h/h₀ <output id="df-p-h-out"></output></span><input type="range" id="df-p-h" min="0.6" max="2" step="0.05" value="1"></label>
+          <div class="ctrl"><span>하중</span><div class="seg" id="df-p-load"><button data-value="udl" class="on">같은 등분포 w</button><button data-value="pt">같은 가운데 P</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">δ / δ₀ (계산)</span><span class="v" id="df-p-r">—</span></div>
+        <div class="stat"><span class="k">공식</span><span class="v" id="df-p-f">—</span></div>
+        <div class="stat"><span class="k">L/δ: 기준 → 새 보</span><span class="v" id="df-p-ld">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 경간 2배에서 춤을 몇 배로 해야 L/δ가 기준과 같아지는지 찾아보세요(등분포에서 2 → h 배율 2) · 모델: 기준 보 L₀ = 6 m 단순보, RC 400×600 총단면, w = 20 kN/m 또는 P = 80 kN. 자중 변화는 무시.</div>
+    </div>
+    <div class="sim" id="sim-df-limit">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>처짐 제한 검토기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="df-cv-lim" aria-label="처짐 곡선과 허용 처짐 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경간 L <output id="df-l-L-out"></output></span><input type="range" id="df-l-L" min="4" max="14" step="0.5" value="8"></label>
+          <label class="ctrl"><span><em class="df-lab">활하중 w<sub>L</sub></em> <output id="df-l-w-out"></output></span><input type="range" id="df-l-w" min="5" max="40" step="1" value="20"></label>
+          <label class="ctrl"><span>단면</span><select id="df-l-sec"><option value="g1">RC 400×700 총단면</option><option value="g1c">RC 400×700 균열(I<sub>e</sub> = 0.35 I<sub>g</sub>, 가정)</option><option value="h400">H-400×200×8×13</option><option value="h600">H-600×200×11×17</option></select></label>
+          <div class="ctrl"><span>지지</span><div class="seg" id="df-l-sup"><button data-value="simple" class="on">단순보</button><button data-value="cont">3경간 연속(가운데)</button><button data-value="fixed">양단 고정</button></div></div>
+          <div class="ctrl"><span>한도</span><div class="seg" id="df-l-lim"><button data-value="180">L/180</button><button data-value="240">L/240</button><button data-value="360" class="on">L/360</button><button data-value="480">L/480</button></div></div>
+          <div class="btn-row"><button class="btn" id="df-l-g1">B-10 G1로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">활하중 처짐 δ</span><span class="v" id="df-l-d">—</span></div>
+        <div class="stat"><span class="k">허용 처짐</span><span class="v" id="df-l-a">—</span></div>
+        <div class="stat"><span class="k">L/δ</span><span class="v" id="df-l-ld">—</span></div>
+      </div>
+      <div class="df-msg" id="df-l-msg"></div>
+      <div class="sim-note">해볼 것: H-400 보로 경간을 늘리며 L/360을 넘는 경간을 찾으세요 · 같은 RC 보라도 균열을 가정하면 처짐이 약 3배가 됩니다 · 모델: 활하중만의 즉시 처짐(탄성), 연속보는 세 경간 모두 재하. 균열 단면의 0.35는 교육용 가정이며 실제 유효 단면 2차 모멘트와 크리프에 의한 장기 처짐은 철근콘크리트 설계에서 따로 계산합니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="b10">
+    <h2>기준 건물 B-10 큰보의 처짐</h2>
+    <p>큰보 G1(경간 8.0 m, 400 × 700 mm, \(EI \approx 3.14\times10^5\) kN·m²)의 처짐을 지금까지의 방법으로 정리해 봅시다. 처짐 검토는 강도 검토와 달리 계수 하중이 아니라 <b>사용 하중</b>으로 합니다.</p>
+    <div class="callout site"><strong>큰보 G1의 활하중 처짐</strong> 활하중 \(w_L = 20\) kN/m만으로 단순보라고 보면 \(\delta_L = 5 \times 20 \times 8^4/(384 \times 3.14\times10^5) = 3.4\) mm, \(L/\delta = 2{,}350\)으로 L/360(22 mm)에 크게 못 미칩니다. 실제 G1처럼 연속보의 가운데 경간이면 더 작습니다(세 경간을 모두 재하한 4경간 연속보의 둘째 경간에서 약 0.5 mm). 다만 이 값은 균열이 없는 총단면 기준입니다. 철근콘크리트 보는 사용 하중에서도 아래쪽에 미세 균열이 생겨 유효 강성이 총단면의 절반 이하로 떨어지기도 하고, 콘크리트의 크리프 때문에 고정하중 처짐이 몇 해에 걸쳐 즉시 처짐의 몇 배까지 커집니다. 철근콘크리트 보의 처짐은 이런 효과를 넣어 따로 계산합니다.</div>
+    <div class="table-wrap"><table class="df-tbl">
+      <thead><tr><th>G1 처짐 (사용 하중 D + L = 76.7 kN/m)</th><th>가운데 처짐</th><th>L/δ</th></tr></thead>
+      <tbody>
+        <tr><td>단순보</td><td>13.0 mm</td><td>615</td></tr>
+        <tr><td>4경간 연속보의 둘째 경간</td><td>1.9 mm</td><td>4,200</td></tr>
+        <tr><td>양단 고정</td><td>2.6 mm</td><td>3,070</td></tr>
+      </tbody></table></div>
+    <p>연속보의 둘째 경간이 양단 고정보다도 적게 처지는 것은 이웃 경간의 하중이 지점 위에서 보를 들어 올리기 때문입니다. 반대로 이웃 경간을 비우고 이 경간만 재하하면 처짐이 커집니다. 이런 <b>하중 배치</b>의 영향은 6장과 14장에서 다룹니다. 처짐 계산은 부정정 해석의 열쇠이기도 합니다. 14장의 응력법은 "끊어 놓은 구조의 처짐이 실제로는 0이어야 한다"는 적합 조건으로 부정정 반력을 구하는데, 그때 쓰는 처짐이 이 장의 공식표입니다.</p>
+    <div class="callout warn"><strong>처짐은 강도와 다른 질문이다</strong> 강도 검토를 통과한 보도 처짐 검토에서 떨어질 수 있습니다. 특히 고강도 강재를 쓴 긴 경간의 보는 응력에는 여유가 있어도 \(E\)가 강재 등급과 상관없이 같기 때문에(약 210 GPa) 처짐이 설계를 지배하는 경우가 많습니다. 재료를 강하게 바꾸는 것보다 단면을 깊게 하는 것이 처짐에는 훨씬 효과적입니다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="energy.html"><small>CH.12 · 에너지 방법</small>트러스와 라멘의 처짐<br><span>단위하중법은 휨과 축력의 처짐을 한 식으로 더한다.</span></a>
+      <a href="indeterminate.html"><small>CH.14 · 부정정 구조와 응력법</small>처짐이 0이어야 한다는 조건<br><span>공식표의 처짐으로 적합 조건을 세워 부정정 반력을 구한다.</span></a>
+      <a href="slope-deflection.html"><small>CH.15 · 처짐각법과 모멘트 분배법</small>끝 처짐각이 미지수<br><span>표 11-1의 끝 기울기가 처짐각 식의 바탕이다.</span></a>
+      <a href="buckling.html"><small>CH.13 · 기둥과 좌굴</small>축력이 처짐을 키울 때<br><span>탄성 곡선 방정식에 축력을 넣으면 좌굴 방정식이 된다.</span></a>
+      <a href="https://semi.euiyun.com/infra/chapters/vibration.html"><small>INFRABOOK · 진동·소음</small>바닥의 강성과 미세진동<br><span>노광 장비를 받치는 팹 바닥은 처짐보다 진동 기준이 지배한다.</span></a>
+      <a href="https://math.euiyun.com/ode/"><small>ODEBOOK · 미분방정식</small>경계값 문제<br><span>EI v″ = M은 양 끝 조건으로 푸는 경계값 문제다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>평면 유지 가정에서 곡률은 κ = M/EI이고, 작은 기울기에서 탄성 곡선은 EI v″ = M을 만족한다(이 책은 v 위쪽 +, 새깅 M +). EI v‴ = V, EI v⁗ = −w도 성립한다.</li>
+      <li>이중 적분법: M을 두 번 적분하고 경계 조건(핀 v = 0, 고정 v = θ = 0)과 연속 조건으로 적분 상수를 정한다. 단순보 등분포 5wL⁴/384EI, 캔틸레버 끝 하중 PL³/3EI.</li>
+      <li>모멘트-면적법: 기울기 차이 = M/EI도의 넓이, 접선 편차 t<sub>B/A</sub> = 그 넓이의 B에 대한 1차 모멘트. 기울기를 아는 점(고정단, 대칭점)에서 출발하면 빠르다.</li>
+      <li>공액보법: M/EI를 하중으로 얹고 지점을 바꾼(고정 ↔ 자유, 중간 지점 ↔ 힌지) 공액보의 V̄와 M̄이 실제 보의 θ와 v다.</li>
+      <li>선형 탄성에서는 중첩이 성립한다. 공식표를 더해 복잡한 하중을 풀고, 끝 모멘트로 기울기를 지우면 부정정 보도 풀린다(양단 고정 등분포 wL⁴/384EI).</li>
+      <li>처짐은 경간의 4제곱(등분포)에 비례하고 춤의 3제곱에 반비례한다. 흔히 쓰는 한도는 L/180–L/480이며, 사용 하중으로 검토하고 현행 기준을 확인한다. RC 보는 균열·크리프를 따로 고려한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 같은 하중을 받는 보의 휨 강성 EI를 두 배로 하면 처짐은?</p><div class="opts">
+        <button class="opt">두 배</button><button class="opt" data-correct>절반</button><button class="opt">1/4</button><button class="opt">변하지 않는다</button>
+      </div><div class="quiz-exp">\(v'' = M/EI\)에서 \(M\)은 하중과 지점으로 정해지고(정정 보) \(EI\)와 무관하므로, 곡률과 처짐은 \(EI\)에 반비례한다.</div></div>
+      <div class="quiz-q"><p>2. 등분포 하중 w를 받는 단순보의 최대 처짐은?</p><div class="opts">
+        <button class="opt">wL⁴/8EI</button><button class="opt">wL³/24EI</button><button class="opt" data-correct>5wL⁴/384EI</button><button class="opt">wL⁴/384EI</button>
+      </div><div class="quiz-exp">예제 11.1의 결과다. \(wL^4/8EI\)는 캔틸레버의 끝 처짐, \(wL^3/24EI\)는 단순보의 끝 기울기, \(wL^4/384EI\)는 양단 고정보의 가운데 처짐이다.</div></div>
+      <div class="quiz-q"><p>3. 하중 w와 단면이 같은 단순보의 경간을 두 배로 늘리면 최대 처짐은?</p><div class="opts">
+        <button class="opt">2배</button><button class="opt">4배</button><button class="opt">8배</button><button class="opt" data-correct>16배</button>
+      </div><div class="quiz-exp">\(\delta \propto wL^4\)이므로 \(2^4 = 16\)배다. 처짐 비율 \(L/\delta\)는 \(2^3 = 8\)배 나빠진다. 경간이 긴 보는 처짐이 설계를 지배하기 쉽다.</div></div>
+      <div class="quiz-q"><p>4. 캔틸레버의 고정단에서 성립하는 경계 조건은?</p><div class="opts">
+        <button class="opt">v = 0, M = 0</button><button class="opt" data-correct>v = 0, θ = 0</button><button class="opt">M = 0, V = 0</button><button class="opt">θ = 0만</button>
+      </div><div class="quiz-exp">고정단은 이동과 회전을 모두 막는다. \(M = 0\), \(V = 0\)은 하중이 없는 자유단의 조건이다. 캔틸레버는 고정단 하나가 적분 상수 두 개를 모두 정한다.</div></div>
+      <div class="quiz-q"><p>5. 모멘트-면적법의 제1정리에 따르면 두 점의 처짐각 차이 θ<sub>B</sub> − θ<sub>A</sub>는?</p><div class="opts">
+        <button class="opt">두 점 사이 휨모멘트도의 최댓값</button><button class="opt" data-correct>두 점 사이 M/EI도의 넓이</button><button class="opt">M/EI도 넓이의 1차 모멘트</button><button class="opt">전단력도의 넓이</button>
+      </div><div class="quiz-exp">\(d\theta/dx = M/EI\)를 A에서 B까지 적분한 결과다. 넓이의 1차 모멘트는 제2정리의 접선 편차이고, 전단력도의 넓이는 휨모멘트의 변화(4장)다.</div></div>
+      <div class="quiz-q"><p>6. 공액보법에서 실제 보의 고정단은 공액보에서 무엇이 되는가?</p><div class="opts">
+        <button class="opt">고정단</button><button class="opt">핀 지점</button><button class="opt" data-correct>자유단</button><button class="opt">내부 힌지</button>
+      </div><div class="quiz-exp">고정단에서 실제 \(\theta = 0\), \(v = 0\)이므로 공액보의 \(\bar V = 0\), \(\bar M = 0\)이어야 한다. 두 단면력이 모두 0인 곳은 자유단이다. 반대로 실제 자유단은 공액보의 고정단이 된다.</div></div>
+      <div class="quiz-q"><p>7. 같은 등분포 하중에서 양단 고정보의 가운데 처짐은 단순보의 몇 배인가?</p><div class="opts">
+        <button class="opt">1/2</button><button class="opt">1/4</button><button class="opt" data-correct>1/5</button><button class="opt">1/8</button>
+      </div><div class="quiz-exp">\(wL^4/384EI \div 5wL^4/384EI = 1/5\). 예제 11.5처럼 단순보의 처짐에서 끝 모멘트 \(wL^2/12\)가 만드는 위 방향 처짐을 빼서 얻는다.</div></div>
+      <div class="quiz-q"><p>8. 직사각형 단면 보의 폭은 그대로 두고 춤만 두 배로 하면 처짐은?</p><div class="opts">
+        <button class="opt">1/2</button><button class="opt">1/4</button><button class="opt" data-correct>1/8</button><button class="opt">1/16</button>
+      </div><div class="quiz-exp">\(I = bh^3/12\)이므로 \(I\)는 \(2^3 = 8\)배, 처짐은 1/8이다. 폭을 두 배로 하면 \(I\)는 2배뿐이다. 춤을 키우는 것이 처짐을 줄이는 가장 효과적인 방법이다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const DFX = {
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.lineJoin = "round";
+    ctx.beginPath(); pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); ctx.restore();
+  },
+  // M/EI를 촘촘히 적분한 정밀 기울기·처짐(x = 0 절점의 회전·처짐에서 출발). 힌지가 없는 보에 쓴다.
+  curve(b, n = 600) {
+    const L = b.L, EI = b.EI, xs = [], M = [], th = [], v = [];
+    for (let k = 0; k <= n; k++) { const x = (L * k) / n; xs.push(x); M.push(b.at(x, k === 0 ? 1 : -1).M); }
+    th.push(b.frame.d[0][2]); v.push(b.frame.d[0][1]);
+    for (let k = 1; k <= n; k++) {
+      const dx = xs[k] - xs[k - 1], k0 = M[k - 1] / EI, k1 = M[k] / EI;
+      v.push(v[k - 1] + th[k - 1] * dx + ((2 * k0 + k1) / 6) * dx * dx);
+      th.push(th[k - 1] + ((k0 + k1) / 2) * dx);
+    }
+    return { xs, M, th, v, n, L, EI, at(x) { const t = CB.clamp(x / L, 0, 1) * n, i = Math.min(n - 1, Math.floor(t)), f = t - i; return { M: M[i] + f * (M[i + 1] - M[i]), th: th[i] + f * (th[i + 1] - th[i]), v: v[i] + f * (v[i + 1] - v[i]) }; } };
+  },
+  EIof(key) {
+    const Ec = 2.75e7, Es = 2.1e8;
+    if (key === "g1") return Ec * (0.4 * 0.7 ** 3) / 12;
+    if (key === "g1c") return 0.35 * Ec * (0.4 * 0.7 ** 3) / 12;
+    if (key === "rc36") return Ec * (0.3 * 0.6 ** 3) / 12;
+    if (key === "h600") return Es * CB.section.H(600, 200, 11, 17).Ix * 1e-12;
+    if (key === "h400") return Es * CB.section.H(400, 200, 8, 13).Ix * 1e-12;
+    return 1e5;
+  },
+};
+
+/* ---------- 1. 하중·지점·단면과 처짐 곡선 ---------- */
+(function () {
+  const L = 8;
+  const sup = CB.seg("df-c-sup", update), load = CB.seg("df-c-load", update);
+  const gw = CB.range("df-c-w", (v) => v + " kN/m", update), gp = CB.range("df-c-p", (v) => v + " kN", update), ga = CB.range("df-c-a", (v) => v.toFixed(1) + " m", update);
+  const sel = document.getElementById("df-c-sec"); sel.addEventListener("change", update);
+  let b, cur;
+  const supports = (t) => t === "cant" ? [{ x: 0, type: "fixed" }] : t === "prop" ? [{ x: 0, type: "fixed" }, { x: L, type: "roller" }] : t === "fixed" ? [{ x: 0, type: "fixed" }, { x: L, type: "fixed" }] : [{ x: 0, type: "pin" }, { x: L, type: "roller" }];
+  function solve() {
+    const loads = load() === "udl" ? [{ type: "udl", w: gw(), a: 0, b: L }] : [{ type: "point", P: gp(), a: ga() }];
+    b = CB.beam({ L, EI: DFX.EIof(sel.value), supports: supports(sup()), loads });
+    cur = DFX.curve(b, 400);
+  }
+  solve();
+  const pl = CB.plane("#df-cv-curve", { x: [-1, L + 1], y: [-1.5, 1.2], aspect: (W) => (W < 520 ? 0.5 : 0.3), minHeight: 170, maxHeight: 250, grid: false, axes: false,
+    draw(P) {
+      if (!b.ok) return;
+      CB.drawFrame(P, b.frame, { deformed: "auto", deformPx: 34, loadPx: 34 });
+      let im = 0; cur.v.forEach((v, i) => { if (Math.abs(v) > Math.abs(cur.v[im])) im = i; });
+      const md = Math.abs(cur.v[im]);
+      if (md > 0) { const x = cur.xs[im]; P.text(`δ = ${CB.num(md * 1000, 1)} mm`, x, 0, { color: P.P.accent, align: "center", dy: 52, bold: true, size: 12 }); }
+    } });
+  const dg = CB.canvas("#df-cv-curve-d", (ctx, w, h) => { if (b.ok) CB.beamDiagrams(ctx, w, h, b, { keys: ["M", "v"] }); }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 400 });
+  function update() { solve(); pl.redraw(); dg.redraw(); readout(); }
+  function readout() {
+    if (!b.ok) return;
+    let im = 0; cur.v.forEach((v, i) => { if (Math.abs(v) > Math.abs(cur.v[im])) im = i; });
+    const d = Math.abs(cur.v[im]);
+    CB.stat("df-c-d", d > 1e-9 ? `${CB.num(d * 1000, 2)} mm <small>x = ${cur.xs[im].toFixed(2)}</small>` : "0");
+    CB.stat("df-c-ld", d > 1e-9 ? CB.sig(L / d, 3) : "—");
+    CB.stat("df-c-ei", CB.sig(b.EI, 3) + " kN·m²");
+    const th = Math.max(Math.abs(cur.th[0]), Math.abs(cur.th[cur.n]));
+    CB.stat("df-c-th", CB.num(th * 1000, 2) + " mrad");
+  }
+  readout();
+})();
+
+/* ---------- 2. 적분 상수 맞히기 ---------- */
+(function () {
+  const L = 8, EI = 3.14e5, n = 400;
+  const cases = {
+    udl: { b: CB.beam({ L, EI, supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }], loads: [{ type: "udl", w: 76.7, a: 0, b: L }] }), bc: "simple" },
+    pt: { b: CB.beam({ L, EI, supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }], loads: [{ type: "point", P: 100, a: 3 }] }), bc: "simple" },
+    cant: { b: CB.beam({ L, EI, supports: [{ x: 0, type: "fixed" }], loads: [{ type: "point", P: 50, a: L }] }), bc: "cant" },
+  };
+  Object.values(cases).forEach((c) => {
+    const xs = [], k = [], I1 = [0], I2 = [0];
+    for (let i = 0; i <= n; i++) { const x = (L * i) / n; xs.push(x); k.push(c.b.at(x, i === 0 ? 1 : -1).M / EI); }
+    for (let i = 1; i <= n; i++) { const dx = xs[i] - xs[i - 1]; I2.push(I2[i - 1] + I1[i - 1] * dx + ((2 * k[i - 1] + k[i]) / 6) * dx * dx); I1.push(I1[i - 1] + ((k[i - 1] + k[i]) / 2) * dx); }
+    Object.assign(c, { xs, k, I1, I2, C1: c.bc === "cant" ? 0 : -I2[n] / L });
+  });
+  let cur = "udl";
+  const gc = CB.range("df-i-c", (v) => CB.num(v, 2) + " mrad", go);
+  const ans = CB.check("df-i-ans", go);
+  CB.seg("df-i-case", (v) => { cur = v; gc.set(0, false); go(); });
+  document.getElementById("df-i-solve").addEventListener("click", () => gc.set(+(cases[cur].C1 * 1000).toFixed(2)));
+  const cv = CB.canvas("#df-cv-int", (ctx, W, H) => {
+    const pal = CB.palette(), c = cases[cur], C1 = gc() / 1000;
+    const th = c.I1.map((v) => (C1 + v) * 1000), v = c.I2.map((q, i) => (C1 * c.xs[i] + q) * 1000);
+    const thx = c.I1.map((q) => (c.C1 + q) * 1000), vx = c.I2.map((q, i) => (c.C1 * c.xs[i] + q) * 1000);
+    const padL = 66, padR = 16, gap = 28, rowH = (H - 8 - 24 - 2 * gap) / 3;
+    const box = (i) => ({ x: padL, y: 8 + i * (rowH + gap), w: W - padL - padR, h: rowH });
+    const rng = (arrs) => { const all = arrs.flat(), lo = Math.min(0, ...all), hi = Math.max(0, ...all), p = (hi - lo) * 0.15 || 1; return [lo - p, hi + p]; };
+    const kk = c.k.map((q) => q * 1000);
+    CB.chart(ctx, box(0), { x: [0, L], y: rng([kk]), yLabel: "M/EI (10⁻³/m)", series: [{ data: c.xs.map((x, i) => [x, kk[i]]), color: pal.accent, width: 2.2, fill: CB.color("accent-soft") }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    const s1 = [{ data: c.xs.map((x, i) => [x, th[i]]), color: pal.accent2, width: 2.4 }];
+    const s2 = [{ data: c.xs.map((x, i) => [x, v[i]]), color: pal.accent2, width: 2.4 }];
+    if (ans()) { s1.push({ data: c.xs.map((x, i) => [x, thx[i]]), color: pal.text, width: 1.4, dash: [6, 4] }); s2.push({ data: c.xs.map((x, i) => [x, vx[i]]), color: pal.text, width: 1.4, dash: [6, 4] }); }
+    const r1 = CB.chart(ctx, box(1), { x: [0, L], y: rng([th, thx]), yLabel: "θ (mrad)", series: s1, hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    const r2 = CB.chart(ctx, box(2), { x: [0, L], y: rng([v, vx]), yLabel: "v (mm)", series: s2, hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    // 경계 조건 표시
+    const okc = (good) => (good ? pal.ok : pal.bad);
+    const dot = (r, x, y, good, label) => { ctx.save(); ctx.fillStyle = okc(good); ctx.beginPath(); ctx.arc(r.X(x), r.Y(y), 5.5, 0, Math.PI * 2); ctx.fill(); ctx.restore(); DFX.text(ctx, label, r.X(x) + (x > L / 2 ? -8 : 8), r.Y(y) - 12, okc(good), { align: x > L / 2 ? "right" : "left", size: 11 }); };
+    dot(r2, 0, v[0], true, "v(0) = 0");
+    if (c.bc === "simple") dot(r2, L, v[n], Math.abs(v[n]) < 0.05, `v(L) = ${CB.num(v[n], 2)}`);
+    else dot(r1, 0, th[0], Math.abs(th[0]) < 0.005, `θ(0) = ${CB.num(th[0], 2)}`);
+    ctx.save(); ctx.fillStyle = pal.dim; ctx.font = "12px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("x (m)", padL - 10, H - 2); ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 1.25 : 0.78), minHeight: 380, maxHeight: 600 });
+  function go() {
+    cv.redraw();
+    const c = cases[cur], C1 = gc() / 1000, vL = (C1 * L + c.I2[n]) * 1000;
+    let vm = 0; c.I2.forEach((q, i) => { const vv = (C1 * c.xs[i] + q) * 1000; if (Math.abs(vv) > Math.abs(vm)) vm = vv; });
+    CB.stat("df-i-vl", CB.num(vL, 2) + " mm");
+    CB.stat("df-i-t0", CB.num(C1 * 1000, 2) + " mrad");
+    CB.stat("df-i-dm", CB.num(Math.abs(vm), 2) + " mm");
+    const msg = document.getElementById("df-i-msg");
+    const good = c.bc === "simple" ? Math.abs(vL) < 0.05 : Math.abs(C1 * 1000) < 0.005;
+    msg.className = "df-msg" + (good ? " ok" : "");
+    msg.innerHTML = c.bc === "simple"
+      ? (good ? `경계 조건 v(L) = 0 만족: C₁/EI = ${CB.num(c.C1 * 1000, 2)} mrad, 최대 처짐 ${CB.num(Math.abs(vm), 2)} mm` : `단순보는 v(0) = 0(→ C₂ = 0)과 <b>v(L) = 0</b>으로 C₁을 정합니다. 지금 v(L) = ${CB.num(vL, 2)} mm. C₁ = −(1/L)∫∫M/EI = <b>${CB.num(c.C1 * 1000, 2)}</b> mrad`)
+      : (good ? "고정단 조건 v(0) = 0, θ(0) = 0 만족: C₁ = C₂ = 0" : `고정단에서는 <b>θ(0) = 0</b>이어야 하므로 C₁ = 0입니다. 지금 θ(0) = ${CB.num(C1 * 1000, 2)} mrad라 보가 고정단에서 꺾여 나갑니다.`);
+  }
+  go();
+})();
+
+/* ---------- 3. 모멘트-면적법 ---------- */
+(function () {
+  const L = 8, EI = 3.14e5;
+  const load = CB.seg("df-m-load", go);
+  const ga = CB.range("df-m-a", (v) => v.toFixed(1) + " m", go), gxa = CB.range("df-m-xa", (v) => v.toFixed(2) + " m", go), gxb = CB.range("df-m-xb", (v) => v.toFixed(2) + " m", go);
+  let b, c;
+  function solve() { b = CB.beam({ L, EI, supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }], loads: load() === "pt" ? [{ type: "point", P: 100, a: ga() }] : [{ type: "udl", w: 50, a: 0, b: L }] }); c = DFX.curve(b, 800); }
+  function pair() { const a = gxa(), bb = gxb(); return a <= bb ? [a, bb] : [bb, a]; }
+  function integrals() {
+    const [xa, xb] = pair(), m = 600, h = (xb - xa) / m; let A = 0, Q = 0;
+    for (let k = 0; k < m; k++) { const x = xa + (k + 0.5) * h, kap = c.at(x).M / EI; A += kap * h; Q += (xb - x) * kap * h; }
+    return { A, Q, xbar: A !== 0 ? xb - Q / A : (xa + xb) / 2 };
+  }
+  solve();
+  const cv1 = CB.canvas("#df-cv-ma", (ctx, W, H) => {
+    const pal = CB.palette(), [xa, xb] = pair(), A = c.at(xa), B = c.at(xb);
+    const vs = c.v.map((q) => q * 1000), lo = Math.min(0, ...vs) * 1.35, hi = Math.max(0.2, ...vs) + Math.abs(lo) * 0.25;
+    const r = CB.chart(ctx, { x: 64, y: 22, w: W - 80, h: H - 50 }, { x: [0, L], y: [lo, hi], yLabel: "v (mm)", series: [{ data: c.xs.map((x, i) => [x, vs[i]]), color: pal.accent, width: 2.6 }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    const tan = (P0, x0, x1) => [[r.X(x0), r.Y(P0.v * 1000)], [r.X(x1), r.Y((P0.v + P0.th * (x1 - x0)) * 1000)]];
+    DFX.line(ctx, tan(A, Math.max(0, xa - 0.6), Math.min(L, xb + 0.6)), pal.text, 1.4, [6, 4]);
+    DFX.line(ctx, tan(B, Math.max(0, xa - 0.6), Math.min(L, xb + 0.6)), pal.dim, 1.4, [3, 3]);
+    const yt = (A.v + A.th * (xb - xa)) * 1000;
+    DFX.line(ctx, [[r.X(xb), r.Y(yt)], [r.X(xb), r.Y(B.v * 1000)]], pal.accent2, 2.6);
+    DFX.text(ctx, `t_B/A = ${CB.num((B.v * 1000 - yt), 2)} mm`, r.X(xb) + (r.X(xb) > W - 130 ? -10 : 10), (r.Y(yt) + r.Y(B.v * 1000)) / 2, pal.accent2, { align: r.X(xb) > W - 130 ? "right" : "left", size: 11 });
+    [[xa, A, "A"], [xb, B, "B"]].forEach(([x, p, s]) => { ctx.save(); ctx.fillStyle = pal.text; ctx.beginPath(); ctx.arc(r.X(x), r.Y(p.v * 1000), 4.5, 0, Math.PI * 2); ctx.fill(); ctx.restore(); DFX.text(ctx, s, r.X(x), r.Y(p.v * 1000) - 14, pal.text); });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.38), minHeight: 200, maxHeight: 300 });
+  const cv2 = CB.canvas("#df-cv-ma2", (ctx, W, H) => {
+    const pal = CB.palette(), [xa, xb] = pair(), ks = c.M.map((q) => (q / EI) * 1000), I = integrals();
+    const hi = Math.max(0, ...ks) * 1.25 + 1e-9, lo = Math.min(0, ...ks) * 1.25;
+    const r = CB.chart(ctx, { x: 64, y: 22, w: W - 80, h: H - 50 }, { x: [0, L], y: [lo, hi], yLabel: "M/EI", series: [{ data: c.xs.map((x, i) => [x, ks[i]]), color: pal.accent, width: 2 }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    ctx.save(); ctx.fillStyle = CB.color("accent-soft"); ctx.beginPath(); ctx.moveTo(r.X(xa), r.Y(0));
+    for (let k = 0; k <= 200; k++) { const x = xa + ((xb - xa) * k) / 200; ctx.lineTo(r.X(x), r.Y((c.at(x).M / EI) * 1000)); }
+    ctx.lineTo(r.X(xb), r.Y(0)); ctx.closePath(); ctx.fill(); ctx.restore();
+    if (xb - xa > 0.05) {
+      const yb = r.Y(0) - 10;
+      ctx.save(); ctx.fillStyle = pal.accent2; ctx.beginPath(); ctx.arc(r.X(I.xbar), yb, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      DFX.line(ctx, [[r.X(I.xbar), yb], [r.X(xb), yb]], pal.accent2, 1.6);
+      DFX.text(ctx, `x̄_B = ${CB.num(xb - I.xbar, 2)} m`, (r.X(I.xbar) + r.X(xb)) / 2, yb - 12, pal.accent2, { size: 11 });
+    }
+  }, { aspect: (W) => (W < 520 ? 0.55 : 0.32), minHeight: 180, maxHeight: 260 });
+  function go() {
+    solve(); cv1.redraw(); cv2.redraw();
+    const [xa, xb] = pair(), A = c.at(xa), B = c.at(xb), I = integrals();
+    CB.stat("df-m-area", CB.num(I.A * 1000, 3) + " mrad");
+    CB.stat("df-m-dth", CB.num((B.th - A.th) * 1000, 3) + " mrad");
+    CB.stat("df-m-mom", CB.num(I.Q * 1000, 3) + " mm");
+    CB.stat("df-m-t", CB.num((B.v - (A.v + A.th * (xb - xa))) * 1000, 3) + " mm");
+  }
+  go();
+})();
+
+/* ---------- 4. 공액보 ---------- */
+(function () {
+  const L = 10, EI = 3.14e5, NSEG = 80;
+  const ccase = CB.seg("df-j-case", go), load = CB.seg("df-j-load", go);
+  const ga = CB.range("df-j-a", (v) => v.toFixed(1) + " m", go);
+  let real, cur, conj, cs;
+  const realSup = (t) => t === "cant" ? [{ x: 0, type: "fixed" }] : t === "over" ? [{ x: 0, type: "pin" }, { x: 7, type: "roller" }] : [{ x: 0, type: "pin" }, { x: L, type: "roller" }];
+  const conjSup = (t) => t === "cant" ? { supports: [{ x: L, type: "fixed" }], hinges: [] } : t === "over" ? { supports: [{ x: 0, type: "pin" }, { x: L, type: "fixed" }], hinges: [7] } : { supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }], hinges: [] };
+  function solve() {
+    const t = ccase();
+    real = CB.beam({ L, EI, supports: realSup(t), loads: load() === "pt" ? [{ type: "point", P: 100, a: ga() }] : [{ type: "udl", w: 20, a: 0, b: L }] });
+    cur = DFX.curve(real, 800);
+    const loads = [];
+    for (let k = 0; k < NSEG; k++) { const a = (L * k) / NSEG, bb = (L * (k + 1)) / NSEG; loads.push({ type: "lin", w1: -real.at(a + 1e-9, 1).M / EI, w2: -real.at(bb - 1e-9, -1).M / EI, a, b: bb }); }
+    cs = conjSup(t);
+    conj = CB.beam({ L, EI: 1, supports: cs.supports, hinges: cs.hinges, loads });
+  }
+  solve();
+  const view = { x: [-1, L + 1], y: [-1.4, 1.3], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.46 : 0.26), minHeight: 150, maxHeight: 220 };
+  const p1 = CB.plane("#df-cv-cj1", Object.assign({}, view, { draw(P) { if (real.ok) CB.drawFrame(P, real.frame, { deformed: "auto", deformPx: 26, loadPx: 30, loadLabels: false }); } }));
+  const p2 = CB.plane("#df-cv-cj2", Object.assign({}, view, { draw(P) {
+    if (!conj.ok) return;
+    CB.drawFrame(P, conj.frame, { loads: false });
+    const pal = P.P, ks = cur.M.map((m) => m / EI), mx = Math.max(...ks.map(Math.abs)) || 1, sc = 30 / mx, y0 = P.Y(0);
+    // 양(+)의 M/EI는 위 방향 하중: 보 아래에서 위로 미는 화살표
+    const ctx = P.ctx;
+    ctx.save(); ctx.fillStyle = CB.color("accent-2-soft"); ctx.strokeStyle = pal.accent2; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(P.X(0), y0); cur.xs.forEach((x, i) => ctx.lineTo(P.X(x), y0 + (ks[i] > 0 ? 8 : -8) * (Math.abs(ks[i]) > 1e-12 ? 1 : 0) + ks[i] * sc)); ctx.lineTo(P.X(L), y0); ctx.closePath(); ctx.globalAlpha = 0.8; ctx.fill(); ctx.globalAlpha = 1; ctx.stroke(); ctx.restore();
+    for (let k = 0; k <= 20; k++) {
+      const x = (L * k) / 20, q = cur.at(x).M / EI; if (Math.abs(q) < mx * 0.06) continue;
+      const tail = y0 + (q > 0 ? 8 : -8) + q * sc, head = y0 + (q > 0 ? 5 : -5);
+      ctx.save(); ctx.strokeStyle = pal.accent2; ctx.fillStyle = pal.accent2; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(P.X(x), tail); ctx.lineTo(P.X(x), head); ctx.stroke();
+      const d = q > 0 ? -1 : 1; ctx.beginPath(); ctx.moveTo(P.X(x), head); ctx.lineTo(P.X(x) - 4, head - d * 7); ctx.lineTo(P.X(x) + 4, head - d * 7); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+  } }));
+  const p3 = CB.canvas("#df-cv-cj3", (ctx, W, H) => {
+    if (!conj.ok) return;
+    const pal = CB.palette(), cp = conj.sample(300);
+    const th = cur.xs.map((x, i) => [x, cur.th[i] * 1000]), v = cur.xs.map((x, i) => [x, cur.v[i] * 1000]);
+    const cth = cp.map((p) => [p.x, p.V * 1000]), cv = cp.map((p) => [p.x, p.M * 1000]);
+    const rng = (a, b) => { const all = a.concat(b).map((p) => p[1]), lo = Math.min(0, ...all), hi = Math.max(0, ...all), pd = (hi - lo) * 0.15 || 1; return [lo - pd, hi + pd]; };
+    const padL = 64, gap = 30, rowH = (H - 8 - 24 - gap) / 2;
+    CB.chart(ctx, { x: padL, y: 8, w: W - padL - 16, h: rowH }, { x: [0, L], y: rng(th, cth), yLabel: "θ, V̄ (mrad)", series: [{ data: th, color: pal.accent, width: 3 }, { data: cth, color: pal.accent2, width: 1.8, dash: [6, 4] }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    CB.chart(ctx, { x: padL, y: 8 + rowH + gap, w: W - padL - 16, h: rowH }, { x: [0, L], y: rng(v, cv), yLabel: "v, M̄ (mm)", series: [{ data: v, color: pal.accent, width: 3 }, { data: cv, color: pal.accent2, width: 1.8, dash: [6, 4] }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    ctx.save(); ctx.fillStyle = pal.dim; ctx.font = "12px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("x (m)", padL - 10, H - 2); ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 380 });
+  function go() {
+    document.getElementById("df-j-a").disabled = load() !== "pt";
+    solve(); p1.redraw(); p2.redraw(); p3.redraw();
+    if (!conj.ok) return;
+    const thA = cur.th[0] * 1000, vA = conj.at(0, 1).V * 1000;
+    let im = 0; cur.v.forEach((q, i) => { if (Math.abs(q) > Math.abs(cur.v[im])) im = i; });
+    const xm = cur.xs[im];
+    CB.stat("df-j-th", `${CB.num(thA, 3)} / ${CB.num(vA, 3)} <small>mrad</small>`);
+    CB.stat("df-j-v", `${CB.num(Math.abs(cur.v[im]) * 1000, 2)} / ${CB.num(Math.abs(conj.at(xm, -1).M) * 1000, 2)} <small>mm</small>`);
+  }
+  go();
+})();
+
+/* ---------- 5. 중첩 조립 ---------- */
+(function () {
+  const L = 8, EI = 3.14e5, N = 160;
+  const gw = CB.range("df-s-w", (v) => CB.num(v, 1) + " kN/m", go), gp = CB.range("df-s-p", (v) => v + " kN", go), ga = CB.range("df-s-a", (v) => v.toFixed(1) + " m", go);
+  const gma = CB.range("df-s-ma", (v) => CB.num(v, 1) + " kN·m", go), gmb = CB.range("df-s-mb", (v) => CB.num(v, 1) + " kN·m", go);
+  document.getElementById("df-s-fix").addEventListener("click", () => { const w = gw() || 76.7; gw.set(w, false); gp.set(0, false); gma.set(+(-w * L * L / 12).toFixed(1), false); gmb.set(+(-w * L * L / 12).toFixed(1), false); go(); });
+  document.getElementById("df-s-reset").addEventListener("click", () => { gw.set(40, false); gp.set(100, false); ga.set(2.5, false); gma.set(0, false); gmb.set(0, false); go(); });
+  const sup = [{ x: 0, type: "pin" }, { x: L, type: "roller" }];
+  // 단면력 부호의 끝 모멘트 → 가할 우력(반시계 +): 왼쪽 C = −M_A, 오른쪽 C = +M_B
+  const loadsOf = () => [
+    { type: "udl", w: gw(), a: 0, b: L },
+    { type: "point", P: gp(), a: ga() },
+    { type: "moment", M: -gma(), a: 0 },
+    { type: "moment", M: gmb(), a: L },
+  ];
+  const xs = Array.from({ length: N + 1 }, (_, k) => (L * k) / N);
+  let parts, direct, dcurve;
+  function solve() {
+    const ls = loadsOf();
+    parts = ls.map((ld) => { const b = CB.beam({ L, EI, supports: sup, loads: [ld] }); const c = DFX.curve(b, 400); return xs.map((x) => c.at(x).v); });
+    const db = CB.beam({ L, EI, supports: sup, loads: ls }); dcurve = DFX.curve(db, 400); direct = xs.map((x) => dcurve.at(x).v);
+  }
+  solve();
+  const colors = () => { const p = CB.palette(); return [p.accent2, p.warn, p.ok, CB.color("blue")]; };
+  const paint = () => { const c = colors(); ["df-s-c1", "df-s-c2", "df-s-c3", "df-s-c4"].forEach((id, i) => { document.getElementById(id).style.background = c[i]; }); };
+  CB.onTheme(paint); paint();
+  const cv = CB.canvas("#df-cv-sup", (ctx, W, H) => {
+    const pal = CB.palette(), c = colors();
+    const sum = xs.map((_, i) => parts.reduce((s, p) => s + p[i], 0));
+    const all = parts.flat().concat(sum).map((v) => v * 1000), lo = Math.min(0, ...all), hi = Math.max(0, ...all), pd = (hi - lo) * 0.12 || 1;
+    const series = parts.map((p, i) => ({ data: xs.map((x, k) => [x, p[k] * 1000]), color: c[i], width: 1.6 }));
+    series.push({ data: xs.map((x, k) => [x, sum[k] * 1000]), color: pal.text, width: 3.2 });
+    series.push({ data: xs.map((x, k) => [x, direct[k] * 1000]), color: pal.accent, width: 1.6, dash: [6, 4] });
+    CB.chart(ctx, null, { x: [0, L], y: [lo - pd, hi + pd], xLabel: "x (m)", yLabel: "v (mm)", series, hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.52), minHeight: 260, maxHeight: 400 });
+  function go() {
+    solve(); cv.redraw();
+    const mid = N / 2, s = parts.reduce((t, p) => t + p[mid], 0);
+    CB.stat("df-s-sum", CB.num(s * 1000, 3) + " mm");
+    CB.stat("df-s-dir", CB.num(direct[mid] * 1000, 3) + " mm");
+    CB.stat("df-s-th", CB.num(dcurve.th[0] * 1000, 3) + " mrad");
+  }
+  go();
+})();
+
+/* ---------- 6. 경간·춤 배율 ---------- */
+(function () {
+  const L0 = 6, EI0 = 2.75e7 * (0.4 * 0.6 ** 3) / 12, w = 20, P = 80;
+  const gk = CB.range("df-p-k", (v) => v.toFixed(2) + "×", go), gh = CB.range("df-p-h", (v) => v.toFixed(2) + "×", go);
+  const load = CB.seg("df-p-load", go);
+  let b0, b1;
+  function solve() {
+    const L1 = L0 * gk(), EI1 = EI0 * gh() ** 3;
+    const ld = (L) => load() === "udl" ? [{ type: "udl", w, a: 0, b: L }] : [{ type: "point", P, a: L / 2 }];
+    b0 = CB.beam({ L: L0, EI: EI0, supports: [{ x: 0, type: "pin" }, { x: L0, type: "roller" }], loads: ld(L0) });
+    b1 = CB.beam({ L: L1, EI: EI1, supports: [{ x: 0, type: "pin" }, { x: L1, type: "roller" }], loads: ld(L1) });
+  }
+  solve();
+  const cv = CB.canvas("#df-cv-span", (ctx, W, H) => {
+    const pal = CB.palette(), s0 = b0.sample(120), s1 = b1.sample(240), Lmax = L0 * 2.5;
+    const lo = Math.min(...s1.map((p) => p.v * 1000), ...s0.map((p) => p.v * 1000)) * 1.15;
+    const c = CB.chart(ctx, null, { x: [0, Lmax], y: [lo, -lo * 0.12], xLabel: "x (m)", yLabel: "v (mm)",
+      series: [{ data: s0.map((p) => [p.x, p.v * 1000]), color: pal.text, width: 2.4 }, { data: s1.map((p) => [p.x, p.v * 1000]), color: pal.accent, width: 2.8, fill: CB.color("accent-soft") }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    DFX.text(ctx, `기준 L₀ = ${L0} m`, c.X(L0 / 2), c.Y(b0.at(L0 / 2).v * 1000) + 16, pal.text, { size: 11 });
+    DFX.text(ctx, `L = ${CB.num(b1.L, 1)} m, h = ${gh().toFixed(2)}h₀`, c.X(b1.L / 2), c.Y(b1.at(b1.L / 2).v * 1000) + 16, pal.accent, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 240, maxHeight: 360 });
+  function go() {
+    solve(); cv.redraw();
+    const d0 = Math.abs(b0.at(L0 / 2).v), d1 = Math.abs(b1.at(b1.L / 2).v), k = gk(), h = gh();
+    const f = load() === "udl" ? k ** 4 / h ** 3 : k ** 3 / h ** 3;
+    CB.stat("df-p-r", CB.num(d1 / d0, 2) + "×");
+    CB.stat("df-p-f", load() === "udl" ? `k⁴/η³ = ${CB.num(f, 2)}` : `k³/η³ = ${CB.num(f, 2)}`);
+    CB.stat("df-p-ld", `${CB.sig(L0 / d0, 3)} → ${CB.sig(b1.L / d1, 3)}`);
+  }
+  go();
+})();
+
+/* ---------- 7. 처짐 제한 검토기 ---------- */
+(function () {
+  const gL = CB.range("df-l-L", (v) => v.toFixed(1) + " m", go), gw = CB.range("df-l-w", (v) => v + " kN/m", go);
+  const sel = document.getElementById("df-l-sec"); sel.addEventListener("change", go);
+  const sup = CB.seg("df-l-sup", go), lim = CB.seg("df-l-lim", go);
+  document.getElementById("df-l-g1").addEventListener("click", () => { gL.set(8, false); gw.set(20, false); sel.value = "g1"; go(); });
+  let b, span0, span1, d, cur;
+  function solve() {
+    const L = gL(), w = gw(), EI = DFX.EIof(sel.value), t = sup();
+    if (t === "cont") { b = CB.beam({ L: 3 * L, EI, supports: [0, 1, 2, 3].map((k) => ({ x: k * L, type: k ? "roller" : "pin" })), loads: [{ type: "udl", w, a: 0, b: 3 * L }] }); span0 = L; span1 = 2 * L; }
+    else { b = CB.beam({ L, EI, supports: t === "fixed" ? [{ x: 0, type: "fixed" }, { x: L, type: "fixed" }] : [{ x: 0, type: "pin" }, { x: L, type: "roller" }], loads: [{ type: "udl", w, a: 0, b: L }] }); span0 = 0; span1 = L; }
+    cur = DFX.curve(b, 600);
+    d = 0; cur.xs.forEach((x, i) => { if (x >= span0 - 1e-9 && x <= span1 + 1e-9) d = Math.max(d, Math.abs(cur.v[i])); });
+  }
+  solve();
+  const cv = CB.canvas("#df-cv-lim", (ctx, W, H) => {
+    const pal = CB.palette(), L = gL(), allow = L / +lim(), ok = d <= allow;
+    // 위: 검토 경간의 처짐 곡선(실제 mm)
+    const pts = cur.xs.map((x, i) => [x, cur.v[i] * 1000]).filter(([x]) => x >= span0 - 1e-9 && x <= span1 + 1e-9);
+    const scaleMin = -Math.max(d, allow) * 1000 * 1.25;
+    const c = CB.chart(ctx, { x: 64, y: 14, w: W - 80, h: H * 0.56 }, { x: [span0, span1], y: [scaleMin, -scaleMin * 0.1], yLabel: "v (mm)", xFmt: (v) => String(+(v - span0).toFixed(1)),
+      series: [{ data: pts, color: ok ? pal.accent : pal.bad, width: 2.8, fill: CB.color("accent-soft") }], hlines: [{ y: 0, color: pal.axis, dash: [] }, { y: -allow * 1000, color: pal.warn, label: `허용 L/${lim()} = ${CB.num(allow * 1000, 1)} mm` }] });
+    // 아래: 사용률 막대
+    const by = 14 + H * 0.56 + 40, bw = W - 80, bh = 18, u = d / allow;
+    ctx.save(); ctx.fillStyle = pal.surface; ctx.fillRect(64, by, bw, bh);
+    ctx.fillStyle = ok ? pal.ok : pal.bad; ctx.fillRect(64, by, Math.min(1.5, u) / 1.5 * bw, bh);
+    ctx.strokeStyle = pal.text; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(64 + bw / 1.5, by - 6); ctx.lineTo(64 + bw / 1.5, by + bh + 6); ctx.stroke(); ctx.restore();
+    DFX.text(ctx, `δ / δ허용 = ${CB.num(u, 2)}`, 64 + Math.min(1.5, u) / 1.5 * bw, by + bh + 16, ok ? pal.ok : pal.bad, { align: u > 1.2 ? "right" : "left", size: 11.5 });
+    DFX.text(ctx, "1.0", 64 + bw / 1.5, by - 12, pal.text, { size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.46), minHeight: 250, maxHeight: 360 });
+  function go() {
+    solve(); cv.redraw();
+    const L = gL(), allow = L / +lim(), ok = d <= allow;
+    CB.stat("df-l-d", CB.num(d * 1000, 2) + " mm");
+    CB.stat("df-l-a", CB.num(allow * 1000, 1) + " mm");
+    CB.stat("df-l-ld", CB.sig(L / d, 3));
+    const msg = document.getElementById("df-l-msg");
+    msg.className = "df-msg " + (ok ? "ok" : "bad");
+    msg.innerHTML = ok ? `통과: 활하중 처짐 ${CB.num(d * 1000, 1)} mm ≤ L/${lim()} = ${CB.num(allow * 1000, 1)} mm` : `초과: I를 ${CB.num(d / allow, 2)}배 이상 키우거나(직사각형이면 춤 ${CB.num(Math.cbrt(d / allow), 2)}배) 경간을 줄여야 합니다.`;
+  }
+  go();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>트러스 · MechanicsBook</title>
+<meta name="description" content="삼각형은 왜 단단한가. 트러스의 이상화와 2력 부재, 안정·정정 판별, 절점법과 단면법, 영부재, 프랫·하우·워런 트러스의 인장과 압축, 높이와 강재량의 관계, 보도교 T-36의 모든 부재력을 직접 계산하며 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .tr-stack { display: grid; grid-template-columns: 1fr; }
+  .tr-stack > div { position: relative; min-width: 0; }
+  .tr-stack > div + div { border-top: 1px solid var(--border); }
+  .tr-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .tr-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .tr-msg b { color: var(--text); }
+  .tr-msg.ok { color: var(--ok); font-weight: 600; }
+  .tr-msg.bad { color: var(--bad); font-weight: 600; }
+  .tr-legend { display: flex; flex-wrap: wrap; gap: 4px 2px; padding: 8px 18px; border-top: 1px solid var(--border); }
+  .tr-tbl td, .tr-tbl th { font-variant-numeric: tabular-nums; }
+  .tr-tbl td.t { color: var(--tension); font-weight: 700; }
+  .tr-tbl td.c { color: var(--compression); font-weight: 700; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="mechanics"></script>
+</head>
+<body data-chapter="truss">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="tr-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="tr-ah-react" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="tr-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--tension)"/></marker>
+      <marker id="tr-ah-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--compression)"/></marker>
+      <marker id="tr-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 03</div>
+    <h1 data-no-glossary>트러스</h1>
+    <p class="lead">철교, 체육관 지붕, 송전탑, 타워크레인의 팔. 가는 막대를 삼각형으로 엮은 구조물은 어디에나 있습니다. 이 구조를 <b>트러스</b>라 합니다. 트러스의 막대는 휘지 않고 오직 당겨지거나(인장) 눌리기만(압축) 하므로, 같은 무게의 강재로 훨씬 먼 거리를 건널 수 있습니다. 이 장에서는 트러스를 이상화하는 가정과 그 이유를 살피고, 절점 하나씩 평형을 푸는 절점법과 한 번에 잘라 푸는 단면법으로 부재력을 구합니다. 그리고 형식과 높이에 따라 인장·압축이 어떻게 나뉘는지 비교하고, 이 책의 기준 교량 T-36의 21개 부재력을 모두 계산합니다.</p>
+    <ul class="objectives">
+      <li>트러스의 네 가지 이상화 가정과, 그 결과 부재가 축력만 받는 2력 부재가 되는 이유를 설명한다.</li>
+      <li>\(m + r = 2j\)로 트러스의 안정·정정을 판별하고, 개수가 맞아도 불안정한 경우를 알아본다.</li>
+      <li>절점법으로 부재력을 차례로 구하고 힘 다각형으로 검산한다.</li>
+      <li>단면법에서 모멘트 중심을 골라 원하는 부재력을 한 식으로 구한다.</li>
+      <li>영부재를 규칙으로 찾고, 영부재가 왜 필요한지 설명한다.</li>
+      <li>프랫·하우·워런 트러스의 인장·압축 분포를 비교하고, 높이에 따른 현재력과 강재량의 관계를 이해한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>철도가 건넌 강</b></div>
+      <div class="o-body"><p>19세기 철도는 이전보다 훨씬 무거운 하중을 훨씬 먼 거리 건너야 했습니다. 미국에서는 1840년 하우(William Howe), 1844년 프랫(Thomas와 Caleb Pratt) 부자, 1848년 영국의 워런(James Warren)과 몬자니가 각자의 트러스 형식으로 특허를 냈고, 이 이름들은 오늘날까지 트러스 형식의 이름으로 남았습니다. 1847년 미국의 휘플(Squire Whipple)은 트러스의 부재력을 평형으로 계산하는 방법을 책으로 정리해, 경험이 아니라 계산으로 다리를 짓는 길을 열었습니다.</p>
+        <p>트러스 계산은 구조역학에서 가장 깔끔한 문제입니다. 부재마다 미지수가 하나(축력)뿐이고, 절점마다 평형 방정식이 두 개씩 있기 때문입니다. 오늘날 해석 프로그램이 푸는 거대한 연립 방정식도 결국 "절점마다 힘의 합이 0"이라는 이 장의 식을 모아 놓은 것입니다(16장).</p>
+        <div class="o-chain"><span>삼각형의 안정</span><i>→</i><span>2력 부재</span><i>→</i><span class="tool">절점법·단면법</span><i>→</i><span>인장재·압축재 설계</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="triangle">
+    <h2>왜 삼각형인가</h2>
+    <div class="problem"><strong>네모난 문틀은 왜 비뚤어지나</strong>
+      <p>막대 네 개를 모서리마다 핀으로 이어 네모를 만들면, 손가락으로 살짝만 밀어도 평행사변형으로 쓰러집니다. 그런데 대각선 막대 하나를 더하면 꿈쩍도 하지 않습니다. 대각선 하나가 무엇을 바꾼 것일까요?</p></div>
+    <p>핀으로 이은 네모는 막대 길이를 바꾸지 않고도 모양이 바뀔 수 있습니다. 네 각이 함께 변하면 되기 때문입니다. 삼각형은 다릅니다. 세 변의 길이가 정해지면 세 각도 하나로 정해지므로, 막대가 늘거나 줄지 않는 한 모양이 바뀔 수 없습니다. 그래서 삼각형을 이어 붙인 구조물은 막대의 축 방향 변형만으로 하중에 저항합니다.</p>
+    <figure class="diagram" id="fig-tr-triangle">
+      <svg viewBox="0 0 760 250" role="img" aria-label="핀으로 이은 사각형은 쓰러지고 대각선을 넣은 삼각형은 단단하다">
+        <rect x="10" y="10" width="740" height="230" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">(a) 네모: 기구</text>
+          <path d="M20 170 L20 50 L180 50 L180 170" style="fill:none;stroke:var(--text-dim);stroke-width:2;stroke-dasharray:5 4"/>
+          <path d="M20 170 L70 60 L230 60 L180 170" style="fill:none;stroke:var(--bad);stroke-width:3"/>
+          <g style="fill:var(--bg-elev);stroke:var(--text);stroke-width:1.6"><circle cx="20" cy="170" r="5"/><circle cx="180" cy="170" r="5"/><circle cx="70" cy="60" r="5"/><circle cx="230" cy="60" r="5"/></g>
+          <line x1="80" y1="34" x2="140" y2="34" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#tr-ah-load)"/>
+          <text x="110" y="196" text-anchor="middle" class="t-dim">막대 길이를 그대로 두고 쓰러진다</text>
+        </g>
+        <g transform="translate(430,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">(b) 대각선 하나: 삼각형 둘</text>
+          <path d="M20 170 L20 50 L180 50 L180 170 Z" style="fill:none;stroke:var(--text);stroke-width:3"/>
+          <line x1="20" y1="170" x2="180" y2="50" style="stroke:var(--tension);stroke-width:3.4"/>
+          <g style="fill:var(--bg-elev);stroke:var(--text);stroke-width:1.6"><circle cx="20" cy="170" r="5"/><circle cx="180" cy="170" r="5"/><circle cx="20" cy="50" r="5"/><circle cx="180" cy="50" r="5"/></g>
+          <line x1="-30" y1="50" x2="12" y2="50" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#tr-ah-load)"/>
+          <text x="110" y="196" text-anchor="middle" class="t-dim">대각선이 늘어나야만 변형 → 단단하다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-1.</b> (a) 핀으로 이은 네모는 막대 길이를 바꾸지 않고도 평행사변형으로 쓰러지는 기구다. (b) 대각선 하나가 네모를 삼각형 둘로 나누면 막대가 늘거나 줄지 않는 한 모양이 바뀌지 않는다. 그림의 하중 방향이면 대각선은 인장을 받는다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-tr-rigid">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>대각선 하나의 힘</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tr-cv-rig" aria-label="핀으로 이은 사각형 틀과 가새"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>가새(대각선)</span><div class="seg" id="tr-g-br"><button data-value="0" class="on">없음</button><button data-value="1">하나 (/)</button><button data-value="2">하나 (\)</button><button data-value="3">둘 (X)</button></div></div>
+          <label class="ctrl"><span>수평 하중 H <output id="tr-g-h-out"></output></span><input type="range" id="tr-g-h" min="-60" max="60" step="5" value="30"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">m + r vs 2j</span><span class="v" id="tr-g-cnt">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="tr-g-v">—</span></div>
+        <div class="stat"><span class="k">가새 부재력</span><span class="v" id="tr-g-n">—</span></div>
+      </div>
+      <div class="tr-legend"><span class="key tension">인장</span><span class="key compression">압축</span><span class="key load">하중</span><span class="key reaction">반력</span></div>
+      <div class="sim-note">해볼 것: 가새가 없으면 틀이 흔들리며 쓰러집니다(기구) · 하중 방향을 바꾸면 같은 가새가 인장에서 압축으로 바뀝니다. 그래서 가새를 X자로 두 개 넣거나, 인장만 받는 가는 가새를 두 방향으로 넣습니다 · 모델: 4 m × 4 m 핀 틀, 아래 두 절점 핀 지점, CB.truss. X 가새는 1차 부정정이라 두 가새가 힘을 나눕니다(같은 단면 가정).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="idealization">
+    <h2>트러스의 이상화</h2>
+    <p>실제 트러스의 절점은 거셋판에 볼트나 용접으로 이어져 있어 회전을 어느 정도 막고, 부재에는 자중이 길이를 따라 걸립니다. 그래도 트러스 해석은 다음 가정에서 출발합니다.</p>
+    <div class="callout def"><strong>정의 3.1 (이상 트러스와 2력 부재)</strong> 다음 가정을 만족하는 구조를 이상 <span class="term">트러스</span><span class="en">(truss)</span>라 한다.
+      <ol style="margin:6px 0 0">
+        <li>부재는 곧은 막대이고, 양 끝이 마찰 없는 핀으로 절점에 이어진다.</li>
+        <li>하중과 반력은 절점에만 작용한다(부재 자중은 양 끝 절점에 반씩 나눠 준다).</li>
+        <li>부재의 축선은 절점의 중심에서 만난다.</li>
+        <li>변형은 작아서 평형은 변형 전 모양으로 세운다.</li>
+      </ol>
+      이 가정에서 각 부재는 양 끝 두 점에서만 힘을 받는 <span class="term">2력 부재</span><span class="en">(two-force member)</span>가 되고, 평형을 위해 두 힘은 크기가 같고 방향이 반대이며 <b>부재 축선 위</b>에 있어야 한다. 따라서 트러스 부재에는 <span class="term">축력</span>(인장 또는 압축)만 생긴다.</div>
+    <figure class="diagram" id="fig-tr-ideal">
+      <svg viewBox="0 0 760 260" role="img" aria-label="거셋판 절점의 이상화와 2력 부재의 자유물체도">
+        <rect x="10" y="10" width="740" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="120" y="0" text-anchor="middle" class="t" style="font-weight:700">(a) 실제 절점: 거셋판 + 볼트</text>
+          <polygon points="80,60 170,60 200,150 50,150" style="fill:var(--surface-2);stroke:var(--text)"/>
+          <rect x="0" y="130" width="250" height="18" style="fill:var(--elev, var(--bg-elev));stroke:var(--text)"/>
+          <rect x="114" y="20" width="18" height="110" class="f-elev" style="stroke:var(--text)"/>
+          <rect x="138" y="70" width="16" height="90" transform="rotate(-38 146 115)" class="f-elev" style="stroke:var(--text)"/>
+          <g style="fill:var(--text)"><circle cx="123" cy="80" r="3"/><circle cx="123" cy="100" r="3"/><circle cx="80" cy="139" r="3"/><circle cx="170" cy="139" r="3"/><circle cx="160" cy="98" r="3"/></g>
+          <text x="125" y="190" text-anchor="middle" class="t-dim">회전을 조금 막지만 무시한다</text>
+        </g>
+        <g transform="translate(320,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">(b) 이상화: 핀</text>
+          <line x1="0" y1="140" x2="160" y2="140" style="stroke:var(--text);stroke-width:3"/>
+          <line x1="80" y1="140" x2="80" y2="30" style="stroke:var(--text);stroke-width:3"/>
+          <line x1="80" y1="140" x2="150" y2="50" style="stroke:var(--text);stroke-width:3"/>
+          <circle cx="80" cy="140" r="6" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/>
+          <text x="80" y="190" text-anchor="middle" class="t-dim">축선이 한 점에서 만난다</text>
+        </g>
+        <g transform="translate(540,40)">
+          <text x="90" y="0" text-anchor="middle" class="t" style="font-weight:700">(c) 2력 부재</text>
+          <line x1="40" y1="150" x2="140" y2="50" style="stroke:var(--text);stroke-width:5"/>
+          <line x1="40" y1="150" x2="10" y2="180" style="stroke:var(--tension);stroke-width:2.6" marker-end="url(#tr-ah-t)"/>
+          <line x1="140" y1="50" x2="170" y2="20" style="stroke:var(--tension);stroke-width:2.6" marker-end="url(#tr-ah-t)"/>
+          <text x="120" y="118" class="t-mono" style="fill:var(--tension)">N (인장 +)</text>
+          <text x="90" y="210" text-anchor="middle" class="t-dim">두 힘은 축선 위, 크기 같고 반대</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-2.</b> (a) 실제 트러스 절점은 거셋판에 볼트로 잇는다. (b) 해석에서는 축선이 한 점에서 만나는 핀으로 본다. (c) 그 결과 각 부재는 양 끝에서 축선 방향의 힘만 받는 2력 부재가 된다. 인장이면 화살표가 절점에서 멀어지는 방향(부재가 절점을 당김)이다.</figcaption>
+    </figure>
+    <p>실제 절점이 회전을 막아 생기는 휨(<b>2차 응력</b>)은 부재가 가늘고 절점이 촘촘할수록 작습니다. 그래서 대부분의 트러스는 이상 트러스로 부재력을 구하고, 필요하면 2차 응력을 따로 검토합니다. 부재력의 부호는 <b>인장 +, 압축 −</b>로 쓰고, 그림에서는 인장을 파랑, 압축을 빨강으로 칠합니다.</p>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="determinacy">
+    <h2>안정과 정정 판별</h2>
+    <p>평면 트러스의 각 절점은 2력 부재들이 모이는 점이므로, 절점마다 독립인 평형 방정식은 \(\Sigma F_x = 0\), \(\Sigma F_y = 0\) 두 개입니다. 절점이 \(j\)개면 방정식은 \(2j\)개, 미지수는 부재력 \(m\)개와 반력 \(r\)개입니다.</p>
+    <div class="callout def"><strong>원리 3.2 (트러스의 판별식)</strong>
+      <div class="formula">$$m + r \lt 2j: \ \text{불안정}, \qquad m + r = 2j: \ \text{정정(배치가 적절하면)}, \qquad m + r \gt 2j: \ (m + r - 2j)\text{차 부정정}.$$</div>
+      이 식은 필요조건일 뿐이다. 개수가 맞아도 한 부분에 부재가 몰리고 다른 부분이 기구가 되면 불안정하다. 삼각형 하나에서 시작해 새 절점 하나를 부재 두 개로 이어 붙이며 만든 <span class="term">단순 트러스</span><span class="en">(simple truss)</span>는 언제나 내적으로 안정하다(\(m = 2j - 3\)).</div>
+    <figure class="diagram" id="fig-tr-count">
+      <svg viewBox="0 0 760 250" role="img" aria-label="단순 트러스를 삼각형 하나에서 키워 가는 과정과 개수는 맞지만 불안정한 트러스">
+        <rect x="10" y="10" width="740" height="230" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="200" y="0" text-anchor="middle" class="t" style="font-weight:700">(a) 단순 트러스: 절점 1개 + 부재 2개씩</text>
+          <g style="stroke:var(--text);stroke-width:2.6"><line x1="0" y1="140" x2="80" y2="140"/><line x1="0" y1="140" x2="40" y2="70"/><line x1="40" y1="70" x2="80" y2="140"/></g>
+          <g style="stroke:var(--accent);stroke-width:2.6"><line x1="80" y1="140" x2="120" y2="70"/><line x1="40" y1="70" x2="120" y2="70"/></g>
+          <g style="stroke:var(--accent-2);stroke-width:2.6"><line x1="120" y1="70" x2="160" y2="140"/><line x1="80" y1="140" x2="160" y2="140"/></g>
+          <g style="stroke:var(--ok);stroke-width:2.6"><line x1="160" y1="140" x2="200" y2="70"/><line x1="120" y1="70" x2="200" y2="70"/></g>
+          <g style="fill:var(--bg-elev);stroke:var(--text);stroke-width:1.5"><circle cx="0" cy="140" r="4"/><circle cx="80" cy="140" r="4"/><circle cx="40" cy="70" r="4"/><circle cx="120" cy="70" r="4"/><circle cx="160" cy="140" r="4"/><circle cx="200" cy="70" r="4"/></g>
+          <text x="100" y="176" text-anchor="middle" class="t-mono">j = 6, m = 9 = 2j − 3</text>
+          <text x="100" y="196" text-anchor="middle" class="t-dim">+ 반력 3 → m + r = 12 = 2j</text>
+        </g>
+        <g transform="translate(430,40)">
+          <text x="140" y="0" text-anchor="middle" class="t" style="font-weight:700">(b) 개수는 맞지만 불안정</text>
+          <g style="stroke:var(--text);stroke-width:2.6"><line x1="20" y1="140" x2="120" y2="140"/><line x1="20" y1="60" x2="120" y2="60"/><line x1="20" y1="60" x2="20" y2="140"/><line x1="120" y1="60" x2="120" y2="140"/><line x1="20" y1="140" x2="120" y2="60"/><line x1="20" y1="60" x2="120" y2="140"/></g>
+          <g style="stroke:var(--bad);stroke-width:2.6"><line x1="120" y1="140" x2="220" y2="140"/><line x1="120" y1="60" x2="220" y2="60"/><line x1="220" y1="60" x2="220" y2="140"/></g>
+          <g style="fill:var(--bg-elev);stroke:var(--text);stroke-width:1.5"><circle cx="20" cy="140" r="4"/><circle cx="120" cy="140" r="4"/><circle cx="20" cy="60" r="4"/><circle cx="120" cy="60" r="4"/><circle cx="220" cy="60" r="4"/><circle cx="220" cy="140" r="4"/></g>
+          <text x="140" y="176" text-anchor="middle" class="t-mono">j = 6, m = 9, r = 3 → 12 = 2j</text>
+          <text x="140" y="196" text-anchor="middle" class="t-dim">왼쪽 칸은 대각선 2개(남음), 오른쪽 칸은 0개(기구)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-3.</b> (a) 삼각형에 절점 하나를 부재 두 개로 붙여 가며 만든 단순 트러스는 안정하다. (b) 같은 개수라도 한 칸에 대각선이 두 개, 이웃 칸에 하나도 없으면 오른쪽 칸이 쓰러지는 기구다. 판별식은 필요조건일 뿐이다.</figcaption>
+    </figure>
+    <div class="callout site"><strong>T-36의 판별</strong> 기준 교량 T-36은 하현 절점 7개(A–G), 상현 절점 5개(H–L)로 \(j = 12\), 부재는 하현 6 + 상현 4 + 수직재 5 + 단부 경사재 2 + 사재 4 = \(m = 21\), 지점은 핀 + 롤러로 \(r = 3\)이다. \(m + r = 24 = 2j\)이고 삼각형으로만 이루어져 있으므로 정정이다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="joints">
+    <h2>절점법</h2>
+    <p><span class="term">절점법</span><span class="en">(method of joints)</span>은 절점 하나를 떼어 내 그 절점에 모인 힘의 평형 \(\Sigma F_x = \Sigma F_y = 0\)을 푸는 방법입니다. 식이 두 개이므로 <b>미지 부재력이 두 개 이하인 절점</b>부터 풀고, 구한 값을 들고 다음 절점으로 갑니다. 보통 먼저 전체 평형으로 반력을 구한 뒤 지점 절점에서 출발합니다.</p>
+    <div class="callout tip"><strong>부호를 틀리지 않는 요령</strong> 모르는 부재력은 모두 <b>인장</b>으로 가정하고, 절점 자유물체도에 절점에서 <b>멀어지는</b> 방향(부재가 절점을 당기는 방향)으로 그립니다. 답이 음수면 압축입니다. 이렇게 하면 한 부재의 양 끝 절점에서 같은 부호를 그대로 쓸 수 있습니다.</div>
+    <figure class="diagram" id="fig-tr-joint">
+      <svg viewBox="0 0 760 280" role="img" aria-label="킹포스트 트러스와 절점 A, D의 자유물체도">
+        <rect x="10" y="10" width="740" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="140" y="0" text-anchor="middle" class="t" style="font-weight:700">예제 3.1의 트러스</text>
+          <g style="stroke:var(--text);stroke-width:3"><line x1="20" y1="180" x2="260" y2="180"/><line x1="20" y1="180" x2="140" y2="90"/><line x1="140" y1="90" x2="260" y2="180"/><line x1="140" y1="90" x2="140" y2="180"/></g>
+          <g style="fill:var(--bg-elev);stroke:var(--text);stroke-width:1.6"><circle cx="20" cy="180" r="5"/><circle cx="140" cy="180" r="5"/><circle cx="260" cy="180" r="5"/><circle cx="140" cy="90" r="5"/></g>
+          <line x1="140" y1="40" x2="140" y2="82" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#tr-ah-load)"/><text x="148" y="54" class="t-mono" style="fill:var(--accent-2)">40 kN</text>
+          <line x1="160" y1="186" x2="160" y2="222" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#tr-ah-load)"/><text x="168" y="218" class="t-mono" style="fill:var(--accent-2)">20 kN</text>
+          <text x="6" y="170" class="t-mono">A</text><text x="126" y="170" class="t-mono">B</text><text x="266" y="170" class="t-mono">C</text><text x="148" y="86" class="t-mono">D</text>
+          <text x="80" y="200" text-anchor="middle" class="t-mono">4 m</text><text x="200" y="200" text-anchor="middle" class="t-mono">4 m</text><text x="150" y="140" class="t-mono">3 m</text>
+        </g>
+        <g transform="translate(390,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">절점 A</text>
+          <circle cx="60" cy="150" r="6" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/>
+          <line x1="60" y1="150" x2="140" y2="90" style="stroke:var(--tension);stroke-width:2.4;stroke-dasharray:6 4" marker-end="url(#tr-ah-t)"/><text x="108" y="96" class="t-mono" style="fill:var(--tension)">N_AD</text>
+          <line x1="60" y1="150" x2="150" y2="150" style="stroke:var(--tension);stroke-width:2.4;stroke-dasharray:6 4" marker-end="url(#tr-ah-t)"/><text x="124" y="168" class="t-mono" style="fill:var(--tension)">N_AB</text>
+          <line x1="60" y1="210" x2="60" y2="160" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#tr-ah-react)"/><text x="68" y="204" class="t-mono" style="fill:var(--ok)">30 kN</text>
+          <text x="80" y="236" text-anchor="middle" class="t-dim">미지수 2개 → 바로 푼다</text>
+        </g>
+        <g transform="translate(580,40)">
+          <text x="70" y="0" text-anchor="middle" class="t" style="font-weight:700">절점 D</text>
+          <circle cx="70" cy="110" r="6" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/>
+          <line x1="70" y1="110" x2="10" y2="155" style="stroke:var(--tension);stroke-width:2.4;stroke-dasharray:6 4" marker-end="url(#tr-ah-t)"/>
+          <line x1="70" y1="110" x2="130" y2="155" style="stroke:var(--tension);stroke-width:2.4;stroke-dasharray:6 4" marker-end="url(#tr-ah-t)"/>
+          <line x1="70" y1="110" x2="70" y2="180" style="stroke:var(--tension);stroke-width:2.4;stroke-dasharray:6 4" marker-end="url(#tr-ah-t)"/>
+          <line x1="70" y1="50" x2="70" y2="100" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#tr-ah-load)"/>
+          <text x="80" y="196" class="t-mono">N_BD (= 20)</text>
+          <text x="70" y="236" text-anchor="middle" class="t-dim">모두 인장으로 가정</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-4.</b> 절점법. 모르는 부재력은 모두 인장(절점에서 멀어지는 방향)으로 그린다. A에서 미지수 두 개(N<sub>AD</sub>, N<sub>AB</sub>)를 풀고, B에서 N<sub>BD</sub>를, D에서 나머지를 푼다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 3.1 (킹포스트 트러스)</strong> 경간 8 m, 높이 3 m인 트러스 ABCD(그림 3-4). 꼭대기 D에 40 kN, 가운데 아래 B에 20 kN(천장 하중)이 걸린다.
+      <ol style="margin:6px 0 0">
+        <li><b>반력.</b> 대칭이므로 \(A_y = C_y = 30\) kN, \(A_x = 0\).</li>
+        <li><b>절점 A.</b> AD의 방향 코사인은 \((4/5, 3/5)\). \(\Sigma F_y\): \(30 + \tfrac35 N_{AD} = 0\) → \(N_{AD} = -50\) kN(압축). \(\Sigma F_x\): \(N_{AB} + \tfrac45(-50) = 0\) → \(N_{AB} = +40\) kN(인장).</li>
+        <li><b>절점 B.</b> \(\Sigma F_y\): \(N_{BD} - 20 = 0\) → \(N_{BD} = +20\) kN(인장). \(\Sigma F_x\): \(N_{BC} = N_{AB} = +40\) kN.</li>
+        <li><b>절점 D(검산).</b> 대칭으로 \(N_{CD} = -50\) kN. 압축재 AD·CD는 D를 각각 위로 \(\tfrac35 \times 50 = 30\) kN씩 밀고, 하중 40 kN과 인장재 BD(20 kN)는 아래로 당긴다: \(30 + 30 - 40 - 20 = 0\). 맞다.</li>
+      </ol>
+      경사재(상현)는 압축, 하현은 인장, 가운데 수직재는 천장을 매다는 인장재다. 지붕 트러스의 전형적인 힘의 흐름이다.</div>
+    <p>절점 하나의 평형은 그 절점에 모인 힘들을 머리와 꼬리로 이어 붙이면 <b>닫힌 다각형</b>이 된다는 뜻이기도 합니다(<span class="term">힘 다각형</span>). 아래 시뮬레이터에서 절점을 하나씩 풀며 힘 다각형이 닫히는 것을 확인하세요.</p>
+    <div class="sim" id="sim-tr-joints">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>절점법 한 단계씩</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view tr-stack">
+          <div><canvas id="tr-cv-jt" aria-label="4패널 프랫 트러스와 현재 절점"></canvas></div>
+          <div><canvas id="tr-cv-jt2" aria-label="현재 절점의 힘 다각형"></canvas><span class="tr-cap">현재 절점의 힘 다각형</span></div>
+        </div>
+        <div class="sim-controls">
+          <div class="btn-row"><button class="btn primary" id="tr-j-next">다음 절점 ▶</button><button class="btn" id="tr-j-reset">처음부터</button></div>
+          <label class="ctrl"><span>절점 하중 P <output id="tr-j-p-out"></output></span><input type="range" id="tr-j-p" min="10" max="80" step="5" value="40"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">단계</span><span class="v" id="tr-j-step">—</span></div>
+        <div class="stat"><span class="k">이번에 구한 부재력</span><span class="v" id="tr-j-new">—</span></div>
+        <div class="stat"><span class="k">CB.truss와의 차</span><span class="v" id="tr-j-err">—</span></div>
+      </div>
+      <div class="tr-msg" id="tr-j-msg"></div>
+      <div class="sim-note">해볼 것: 각 단계에서 미지 부재가 두 개 이하인지 확인하세요 · 마지막 두 절점은 미지수가 하나 또는 없으니 검산용입니다 · 모델: 경간 16 m(4 패널 × 4 m), 높이 4 m 프랫 트러스, 하현 내부 절점마다 P. 순서 A → B → F → G → C → H → D → E. 힘 다각형은 외력(주황·초록) 다음 부재력(인장 파랑·압축 빨강)을 이어 붙인 것.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="sections">
+    <h2>단면법</h2>
+    <div class="problem"><strong>가운데 부재 하나만 알고 싶다면</strong>
+      <p>T-36의 가운데 상현재가 얼마나 눌리는지만 알고 싶습니다. 절점법이라면 지점에서부터 절점 여섯 개를 차례로 풀어야 합니다. 바로 그 부재로 갈 수는 없을까요?</p></div>
+    <p><span class="term">단면법</span><span class="en">(method of sections)</span>은 트러스를 원하는 부재를 지나도록 잘라, 한쪽 조각 전체의 평형(식 3개)을 쓰는 방법입니다. 미지 부재가 세 개 이하가 되도록 자르면 바로 풀립니다. 요령은 <b>두 미지 부재의 작용선이 만나는 점</b>을 모멘트 중심으로 잡는 것입니다. 그 두 힘은 모멘트를 만들지 않으므로 세 번째 부재력이 한 식으로 나옵니다.</p>
+    <div class="callout def"><strong>원리 3.3 (평행현 트러스의 현재력과 사재력)</strong> 높이 \(h\)인 평행현 트러스를 한 패널에서 자르면, 같은 하중을 받는 단순보의 휨모멘트 \(M\)과 전단력 \(V\)로
+      <div class="formula">$$N_{현재} = \pm\frac{M_{\text{모멘트 중심}}}{h}, \qquad N_{사재} = \pm\frac{V_{\text{패널}}}{\sin\theta}$$<div class="where">현재는 반대편 현재와 사재가 만나는 절점에 대한 \(M\)으로, 사재는 그 패널의 전단력으로 정해진다. 아래로 처지는 하중이면 상현은 압축, 하현은 인장이다. \(\theta\)는 사재가 수평과 이루는 각.</div></div>
+      트러스는 휨모멘트를 위아래 현재의 짝힘(우력)으로, 전단력을 사재로 나르는 "속이 빈 보"다.</div>
+    <figure class="diagram" id="fig-tr-section">
+      <svg viewBox="0 0 760 290" role="img" aria-label="T-36을 셋째 패널에서 잘라 왼쪽 조각의 평형을 쓰는 단면법">
+        <rect x="10" y="10" width="740" height="270" rx="10" class="f-surface"/>
+        <g style="stroke:var(--text);stroke-width:2.8;stroke-linecap:round">
+          <line x1="60" y1="210" x2="330" y2="210"/><line x1="150" y1="120" x2="270" y2="120"/>
+          <line x1="60" y1="210" x2="150" y2="120"/><line x1="150" y1="120" x2="150" y2="210"/><line x1="240" y1="120" x2="240" y2="210"/>
+          <line x1="150" y1="120" x2="240" y2="210"/>
+        </g>
+        <line x1="240" y1="120" x2="300" y2="120" style="stroke:var(--compression);stroke-width:3.4"/>
+        <line x1="240" y1="210" x2="300" y2="210" style="stroke:var(--tension);stroke-width:3.4"/>
+        <line x1="240" y1="120" x2="276" y2="156" style="stroke:var(--tension);stroke-width:3.4"/>
+        <line x1="290" y1="90" x2="290" y2="240" style="stroke:var(--text-dim);stroke-width:1.6;stroke-dasharray:6 4"/>
+        <line x1="300" y1="120" x2="350" y2="120" style="stroke:var(--compression);stroke-width:2.2" marker-start="url(#tr-ah-c)"/>
+        <text x="354" y="114" class="t-mono" style="fill:var(--compression)">N_IJ (압축)</text>
+        <line x1="300" y1="210" x2="350" y2="210" style="stroke:var(--tension);stroke-width:2.2" marker-end="url(#tr-ah-t)"/>
+        <text x="354" y="214" class="t-mono" style="fill:var(--tension)">N_CD (인장)</text>
+        <line x1="276" y1="156" x2="310" y2="190" style="stroke:var(--tension);stroke-width:2.2" marker-end="url(#tr-ah-t)"/>
+        <text x="314" y="174" class="t-mono" style="fill:var(--tension)">N_ID</text>
+        <g style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#tr-ah-load)"><line x1="150" y1="226" x2="150" y2="256"/><line x1="240" y1="226" x2="240" y2="256"/></g>
+        <line x1="60" y1="262" x2="60" y2="222" style="stroke:var(--ok);stroke-width:2.6" marker-end="url(#tr-ah-react)"/><text x="68" y="258" class="t-mono" style="fill:var(--ok)">150</text>
+        <circle cx="330" cy="210" r="7" style="fill:none;stroke:var(--accent);stroke-width:2.4"/><text x="320" y="236" class="t-mono" style="fill:var(--accent)">D: N_IJ의 모멘트 중심</text>
+        <circle cx="240" cy="120" r="7" style="fill:none;stroke:var(--accent);stroke-width:2.4"/><text x="186" y="104" class="t-mono" style="fill:var(--accent)">I: N_CD의 중심</text>
+        <text x="60" y="200" class="t-mono">A</text><text x="144" y="112" class="t-mono">H</text><text x="234" y="112" class="t-mono">I</text><text x="146" y="228" class="t-mono">B</text><text x="236" y="228" class="t-mono">C</text>
+        <g transform="translate(470,50)">
+          <text x="0" y="0" class="t" style="font-weight:700">셋째 패널(C–D)에서 자르면</text>
+          <text x="0" y="30" class="t-mono">ΣM_D: N_IJ·4.5 + M_D = 0</text>
+          <text x="0" y="50" class="t-mono">  M_D = 150·18 − 60·(12+6)</text>
+          <text x="0" y="70" class="t-mono">      = 1620 kN·m</text>
+          <text x="0" y="90" class="t-mono" style="fill:var(--compression)">  N_IJ = −360 kN</text>
+          <text x="0" y="120" class="t-mono">ΣM_I: N_CD·4.5 = M_I = 1440</text>
+          <text x="0" y="140" class="t-mono" style="fill:var(--tension)">  N_CD = +320 kN</text>
+          <text x="0" y="170" class="t-mono">ΣF_y: 150 − 120 = 30 kN</text>
+          <text x="0" y="190" class="t-mono" style="fill:var(--tension)">  N_ID = 30/0.6 = +50 kN</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-5.</b> T-36을 셋째 패널에서 자른 왼쪽 조각. 상현재 IJ는 사재 ID와 하현재 CD가 만나는 점 D에 대한 모멘트로, 하현재 CD는 IJ와 ID가 만나는 점 I에 대한 모멘트로, 사재 ID는 연직 방향 힘의 평형으로 한 번에 구한다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 3.2 (T-36 가운데 패널의 부재력)</strong> T-36(패널 6 m, 높이 4.5 m, 하현 내부 절점마다 60 kN, 반력 150 kN)을 셋째 패널(x = 12–18 m)에서 자른다(그림 3-5).
+      <ol style="margin:6px 0 0">
+        <li><b>상현재 IJ.</b> 모멘트 중심 D(x = 18 m, 하현): \(M_D = 150 \times 18 - 60 \times 12 - 60 \times 6 = 1620\) kN·m. \(N_{IJ} = -1620/4.5 = -360\) kN(압축).</li>
+        <li><b>하현재 CD.</b> 모멘트 중심 I(x = 12 m, 상현): \(M_I = 150 \times 12 - 60 \times 6 = 1440\) kN·m. \(N_{CD} = +1440/4.5 = +320\) kN(인장).</li>
+        <li><b>사재 ID.</b> 패널 전단력 \(V = 150 - 60 - 60 = 30\) kN, \(\sin\theta = 4.5/7.5 = 0.6\) → \(N_{ID} = 30/0.6 = +50\) kN(인장).</li>
+      </ol>
+      하현재의 최댓값이 360이 아니라 320 kN인 것에 주의하자. 프랫 트러스의 사재는 가운데로 내려가므로, 가운데 패널의 하현재는 경간 중앙(18 m)이 아니라 12 m 지점의 모멘트로 정해진다.</div>
+    <div class="sim" id="sim-tr-cut">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>T-36 단면법 커터</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tr-cv-cut" aria-label="T-36과 자르는 선, 왼쪽 조각의 부재력"></canvas><span class="tr-cap">자르는 선을 좌우로 끌기</span></div>
+        <div class="sim-controls">
+          <label class="check"><input type="checkbox" id="tr-c-mc" checked> 모멘트 중심 보기</label>
+          <label class="check"><input type="checkbox" id="tr-c-fade" checked> 오른쪽 조각 흐리게</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">상현재</span><span class="v" id="tr-c-top">—</span></div>
+        <div class="stat"><span class="k">사재</span><span class="v" id="tr-c-dia">—</span></div>
+        <div class="stat"><span class="k">하현재</span><span class="v" id="tr-c-bot">—</span></div>
+      </div>
+      <div class="tr-msg" id="tr-c-msg"></div>
+      <div class="sim-note">해볼 것: 패널 2–5를 차례로 잘라 상현재 압축이 가운데로 갈수록 커지고, 사재 힘은 작아지는 것을 보세요 · 모델: 왼쪽 조각의 ΣF<sub>x</sub>, ΣF<sub>y</sub>, ΣM 세 식을 3 × 3 연립으로 풀고, CB.truss의 결과와 대조합니다. 패널 1·6은 잘리는 부재가 둘(단부 경사재와 하현재)입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="zero-force">
+    <h2>영부재</h2>
+    <p>하중에 따라 힘이 전혀 걸리지 않는 부재가 있습니다. 이런 <span class="term">영부재</span><span class="en">(zero-force member)</span>를 먼저 찾아 두면 손계산이 크게 줄어듭니다. 하중이 걸리지 않은 절점에서 다음 두 규칙이 성립합니다.</p>
+    <div class="callout def"><strong>원리 3.4 (영부재 규칙)</strong>
+      <ol style="margin:6px 0 0">
+        <li>하중·반력이 없는 절점에 한 직선 위에 있지 않은 부재 <b>두 개</b>만 모이면, 두 부재 모두 영부재다.</li>
+        <li>하중·반력이 없는 절점에 부재 <b>세 개</b>가 모이고 그중 두 개가 한 직선 위에 있으면, 나머지 하나는 영부재다.</li>
+      </ol>
+      두 규칙 모두, 남은 부재에 수직인 방향으로 힘의 평형을 쓰면 바로 나온다.</div>
+    <figure class="diagram" id="fig-tr-zero">
+      <svg viewBox="0 0 760 230" role="img" aria-label="영부재 규칙 두 가지">
+        <rect x="10" y="10" width="740" height="220" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <text x="130" y="0" text-anchor="middle" class="t" style="font-weight:700">규칙 1: 부재 두 개, 하중 없음</text>
+          <line x1="130" y1="120" x2="20" y2="120" style="stroke:var(--text-dim);stroke-width:3;stroke-dasharray:6 4"/>
+          <line x1="130" y1="120" x2="220" y2="50" style="stroke:var(--text-dim);stroke-width:3;stroke-dasharray:6 4"/>
+          <circle cx="130" cy="120" r="6" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/>
+          <text x="70" y="146" text-anchor="middle" class="t-mono">0</text><text x="190" y="104" class="t-mono">0</text>
+          <text x="130" y="176" text-anchor="middle" class="t-dim">한 부재에 수직으로 보면 다른 하나가 0, 따라서 둘 다 0</text>
+        </g>
+        <g transform="translate(420,40)">
+          <text x="130" y="0" text-anchor="middle" class="t" style="font-weight:700">규칙 2: 둘은 일직선, 하나는 따로</text>
+          <line x1="20" y1="120" x2="240" y2="120" style="stroke:var(--text);stroke-width:3"/>
+          <line x1="130" y1="120" x2="130" y2="40" style="stroke:var(--text-dim);stroke-width:3;stroke-dasharray:6 4"/>
+          <circle cx="130" cy="120" r="6" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/>
+          <text x="140" y="74" class="t-mono">0</text>
+          <text x="60" y="110" class="t-mono">N</text><text x="200" y="110" class="t-mono">N</text>
+          <text x="130" y="176" text-anchor="middle" class="t-dim">일직선 두 부재에 수직인 방향의 평형 → 따로 선 부재 = 0</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-6.</b> 영부재 규칙. 하중이 없는 절점에서만 성립한다. T-36에서 상현 가운데 절점 J는 규칙 2에 해당해 수직재 DJ가 영부재다(하현에만 하중이 걸릴 때).</figcaption>
+    </figure>
+    <p>영부재는 "없어도 되는 부재"가 아닙니다. 하중이 바뀌면(바람, 비대칭 군중, 차량) 힘을 받게 되고, 압축재의 좌굴 길이를 줄여 주는 버팀 역할도 합니다. 영부재를 빼면 트러스가 불안정해지는 경우도 많습니다.</p>
+    <div class="sim" id="sim-tr-zero">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>영부재 찾기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tr-cv-zero" aria-label="영부재를 고르는 트러스"></canvas><span class="tr-cap">영부재라고 생각하는 부재를 누르기</span></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>문제</span><div class="seg" id="tr-z-case"><button data-value="0" class="on">캔틸레버 트러스</button><button data-value="1">T-36 전체 재하</button><button data-value="2">T-36 상현 재하</button></div></div>
+          <div class="btn-row"><button class="btn primary" id="tr-z-chk">정답 확인</button><button class="btn" id="tr-z-clr">지우기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">고른 부재</span><span class="v" id="tr-z-n">—</span></div>
+        <div class="stat"><span class="k">맞힘 / 영부재 수</span><span class="v" id="tr-z-s">—</span></div>
+      </div>
+      <div class="tr-msg" id="tr-z-msg"></div>
+      <div class="sim-note">해볼 것: 하중을 하현에서 상현으로 옮기면 영부재가 바뀌는 것을 보세요 · 모델: 정답은 CB.truss로 푼 부재력이 0인 부재(최대값의 0.01 % 이하).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="types">
+    <h2>트러스 형식: 프랫·하우·워런</h2>
+    <p>같은 현재와 같은 하중이라도 사재를 어느 방향으로 기울이느냐에 따라 사재와 수직재의 인장·압축이 뒤바뀝니다. 강재는 인장에 강하고 압축에서는 좌굴이 먼저 오므로(13장), 긴 부재가 인장을 받도록 배치하는 것이 유리합니다.</p>
+    <ul>
+      <li><span class="term">프랫 트러스</span><span class="en">(Pratt)</span>: 사재가 가운데를 향해 내려간다. 아래로 처지는 하중에서 긴 사재는 인장, 짧은 수직재는 압축. 강재 트러스에 알맞다(T-36).</li>
+      <li><span class="term">하우 트러스</span><span class="en">(Howe)</span>: 사재가 가운데를 향해 올라간다. 사재가 압축, 수직재가 인장. 압축에 강한 목재 사재와 강철 봉 수직재로 짓던 시절의 형식이다.</li>
+      <li><span class="term">워런 트러스</span><span class="en">(Warren)</span>: 사재가 번갈아 기울어 정삼각형에 가까운 모양을 만든다. 사재가 인장·압축을 번갈아 받고, 같은 길이의 부재를 반복해 쓸 수 있다. 수직재를 더해 상현 패널 길이를 줄이기도 한다.</li>
+      <li><b>K 트러스</b>: 수직재 가운데에서 사재 두 개가 K자로 갈라진다. 높은 트러스에서 압축재의 길이를 줄이는 형식이다.</li>
+    </ul>
+    <figure class="diagram" id="fig-tr-types">
+      <svg viewBox="0 0 760 300" role="img" aria-label="프랫, 하우, 워런, K 트러스의 인장과 압축">
+        <rect x="10" y="10" width="740" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">프랫</text>
+          <g style="stroke-width:2.6;stroke-linecap:round">
+            <line x1="0" y1="90" x2="300" y2="90" style="stroke:var(--tension)"/><line x1="50" y1="30" x2="250" y2="30" style="stroke:var(--compression)"/>
+            <line x1="0" y1="90" x2="50" y2="30" style="stroke:var(--compression)"/><line x1="250" y1="30" x2="300" y2="90" style="stroke:var(--compression)"/>
+            <line x1="50" y1="30" x2="100" y2="90" style="stroke:var(--tension)"/><line x1="100" y1="30" x2="150" y2="90" style="stroke:var(--tension)"/><line x1="200" y1="30" x2="150" y2="90" style="stroke:var(--tension)"/><line x1="250" y1="30" x2="200" y2="90" style="stroke:var(--tension)"/>
+            <line x1="100" y1="30" x2="100" y2="90" style="stroke:var(--compression)"/><line x1="200" y1="30" x2="200" y2="90" style="stroke:var(--compression)"/><line x1="50" y1="30" x2="50" y2="90" style="stroke:var(--tension)"/><line x1="250" y1="30" x2="250" y2="90" style="stroke:var(--tension)"/><line x1="150" y1="30" x2="150" y2="90" style="stroke:var(--text-faint)"/>
+          </g>
+          <text x="150" y="116" text-anchor="middle" class="t-dim">사재 인장 · 수직재 압축</text>
+        </g>
+        <g transform="translate(420,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">하우</text>
+          <g style="stroke-width:2.6;stroke-linecap:round">
+            <line x1="0" y1="90" x2="300" y2="90" style="stroke:var(--tension)"/><line x1="50" y1="30" x2="250" y2="30" style="stroke:var(--compression)"/>
+            <line x1="0" y1="90" x2="50" y2="30" style="stroke:var(--compression)"/><line x1="250" y1="30" x2="300" y2="90" style="stroke:var(--compression)"/>
+            <line x1="50" y1="90" x2="100" y2="30" style="stroke:var(--compression)"/><line x1="100" y1="90" x2="150" y2="30" style="stroke:var(--compression)"/><line x1="200" y1="90" x2="150" y2="30" style="stroke:var(--compression)"/><line x1="250" y1="90" x2="200" y2="30" style="stroke:var(--compression)"/>
+            <line x1="50" y1="30" x2="50" y2="90" style="stroke:var(--tension)"/><line x1="100" y1="30" x2="100" y2="90" style="stroke:var(--tension)"/><line x1="150" y1="30" x2="150" y2="90" style="stroke:var(--tension)"/><line x1="200" y1="30" x2="200" y2="90" style="stroke:var(--tension)"/><line x1="250" y1="30" x2="250" y2="90" style="stroke:var(--tension)"/>
+          </g>
+          <text x="150" y="116" text-anchor="middle" class="t-dim">사재 압축 · 수직재 인장</text>
+        </g>
+        <g transform="translate(30,170)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">워런</text>
+          <g style="stroke-width:2.6;stroke-linecap:round">
+            <line x1="0" y1="90" x2="300" y2="90" style="stroke:var(--tension)"/><line x1="25" y1="30" x2="275" y2="30" style="stroke:var(--compression)"/>
+            <line x1="0" y1="90" x2="25" y2="30" style="stroke:var(--compression)"/><line x1="25" y1="30" x2="50" y2="90" style="stroke:var(--tension)"/><line x1="50" y1="90" x2="75" y2="30" style="stroke:var(--compression)"/><line x1="75" y1="30" x2="100" y2="90" style="stroke:var(--tension)"/><line x1="100" y1="90" x2="125" y2="30" style="stroke:var(--compression)"/><line x1="125" y1="30" x2="150" y2="90" style="stroke:var(--tension)"/>
+            <line x1="150" y1="90" x2="175" y2="30" style="stroke:var(--tension)"/><line x1="175" y1="30" x2="200" y2="90" style="stroke:var(--compression)"/><line x1="200" y1="90" x2="225" y2="30" style="stroke:var(--tension)"/><line x1="225" y1="30" x2="250" y2="90" style="stroke:var(--compression)"/><line x1="250" y1="90" x2="275" y2="30" style="stroke:var(--tension)"/><line x1="275" y1="30" x2="300" y2="90" style="stroke:var(--compression)"/>
+          </g>
+          <text x="150" y="116" text-anchor="middle" class="t-dim">사재가 번갈아 인장·압축</text>
+        </g>
+        <g transform="translate(420,170)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">K 트러스 (모양만)</text>
+          <g style="stroke:var(--text);stroke-width:2.2;stroke-linecap:round">
+            <line x1="0" y1="90" x2="300" y2="90"/><line x1="0" y1="30" x2="300" y2="30"/><line x1="0" y1="30" x2="0" y2="90"/><line x1="300" y1="30" x2="300" y2="90"/>
+            <line x1="75" y1="30" x2="75" y2="90"/><line x1="150" y1="30" x2="150" y2="90"/><line x1="225" y1="30" x2="225" y2="90"/>
+            <line x1="75" y1="60" x2="0" y2="30"/><line x1="75" y1="60" x2="0" y2="90"/><line x1="150" y1="60" x2="75" y2="30"/><line x1="150" y1="60" x2="75" y2="90"/>
+            <line x1="150" y1="60" x2="225" y2="30"/><line x1="150" y1="60" x2="225" y2="90"/><line x1="225" y1="60" x2="300" y2="30"/><line x1="225" y1="60" x2="300" y2="90"/>
+          </g>
+          <text x="150" y="116" text-anchor="middle" class="t-dim">수직재 가운데에서 갈라지는 사재</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-7.</b> 하현 절점에 연직 하중이 걸린 네 가지 트러스 형식(인장 파랑, 압축 빨강, 0 회색). 현재는 형식과 관계없이 상현 압축·하현 인장이고, 사재와 수직재의 부호가 형식에 따라 바뀐다. K 트러스는 모양만 보였다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-tr-types">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>형식에 따라 바뀌는 인장과 압축</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tr-cv-type" aria-label="고른 형식의 트러스와 부재력"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>형식</span><div class="seg" id="tr-t-type"><button data-value="pratt" class="on">프랫</button><button data-value="howe">하우</button><button data-value="warren">워런</button><button data-value="warrenv">워런 + 수직재</button></div></div>
+          <div class="ctrl"><span>하중</span><div class="seg" id="tr-t-load"><button data-value="all" class="on">하현 전체</button><button data-value="one">한 절점</button></div></div>
+          <label class="ctrl"><span>한 절점 하중 위치 <output id="tr-t-pos-out"></output></span><input type="range" id="tr-t-pos" min="1" max="5" step="1" value="2"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 인장</span><span class="v" id="tr-t-t">—</span></div>
+        <div class="stat"><span class="k">최대 압축</span><span class="v" id="tr-t-c">—</span></div>
+        <div class="stat"><span class="k">가장 긴 압축재</span><span class="v" id="tr-t-lc">—</span></div>
+        <div class="stat"><span class="k">Σ|N|·L</span><span class="v" id="tr-t-s">—</span></div>
+      </div>
+      <div class="tr-legend"><span class="key tension">인장</span><span class="key compression">압축</span><span class="key load">하중</span><span class="key reaction">반력</span></div>
+      <div class="sim-note">해볼 것: 프랫과 하우에서 '가장 긴 압축재'의 길이를 비교하세요. 긴 압축재는 좌굴에 약합니다 · 한 절점 하중을 옮기면 워런의 사재 부호가 패널마다 어떻게 바뀌는지 보세요 · 모델: 지간 36 m, 6 패널, 높이 4.5 m, 하현 절점 하중 60 kN(한 절점이면 그 절점에만), CB.truss. Σ|N|·L은 강재량에 비례하는 어림 지표(kN·m).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="depth">
+    <h2>높이와 부재력, 그리고 강재량</h2>
+    <p>원리 3.3에 따르면 현재력은 \(M/h\)입니다. 트러스를 높이 지을수록 현재력은 줄어듭니다. 그러나 수직재와 사재가 길어지고, 길어진 압축재는 좌굴 때문에 단면을 키워야 합니다. 그래서 강재량이 가장 작은 높이가 존재합니다.</p>
+    <div class="callout"><strong>예제 3.3 (높이를 반으로 줄이면)</strong> T-36의 높이를 4.5 m에서 2.25 m로 낮추면 상현재 중앙 힘은 \(1620/2.25 = 720\) kN으로 두 배가 된다. 사재 각도는 \(\tan\theta = 2.25/6\)으로 눕고, 가운데 사재 힘은 \(30/\sin\theta = 30/0.351 = 85\) kN으로 커진다. 낮은 트러스는 모든 부재가 무거워진다. 반대로 9 m로 높이면 상현재는 180 kN으로 줄지만 9 m짜리 압축 수직재와 10.8 m짜리 단부 경사재를 좌굴에 견디게 해야 한다.</div>
+    <div class="sim" id="sim-tr-depth">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>T-36의 높이를 바꾸면</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view tr-stack">
+          <div><canvas id="tr-cv-dep" aria-label="높이를 바꾼 T-36 트러스"></canvas></div>
+          <div><canvas id="tr-cv-dep2" aria-label="높이에 따른 부재 강재량"></canvas><span class="tr-cap">트러스 한 면의 부재 강재량(어림)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>높이 h <output id="tr-d-h-out"></output></span><input type="range" id="tr-d-h" min="2" max="9" step="0.1" value="4.5"></label>
+          <label class="check"><input type="checkbox" id="tr-d-bk" checked> 압축재 좌굴 고려</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">h / L</span><span class="v" id="tr-d-r">—</span></div>
+        <div class="stat"><span class="k">상현재 최대 압축</span><span class="v" id="tr-d-c">—</span></div>
+        <div class="stat"><span class="k">강재량(어림)</span><span class="v" id="tr-d-w">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 좌굴을 끄면 높을수록 계속 가벼워지지만, 켜면 h ≈ 5–6 m(L/7–L/6) 근처에서 가장 가볍고 그 근처에서는 곡선이 평평합니다. T-36의 4.5 m(L/8)는 최소에서 2 % 안쪽입니다 · 모델(교육용): 인장재 단면적 A = |N|/210 MPa, 압축재는 같은 값과 오일러 좌굴 A = (L/π)√(2|N|/(E·k)) (안전율 2, E = 210 GPa, 상자형 단면 k = I/A² ≈ 0.83) 중 큰 값, 최소 500 mm². 강재량 = ΣAL × 7.85 t/m³. 접합부·바닥판·횡방향 부재는 빼고, 실제 설계는 KDS 14 31의 압축재 설계식을 씁니다.</div>
+    </div>
+    <p>계산이 알려 주는 것은 "최적 높이가 꽤 높고, 그 근처에서 강재량이 거의 변하지 않는다"는 사실입니다. 그래서 실제 높이는 강재량만이 아니라 다리 위 통과 높이, 바람을 받는 면적, 처짐, 경관 같은 다른 이유로 정해지고, 도로·철도 트러스는 대개 지간의 1/6–1/10 범위에 있습니다.</p>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="t36">
+    <h2>보도교 T-36의 부재력</h2>
+    <p>지금까지의 도구로 T-36의 21개 부재력을 모두 구할 수 있습니다. 대칭이므로 왼쪽 절반만 정리합니다(오른쪽은 거울상).</p>
+    <div class="table-wrap"><table class="tr-tbl">
+      <thead><tr><th>부재</th><th>종류</th><th>부재력 (kN)</th><th>구하는 법</th></tr></thead>
+      <tbody>
+        <tr><td>AB, BC</td><td>하현재</td><td class="t">+200</td><td>절점 A·B, 또는 M<sub>H</sub>/h = 900/4.5</td></tr>
+        <tr><td>CD</td><td>하현재</td><td class="t">+320</td><td>M<sub>I</sub>/h = 1440/4.5</td></tr>
+        <tr><td>HI</td><td>상현재</td><td class="c">−320</td><td>M<sub>C</sub>/h = 1440/4.5</td></tr>
+        <tr><td>IJ</td><td>상현재</td><td class="c">−360</td><td>M<sub>D</sub>/h = 1620/4.5</td></tr>
+        <tr><td>AH</td><td>단부 경사재</td><td class="c">−250</td><td>절점 A: 150/sin θ, sin θ = 0.6</td></tr>
+        <tr><td>HC</td><td>사재</td><td class="t">+150</td><td>V = 150 − 60 = 90, 90/0.6</td></tr>
+        <tr><td>ID</td><td>사재</td><td class="t">+50</td><td>V = 30, 30/0.6</td></tr>
+        <tr><td>BH</td><td>수직재(행어)</td><td class="t">+60</td><td>절점 B: 하중 60 kN을 매단다</td></tr>
+        <tr><td>CI</td><td>수직재</td><td class="c">−30</td><td>절점 I의 연직 평형</td></tr>
+        <tr><td>DJ</td><td>수직재</td><td>0</td><td>영부재(절점 J, 규칙 2)</td></tr>
+      </tbody></table></div>
+    <div class="callout site"><strong>T-36 부재 선택 맛보기</strong> 가장 큰 인장재는 하현재 CD·DE(+320 kN), 가장 큰 압축재는 상현재 IJ·JK(−360 kN)다. 인장재는 교육용 허용 응력 210 MPa로 나누면 \(320 \times 10^3/210 \approx 1{,}520\) mm²면 된다. 같은 크기의 압축재는 좌굴 때문에 단면적이 훨씬 커야 하며(13장), 상현재는 바닥판이 없는 위쪽에 있어 옆으로 버텨 줄 부재(횡지지)도 중요하다. 절반만 재하되면 사재 하나가 압축으로 바뀌기도 한다(아래 시뮬레이터).</div>
+    <div class="sim" id="sim-tr-t36">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>T-36 하중 배치와 부재력</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tr-cv-t36" aria-label="T-36 부재력, 재하 절점을 누를 수 있음"></canvas><span class="tr-cap">하현 절점을 눌러 하중 켜고 끄기</span></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>절점 하중 P <output id="tr-x-p-out"></output></span><input type="range" id="tr-x-p" min="10" max="120" step="5" value="60"></label>
+          <div class="btn-row"><button class="btn" data-trx="11111">전체</button><button class="btn" data-trx="11100">왼쪽 절반</button><button class="btn" data-trx="01000">C만</button><button class="btn" data-trx="00100">D만</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">반력 A · G</span><span class="v" id="tr-x-r">—</span></div>
+        <div class="stat"><span class="k">최대 인장</span><span class="v" id="tr-x-t">—</span></div>
+        <div class="stat"><span class="k">최대 압축</span><span class="v" id="tr-x-c">—</span></div>
+      </div>
+      <div class="tr-msg" id="tr-x-msg"></div>
+      <div class="sim-note">해볼 것: 'C만'을 누르면 가운데 사재 ID가 압축으로 바뀌는 것을 확인하세요. 하중 위치에 따라 부호가 바뀌는 부재는 인장·압축 모두에 견디게 설계합니다(6장 영향선) · 모델: T-36, 하현 내부 절점 B–F 중 켠 절점에 P, CB.truss. 부재 위 숫자 kN(인장 +).</div>
+    </div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="influence.html"><small>CH.06 · 영향선과 이동 하중</small>관리 차량이 T-36을 지날 때<br><span>하중 위치에 따라 부재력이 어떻게 바뀌는지 영향선으로 그린다.</span></a>
+      <a href="buckling.html"><small>CH.13 · 기둥과 좌굴</small>상현재 −360 kN을 견딜 단면<br><span>압축재는 강도보다 좌굴이 먼저 온다.</span></a>
+      <a href="energy.html"><small>CH.12 · 에너지 방법</small>트러스는 얼마나 처질까<br><span>부재력과 단위하중법으로 T-36의 처짐을 구한다.</span></a>
+      <a href="matrix.html"><small>CH.16 · 매트릭스 구조해석</small>절점 평형을 행렬로<br><span>이 장의 절점법을 모든 절점에 한꺼번에 적용한 것이 강성법이다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>삼각형은 변의 길이가 바뀌지 않는 한 모양이 바뀌지 않는다. 트러스는 삼각형을 엮어 하중을 부재의 축력으로 나른다.</li>
+      <li>핀 절점, 절점 하중, 곧은 부재 가정에서 트러스 부재는 2력 부재가 되어 축력(인장 +, 압축 −)만 받는다.</li>
+      <li>판별식 m + r = 2j(정정), < 2j(불안정), > 2j(부정정)는 필요조건이며, 개수가 맞아도 배치에 따라 불안정할 수 있다.</li>
+      <li>절점법은 미지수 두 개 이하인 절점부터 ΣF<sub>x</sub> = ΣF<sub>y</sub> = 0을 차례로 푼다. 단면법은 세 부재 이하를 자르고, 두 미지 부재가 만나는 점에 대한 모멘트로 세 번째를 한 식에 구한다.</li>
+      <li>평행현 트러스의 현재력은 M/h, 사재력은 V/sin θ다. 트러스는 휨을 현재의 짝힘으로, 전단을 사재로 나르는 속 빈 보다.</li>
+      <li>프랫은 사재 인장·수직재 압축, 하우는 그 반대다. 높이를 키우면 현재력은 줄지만 압축재가 길어져, 강재량은 L/7–L/6 근처에서 가장 작고 그 근처가 평평하다. T-36: 상현재 −360, 하현재 +320, 단부 경사재 −250 kN.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 이상 트러스의 부재가 축력만 받는 이유는?</p><div class="opts">
+        <button class="opt">부재가 가늘어서</button><button class="opt" data-correct>양 끝이 핀이고 하중이 절점에만 걸려 2력 부재가 되기 때문</button><button class="opt">강재로 만들어서</button><button class="opt">삼각형이라서</button>
+      </div><div class="quiz-exp">양 끝 두 점에서만 힘을 받는 부재가 평형이려면 두 힘이 크기가 같고 반대이며 같은 작용선(부재 축) 위에 있어야 한다. 그래서 축력만 남는다.</div></div>
+      <div class="quiz-q"><p>2. 절점 10개, 부재 16개, 반력 3개인 평면 트러스는?</p><div class="opts">
+        <button class="opt">정정</button><button class="opt" data-correct>불안정(개수 부족)</button><button class="opt">1차 부정정</button><button class="opt">3차 부정정</button>
+      </div><div class="quiz-exp">\(m + r = 19 \lt 2j = 20\)이므로 불안정하다. 정정이려면 부재가 하나 더 필요하다.</div></div>
+      <div class="quiz-q"><p>3. 절점법에서 모르는 부재력을 모두 인장으로 가정하는 이유는?</p><div class="opts">
+        <button class="opt">인장이 더 흔해서</button><button class="opt" data-correct>답의 부호가 곧 인장(+)·압축(−)이 되고, 양 끝 절점에서 같은 값을 쓸 수 있어서</button><button class="opt">압축재는 계산할 수 없어서</button><button class="opt">반력을 구할 필요가 없어서</button>
+      </div><div class="quiz-exp">인장은 절점에서 멀어지는 방향이라는 하나의 규칙으로 그리면 결과가 음수일 때 압축이다. 같은 부재의 다른 끝에서도 그 값을 그대로 쓴다.</div></div>
+      <div class="quiz-q"><p>4. 평행현 트러스의 높이를 두 배로 하면 (같은 하중에서) 가운데 현재력은?</p><div class="opts">
+        <button class="opt">두 배</button><button class="opt">변하지 않음</button><button class="opt" data-correct>절반</button><button class="opt">네 배</button>
+      </div><div class="quiz-exp">현재력 \(N = M/h\)이고 \(M\)은 하중과 경간으로 정해진다. 높이가 두 배면 현재력은 절반이다. 대신 수직재와 사재가 길어진다.</div></div>
+      <div class="quiz-q"><p>5. 하중이 없는 절점에 상현재 둘(일직선)과 수직재 하나가 모인다. 수직재의 힘은?</p><div class="opts">
+        <button class="opt" data-correct>0</button><button class="opt">상현재 힘과 같다</button><button class="opt">상현재 힘의 절반</button><button class="opt">알 수 없다</button>
+      </div><div class="quiz-exp">영부재 규칙 2. 일직선 두 부재에 수직인 방향(연직)으로 평형을 쓰면 수직재 힘만 남으므로 0이다. T-36의 DJ가 이 경우다.</div></div>
+      <div class="quiz-q"><p>6. 아래로 처지는 하중을 받는 프랫 트러스에서 사재와 수직재는?</p><div class="opts">
+        <button class="opt">사재 압축, 수직재 인장</button><button class="opt" data-correct>사재 인장, 수직재 압축</button><button class="opt">모두 인장</button><button class="opt">모두 0</button>
+      </div><div class="quiz-exp">프랫의 사재는 가운데를 향해 내려가므로 전단력을 인장으로 나른다. 긴 사재가 인장이라 좌굴 걱정이 적어 강재 트러스에 알맞다. 하우는 반대다.</div></div>
+      <div class="quiz-q"><p>7. T-36(패널 6 m, 높이 4.5 m, 절점 하중 60 kN, 반력 150 kN)의 가운데 상현재 힘은?</p><div class="opts">
+        <button class="opt">+360 kN</button><button class="opt">−320 kN</button><button class="opt" data-correct>−360 kN</button><button class="opt">−250 kN</button>
+      </div><div class="quiz-exp">모멘트 중심 D(18 m): \(M = 150 \times 18 - 60 \times 18 = 1620\) kN·m, \(N = -1620/4.5 = -360\) kN(압축). 하현재 CD는 12 m 지점의 모멘트로 정해져 +320 kN이다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const TRX = {
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  lbl: (v) => (Math.abs(v) < 0.05 ? "0" : CB.num(v, 0)),
+  // T-36형(6 패널, 하현 7 + 상현 5) 트러스 생성: type = pratt | howe | warrenv
+  t36(h = 4.5, type = "pratt") {
+    const nodes = [], bars = [];
+    for (let k = 0; k <= 6; k++) nodes.push([6 * k, 0]);
+    for (let k = 1; k <= 5; k++) nodes.push([6 * k, h]);
+    const tp = (k) => 6 + k;
+    for (let k = 0; k < 6; k++) bars.push([k, k + 1]);
+    for (let k = 1; k < 5; k++) bars.push([tp(k), tp(k + 1)]);
+    for (let k = 1; k <= 5; k++) bars.push([k, tp(k)]);
+    bars.push([0, tp(1)], [tp(5), 6]);
+    if (type === "pratt") bars.push([tp(1), 2], [tp(2), 3], [tp(4), 3], [tp(5), 4]);
+    else if (type === "howe") bars.push([1, tp(2)], [2, tp(3)], [tp(3), 4], [tp(4), 5]);
+    else bars.push([tp(1), 2], [2, tp(3)], [tp(3), 4], [4, tp(5)]);
+    return { nodes, bars };
+  },
+  warren(h = 4.5) { // 수직재 없는 워런: 하현 0..36(6 m), 상현 3..33
+    const nodes = [], bars = [];
+    for (let k = 0; k <= 6; k++) nodes.push([6 * k, 0]);
+    for (let k = 0; k < 6; k++) nodes.push([6 * k + 3, h]);
+    for (let k = 0; k < 6; k++) bars.push([k, k + 1]);
+    for (let k = 0; k < 5; k++) bars.push([7 + k, 8 + k]);
+    for (let k = 0; k < 6; k++) { bars.push([k, 7 + k]); bars.push([7 + k, k + 1]); }
+    return { nodes, bars };
+  },
+  len: (n, [a, b]) => Math.hypot(n[b][0] - n[a][0], n[b][1] - n[a][1]),
+};
+
+/* ---------- 1. 대각선 하나의 힘 ---------- */
+(function () {
+  const br = CB.seg("tr-g-br", go), gh = CB.range("tr-g-h", (v) => v + " kN", go);
+  let t, phase = 0;
+  const nodes = [[0, 0], [4, 0], [0, 4], [4, 4]];
+  function solve() {
+    const bars = [[0, 2], [1, 3], [2, 3]], b = br();
+    if (b === "1" || b === "3") bars.push([0, 3]);
+    if (b === "2" || b === "3") bars.push([1, 2]);
+    t = CB.truss({ nodes, bars, supports: { 0: "pin", 1: "pin" }, loads: [{ node: 2, fx: gh() }], EA: 1e6 });
+    t.bars = bars;
+  }
+  solve();
+  const pl = CB.plane("#tr-cv-rig", { x: [-3, 7.5], y: [-1.6, 5.6], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.85 : 0.55), minHeight: 230, maxHeight: 360,
+    draw(P) {
+      const pal = P.P, ctx = P.ctx;
+      if (t.ok) {
+        CB.drawFrame(P, t, { axialColors: true, reactions: true, loads: true, loadPx: 46, memberLabels: (m) => TRX.lbl(t.N[m]) });
+      } else {
+        const d = 1.1 * Math.sin(phase) * Math.sign(gh() || 1), n2 = [d, 4], n3 = [4 + d, 4];
+        ctx.save(); ctx.strokeStyle = pal.bad; ctx.lineWidth = 3; ctx.lineCap = "round";
+        [[nodes[0], n2], [nodes[1], n3], [n2, n3]].forEach(([a, b]) => { ctx.beginPath(); ctx.moveTo(P.X(a[0]), P.Y(a[1])); ctx.lineTo(P.X(b[0]), P.Y(b[1])); ctx.stroke(); });
+        ctx.strokeStyle = pal.faint; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.4; ctx.strokeRect(P.X(0), P.Y(4), P.X(4) - P.X(0), P.Y(0) - P.Y(4)); ctx.restore();
+        [nodes[0], nodes[1], n2, n3].forEach((p) => { ctx.save(); ctx.fillStyle = pal.bg; ctx.strokeStyle = pal.text; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(P.X(p[0]), P.Y(p[1]), 4, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore(); });
+        TRX.text(ctx, "기구: 막대 길이를 바꾸지 않고 쓰러진다", P.X(2), P.Y(5.2), pal.bad, { mono: false, size: 13 });
+      }
+    } });
+  const loop = CB.loop(document.getElementById("sim-tr-rigid"), (dt) => { if (t.ok) return; phase += dt * 2.4; pl.redraw(); });
+  function go() {
+    solve(); pl.redraw();
+    const m = t.bars.length, r = 4, j = 4;
+    CB.stat("tr-g-cnt", `${m} + ${r} = ${m + r} ${m + r < 2 * j ? "<" : m + r > 2 * j ? ">" : "="} ${2 * j}`);
+    CB.stat("tr-g-v", !t.ok ? "불안정" : m + r > 2 * j ? `${m + r - 2 * j}차 부정정` : "정정");
+    CB.stat("tr-g-n", t.ok && m > 3 ? t.N.slice(3).map((v) => (v > 0 ? "+" : "") + CB.num(v, 1)).join(" / ") + " kN" : "—");
+  }
+  go();
+})();
+
+/* ---------- 2. 절점법 단계 ---------- */
+(function () {
+  const nodes = [[0, 0], [4, 0], [8, 0], [12, 0], [16, 0], [4, 4], [8, 4], [12, 4]];
+  const NM = ["A", "B", "C", "D", "E", "F", "G", "H"];
+  const bars = [[0, 1], [1, 2], [2, 3], [3, 4], [5, 6], [6, 7], [0, 5], [7, 4], [1, 5], [2, 6], [3, 7], [5, 2], [7, 2]];
+  const order = [0, 1, 5, 6, 2, 7, 3, 4];
+  const gp = CB.range("tr-j-p", (v) => v + " kN", () => { reset(); });
+  let step = 0, known = {}, last = { node: -1, solved: [] }, ref;
+  const loads = () => { const P = gp(); return { 1: [0, -P], 2: [0, -P], 3: [0, -P], 0: [0, 1.5 * P], 4: [0, 1.5 * P] }; };
+  function reset() { step = 0; known = {}; last = { node: -1, solved: [] }; ref = CB.truss({ nodes, bars, supports: { 0: "pin", 4: "roller" }, loads: [1, 2, 3].map((n) => ({ node: n, fy: -gp() })), EA: 1e6 }); draw(); }
+  function unit(n, m) { const [a, b] = bars[m], o = a === n ? b : a; const dx = nodes[o][0] - nodes[n][0], dy = nodes[o][1] - nodes[n][1], L = Math.hypot(dx, dy); return [dx / L, dy / L]; }
+  function solveJoint(n) {
+    const ext = loads()[n] || [0, 0], ms = bars.map((b, m) => m).filter((m) => bars[m].includes(n));
+    let fx = ext[0], fy = ext[1];
+    ms.filter((m) => m in known).forEach((m) => { const u = unit(n, m); fx += known[m] * u[0]; fy += known[m] * u[1]; });
+    const U = ms.filter((m) => !(m in known));
+    if (U.length === 2) {
+      const a = unit(n, U[0]), b = unit(n, U[1]), det = a[0] * b[1] - a[1] * b[0];
+      known[U[0]] = (-fx * b[1] + fy * b[0]) / det; known[U[1]] = (-a[0] * fy + a[1] * fx) / det;
+    } else if (U.length === 1) {
+      const a = unit(n, U[0]); known[U[0]] = -(fx * a[0] + fy * a[1]);
+    }
+    return { node: n, solved: U, ms, ext };
+  }
+  document.getElementById("tr-j-next").addEventListener("click", () => { if (step >= order.length) return; last = solveJoint(order[step]); step++; draw(); });
+  document.getElementById("tr-j-reset").addEventListener("click", reset);
+  const pl = CB.plane("#tr-cv-jt", { x: [-1.8, 17.8], y: [-2.2, 5.6], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.6 : 0.38), minHeight: 200, maxHeight: 300,
+    draw(P) {
+      const pal = P.P, ctx = P.ctx;
+      bars.forEach(([a, b], m) => {
+        const v = known[m], col = v == null ? pal.faint : Math.abs(v) < 1e-6 ? pal.dim : v > 0 ? pal.tension : pal.compression;
+        ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = v == null ? 2 : 3.4; ctx.setLineDash(v == null ? [5, 4] : []); ctx.beginPath(); ctx.moveTo(P.X(nodes[a][0]), P.Y(nodes[a][1])); ctx.lineTo(P.X(nodes[b][0]), P.Y(nodes[b][1])); ctx.stroke(); ctx.restore();
+        if (v != null) TRX.text(ctx, TRX.lbl(v), (P.X(nodes[a][0]) + P.X(nodes[b][0])) / 2, (P.Y(nodes[a][1]) + P.Y(nodes[b][1])) / 2, col, { size: 11 });
+      });
+      nodes.forEach(([x, y], n) => {
+        const cur = n === last.node, done = order.slice(0, step).includes(n);
+        ctx.save(); ctx.fillStyle = cur ? pal.accent2 : done ? pal.ok : pal.bg; ctx.strokeStyle = pal.text; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(P.X(x), P.Y(y), cur ? 7 : 4.5, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore();
+        TRX.text(ctx, NM[n], P.X(x) - 12, P.Y(y) + (y > 0 ? -14 : 16), pal.dim, { size: 11 });
+      });
+      [1, 2, 3].forEach((n) => TRX.arrow(ctx, P.X(nodes[n][0]), P.Y(0) + 8, P.X(nodes[n][0]), P.Y(0) + 32, pal.accent2, 2, 8));
+      [0, 4].forEach((n) => TRX.arrow(ctx, P.X(nodes[n][0]), P.Y(0) + 46, P.X(nodes[n][0]), P.Y(0) + 12, pal.ok, 2.2, 8));
+    } });
+  const fp = CB.canvas("#tr-cv-jt2", (ctx, W, H) => {
+    const pal = CB.palette();
+    if (last.node < 0) { TRX.text(ctx, "‘다음 절점’을 누르면 그 절점의 힘 다각형이 그려집니다", W / 2, H / 2, pal.dim, { mono: false, size: 12 }); return; }
+    const vecs = [];
+    if (last.ext[0] || last.ext[1]) vecs.push({ v: last.ext, c: last.ext[1] > 0 ? pal.ok : pal.accent2, t: last.ext[1] > 0 ? "반력" : "하중" });
+    last.ms.forEach((m) => { const u = unit(last.node, m), N = known[m]; vecs.push({ v: [N * u[0], N * u[1]], c: Math.abs(N) < 1e-6 ? pal.dim : N > 0 ? pal.tension : pal.compression, t: `${NM[bars[m][0]]}${NM[bars[m][1]]} ${TRX.lbl(N)}`, isNew: last.solved.includes(m) }); });
+    let x = 0, y = 0, minx = 0, maxx = 0, miny = 0, maxy = 0; const pts = [[0, 0]];
+    vecs.forEach((o) => { x += o.v[0]; y += o.v[1]; pts.push([x, y]); minx = Math.min(minx, x); maxx = Math.max(maxx, x); miny = Math.min(miny, y); maxy = Math.max(maxy, y); });
+    const span = Math.max(maxx - minx, maxy - miny, 1), s = Math.min((W - 160) / span, (H - 40) / span) * 0.9;
+    const ox = 80 + ((W - 160) - (maxx - minx) * s) / 2 - minx * s, oy = 20 + ((H - 40) - (maxy - miny) * s) / 2 + maxy * s;
+    vecs.forEach((o, i) => { const [x0, y0] = pts[i], [x1, y1] = pts[i + 1]; TRX.arrow(ctx, ox + x0 * s, oy - y0 * s, ox + x1 * s, oy - y1 * s, o.c, o.isNew ? 3.2 : 2.2, 10); TRX.text(ctx, o.t, ox + ((x0 + x1) / 2) * s + 10, oy - ((y0 + y1) / 2) * s - 10, o.c, { size: 11, align: "left" }); });
+    const end = pts[pts.length - 1], gap = Math.hypot(end[0], end[1]);
+    TRX.text(ctx, gap < 1e-6 ? "다각형이 닫힘: ΣF = 0" : `닫히지 않음: ${CB.num(gap, 2)}`, W - 12, H - 14, gap < 1e-6 ? pal.ok : pal.bad, { align: "right", mono: false, size: 12 });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.36), minHeight: 200, maxHeight: 280 });
+  function draw() {
+    pl.redraw(); fp.redraw();
+    CB.stat("tr-j-step", `${step} / ${order.length}`);
+    CB.stat("tr-j-new", last.node < 0 ? "—" : last.solved.length ? last.solved.map((m) => `${NM[bars[m][0]]}${NM[bars[m][1]]} = ${TRX.lbl(known[m])}`).join(", ") : "검산만");
+    const errs = Object.keys(known).map((m) => Math.abs(known[m] - ref.N[m]));
+    CB.stat("tr-j-err", errs.length ? `${CB.num(Math.max(...errs), 3)} kN` : "—");
+    const msg = document.getElementById("tr-j-msg");
+    if (step >= order.length) { msg.className = "tr-msg ok"; msg.textContent = "모든 절점을 풀었습니다. 13개 부재력이 CB.truss 결과와 같고, 마지막 절점의 힘 다각형도 닫힙니다."; }
+    else { const n = order[step], U = bars.map((b, m) => m).filter((m) => bars[m].includes(n) && !(m in known)); msg.className = "tr-msg"; msg.innerHTML = `다음 절점 <b>${NM[n]}</b>: 미지 부재 ${U.length}개 (${U.map((m) => NM[bars[m][0]] + NM[bars[m][1]]).join(", ") || "없음"})`; }
+  }
+  reset();
+})();
+
+/* ---------- 3. T-36 단면법 커터 ---------- */
+(function () {
+  const h = 4.5, P = 60, { nodes, bars } = TRX.t36(h, "pratt");
+  const NM = "ABCDEFGHIJKL".split("");
+  const ref = CB.truss({ nodes, bars, supports: { 0: "pin", 6: "roller" }, loads: [1, 2, 3, 4, 5].map((n) => ({ node: n, fy: -P })), EA: 1e6 });
+  const cut = { x: 15, y: h + 1.2, lock: "y", label: "✂", constrain: (p) => { p.x = CB.clamp(p.x, 0.5, 35.5); } };
+  const mc = CB.check("tr-c-mc", () => go()), fade = CB.check("tr-c-fade", () => go());
+  let res = null;
+  function solveCut() {
+    const xc = cut.x, cutBars = bars.map((b, m) => m).filter((m) => { const [a, b] = bars[m]; return (nodes[a][0] - xc) * (nodes[b][0] - xc) < 0; });
+    const leftNodes = nodes.map((n, i) => i).filter((i) => nodes[i][0] < xc);
+    // 외력(왼쪽): 반력 150, 하중
+    let Fx = 0, Fy = 0, Mo = 0; const ox = xc, oy = 0;
+    leftNodes.forEach((i) => { let fy = 0; if (i === 0) fy += 150; if (i >= 1 && i <= 5) fy -= P; Fy += fy; Mo += (nodes[i][0] - ox) * fy; });
+    // 각 잘린 부재: 왼쪽 절점에서 오른쪽 절점 방향 단위벡터 × N (인장이면 왼쪽 조각을 오른쪽으로 당김)
+    const cols = cutBars.map((m) => { let [a, b] = bars[m]; if (nodes[a][0] > xc) [a, b] = [b, a]; const dx = nodes[b][0] - nodes[a][0], dy = nodes[b][1] - nodes[a][1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L; return { m, a, ux, uy, mom: (nodes[a][0] - ox) * uy - (nodes[a][1] - oy) * ux }; });
+    const A = [cols.map((c) => c.ux), cols.map((c) => c.uy), cols.map((c) => c.mom)], rhs = [-Fx, -Fy, -Mo];
+    let N;
+    if (cols.length === 3) N = CB.solve(A, rhs);
+    else { const A2 = [A[0], A[1]], r2 = [rhs[0], rhs[1]]; N = CB.solve(A2, r2); }
+    return { cols, N: N || cols.map(() => NaN) };
+  }
+  const pl = CB.plane("#tr-cv-cut", { x: [-3, 39], y: [-3.4, 7.2], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.6 : 0.36), minHeight: 210, maxHeight: 320, points: [cut],
+    draw(Pl) {
+      const pal = Pl.P, ctx = Pl.ctx; res = solveCut();
+      cut.color = pal.text; cut.r = 8;
+      bars.forEach(([a, b], m) => {
+        const isCut = res.cols.some((c) => c.m === m), right = nodes[a][0] > cut.x && nodes[b][0] > cut.x;
+        const N = ref.N[m], col = isCut ? (N > 0 ? pal.tension : pal.compression) : pal.text;
+        ctx.save(); ctx.globalAlpha = right && fade() ? 0.18 : 1; ctx.strokeStyle = col; ctx.lineWidth = isCut ? 4 : 2.4; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(Pl.X(nodes[a][0]), Pl.Y(nodes[a][1])); ctx.lineTo(Pl.X(nodes[b][0]), Pl.Y(nodes[b][1])); ctx.stroke(); ctx.restore();
+      });
+      nodes.forEach(([x, y], i) => { ctx.save(); ctx.globalAlpha = x > cut.x && fade() ? 0.25 : 1; ctx.fillStyle = pal.bg; ctx.strokeStyle = pal.text; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(Pl.X(x), Pl.Y(y), 3.6, 0, 7); ctx.fill(); ctx.stroke(); TRX.text(ctx, NM[i], Pl.X(x) - 10, Pl.Y(y) + (y > 0 ? -12 : 14), pal.dim, { size: 10.5 }); ctx.restore(); });
+      ctx.save(); ctx.strokeStyle = pal.dim; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(Pl.X(cut.x), Pl.Y(h + 1)); ctx.lineTo(Pl.X(cut.x), Pl.Y(-1.2)); ctx.stroke(); ctx.restore();
+      [1, 2, 3, 4, 5].forEach((n) => { if (nodes[n][0] < cut.x || !fade()) TRX.arrow(ctx, Pl.X(nodes[n][0]), Pl.Y(0) + 6, Pl.X(nodes[n][0]), Pl.Y(0) + 28, pal.accent2, 2, 7); });
+      TRX.arrow(ctx, Pl.X(0), Pl.Y(0) + 46, Pl.X(0), Pl.Y(0) + 12, pal.ok, 2.4, 8); TRX.text(ctx, "150", Pl.X(0) + 18, Pl.Y(0) + 40, pal.ok, { size: 11 });
+      res.cols.forEach((c, k) => { const N = res.N[k]; if (!isFinite(N)) return; const [a, b] = bars[c.m], mx = (nodes[a][0] + nodes[b][0]) / 2, my = (nodes[a][1] + nodes[b][1]) / 2; TRX.text(ctx, TRX.lbl(N), Pl.X(mx), Pl.Y(my) - 12, N > 0 ? pal.tension : pal.compression, { size: 12 }); });
+      if (mc() && res.cols.length === 3) {
+        // 두 부재의 교점(모멘트 중심)
+        for (let k = 0; k < 3; k++) {
+          const [p, q] = [0, 1, 2].filter((i) => i !== k).map((i) => res.cols[i]);
+          const det = p.ux * q.uy - p.uy * q.ux; if (Math.abs(det) < 1e-9) continue;
+          const ax = nodes[p.a][0], ay = nodes[p.a][1], bx = nodes[q.a][0], by = nodes[q.a][1];
+          const t = ((bx - ax) * q.uy - (by - ay) * q.ux) / det, ix = ax + t * p.ux, iy = ay + t * p.uy;
+          ctx.save(); ctx.strokeStyle = pal.accent; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(Pl.X(ix), Pl.Y(iy), 8, 0, 7); ctx.stroke(); ctx.restore();
+        }
+      }
+    },
+    onDrag() { go(false); } });
+  function go() {
+    pl.redraw(); res = solveCut();
+    const kinds = { top: "—", dia: "—", bot: "—" };
+    res.cols.forEach((c, k) => { const [a, b] = bars[c.m], N = res.N[k], nm = NM[a] + NM[b], top = nodes[a][1] > 0 && nodes[b][1] > 0, bot = nodes[a][1] === 0 && nodes[b][1] === 0; const s = `${nm} ${TRX.lbl(N)} kN`; if (top) kinds.top = s; else if (bot) kinds.bot = s; else kinds.dia = s; });
+    CB.stat("tr-c-top", kinds.top); CB.stat("tr-c-dia", kinds.dia); CB.stat("tr-c-bot", kinds.bot);
+    const err = Math.max(...res.cols.map((c, k) => Math.abs(res.N[k] - ref.N[c.m])));
+    const panel = Math.floor(cut.x / 6) + 1, msg = document.getElementById("tr-c-msg");
+    msg.className = "tr-msg";
+    msg.innerHTML = `패널 ${panel}(x = ${6 * (panel - 1)}–${6 * panel} m)을 잘라 부재 ${res.cols.length}개 · 왼쪽 조각 평형 ${res.cols.length}식 · CB.truss와의 최대 차 <b>${CB.num(err, 3)} kN</b>` + (res.cols.length === 3 ? " · 파란 원: 모멘트 중심" : "");
+  }
+  go();
+})();
+
+/* ---------- 4. 영부재 찾기 ---------- */
+(function () {
+  const C = [
+    () => ({ nodes: [[0, 0], [3, 0], [6, 0], [9, 0], [0, 3], [3, 3], [6, 3]], bars: [[0, 1], [1, 2], [2, 3], [4, 5], [5, 6], [1, 5], [2, 6], [0, 5], [1, 6], [6, 3]], supports: { 0: "pin", 4: "pin" }, loads: [{ node: 6, fy: -30 }], view: [-2, 10.5, -2, 4.8] }),
+    () => { const t = TRX.t36(4.5); return { nodes: t.nodes, bars: t.bars, supports: { 0: "pin", 6: "roller" }, loads: [1, 2, 3, 4, 5].map((n) => ({ node: n, fy: -60 })), view: [-3, 39, -3, 6.8] }; },
+    () => { const t = TRX.t36(4.5); return { nodes: t.nodes, bars: t.bars, supports: { 0: "pin", 6: "roller" }, loads: [7, 8, 9, 10, 11].map((n) => ({ node: n, fy: -60 })), view: [-3, 39, -3, 6.8] }; },
+  ];
+  let cur, t, pick = new Set(), shown = false;
+  function setCase(k) { cur = C[k](); t = CB.truss({ nodes: cur.nodes, bars: cur.bars, supports: cur.supports, loads: cur.loads, EA: 1e6 }); pick.clear(); shown = false; if (pl) { pl.view({ x: cur.view.slice(0, 2), y: cur.view.slice(2) }); } upd(); }
+  const zeroSet = () => { const mx = Math.max(...t.N.map(Math.abs)); return new Set(t.N.map((v, m) => (Math.abs(v) <= 1e-4 * mx ? m : -1)).filter((m) => m >= 0)); };
+  CB.seg("tr-z-case", (v) => setCase(Number(v)));
+  let pl = null; cur = C[0](); t = CB.truss({ nodes: cur.nodes, bars: cur.bars, supports: cur.supports, loads: cur.loads, EA: 1e6 });
+  pl = CB.plane("#tr-cv-zero", { x: cur.view.slice(0, 2), y: cur.view.slice(2), grid: false, axes: false, aspect: (W) => (W < 520 ? 0.65 : 0.4), minHeight: 210, maxHeight: 320,
+    draw(P) {
+      const pal = P.P, ctx = P.ctx, Z = zeroSet();
+      CB.drawFrame(P, t, { reactions: false, loadPx: 30, loadLabels: false, memberColor: (m) => (shown ? (Z.has(m) ? (pick.has(m) ? pal.ok : pal.warn) : pick.has(m) ? pal.bad : pal.text) : pick.has(m) ? pal.accent : pal.text), memberWidth: 3 });
+      if (shown) cur.bars.forEach(([a, b], m) => { if (!Z.has(m)) TRX.text(ctx, TRX.lbl(t.N[m]), (P.X(cur.nodes[a][0]) + P.X(cur.nodes[b][0])) / 2, (P.Y(cur.nodes[a][1]) + P.Y(cur.nodes[b][1])) / 2, t.N[m] > 0 ? pal.tension : pal.compression, { size: 10.5 }); });
+    },
+    onPointer(x, y, ev) {
+      if (ev !== "down") return;
+      let best = -1, bd = 0.9;
+      cur.bars.forEach(([a, b], m) => { const [x1, y1] = cur.nodes[a], [x2, y2] = cur.nodes[b], dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy, s = CB.clamp(((x - x1) * dx + (y - y1) * dy) / L2, 0, 1), d = Math.hypot(x - x1 - s * dx, y - y1 - s * dy); if (d < bd) { bd = d; best = m; } });
+      if (best < 0) return;
+      pick.has(best) ? pick.delete(best) : pick.add(best); shown = false; upd();
+    } });
+  document.getElementById("tr-z-chk").addEventListener("click", () => { shown = true; upd(); });
+  document.getElementById("tr-z-clr").addEventListener("click", () => { pick.clear(); shown = false; upd(); });
+  function upd() {
+    if (!pl) return; pl.redraw();
+    const Z = zeroSet(), hit = [...pick].filter((m) => Z.has(m)).length, wrong = pick.size - hit;
+    CB.stat("tr-z-n", `${pick.size}개`); CB.stat("tr-z-s", shown ? `${hit} / ${Z.size}` : `? / ${Z.size}`);
+    const msg = document.getElementById("tr-z-msg");
+    if (!shown) { msg.className = "tr-msg"; msg.textContent = `영부재는 모두 ${Z.size}개입니다. 하중이 없는 절점부터 살펴보세요.`; return; }
+    const ok = hit === Z.size && wrong === 0;
+    msg.className = "tr-msg " + (ok ? "ok" : "bad");
+    msg.innerHTML = ok ? "모두 맞혔습니다. 초록이 맞힌 영부재입니다." : `초록 = 맞힘, 주황 = 놓친 영부재, 빨강 = 영부재가 아닌데 고른 부재(${wrong}개). 숫자는 힘이 있는 부재의 부재력입니다.`;
+  }
+  upd();
+})();
+
+/* ---------- 5. 형식 비교 ---------- */
+(function () {
+  const type = CB.seg("tr-t-type", go), load = CB.seg("tr-t-load", go), pos = CB.range("tr-t-pos", (v) => "BCDEF"[v - 1], go);
+  let t, g;
+  function solve() {
+    g = type() === "warren" ? TRX.warren(4.5) : TRX.t36(4.5, type() === "warrenv" ? "warrenv" : type());
+    const ln = load() === "all" ? [1, 2, 3, 4, 5] : [pos()];
+    t = CB.truss({ nodes: g.nodes, bars: g.bars, supports: { 0: "pin", 6: "roller" }, loads: ln.map((n) => ({ node: n, fy: -60 })), EA: 1e6 });
+  }
+  solve();
+  const pl = CB.plane("#tr-cv-type", { x: [-3, 39], y: [-4.2, 6.8], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.6 : 0.36), minHeight: 200, maxHeight: 320,
+    draw(P) { if (t.ok) CB.drawFrame(P, t, { axialColors: true, reactions: true, loadPx: 28, loadLabels: false, memberLabels: (m) => TRX.lbl(t.N[m]) }); } });
+  function go() {
+    solve(); pl.redraw();
+    const N = t.N, L = g.bars.map((b) => TRX.len(g.nodes, b));
+    const tmax = Math.max(0, ...N), cmin = Math.min(0, ...N);
+    let lc = 0; N.forEach((v, m) => { if (v < -1e-6) lc = Math.max(lc, L[m]); });
+    CB.stat("tr-t-t", `+${CB.num(tmax, 0)} kN`); CB.stat("tr-t-c", `${CB.num(cmin, 0)} kN`); CB.stat("tr-t-lc", `${CB.num(lc, 2)} m`);
+    CB.stat("tr-t-s", CB.sig(N.reduce((s, v, m) => s + Math.abs(v) * L[m], 0), 4));
+  }
+  go();
+})();
+
+/* ---------- 6. 높이와 강재량 ---------- */
+(function () {
+  const gh = CB.range("tr-d-h", (v) => v.toFixed(1) + " m", go), bk = CB.check("tr-d-bk", go);
+  const f = 210, E = 210000, k = 0.83, FS = 2, rho = 7.85e-9;
+  function calc(h) {
+    const g = TRX.t36(h), t = CB.truss({ nodes: g.nodes, bars: g.bars, supports: { 0: "pin", 6: "roller" }, loads: [1, 2, 3, 4, 5].map((n) => ({ node: n, fy: -60 })), EA: 1e6 });
+    let V = 0;
+    g.bars.forEach((b, m) => { const L = TRX.len(g.nodes, b) * 1000, N = t.N[m] * 1000; let A = Math.abs(N) / f; if (N < 0 && bk()) A = Math.max(A, (L / Math.PI) * Math.sqrt((FS * -N) / (E * k))); V += Math.max(A, 500) * L; });
+    return { g, t, w: V * rho };
+  }
+  let cur = calc(gh());
+  const pl = CB.plane("#tr-cv-dep", { x: [-3, 39], y: [-1.5, 10], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.6 : 0.34), minHeight: 190, maxHeight: 300,
+    draw(P) { if (cur.t.ok) CB.drawFrame(P, cur.t, { axialColors: true, reactions: false, loads: false, memberLabels: (m) => (Math.abs(cur.t.N[m]) > 100 ? TRX.lbl(cur.t.N[m]) : "") }); } });
+  const ch = CB.canvas("#tr-cv-dep2", (ctx, W, H) => {
+    const pal = CB.palette(), data = [];
+    let best = { h: 0, w: 1e9 };
+    for (let h = 2; h <= 9.001; h += 0.25) { const w = calc(h).w; data.push([h, w]); if (w < best.w) best = { h, w }; }
+    const hi = Math.max(...data.map((d) => d[1])) * 1.08;
+    CB.chart(ctx, null, { x: [2, 9], y: [0, hi], xLabel: "높이 h (m)", yLabel: "강재량 (t)", series: [{ data, color: pal.accent, width: 2.4, fill: CB.color("accent-soft") }],
+      vlines: [{ x: 4.5, color: pal.dim, label: "T-36" }, { x: best.h, color: pal.ok, label: "최소" }], points: [{ x: gh(), y: cur.w, color: pal.accent2, r: 6 }] });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.34), minHeight: 190, maxHeight: 280 });
+  function go() {
+    cur = calc(gh()); pl.redraw(); ch.redraw();
+    CB.stat("tr-d-r", `1 / ${CB.num(36 / gh(), 1)}`); CB.stat("tr-d-c", `${CB.num(Math.min(...cur.t.N), 0)} kN`); CB.stat("tr-d-w", `${cur.w.toFixed(2)} t`);
+  }
+  go();
+})();
+
+/* ---------- 7. T-36 하중 배치 ---------- */
+(function () {
+  const { nodes, bars } = TRX.t36(4.5), NM = "ABCDEFGHIJKL".split("");
+  const gp = CB.range("tr-x-p", (v) => v + " kN", go);
+  let on = [1, 1, 1, 1, 1], t;
+  document.querySelectorAll("#sim-tr-t36 [data-trx]").forEach((b) => b.addEventListener("click", () => { on = b.dataset.trx.split("").map(Number); go(); }));
+  function solve() { const ld = []; on.forEach((v, i) => { if (v) ld.push({ node: i + 1, fy: -gp() }); }); t = CB.truss({ nodes, bars, supports: { 0: "pin", 6: "roller" }, loads: ld, EA: 1e6 }); }
+  solve();
+  const pl = CB.plane("#tr-cv-t36", { x: [-3, 39], y: [-5.2, 6.6], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.6 : 0.38), minHeight: 210, maxHeight: 330,
+    draw(P) {
+      const pal = P.P, ctx = P.ctx;
+      CB.drawFrame(P, t, { axialColors: true, reactions: true, loads: false, reactionPx: 30, memberLabels: (m) => TRX.lbl(t.N[m]) });
+      on.forEach((v, i) => { const x = P.X(nodes[i + 1][0]), y = P.Y(0); if (v) TRX.arrow(ctx, x, y + 6, x, y + 30, pal.accent2, 2.2, 8); else { ctx.save(); ctx.strokeStyle = pal.faint; ctx.setLineDash([3, 3]); ctx.strokeRect(x - 7, y + 8, 14, 18); ctx.restore(); } });
+      nodes.forEach(([x, y], i) => TRX.text(ctx, NM[i], P.X(x) - 10, P.Y(y) + (y > 0 ? -12 : -12), pal.dim, { size: 10.5 }));
+    },
+    onPointer(x, y, ev) { if (ev !== "down") return; const k = Math.round(x / 6); if (k >= 1 && k <= 5 && Math.abs(x - 6 * k) < 2 && y < 1.5) { on[k - 1] = on[k - 1] ? 0 : 1; go(); } } });
+  function go() {
+    solve(); pl.redraw();
+    CB.stat("tr-x-r", `${CB.num(t.reactions[0][1], 1)} · ${CB.num(t.reactions[6][1], 1)} kN`);
+    const N = t.N, it = N.indexOf(Math.max(...N)), ic = N.indexOf(Math.min(...N));
+    CB.stat("tr-x-t", `${NM[bars[it][0]]}${NM[bars[it][1]]} +${CB.num(N[it], 0)}`); CB.stat("tr-x-c", `${NM[bars[ic][0]]}${NM[bars[ic][1]]} ${CB.num(N[ic], 0)}`);
+    const diag = [17, 18, 19, 20].filter((m) => N[m] < -0.01).map((m) => NM[bars[m][0]] + NM[bars[m][1]]);
+    const msg = document.getElementById("tr-x-msg");
+    msg.className = "tr-msg" + (diag.length ? " bad" : "");
+    msg.innerHTML = diag.length ? `사재 ${diag.join(", ")}가 압축입니다. 프랫의 사재는 보통 인장이지만, 하중이 한쪽에 몰리면 패널 전단력의 부호가 바뀌어 압축이 됩니다.` : "모든 사재가 인장입니다(프랫 트러스의 보통 상태).";
+  }
+  go();
+})();
+</script>
+</body>
+</html>
