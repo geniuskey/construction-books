@@ -44,6 +44,14 @@ LOCAL_BOOKS = [{
     'status': 'published', 'level': '건축·토목 3학년', 'stage': 'design', 'slug': 'concrete', 'legacyUrl': None,
     'color': '#5c677d', 'colorDark': '#a9b4c8', 'motif': 'rebar',
     'topics': ['응력 블록·휨', '전단·비틀림', '정착·처짐·균열', '슬래브', 'P–M 상관도', '내진 상세', '기초·STM·PSC'],
+}, {
+    'id': 'civilbook', 'code': 'CIV', 'title': 'CivilBook', 'subtitle': '교량·터널·도로 교과서',
+    'headline': '강을 건너고 산을 뚫는 구조물',
+    'description': '교량 하중과 영향선, 거더교·아치교·트러스교·사장교·현수교, 하부 구조와 받침, 터널 굴착과 지반 반응 곡선, NATM 지보, TBM과 지표 침하, 교통류와 선형 설계, 토공과 배수, 포장 설계, 철도, 하천, 유지관리까지 — 트럭을 달리게 하고 산을 뚫어 보며 기준 시설 B-130·TN-11·R-60의 숫자로 익히는 토목 교과서.',
+    'url': 'https://construction.euiyun.com/civil/', 'repo': 'https://github.com/geniuskey/construction-books', 'field': 'construction',
+    'status': 'published', 'level': '토목 3학년', 'stage': 'civil', 'slug': 'civil', 'legacyUrl': None,
+    'color': '#2b8a3e', 'colorDark': '#8ce99a', 'motif': 'bridge',
+    'topics': ['교량 하중', '거더·아치·케이블', '하부 구조', '터널·지보', 'TBM', '교통·선형', '포장·배수', '철도·하천'],
 }]
 books = LOCAL_BOOKS
 catalog = []

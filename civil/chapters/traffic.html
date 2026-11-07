@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>도로 계획과 교통 · CivilBook</title>
+<meta name="description" content="길의 수요와 용량. 도로의 기능 분류, AADT와 설계 시간 교통량 DHV = AADT·K·D, 그린실즈의 속도–밀도–교통량, 용량과 서비스 수준, 병목의 충격파, 신호 교차로와 웹스터 최적 주기, 셀 오토마타 교통 시뮬레이션을 R-60 진입 도로로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .tf-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .tf-msg b { color: var(--text); }
+  .tf-msg.ok { color: var(--ok); font-weight: 600; }
+  .tf-msg.bad { color: var(--bad); font-weight: 600; }
+  .tf-tbl td, .tf-tbl th { font-variant-numeric: tabular-nums; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="civil"></script>
+</head>
+<body data-chapter="traffic">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="tf-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="tf-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="tf-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="tf-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 10</div>
+    <h1 data-no-glossary>도로 계획과 교통</h1>
+    <p class="lead">다리와 터널은 길의 일부입니다. 그 길에 차로를 몇 개 둘지, 교차로 신호를 몇 초로 할지는 구조 계산이 아니라 <b>교통량</b>이 정합니다. 그런데 교통량은 하중과 달리 이상하게 행동합니다. 차가 늘어나면 길이 처리하는 양도 늘다가, 어느 순간 오히려 줄어들고, 아무 사고도 없는데 정체가 뒤로 퍼져 나갑니다. 이 장은 도로를 계획하는 숫자들 — 연평균 일교통량과 설계 시간 교통량, 교통류의 속도–밀도–교통량 관계, 용량과 서비스 수준, 충격파, 신호 교차로의 주기 — 을 차례로 세우고, B-10 진입로를 넓히는 지방부 2차로 도로 R-60(설계 속도 60 km/h)에 차로가 몇 개 필요한지, 진입 교차로의 신호를 몇 초로 할지 계산합니다.</p>
+    <ul class="objectives">
+      <li>도로의 기능 분류(주간선·보조간선·집산·국지)와 이동성–접근성의 맞바꿈, 접근 관리를 설명한다.</li>
+      <li>연평균 일교통량에서 설계 시간 교통량 \(DHV = AADT\cdot K\cdot D\)와 승용차 환산 교통량을 계산한다.</li>
+      <li>그린실즈 모형으로 속도–밀도–교통량 관계와 용량 \(q_{max} = v_f k_j/4\)을 유도하고 비혼잡·혼잡 영역을 구별한다.</li>
+      <li>교통량/용량 비로 서비스 수준을 판정하고 R-60의 필요 차로 수와 확장 시기를 정한다.</li>
+      <li>병목에서 생기는 충격파의 속도 \(w = \Delta q/\Delta k\)와 대기 행렬의 길이·해소 시간을 계산한다.</li>
+      <li>포화 교통류율과 손실 시간으로 신호 교차로의 용량, 지체, 웹스터 최적 주기 \(C_0 = (1.5L + 5)/(1 - Y)\)를 계산한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>도로는 늘 너무 좁거나 쓸데없이 넓었다</b></div>
+      <div class="o-body"><p>자동차가 빠르게 늘던 1930년대 미국에서 도로 기술자들은 "이 길이 차를 몇 대까지 받을 수 있나"에 답하지 못했습니다. 1934년 브루스 그린실즈(Bruce Greenshields)는 도로 옆에서 일정 간격으로 사진을 찍어 차량의 간격과 속도를 재고, 속도가 밀도에 따라 거의 직선으로 줄어든다는 관계를 발표했습니다. 이 단순한 직선에서 "교통량이 최대가 되는 밀도"가 나오고, 그것이 곧 도로의 용량입니다. 1950년 미국에서 첫 도로 용량 편람(HCM)이 나왔고, 1965년판에서 운전자가 느끼는 품질을 A–F 여섯 등급으로 나누는 서비스 수준이 도입되었습니다.</p>
+        <p>1955년 라이트힐(Lighthill)과 휘텀(Whitham), 이듬해 리처즈(Richards)는 교통을 압축성 유체처럼 보고, 교통 상태가 바뀌는 경계가 충격파로 움직인다는 이론(LWR 모형)을 세웠습니다. 1958년 영국 도로 연구소의 웹스터(F. V. Webster)는 신호 교차로의 지체 공식과 최적 주기를 내놓았습니다. 오늘날 차로 수를 정하고 신호를 맞추는 모든 계산은 이 세 가지 생각 — 기본 관계, 충격파, 신호 지체 — 위에 있습니다.</p>
+        <div class="o-chain"><span>교통 수요(AADT)</span><i>→</i><span class="tool">DHV · q = k·v · 용량 · LOS · w = Δq/Δk · C₀</span><i>→</i><span>차로 수 · 신호 시간 · 확장 시기</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="classification">
+    <h2>도로의 기능 분류와 접근 관리</h2>
+    <div class="problem"><strong>모든 도로가 빨리 달리게 해야 하나</strong>
+      <p>R-60은 B-10 부지와 인근 산업 단지를 국도에 잇는 지방부 2차로 도로입니다. 길가의 상점과 농가마다 진입로를 내 달라는 요구가 있습니다. 진입로를 모두 허락하면 무엇을 잃을까요?</p></div>
+    <p>도로는 두 가지 일을 합니다. 멀리 빠르게 가게 하는 <b>이동성</b>, 그리고 땅(집, 상점, 공장)에 닿게 하는 <b>접근성</b>입니다. 둘은 맞바꿈 관계입니다. 진입로와 교차로가 많을수록 접근은 쉽지만 차들이 자주 끼어들고 멈춰 속도와 안전이 떨어집니다. 그래서 도로망을 기능에 따라 층으로 나눕니다. 이것이 도로의 <span class="term">기능 분류</span><span class="en">(functional classification)</span>입니다. 「도로의 구조·시설 기준에 관한 규칙」은 도로를 기능에 따라 주간선도로, 보조간선도로, 집산도로, 국지도로로 구분합니다(현행 규칙 확인).</p>
+    <figure class="diagram" id="fig-tf-class">
+      <svg viewBox="0 0 860 330" role="img" aria-label="도로 기능 분류: 이동성과 접근성의 비율, 간선·집산·국지도로의 위계">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <line x1="0" y1="230" x2="360" y2="230" class="s-axis"/><line x1="0" y1="230" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 0H90L270 230H360" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <path d="M0 230H90L270 0H360" style="fill:none;stroke:var(--accent-2);stroke-width:3"/>
+          <text x="20" y="-8" class="t-mono" style="fill:var(--accent)">이동성</text><text x="290" y="-8" class="t-mono" style="fill:var(--accent-2)">접근성</text>
+          <g class="t-mono" text-anchor="middle"><text x="45" y="250">주간선</text><text x="135" y="250">보조간선</text><text x="225" y="250">집산</text><text x="315" y="250">국지</text></g>
+          <text x="-14" y="115" text-anchor="middle" class="t-dim" transform="rotate(-90 -14 115)">기능의 비중</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="170" y="0" text-anchor="middle" class="t" style="font-weight:700">도로망의 위계(개략)</text>
+          <line x1="20" y1="40" x2="340" y2="40" style="stroke:var(--accent);stroke-width:7"/><text x="20" y="30" class="t-mono">주간선(국도·고속도로)</text>
+          <line x1="120" y1="40" x2="120" y2="140" style="stroke:var(--accent);stroke-width:4.5;opacity:.8"/><line x1="260" y1="40" x2="260" y2="140" style="stroke:var(--accent);stroke-width:4.5;opacity:.8"/>
+          <text x="128" y="96" class="t-mono">보조간선·집산</text>
+          <line x1="60" y1="140" x2="320" y2="140" style="stroke:var(--accent);stroke-width:3.5;opacity:.7"/>
+          <g style="stroke:var(--text-dim);stroke-width:1.6"><line x1="80" y1="140" x2="80" y2="200"/><line x1="160" y1="140" x2="160" y2="210"/><line x1="200" y1="140" x2="200" y2="190"/><line x1="300" y1="140" x2="300" y2="205"/></g>
+          <g style="fill:var(--accent-2);opacity:.5"><rect x="66" y="200" width="28" height="18"/><rect x="146" y="210" width="28" height="18"/><rect x="186" y="190" width="28" height="18"/><rect x="286" y="205" width="28" height="18"/></g>
+          <text x="200" y="250" text-anchor="middle" class="t-mono">국지도로 → 개별 필지</text>
+          <text x="240" y="128" class="t-mono" style="fill:var(--accent-2)">R-60 (집산 성격)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-1.</b> 도로 기능의 맞바꿈(개략). 주간선도로는 이동성이 거의 전부이고 진입을 엄격히 제한한다. 국지도로는 필지에 닿는 접근이 목적이다. 통행은 국지 → 집산 → 간선으로 모였다가 다시 흩어진다. R-60은 산업 단지와 국도를 잇는 집산 성격의 지방부 도로로 본다(교육용).</figcaption>
+    </figure>
+    <p>기능 분류는 설계의 거의 모든 것을 정합니다. 간선도로는 설계 속도가 높고, 교차로 간격이 넓고, 진입로를 제한합니다. 국지도로는 설계 속도가 낮고 보행자와 주차를 받아들입니다. <span class="term">접근 관리</span><span class="en">(access management)</span>는 진입로와 교차로의 위치·간격·형식을 관리해 간선 기능을 지키는 일입니다. 진입로를 모아 하나의 연결로로 내거나, 중앙 분리대로 좌회전을 제한하거나, 진입로를 교차로에서 일정 거리 떨어뜨립니다. 접근 지점의 밀도가 높을수록 사고율이 커진다는 것은 여러 나라의 연구에서 일관된 결과입니다.</p>
+    <div class="callout site"><strong>R-60 지방부 2차로 도로</strong> B-10 진입로 확장 구간. 설계 속도 60 km/h, 차로 폭 3.5 m(양방향 2차로), 집산 성격의 지방부 도로(교육용 분류). 이 장에서 쓰는 교통 조건(교육용 가정): 개통 연도 AADT 7,200대/일, 연 증가율 2.6 %, 20년 뒤 설계 연도 AADT 약 12,000대/일, 설계 시간 계수 K = 0.12, 중방향 계수 D = 0.60, 중차량 8 %(승용차 환산 계수 1.5), 첨두 시간 계수 0.90. 2차로 도로의 방향 용량 1,700 pcu/h(HCM 형태). 평면·종단 선형은 11장, 포장은 13장, 성토 E-4는 GeotechBook.</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="volume">
+    <h2>교통량과 설계 시간 교통량</h2>
+    <div class="problem"><strong>하루 12,000대인 길을 몇 대로 설계하나</strong>
+      <p>하루 교통량을 24로 나누면 시간당 500대입니다. 하지만 출근 시간 한 시간에 1,400대가 몰리고, 새벽에는 30대가 지나갑니다. 1년 8,760시간 가운데 어느 시간을 설계 기준으로 삼아야 할까요?</p></div>
+    <p>도로 계획의 출발점은 <span class="term">연평균 일교통량</span><span class="en">(annual average daily traffic, AADT)</span>입니다. 1년 동안 지점을 지난 차량 수를 365로 나눈 값으로, 상시 조사 지점의 연속 측정과 수시 조사 지점의 단기 측정(요일·월 보정)으로 구합니다. 그러나 차로 수는 하루가 아니라 <b>가장 붐비는 시간</b>이 정합니다. 1년의 시간 교통량을 큰 순서로 늘어놓으면(그림 10-2) 처음 몇십 시간은 가파르게 떨어지다 완만해집니다. 그 꺾이는 곳, 전통적으로 <b>30번째 순위 시간</b>의 교통량을 설계 시간 교통량으로 씁니다. 1년에 29시간은 설계보다 붐비는 것을 받아들이는 대신, 드문 극단값 때문에 과대 설계하지 않는 경제적 선택입니다.</p>
+    <figure class="diagram" id="fig-tf-30hv">
+      <svg viewBox="0 0 860 320" role="img" aria-label="연간 시간 교통량을 순위대로 늘어놓은 곡선과 30번째 시간 교통량">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <line x1="90" y1="250" x2="790" y2="250" class="s-axis"/><line x1="90" y1="250" x2="90" y2="30" class="s-axis"/>
+        <path d="M92 40C110 70 130 100 160 118C200 136 260 146 340 152C460 160 600 166 780 172" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+        <line x1="166" y1="30" x2="166" y2="250" style="stroke:var(--accent-2);stroke-dasharray:5 4;stroke-width:1.6"/>
+        <line x1="90" y1="121" x2="166" y2="121" style="stroke:var(--accent-2);stroke-dasharray:5 4;stroke-width:1.6"/>
+        <circle cx="166" cy="121" r="5" style="fill:var(--accent-2)"/>
+        <text x="174" y="112" class="t-mono" style="fill:var(--accent-2)">30번째 시간: K = 30HV/AADT</text>
+        <g class="t-mono" text-anchor="middle"><text x="90" y="268">1</text><text x="166" y="268">30</text><text x="340" y="268">100</text><text x="780" y="268">200</text></g>
+        <text x="440" y="292" text-anchor="middle" class="t-dim">1년 중 순위(시간)</text>
+        <text x="44" y="140" text-anchor="middle" class="t-dim" transform="rotate(-90 44 140)">시간 교통량 / AADT (%)</text>
+        <g class="t-mono" text-anchor="end"><text x="84" y="44">20</text><text x="84" y="124">12</text><text x="84" y="174">8</text></g>
+        <text x="520" y="80" class="t-dim">순위가 앞쪽은 휴가철·명절 같은 드문 극단</text>
+        <text x="520" y="100" class="t-dim">꺾이는 곳 이후는 매일 반복되는 첨두</text>
+      </svg>
+      <figcaption><b>그림 10-2.</b> 연간 시간 교통량 순위 곡선(지방부 도로의 개략, 교육용 모양). 곡선이 꺾이는 30번째 시간 근처에서 설계 시간을 잡으면 투자 대비 효율이 좋다. 실제 곡선과 K 값은 지점마다 조사한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 10.1 (설계 시간 교통량)</strong> 설계 연도의 AADT에 <span class="term">설계 시간 계수</span><span class="en">(design hour factor)</span> \(K\)와 <span class="term">중방향 계수</span><span class="en">(directional distribution factor)</span> \(D\)를 곱한 값을 중방향 <span class="term">설계 시간 교통량</span><span class="en">(directional design hour volume, DHV)</span>이라 한다.
+      <div class="formula">$$DDHV = AADT \cdot K \cdot D \quad (\text{대/시}), \qquad v_p = \frac{DDHV}{PHF\cdot f_{HV}}, \quad f_{HV} = \frac{1}{1 + P_T(E_T - 1)}$$<div class="where">\(K\): 30번째 시간 교통량/AADT(지방부 약 0.10–0.15, 도시부 약 0.08–0.10, 형태), \(D\): 첨두 시간 양방향 중 많은 쪽의 비율(0.5–0.7 정도). \(PHF\): <span class="term">첨두 시간 계수</span><span class="en">(peak hour factor)</span> = 시간 교통량/(가장 붐비는 15분 × 4), 1 이하. \(f_{HV}\): 중차량 보정, \(P_T\) 중차량 비율, \(E_T\) 중차량 1대를 승용차 몇 대로 보는지의 <span class="term">승용차 환산 계수</span><span class="en">(passenger car equivalent, PCE)</span>(평지 1.5 정도, 경사·차종에 따라 다름). \(v_p\)는 승용차 환산 교통량(pcu/h)으로, 용량과 비교하는 값이다. 계수는 현행 도로용량편람을 확인한다.</div></div></div>
+    <div class="sim" id="sim-tf-dhv">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>설계 시간 교통량 계산기: AADT · K · D → DHV → 필요 차로 수</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tf-cv-dhv" aria-label="AADT에서 설계 시간 교통량, 승용차 환산 교통량, 차로별 용량 막대로 가는 계산 흐름"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>설계 연도 AADT <output id="tf-dh-a-out"></output></span><input type="range" id="tf-dh-a" min="2000" max="60000" step="500" value="12000"></label>
+          <label class="ctrl"><span>설계 시간 계수 K <output id="tf-dh-k-out"></output></span><input type="range" id="tf-dh-k" min="0.06" max="0.2" step="0.005" value="0.12"></label>
+          <label class="ctrl"><span>중방향 계수 D <output id="tf-dh-d-out"></output></span><input type="range" id="tf-dh-d" min="0.5" max="0.8" step="0.01" value="0.6"></label>
+          <label class="ctrl"><span>중차량 비율 <output id="tf-dh-hv-out"></output></span><input type="range" id="tf-dh-hv" min="0" max="30" step="1" value="8"></label>
+          <label class="ctrl"><span>첨두 시간 계수 PHF <output id="tf-dh-phf-out"></output></span><input type="range" id="tf-dh-phf" min="0.75" max="1" step="0.01" value="0.9"></label>
+          <div class="ctrl"><span>목표 서비스 수준</span><div class="seg" id="tf-dh-los"><button data-value="C">C (v/c ≤ 0.70)</button><button data-value="D" class="on">D (v/c ≤ 0.85)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">DDHV</span><span class="v" id="tf-dh-o-d">—</span></div>
+        <div class="stat"><span class="k">v<sub>p</sub> (pcu/h)</span><span class="v" id="tf-dh-o-v">—</span></div>
+        <div class="stat"><span class="k">필요 차로(방향)</span><span class="v" id="tf-dh-o-n">—</span></div>
+        <div class="stat"><span class="k">v/c · LOS</span><span class="v" id="tf-dh-o-c">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: R-60 기본값에서 DDHV 864대/h, v<sub>p</sub> 약 1,000 pcu/h, 방향 1차로(2차로 도로)로 v/c 0.59, LOS C를 확인하세요 · AADT를 25,000으로 올리면 방향 2차로(4차로 도로)가 필요해집니다 · K를 0.08(도시부)로 바꾸면 같은 AADT에서 필요한 차로가 줄어듭니다 · 중차량 30 %면 같은 대수가 더 많은 승용차 환산 교통량이 됩니다 · 모델: 정의 10.1(E<sub>T</sub> = 1.5), 차로당 용량 — 방향 1차로(2차로 도로) 1,700 pcu/h, 방향 2차로 이상 다차로 도로 2,000 pcu/h/차로(교육용 형태), 서비스 수준 띠는 표 10-1(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 10.1 (R-60의 설계 시간 교통량)</strong> 설계 연도 AADT 12,000대/일, \(K = 0.12\), \(D = 0.60\), 중차량 8 %(\(E_T = 1.5\)), \(PHF = 0.90\).
+      <p><b>① 양방향 설계 시간 교통량</b> \(12{,}000\times0.12 = 1{,}440\) 대/시. <b>중방향</b> \(1{,}440\times0.60 = 864\) 대/시.</p>
+      <p><b>② 중차량 보정</b> \(f_{HV} = 1/(1 + 0.08\times0.5) = 0.962\).</p>
+      <p><b>③ 승용차 환산 첨두 15분 율</b> \(v_p = 864/(0.90\times0.962) = 998\) pcu/h.</p>
+      <p><b>④ 비교</b> 2차로 도로의 방향 용량 1,700 pcu/h → \(v/c = 998/1{,}700 = 0.59\) → 교육용 띠로 <b>LOS C</b>. 목표 D(\(v/c \le 0.85\))를 만족하므로 설계 연도까지 <b>양방향 2차로</b>로 충분하다. 다만 지방부 2차로 도로는 앞지르기 기회가 서비스 품질을 크게 좌우하므로, 실제 평가는 앞지르기 가능 구간 비율과 평균 통행 속도를 함께 본다(도로용량편람의 2차로 도로 분석, 형태).</p></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="traffic-flow">
+    <h2>교통류의 기본 관계</h2>
+    <div class="problem"><strong>차가 많아지면 왜 오히려 덜 지나가나</strong>
+      <p>텅 빈 도로에서는 모두 빠르게 달리지만 지나가는 차는 적습니다. 꽉 막힌 도로에는 차가 가득하지만 거의 움직이지 않아 역시 지나가는 차가 적습니다. 그 사이 어딘가에서 가장 많은 차가 지나갑니다. 그곳은 어디일까요?</p></div>
+    <p>교통류를 기술하는 세 변수는 <span class="term">교통량</span><span class="en">(flow, q)</span>(한 지점을 단위 시간에 지나는 차량 수, 대/시), <span class="term">밀도</span><span class="en">(density, k)</span>(단위 길이에 있는 차량 수, 대/km), <span class="term">공간 평균 속도</span><span class="en">(space mean speed, v)</span>(한 순간 구간 안 차량 속도의 평균, km/h)입니다. 유체의 유량 = 밀도 × 속도와 같이 세 변수는 항상
+      \[ q = k\,v \]
+    를 만족합니다. 한 지점에서 지나는 차들의 속도를 평균한 <b>시간 평균 속도</b>는 빠른 차가 더 자주 지나가므로 공간 평균 속도보다 크거나 같고, 이 식에는 공간 평균 속도를 써야 합니다.</p>
+    <div class="callout def"><strong>원리 10.2 (그린실즈 모형)</strong> 속도가 밀도에 대해 직선으로 줄어든다고 가정하면
+      <div class="formula">$$v = v_f\left(1 - \frac{k}{k_j}\right), \qquad q = v_f\,k\left(1 - \frac{k}{k_j}\right), \qquad q_{max} = \frac{v_f k_j}{4}\ \ \text{at}\ \ k_c = \frac{k_j}{2},\ v_c = \frac{v_f}{2}$$<div class="where">\(v_f\): <span class="term">자유 속도</span><span class="en">(free-flow speed)</span>(밀도 0에서의 속도), \(k_j\): <span class="term">혼잡 밀도</span><span class="en">(jam density)</span>(차가 멈춰 꽉 찼을 때, 차로당 약 110–160대/km, 차두 거리 6–9 m), \(k_c\): <span class="term">임계 밀도</span><span class="en">(critical density)</span>, \(q_{max}\): <span class="term">용량</span><span class="en">(capacity)</span>. 교통량–밀도 곡선(기본 다이어그램)은 포물선이고, 같은 교통량 \(q \lt q_{max}\)에 밀도가 두 개(비혼잡 \(k \lt k_c\), 혼잡 \(k \gt k_c\)) 있다: \(k = \frac{k_j}{2}\left(1 \mp \sqrt{1 - q/q_{max}}\right)\). 실제 고속도로 자료는 비혼잡 영역에서 속도가 거의 일정하다가 용량 근처에서 떨어지는 모양이 더 잘 맞아(삼각형·이중 영역 모형 등) 그린실즈는 개념과 계산용 첫 모형이다.</div></div></div>
+    <figure class="diagram" id="fig-tf-fd">
+      <svg viewBox="0 0 860 300" role="img" aria-label="속도–밀도, 교통량–밀도, 속도–교통량의 세 관계 개략">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(50,40)">
+          <line x1="0" y1="200" x2="220" y2="200" class="s-axis"/><line x1="0" y1="200" x2="0" y2="0" class="s-axis"/>
+          <line x1="0" y1="20" x2="200" y2="200" style="stroke:var(--accent);stroke-width:3"/>
+          <text x="6" y="16" class="t-mono">v_f</text><text x="200" y="216" text-anchor="middle" class="t-mono">k_j</text>
+          <text x="110" y="236" text-anchor="middle" class="t-dim">밀도 k → 속도 v</text>
+        </g>
+        <g transform="translate(320,40)">
+          <line x1="0" y1="200" x2="220" y2="200" class="s-axis"/><line x1="0" y1="200" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 200Q100 -20 200 200" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <line x1="100" y1="90" x2="100" y2="200" style="stroke:var(--accent-2);stroke-dasharray:4 3"/>
+          <text x="100" y="80" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">q_max</text>
+          <text x="100" y="216" text-anchor="middle" class="t-mono">k_c = k_j/2</text>
+          <text x="40" y="120" class="t-mono" style="fill:var(--ok)">비혼잡</text><text x="150" y="120" class="t-mono" style="fill:var(--bad)">혼잡</text>
+          <line x1="0" y1="200" x2="60" y2="70" style="stroke:var(--text-dim);stroke-dasharray:3 3"/><text x="30" y="60" class="t-mono">기울기 = v</text>
+          <text x="110" y="236" text-anchor="middle" class="t-dim">밀도 k → 교통량 q</text>
+        </g>
+        <g transform="translate(590,40)">
+          <line x1="0" y1="200" x2="220" y2="200" class="s-axis"/><line x1="0" y1="200" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 20Q200 110 0 200" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <text x="104" y="108" class="t-mono" style="fill:var(--accent-2)">q_max</text>
+          <text x="20" y="60" class="t-mono" style="fill:var(--ok)">비혼잡(위)</text><text x="20" y="170" class="t-mono" style="fill:var(--bad)">혼잡(아래)</text>
+          <text x="110" y="236" text-anchor="middle" class="t-dim">교통량 q → 속도 v</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-3.</b> 그린실즈 모형의 세 관계. 교통량–밀도 곡선의 원점에서 그은 직선의 기울기가 속도, 곡선의 접선 기울기 \(dq/dk\)는 교통 상태의 작은 변화(파동)가 전파되는 속도다 — 비혼잡에서는 앞으로(+), 혼잡에서는 뒤로(−) 전파된다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-tf-fd">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>교통류 3관계: 밀도를 움직여 세 곡선 위의 점을 보기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tf-cv-fd" aria-label="그린실즈 모형의 속도–밀도, 교통량–밀도, 속도–교통량 곡선과 현재 상태 점"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>밀도 k <output id="tf-fd-k-out"></output></span><input type="range" id="tf-fd-k" min="0" max="160" step="1" value="30"></label>
+          <label class="ctrl"><span><span>자유 속도 v<sub>f</sub></span> <output id="tf-fd-vf-out"></output></span><input type="range" id="tf-fd-vf" min="40" max="120" step="1" value="80"></label>
+          <label class="ctrl"><span><span>혼잡 밀도 k<sub>j</sub></span> <output id="tf-fd-kj-out"></output></span><input type="range" id="tf-fd-kj" min="80" max="160" step="1" value="120"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">속도 v</span><span class="v" id="tf-fd-o-v">—</span></div>
+        <div class="stat"><span class="k">교통량 q</span><span class="v" id="tf-fd-o-q">—</span></div>
+        <div class="stat"><span class="k">용량 q<sub>max</sub></span><span class="v" id="tf-fd-o-m">—</span></div>
+        <div class="stat"><span class="k">상태</span><span class="v" id="tf-fd-o-s">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 밀도를 0에서 천천히 올려 교통량이 늘다가 k<sub>c</sub> = 60대/km에서 2,400대/h로 최대가 되고, 그 뒤 밀도가 더 늘면 교통량이 줄어드는 것을 보세요 · 같은 교통량 1,800대/h가 밀도 20과 100 두 곳에 있습니다(비혼잡과 혼잡) · v<sub>f</sub>를 올리면 용량이 비례해 커집니다 · 모델: <code>CB.civ.greenshields(k, vf, kj)</code>, 차로당 값. 혼잡 밀도 120대/km는 차두 거리 약 8.3 m.</div>
+    </div>
+    <div class="callout"><strong>예제 10.2 (그린실즈 용량)</strong> 차로당 \(v_f = 80\) km/h, \(k_j = 120\) 대/km.
+      <p><b>① 용량</b> \(q_{max} = 80\times120/4 = 2{,}400\) 대/h/차로, \(k_c = 60\) 대/km, \(v_c = 40\) km/h.</p>
+      <p><b>② 교통량 1,800 대/h의 두 상태</b> \(k = 60(1 \mp \sqrt{1 - 0.75}) = 60(1 \mp 0.5)\) → 비혼잡 30 대/km(60 km/h), 혼잡 90 대/km(20 km/h).</p>
+      <p><b>③ 해석</b> 같은 1,800대/h라도 하나는 쾌적한 흐름, 하나는 가다 서다 하는 정체다. 그래서 교통량만으로는 서비스 품질을 말할 수 없고, 밀도나 속도를 함께 본다. 실제 도로의 차로당 용량은 기하 구조와 운전자에 따라 약 1,700–2,400 pcu/h이다(형태). 그린실즈의 2,400은 상한 쪽 값이다.</p></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="capacity-los">
+    <h2>용량과 서비스 수준</h2>
+    <div class="problem"><strong>"용량에 맞게" 설계하면 되나</strong>
+      <p>R-60의 방향 용량이 1,700 pcu/h라면 첨두 교통량을 1,700까지 받아도 될까요? 용량에서는 작은 교란 하나로 흐름이 혼잡으로 무너지고, 운전자는 원하는 속도를 낼 수 없습니다. 설계는 용량보다 얼마나 아래에 있어야 할까요?</p></div>
+    <p><span class="term">서비스 수준</span><span class="en">(level of service, LOS)</span>은 운전자가 느끼는 교통 품질을 A(자유로운 흐름)부터 F(용량 초과, 정체)까지 여섯 등급으로 나눈 것입니다. 측정 지표는 시설마다 다릅니다. 고속도로 기본 구간은 밀도, 2차로 도로는 평균 통행 속도와 추종 비율, 신호 교차로는 차량당 평균 제어 지체를 씁니다. 이 장에서는 개념을 보이기 위해 모든 시설을 하나의 지표, 교통량/용량 비 \(v/c\)로 묶은 교육용 띠를 씁니다(표 10-1). 신설 도로는 보통 설계 연도 첨두에 LOS C–D를 목표로 합니다(도로 등급·지역에 따라 다름, 형태).</p>
+    <div class="table-wrap"><table class="tf-tbl">
+      <thead><tr><th>LOS</th><th>v/c (교육용 띠)</th><th>흐름의 모습</th><th>참고: 고속도로 기본 구간 밀도(HCM 형태, pc/km/차로)</th><th>참고: 신호 교차로 지체(HCM 형태, 초/대)</th></tr></thead>
+      <tbody>
+        <tr><td>A</td><td>≤ 0.30</td><td>자유 흐름, 차로 변경 자유</td><td>≤ 7</td><td>≤ 10</td></tr>
+        <tr><td>B</td><td>0.30 – 0.50</td><td>거의 자유, 다른 차를 의식</td><td>7 – 11</td><td>10 – 20</td></tr>
+        <tr><td>C</td><td>0.50 – 0.70</td><td>안정 흐름, 차로 변경에 주의</td><td>11 – 16</td><td>20 – 35</td></tr>
+        <tr><td>D</td><td>0.70 – 0.85</td><td>안정의 끝, 속도 저하 시작</td><td>16 – 22</td><td>35 – 55</td></tr>
+        <tr><td>E</td><td>0.85 – 1.00</td><td>용량 근처, 불안정</td><td>22 – 28</td><td>55 – 80</td></tr>
+        <tr><td>F</td><td>&gt; 1.00</td><td>수요 초과, 대기 행렬</td><td>&gt; 28 또는 v/c &gt; 1</td><td>&gt; 80</td></tr>
+      </tbody>
+    </table></div>
+    <p class="table-note"><b>표 10-1.</b> 서비스 수준의 교육용 v/c 띠와 참고 기준. 밀도는 HCM 고속도로 기본 구간의 pc/mi/ln 경계 11, 18, 26, 35, 45를 km로 바꾼 값, 지체는 HCM 신호 교차로 경계다. 국내 도로용량편람(KHCM)은 지표와 경계가 다를 수 있으므로 현행 편람을 확인한다.</p>
+    <div class="sim" id="sim-tf-los">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>서비스 수준: 교통량/용량 → LOS 띠</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tf-cv-los" aria-label="교통량/용량 비 막대와 LOS 띠, 그린실즈 속도"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>방향 교통량 v<sub>p</sub></span> <output id="tf-ls-v-out"></output></span><input type="range" id="tf-ls-v" min="100" max="9000" step="50" value="1000"></label>
+          <label class="ctrl"><span>방향 차로 수 <output id="tf-ls-n-out"></output></span><input type="range" id="tf-ls-n" min="1" max="4" step="1" value="1"></label>
+          <label class="ctrl"><span><span>자유 속도 v<sub>f</sub></span> <output id="tf-ls-vf-out"></output></span><input type="range" id="tf-ls-vf" min="50" max="110" step="5" value="70"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">용량 c</span><span class="v" id="tf-ls-o-c">—</span></div>
+        <div class="stat"><span class="k">v/c</span><span class="v" id="tf-ls-o-x">—</span></div>
+        <div class="stat"><span class="k">LOS</span><span class="v" id="tf-ls-o-l">—</span></div>
+        <div class="stat"><span class="k">추정 속도</span><span class="v" id="tf-ls-o-s">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: R-60 기본값(1,000 pcu/h, 방향 1차로)에서 v/c 0.59, LOS C · 교통량을 1,500으로 올리면 E에 들어갑니다 · 차로 수를 2로 늘리면(4차로 도로) 용량이 4,000으로 커져 같은 교통량이 B가 됩니다 · v/c가 1에 가까워질수록 속도가 급하게 떨어지는 것을 보세요 · 모델: 용량 — 방향 1차로 1,700, 다차로 2,000 pcu/h/차로(교육용 형태), LOS는 표 10-1의 v/c 띠, 속도는 용량이 같아지도록 k<sub>j</sub>를 맞춘 그린실즈 비혼잡 가지(v/c > 1이면 정의되지 않음). 교육용.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="shockwave">
+    <h2>병목과 충격파</h2>
+    <div class="problem"><strong>사고는 앞에서 났는데 정체 끝은 왜 뒤로 달려오나</strong>
+      <p>R-60의 2차로 구간 한 방향에서 공사로 한 차로가 20분 동안 막혔습니다. 정체의 끝(꼬리)은 처음에 공사 지점에 있다가 뒤로 퍼져 나갑니다. 공사가 끝난 뒤에도 정체는 한동안 남습니다. 꼬리는 얼마나 빨리 뒤로 오고, 정체는 언제 풀릴까요?</p></div>
+    <p>교통 상태가 다른 두 영역(예: 빠르고 성긴 상류 흐름 A와 느리고 빽빽한 정체 Q)이 만나는 경계를 <span class="term">충격파</span><span class="en">(shockwave)</span>라 합니다. 경계에서 차량은 생기지도 사라지지도 않으므로, 경계가 움직이는 속도는 두 상태의 교통량 차이를 밀도 차이로 나눈 값입니다(차량 보존). 교통량–밀도 곡선 위에서 두 상태를 잇는 현의 기울기와 같습니다.</p>
+    <div class="callout def"><strong>원리 10.3 (충격파 속도, LWR 이론)</strong> 상류 상태 \((k_1, q_1)\)와 하류 상태 \((k_2, q_2)\) 사이 경계의 속도는
+      <div class="formula">$$w_{12} = \frac{q_2 - q_1}{k_2 - k_1}$$<div class="where">\(w \lt 0\)이면 경계가 상류(뒤)로, \(w \gt 0\)이면 하류(앞)로 움직인다. <span class="term">병목</span><span class="en">(bottleneck)</span>의 용량 \(q_B\)가 도착 교통량 \(q_A\)보다 작으면 병목 상류에 혼잡 상태 \(Q\)(같은 \(q_B\), 혼잡 가지의 밀도)가 생기고 꼬리가 \(w_{AQ}\)로 뒤로 자란다. 병목이 풀리면 앞에서부터 용량 상태 \(C\)(\(q_{max}\), \(k_c\))가 \(w_{QC}\)로 뒤로 퍼지며 정체를 녹이고, 두 파가 만나면 정체가 사라진다.</div></div></div>
+    <figure class="diagram" id="fig-tf-shock">
+      <svg viewBox="0 0 860 330" role="img" aria-label="시간–공간도의 충격파: 대기 행렬의 성장, 병목 해소 후 회복파, 정체 소멸">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <line x1="90" y1="280" x2="790" y2="280" class="s-axis"/><line x1="90" y1="280" x2="90" y2="30" class="s-axis"/>
+        <text x="440" y="306" text-anchor="middle" class="t-dim">시간 t</text>
+        <text x="46" y="155" text-anchor="middle" class="t-dim" transform="rotate(-90 46 155)">위치 x (진행 방향 ↑)</text>
+        <line x1="90" y1="120" x2="790" y2="120" style="stroke:var(--text-dim);stroke-dasharray:4 3"/>
+        <text x="96" y="112" class="t-mono">병목(공사 구간) x = 0</text>
+        <path d="M150 120L410 196L560 236" style="fill:none;stroke:var(--bad);stroke-width:2.6"/>
+        <path d="M410 120L560 236" style="fill:none;stroke:var(--ok);stroke-width:2.6"/>
+        <path d="M560 236L700 160" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+        <line x1="150" y1="120" x2="150" y2="280" style="stroke:var(--text-faint);stroke-dasharray:2 3"/>
+        <line x1="410" y1="120" x2="410" y2="280" style="stroke:var(--text-faint);stroke-dasharray:2 3"/>
+        <g class="t-mono" text-anchor="middle"><text x="150" y="296">막힘</text><text x="410" y="296">해소 T</text><text x="560" y="296">정체 소멸</text></g>
+        <path d="M300 120L390 120L410 120L300 168Z" style="fill:var(--bad);opacity:.12"/>
+        <text x="310" y="146" class="t" style="font-weight:700;fill:var(--bad)">Q 정체</text>
+        <text x="220" y="230" class="t-mono">A 상류 도착 흐름</text>
+        <text x="480" y="176" class="t-mono" style="fill:var(--ok)">C 용량 방출</text>
+        <text x="250" y="182" class="t-mono" style="fill:var(--bad)">꼬리 w_AQ &lt; 0</text>
+        <text x="500" y="205" class="t-mono" style="fill:var(--ok)">회복파 w_QC</text>
+        <text x="280" y="80" class="t-mono">D: 병목 하류는 q_B로 성긴 흐름</text>
+        <g style="stroke:var(--text-dim);stroke-width:1"><path d="M110 250L300 168L410 155L500 140L600 80"/><path d="M110 270L360 196L450 175L540 160L640 92"/></g>
+        <text x="650" y="76" class="t-mono">차량 궤적(기울기 = 속도)</text>
+      </svg>
+      <figcaption><b>그림 10-4.</b> 병목의 시간–공간도(개략). 빨간 선(정체 꼬리)은 뒤로 자라고, 병목이 풀린 뒤 초록 선(회복파)이 더 빠르게 뒤로 와서 꼬리와 만나는 곳에서 정체가 사라진다. 차량 궤적은 정체 구역을 지날 때 기울기(속도)가 작아진다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-tf-shock">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>충격파: 차로 차단 병목 → 정체 전파 애니메이션</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tf-cv-shock" aria-label="시간–공간도 위의 차량 궤적과 충격파, 아래는 현재 시각의 도로 모습"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>상류 도착 교통량 q<sub>A</sub></span> <output id="tf-sh-q-out"></output></span><input type="range" id="tf-sh-q" min="800" max="4600" step="50" value="3000"></label>
+          <label class="ctrl"><span>병목 용량(남은 차로 비) <output id="tf-sh-r-out"></output></span><input type="range" id="tf-sh-r" min="0.2" max="1" step="0.05" value="0.5"></label>
+          <label class="ctrl"><span>차단 시간 T <output id="tf-sh-t-out"></output></span><input type="range" id="tf-sh-t" min="5" max="30" step="1" value="20"></label>
+          <div class="btn-row"><button class="btn primary" id="tf-sh-play">▶ 재생</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">꼬리 속도 w<sub>AQ</sub></span><span class="v" id="tf-sh-o-w1">—</span></div>
+        <div class="stat"><span class="k">회복파 w<sub>QC</sub></span><span class="v" id="tf-sh-o-w2">—</span></div>
+        <div class="stat"><span class="k">최대 정체 길이</span><span class="v" id="tf-sh-o-l">—</span></div>
+        <div class="stat"><span class="k">정체 소멸 시각</span><span class="v" id="tf-sh-o-t">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(양방향 아닌 한 방향 2차로, q<sub>A</sub> 3,000대/h, 1차로 차단 20분)에서 꼬리가 시속 약 3.8 km로 뒤로 자라고, 해소 뒤 회복파가 시속 약 28 km로 따라와 약 23분에 정체가 사라지는 것을 보세요 · q<sub>A</sub>를 2,400 이하로 줄이면 병목 용량보다 작아 정체가 생기지 않습니다 · q<sub>A</sub>를 용량에 가깝게(4,200) 올리면 꼬리가 빨라지고 정체가 훨씬 오래 갑니다 — 용량 근처 도로가 사고에 민감한 이유 · 모델: 방향 2차로 합계 그린실즈(v<sub>f</sub> 80 km/h, k<sub>j</sub> 240대/km, q<sub>max</sub> 4,800대/h), 원리 10.3의 충격파, 차량 궤적은 영역별 속도 v = q/k로 적분(교육용 LWR 해).</div>
+    </div>
+    <div class="callout"><strong>예제 10.3 (20분 차로 차단의 정체)</strong> 방향 2차로, 그린실즈 합계 \(v_f = 80\) km/h, \(k_j = 240\) 대/km(\(q_{max} = 4{,}800\) 대/h). 도착 \(q_A = 3{,}000\) 대/h, 1차로 차단으로 병목 용량 \(q_B = 2{,}400\) 대/h, 20분.
+      <p><b>① 상태 A(비혼잡)</b> \(k_A = 120(1 - \sqrt{1 - 3000/4800}) = 120(1 - 0.612) = 46.5\) 대/km, \(v_A = 64.5\) km/h.</p>
+      <p><b>② 상태 Q(병목 상류 정체, 혼잡 가지)</b> \(k_Q = 120(1 + \sqrt{1 - 0.5}) = 204.9\) 대/km, \(v_Q = 2400/204.9 = 11.7\) km/h.</p>
+      <p><b>③ 꼬리</b> \(w_{AQ} = (2400 - 3000)/(204.9 - 46.5) = -3.79\) km/h. 20분 뒤 정체 길이 \(3.79\times20/60 = 1.26\) km.</p>
+      <p><b>④ 회복파</b> 상태 C(\(q = 4{,}800\), \(k = 120\)): \(w_{QC} = (4800 - 2400)/(120 - 204.9) = -28.3\) km/h.</p>
+      <p><b>⑤ 소멸</b> \(-3.79\,t = -28.3(t - 1/3)\) → \(t = 0.385\) h = <b>23.1분</b>, 그때 꼬리 위치 \(-1.46\) km. 차단은 20분이었지만 정체는 23분 동안, 최대 1.46 km까지 퍼진다. 정체 안의 차량 수는 최대 약 \((204.9 - 46.5)\times1.26 \approx 200\)대 많아진다.</p></div>
+    <div class="callout deep"><strong>심화: 유령 정체와 용량 저하</strong> 실제 도로에서는 병목 없이도 정체가 생긴다. 밀도가 임계값 근처일 때 한 운전자의 작은 감속이 뒤차로 증폭되며 전해져 "멈춤–출발" 파가 상류로 시속 약 15–20 km(형태)로 이동한다. 또 정체가 한 번 생기면 병목에서 빠져나가는 방출 교통량이 정체 전의 최대 교통량보다 몇 % 작아지는 <b>용량 저하</b>(capacity drop)가 관찰된다. 램프 미터링이나 가변 속도 제한은 흐름을 용량 바로 아래에 붙잡아 이 저하를 피하려는 운영 기법이다. 다음 절의 셀 오토마타는 이 유령 정체를 재현하는 가장 간단한 모형이다.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="ca-traffic">
+    <h2>셀 오토마타 교통 시뮬레이션</h2>
+    <p>그린실즈와 LWR 모형은 교통을 연속체로 봅니다. 반대로 차 한 대 한 대를 규칙으로 움직이게 하면 어떤 흐름이 나올까요? 1992년 나겔(Kai Nagel)과 슈레켄베르크(Michael Schreckenberg)는 도로를 길이 7.5 m의 칸으로 나누고 1초마다 네 규칙만 적용하는 <span class="term">셀 오토마타</span><span class="en">(cellular automaton)</span> 교통 모형을 제안했습니다. ① 가속: 속도가 최대 속도보다 작으면 1 늘린다. ② 감속: 앞차까지 빈칸 수보다 크면 빈칸 수로 줄인다(충돌 금지). ③ 무작위 감속: 확률 \(p\)로 속도를 1 줄인다(운전자의 불완전함). ④ 이동: 속도만큼 칸을 옮긴다. 이 단순한 규칙에서 밀도가 높아지면 아무 원인 없이 정체가 생기고, 그 정체가 뒤로 흘러가는 모습이 저절로 나타납니다.</p>
+    <div class="sim" id="sim-tf-ca">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>나겔–슈레켄베르크 셀 오토마타: 밀도 → 정체파</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tf-cv-ca" aria-label="원형 도로의 차량 칸과 시간–공간도(아래로 갈수록 나중), 정체파가 왼쪽 아래로 흐르는 모습"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>밀도(칸당 차량) <output id="tf-ca-d-out"></output></span><input type="range" id="tf-ca-d" min="0.03" max="0.6" step="0.01" value="0.15"></label>
+          <label class="ctrl"><span>무작위 감속 확률 p <output id="tf-ca-p-out"></output></span><input type="range" id="tf-ca-p" min="0" max="0.6" step="0.01" value="0.25"></label>
+          <label class="ctrl"><span><span>최대 속도 v<sub>max</sub></span> <output id="tf-ca-v-out"></output></span><input type="range" id="tf-ca-v" min="1" max="5" step="1" value="3"></label>
+          <div class="btn-row"><button class="btn primary" id="tf-ca-play">▶ 재생</button><button class="btn" id="tf-ca-reset">다시 배치</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">밀도</span><span class="v" id="tf-ca-o-k">—</span></div>
+        <div class="stat"><span class="k">평균 속도</span><span class="v" id="tf-ca-o-v">—</span></div>
+        <div class="stat"><span class="k">교통량</span><span class="v" id="tf-ca-o-q">—</span></div>
+        <div class="stat"><span class="k">정지 차량 비율</span><span class="v" id="tf-ca-o-s">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 밀도 0.15, p 0.25에서 재생하면 가끔 생긴 정체 덩어리(빨강)가 시간–공간도에서 왼쪽 아래로, 곧 진행 방향의 반대로 흘러갑니다 · p를 0으로 하면 정체가 사라지고 모두 최대 속도로 달립니다(낮은 밀도) · 밀도를 0.3 이상으로 올리면 정체가 도로 전체에 퍼지고 교통량이 오히려 줄어듭니다 — 기본 다이어그램의 혼잡 가지 · 모델: 200칸 원형 도로(1.5 km, 칸 7.5 m, 1단계 1초), 속도 1칸/초 = 27 km/h(v<sub>max</sub> 3 → 81 km/h), Nagel–Schreckenberg(1992) 규칙, 교통량 = 밀도 × 평균 속도(최근 60초 평균). 이 페이지 안의 교육용 모형.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="signals">
+    <h2>신호 교차로</h2>
+    <div class="problem"><strong>R-60과 B-10 진입로의 교차로, 신호를 몇 초로 할까</strong>
+      <p>R-60 동서 방향 주도로의 첨두 임계 차로 교통량은 650대/h, 진입로(남북)는 450대/h입니다. 2현시 신호로 처리할 때 주기를 길게 하면 출발 손실은 줄지만 빨간불에서 기다리는 시간이 늘고, 짧게 하면 반대입니다. 가장 좋은 주기는 몇 초일까요?</p></div>
+    <p>신호 교차로는 시간을 나누어 쓰는 병목입니다. 녹색이 켜지면 대기 행렬의 차량이 일정한 간격(포화 차두 시간, 약 1.8–2.0초)으로 빠져나가는데, 이 간격으로 한 시간 내내 빠져나간다면 지날 교통량을 <span class="term">포화 교통류율</span><span class="en">(saturation flow rate)</span> \(s\)라 합니다(HCM 형태 기본값 1,900 pc/h/차로, 국내 KHCM 형태 2,200 pcu/h/차로, 현행 편람 확인). 녹색 처음 몇 초는 운전자의 반응과 가속 때문에, 녹색 끝의 황색·전적색 일부는 차가 멈추기 때문에 쓰이지 못합니다. 이 쓰이지 못한 시간을 <span class="term">손실 시간</span><span class="en">(lost time)</span>, 실제로 포화 교통류율로 방출하는 시간을 <span class="term">유효 녹색 시간</span><span class="en">(effective green time)</span> \(g\)라 합니다.</p>
+    <figure class="diagram" id="fig-tf-signal">
+      <svg viewBox="0 0 860 320" role="img" aria-label="신호 주기, 현시, 유효 녹색과 손실 시간, 포화 교통류율 방출 다이어그램">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(70,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">신호 시간 배분(2현시)</text>
+          <rect x="0" y="20" width="300" height="22" style="fill:var(--ok);opacity:.7"/><rect x="300" y="20" width="24" height="22" style="fill:var(--warn)"/><rect x="324" y="20" width="356" height="22" style="fill:var(--bad);opacity:.6"/>
+          <rect x="0" y="56" width="324" height="22" style="fill:var(--bad);opacity:.6"/><rect x="324" y="56" width="200" height="22" style="fill:var(--ok);opacity:.7"/><rect x="524" y="56" width="24" height="22" style="fill:var(--warn)"/><rect x="548" y="56" width="132" height="22" style="fill:var(--bad);opacity:.6"/>
+          <text x="-8" y="36" text-anchor="end" class="t-mono">현시 1</text><text x="-8" y="72" text-anchor="end" class="t-mono">현시 2</text>
+          <line x1="0" y1="96" x2="680" y2="96" style="stroke:var(--text-dim)" marker-start="url(#tf-ah-dim)" marker-end="url(#tf-ah-dim)"/>
+          <text x="340" y="112" text-anchor="middle" class="t-mono">신호 주기 C</text>
+        </g>
+        <g transform="translate(70,170)">
+          <line x1="0" y1="110" x2="440" y2="110" class="s-axis"/><line x1="0" y1="110" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 110L20 70L40 30H320L340 70L350 110" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <rect x="30" y="30" width="300" height="80" style="fill:var(--accent);opacity:.12"/>
+          <line x1="0" y1="30" x2="440" y2="30" style="stroke:var(--accent-2);stroke-dasharray:4 3"/>
+          <text x="380" y="26" class="t-mono" style="fill:var(--accent-2)">포화 교통류율 s</text>
+          <text x="180" y="78" text-anchor="middle" class="t-mono">유효 녹색 g (면적 = 실제 방출 대수)</text>
+          <text x="10" y="128" class="t-mono">출발 손실</text><text x="330" y="128" class="t-mono">정리 손실</text>
+          <text x="-10" y="60" text-anchor="end" class="t-mono" transform="rotate(-90 -10 60)">방출률</text>
+        </g>
+        <g transform="translate(560,170)">
+          <text x="0" y="10" class="t-mono">용량 c = s · g / C</text>
+          <text x="0" y="34" class="t-mono">교통량비 y = q / s</text>
+          <text x="0" y="58" class="t-mono">포화도 X = q / c</text>
+          <text x="0" y="82" class="t-mono">총 손실 L = Σ 현시 손실</text>
+          <text x="0" y="106" class="t-mono">임계 교통량비 합 Y = Σ y</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-5.</b> 신호 시간과 방출. 위: 2현시 신호의 녹색·황색·적색 배분. 아래: 녹색 동안 대기 차량의 방출률은 출발 몇 초 뒤 포화 교통류율 \(s\)에 이르고, 실제 방출을 같은 면적의 직사각형으로 바꾼 폭이 유효 녹색 시간 \(g\)다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 10.4 (신호 교차로의 용량, 지체, 웹스터 최적 주기)</strong> 접근로(차로군)의 용량과 포화도는
+      <div class="formula">$$c = s\,\frac{g}{C}, \qquad X = \frac{q}{c} = \frac{q\,C}{s\,g}$$<div class="where">이다. 웹스터(1958)는 무작위 도착을 가정해 차량당 평균 지체를
+        $$d = \frac{C(1-\lambda)^2}{2(1-\lambda X)} + \frac{X^2}{2q(1-X)} - 0.65\left(\frac{C}{q^2}\right)^{1/3}X^{2+5\lambda}, \qquad \lambda = g/C$$
+        (\(q\)는 대/초)로 주고, 교차로 전체 지체를 최소로 하는 주기를
+        $$C_0 = \frac{1.5L + 5}{1 - Y}, \qquad g_i = (C_0 - L)\frac{y_i}{Y}$$
+        로 주었다. \(L\): 주기당 총 손실 시간(초), \(Y = \sum y_i\): 각 현시 임계 차로의 교통량비 \(y = q/s\)의 합. \(Y \to 1\)이면 \(C_0 \to \infty\)이고 \(Y \ge 1\)이면 어떤 주기로도 처리할 수 없다(용량 초과). 첫 항은 균일 도착의 지체, 둘째 항은 무작위 도착의 추가 지체다. 실무에서는 최소·최대 주기(예: 보행자 횡단 시간, 형태)와 연동 신호를 함께 고려한다.</div></div></div>
+    <div class="sim" id="sim-tf-signal">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>신호 교차로: 주기 · 녹색 시간 → 용량 · 지체 (웹스터)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tf-cv-sig" aria-label="주기에 따른 평균 지체 곡선과 웹스터 최적 주기, 녹색 시간 배분 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>현시 1 임계 교통량 q₁ <output id="tf-sg-q1-out"></output></span><input type="range" id="tf-sg-q1" min="100" max="1200" step="10" value="650"></label>
+          <label class="ctrl"><span>현시 2 임계 교통량 q₂ <output id="tf-sg-q2-out"></output></span><input type="range" id="tf-sg-q2" min="100" max="1000" step="10" value="450"></label>
+          <label class="ctrl"><span>포화 교통류율 s <output id="tf-sg-s-out"></output></span><input type="range" id="tf-sg-s" min="1400" max="2200" step="50" value="1800"></label>
+          <label class="ctrl"><span>현시당 손실 시간 <output id="tf-sg-l-out"></output></span><input type="range" id="tf-sg-l" min="2" max="8" step="0.5" value="5"></label>
+          <label class="ctrl"><span>주기 C <output id="tf-sg-c-out"></output></span><input type="range" id="tf-sg-c" min="30" max="150" step="1" value="80"></label>
+          <div class="btn-row"><button class="btn" id="tf-sg-opt">주기를 C₀로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">Y = y₁ + y₂</span><span class="v" id="tf-sg-o-y">—</span></div>
+        <div class="stat"><span class="k">웹스터 C₀</span><span class="v" id="tf-sg-o-c0">—</span></div>
+        <div class="stat"><span class="k">유효 녹색 g₁ / g₂</span><span class="v" id="tf-sg-o-g">—</span></div>
+        <div class="stat"><span class="k">포화도 X</span><span class="v" id="tf-sg-o-x">—</span></div>
+        <div class="stat"><span class="k">평균 지체 · LOS</span><span class="v" id="tf-sg-o-d">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: R-60 교차로 기본값에서 Y 0.61, C₀ 약 51초를 확인하고 "주기를 C₀로"를 눌러 지체 곡선의 바닥 근처인지 보세요 · 주기를 150초로 늘리면 지체가 커집니다(빨간불 대기) · 주기를 C₀보다 많이 줄이면 X가 1에 가까워지며 지체가 폭증합니다 · q₁을 1,100으로 올리면 Y가 1에 가까워져 C₀가 급격히 길어집니다 · 모델: 2현시, L = 2 × 현시당 손실, 녹색은 y에 비례해 배분, 원리 10.4의 웹스터 지체(X ≥ 0.98이면 과포화로 표시), 평균 지체는 교통량 가중 평균, LOS는 표 10-1의 신호 지체 띠(HCM 형태). 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 10.4 (R-60 진입 교차로의 신호)</strong> 2현시, \(s = 1{,}800\) 대/h/차로, 현시당 손실 5초 → \(L = 10\) 초. 임계 차로 교통량 \(q_1 = 650\), \(q_2 = 450\) 대/h.
+      <p><b>① 교통량비</b> \(y_1 = 650/1800 = 0.361\), \(y_2 = 450/1800 = 0.250\), \(Y = 0.611\).</p>
+      <p><b>② 최적 주기</b> \(C_0 = (1.5\times10 + 5)/(1 - 0.611) = 20/0.389 = 51.4\) 초 → 실무적으로 52초(또는 보행 횡단을 고려해 더 길게).</p>
+      <p><b>③ 녹색 배분</b> 유효 녹색 합 \(51.4 - 10 = 41.4\) 초 → \(g_1 = 41.4\times0.361/0.611 = 24.5\) 초, \(g_2 = 16.9\) 초.</p>
+      <p><b>④ 용량과 포화도</b> \(c_1 = 1800\times24.5/51.4 = 857\) 대/h, \(X_1 = 650/857 = 0.76\)(두 현시 모두 같은 \(X = Y/(1 - L/C)\)).</p>
+      <p><b>⑤ 지체</b> 웹스터 식으로 현시 1 약 15.4초, 현시 2 약 21.4초, 가중 평균 약 17.9초 → HCM 형태 띠 <b>LOS B</b>. 주기 80초로 하면 각각 17.4·25.6초로 커진다. 짧은 주기가 대체로 유리하지만, 주기가 \(C_0\)의 약 0.75배보다 짧아지면 지체가 급격히 늘어난다는 것이 웹스터가 보인 성질이다.</p></div>
+    <div class="sim" id="sim-tf-3d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>3D 신호 교차로: 대기 행렬이 쌓이고 빠지는 모습</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tf-cv-3d" aria-label="R-60과 진입로 교차로의 3D 장면: 신호등, 접근로별 대기 차량"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>주기 C <output id="tf-3d-c-out"></output></span><input type="range" id="tf-3d-c" min="40" max="140" step="1" value="52"></label>
+          <label class="ctrl"><span>동서(R-60) 녹색 비율 <output id="tf-3d-g-out"></output></span><input type="range" id="tf-3d-g" min="0.2" max="0.8" step="0.01" value="0.59"></label>
+          <label class="ctrl"><span>동서 교통량 <output id="tf-3d-q1-out"></output></span><input type="range" id="tf-3d-q1" min="100" max="1200" step="10" value="650"></label>
+          <label class="ctrl"><span>남북 교통량 <output id="tf-3d-q2-out"></output></span><input type="range" id="tf-3d-q2" min="100" max="1000" step="10" value="450"></label>
+          <div class="btn-row"><button class="btn primary" id="tf-3d-play">▶ 재생</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">신호</span><span class="v" id="tf-3d-o-ph">—</span></div>
+        <div class="stat"><span class="k">동서 대기</span><span class="v" id="tf-3d-o-q1">—</span></div>
+        <div class="stat"><span class="k">남북 대기</span><span class="v" id="tf-3d-o-q2">—</span></div>
+        <div class="stat"><span class="k">이론 최대 대기(동서/남북)</span><span class="v" id="tf-3d-o-m">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 끌어서 돌려 보세요(터치는 가로로 끌기) · 재생하면 빨간불 동안 대기 차량이 도착률로 쌓이고 녹색에 포화 교통류율로 빠집니다 · 동서 녹색 비율을 0.35로 줄이면 동서 대기가 주기마다 다 빠지지 못하고 늘어나는 과포화가 됩니다 · 모델: 결정론적 대기 행렬(도착 q, 방출 s = 1,800대/h, 녹색 = 유효 녹색, 현시당 손실 5초는 황색·전적색으로 표시), 차량 간격 7 m, 이론 최대 대기 = 적색 끝의 대기 q·r(r = 유효 적색), 해소 시간 q·r/(s − q). 동서·남북 각 1개 임계 차로만 그림. 교육용.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="lane-plan">
+    <h2>R-60의 차로 수 계획</h2>
+    <div class="problem"><strong>지금은 2차로로 충분하다. 언제까지?</strong>
+      <p>예제 10.1은 설계 연도(개통 20년 뒤)에 2차로로 LOS C라고 했습니다. 교통량이 해마다 늘면 언젠가 4차로가 필요합니다. 그 시점을 미리 알면 용지를 미리 확보하고, 교량(B-130)과 성토(E-4)를 처음부터 넓게 만들지 정할 수 있습니다.</p></div>
+    <p>교통량 증가는 보통 복리로 둡니다: \(AADT_n = AADT_0(1 + r)^n\). 장래 교통량은 지역 개발 계획을 넣은 수요 추정(다음 절의 4단계 모형)으로 구하는 것이 원칙이지만, 개략 계획에서는 과거 추세의 증가율을 씁니다. 차로 확장은 공사 자체보다 <b>용지 확보</b>와 <b>구조물</b>이 어렵습니다. 도로는 나중에 넓힐 수 있지만 교량을 넓히는 일은 새로 짓는 것과 비슷하므로, 확장이 확실하면 구조물만 미리 장래 폭으로 짓는 단계 건설을 검토합니다.</p>
+    <div class="sim" id="sim-tf-plan">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>차로 수–용량 계획: 교통량 증가 → 확장 시기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="tf-cv-plan" aria-label="연도별 2차로 도로의 v/c와 LOS 띠, 필요 차로 수 계단"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>개통 연도 AADT <output id="tf-pl-a-out"></output></span><input type="range" id="tf-pl-a" min="2000" max="30000" step="100" value="7200"></label>
+          <label class="ctrl"><span>연 증가율 r <output id="tf-pl-r-out"></output></span><input type="range" id="tf-pl-r" min="0" max="8" step="0.1" value="2.6"></label>
+          <div class="ctrl"><span>확장 기준 LOS</span><div class="seg" id="tf-pl-los"><button data-value="C">C 초과 시</button><button data-value="D" class="on">D 초과 시</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">20년 뒤 AADT</span><span class="v" id="tf-pl-o-a">—</span></div>
+        <div class="stat"><span class="k">20년 뒤 v/c (2차로)</span><span class="v" id="tf-pl-o-x">—</span></div>
+        <div class="stat"><span class="k">4차로 필요 시점</span><span class="v" id="tf-pl-o-y">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: R-60 기본값(7,200대/일, 2.6 %)에서 20년 뒤 약 12,000대/일, v/c 0.59, 확장 필요 시점 약 34년 뒤를 확인하세요 · 증가율 5 %면 약 18년 뒤, 곧 설계 기간 안으로 당겨집니다 — 이 경우 B-130 같은 교량은 처음부터 4차로 폭을 검토합니다 · 기준을 C로 엄격하게 하면 시점이 크게 앞당겨집니다 · 모델: 정의 10.1(K 0.12, D 0.60, 중차량 8 %, E<sub>T</sub> 1.5, PHF 0.90), 방향 1차로 1,700, 다차로 2,000 pcu/h/차로, AADT<sub>n</sub> = AADT₀(1 + r)<sup>n</sup>(교육용).</div>
+    </div>
+    <div class="callout site"><strong>R-60 차로 계획</strong> 개통 AADT 7,200대/일, 연 2.6 % → 20년 뒤 약 12,000대/일(예제 10.1: v/c 0.59, LOS C). LOS D 경계(v/c 0.85, AADT 약 17,400대/일)에 이르는 시점은 개통 후 약 34년으로 설계 기간(20년) 밖이므로 <b>양방향 2차로</b>로 계획한다. 단, 산업 단지 2단계 개발이 확정되면 증가율이 커질 수 있으므로 용지는 4차로 폭을 확보하고 B-10 진입 교차로는 웹스터 최적 주기 약 52초(예제 10.4)의 2현시 신호로 운영한다. 모든 수치는 교육용 가정이다.</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="demand">
+    <h2>교통 수요 4단계 모형과 대중교통·보행 (맛보기)</h2>
+    <p>지금까지는 교통량이 주어졌다고 보았습니다. 새 도로나 철도를 만들면 사람들의 통행 자체가 바뀌므로, 장래 교통량은 <span class="term">교통 수요 4단계 모형</span><span class="en">(four-step travel demand model)</span>으로 추정합니다. 지역을 존(zone)으로 나누고, ① <b>통행 발생</b>: 존마다 인구·고용·토지 이용으로 출발·도착 통행량을 구하고, ② <b>통행 분포</b>: 출발지–도착지 짝(OD)으로 나누며(존 사이 거리·시간이 멀수록 통행이 적다는 중력 모형 등), ③ <b>수단 선택</b>: 승용차·버스·철도·보행으로 나누고(로짓 모형 등), ④ <b>통행 배정</b>: 경로마다 통행 시간이 같아지도록 도로망에 싣습니다(사용자 균형).</p>
+    <figure class="diagram" id="fig-tf-4step">
+      <svg viewBox="0 0 860 220" role="img" aria-label="교통 수요 4단계: 통행 발생, 분포, 수단 선택, 배정">
+        <rect x="10" y="10" width="840" height="200" rx="10" class="f-surface"/>
+        <g transform="translate(30,50)">
+          <rect x="0" y="0" width="170" height="70" rx="8" class="f-acc2-soft" style="stroke:var(--accent-2)"/><text x="85" y="30" text-anchor="middle" class="t" style="font-weight:700">① 통행 발생</text><text x="85" y="52" text-anchor="middle" class="t-mono">존별 출발·도착 수</text>
+          <rect x="205" y="0" width="170" height="70" rx="8" class="f-acc2-soft" style="stroke:var(--accent-2)"/><text x="290" y="30" text-anchor="middle" class="t" style="font-weight:700">② 통행 분포</text><text x="290" y="52" text-anchor="middle" class="t-mono">OD 표(중력 모형)</text>
+          <rect x="410" y="0" width="170" height="70" rx="8" class="f-acc2-soft" style="stroke:var(--accent-2)"/><text x="495" y="30" text-anchor="middle" class="t" style="font-weight:700">③ 수단 선택</text><text x="495" y="52" text-anchor="middle" class="t-mono">승용차·버스·철도</text>
+          <rect x="615" y="0" width="170" height="70" rx="8" class="f-acc2-soft" style="stroke:var(--accent-2)"/><text x="700" y="30" text-anchor="middle" class="t" style="font-weight:700">④ 통행 배정</text><text x="700" y="52" text-anchor="middle" class="t-mono">경로별 교통량</text>
+          <g style="stroke:var(--text-dim);stroke-width:2" marker-end="url(#tf-ah-dim)"><line x1="172" y1="35" x2="202" y2="35"/><line x1="377" y1="35" x2="407" y2="35"/><line x1="582" y1="35" x2="612" y2="35"/></g>
+          <path d="M700 72V110H85V74" style="fill:none;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 4" marker-end="url(#tf-ah-acc)"/>
+          <text x="392" y="130" text-anchor="middle" class="t-mono" style="fill:var(--accent)">혼잡한 통행 시간을 되먹임(반복 계산)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-6.</b> 교통 수요 4단계 모형. 배정 결과의 혼잡 통행 시간을 분포·수단 선택에 되먹여 일관된 해를 찾는다. 4단계 모형의 결과가 이 장의 AADT와 DHV의 출발점이다.</figcaption>
+    </figure>
+    <p>도로 계획은 승용차만을 위한 것이 아닙니다. 버스 한 대는 승용차 40–50대분의 승객을 나르면서 도로 공간은 승용차 2–3대분만 씁니다(형태). 그래서 도시 도로의 용량은 "차량"보다 "사람" 단위로 볼 때 다른 결론이 나오고, 버스 전용 차로, 보행·자전거 공간, 대중교통 정류장의 위치가 차로 수만큼 중요한 설계 변수가 됩니다. 보행 시설에도 보도 폭당 보행자 교통량과 밀도로 정하는 서비스 수준이 있습니다(HCM·KHCM 보행 편, 형태). 지방부 R-60에서는 산업 단지 통근 버스 정류장을 버스베이로 만들어 정차한 버스가 차로를 막지 않게 하고, 마을 구간에는 보도를 둡니다.</p>
+    <figure class="diagram" id="fig-tf-section">
+      <svg viewBox="0 0 860 240" role="img" aria-label="R-60 표준 횡단면: 차로 3.5 m 두 개, 길어깨, 보도, 측구, 성토 비탈">
+        <rect x="10" y="10" width="840" height="220" rx="10" class="f-surface"/>
+        <path d="M60 170L170 110H690L800 170" style="fill:var(--warn);opacity:.15;stroke:var(--warn)"/>
+        <rect x="230" y="98" width="400" height="12" style="fill:var(--text-dim);opacity:.8"/>
+        <rect x="170" y="100" width="60" height="10" style="fill:var(--text-faint)"/><rect x="630" y="100" width="60" height="10" style="fill:var(--text-faint)"/>
+        <line x1="430" y1="92" x2="430" y2="98" style="stroke:var(--accent-2);stroke-width:3;stroke-dasharray:4 2"/>
+        <g class="t-mono" text-anchor="middle">
+          <text x="330" y="88">차로 3.5 m</text><text x="530" y="88">차로 3.5 m</text>
+          <text x="200" y="88">길어깨</text><text x="660" y="88">보도·길어깨</text>
+          <text x="430" y="140">포장 P-13 (13장)</text>
+          <text x="430" y="190">성토 E-4 (GeotechBook)</text>
+        </g>
+        <path d="M150 112l12 8h-16z" style="fill:var(--blue)"/><path d="M710 112l12 8h-16z" style="fill:var(--blue)"/>
+        <text x="130" y="140" class="t-mono" style="fill:var(--blue)">측구</text>
+        <g style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#tf-ah-load)"><line x1="300" y1="60" x2="360" y2="60"/><line x1="560" y1="60" x2="500" y2="60"/></g>
+        <text x="430" y="36" text-anchor="middle" class="t-dim">양방향 2차로 · 설계 속도 60 km/h · 용지는 4차로 폭 확보</text>
+      </svg>
+      <figcaption><b>그림 10-7.</b> R-60의 표준 횡단면(개략, 교육용). 차로 폭과 길어깨 폭은 설계 속도와 도로 등급에 따라 「도로의 구조·시설 기준에 관한 규칙」이 정한다(현행 규칙 확인). 횡단 구성과 토량·배수는 12장, 포장 두께는 13장에서 계산한다.</figcaption>
+    </figure>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="alignment.html"><small>CH.11 · 도로 선형 설계</small>설계 속도 60 km/h<br><span>기능 분류와 교통량이 설계 속도를, 설계 속도가 시거와 곡선 반지름을 정한다.</span></a>
+      <a href="pavement.html"><small>CH.13 · 포장 설계</small>교통량 → 누적 ESAL<br><span>AADT와 중차량 비율이 포장 두께를 정한다.</span></a>
+      <a href="earthwork.html"><small>CH.12 · 토공과 배수</small>차로 수 → 횡단 폭<br><span>횡단면 폭이 토량과 용지를 정한다.</span></a>
+      <a href="bridges.html"><small>CH.01 · 교량의 이해</small>교폭과 차로<br><span>B-130의 2차로 + 보도, 장래 확장 여부.</span></a>
+      <a href="tbm.html"><small>CH.09 · TBM과 도심지 터널</small>개착 vs TBM의 교란 비용<br><span>공사 중 차로 점용의 교통 영향을 비용으로 본다.</span></a>
+      <a href="maintenance.html"><small>CH.16 · 유지관리와 성능 개선</small>교통 통제와 공사 시간<br><span>보수 공사의 차로 차단은 이 장의 병목·충격파 문제다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>도로는 이동성과 접근성을 맞바꾼다. 기능 분류(주간선·보조간선·집산·국지)가 설계 속도, 교차로 간격, 진입 제한을 정하고, 접근 관리가 간선 기능을 지킨다.</li>
+      <li>DDHV = AADT · K · D, v<sub>p</sub> = DDHV/(PHF · f<sub>HV</sub>), f<sub>HV</sub> = 1/(1 + P<sub>T</sub>(E<sub>T</sub> − 1)). R-60: 12,000 × 0.12 × 0.60 = 864대/h → 998 pcu/h, v/c 0.59, LOS C → 양방향 2차로.</li>
+      <li>q = k·v(공간 평균 속도). 그린실즈 v = v<sub>f</sub>(1 − k/k<sub>j</sub>) → q<sub>max</sub> = v<sub>f</sub>k<sub>j</sub>/4 at k<sub>c</sub> = k<sub>j</sub>/2. 같은 교통량에 비혼잡·혼잡 두 상태가 있다.</li>
+      <li>서비스 수준 A–F는 운전자가 느끼는 품질이다. 신설 도로는 설계 연도 첨두에 C–D를 목표로 하고, 시설별 지표(밀도·속도·지체)는 현행 편람을 따른다.</li>
+      <li>충격파 속도 w = (q₂ − q₁)/(k₂ − k₁). 병목 정체의 꼬리는 뒤로 자라고, 해소 뒤 회복파가 더 빨리 따라와 만나는 곳에서 사라진다. 예: 20분 차단 → 23분, 1.46 km.</li>
+      <li>셀 오토마타(나겔–슈레켄베르크)의 네 규칙만으로 원인 없는 정체파가 진행 반대 방향으로 흐르는 것을 재현한다.</li>
+      <li>신호: c = s·g/C, X = q/c, 웹스터 C₀ = (1.5L + 5)/(1 − Y), 녹색은 y에 비례해 배분. R-60 교차로: Y 0.61, C₀ ≈ 51초, X 0.76, 평균 지체 약 18초.</li>
+      <li>장래 교통량 AADT<sub>n</sub> = AADT₀(1 + r)<sup>n</sup>로 확장 시기를 정한다. R-60은 약 34년 뒤 LOS D를 넘으므로 2차로로 짓고 용지와 구조물 폭을 검토한다. 장래 수요는 4단계 모형으로 추정한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 진입로가 많은 간선도로에서 접근 관리를 하면 주로 무엇을 얻는가?</p><div class="opts">
+        <button class="opt">국지 접근성이 좋아진다</button><button class="opt" data-correct>끼어들기·정지가 줄어 이동성과 안전이 좋아진다</button><button class="opt">포장 두께가 줄어든다</button><button class="opt">설계 시간 계수 K가 커진다</button>
+      </div><div class="quiz-exp">접근 지점이 줄면 상충이 줄어 속도·용량·안전이 좋아진다. 대신 필지 접근은 집산·국지도로가 맡는다.</div></div>
+      <div class="quiz-q"><p>2. AADT 20,000대/일, K = 0.10, D = 0.55일 때 중방향 설계 시간 교통량은?</p><div class="opts">
+        <button class="opt">2,000대/h</button><button class="opt" data-correct>1,100대/h</button><button class="opt">833대/h</button><button class="opt">11,000대/h</button>
+      </div><div class="quiz-exp">\(20{,}000\times0.10\times0.55 = 1{,}100\) 대/h. 2,000은 양방향 설계 시간 교통량, 833은 하루를 24로 나눈 값이다.</div></div>
+      <div class="quiz-q"><p>3. 그린실즈 모형에서 v<sub>f</sub> = 90 km/h, k<sub>j</sub> = 140대/km이면 차로당 용량과 그때의 속도는?</p><div class="opts">
+        <button class="opt">12,600대/h, 90 km/h</button><button class="opt" data-correct>3,150대/h, 45 km/h</button><button class="opt">6,300대/h, 45 km/h</button><button class="opt">3,150대/h, 90 km/h</button>
+      </div><div class="quiz-exp">\(q_{max} = 90\times140/4 = 3{,}150\), 임계 밀도 70대/km에서 속도는 \(v_f/2 = 45\) km/h. (그린실즈는 실제 용량을 과대평가하는 경향이 있다.)</div></div>
+      <div class="quiz-q"><p>4. 교통량이 같은 두 구간 중 하나는 밀도 20대/km, 다른 하나는 100대/km이다. 옳은 설명은?</p><div class="opts">
+        <button class="opt">두 구간의 서비스 수준은 같다</button><button class="opt" data-correct>밀도 100인 구간은 혼잡 영역으로 속도가 낮고 서비스 수준이 나쁘다</button><button class="opt">밀도가 높은 쪽이 용량에 더 여유가 있다</button><button class="opt">그린실즈 모형에서는 불가능한 상황이다</button>
+      </div><div class="quiz-exp">기본 다이어그램에서 같은 교통량에 비혼잡·혼잡 두 밀도가 있다. 교통량만으로는 품질을 알 수 없다.</div></div>
+      <div class="quiz-q"><p>5. 상류 상태 (k, q) = (40대/km, 2,800대/h), 정체 상태 (180대/km, 1,400대/h)이다. 정체 꼬리의 속도는?</p><div class="opts">
+        <button class="opt">+10 km/h(하류로)</button><button class="opt" data-correct>−10 km/h(상류로)</button><button class="opt">−20 km/h</button><button class="opt">0(제자리)</button>
+      </div><div class="quiz-exp">\(w = (1400 - 2800)/(180 - 40) = -1400/140 = -10\) km/h. 음수이므로 꼬리는 뒤로 자란다.</div></div>
+      <div class="quiz-q"><p>6. 나겔–슈레켄베르크 모형에서 무작위 감속 확률 p를 0으로 하고 밀도를 낮게 두면?</p><div class="opts">
+        <button class="opt">정체가 무작위로 계속 생긴다</button><button class="opt" data-correct>모든 차가 최대 속도로 달리고 자발적 정체가 생기지 않는다</button><button class="opt">모든 차가 멈춘다</button><button class="opt">교통량이 0이 된다</button>
+      </div><div class="quiz-exp">무작위 감속이 정체의 씨앗이다. 낮은 밀도에서 p = 0이면 결정론적으로 최대 속도 흐름에 이른다.</div></div>
+      <div class="quiz-q"><p>7. 2현시 신호에서 L = 10초, y₁ = 0.40, y₂ = 0.30이다. 웹스터 최적 주기는?</p><div class="opts">
+        <button class="opt">약 29초</button><button class="opt">약 50초</button><button class="opt" data-correct>약 67초</button><button class="opt">약 100초</button>
+      </div><div class="quiz-exp">\(Y = 0.70\), \(C_0 = (15 + 5)/(1 - 0.70) = 66.7\) 초. Y가 클수록 최적 주기가 급격히 길어진다.</div></div>
+      <div class="quiz-q"><p>8. 개통 AADT 10,000, 연 증가율 3.5 %면 20년 뒤 AADT는 대략?</p><div class="opts">
+        <button class="opt">17,000</button><button class="opt" data-correct>19,900</button><button class="opt">24,000</button><button class="opt">13,500</button>
+      </div><div class="quiz-exp">\(10{,}000\times1.035^{20} = 10{,}000\times1.990 = 19{,}900\). 단리(1 + 0.035 × 20 = 1.7)로 하면 17,000이 되어 과소 추정한다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const TFX = {
+  font(o) { return `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`; },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = TFX.font(o);
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, x0, y0, x1, y1, color, width = 1.4, dash) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.restore(); },
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  /** 교육용 LOS 띠(표 10-1) */
+  LOS: [[0.3, "A"], [0.5, "B"], [0.7, "C"], [0.85, "D"], [1.0, "E"], [Infinity, "F"]],
+  los(x) { return TFX.LOS.find((b) => x <= b[0] + 1e-9)[1]; },
+  losColor(P, l) { return { A: P.ok, B: P.ok, C: P.accent, D: P.warn, E: P.accent2, F: P.bad }[l]; },
+  SIG: [[10, "A"], [20, "B"], [35, "C"], [55, "D"], [80, "E"], [Infinity, "F"]],
+  sigLos(d) { return TFX.SIG.find((b) => d <= b[0])[1]; },
+  /** 방향 차로당 용량(교육용 형태): 1차로 = 2차로 도로 1,700, 다차로 2,000 pcu/h/차로 */
+  cap(n) { return n <= 1 ? 1700 : 2000 * n; },
+  lanes(v, xmax) { if (v <= xmax * 1700) return 1; return Math.max(2, Math.ceil(v / (xmax * 2000))); },
+  vp(aadt, K, D, hv, phf, ET = 1.5) { const ddhv = aadt * K * D, fhv = 1 / (1 + hv * (ET - 1)); return { ddhv, fhv, v: ddhv / (phf * fhv) }; },
+  /** 웹스터 지체(초/대). q 대/h, s 대/h, g·C 초 */
+  webster(C, g, q, s) {
+    const lam = g / C, X = (q * C) / (s * g), qs = q / 3600;
+    if (!(X < 0.98) || g <= 0) return { d: NaN, X };
+    const d = (C * (1 - lam) ** 2) / (2 * (1 - lam * X)) + (X * X) / (2 * qs * (1 - X)) - 0.65 * Math.cbrt(C / (qs * qs)) * Math.pow(X, 2 + 5 * lam);
+    return { d: Math.max(0, d), X };
+  },
+  rgb(c) { const cv = TFX._c || (TFX._c = document.createElement("canvas")); cv.width = cv.height = 1; const x = cv.getContext("2d"); x.clearRect(0, 0, 1, 1); x.fillStyle = c; x.fillRect(0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; },
+};
+
+/* ---------- 1. 설계 시간 교통량 ---------- */
+(function () {
+  const ga = CB.range("tf-dh-a", (v) => CB.sig(v) + " 대/일", draw), gk = CB.range("tf-dh-k", (v) => v.toFixed(3), draw), gd = CB.range("tf-dh-d", (v) => v.toFixed(2), draw);
+  const gh = CB.range("tf-dh-hv", (v) => v + " %", draw), gp = CB.range("tf-dh-phf", (v) => v.toFixed(2), draw), gl = CB.seg("tf-dh-los", draw);
+  const calc = () => { const r = TFX.vp(ga(), gk(), gd(), gh() / 100, gp()), xm = gl() === "C" ? 0.7 : 0.85, n = TFX.lanes(r.v, xm), c = TFX.cap(n); return Object.assign(r, { xm, n, c, x: r.v / c }); };
+  const cv = CB.canvas("#tf-cv-dhv", (ctx, W, H) => {
+    const P = CB.palette(), r = calc(), aadt = ga(), K = gk();
+    const bars = [["AADT/24", aadt / 24, P.faint], ["양방향 DHV", aadt * K, P.dim], ["DDHV", r.ddhv, P.accent2], ["v_p (pcu/h)", r.v, P.accent]];
+    const vmax = Math.max(r.c, r.v, aadt * K) * 1.12;
+    const x0 = 64, y0 = 20, w = W - x0 - 16, h = H - y0 - 54;
+    const res = CB.chart(ctx, { x: x0, y: y0, w, h }, { x: [0, 1], y: [0, vmax], yLabel: "대/h 또는 pcu/h", xTicks: [],
+      hlines: [{ y: r.c, color: P.bad, label: `용량 ${CB.sig(r.c)} (방향 ${r.n}차로)`, dash: [] }, { y: r.c * r.xm, color: P.warn, label: `서비스 교통량 v/c ${r.xm}` }] });
+    const bw = w / bars.length;
+    bars.forEach(([name, v, col], k) => {
+      const X0 = x0 + bw * k + bw * 0.18, Y0 = res.Y(v);
+      ctx.fillStyle = TFX.alpha(col, 0.75); ctx.fillRect(X0, Y0, bw * 0.64, res.Y(0) - Y0);
+      TFX.text(ctx, CB.sig(v), X0 + bw * 0.32, Y0 - 10, P.text, { size: 11.5 });
+      TFX.text(ctx, name, X0 + bw * 0.32, res.Y(0) + 14, P.dim, { size: W < 480 ? 9.5 : 11 });
+    });
+    const steps = ["×K", "×D", "÷(PHF·f_HV)"];
+    steps.forEach((s, k) => TFX.text(ctx, s, x0 + bw * (k + 1), res.Y(0) + 32, P.dim, { size: 10.5 }));
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.58), minHeight: 280, maxHeight: 420 });
+  function draw() {
+    cv.redraw();
+    const r = calc();
+    CB.stat("tf-dh-o-d", CB.sig(r.ddhv) + " 대/h"); CB.stat("tf-dh-o-v", CB.sig(r.v));
+    CB.stat("tf-dh-o-n", r.n + "차로 → " + (r.n === 1 ? "2차로 도로" : 2 * r.n + "차로 도로"));
+    CB.stat("tf-dh-o-c", r.x.toFixed(2) + " · " + TFX.los(r.x));
+  }
+  draw();
+})();
+
+/* ---------- 2. 교통류 3관계 ---------- */
+(function () {
+  const gk = CB.range("tf-fd-k", (v) => v + " 대/km", draw), gvf = CB.range("tf-fd-vf", (v) => v + " km/h", draw), gkj = CB.range("tf-fd-kj", (v) => v + " 대/km", draw);
+  const cv = CB.canvas("#tf-cv-fd", (ctx, W, H) => {
+    const P = CB.palette(), vf = gvf(), kj = gkj(), k = Math.min(gk(), kj), g = CB.civ.greenshields(k, vf, kj), qm = g.qmax;
+    const narrow = W < 560;
+    const boxes = narrow
+      ? [0, 1, 2].map((i) => ({ x: 58, y: 10 + i * ((H - 6) / 3), w: W - 58 - 24, h: (H - 6) / 3 - 54 }))
+      : [0, 1, 2].map((i) => ({ x: 52 + i * (W / 3), y: 14, w: W / 3 - 66, h: H - 14 - 50 }));
+    const N = 80, vk = [], qk = [], vq = [];
+    for (let i = 0; i <= N; i++) { const kk = (kj * i) / N, r = CB.civ.greenshields(kk, vf, kj); vk.push([kk, r.v]); qk.push([kk, r.q]); vq.push([r.q, r.v]); }
+    const st = k < kj / 2 ? P.ok : P.bad;
+    CB.chart(ctx, boxes[0], { x: [0, 160], y: [0, 125], xTicks: [0, 40, 80, 120, 160], xLabel: "밀도 k (대/km)", series: [{ data: vk, color: P.accent, width: 2.4 }], points: [{ x: k, y: g.v, color: st, r: 6 }], vlines: [{ x: kj / 2, color: P.faint }] });
+    CB.chart(ctx, boxes[1], { x: [0, 160], y: [0, 5000], xTicks: [0, 40, 80, 120, 160], yFmt: (v) => (v / 1000) + "k", xLabel: "밀도 k (대/km)", series: [{ data: qk, color: P.accent2, width: 2.4 }, { data: [[0, 0], [k, g.q]], color: P.dim, width: 1.2, dash: [4, 3] }], points: [{ x: k, y: g.q, color: st, r: 6 }], hlines: [{ y: qm, color: P.accent2, label: "q_max" }] });
+    CB.chart(ctx, boxes[2], { x: [0, 5000], y: [0, 125], xTicks: [0, 2500, 5000], xLabel: "교통량 q (대/h)", series: [{ data: vq, color: P.blue, width: 2.4 }], points: [{ x: g.q, y: g.v, color: st, r: 6 }], vlines: [{ x: qm, color: P.accent2 }] });
+    [["속도 v (km/h)", 0], ["교통량 q (대/h)", 1], ["속도 v (km/h)", 2]].forEach(([s, i]) => TFX.text(ctx, s, boxes[i].x + 4, boxes[i].y + 8, P.dim, { size: 10.5, align: "left" }));
+  }, { aspect: (W) => (W < 560 ? 1.55 : 0.4), minHeight: 260, maxHeight: 640 });
+  function draw() {
+    cv.redraw();
+    const vf = gvf(), kj = gkj(), k = Math.min(gk(), kj), g = CB.civ.greenshields(k, vf, kj);
+    CB.stat("tf-fd-o-v", CB.num(g.v, 1) + " km/h"); CB.stat("tf-fd-o-q", CB.sig(g.q) + " 대/h"); CB.stat("tf-fd-o-m", CB.sig(g.qmax) + " 대/h");
+    CB.stat("tf-fd-o-s", k < kj / 2 - 0.5 ? "비혼잡" : k > kj / 2 + 0.5 ? "혼잡" : "임계(용량)");
+  }
+  draw();
+})();
+
+/* ---------- 3. 서비스 수준 ---------- */
+(function () {
+  const gv = CB.range("tf-ls-v", (v) => CB.sig(v) + " pcu/h", draw), gn = CB.range("tf-ls-n", (v) => v + "차로", draw), gvf = CB.range("tf-ls-vf", (v) => v + " km/h", draw);
+  const calc = () => { const n = gn(), c = TFX.cap(n), cl = c / n, x = gv() / c, vf = gvf(); const sp = x <= 1 ? (vf / 2) * (1 + Math.sqrt(Math.max(0, 1 - x))) : NaN; return { n, c, cl, x, vf, sp }; };
+  const cv = CB.canvas("#tf-cv-los", (ctx, W, H) => {
+    const P = CB.palette(), r = calc(), x0 = 58, w = W - x0 - 18, bx = (v) => x0 + (Math.min(v, 1.3) / 1.3) * w;
+    // 띠
+    let prev = 0; const by = 18, bh = 30;
+    TFX.LOS.forEach(([e, l]) => { const e2 = Math.min(1.3, e); ctx.fillStyle = TFX.alpha(TFX.losColor(P, l), 0.35); ctx.fillRect(bx(prev), by, bx(e2) - bx(prev), bh); TFX.text(ctx, l, (bx(prev) + bx(e2)) / 2, by + bh / 2, P.text, { size: 13 }); prev = e2; });
+    const px = bx(r.x); ctx.fillStyle = P.text; ctx.beginPath(); ctx.moveTo(px, by + bh + 2); ctx.lineTo(px - 6, by + bh + 12); ctx.lineTo(px + 6, by + bh + 12); ctx.closePath(); ctx.fill();
+    TFX.text(ctx, `v/c = ${r.x.toFixed(2)}`, Math.min(W - 50, Math.max(50, px)), by + bh + 24, P.text, { size: 12 });
+    // 속도 곡선
+    const S = []; for (let i = 0; i <= 100; i++) { const x = i / 100; S.push([x, (r.vf / 2) * (1 + Math.sqrt(1 - x))]); }
+    CB.chart(ctx, { x: x0, y: by + bh + 40, w, h: H - (by + bh + 40) - 48 }, { x: [0, 1.3], y: [0, Math.max(60, r.vf * 1.1)], xLabel: "교통량/용량 v/c", yLabel: "속도 (km/h)",
+      series: [{ data: S, color: P.accent, width: 2.4 }], vlines: [{ x: 1, color: P.bad, label: "용량" }],
+      points: isFinite(r.sp) ? [{ x: r.x, y: r.sp, color: TFX.losColor(P, TFX.los(r.x)), r: 6 }] : [] });
+    if (!isFinite(r.sp)) TFX.text(ctx, "v/c > 1: 수요 초과 → 대기 행렬(LOS F)", x0 + w * 0.75, by + bh + 70, P.bad, { size: 12 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 280, maxHeight: 420 });
+  function draw() {
+    cv.redraw(); const r = calc();
+    CB.stat("tf-ls-o-c", CB.sig(r.c) + " pcu/h"); CB.stat("tf-ls-o-x", r.x.toFixed(2)); CB.stat("tf-ls-o-l", TFX.los(r.x));
+    CB.stat("tf-ls-o-s", isFinite(r.sp) ? CB.num(r.sp, 0) + " km/h" : "정체");
+  }
+  draw();
+})();
+
+/* ---------- 4. 충격파 ---------- */
+(function () {
+  const gq = CB.range("tf-sh-q", (v) => CB.sig(v) + " 대/h", reset), gr = CB.range("tf-sh-r", (v) => Math.round(v * 100) + " %", reset), gT = CB.range("tf-sh-t", (v) => v + " 분", reset);
+  const vf = 80, kj = 240, qm = (vf * kj) / 4, kc = kj / 2;
+  const ku = (q) => (kj / 2) * (1 - Math.sqrt(Math.max(0, 1 - q / qm))), kcg = (q) => (kj / 2) * (1 + Math.sqrt(Math.max(0, 1 - q / qm)));
+  const XR = [-3, 1], TM = 40 / 60;
+  let M = null, tc = 0;
+  function model() {
+    const qA = gq(), qB = gr() * qm, T = gT() / 60, kA = ku(qA);
+    const S = { A: { q: qA, k: kA } };
+    if (qA <= qB + 1e-6) return { queue: false, S, T, qA, qB, v: () => qA / kA, region: () => "A" };
+    S.Q = { q: qB, k: kcg(qB) }; S.D = { q: qB, k: ku(qB) }; S.C = { q: qm, k: kc };
+    const w = (a, b) => (S[b].q - S[a].q) / (S[b].k - S[a].k);
+    const w1 = w("A", "Q"), w2 = w("Q", "C"), w3 = w("A", "C"), w4 = w("D", "A"), w5 = w("C", "D");
+    const tm = (w2 * T) / (w2 - w1), xm = w1 * tm;
+    const region = (x, t) => {
+      if (x < 0) {
+        if (t <= T) return x > w1 * t ? "Q" : "A";
+        if (t <= tm) return x > w2 * (t - T) ? "C" : x > w1 * t ? "Q" : "A";
+        return x > xm + w3 * (t - tm) ? "C" : "A";
+      }
+      const xDA = w4 * t;
+      if (t <= T) return x < xDA ? "D" : "A";
+      const xCD = Math.min(xDA, w5 * (t - T));
+      if (x < xCD) return t > tm && x < xm + w3 * (t - tm) ? "A" : "C";
+      return x < xDA ? "D" : "A";
+    };
+    const v = (x, t) => { const s = S[region(x, t)]; return s.q / s.k; };
+    return { queue: true, S, T, qA, qB, w1, w2, w3, tm, xm, region, v };
+  }
+  function trajectories(m) {
+    const qA = m.qA, kA = m.S.A.k, n = Math.max(1, Math.ceil((qA * TM) / 28)), out = [], dt = 4 / 3600;
+    const starts = [];
+    for (let x = XR[1]; x >= XR[0]; x -= n / kA) starts.push([x, 0]);
+    for (let t = n / qA; t < TM; t += n / qA) starts.push([XR[0], t]);
+    starts.forEach(([x0, t0]) => {
+      const pts = [[t0, x0]]; let x = x0, t = t0;
+      while (t < TM && x < XR[1]) { x += m.v(x, t) * dt; t += dt; pts.push([t, x]); }
+      out.push(pts);
+    });
+    return { out, n };
+  }
+  let TR = null;
+  function reset() { M = model(); TR = trajectories(M); out(); cv.redraw(); }
+  const cv = CB.canvas("#tf-cv-shock", (ctx, W, H) => {
+    if (!M) return;
+    const P = CB.palette(), road = 46, x0 = 58, y0 = 14, w = W - x0 - 14, h = H - y0 - 46 - road - 20;
+    const X = (t) => x0 + (t / TM) * w, Y = (x) => y0 + h - ((x - XR[0]) / (XR[1] - XR[0])) * h;
+    // 영역 색(격자 샘플)
+    const col = { A: null, Q: TFX.alpha(P.bad, 0.22), C: TFX.alpha(P.ok, 0.2), D: TFX.alpha(P.blue, 0.12) };
+    const nx = 80, ny = 60;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      const t = ((i + 0.5) / nx) * TM, x = XR[0] + ((j + 0.5) / ny) * (XR[1] - XR[0]), c = col[M.region(x, t)];
+      if (c) { ctx.fillStyle = c; ctx.fillRect(X((i / nx) * TM), Y(XR[0] + ((j + 1) / ny) * (XR[1] - XR[0])), w / nx + 0.6, h / ny + 0.6); }
+    }
+    CB.chart(ctx, { x: x0, y: y0, w, h }, { x: [0, 40], y: XR, xLabel: "", yLabel: "위치 x (km)", xFmt: (v) => v + "분",
+      hlines: [{ y: 0, color: P.text, label: "병목", dash: [5, 3] }], vlines: M.queue ? [{ x: M.T * 60, color: P.ok, label: "해소" }] : [] });
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
+    ctx.strokeStyle = P.dim; ctx.lineWidth = 1;
+    TR.out.forEach((pts) => { ctx.beginPath(); pts.forEach(([t, x], i) => (i ? ctx.lineTo(X(t), Y(x)) : ctx.moveTo(X(t), Y(x)))); ctx.stroke(); });
+    if (M.queue) {
+      TFX.line(ctx, X(0), Y(0), X(Math.min(M.tm, TM)), Y(M.w1 * Math.min(M.tm, TM)), P.bad, 2.4);
+      if (M.T < TM) TFX.line(ctx, X(M.T), Y(0), X(Math.min(M.tm, TM)), Y(M.w2 * (Math.min(M.tm, TM) - M.T)), P.ok, 2.4);
+    }
+    TFX.line(ctx, X(tc), y0, X(tc), y0 + h, P.accent2, 1.6);
+    ctx.restore();
+    // 아래: 현재 시각의 도로
+    const ry = y0 + h + 30, rx = (x) => x0 + ((x - XR[0]) / (XR[1] - XR[0])) * w;
+    ctx.fillStyle = TFX.alpha(P.faint, 0.35); ctx.fillRect(x0, ry, w, road - 16);
+    for (let s = XR[0]; s < XR[1]; s += 0.05) { const c = col[M.region(s + 0.025, tc)]; if (c) { ctx.fillStyle = c; ctx.fillRect(rx(s), ry, rx(s + 0.05) - rx(s) + 0.5, road - 16); } }
+    if (M.queue && tc < M.T) { ctx.fillStyle = P.bad; ctx.fillRect(rx(0), ry + (road - 16) / 2, 6, (road - 16) / 2); }
+    TR.out.forEach((pts) => {
+      const k = Math.round((tc - pts[0][0]) / (4 / 3600)); if (k < 0 || k >= pts.length) return;
+      const [t, x] = pts[k]; if (x < XR[0] || x > XR[1]) return; void t;
+      const sp = M.v(x, tc); ctx.fillStyle = sp < 20 ? P.bad : sp < 50 ? P.warn : P.ok; ctx.beginPath(); ctx.arc(rx(x), ry + (road - 16) / 2, 3.5, 0, Math.PI * 2); ctx.fill();
+    });
+    TFX.text(ctx, `t = ${CB.num(tc * 60, 1)}분 · 점 하나 = ${TR.n}대 · 진행 →`, x0 + w / 2, ry + road - 4, P.dim, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 1.15 : 0.62), minHeight: 320, maxHeight: 500 });
+  function out() {
+    if (!M.queue) { ["tf-sh-o-w1", "tf-sh-o-w2"].forEach((id) => CB.stat(id, "—")); CB.stat("tf-sh-o-l", "정체 없음"); CB.stat("tf-sh-o-t", "—"); return; }
+    CB.stat("tf-sh-o-w1", CB.num(M.w1, 1) + " km/h"); CB.stat("tf-sh-o-w2", CB.num(M.w2, 1) + " km/h");
+    CB.stat("tf-sh-o-l", CB.num(-M.xm, 2) + " km"); CB.stat("tf-sh-o-t", CB.num(M.tm * 60, 1) + " 분");
+  }
+  const loop = CB.loop(document.getElementById("tf-cv-shock"), (dt) => { tc += (dt * TM) / 12; if (tc > TM) tc = 0; cv.redraw(); });
+  loop.stop();
+  CB.playButton("tf-sh-play", () => loop.start(), () => loop.stop());
+  tc = 20 / 60; reset();
+})();
+
+/* ---------- 5. 셀 오토마타 ---------- */
+(function () {
+  const L = 200, ROWS = 150;
+  const gd = CB.range("tf-ca-d", (v) => v.toFixed(2), reset), gp = CB.range("tf-ca-p", (v) => v.toFixed(2)), gv = CB.range("tf-ca-v", (v) => v + " (" + v * 27 + " km/h)", reset);
+  let pos = [], vel = [], rows = [], hist = [], rng = CB.rng(7), acc = 0;
+  function reset() {
+    const n = Math.max(1, Math.round(gd() * L)); const cells = [...Array(L).keys()];
+    for (let i = L - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [cells[i], cells[j]] = [cells[j], cells[i]]; }
+    pos = cells.slice(0, n).sort((a, b) => a - b); vel = pos.map(() => 0); rows = []; hist = [];
+    record(); cv.redraw(); out();
+  }
+  function step() {
+    const n = pos.length, vm = gv(), p = gp();
+    for (let i = 0; i < n; i++) {
+      const gap = (pos[(i + 1) % n] - pos[i] - 1 + L) % L || (n === 1 ? L - 1 : 0);
+      let v = Math.min(vel[i] + 1, vm); v = Math.min(v, gap); if (v > 0 && rng() < p) v--; vel[i] = v;
+    }
+    for (let i = 0; i < n; i++) pos[i] = (pos[i] + vel[i]) % L;
+    const order = pos.map((x, i) => [x, vel[i]]).sort((a, b) => a[0] - b[0]); pos = order.map((o) => o[0]); vel = order.map((o) => o[1]);
+    record();
+  }
+  function record() {
+    const row = new Int8Array(L).fill(-1); pos.forEach((x, i) => (row[x] = vel[i])); rows.push(row); if (rows.length > ROWS) rows.shift();
+    const mv = vel.reduce((a, b) => a + b, 0) / Math.max(1, vel.length), stop = vel.filter((v) => v === 0).length / Math.max(1, vel.length);
+    hist.push([mv, stop]); if (hist.length > 60) hist.shift();
+  }
+  const img = document.createElement("canvas"); img.width = L; img.height = ROWS; const ictx = img.getContext("2d");
+  const cv = CB.canvas("#tf-cv-ca", (ctx, W, H) => {
+    const P = CB.palette(), vm = gv(), x0 = 12, w = W - 24, ry = 14, rh = 22;
+    const bg = TFX.rgb(P.bg), cBad = TFX.rgb(P.bad), cOk = TFX.rgb(P.ok), cWarn = TFX.rgb(P.warn);
+    const colOf = (v) => { if (v <= 0) return cBad; const t = v / vm; return t < 0.6 ? cWarn : cOk; };
+    // 도로 띠
+    ctx.fillStyle = TFX.alpha(P.faint, 0.3); ctx.fillRect(x0, ry, w, rh);
+    const last = rows[rows.length - 1] || new Int8Array(L).fill(-1);
+    for (let c = 0; c < L; c++) if (last[c] >= 0) { const [r, g, b] = colOf(last[c]); ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.fillRect(x0 + (c / L) * w, ry + 4, Math.max(2, w / L - 0.5), rh - 8); }
+    TFX.text(ctx, "진행 →  (원형 도로 1.5 km를 펼친 것)", x0 + w / 2, ry + rh + 12, P.dim, { size: 11 });
+    // 시간–공간도
+    const data = ictx.createImageData(L, ROWS), d = data.data;
+    for (let r = 0; r < ROWS; r++) {
+      const row = rows[rows.length - 1 - r];
+      for (let c = 0; c < L; c++) {
+        const k = (r * L + c) * 4, v = row ? row[c] : -1, col = v >= 0 ? colOf(v) : bg;
+        d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; d[k + 3] = 255;
+      }
+    }
+    ictx.putImageData(data, 0, 0);
+    const sy = ry + rh + 26, sh = H - sy - 22;
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(img, x0, sy, w, sh);
+    ctx.strokeStyle = P.border; ctx.strokeRect(x0, sy, w, sh);
+    TFX.text(ctx, "↓ 시간(최근 150초, 위가 지금)  ·  빨강 = 정지, 주황 = 느림, 초록 = 빠름", x0 + w / 2, H - 10, P.dim, { size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 1.1 : 0.62), minHeight: 300, maxHeight: 460 });
+  function out() {
+    const n = pos.length, rho = n / L, mv = hist.reduce((a, h) => a + h[0], 0) / Math.max(1, hist.length), st = hist.reduce((a, h) => a + h[1], 0) / Math.max(1, hist.length);
+    CB.stat("tf-ca-o-k", CB.num(rho / 0.0075, 0) + " 대/km"); CB.stat("tf-ca-o-v", CB.num(mv * 27, 0) + " km/h");
+    CB.stat("tf-ca-o-q", CB.sig(rho * mv * 3600) + " 대/h"); CB.stat("tf-ca-o-s", CB.num(st * 100, 0) + " %");
+  }
+  const loop = CB.loop(document.getElementById("tf-cv-ca"), (dt) => { acc += dt * 8; let k = 0; while (acc >= 1 && k < 4) { step(); acc -= 1; k++; } if (k) { cv.redraw(); out(); } });
+  loop.stop();
+  CB.playButton("tf-ca-play", () => loop.start(), () => loop.stop());
+  document.getElementById("tf-ca-reset").addEventListener("click", reset);
+  reset();
+  for (let i = 0; i < ROWS; i++) step(); // 처음 화면을 채운다
+  cv.redraw(); out();
+})();
+
+/* ---------- 6. 신호 교차로(웹스터) ---------- */
+(function () {
+  const g1q = CB.range("tf-sg-q1", (v) => v + " 대/h", draw), g2q = CB.range("tf-sg-q2", (v) => v + " 대/h", draw), gs = CB.range("tf-sg-s", (v) => CB.sig(v) + " 대/h", draw);
+  const gl = CB.range("tf-sg-l", (v) => v + " 초", draw), gc = CB.range("tf-sg-c", (v) => v + " 초", draw);
+  const calc = (C) => {
+    const q1 = g1q(), q2 = g2q(), s = gs(), L = 2 * gl(), y1 = q1 / s, y2 = q2 / s, Y = y1 + y2;
+    const ge = C - L, g1 = ge > 0 ? (ge * y1) / Y : 0, g2 = ge > 0 ? (ge * y2) / Y : 0;
+    const a = TFX.webster(C, g1, q1, s), b = TFX.webster(C, g2, q2, s);
+    const d = isFinite(a.d) && isFinite(b.d) ? (a.d * q1 + b.d * q2) / (q1 + q2) : NaN;
+    const C0 = Y < 1 ? (1.5 * L + 5) / (1 - Y) : Infinity;
+    return { q1, q2, s, L, y1, y2, Y, g1, g2, d1: a.d, d2: b.d, X: a.X, d, C0 };
+  };
+  document.getElementById("tf-sg-opt").addEventListener("click", () => { const c = calc(gc()); if (isFinite(c.C0)) gc.set(Math.round(CB.clamp(c.C0, 30, 150)), true); });
+  const cv = CB.canvas("#tf-cv-sig", (ctx, W, H) => {
+    const P = CB.palette(), C = gc(), r = calc(C);
+    // 주기 막대
+    const x0 = 58, w = W - x0 - 16, by = 12, bh = 18, sc = w / C, lp = gl();
+    let x = x0;
+    const seg = (len, col, lab) => { const ww = Math.max(0, len * sc); ctx.fillStyle = col; ctx.fillRect(x, by, ww, bh); if (lab && ww > 40) TFX.text(ctx, lab, x + ww / 2, by + bh / 2, P.text, { size: 10.5 }); x += ww; };
+    seg(r.g1, TFX.alpha(P.ok, 0.7), `g₁ ${CB.num(r.g1, 1)}s`); seg(lp, TFX.alpha(P.warn, 0.8), ""); seg(r.g2, TFX.alpha(P.accent, 0.6), `g₂ ${CB.num(r.g2, 1)}s`); seg(lp, TFX.alpha(P.warn, 0.8), "");
+    TFX.text(ctx, `주기 C = ${C}초 (노랑 = 손실 시간)`, x0 + w / 2, by + bh + 12, P.dim, { size: 10.5 });
+    const D1 = [], D2 = [], DA = [];
+    for (let c = 30; c <= 150; c += 1) { const k = calc(c); D1.push([c, k.d1]); D2.push([c, k.d2]); DA.push([c, k.d]); }
+    const vl = [{ x: C, color: P.text, label: "C" }]; if (isFinite(r.C0) && r.C0 <= 150) vl.push({ x: r.C0, color: P.accent2, label: "C₀" });
+    CB.chart(ctx, { x: x0, y: by + bh + 26, w, h: H - (by + bh + 26) - 48 }, { x: [30, 150], y: [0, 80], xLabel: "주기 C (초)", yLabel: "평균 지체 (초/대)",
+      series: [{ data: D1, color: P.ok, width: 1.6, dash: [5, 3] }, { data: D2, color: P.accent, width: 1.6, dash: [5, 3] }, { data: DA, color: P.accent2, width: 2.8 }],
+      vlines: vl, points: isFinite(r.d) ? [{ x: C, y: Math.min(80, r.d), color: P.accent2, r: 5 }] : [] });
+    TFX.text(ctx, "— 평균  - - 현시 1(초록)·현시 2", x0 + w - 110, by + bh + 38, P.dim, { size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.58), minHeight: 300, maxHeight: 440 });
+  function draw() {
+    cv.redraw();
+    const r = calc(gc());
+    CB.stat("tf-sg-o-y", r.Y.toFixed(3)); CB.stat("tf-sg-o-c0", isFinite(r.C0) ? CB.num(r.C0, 1) + " 초" : "Y ≥ 1: 불가");
+    CB.stat("tf-sg-o-g", CB.num(r.g1, 1) + " / " + CB.num(r.g2, 1) + " 초"); CB.stat("tf-sg-o-x", isFinite(r.X) && r.g1 > 0 ? r.X.toFixed(2) : "—");
+    CB.stat("tf-sg-o-d", isFinite(r.d) ? CB.num(r.d, 1) + " 초 · " + TFX.sigLos(r.d) : "과포화(X ≥ 0.98)");
+  }
+  draw();
+})();
+
+/* ---------- 7. 3D 신호 교차로 ---------- */
+(function () {
+  const gc = CB.range("tf-3d-c", (v) => v + " 초", info), gg = CB.range("tf-3d-g", (v) => v.toFixed(2), info);
+  const gq1 = CB.range("tf-3d-q1", (v) => v + " 대/h", info), gq2 = CB.range("tf-3d-q2", (v) => v + " 대/h", info);
+  const S = 1800, LP = 5, GAP = 7, R = 60;
+  let t = 0, Q = [0, 0], cnt = [0, 0], moving = [], maxQ = [0, 0];
+  const times = () => { const C = gc(), ge = Math.max(4, C - 2 * LP), g1 = ge * gg(), g2 = ge - g1; return { C, g1, g2 }; };
+  function phase(tau) {
+    const { g1, g2 } = times();
+    if (tau < g1) return [1, 0, "동서 녹색"]; if (tau < g1 + 3) return [0, 0, "동서 황색"]; if (tau < g1 + LP) return [0, 0, "전적색"];
+    if (tau < g1 + LP + g2) return [0, 1, "남북 녹색"]; if (tau < g1 + LP + g2 + 3) return [0, 0, "남북 황색"]; return [0, 0, "전적색"];
+  }
+  function advance(dt) {
+    const { C } = times(); const tau = t % C, [G1, G2] = phase(tau), q = [gq1(), gq2()], G = [G1, G2];
+    for (let i = 0; i < 2; i++) {
+      Q[i] += (q[i] / 3600) * dt;
+      if (G[i]) { const out = Math.min(Q[i], (S / 3600) * dt); Q[i] -= out; cnt[i] += out; while (cnt[i] >= 1) { cnt[i] -= 1; moving.push({ a: i, s: 0, mirror: false }, { a: i, s: 0, mirror: true }); } }
+      maxQ[i] = Math.max(maxQ[i], Q[i]);
+    }
+    moving.forEach((m) => (m.s += 11 * dt)); moving = moving.filter((m) => m.s < R + 10);
+    const prev = (t - dt) % C; t += dt; if ((t % C) < prev) maxQ = [Q[0], Q[1]];
+  }
+  const car = (V, P, cx, cy, dir, col) => {
+    const lx = dir ? 0.9 : 2.2, ly = dir ? 2.2 : 0.9, h = 1.4, b = [[cx - lx, cy - ly], [cx + lx, cy - ly], [cx + lx, cy + ly], [cx - lx, cy + ly]];
+    const top = b.map(([x, y]) => [x, y, h]);
+    for (let k = 0; k < 4; k++) { const a = b[k], c = b[(k + 1) % 4]; V.poly3([[a[0], a[1], 0], [c[0], c[1], 0], [c[0], c[1], h], [a[0], a[1], h]], { fill: col, fillAlpha: 0.55, color: col, width: 0.6 }); }
+    V.poly3(top, { fill: col, fillAlpha: 0.85, color: col, width: 0.8 });
+  };
+  const v = CB.orbit("#tf-cv-3d", { yaw: -0.75, pitch: 0.62, dist: 115, target: [0, 0, 0], fov: 0.85, aspect: 0.66, minHeight: 300, maxHeight: 480,
+    draw(V) {
+      const P = V.P, { C } = times(), tau = t % C, [G1, G2, nm] = phase(tau), yEW = nm === "동서 황색", yNS = nm === "남북 황색";
+      // 도로
+      V.poly3([[-R, -3.5, 0], [R, -3.5, 0], [R, 3.5, 0], [-R, 3.5, 0]], { fill: P.faint, fillAlpha: 0.25, color: P.dim, width: 0.8 });
+      V.poly3([[-3.5, -R, 0], [3.5, -R, 0], [3.5, R, 0], [-3.5, R, 0]], { fill: P.faint, fillAlpha: 0.25, color: P.dim, width: 0.8 });
+      V.line3([-R, 0, 0.01], [-3.5, 0, 0.01], { color: P.warn, width: 1, dash: [4, 4] }); V.line3([3.5, 0, 0.01], [R, 0, 0.01], { color: P.warn, width: 1, dash: [4, 4] });
+      V.line3([0, -R, 0.01], [0, -3.5, 0.01], { color: P.warn, width: 1, dash: [4, 4] }); V.line3([0, 3.5, 0.01], [0, R, 0.01], { color: P.warn, width: 1, dash: [4, 4] });
+      // 정지선
+      V.line3([-5, -3.5, 0.02], [-5, 0, 0.02], { color: P.text, width: 2.5 }); V.line3([5, 0, 0.02], [5, 3.5, 0.02], { color: P.text, width: 2.5 });
+      V.line3([0, -5, 0.02], [3.5, -5, 0.02], { color: P.text, width: 2.5 }); V.line3([-3.5, 5, 0.02], [0, 5, 0.02], { color: P.text, width: 2.5 });
+      // 신호등
+      const sig = (x, y, on, yl) => { V.line3([x, y, 0], [x, y, 5], { color: P.dim, width: 2 }); V.dot3([x, y, 5.4], { color: on ? P.ok : yl ? P.warn : P.bad, r: 6 }); };
+      sig(-6, -5, G1, yEW); sig(6, 5, G1, yEW); sig(5, -6, G2, yNS); sig(-5, 6, G2, yNS);
+      // 대기 차량
+      const cars = [];
+      for (let k = 0; k < Math.floor(Q[0] + 1e-6) && k < 8; k++) { cars.push([-8 - k * GAP, -1.75, 0]); cars.push([8 + k * GAP, 1.75, 0]); }
+      for (let k = 0; k < Math.floor(Q[1] + 1e-6) && k < 8; k++) { cars.push([1.75, -8 - k * GAP, 1]); cars.push([-1.75, 8 + k * GAP, 1]); }
+      moving.forEach((m) => { const s = m.s - 5; if (m.a === 0) cars.push(m.mirror ? [-s, 1.75, 0, 1] : [s, -1.75, 0, 1]); else cars.push(m.mirror ? [-1.75, -s, 1, 1] : [1.75, s, 1, 1]); });
+      cars.sort((a, b) => V.depth([[b[0], b[1], 0]]) - V.depth([[a[0], a[1], 0]]));
+      cars.forEach((c) => car(V, P, c[0], c[1], c[2], c[3] ? P.accent : P.accent2));
+      if (Q[0] > 8) V.text3(`+${Math.floor(Q[0] - 8)}대`, [-8 - 8 * GAP, -1.75, 3], { color: P.bad, size: 12, bold: true });
+      if (Q[1] > 8) V.text3(`+${Math.floor(Q[1] - 8)}대`, [1.75, -8 - 8 * GAP, 3], { color: P.bad, size: 12, bold: true });
+      V.text3("R-60 동서", [-R + 8, -7, 0], { color: P.dim, size: 11 }); V.text3("진입로 남북", [7, -R + 8, 0], { color: P.dim, size: 11 });
+    } });
+  function info() {
+    const { C, g1, g2 } = times(), r1 = C - g1, r2 = C - g2;
+    CB.stat("tf-3d-o-ph", phase(t % C)[2] + ` (${CB.num(t % C, 0)}/${C} s)`);
+    CB.stat("tf-3d-o-q1", CB.num(Q[0], 0) + "대 · " + CB.num(Q[0] * GAP, 0) + " m"); CB.stat("tf-3d-o-q2", CB.num(Q[1], 0) + "대 · " + CB.num(Q[1] * GAP, 0) + " m");
+    const m1 = (gq1() * r1) / 3600, m2 = (gq2() * r2) / 3600, ok1 = (gq1() * C) / 3600 < (S * g1) / 3600, ok2 = (gq2() * C) / 3600 < (S * g2) / 3600;
+    CB.stat("tf-3d-o-m", (ok1 ? CB.num(m1, 1) : "과포화") + " / " + (ok2 ? CB.num(m2, 1) : "과포화") + "대");
+    v.redraw();
+  }
+  // 첫 화면: 동서 적색 끝 근처 상태를 만든다
+  for (let k = 0; k < 400; k++) advance(0.25);
+  const loop = CB.loop(document.getElementById("tf-cv-3d"), (dt) => { const n = 4; for (let k = 0; k < n; k++) advance((dt * 4) / n); info(); });
+  loop.stop();
+  CB.playButton("tf-3d-play", () => loop.start(), () => loop.stop());
+  info();
+})();
+
+/* ---------- 8. 차로 수 계획 ---------- */
+(function () {
+  const ga = CB.range("tf-pl-a", (v) => CB.sig(v) + " 대/일", draw), gr = CB.range("tf-pl-r", (v) => v.toFixed(1) + " %", draw), gl = CB.seg("tf-pl-los", draw);
+  const K = 0.12, D = 0.6, HV = 0.08, PHF = 0.9, YR = 40;
+  const vcAt = (n) => TFX.vp(ga() * Math.pow(1 + gr() / 100, n), K, D, HV, PHF).v / 1700;
+  const calc = () => { const xm = gl() === "C" ? 0.7 : 0.85; let yr = null; for (let n = 0; n <= 60; n += 0.05) if (vcAt(n) > xm) { yr = n; break; } return { xm, yr }; };
+  const cv = CB.canvas("#tf-cv-plan", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), S = [];
+    for (let n = 0; n <= YR; n += 0.5) S.push([n, vcAt(n)]);
+    const ymax = Math.max(1.2, Math.min(3, vcAt(YR) * 1.1));
+    const r = CB.chart(ctx, null, { x: [0, YR], y: [0, ymax], xLabel: "개통 후 연수", yLabel: "v/c (양방향 2차로 도로)",
+      series: [{ data: S, color: P.accent, width: 2.8 }],
+      vlines: [{ x: 20, color: P.dim, label: "설계 연도" }].concat(c.yr != null && c.yr <= YR ? [{ x: c.yr, color: P.bad, label: "4차로 필요" }] : []),
+      hlines: [{ y: c.xm, color: P.warn, label: `LOS ${gl()} 경계` }] });
+    let prev = 0;
+    TFX.LOS.forEach(([e, l]) => { const e2 = Math.min(ymax, e); if (e2 <= prev) return; ctx.fillStyle = TFX.alpha(TFX.losColor(P, l), 0.08); ctx.fillRect(r.box.x, r.Y(e2), r.box.w, r.Y(prev) - r.Y(e2)); TFX.text(ctx, l, r.box.x + 12, (r.Y(prev) + r.Y(e2)) / 2, TFX.losColor(P, l), { size: 11 }); prev = e2; });
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.55), minHeight: 280, maxHeight: 420 });
+  function draw() {
+    cv.redraw(); const c = calc(), a20 = ga() * Math.pow(1 + gr() / 100, 20);
+    CB.stat("tf-pl-o-a", CB.sig(a20) + " 대/일"); CB.stat("tf-pl-o-x", vcAt(20).toFixed(2) + " · " + TFX.los(vcAt(20)));
+    CB.stat("tf-pl-o-y", c.yr == null ? "60년 이후" : c.yr < 0.05 ? "개통 시부터" : "약 " + CB.num(c.yr, 0) + "년 뒤");
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

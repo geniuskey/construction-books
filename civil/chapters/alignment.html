@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>도로 선형 설계 · CivilBook</title>
+<meta name="description" content="설계 속도 60 km/h의 R-60을 따라 정지 시거 85 m, 곡선 주행의 힘 e + f = V²/127R과 최소 반지름 135 m, 원곡선·편경사 접속·클로소이드, 오르막 차로, 볼록 종단 곡선 112 m, 평면·종단 조화와 3D 운전자 시점을 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .al-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .al-msg b { color: var(--text); }
+  .al-msg.ok { color: var(--ok); font-weight: 600; }
+  .al-msg.bad { color: var(--bad); font-weight: 600; }
+  .al-tbl td, .al-tbl th { font-variant-numeric: tabular-nums; }
+  .al-stake { max-height: 230px; overflow: auto; border-top: 1px solid var(--border); }
+  .al-stake table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--mono); }
+  .al-stake th, .al-stake td { padding: 4px 10px; text-align: right; border-bottom: 1px solid var(--border); }
+  .al-stake th { position: sticky; top: 0; background: var(--surface); color: var(--text-dim); font-weight: 600; }
+  .al-steps { margin: 6px 0 0; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="civil"></script>
+</head>
+<body data-chapter="alignment">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="al-ah-load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="al-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="al-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="al-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="al-ah-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 11</div>
+    <h1 data-no-glossary>도로 선형 설계</h1>
+    <p class="lead">도로는 땅 위에 그린 3차원 곡선입니다. 위에서 내려다본 모양이 평면 선형, 옆에서 본 높낮이가 종단 선형이고, 운전자는 그 둘이 겹친 하나의 길을 봅니다. 선형 설계는 "이 길을 설계 속도로 달리는 운전자가 앞을 충분히 보고, 미끄러지지 않고, 놀라지 않게" 곡선의 반지름, 기울기, 곡선 사이의 이음을 정하는 일입니다. 이 장은 B-10 진입로를 확장하는 지방부 2차로 도로 R-60(설계 속도 60 km/h)을 처음부터 끝까지 설계합니다. 정지 시거 85 m, 최소 곡선 반지름 135 m, 반지름 200 m · 교각 30°의 원곡선과 A = 100의 클로소이드, +4 % → −2 %의 볼록 종단 곡선 120 m를 차례로 계산하고, 마지막에 운전석에 앉아 그 길을 3D로 달려 봅니다.</p>
+    <ul class="objectives">
+      <li>설계 속도가 시거·반지름·편경사·종단 곡선 길이를 어떻게 결정하는지 설명하고, 정지 시거를 공주 거리와 제동 거리로 나누어 계산한다.</li>
+      <li>곡선을 도는 차량의 힘의 평형에서 \(e + f = V^2/127R\)을 유도하고 최소 곡선 반지름을 구한다.</li>
+      <li>원곡선의 접선 길이·곡선 길이·외할·중앙 종거와 측점을 계산하고, 편각법으로 곡선을 측설한다.</li>
+      <li>편경사 접속 길이와 클로소이드 완화 곡선(\(A^2 = RL\))의 요소를 계산하고, 곡률이 길이에 비례해 변하는 의미를 설명한다.</li>
+      <li>종단 경사와 오르막 차로의 필요성을 트럭 속도 저하로 판단하고, 포물선 종단 곡선의 표고와 볼록·오목 곡선의 최소 길이를 계산한다.</li>
+      <li>평면·종단 선형의 조화 원칙을 3D 운전자 시점으로 확인한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>길은 지형을 따라 굽이치기만 했다</b></div>
+      <div class="o-body"><p>마차 시대의 길은 지형을 따라 굽었습니다. 시속 10 km 안팎에서는 급한 굽이도, 언덕 너머가 안 보이는 것도 큰 문제가 아니었습니다. 자동차가 시속 수십 km로 달리기 시작하자 사정이 달라졌습니다. 반지름이 작은 굽이에서는 차가 바깥으로 미끄러졌고, 직선에서 원곡선으로 갑자기 들어가는 곳에서는 운전대를 한 번에 크게 꺾어야 했으며, 언덕 마루 너머에 멈춰 선 차를 너무 늦게 보았습니다.</p>
+        <p>이 문제에는 각각 계산이 있습니다. 미끄러짐은 노면을 안쪽으로 기울이는 편경사와 타이어 마찰로 원심력을 받는 힘의 평형으로, 갑작스러운 곡률 변화는 19세기 철도에서 먼저 쓰인 완화 곡선(곡률이 길이에 비례해 변하는 클로소이드)으로, 보이지 않는 장애물은 반응 시간과 제동 거리로 정한 시거와 그 시거를 보장하는 종단 곡선 길이로 풉니다. 오늘날의 도로 설계 기준은 이 계산을 설계 속도별 표로 정리해 둔 것입니다.</p>
+        <div class="o-chain"><span>설계 속도 V</span><i>→</i><span class="tool">시거 · R<sub>min</sub> · 편경사 · 클로소이드 A · 종단 곡선 K</span><i>→</i><span>안전하고 편안한 3차원 선형</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="design-speed">
+    <h2>설계 속도와 선형 요소의 사슬</h2>
+    <div class="problem"><strong>R-60의 모든 숫자는 어디서 오나</strong>
+      <p>B-10 진입로를 확장하는 지방부 2차로 도로 R-60은 길이 약 1 km입니다. 0+000에서 출발해 0+350 부근에서 오른쪽으로 30° 꺾이고, 4 % 오르막으로 언덕을 올라 0+700 부근에서 마루를 넘은 뒤 2 % 내리막으로 내려갑니다. 굽이의 반지름은 몇 m 이상이어야 하고, 마루 위의 종단 곡선은 얼마나 길어야 할까요? 답은 모두 하나의 숫자, 설계 속도 60 km/h에서 출발합니다.</p></div>
+    <p>도로를 설계할 때 가장 먼저 정하는 숫자가 <span class="term">설계 속도</span><span class="en">(design speed)</span>입니다. 도로의 기능(10장의 간선·집산·국지)과 지형(평지·구릉·산지), 지역(지방부·도시부)에 따라 정하며, 한 구간 안에서는 되도록 일정하게 둡니다. 설계 속도가 정해지면 정지 시거, 최소 곡선 반지름, 편경사, 완화 곡선 길이, 종단 곡선 길이가 차례로 따라 나옵니다. 그래서 설계 속도는 선형 요소 사이의 "공통 화폐"입니다.</p>
+    <div class="callout def"><strong>정의 11.1 (설계 속도와 운영 속도)</strong> <span class="term">설계 속도</span>는 날씨가 좋고 교통량이 적어 도로의 기하 구조만이 속도를 제한할 때, 평균적인 운전자가 안전하고 쾌적하게 유지할 수 있는 속도로서 선형 요소를 정하는 기준 속도다. 실제로 운전자가 내는 속도의 분포는 <span class="term">운영 속도</span><span class="en">(operating speed)</span>라 하며, 흔히 자유 주행 차량의 85번째 백분위 속도 \(V_{85}\)로 나타낸다. 좋은 선형은 \(V_{85}\)가 설계 속도와 크게 다르지 않고, 이웃한 구간 사이에서 갑자기 변하지 않는다(설계 일관성). 우리나라는 「도로의 구조·시설 기준에 관한 규칙」이 도로 기능·지역·지형별 설계 속도와 그에 따른 선형 기준값을 정한다(현행 규칙 확인).</div>
+    <figure class="diagram" id="fig-al-overview">
+      <svg viewBox="0 0 880 440" role="img" aria-label="R-60의 평면 선형과 종단 선형 개요">
+        <rect x="6" y="6" width="868" height="428" rx="10" class="f-surface"/>
+        <text x="24" y="32" class="t" style="font-weight:700">평면 선형 (위에서 본 모양)</text>
+        <!-- plan: scale 0.7 px/m; start (40,150) heading east, TS at 271 m -->
+        <g transform="translate(40,90)">
+          <path d="M0 0H190" style="stroke:var(--text);stroke-width:3;fill:none"/>
+          <path d="M190 0C215 0 240 2.5 262 8.5" style="stroke:var(--accent-2);stroke-width:3;fill:none"/>
+          <path d="M262 8.5C285 15 303 24 322 35" style="stroke:var(--accent);stroke-width:3;fill:none"/>
+          <path d="M322 35C340 46 356 57 370 64" style="stroke:var(--accent-2);stroke-width:3;fill:none"/>
+          <path d="M370 64L560 174" style="stroke:var(--text);stroke-width:3;fill:none"/>
+          <path d="M190 0H245L370 72" style="stroke:var(--text-dim);stroke-width:1;stroke-dasharray:5 4;fill:none"/>
+          <circle cx="245" cy="0" r="4" style="fill:var(--warn)"/>
+          <text x="245" y="-12" text-anchor="middle" class="t-mono" style="fill:var(--warn)">IP 0+350 · Δ = 30°</text>
+          <g class="t-mono"><text x="0" y="22">0+000</text><text x="176" y="22" text-anchor="middle">TS 0+271</text><text x="252" y="34" text-anchor="end">SC 0+321</text><text x="330" y="66" text-anchor="end">CS 0+376</text><text x="380" y="92">ST 0+426</text><text x="566" y="192">1+000</text></g>
+          <text x="300" y="2" class="t-mono" style="fill:var(--accent)">R = 200 m</text>
+          <text x="420" y="30" class="t-dim">클로소이드 A = 100(L = 50 m)이 직선과 원곡선을 잇는다</text>
+        </g>
+        <line x1="20" y1="286" x2="860" y2="286" style="stroke:var(--border)"/>
+        <text x="24" y="306" class="t" style="font-weight:700">종단 선형 (옆에서 본 높낮이, 세로 10배 과장)</text>
+        <g transform="translate(0,46)">
+          <path d="M40 376L552 325" style="stroke:var(--text);stroke-width:2.6;fill:none"/>
+          <path d="M552 325Q600 316 648 322" style="stroke:var(--accent);stroke-width:3;fill:none"/>
+          <path d="M648 322L840 335" style="stroke:var(--text);stroke-width:2.6;fill:none"/>
+          <path d="M552 325L600 316L648 322" style="stroke:var(--text-dim);stroke-width:1;stroke-dasharray:5 4;fill:none"/>
+          <circle cx="600" cy="316" r="4" style="fill:var(--warn)"/>
+          <g class="t-mono"><text x="80" y="362">+4.0 %</text><text x="760" y="320">−2.0 %</text><text x="600" y="302" text-anchor="middle" style="fill:var(--warn)">PVI 0+700 · 50.00 m</text><text x="552" y="344" text-anchor="middle">BVC 0+640</text><text x="660" y="346">EVC 0+760</text></g>
+          <text x="330" y="312" class="t-mono" style="fill:var(--accent)">볼록 종단 곡선 L = 120 m (K = 20)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-1.</b> R-60의 평면 선형과 종단 선형(축척 대략, 종단은 세로 과장). 평면에서는 직선 → 클로소이드 → 원곡선 → 클로소이드 → 직선, 종단에서는 경사 직선 → 포물선 → 경사 직선으로 이어진다. 평면 곡선과 종단 곡선이 떨어져 있는 이 배치가 좋은지는 마지막 절에서 3D로 확인한다.</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="al-tbl">
+      <thead><tr><th>선형 요소</th><th>지배하는 물리</th><th>R-60 값(교육용)</th><th>이 장의 절</th></tr></thead>
+      <tbody>
+        <tr><td>정지 시거</td><td>반응 시간 + 제동(마찰)</td><td>약 85 m</td><td>시거</td></tr>
+        <tr><td>최소 곡선 반지름</td><td>원심력 = 편경사 + 횡방향 마찰</td><td>약 135 m(e 6 %, f 0.15)</td><td>곡선 주행의 역학</td></tr>
+        <tr><td>원곡선</td><td>기하(접선과 원)</td><td>R 200 m, Δ 30°, T 53.6 m, L<sub>c</sub> 104.7 m</td><td>원곡선</td></tr>
+        <tr><td>완화 곡선</td><td>핸들 조작 속도·횡가속도 변화율</td><td>클로소이드 L 50 m, A 100</td><td>완화 곡선</td></tr>
+        <tr><td>종단 경사</td><td>트럭의 등판 능력</td><td>+4 %, −2 %</td><td>종단 경사</td></tr>
+        <tr><td>종단 곡선</td><td>마루 너머 시거·충격</td><td>필요 112 m → 120 m 사용</td><td>종단 곡선</td></tr>
+      </tbody></table></div>
+    <p>표의 값은 이 책의 교육용 가정이며 실제 설계에는 현행 규칙과 지침의 표 값을 쓴다. 규칙의 표 값은 같은 식에서 나오지만 마찰 계수, 반응 시간, 반올림 방법 같은 가정이 조금씩 달라 이 책의 숫자와 몇 m씩 다를 수 있다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="sight-distance">
+    <h2>정지 시거: 보고, 반응하고, 멈춘다</h2>
+    <div class="problem"><strong>길 위의 상자를 언제 보아야 하나</strong>
+      <p>시속 60 km로 달리던 운전자가 차로 위에 떨어진 상자를 봅니다. 브레이크를 밟기로 마음먹고 발을 옮기는 데 시간이 걸리고, 브레이크가 걸린 뒤에도 차는 한참 미끄러집니다. 상자 앞에서 멈추려면 상자를 몇 m 앞에서 보아야 할까요? 그 거리를 도로 어디서나 보장하는 것이 선형 설계의 첫째 조건입니다.</p></div>
+    <p>운전자가 앞 차로의 장애물을 보고 멈추는 데 필요한 거리를 <span class="term">정지 시거</span><span class="en">(stopping sight distance, SSD)</span>라 합니다. 두 부분으로 나뉩니다. 장애물을 보고 브레이크를 밟기까지 차가 원래 속도로 달린 <b>공주 거리</b>, 그리고 브레이크가 걸린 뒤 멈출 때까지 미끄러진 <b>제동 거리</b>입니다.</p>
+    <figure class="diagram" id="fig-al-ssd">
+      <svg viewBox="0 0 860 230" role="img" aria-label="정지 시거의 공주 거리와 제동 거리">
+        <rect x="6" y="6" width="848" height="218" rx="10" class="f-surface"/>
+        <rect x="30" y="120" width="800" height="44" style="fill:var(--text-dim);opacity:.18"/>
+        <line x1="30" y1="142" x2="830" y2="142" style="stroke:var(--text-faint);stroke-dasharray:14 10;stroke-width:2"/>
+        <g transform="translate(40,124)"><rect x="0" y="4" width="46" height="18" rx="4" style="fill:var(--accent-2)"/><circle cx="10" cy="24" r="4" style="fill:var(--text)"/><circle cx="36" cy="24" r="4" style="fill:var(--text)"/></g>
+        <circle cx="64" cy="118" r="3" style="fill:var(--accent)"/>
+        <line x1="64" y1="118" x2="790" y2="126" style="stroke:var(--warn);stroke-width:1.4;stroke-dasharray:6 4"/>
+        <rect x="784" y="126" width="16" height="12" style="fill:var(--warn)"/>
+        <text x="792" y="114" text-anchor="middle" class="t-mono" style="fill:var(--warn)">물체 0.15 m</text>
+        <text x="64" y="104" text-anchor="middle" class="t-mono" style="fill:var(--accent)">눈 1.0 m</text>
+        <line x1="64" y1="186" x2="455" y2="186" style="stroke:var(--accent-2);stroke-width:2" marker-start="url(#al-ah-load)" marker-end="url(#al-ah-load)"/>
+        <line x1="455" y1="186" x2="784" y2="186" style="stroke:var(--accent);stroke-width:2" marker-start="url(#al-ah-acc)" marker-end="url(#al-ah-acc)"/>
+        <text x="260" y="206" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">공주 거리 V t / 3.6 = 41.7 m</text>
+        <text x="620" y="206" text-anchor="middle" class="t-mono" style="fill:var(--accent)">제동 거리 V² / 254(f ± G) = 42.9 m</text>
+        <line x1="455" y1="170" x2="455" y2="198" style="stroke:var(--text-dim)"/>
+        <text x="455" y="60" text-anchor="middle" class="t">브레이크 작동</text>
+        <line x1="455" y1="66" x2="455" y2="118" style="stroke:var(--text-dim);stroke-dasharray:3 3"/>
+        <text x="64" y="44" class="t">장애물을 봄 (t = 0)</text>
+        <text x="420" y="38" text-anchor="end" class="t-dim">반응 시간 t = 2.5 s 동안 60 km/h 그대로</text>
+        <text x="830" y="38" text-anchor="end" class="t-dim">마찰 f = 0.33으로 감속 → 정지</text>
+        <text x="424" y="226" text-anchor="middle" class="t-mono" style="fill:var(--text)">정지 시거 ≈ 84.6 m → 85 m</text>
+      </svg>
+      <figcaption><b>그림 11-2.</b> 정지 시거 = 공주 거리 + 제동 거리. 시거는 눈높이 1.0 m에서 높이 0.15 m의 물체를 볼 수 있는 거리로 잰다(이 책의 형태, 규칙의 값 확인). 60 km/h에서는 두 부분이 거의 같고, 속도가 높을수록 V²에 비례하는 제동 거리가 커진다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 11.2 (정지 시거)</strong> 속도 V(km/h), 반응 시간 t(s), 종방향 마찰 계수 f, 종단 경사 G(소수, 오르막 +)일 때
+      <div class="formula">$$D = \underbrace{\frac{V\,t}{3.6}}_{\text{공주 거리}} + \underbrace{\frac{V^2}{254\,(f + G)}}_{\text{제동 거리}} \quad (\text{m})$$<div class="where">제동 거리는 에너지 평형 \(\tfrac12 m v^2 = m g (f + G) d\)에서 \(d = v^2/(2g(f+G))\), \(v = V/3.6\)을 넣으면 \(V^2/(2 \times 9.81 \times 3.6^2 (f+G)) = V^2/(254(f+G))\). 오르막(G &gt; 0)은 중력이 감속을 돕고, 내리막(G &lt; 0)은 방해한다. f는 젖은 노면의 마모된 타이어를 가정한 값으로 속도가 높을수록 작게 잡는다.</div></div></div>
+    <div class="callout"><strong>예제 11.1 (R-60의 정지 시거)</strong> V = 60 km/h, t = 2.5 s, f = 0.33(교육용).
+      <ol class="al-steps">
+        <li><b>공주 거리.</b> \(60 \times 2.5/3.6 = 41.7\) m.</li>
+        <li><b>제동 거리(평지).</b> \(60^2/(254 \times 0.33) = 3{,}600/83.8 = 42.9\) m.</li>
+        <li><b>정지 시거.</b> \(D = 41.7 + 42.9 = 84.6\) m → <b>85 m</b>.</li>
+        <li><b>내리막 5 %에서.</b> \(3{,}600/(254 \times 0.28) = 50.6\) m, \(D = 92.3\) m. 오르막 4 %에서는 \(3{,}600/(254 \times 0.37) = 38.3\) m, \(D = 80.0\) m. 규칙은 경사 보정 없이 평지 값을 쓰는 것이 보통이지만, 긴 내리막에서는 보정한 값을 확인하는 것이 안전하다.</li>
+        <li><b>판정.</b> R-60의 볼록 종단 곡선(9절)과 평면 곡선 안쪽의 시야(4절)가 85 m를 보장하는지 확인한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-al-ssd">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>정지 시거 계산기: 공주 거리와 제동 거리</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="al-cv-ssd" aria-label="속도별 공주 거리와 제동 거리 막대와 정지하는 차량"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>속도 V <output id="al-s-v-out"></output></span><input type="range" id="al-s-v" min="20" max="120" step="5" value="60"></label>
+          <label class="ctrl"><span>반응 시간 t <output id="al-s-t-out"></output></span><input type="range" id="al-s-t" min="0.5" max="4" step="0.1" value="2.5"></label>
+          <label class="ctrl"><span>종방향 마찰 f <output id="al-s-f-out"></output></span><input type="range" id="al-s-f" min="0.1" max="0.7" step="0.01" value="0.33"></label>
+          <label class="ctrl"><span>종단 경사 G <output id="al-s-g-out"></output></span><input type="range" id="al-s-g" min="-8" max="8" step="0.5" value="0"></label>
+          <div class="ctrl"><span>노면 예시</span><div class="seg" id="al-s-pre"><button data-value="design" class="on">설계(젖음)</button><button data-value="dry">마른 노면</button><button data-value="ice">결빙</button></div></div>
+          <div class="btn-row"><button class="btn" id="al-s-play">▶ 재생</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">공주 거리</span><span class="v" id="al-s-o-r">—</span></div>
+        <div class="stat"><span class="k">제동 거리</span><span class="v" id="al-s-o-b">—</span></div>
+        <div class="stat"><span class="k">정지 시거 D</span><span class="v" id="al-s-o-d">—</span></div>
+        <div class="stat"><span class="k">R-60 기준 85 m 대비</span><span class="v" id="al-s-o-c">—</span></div>
+      </div>
+      <div class="al-msg" id="al-s-msg"></div>
+      <div class="sim-note">해볼 것: 속도를 60 → 80 → 100 km/h로 올리면 공주 거리는 직선으로, 제동 거리는 포물선으로 커집니다 · 결빙 노면(f ≈ 0.1)에서는 같은 속도에서도 정지 거리가 두 배를 넘습니다 · 재생을 누르면 반응 시간 동안 같은 속도로, 그 뒤 일정한 감속도로 멈추는 차가 보입니다 · 모델: 원리 11.2, CB.civ.ssd. 마른 노면·결빙 마찰 값은 교육용입니다.</div>
+    </div>
+    <div class="callout deep"><strong>앞지르기 시거 맛보기</strong> 2차로 도로에서 반대 차로로 나가 느린 차를 앞지르려면 훨씬 긴 시야가 필요하다. <span class="term">앞지르기 시거</span><span class="en">(passing sight distance)</span>는 보통 네 부분으로 나눈다: 앞지르기를 결심하고 반대 차로에 들어가기까지(d₁), 반대 차로를 달리는 동안(d₂), 복귀 뒤 마주 오는 차와의 여유(d₃), 그 사이 마주 오는 차가 달린 거리(d₄). 60 km/h에서도 정지 시거의 몇 배, 수백 m가 필요해 언덕과 굽이가 많은 도로에서는 보장하기 어렵다. 그래서 2차로 도로는 앞지르기 가능 구간의 비율을 확인하고, 부족하면 앞지르기 차로(2+1 차로)를 두거나 앞지르기 금지 구간을 표시한다(규칙·지침 확인).</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="curve-dynamics">
+    <h2>곡선 주행의 역학: 편경사와 마찰</h2>
+    <div class="problem"><strong>왜 굽이의 노면은 안쪽으로 기울어 있나</strong>
+      <p>질량 m인 차가 반지름 R의 원을 속도 v로 돌려면 원의 중심 쪽으로 \(mv^2/R\)의 힘이 필요합니다. 평평한 노면에서는 그 힘을 타이어의 옆 마찰이 혼자 내야 합니다. 노면을 안쪽으로 기울이면 중력과 노면 반력의 일부가 그 일을 나눠 맡습니다. 얼마나 기울이고, 마찰에 얼마나 맡길 수 있을까요?</p></div>
+    <figure class="diagram" id="fig-al-forces">
+      <svg viewBox="0 0 860 330" role="img" aria-label="편경사 노면 위 곡선 주행 차량의 힘 평형">
+        <rect x="6" y="6" width="848" height="318" rx="10" class="f-surface"/>
+        <g transform="translate(250,200) rotate(-6)">
+          <rect x="-200" y="40" width="400" height="16" style="fill:var(--text-dim);opacity:.35"/>
+          <rect x="-70" y="-40" width="140" height="62" rx="12" style="fill:var(--accent-2);opacity:.85"/>
+          <rect x="-50" y="-70" width="100" height="34" rx="8" style="fill:var(--accent-2);opacity:.55"/>
+          <rect x="-62" y="20" width="22" height="22" rx="4" style="fill:var(--text)"/>
+          <rect x="40" y="20" width="22" height="22" rx="4" style="fill:var(--text)"/>
+          <line x1="0" y1="0" x2="0" y2="-150" style="stroke:var(--ok);stroke-width:2.4" marker-end="url(#al-ah-ok)"/>
+          <text x="10" y="-150" class="t-mono" style="fill:var(--ok)">N (노면에 수직)</text>
+          <line x1="-50" y1="44" x2="-170" y2="44" style="stroke:var(--blue);stroke-width:2.4" marker-end="url(#al-ah-blue)"/>
+          <text x="-170" y="70" class="t-mono" style="fill:var(--blue)">F = f N (노면 방향)</text>
+          <text x="210" y="62" class="t-mono">노면 기울기 tan α = e</text>
+        </g>
+        <line x1="250" y1="200" x2="250" y2="300" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#al-ah-load)"/>
+        <text x="260" y="300" class="t-mono" style="fill:var(--accent-2)">W = m g</text>
+        <line x1="250" y1="200" x2="80" y2="200" style="stroke:var(--accent);stroke-width:2.6;stroke-dasharray:7 4" marker-end="url(#al-ah-acc)"/>
+        <text x="80" y="190" class="t-mono" style="fill:var(--accent)">필요한 구심력 m v²/R</text>
+        <text x="40" y="232" class="t-dim">← 곡선 중심 쪽</text>
+        <g transform="translate(560,40)">
+          <text x="0" y="16" class="t" style="font-weight:700">노면 방향과 수직 방향의 평형</text>
+          <text x="0" y="48" class="t-mono" style="fill:var(--text)">노면 방향: m v²/R · cos α = W sin α + F</text>
+          <text x="0" y="74" class="t-mono" style="fill:var(--text)">수직 방향: N = W cos α + m v²/R · sin α</text>
+          <text x="0" y="104" class="t-mono">F = f N 으로 두고 cos α로 나누면</text>
+          <text x="0" y="132" class="t-mono" style="fill:var(--accent)">v²/(gR) = (e + f)/(1 − e f)</text>
+          <text x="0" y="160" class="t-mono">e f ≈ 0.01 ≪ 1 이므로</text>
+          <text x="0" y="192" class="t" style="font-weight:700;fill:var(--accent)">e + f = V² / (127 R)</text>
+          <text x="0" y="218" class="t-mono">(V km/h: g × 3.6² = 127)</text>
+          <text x="0" y="252" class="t-dim">편경사 e는 "공짜" 구심력,</text>
+          <text x="0" y="272" class="t-dim">마찰 f는 타이어가 내는 몫이다.</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-3.</b> 편경사 e(= tan α)의 노면에서 곡선을 도는 차량. 구심력은 중력의 노면 방향 성분과 타이어의 옆 마찰 F가 함께 낸다. 노면 방향과 수직 방향의 평형에서 \(e + f = V^2/127R\)이 나온다. 운전자가 느끼는 "바깥으로 쏠림"은 마찰 몫 f에 비례한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 11.3 (곡선 주행의 평형과 최소 반지름)</strong> 편경사 e(소수), 횡방향 마찰 계수 f, 속도 V(km/h), 반지름 R(m) 사이에
+      <div class="formula">$$e + f = \frac{V^2}{127\,R} \qquad\Longrightarrow\qquad R_{min} = \frac{V^2}{127\,(e_{max} + f_{max})}$$<div class="where">\(f_{max}\)는 미끄러지는 한계가 아니라 운전자가 불쾌감 없이 받아들이는 횡방향 마찰(편안함의 한계)로, 속도가 높을수록 작다(60 km/h 근처에서 약 0.15 형태). \(e_{max}\)는 결빙 때 느리게 가는 차가 안쪽으로 미끄러지지 않고 트럭이 넘어지지 않도록 제한하며, 지방부 6–8 %, 적설·한랭 지역과 도시부는 더 작게 둔다(현행 규칙 확인).</div></div></div>
+    <div class="callout"><strong>예제 11.2 (R-60의 최소 반지름과 R = 200 m의 마찰 몫)</strong> V = 60 km/h, \(e_{max}\) = 6 %, \(f_{max}\) = 0.15(교육용).
+      <ol class="al-steps">
+        <li><b>최소 반지름.</b> \(R_{min} = 60^2/(127 \times 0.21) = 3{,}600/26.67 = 135.0\) m. 규칙의 표는 이런 계산값을 보기 좋은 수로 올려 정리한다.</li>
+        <li><b>설계 반지름 R = 200 m, e = 6 %에서 필요한 마찰.</b> \(V^2/127R = 3{,}600/25{,}400 = 0.142\), \(f = 0.142 - 0.060 = 0.082\). 허용 0.15의 55 %만 쓴다 → <b>여유 있음</b>.</li>
+        <li><b>이 곡선의 한계 속도(f = 0.15).</b> \(V = \sqrt{127 \times 200 \times 0.21} = 73\) km/h. 설계 속도보다 13 km/h 빨라도 편안함의 한계 안에 있다.</li>
+        <li><b>편경사 없이(e = −2 %, 바깥쪽으로 내려가는 보통 횡단 경사).</b> \(f = 0.142 + 0.02 = 0.162\) &gt; 0.15 → <b>부족</b>. 그래서 R = 200 m 곡선에는 편경사를 둔다.</li>
+      </ol></div>
+    <div class="sim" id="sim-al-force">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>곡선 주행 힘의 평형: 편경사가 할 일, 마찰이 할 일</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="al-cv-force" aria-label="편경사 노면 위 차량의 중력, 노면 반력, 마찰력, 구심력 벡터"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>속도 V <output id="al-f-v-out"></output></span><input type="range" id="al-f-v" min="20" max="120" step="1" value="60"></label>
+          <label class="ctrl"><span>반지름 R <output id="al-f-r-out"></output></span><input type="range" id="al-f-r" min="40" max="800" step="5" value="200"></label>
+          <label class="ctrl"><span>편경사 e <output id="al-f-e-out"></output></span><input type="range" id="al-f-e" min="-2" max="10" step="0.5" value="6"></label>
+          <label class="ctrl"><span>허용 횡방향 마찰 f<sub>max</sub> <output id="al-f-fm-out"></output></span><input type="range" id="al-f-fm" min="0.08" max="0.3" step="0.01" value="0.15"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">V²/127R</span><span class="v" id="al-f-o-a">—</span></div>
+        <div class="stat"><span class="k">필요 마찰 f</span><span class="v" id="al-f-o-f">—</span></div>
+        <div class="stat"><span class="k">R<sub>min</sub>(e, f<sub>max</sub>)</span><span class="v" id="al-f-o-rmin">—</span></div>
+        <div class="stat"><span class="k">이 곡선의 한계 속도</span><span class="v" id="al-f-o-vl">—</span></div>
+      </div>
+      <div class="al-msg" id="al-f-msg"></div>
+      <div class="sim-note">해볼 것: R-60 기본값(60 km/h, R 200 m, e 6 %)에서 필요 마찰은 0.082입니다 · 반지름을 135 m로 줄이면 f가 정확히 0.15에 닿습니다 · 속도를 아주 낮추면 f가 음수가 됩니다 — 편경사가 너무 커서 느린 차를 안쪽으로 끌어내리는 상태로, 결빙 노면에서 최대 편경사를 제한하는 이유입니다 · 모델: 원리 11.3(작은 e f 무시), CB.civ.rMin.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="circular-curve">
+    <h2>원곡선: 두 직선을 원호로 잇는다</h2>
+    <div class="problem"><strong>곡선은 어디서 시작하고 어디서 끝나나</strong>
+      <p>R-60의 두 직선은 0+350의 교점(IP)에서 30° 꺾여 만납니다. 반지름 200 m의 원호로 둘을 이으면 원호는 교점보다 몇 m 앞에서 시작하고, 길이는 얼마이며, 교점과 원호 사이는 얼마나 떨어질까요? 현장에서는 그 원호 위에 20 m마다 말뚝을 박아야 합니다.</p></div>
+    <p>두 직선(접선)이 만나는 점을 <span class="term">교점</span><span class="en">(intersection point, IP)</span>, 두 직선 사이의 꺾인 각을 <b>교각</b><span class="en">(deflection angle — 교량의 교각과는 다른 말)</span> Δ라 합니다. 반지름 R의 원이 두 직선에 접하도록 넣으면, 접점이 곡선 시점(BC)과 곡선 종점(EC)이고 모든 요소가 R과 Δ로 정해집니다.</p>
+    <figure class="diagram" id="fig-al-circle">
+      <svg viewBox="0 0 860 380" role="img" aria-label="원곡선의 요소: 교점, 접선 길이, 곡선 길이, 외할, 중앙 종거, 장현">
+        <rect x="6" y="6" width="848" height="368" rx="10" class="f-surface"/>
+        <path d="M182 153L430 42.5L678 153" style="stroke:var(--text);stroke-width:2;fill:none"/>
+        <path d="M312.1 95.1A290 290 0 0 1 547.9 95.1" style="stroke:var(--accent);stroke-width:3.2;fill:none"/>
+        <line x1="312.1" y1="95.1" x2="547.9" y2="95.1" style="stroke:var(--text-dim);stroke-width:1.2;stroke-dasharray:5 4"/>
+        <line x1="430" y1="360" x2="312.1" y2="95.1" style="stroke:var(--text-dim);stroke-width:1.2;stroke-dasharray:5 4"/>
+        <line x1="430" y1="360" x2="547.9" y2="95.1" style="stroke:var(--text-dim);stroke-width:1.2;stroke-dasharray:5 4"/>
+        <line x1="430" y1="360" x2="430" y2="42.5" style="stroke:var(--text-faint);stroke-width:1;stroke-dasharray:2 4"/>
+        <path d="M410 315A50 50 0 0 1 450 315" style="stroke:var(--warn);fill:none;stroke-width:1.5"/>
+        <text x="430" y="306" text-anchor="middle" class="t-mono" style="fill:var(--warn)">Δ</text>
+        <path d="M430 42.5L580 109.3" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+        <text x="560" y="74" class="t-mono" style="fill:var(--warn)">Δ (교각)</text>
+        <circle cx="430" cy="42.5" r="4.5" style="fill:var(--warn)"/><text x="430" y="30" text-anchor="middle" class="t-mono" style="fill:var(--warn)">IP</text>
+        <circle cx="312.1" cy="95.1" r="4.5" style="fill:var(--accent)"/><text x="300" y="118" text-anchor="end" class="t-mono" style="fill:var(--accent)">BC (곡선 시점)</text>
+        <circle cx="547.9" cy="95.1" r="4.5" style="fill:var(--accent)"/><text x="560" y="118" class="t-mono" style="fill:var(--accent)">EC (곡선 종점)</text>
+        <circle cx="430" cy="360" r="4" style="fill:var(--text)"/><text x="444" y="362" class="t-mono">O (중심)</text>
+        <text x="352" y="58" class="t-mono" style="fill:var(--text)">T</text>
+        <text x="500" y="58" class="t-mono" style="fill:var(--text)">T</text>
+        <line x1="438" y1="44" x2="438" y2="69" style="stroke:var(--accent-2);stroke-width:2"/><text x="444" y="60" class="t-mono" style="fill:var(--accent-2)">E</text>
+        <line x1="422" y1="71" x2="422" y2="95" style="stroke:var(--blue);stroke-width:2"/><text x="414" y="88" text-anchor="end" class="t-mono" style="fill:var(--blue)">M</text>
+        <text x="470" y="108" class="t-mono">C (장현)</text>
+        <text x="350" y="240" class="t-mono" transform="rotate(66 350 240)">R</text>
+        <text x="380" y="80" class="t-mono" style="fill:var(--accent)">L<tspan font-size="9" dy="3">c</tspan></text>
+        <g transform="translate(600,190)">
+          <text x="0" y="0" class="t" style="font-weight:700">R, Δ만 알면</text>
+          <text x="0" y="26" class="t-mono" style="fill:var(--text)">T = R tan(Δ/2)</text>
+          <text x="0" y="48" class="t-mono" style="fill:var(--text)">L꜀ = R Δ (Δ 라디안)</text>
+          <text x="0" y="70" class="t-mono" style="fill:var(--text)">E = R (sec(Δ/2) − 1)</text>
+          <text x="0" y="92" class="t-mono" style="fill:var(--text)">M = R (1 − cos(Δ/2))</text>
+          <text x="0" y="114" class="t-mono" style="fill:var(--text)">C = 2 R sin(Δ/2)</text>
+          <text x="0" y="146" class="t-mono">BC = IP − T, EC = BC + L꜀</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-4.</b> 원곡선의 요소(교각은 보기 좋게 키움). 교각 Δ는 중심각과 같다. 측점은 곡선을 따라 잰 거리이므로 EC의 측점은 IP + T가 아니라 BC + L<sub>c</sub>다(직선으로 질러가는 T + T가 곡선 길이보다 길다).</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 11.4 (원곡선의 요소)</strong> 반지름 R, 교각 Δ인 원곡선에서 <span class="term">접선 길이</span><span class="en">(tangent length)</span> \(T = R\tan(\Delta/2)\), 곡선 길이 \(L_c = R\Delta\)(Δ는 라디안), <span class="term">외할</span><span class="en">(external distance)</span> \(E = R(\sec\tfrac{\Delta}{2} - 1)\), <span class="term">중앙 종거</span><span class="en">(middle ordinate)</span> \(M = R(1 - \cos\tfrac{\Delta}{2})\), 장현 \(C = 2R\sin\tfrac{\Delta}{2}\). <span class="term">측점</span><span class="en">(station)</span>은 도로 중심선을 따라 시점에서 잰 거리로, 이 책은 "0+350.00"처럼 km+m로 쓴다.</div>
+    <div class="callout"><strong>예제 11.3 (R-60의 원곡선, 완화 곡선 없이)</strong> IP 0+350.00, R = 200 m, Δ = 30°(= 0.5236 rad).
+      <ol class="al-steps">
+        <li><b>접선 길이.</b> \(T = 200 \tan 15^\circ = 200 \times 0.26795 = 53.59\) m.</li>
+        <li><b>곡선 길이.</b> \(L_c = 200 \times 0.5236 = 104.72\) m.</li>
+        <li><b>외할·중앙 종거·장현.</b> \(E = 200(1/\cos 15^\circ - 1) = 7.06\) m, \(M = 200(1 - \cos 15^\circ) = 6.81\) m, \(C = 400 \sin 15^\circ = 103.53\) m.</li>
+        <li><b>측점.</b> BC = 350.00 − 53.59 = <b>0+296.41</b>, EC = 296.41 + 104.72 = <b>0+401.13</b>. 2T − L<sub>c</sub> = 2.46 m만큼 곡선이 "지름길"보다 짧다.</li>
+        <li><b>편각법 측설.</b> BC에서 호 길이 l인 점까지의 편각은 접선에서 \(\delta = l/(2R)\)(라디안)이다. 첫 20 m 측점 0+300까지 l = 3.59 m → δ = 0.00898 rad = 0°30′51″, 그 뒤 20 m마다 \(20/400\) rad = 2°51′53″씩 늘고, EC에서 Δ/2 = 15°가 된다.</li>
+      </ol></div>
+    <div class="sim" id="sim-al-curve">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>원곡선 요소 계산기와 편각법 측설표</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="al-cv-curve" aria-label="원곡선 평면도와 접선, 외할, 중앙 종거, 측점 말뚝"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>반지름 R <output id="al-c-r-out"></output></span><input type="range" id="al-c-r" min="60" max="800" step="5" value="200"></label>
+          <label class="ctrl"><span>교각 Δ <output id="al-c-d-out"></output></span><input type="range" id="al-c-d" min="2" max="120" step="0.5" value="30"></label>
+          <label class="ctrl"><span>IP 측점 <output id="al-c-ip-out"></output></span><input type="range" id="al-c-ip" min="150" max="900" step="0.5" value="350"></label>
+          <label class="ctrl"><span>말뚝 간격 <output id="al-c-int-out"></output></span><input type="range" id="al-c-int" min="5" max="40" step="5" value="20"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">T · L<sub>c</sub></span><span class="v" id="al-c-o-t">—</span></div>
+        <div class="stat"><span class="k">E · M</span><span class="v" id="al-c-o-e">—</span></div>
+        <div class="stat"><span class="k">BC</span><span class="v" id="al-c-o-bc">—</span></div>
+        <div class="stat"><span class="k">EC</span><span class="v" id="al-c-o-ec">—</span></div>
+      </div>
+      <div class="al-stake" id="al-c-table"></div>
+      <div class="al-msg" id="al-c-msg"></div>
+      <div class="sim-note">해볼 것: Δ를 키우면 T가 tan으로 빠르게 커져 Δ = 120°에서는 T가 R의 1.7배가 됩니다 · 반지름을 R<sub>min</sub>(135 m) 아래로 내리면 경고가 뜹니다 · 표의 편각은 BC의 접선에서 잰 값이고, 마지막 줄(EC)이 항상 Δ/2인지 확인해 보세요 · 모델: 정의 11.4, CB.civ.curve.</div>
+    </div>
+    <div class="callout warn"><strong>곡선 안쪽의 시야: 횡방향 시거 여유</strong> 평면 곡선에서는 안쪽의 깎기 비탈, 방음벽, 나무가 시야를 가린다. 안쪽 차로 중심을 따라 시거 S를 확보하려면 차로 중심에서 장애물까지 \(HSO = R(1 - \cos(S/2R))\)(S/2R 라디안, S ≤ 곡선 길이일 때) 이상 비워야 한다. R-60: 안쪽 차로 중심 반지름 약 200 m, S = 85 m → \(HSO = 200(1 - \cos 0.2125) = 4.50\) m. 차로 중심에서 길어깨 끝까지는 1.75 + 1.5 = 3.25 m(교육용)이므로 깎기 구간이라면 측구와 비탈 끝을 약 1.3 m 더 물려야 한다(12장 횡단면).</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="superelevation">
+    <h2>편경사와 편경사 접속</h2>
+    <div class="problem"><strong>직선의 지붕 모양 노면은 곡선에서 어떻게 한쪽으로 기우나</strong>
+      <p>직선 구간의 노면은 빗물이 빠지도록 가운데가 높고 양쪽으로 2 % 내려가는 지붕 모양입니다. 곡선에 들어가면 노면 전체가 안쪽으로 6 % 기울어야 합니다. 그 변화를 한순간에 할 수는 없습니다. 얼마의 길이에 걸쳐, 어떤 순서로 노면을 돌려야 할까요?</p></div>
+    <p>직선부의 <span class="term">횡단 경사</span><span class="en">(normal crown, cross slope)</span>에서 곡선부의 <span class="term">편경사</span><span class="en">(superelevation)</span>로 바꾸는 구간을 <span class="term">편경사 접속</span><span class="en">(superelevation transition)</span>이라 합니다. 보통 도로 중심선을 축으로 노면을 돌립니다. 먼저 바깥쪽 절반을 −2 %에서 0 %로 올리고(접선 접속, tangent runout), 계속 올려 +2 %로 노면을 한 평면으로 만든 뒤, 두 쪽을 함께 돌려 최대 편경사에 이릅니다(편경사 접속, runoff).</p>
+    <figure class="diagram" id="fig-al-super">
+      <svg viewBox="0 0 860 310" role="img" aria-label="편경사 접속의 네 단계 횡단면과 도로 가장자리 높이 변화">
+        <rect x="6" y="6" width="848" height="298" rx="10" class="f-surface"/>
+        <g class="t-mono" style="fill:var(--text)">
+          <text x="110" y="30" text-anchor="middle">① 직선: 지붕형 −2 % / −2 %</text>
+          <text x="320" y="30" text-anchor="middle">② 바깥쪽 0 %</text>
+          <text x="530" y="30" text-anchor="middle">③ 한 평면 +2 % / −2 %</text>
+          <text x="740" y="30" text-anchor="middle">④ 최대 편경사 6 %</text>
+        </g>
+        <!-- sections: half width 70 px; slope exaggerated x5 -->
+        <g style="stroke-width:3.5;fill:none">
+          <path d="M40 74L110 67L180 74" style="stroke:var(--text)"/>
+          <path d="M250 74L320 67L390 67" style="stroke:var(--text)"/>
+          <path d="M460 74L530 67L600 60" style="stroke:var(--text)"/>
+          <path d="M670 88L740 67L810 46" style="stroke:var(--accent)"/>
+        </g>
+        <g style="stroke:var(--text-faint);stroke-dasharray:2 3"><line x1="110" y1="50" x2="110" y2="96"/><line x1="320" y1="50" x2="320" y2="96"/><line x1="530" y1="50" x2="530" y2="96"/><line x1="740" y1="50" x2="740" y2="96"/></g>
+        <g class="t-mono"><text x="40" y="100">안쪽</text><text x="180" y="100" text-anchor="end">바깥쪽</text><text x="670" y="108">안쪽 −6 %</text><text x="810" y="40" text-anchor="end">바깥쪽 +6 %</text></g>
+        <!-- edge profile -->
+        <g transform="translate(60,140)">
+          <line x1="0" y1="80" x2="760" y2="80" style="stroke:var(--text);stroke-width:1.5"/>
+          <text x="764" y="84" class="t-mono">중심선(회전축)</text>
+          <path d="M0 101L120 101L180 80L240 59L400 17L760 17" style="stroke:var(--accent-2);stroke-width:2.4;fill:none"/>
+          <path d="M0 101L240 101L400 143L760 143" style="stroke:var(--blue);stroke-width:2.4;fill:none"/>
+          <text x="560" y="12" class="t-mono" style="fill:var(--accent-2)">바깥쪽 가장자리 +e·w</text>
+          <text x="560" y="160" class="t-mono" style="fill:var(--blue)">안쪽 가장자리 −e·w</text>
+          <g style="stroke:var(--text-faint);stroke-dasharray:3 3"><line x1="120" y1="0" x2="120" y2="150"/><line x1="180" y1="0" x2="180" y2="150"/><line x1="240" y1="0" x2="240" y2="150"/><line x1="400" y1="0" x2="400" y2="150"/></g>
+          <line x1="120" y1="-4" x2="180" y2="-4" style="stroke:var(--text-dim)" marker-start="url(#al-ah-dim)" marker-end="url(#al-ah-dim)"/>
+          <text x="150" y="-10" text-anchor="middle" class="t-mono">L<tspan font-size="9" dy="3">t</tspan></text>
+          <line x1="180" y1="-4" x2="400" y2="-4" style="stroke:var(--accent)" marker-start="url(#al-ah-acc)" marker-end="url(#al-ah-acc)"/>
+          <text x="290" y="-10" text-anchor="middle" class="t-mono" style="fill:var(--accent)">L<tspan font-size="9" dy="3">r</tspan><tspan dy="-3"> (편경사 접속 길이, 보통 완화 곡선 안)</tspan></text>
+          <g class="t-mono"><text x="120" y="164" text-anchor="middle">①</text><text x="180" y="164" text-anchor="middle">②</text><text x="240" y="164" text-anchor="middle">③</text><text x="400" y="164" text-anchor="middle">④ SC</text></g>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-5.</b> 중심선 축 회전에 의한 편경사 접속(경사는 과장). 위: 네 단계의 횡단면. 아래: 도로 가장자리 높이(중심선 기준). 바깥쪽 가장자리가 중심선에 대해 오르는 기울기를 편경사 접속률이라 하며, 이 기울기가 너무 크면 차가 비틀리고 보기에도 꺾여 보인다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 11.5 (편경사 접속 길이)</strong> 회전축에서 가장자리까지의 폭 w(m), 편경사 변화량 Δe, 허용 <span class="term">편경사 접속률</span><span class="en">(relative gradient)</span> 1/n이면
+      <div class="formula">$$L_r = w\,\Delta e\; n, \qquad L_t = w\,e_{NC}\; n$$<div class="where">\(L_r\)은 0 %에서 최대 편경사 e까지(Δe = e), \(L_t\)는 −\(e_{NC}\)(보통 2 %)에서 0 %까지의 길이. 2차로를 중심선으로 돌리면 w는 차로 하나의 폭이다. 접속률은 설계 속도가 높을수록 작게(완만하게) 둔다. 이 책은 60 km/h에서 1/125를 쓴다(교육용 형태, 현행 규칙의 편경사 접속 설치율 확인). 완화 곡선이 있으면 편경사 접속을 완화 곡선 구간에서 끝내는 것이 보통이다.</div></div></div>
+    <div class="callout"><strong>예제 11.4 (R-60의 편경사 접속)</strong> 차로 폭 3.5 m, 중심선 회전, e = 6 %, \(e_{NC}\) = 2 %, 접속률 1/125.
+      <ol class="al-steps">
+        <li><b>편경사 접속.</b> \(L_r = 3.5 \times 0.06 \times 125 = 26.3\) m.</li>
+        <li><b>접선 접속.</b> \(L_t = 3.5 \times 0.02 \times 125 = 8.8\) m.</li>
+        <li><b>클로소이드 안에 넣기.</b> 완화 곡선 L = 50 m에서 0 → 6 %를 하면 실제 접속률은 \(3.5 \times 0.06/50 = 1/238\)로 허용 1/125보다 완만하다 → <b>만족</b>. 곡률이 0에서 1/R로 커지는 것과 편경사가 0에서 e로 커지는 것이 같은 길이에서 일어나므로 필요한 마찰 몫이 구간 내내 고르다.</li>
+        <li><b>가장자리 높이 차.</b> SC에서 바깥 가장자리는 중심선보다 3.5 × 0.06 = 0.21 m 높고, 안쪽은 0.21 m 낮다. 안쪽 가장자리 쪽으로 물이 모이므로 측구 위치를 확인한다(12장).</li>
+      </ol></div>
+    <div class="sim" id="sim-al-super">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>편경사 접속 다이어그램</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="al-cv-super" aria-label="측점에 따른 도로 가장자리 높이와 선택한 측점의 횡단면"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>최대 편경사 e <output id="al-e-e-out"></output></span><input type="range" id="al-e-e" min="2" max="10" step="0.5" value="6"></label>
+          <label class="ctrl"><span>차로 폭 w <output id="al-e-w-out"></output></span><input type="range" id="al-e-w" min="2.75" max="3.75" step="0.25" value="3.5"></label>
+          <label class="ctrl"><span>접속률 1/n <output id="al-e-n-out"></output></span><input type="range" id="al-e-n" min="50" max="250" step="5" value="125"></label>
+          <label class="ctrl"><span>보는 측점 <output id="al-e-s-out"></output></span><input type="range" id="al-e-s" min="0" max="1" step="0.005" value="0.6"></label>
+          <div class="ctrl"><span>회전축</span><div class="seg" id="al-e-axis"><button data-value="c" class="on">중심선</button><button data-value="i">안쪽 가장자리</button></div></div>
+          <div class="ctrl"><span>접속 방법</span><div class="seg" id="al-e-mode"><button data-value="min" class="on">최소 길이</button><button data-value="spiral">클로소이드 50 m 전체</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">L<sub>t</sub> (−2 → 0 %)</span><span class="v" id="al-e-o-lt">—</span></div>
+        <div class="stat"><span class="k">L<sub>r</sub> (0 → e)</span><span class="v" id="al-e-o-lr">—</span></div>
+        <div class="stat"><span class="k">실제 접속률</span><span class="v" id="al-e-o-rg">—</span></div>
+        <div class="stat"><span class="k">이 측점의 횡단 경사</span><span class="v" id="al-e-o-x">—</span></div>
+      </div>
+      <div class="al-msg" id="al-e-msg"></div>
+      <div class="sim-note">해볼 것: 회전축을 안쪽 가장자리로 바꾸면 바깥쪽이 두 배(2w) 올라가야 해 같은 접속률에서 길이가 두 배가 됩니다(배수·미관에 따라 고름) · 접속 방법을 "클로소이드 50 m 전체"로 두면 접속률이 1/238로 완만해집니다 · 보는 측점을 움직이면 아래쪽 횡단면이 그 자리의 노면을 보여 줍니다 · 모델: 원리 11.5, 선형 접속(교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="transition">
+    <h2>완화 곡선: 클로소이드</h2>
+    <div class="problem"><strong>직선에서 원으로 바로 들어가면 무엇이 문제인가</strong>
+      <p>직선의 곡률은 0, 반지름 200 m 원의 곡률은 1/200 m⁻¹입니다. 직선과 원이 바로 붙어 있으면 곡률이 한 점에서 뛰므로 운전자는 핸들을 순간적으로 꺾어야 하고, 횡가속도도 순간적으로 0에서 \(v^2/R\)로 뜁니다. 실제 운전자는 핸들을 일정한 속도로 돌리므로, 차는 저절로 곡률이 서서히 커지는 길을 그립니다. 그 길을 도로 자체에 넣으면 어떨까요?</p></div>
+    <p>일정한 속도로 달리며 핸들을 일정한 각속도로 돌리면 차가 그리는 길의 곡률은 달린 거리에 비례해 커집니다. 곡률이 길이에 비례하는 곡선이 <span class="term">클로소이드</span><span class="en">(clothoid, Euler spiral)</span>이고, 직선과 원곡선 사이에 넣는 이런 곡선을 <span class="term">완화 곡선</span><span class="en">(transition curve)</span>이라 합니다.</p>
+    <figure class="diagram" id="fig-al-clothoid">
+      <svg viewBox="0 0 860 340" role="img" aria-label="클로소이드 완화 곡선의 요소: 이정량, 접선각, 완화 곡선 시점과 종점">
+        <rect x="6" y="6" width="848" height="328" rx="10" class="f-surface"/>
+        <line x1="30" y1="250" x2="560" y2="250" style="stroke:var(--text);stroke-width:2"/>
+        <path d="M250 250C330 250 400 246 470 232" style="stroke:var(--accent-2);stroke-width:3.4;fill:none"/>
+        <path d="M470 232A260 260 0 0 1 640 140" style="stroke:var(--accent);stroke-width:3.4;fill:none"/>
+        <path d="M368 222A260 260 0 0 1 470 232" style="stroke:var(--accent);stroke-width:1.2;stroke-dasharray:4 4;fill:none;opacity:.7"/>
+        <line x1="368" y1="222" x2="368" y2="250" style="stroke:var(--warn);stroke-width:2"/>
+        <text x="374" y="270" class="t-mono" style="fill:var(--warn)">이정량 ΔR(p) = L²/24R</text>
+        <line x1="368" y1="250" x2="368" y2="20" style="stroke:var(--text-faint);stroke-dasharray:2 4"/>
+        <line x1="250" y1="286" x2="368" y2="286" style="stroke:var(--text-dim)" marker-start="url(#al-ah-dim)" marker-end="url(#al-ah-dim)"/>
+        <text x="309" y="304" text-anchor="middle" class="t-mono">k ≈ L/2</text>
+        <circle cx="250" cy="250" r="4.5" style="fill:var(--accent-2)"/><text x="250" y="236" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">TS</text>
+        <circle cx="470" cy="232" r="4.5" style="fill:var(--accent)"/><text x="482" y="252" class="t-mono" style="fill:var(--accent)">SC</text>
+        <line x1="470" y1="232" x2="590" y2="208" style="stroke:var(--text-dim);stroke-dasharray:5 4"/>
+        <text x="596" y="206" class="t-mono">SC의 접선</text>
+        <text x="520" y="244" class="t-mono" style="fill:var(--warn)">τ = L/2R</text>
+        <text x="330" y="236" class="t-mono" style="fill:var(--accent-2)">클로소이드 L</text>
+        <text x="610" y="130" class="t-mono" style="fill:var(--accent)">원곡선 R</text>
+        <text x="40" y="240" class="t-dim">직선(곡률 0)</text>
+        <!-- curvature mini plot -->
+        <g transform="translate(600,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">곡률 κ = 1/r</text>
+          <line x1="0" y1="80" x2="230" y2="80" style="stroke:var(--axis)"/><line x1="0" y1="80" x2="0" y2="14" style="stroke:var(--axis)"/>
+          <path d="M0 80H50L120 30H230" style="stroke:var(--accent);stroke-width:2.4;fill:none"/>
+          <path d="M0 80H120V30" style="stroke:var(--bad);stroke-width:1.4;stroke-dasharray:4 3;fill:none"/>
+          <text x="124" y="24" class="t-mono">1/R</text>
+          <text x="60" y="98" class="t-mono">TS → SC</text><text x="164" y="98" class="t-mono">거리 s</text>
+          <text x="130" y="62" class="t-mono" style="fill:var(--bad)">완화 없음: 계단</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-6.</b> 클로소이드 완화 곡선(곡률 과장). 원곡선은 완화 곡선을 넣을 자리만큼 안쪽으로 ΔR 옮겨진다(이정). 완화 곡선 시점 TS에서 곡률 0, 종점 SC에서 1/R이며, 그 사이 곡률은 길이에 정비례한다. 오른쪽 위: 완화 곡선이 없으면 곡률이 계단처럼 뛴다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 11.6 (클로소이드)</strong> 시점에서 곡선을 따라 잰 길이 l인 점의 곡률 반지름을 r이라 할 때
+      <div class="formula">$$r\,l = A^2 \;(\text{일정}), \qquad \kappa(l) = \frac{1}{r} = \frac{l}{A^2}$$<div class="where">A는 <span class="term">클로소이드 파라미터</span><span class="en">(clothoid parameter)</span>로 길이 단위다. 길이 L의 완화 곡선이 반지름 R의 원에 이어지면 \(A^2 = RL\). 끝의 접선각 \(\tau = L/(2R)\)(라디안), 좌표는 급수 \(x = l - l^5/(40A^4) + \cdots\), \(y = l^3/(6A^2) - l^7/(336A^6) + \cdots\), 원의 이정량 \(\Delta R \approx L^2/(24R)\), 시점에서 원 중심까지의 접선 방향 거리 \(k \approx L/2 - L^3/(240R^2)\). 모든 클로소이드는 A배 확대한 하나의 모양이다(닮은꼴).</div></div></div>
+    <p>완화 곡선의 길이는 몇 가지 조건 중 큰 값으로 정합니다. (1) 횡가속도 \(v^2/r\)가 시간에 따라 너무 빨리 변하지 않을 것: 일정 속도에서 변화율은 \(C = v^3/(RL)\)(m/s³)이며 0.3–0.9 m/s³ 정도를 허용한다(교육용 범위). (2) 편경사 접속을 그 안에서 끝낼 수 있을 것. (3) 운전자가 곡선을 알아볼 수 있도록 접선각 τ가 너무 작지 않을 것: 경험적으로 \(R/3 \le A \le R\)이 보기 좋다고 한다(형태).</p>
+    <div class="callout"><strong>예제 11.5 (R-60의 클로소이드, L = 50 m)</strong> R = 200 m, Δ = 30°, IP 0+350.00, V = 60 km/h(v = 16.67 m/s).
+      <ol class="al-steps">
+        <li><b>파라미터.</b> \(A = \sqrt{200 \times 50} = 100\) m. R/3 = 67 ≤ 100 ≤ 200 → 범위 안.</li>
+        <li><b>접선각과 이정.</b> \(\tau = 50/400 = 0.125\) rad = 7.16°, \(\Delta R = 50^2/(24 \times 200) = 0.52\) m, k = 24.99 m.</li>
+        <li><b>횡가속도 변화율.</b> \(C = 16.67^3/(200 \times 50) = 0.46\) m/s³ → 허용 범위 안. C = 0.6 m/s³로 정한다면 최소 길이는 \(16.67^3/(0.6 \times 200) = 38.6\) m.</li>
+        <li><b>총 접선 길이.</b> \(T_s = (R + \Delta R)\tan(\Delta/2) + k = 200.52 \times 0.26795 + 24.99 = 78.72\) m.</li>
+        <li><b>남은 원곡선.</b> 중심각 \(30^\circ - 2 \times 7.16^\circ = 15.68^\circ\), 길이 \(200 \times 0.2736 = 54.72\) m.</li>
+        <li><b>측점.</b> TS = 0+271.28, SC = 0+321.28, CS = 0+376.00, ST = 0+426.00. 총 곡선 길이 154.72 m.</li>
+      </ol></div>
+    <div class="sim" id="sim-al-clothoid">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>클로소이드 완화 곡선: 평면과 곡률 그래프</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="al-cv-clo" aria-label="직선-클로소이드-원곡선-클로소이드-직선 평면도와 곡률 그래프"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>반지름 R <output id="al-k-r-out"></output></span><input type="range" id="al-k-r" min="80" max="600" step="5" value="200"></label>
+          <label class="ctrl"><span>완화 곡선 길이 L <output id="al-k-l-out"></output></span><input type="range" id="al-k-l" min="0" max="150" step="1" value="50"></label>
+          <label class="ctrl"><span>교각 Δ <output id="al-k-d-out"></output></span><input type="range" id="al-k-d" min="10" max="90" step="0.5" value="30"></label>
+          <label class="ctrl"><span>속도 V <output id="al-k-v-out"></output></span><input type="range" id="al-k-v" min="30" max="120" step="5" value="60"></label>
+          <div class="btn-row"><button class="btn" id="al-k-play">▶ 차 주행</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">A = √(RL)</span><span class="v" id="al-k-o-a">—</span></div>
+        <div class="stat"><span class="k">τ · ΔR</span><span class="v" id="al-k-o-t">—</span></div>
+        <div class="stat"><span class="k">횡가속도 변화율 C</span><span class="v" id="al-k-o-c">—</span></div>
+        <div class="stat"><span class="k">T<sub>s</sub> · 원곡선 길이</span><span class="v" id="al-k-o-ts">—</span></div>
+      </div>
+      <div class="al-msg" id="al-k-msg"></div>
+      <div class="sim-note">해볼 것: L을 0으로 두면 곡률 그래프가 계단이 되고 C가 무한대가 됩니다 · L을 키우면 원곡선 부분이 줄다가, 2τ가 Δ를 넘으면 원곡선이 사라집니다(완화 곡선끼리 바로 만나는 형태, 경고) · "차 주행"은 차가 지나는 동안 횡가속도 v²/r를 그래프 아래에 그립니다 · 모델: 정의 11.6, CB.civ.clothoid, 좌표는 급수 3항(교육용 정밀도).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="widening">
+    <h2>곡선부 확폭</h2>
+    <p>긴 트럭이 곡선을 돌면 뒷바퀴는 앞바퀴보다 안쪽을 지나갑니다(내륜차, off-tracking). 차로 폭이 직선과 같으면 뒷바퀴가 차로 밖으로 나가거나 운전자가 바깥쪽으로 붙어 달려야 하므로, 작은 반지름의 곡선에서는 차로를 넓힙니다. 이를 <span class="term">곡선부 확폭</span><span class="en">(curve widening)</span>이라 합니다.</p>
+    <figure class="diagram" id="fig-al-widen">
+      <svg viewBox="0 0 860 270" role="img" aria-label="곡선을 도는 세미트레일러의 앞바퀴와 뒷바퀴 궤적 차이">
+        <rect x="6" y="6" width="848" height="258" rx="10" class="f-surface"/>
+        <path d="M60 250A520 520 0 0 1 560 40" style="stroke:var(--text-dim);stroke-width:1.4;fill:none"/>
+        <path d="M110 250A470 470 0 0 1 560 90" style="stroke:var(--text-dim);stroke-width:1.4;fill:none;stroke-dasharray:10 8"/>
+        <path d="M160 250A420 420 0 0 1 560 140" style="stroke:var(--text-dim);stroke-width:1.4;fill:none"/>
+        <path d="M150 250A430 430 0 0 1 560 130" style="stroke:var(--accent-2);stroke-width:2;fill:none"/>
+        <path d="M170 250A410 410 0 0 1 560 150" style="stroke:var(--blue);stroke-width:2;fill:none;stroke-dasharray:6 3"/>
+        <g transform="translate(372,166) rotate(-27)">
+          <rect x="-8" y="-12" width="34" height="24" rx="3" style="fill:var(--accent-2)"/>
+          <rect x="-104" y="-13" width="92" height="26" rx="2" style="fill:var(--accent-2);opacity:.55"/>
+        </g>
+        <text x="600" y="128" class="t-mono" style="fill:var(--accent-2)">앞바퀴 궤적 (반지름 R)</text>
+        <text x="600" y="152" class="t-mono" style="fill:var(--blue)">뒷바퀴 궤적 √(R² − ΣLᵢ²)</text>
+        <text x="600" y="186" class="t-mono">내륜차 ≈ ΣLᵢ² / (2R)</text>
+        <text x="600" y="212" class="t-dim">L₁: 트랙터 축간 거리</text>
+        <text x="600" y="232" class="t-dim">L₂: 킹핀 → 트레일러 뒤축</text>
+      </svg>
+      <figcaption><b>그림 11-7.</b> 곡선을 도는 세미트레일러(축척 과장). 뒷바퀴는 앞바퀴보다 안쪽 반지름을 지나며, 그 차이(내륜차)는 각 연결부 길이의 제곱 합에 비례하고 반지름에 반비례한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 11.7 (내륜차와 확폭)</strong> 앞바퀴가 반지름 R을 돌 때 길이 \(L_i\)인 연결부들을 거친 뒷바퀴의 반지름은 \(\sqrt{R^2 - \sum L_i^2}\)이므로 차로 하나의 확폭은 대략
+      <div class="formula">$$w_{off} = R - \sqrt{R^2 - \textstyle\sum L_i^2} \approx \frac{\sum L_i^2}{2R}$$<div class="where">기준 차량(대형 트럭·세미트레일러)의 치수, 앞 오버행이 바깥쪽으로 쓸고 가는 폭, 운전 여유를 더해 정한다. 규칙은 설계 기준 자동차와 반지름 구간별 확폭량 표를 두고, 확폭은 곡선 안쪽에 두며 완화 구간에서 서서히 붙인다(현행 규칙 확인).</div></div></div>
+    <div class="callout"><strong>예제 11.6 (R = 200 m의 내륜차)</strong> 교육용 세미트레일러 L₁ = 4.0 m, L₂ = 9.0 m. \(\sum L_i^2 = 16 + 81 = 97\) m², 내륜차 \(97/(2 \times 200) = 0.24\) m(정확식 0.243 m). 2차로면 약 0.5 m. 같은 차가 R = 50 m 교차로 모퉁이를 돌면 0.98 m — 그래서 확폭은 큰 반지름의 본선보다 램프·교차로·산지 도로에서 중요하다. R-60의 본선(R 200 m)에서는 작은 값이므로 이 책은 확폭 없이 차로 3.5 m를 유지하는 것으로 가정한다(규칙 표 확인).</div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="grades">
+    <h2>종단 경사와 오르막 차로</h2>
+    <div class="problem"><strong>4 % 오르막 640 m, 트럭은 따라올 수 있나</strong>
+      <p>승용차는 4 % 오르막에서도 속도를 거의 잃지 않습니다. 무게에 비해 출력이 작은 트럭은 다릅니다. 오르막이 길면 트럭은 점점 느려지고, 2차로 도로에서는 그 뒤에 차들이 줄을 섭니다. 뒤차가 앞지르기를 하려고 반대 차로로 나가는 것은 2차로 도로의 가장 위험한 순간입니다. 언제 오르막 차로를 더해야 할까요?</p></div>
+    <p><span class="term">종단 경사</span><span class="en">(grade)</span>는 진행 방향으로 100 m 갈 때 오르는 높이(%)입니다(오르막 +). 경사가 급하면 깎기·쌓기가 줄어 건설비가 싸지지만, 트럭이 느려지고 내리막에서는 제동이 길어집니다. 그래서 규칙은 설계 속도와 지형별로 최대 종단 경사를 정하고(속도가 낮고 산지일수록 크게 허용, 현행 규칙 확인), 배수를 위해 최소 경사(보통 0.3–0.5 % 형태)도 둡니다. 경사가 허용 범위 안이어도 길이가 길면 트럭이 크게 느려지므로, 속도 저하가 기준을 넘는 길이(<span class="term">임계 경사 길이</span><span class="en">(critical length of grade)</span>)보다 오르막이 길면 <span class="term">오르막 차로</span><span class="en">(climbing lane)</span>를 검토합니다.</p>
+    <div class="callout def"><strong>원리 11.8 (트럭의 등판 — 교육용 운동 방정식)</strong> 질량 m, 유효 출력 ηP의 트럭이 경사 G를 오를 때
+      <div class="formula">$$m\,v\frac{dv}{dx} = \frac{\eta P}{v} - m g\,(G + C_r) - \tfrac12 \rho C_d A\, v^2$$<div class="where">구름 저항 \(C_r\) ≈ 0.01, 공기 저항 \(\tfrac12\rho C_dA\)(트럭 약 3.9 kN/(m/s)² 형태). 우변이 0이 되는 속도가 그 경사의 <b>정상(crawl) 속도</b>다. 트럭 성능은 무게–출력비(kg/kW)로 나타내며 대표 트럭은 120 kg/kW 안팎으로 본다(AASHTO 형태). 이 책은 진입 속도보다 15 km/h 이상 느려지는 지점까지의 거리를 임계 경사 길이로 쓴다(교육용 기준, 현행 규칙·지침의 오르막 차로 설치 기준 확인).</div></div></div>
+    <div class="callout"><strong>예제 11.7 (R-60 오르막 +4 %, 640 m)</strong> 진입 60 km/h, η = 0.85, 30 t 트럭(교육용).
+      <ol class="al-steps">
+        <li><b>정상 속도.</b> 120 kg/kW이면 질량당 출력 \(0.85 \times 1000/120 = 7.1\) W/kg. 공기 저항을 빼고 근사하면 \(v = 7.1/(9.81 \times 0.05) = 14.4\) m/s = 52 km/h, 공기 저항을 넣고 풀면 <b>49.5 km/h</b>.</li>
+        <li><b>640 m 끝의 속도.</b> 관성 때문에 정상 속도까지 바로 떨어지지 않는다. 운동 방정식을 1 m씩 적분하면 640 m 끝에서 약 52 km/h, 속도 저하 8 km/h &lt; 15 km/h → <b>오르막 차로 불필요</b>.</li>
+        <li><b>더 무거운 트럭(150 kg/kW).</b> 정상 속도 40 km/h, 약 510 m에서 15 km/h 저하 → 640 m 오르막은 임계 길이를 넘는다. 무거운 트럭 비율이 높다면 오르막 차로를 검토할 대상이다.</li>
+        <li><b>판정.</b> 결과는 트럭 성능 가정에 민감하다. 실제 설계는 규칙·지침의 성능 곡선과 교통량(10장) 조건을 함께 본다.</li>
+      </ol></div>
+    <div class="sim" id="sim-al-grade">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>오르막에서 트럭 속도와 임계 경사 길이</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="al-cv-grade" aria-label="거리에 따른 트럭 속도 곡선과 15 km/h 저하선, 경사 구간"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>종단 경사 G <output id="al-g-g-out"></output></span><input type="range" id="al-g-g" min="0" max="10" step="0.5" value="4"></label>
+          <label class="ctrl"><span>경사 길이 <output id="al-g-l-out"></output></span><input type="range" id="al-g-l" min="100" max="2000" step="20" value="640"></label>
+          <label class="ctrl"><span>진입 속도 <output id="al-g-v-out"></output></span><input type="range" id="al-g-v" min="40" max="100" step="5" value="60"></label>
+          <label class="ctrl"><span>무게–출력비 <output id="al-g-w-out"></output></span><input type="range" id="al-g-w" min="80" max="200" step="5" value="120"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">정상(crawl) 속도</span><span class="v" id="al-g-o-cr">—</span></div>
+        <div class="stat"><span class="k">경사 끝 속도</span><span class="v" id="al-g-o-end">—</span></div>
+        <div class="stat"><span class="k">15 km/h 저하 지점</span><span class="v" id="al-g-o-crit">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="al-g-o-v">—</span></div>
+      </div>
+      <div class="al-msg" id="al-g-msg"></div>
+      <div class="sim-note">해볼 것: R-60 기본값(4 %, 640 m, 120 kg/kW)에서 트럭은 약 52 km/h까지만 느려집니다 · 무게–출력비를 150으로 올리거나 경사를 6 %로 바꾸면 임계 길이가 경사 길이보다 짧아집니다 · 경사가 끝난 뒤 트럭이 다시 가속하는 데도 수백 m가 걸립니다(오르막 차로를 경사 끝 너머까지 연장하는 이유) · 모델: 원리 11.8, 교육용 트럭(30 t, η 0.85, CdA 6.5 m², Cr 0.01).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="vertical-curves">
+    <h2>종단 곡선: 마루와 골짜기를 포물선으로</h2>
+    <div class="problem"><strong>언덕 마루 너머의 상자</strong>
+      <p>+4 % 오르막이 −2 % 내리막으로 바뀌는 0+700에서 두 경사선이 꺾인 그대로 만나면, 마루 바로 앞의 운전자는 내리막에 놓인 장애물을 거의 보지 못합니다. 꺾인 곳을 둥글게 다듬어야 하는데, 얼마나 길게 다듬어야 85 m 앞의 15 cm 상자가 보일까요?</p></div>
+    <p>두 종단 경사가 만나는 점을 <span class="term">종단 교점</span><span class="en">(point of vertical intersection, PVI)</span>이라 하고, 그 사이를 잇는 곡선을 <span class="term">종단 곡선</span><span class="en">(vertical curve)</span>이라 합니다. 도로에서는 포물선을 씁니다. 포물선은 경사가 거리에 따라 일정하게 변하므로(곡률이 거의 일정) 주행감이 고르고, 표고를 손으로 계산하기 쉽습니다. 위로 볼록한 마루의 곡선을 <span class="term">볼록 종단 곡선</span><span class="en">(crest vertical curve)</span>, 골짜기의 곡선을 <span class="term">오목 종단 곡선</span><span class="en">(sag vertical curve)</span>이라 합니다.</p>
+    <figure class="diagram" id="fig-al-vcurve">
+      <svg viewBox="0 0 860 300" role="img" aria-label="포물선 볼록 종단 곡선의 요소와 시거선">
+        <rect x="6" y="6" width="848" height="288" rx="10" class="f-surface"/>
+        <line x1="40" y1="250" x2="820" y2="250" style="stroke:var(--axis)"/>
+        <path d="M60 210L430 62L800 136" style="stroke:var(--text-dim);stroke-width:1.4;stroke-dasharray:6 4;fill:none"/>
+        <path d="M60 210L240 138Q430 62 620 98L800 136" style="stroke:var(--text);stroke-width:3;fill:none"/>
+        <circle cx="240" cy="138" r="4.5" style="fill:var(--accent)"/><text x="240" y="160" text-anchor="middle" class="t-mono" style="fill:var(--accent)">BVC</text>
+        <circle cx="620" cy="98" r="4.5" style="fill:var(--accent)"/><text x="624" y="122" class="t-mono" style="fill:var(--accent)">EVC</text>
+        <circle cx="430" cy="62" r="4.5" style="fill:var(--warn)"/><text x="430" y="48" text-anchor="middle" class="t-mono" style="fill:var(--warn)">PVI</text>
+        <line x1="430" y1="62" x2="430" y2="99" style="stroke:var(--accent-2);stroke-width:2"/><text x="438" y="86" class="t-mono" style="fill:var(--accent-2)">e = A L/800</text>
+        <circle cx="494" cy="96" r="4" style="fill:var(--blue)"/><text x="500" y="88" class="t-mono" style="fill:var(--blue)">최고점</text>
+        <line x1="240" y1="270" x2="620" y2="270" style="stroke:var(--text-dim)" marker-start="url(#al-ah-dim)" marker-end="url(#al-ah-dim)"/>
+        <text x="430" y="288" text-anchor="middle" class="t-mono">L (수평 거리, PVI 앞뒤 L/2씩)</text>
+        <text x="120" y="172" class="t-mono" style="fill:var(--text)">g₁ = +4 %</text>
+        <text x="700" y="112" class="t-mono" style="fill:var(--text)">g₂ = −2 %</text>
+        <circle cx="290" cy="112" r="3" style="fill:var(--accent-2)"/>
+        <line x1="290" y1="112" x2="570" y2="84" style="stroke:var(--warn);stroke-width:1.4;stroke-dasharray:5 4"/>
+        <rect x="566" y="82" width="8" height="8" style="fill:var(--warn)"/>
+        <text x="300" y="200" class="t-dim">z(x) = z<tspan font-size="9" dy="3">BVC</tspan><tspan dy="-3"> + g₁x + (g₂ − g₁)x²/(200L)</tspan></text>
+        <text x="300" y="222" class="t-dim">A = |g₂ − g₁| (%), K = L/A (m/%)</text>
+      </svg>
+      <figcaption><b>그림 11-8.</b> 포물선 볼록 종단 곡선(세로 과장). 경사 직선에서 곡선까지의 세로 거리는 시점에서 거리의 제곱에 비례하고, PVI에서 최대 \(e = AL/800\)(m)이다. 눈높이 1.0 m에서 0.15 m 물체를 잇는 시선(주황 점선)이 노면에 걸리지 않을 만큼 곡선이 길어야 한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 11.9 (포물선 종단 곡선)</strong> 시점 BVC에서의 수평 거리 x, 경사 \(g_1, g_2\)(%), 길이 L일 때
+      <div class="formula">$$z(x) = z_{BVC} + \frac{g_1}{100}x + \frac{g_2 - g_1}{200\,L}x^2, \qquad x_{turn} = \frac{-g_1 L}{g_2 - g_1}, \qquad K = \frac{L}{A}$$<div class="where">경사는 \(g(x) = g_1 + (g_2 - g_1)x/L\)로 거리에 정비례해 변한다. \(x_{turn}\)은 최고점(볼록) 또는 최저점(오목)으로 \(0 \le x_{turn} \le L\)일 때만 곡선 안에 있다. K(경사가 1 % 변하는 데 필요한 길이)는 곡선의 "둥글기"를 나타내며 기준은 K로 최소 길이를 정리하기도 한다.</div></div></div>
+    <div class="callout def"><strong>원리 11.10 (종단 곡선의 최소 길이)</strong> 시거 S, 경사 차 A(%), 눈높이 \(h_1\), 물체 높이 \(h_2\)일 때 볼록 곡선은
+      <div class="formula">$$L = \frac{A\,S^2}{200(\sqrt{h_1} + \sqrt{h_2})^2}\;(S \lt L), \qquad L = 2S - \frac{200(\sqrt{h_1} + \sqrt{h_2})^2}{A}\;(S \ge L)$$<div class="where">포물선의 두 점에서 그은 접선이 만나는 기하에서 나온다. \(h_1\) = 1.0 m, \(h_2\) = 0.15 m이면 분모는 \(200(1 + 0.387)^2 = 384.8\). 오목 곡선은 낮에는 시야가 열려 있으므로 밤의 전조등 빛이 닿는 거리(전조등 높이 0.6 m, 위로 1° 퍼짐 형태)로 \(L = AS^2/(120 + 3.5S)\)(S &lt; L), 승차감(연직 가속도)으로 \(L = AV^2/395\)를 확인한다(AASHTO 형태, 현행 규칙 확인).</div></div></div>
+    <div class="callout"><strong>예제 11.8 (R-60의 볼록 종단 곡선)</strong> g₁ = +4 %, g₂ = −2 %, A = 6, S = 85 m, PVI 0+700.00, 표고 50.00 m.
+      <ol class="al-steps">
+        <li><b>최소 길이(S &lt; L 가정).</b> \(L = 6 \times 85^2/384.8 = 112.6\) m ≥ 85 → 가정 맞음. <b>L = 120 m</b>(K = 20)를 쓴다.</li>
+        <li><b>시점·종점.</b> BVC 0+640.00, 표고 \(50.00 - 0.04 \times 60 = 47.60\) m. EVC 0+760.00, 표고 \(50.00 - 0.02 \times 60 = 48.80\) m.</li>
+        <li><b>PVI 아래의 곡선 표고.</b> \(e = 6 \times 120/800 = 0.90\) m → 49.10 m.</li>
+        <li><b>최고점.</b> \(x_{turn} = 4 \times 120/6 = 80\) m → 0+720.00, 표고 \(47.60 + 0.04 \times 80 - 0.00025 \times 80^2 = 49.20\) m. 여기가 측구의 물이 양쪽으로 갈라지는 곳이므로 최고점 부근의 종단 경사가 작아 배수가 느린 구간을 확인한다(12장).</li>
+        <li><b>오목 곡선 연습.</b> −2 % → +3 %(A = 5), S = 85 m: 전조등 \(L = 5 \times 7{,}225/(120 + 297.5) = 86.5\) m(≥ S, 맞음), 승차감 \(5 \times 3{,}600/395 = 45.6\) m → 전조등 조건이 지배, 약 90 m 이상.</li>
+      </ol></div>
+    <div class="sim" id="sim-al-vcurve">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>종단 곡선 설계: 표고, 시거선, 최소 길이</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="al-cv-vc" aria-label="종단 곡선 표고와 운전자의 시거선, 끌 수 있는 차량 위치"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>g₁ <output id="al-v-g1-out"></output></span><input type="range" id="al-v-g1" min="-6" max="6" step="0.5" value="4"></label>
+          <label class="ctrl"><span>g₂ <output id="al-v-g2-out"></output></span><input type="range" id="al-v-g2" min="-6" max="6" step="0.5" value="-2"></label>
+          <label class="ctrl"><span>곡선 길이 L <output id="al-v-l-out"></output></span><input type="range" id="al-v-l" min="0" max="300" step="5" value="120"></label>
+          <label class="ctrl"><span>설계 속도 <output id="al-v-v-out"></output></span><input type="range" id="al-v-v" min="40" max="100" step="10" value="60"></label>
+          <label class="ctrl"><span>운전자 위치(BVC 기준) <output id="al-v-x-out"></output></span><input type="range" id="al-v-x" min="-200" max="200" step="1" value="-30"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">요구 시거 S</span><span class="v" id="al-v-o-s">—</span></div>
+        <div class="stat"><span class="k">최소 길이 L<sub>min</sub></span><span class="v" id="al-v-o-lmin">—</span></div>
+        <div class="stat"><span class="k">K · 최고/최저점</span><span class="v" id="al-v-o-k">—</span></div>
+        <div class="stat"><span class="k">이 위치의 가용 시거</span><span class="v" id="al-v-o-av">—</span></div>
+      </div>
+      <div class="al-msg" id="al-v-msg"></div>
+      <div class="sim-note">해볼 것: 그래프를 좌우로 끌어 운전자를 옮겨 보세요 — 마루 바로 앞(BVC 근처)에서 가용 시거가 가장 짧아집니다 · L을 60 m로 줄이면 가용 시거가 85 m 아래로 떨어지는 구간이 생깁니다 · g₁ &lt; g₂로 바꾸면 오목 곡선이 되고 최소 길이는 전조등 조건으로 계산됩니다(낮의 시선은 막히지 않음) · 모델: 정의 11.9, 원리 11.10, CB.civ.vcurve, CB.civ.crestL, CB.civ.ssd, 가용 시거는 노면 위 시선을 1 m 간격으로 검사(그림은 세로 과장).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="coordination">
+    <h2>평면·종단 선형의 조화와 운전자 시각</h2>
+    <div class="problem"><strong>따로따로 기준을 만족하면 충분한가</strong>
+      <p>평면 곡선은 R ≥ 135 m를, 종단 곡선은 L ≥ 113 m를 만족합니다. 그런데 운전자는 평면도와 종단도를 따로 보지 않습니다. 언덕 마루를 넘자마자 급한 굽이가 시작된다면, 둘 다 기준을 만족해도 운전자는 곡선을 마루 너머에서야 알아챕니다. 두 선형을 어떻게 겹쳐야 할까요?</p></div>
+    <p>도로는 3차원 곡선이므로 운전자가 보는 모습, 곧 투시도로 판단해야 합니다. 경험에서 나온 <span class="term">선형 조화</span><span class="en">(coordination of horizontal and vertical alignment)</span>의 원칙은 다음과 같습니다.</p>
+    <div class="callout def"><strong>원리 11.11 (평면·종단 선형 조화의 원칙, 형태)</strong>
+      <ol style="margin:6px 0 0">
+        <li><b>꼭짓점을 맞춘다.</b> 평면 곡선과 종단 곡선이 겹칠 때는 두 꼭짓점(IP, PVI)을 거의 같은 곳에 두고, 평면 곡선이 종단 곡선보다 조금 길게 감싸게 한다.</li>
+        <li><b>마루 너머에서 급한 굽이를 시작하지 않는다.</b> 볼록 곡선의 정점 근처에서 평면 곡선이 시작되면 운전자가 굽이를 늦게 알아챈다.</li>
+        <li><b>골짜기 바닥에 급한 굽이를 두지 않는다.</b> 내리막에서 속도가 붙은 상태로 급한 곡선을 만나게 된다.</li>
+        <li><b>숨은 골짜기(dip)를 피한다.</b> 긴 직선 위에 작은 오목·볼록이 반복되면 앞 차가 골짜기에 숨어 안 보인다.</li>
+        <li><b>같은 방향 곡선 사이의 짧은 직선(broken-back)을 피한다.</b> 하나의 큰 곡선으로 바꾼다.</li>
+        <li><b>균형.</b> 큰 반지름의 평면 곡선에는 긴 종단 곡선을 짝지어 선형의 "규모"를 맞춘다.</li>
+      </ol>
+    </div>
+    <figure class="diagram" id="fig-al-coord">
+      <svg viewBox="0 0 860 270" role="img" aria-label="운전자 시점의 나쁜 조합과 좋은 조합 투시도 스케치">
+        <rect x="6" y="6" width="848" height="258" rx="10" class="f-surface"/>
+        <g transform="translate(20,20)">
+          <rect x="0" y="0" width="260" height="200" rx="8" class="f-elev"/>
+          <line x1="0" y1="96" x2="260" y2="96" style="stroke:var(--text-faint)"/>
+          <path d="M40 200L122 104H138L220 200Z" style="fill:var(--text-dim);opacity:.35"/>
+          <path d="M122 104Q130 100 138 104" style="stroke:var(--text);fill:none"/>
+          <path d="M150 98Q190 94 236 104" style="stroke:var(--bad);stroke-width:2;fill:none;stroke-dasharray:4 3"/>
+          <text x="130" y="224" text-anchor="middle" class="t-mono" style="fill:var(--bad)">나쁨: 마루 너머 굽이가 숨음</text>
+        </g>
+        <g transform="translate(300,20)">
+          <rect x="0" y="0" width="260" height="200" rx="8" class="f-elev"/>
+          <line x1="0" y1="84" x2="260" y2="84" style="stroke:var(--text-faint)"/>
+          <path d="M40 200C100 160 150 120 190 98C205 90 215 88 228 88L232 90C220 92 210 96 196 104C160 126 130 160 120 200Z" style="fill:var(--accent);opacity:.3;stroke:var(--accent)"/>
+          <text x="130" y="224" text-anchor="middle" class="t-mono" style="fill:var(--ok)">좋음: 굽이와 마루가 겹쳐 함께 보임</text>
+        </g>
+        <g transform="translate(580,20)">
+          <rect x="0" y="0" width="260" height="200" rx="8" class="f-elev"/>
+          <line x1="0" y1="70" x2="260" y2="70" style="stroke:var(--text-faint)"/>
+          <path d="M60 200L124 120H136L200 200Z" style="fill:var(--text-dim);opacity:.35"/>
+          <path d="M126 104L134 104L133 92L127 92Z" style="fill:var(--text-dim);opacity:.35"/>
+          <path d="M128 84L132 84L131.5 74L128.5 74Z" style="fill:var(--text-dim);opacity:.35"/>
+          <rect x="127" y="96" width="6" height="4" style="fill:var(--accent-2);opacity:.2"/>
+          <text x="130" y="224" text-anchor="middle" class="t-mono" style="fill:var(--bad)">나쁨: 직선 위 숨은 골짜기</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-9.</b> 운전자 시점 스케치(개념). 왼쪽: 마루 너머에서 시작하는 굽이는 길이 끊겨 보인다. 가운데: 평면 곡선이 종단 곡선을 감싸면 곡선이 미리 보인다. 오른쪽: 긴 직선 위의 작은 골짜기는 그 안의 차를 숨긴다. 아래 시뮬레이터에서 직접 달려 확인한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-al-drive">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>R-60 3D 주행: 운전자 시점과 조감</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="al-cv-drive" aria-label="R-60 도로를 운전자 시점 또는 조감으로 본 3차원 투시도"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>시점</span><div class="seg" id="al-d-view"><button data-value="driver" class="on">운전자</button><button data-value="bird">조감</button></div></div>
+          <div class="ctrl"><span>평면·종단 조합</span><div class="seg" id="al-d-combo"><button data-value="r60" class="on">R-60(분리)</button><button data-value="bad">마루 너머 굽이</button><button data-value="good">겹침(조화)</button></div></div>
+          <label class="ctrl"><span>차량 위치 <output id="al-d-s-out"></output></span><input type="range" id="al-d-s" min="0" max="960" step="1" value="200"></label>
+          <label class="ctrl"><span>주행 속도(재생) <output id="al-d-v-out"></output></span><input type="range" id="al-d-v" min="20" max="100" step="5" value="60"></label>
+          <label class="ctrl"><input type="checkbox" id="al-d-obj" checked> 85 m 앞에 0.15 m 물체 표시</label>
+          <div class="btn-row"><button class="btn" id="al-d-play">▶ 재생</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">측점</span><span class="v" id="al-d-o-sta">—</span></div>
+        <div class="stat"><span class="k">평면 곡률 반지름</span><span class="v" id="al-d-o-r">—</span></div>
+        <div class="stat"><span class="k">종단 경사</span><span class="v" id="al-d-o-g">—</span></div>
+        <div class="stat"><span class="k">종단 가용 시거</span><span class="v" id="al-d-o-sd">—</span></div>
+      </div>
+      <div class="al-msg" id="al-d-msg"></div>
+      <div class="sim-note">해볼 것: "마루 너머 굽이"를 고르고 0+180 부근에서 앞을 보세요 — 길이 마루에서 끊긴 것처럼 보이고, 굽이는 마루를 넘어서야 나타납니다 · "겹침(조화)"에서는 같은 자리에서 굽이와 마루가 한 번에 보입니다 · 조감에서는 화면을 좌우로 끌어 돌릴 수 있습니다 · 모델: 클로소이드–원–클로소이드 평면(예제 11.5), 포물선 종단(예제 11.8), 편경사 6 %, 차로 3.5 m × 2 + 길어깨 1.5 m, 눈높이 1.0 m, 페이지 내 투시 투영(교육용).</div>
+    </div>
+    <div class="callout tip"><strong>투시도로 검토하는 이유</strong> 평면도와 종단도는 각각 2차원 정보만 준다. 실제 설계에서는 3차원 도로 모델(BIM, 디지털 지형 위의 선형)을 만들고 운전자 눈높이에서 주행 영상을 돌려 시거, 선형의 끊김, 표지판 가림을 확인한다. 이 장의 3D 주행은 그 과정을 아주 단순하게 흉내 낸 것이다.</div>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="r60">
+    <h2>R-60 선형 설계 정리</h2>
+    <p>지금까지의 계산을 R-60 한 도로로 모으면 다음과 같습니다. 이 선형은 12장에서 횡단면과 토공량, 배수의 기준선이 되고, 13장 포장 설계의 대상 구간이 됩니다.</p>
+    <div class="callout site"><strong>R-60 지방부 2차로 도로의 선형(교육용)</strong> ① 설계 속도 60 km/h, 차로 3.5 m × 2, 최대 편경사 6 %, 횡방향 마찰 0.15 → <b>R<sub>min</sub> = 135 m</b>. ② 정지 시거(반응 2.5 s, f 0.33) <b>84.6 ≈ 85 m</b>, 내리막 5 %에서 92 m. ③ 평면 곡선: IP 0+350.00, Δ = 30°, R = 200 m(필요 마찰 0.082), 원곡선만이면 T = 53.59 m, L<sub>c</sub> = 104.72 m, E = 7.06 m. ④ 클로소이드 L = 50 m, <b>A = 100</b>, τ = 7.16°, ΔR = 0.52 m, T<sub>s</sub> = 78.72 m → TS 0+271.28, SC 0+321.28, CS 0+376.00, ST 0+426.00, 횡가속도 변화율 0.46 m/s³. ⑤ 편경사 접속: 최소 26.3 m(1/125) → 클로소이드 50 m 전체에서 접속(1/238). 곡선 안쪽 시야 여유 4.5 m. ⑥ 종단: 0+000(22.00 m)에서 +4 % → PVI 0+700(50.00 m) → −2 %, 볼록 곡선 필요 <b>112.6 m → 120 m</b>(K = 20), 최고점 0+720(49.20 m). 대표 트럭(120 kg/kW)은 640 m 오르막에서 약 52 km/h까지 느려져 오르막 차로는 필요 없다. ⑦ 평면 곡선(0+271–0+426)과 종단 곡선(0+640–0+760)은 떨어져 있어 서로 가리지 않는다. 모든 값은 교육용이며 실제 설계에는 현행 「도로의 구조·시설 기준에 관한 규칙」과 지침을 적용한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="traffic.html"><small>CH.10 · 도로 계획과 교통</small>도로 기능과 설계 속도<br><span>기능 분류, 설계 시간 교통량, 서비스 수준.</span></a>
+      <a href="earthwork.html"><small>CH.12 · 토공과 배수</small>선형이 정한 깎기·쌓기<br><span>횡단면 면적, 토적곡선, 측구와 암거.</span></a>
+      <a href="pavement.html"><small>CH.13 · 포장 설계</small>R-60의 포장<br><span>누적 ESAL, AASHTO 93 SN 3.47.</span></a>
+      <a href="railway.html"><small>CH.14 · 철도</small>캔트와 완화 곡선<br><span>편경사의 철도판: 평형 캔트 GV²/127R.</span></a>
+      <a href="bridges.html"><small>CH.01 · 교량의 이해</small>교량 위의 선형<br><span>곡선교, 종단 곡선 위의 거더 캠버.</span></a>
+      <a href="../../geotech/chapters/slope.html"><small>GeotechBook · CH.12</small>깎기·쌓기 비탈<br><span>선형이 정한 비탈 높이의 안정 검토.</span></a>
+      <a href="../../mechanics/chapters/equilibrium.html"><small>MechanicsBook</small>원운동과 마찰<br><span>구심력과 힘의 평형.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>설계 속도가 선형 요소의 공통 화폐다: 시거·R<sub>min</sub>·편경사·완화 곡선·종단 곡선이 모두 설계 속도에서 나온다. 좋은 선형은 운영 속도 V<sub>85</sub>가 설계 속도와 비슷하고 구간 사이에 고르다.</li>
+      <li>정지 시거 D = Vt/3.6 + V²/254(f ± G). R-60: 41.7 + 42.9 = 84.6 ≈ 85 m. 내리막은 길어진다(−5 %에서 92 m).</li>
+      <li>곡선 주행 평형 e + f = V²/127R(ef 무시). R<sub>min</sub> = V²/127(e<sub>max</sub> + f<sub>max</sub>) = 135 m(60 km/h, 6 %, 0.15). f<sub>max</sub>는 미끄럼 한계가 아니라 편안함의 한계다.</li>
+      <li>원곡선: T = R tan(Δ/2), L<sub>c</sub> = RΔ, E = R(sec(Δ/2) − 1), M = R(1 − cos(Δ/2)). R 200 m, Δ 30° → T 53.59 m, L<sub>c</sub> 104.72 m. 편각 δ = l/2R.</li>
+      <li>편경사 접속 L<sub>r</sub> = w·e·n(접속률 1/n), 보통 완화 곡선 안에서 끝낸다. R-60: 최소 26.3 m, 클로소이드 50 m에서 1/238.</li>
+      <li>클로소이드는 곡률이 길이에 비례(rl = A²). A² = RL, τ = L/2R, ΔR ≈ L²/24R, 횡가속도 변화율 v³/RL. R-60: A = 100, ΔR = 0.52 m, T<sub>s</sub> = 78.72 m.</li>
+      <li>종단 경사는 트럭 속도로 판단한다: 정상 속도와 임계 경사 길이(15 km/h 저하 형태)를 넘으면 오르막 차로. 종단 곡선은 포물선, e = AL/800, K = L/A. 볼록 곡선 최소 길이 AS²/384.8(S &lt; L) → R-60 112.6 m → 120 m.</li>
+      <li>평면과 종단은 함께 본다: 꼭짓점을 맞추고 평면 곡선이 종단 곡선을 감싸게, 마루 너머·골짜기 바닥의 급한 굽이와 숨은 골짜기를 피한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 설계 속도 80 km/h, 반응 시간 2.5 s, f = 0.30, 평지일 때 정지 시거에 가장 가까운 값은?</p><div class="opts">
+        <button class="opt">84 m</button><button class="opt">111 m</button><button class="opt" data-correct>140 m</button><button class="opt">184 m</button>
+      </div><div class="quiz-exp">공주 80 × 2.5/3.6 = 55.6 m, 제동 6,400/(254 × 0.30) = 84.0 m, 합 139.6 ≈ 140 m. 속도가 60 → 80 km/h로 33 % 늘었는데 시거는 65 % 늘었다(제동 거리가 V²).</div></div>
+      <div class="quiz-q"><p>2. V = 60 km/h, R = 150 m, e = 6 %일 때 필요한 횡방향 마찰 계수는?</p><div class="opts">
+        <button class="opt">0.06</button><button class="opt" data-correct>0.13</button><button class="opt">0.19</button><button class="opt">0.25</button>
+      </div><div class="quiz-exp">V²/127R = 3,600/19,050 = 0.189, f = 0.189 − 0.06 = 0.129. 허용 0.15 안이다.</div></div>
+      <div class="quiz-q"><p>3. R = 300 m, Δ = 40°인 원곡선의 접선 길이와 곡선 길이는?</p><div class="opts">
+        <button class="opt">T = 102.6 m, L<sub>c</sub> = 120.0 m</button><button class="opt" data-correct>T = 109.2 m, L<sub>c</sub> = 209.4 m</button><button class="opt">T = 150.0 m, L<sub>c</sub> = 209.4 m</button><button class="opt">T = 109.2 m, L<sub>c</sub> = 218.4 m</button>
+      </div><div class="quiz-exp">T = 300 tan 20° = 300 × 0.3640 = 109.2 m. L<sub>c</sub> = 300 × 40π/180 = 209.4 m. 2T = 218.4 m는 곡선 길이보다 길다.</div></div>
+      <div class="quiz-q"><p>4. 반지름 400 m 원곡선에 길이 100 m의 클로소이드를 붙였다. 파라미터 A와 이정량 ΔR은?</p><div class="opts">
+        <button class="opt">A = 100 m, ΔR = 0.25 m</button><button class="opt" data-correct>A = 200 m, ΔR = 1.04 m</button><button class="opt">A = 200 m, ΔR = 4.17 m</button><button class="opt">A = 40,000 m, ΔR = 1.04 m</button>
+      </div><div class="quiz-exp">A = √(400 × 100) = 200 m(길이 단위, A² = 40,000 m²). ΔR ≈ L²/24R = 10,000/9,600 = 1.04 m.</div></div>
+      <div class="quiz-q"><p>5. 클로소이드를 완화 곡선으로 쓰는 가장 근본적인 이유는?</p><div class="opts">
+        <button class="opt">곡선 길이를 줄여 공사비를 아끼려고</button><button class="opt" data-correct>곡률(따라서 횡가속도와 핸들 각)이 거리에 비례해 고르게 변해서</button><button class="opt">원곡선보다 반지름이 커서</button><button class="opt">측량이 원곡선보다 쉬워서</button>
+      </div><div class="quiz-exp">일정 속도로 핸들을 일정하게 돌리는 차의 궤적이 클로소이드다. 곡률이 0에서 1/R로 선형으로 변하므로 횡가속도 v²/r도 고르게 커지고, 편경사 접속도 같은 구간에서 맞출 수 있다.</div></div>
+      <div class="quiz-q"><p>6. 차로 폭 3.5 m를 중심선으로 돌려 편경사 8 %를 만들고 접속률이 1/150이면 편경사 접속 길이(0 → 8 %)는?</p><div class="opts">
+        <button class="opt">28 m</button><button class="opt" data-correct>42 m</button><button class="opt">84 m</button><button class="opt">120 m</button>
+      </div><div class="quiz-exp">L<sub>r</sub> = w·e·n = 3.5 × 0.08 × 150 = 42 m. 안쪽 가장자리를 축으로 돌리면 폭 7 m가 올라가야 하므로 84 m가 된다.</div></div>
+      <div class="quiz-q"><p>7. +3 % → −3 % 볼록 종단 곡선에서 정지 시거 100 m(눈 1.0 m, 물체 0.15 m)를 확보하는 최소 길이는?</p><div class="opts">
+        <button class="opt">78 m</button><button class="opt">100 m</button><button class="opt" data-correct>156 m</button><button class="opt">200 m</button>
+      </div><div class="quiz-exp">A = 6, L = 6 × 100²/384.8 = 155.9 m ≥ S이므로 식의 가정(S &lt; L)이 맞다. K = 156/6 = 26.</div></div>
+      <div class="quiz-q"><p>8. 평면·종단 선형 조화의 원칙으로 옳지 않은 것은?</p><div class="opts">
+        <button class="opt">평면 곡선의 IP와 종단 곡선의 PVI를 가까이 둔다</button><button class="opt">볼록 곡선 정점 바로 너머에서 급한 평면 곡선을 시작하지 않는다</button><button class="opt" data-correct>긴 직선 위에 작은 오목·볼록 곡선을 여러 번 넣어 토공량을 줄이는 것이 좋다</button><button class="opt">평면 곡선이 종단 곡선을 조금 더 길게 감싸도록 한다</button>
+      </div><div class="quiz-exp">긴 직선 위에 작은 오목·볼록이 반복되면 숨은 골짜기가 생겨 앞 차나 장애물이 골짜기에 숨는다. 토공량이 조금 늘더라도 피해야 하는 조합이다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const AL = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${AL.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = AL._c || (AL._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  msg(id, html, cls) { const m = document.getElementById(id); if (!m) return; m.className = "al-msg" + (cls ? " " + cls : ""); m.innerHTML = html; },
+  sta(s) { if (!isFinite(s)) return "—"; const neg = s < 0; s = Math.abs(s); const km = Math.floor(s / 1000), m = s - km * 1000; return (neg ? "−" : "") + km + "+" + m.toFixed(2).padStart(6, "0"); },
+  dms(deg) { const s = Math.round(Math.abs(deg) * 3600), d = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60; return `${d}°${String(m).padStart(2, "0")}′${String(r).padStart(2, "0")}″`; },
+  /** 교육용 트럭 등판(원리 11.8): G 소수, len m, V0 km/h, wp kg/kW → { pts: [[x, V]], crit, end, crawl } */
+  truck(G, len, V0, wp, tail = 400) {
+    const eta = 0.85, Pm = (1000 / wp) * eta, kd = (0.5 * 1.2 * 6.5) / 30000, g = 9.81, Cr = 0.01;
+    const acc = (v, gr) => Pm / Math.max(v, 3) - g * (gr + Cr) - kd * v * v;
+    let lo = 0.5, hi = 60; for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (acc(m, G) > 0) lo = m; else hi = m; }
+    const crawl = Math.min(V0, lo * 3.6);
+    let v = V0 / 3.6, crit = null, end = V0; const pts = [];
+    for (let x = 0; x <= len + tail; x += 1) {
+      const gr = x <= len ? G : 0;
+      const a = Math.min(acc(v, gr), 0.8); v = Math.min(V0 / 3.6, Math.max(1, v + a / v));
+      if (crit === null && V0 - v * 3.6 >= 15) crit = x;
+      if (x === Math.round(len)) end = v * 3.6;
+      if (x % 4 === 0) pts.push([x, v * 3.6]);
+    }
+    return { pts, crit, end, crawl };
+  },
+  /** 오목 곡선 전조등 조건(AASHTO 형태) */
+  sagL(S, A) { if (A <= 0) return 0; const L1 = (A * S * S) / (120 + 3.5 * S); return L1 >= S ? L1 : Math.max(0, 2 * S - (120 + 3.5 * S) / A); },
+};
+
+/* ---------- 1. 정지 시거 ---------- */
+(function () {
+  const PRE = { design: 0.33, dry: 0.7, ice: 0.1 };
+  const gv = CB.range("al-s-v", (v) => v + " km/h", go), gt = CB.range("al-s-t", (v) => v.toFixed(1) + " s", go), gf = CB.range("al-s-f", (v) => v.toFixed(2), go), gg = CB.range("al-s-g", (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + " %", go);
+  CB.seg("al-s-pre", (v) => { gf.set(PRE[v], false); go(); });
+  let anim = 0, playing = false;
+  const geo = () => { const V = gv(), t = gt(), f = gf(), G = gg() / 100, r = (V * t) / 3.6, D = CB.civ.ssd(V, f, t, G); return { V, t, f, G, r, b: D - r, D }; };
+  const cv = CB.canvas("#al-cv-ssd", (ctx, W, H) => {
+    const P = CB.palette(), c = geo(), xmax = Math.max(c.D, 85, 60) * 1.12, x0 = 46, x1 = W - 20, X = (d) => x0 + ((x1 - x0) * d) / xmax;
+    // road
+    const ry = H * 0.2, rh = Math.min(46, H * 0.16);
+    ctx.fillStyle = AL.alpha(P.dim, 0.18); ctx.fillRect(x0, ry, x1 - x0, rh);
+    AL.line(ctx, [[x0, ry + rh / 2], [x1, ry + rh / 2]], P.faint, 2, [14, 10]);
+    // obstacle at D
+    ctx.fillStyle = P.warn; ctx.fillRect(X(c.D) - 2, ry + rh / 2 + 2, 10, 10);
+    AL.text(ctx, "장애물", X(c.D) + 3, ry - 10, P.warn, { size: 11 });
+    // car position (animation)
+    const v = c.V / 3.6, a = 9.81 * Math.max(0.05, c.f + c.G), tr = c.t;
+    let pos = 0, st = "";
+    if (playing || anim > 0) { const T = anim; if (T < tr) { pos = v * T; st = "반응 중"; } else { const tb = Math.min(T - tr, v / a); pos = v * tr + v * tb - 0.5 * a * tb * tb; st = tb >= v / a - 1e-6 ? "정지" : "제동 중"; } }
+    const cx = X(pos);
+    ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - 34, ry + rh / 2 + 3, 32, 15, 4) : ctx.rect(cx - 34, ry + rh / 2 + 3, 32, 15); ctx.fill();
+    if (st) AL.text(ctx, st + " " + CB.num(pos, 1) + " m", Math.min(cx, x1 - 70), ry + rh + 14, P.text, { size: 11 });
+    // bars
+    const by = H * 0.58, bh = Math.min(30, H * 0.11);
+    ctx.fillStyle = AL.alpha(P.accent2, 0.75); ctx.fillRect(X(0), by, X(c.r) - X(0), bh);
+    ctx.fillStyle = AL.alpha(P.accent, 0.75); ctx.fillRect(X(c.r), by, X(c.D) - X(c.r), bh);
+    AL.text(ctx, "공주 " + CB.num(c.r, 1), (X(0) + X(c.r)) / 2, by + bh / 2, P.text, { size: 11 });
+    AL.text(ctx, "제동 " + CB.num(c.b, 1), (X(c.r) + X(c.D)) / 2, by + bh / 2, P.text, { size: 11 });
+    // 85 m line
+    AL.line(ctx, [[X(85), by - 18], [X(85), by + bh + 18]], P.warn, 1.6, [5, 4]);
+    AL.text(ctx, "85 m (R-60)", X(85), by + bh + 30, P.warn, { size: 11 });
+    // axis
+    AL.line(ctx, [[x0, H - 18], [x1, H - 18]], P.axis, 1);
+    const step = xmax > 300 ? 50 : xmax > 120 ? 20 : 10;
+    for (let d = 0; d <= xmax; d += step) { AL.line(ctx, [[X(d), H - 22], [X(d), H - 14]], P.axis, 1); if (X(d) < x1 - 20) AL.text(ctx, String(d), X(d), H - 6, P.dim, { size: 10, bold: false }); }
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 240, maxHeight: 330 });
+  const loop = CB.loop(cv.canvas, (dt) => {
+    if (!playing) return; anim += dt; const c = geo(); const v = c.V / 3.6, a = 9.81 * Math.max(0.05, c.f + c.G);
+    if (anim > c.t + v / a + 1.2) { playing = false; btn.set(false); }
+    cv.redraw();
+  });
+  const btn = CB.playButton("al-s-play", () => { anim = 0; playing = true; loop.start(); }, () => { playing = false; });
+  function go() {
+    const c = geo();
+    anim = 0; cv.redraw();
+    CB.stat("al-s-o-r", CB.num(c.r, 1) + " m"); CB.stat("al-s-o-b", CB.num(c.b, 1) + " m"); CB.stat("al-s-o-d", "<b>" + CB.num(c.D, 1) + " m</b>");
+    CB.stat("al-s-o-c", (c.D <= 85 ? "" : "+") + CB.num(c.D - 85, 1) + " m");
+    const sh = (100 * c.b) / c.D;
+    if (c.f + c.G < 0.05) AL.msg("al-s-msg", "마찰 + 경사가 0.05 아래입니다 — 내리막이 너무 급하거나 노면이 너무 미끄러워 사실상 멈출 수 없습니다(모델은 0.05로 제한).", "bad");
+    else AL.msg("al-s-msg", `D = ${c.V}×${c.t.toFixed(1)}/3.6 + ${c.V}²/(254×(${c.f.toFixed(2)} ${c.G >= 0 ? "+" : "−"} ${Math.abs(c.G).toFixed(3)})) = ${CB.num(c.r, 1)} + ${CB.num(c.b, 1)} = <b>${CB.num(c.D, 1)} m</b>. 제동 거리가 ${CB.num(sh, 0)} %를 차지합니다.` + (c.D > 85 && c.V === 60 ? " 85 m보다 길어 R-60의 시거 설계값으로는 부족한 조건입니다." : ""), c.V === 60 && c.D > 85 ? "bad" : "");
+  }
+  go();
+})();
+
+/* ---------- 2. 곡선 주행 힘의 평형 ---------- */
+(function () {
+  const gv = CB.range("al-f-v", (v) => v + " km/h", go), gr = CB.range("al-f-r", (v) => v + " m", go), ge = CB.range("al-f-e", (v) => (v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + " %", go), gm = CB.range("al-f-fm", (v) => v.toFixed(2), go);
+  const calc = () => { const V = gv(), R = gr(), e = ge() / 100, fm = gm(), c = (V * V) / (127 * R); return { V, R, e, fm, c, f: c - e, rmin: CB.civ.rMin(V, Math.max(e, 0), fm), vl: Math.sqrt(127 * R * Math.max(0, e + fm)) }; };
+  const cv = CB.canvas("#al-cv-force", (ctx, W, Hh) => {
+    const H = Hh, P = CB.palette(), c = calc(), al = Math.atan(c.e * 3), cx = W * 0.45, cy = H * 0.55, sc = Math.min(W, H) * 0.26;
+    // road (exaggerated tilt): outer edge (right) higher when e>0
+    ctx.save(); ctx.translate(cx, cy + 40); ctx.rotate(-al);
+    ctx.fillStyle = AL.alpha(P.dim, 0.35); ctx.fillRect(-W * 0.36, 0, W * 0.72, 12);
+    ctx.fillStyle = AL.alpha(P.accent2, 0.85); ctx.fillRect(-52, -44, 104, 36); ctx.fillStyle = AL.alpha(P.accent2, 0.5); ctx.fillRect(-36, -64, 72, 22);
+    ctx.fillStyle = P.text; ctx.fillRect(-46, -10, 16, 10); ctx.fillRect(30, -10, 16, 10);
+    ctx.restore();
+    const ox = cx, oy = cy, ca = Math.cos(al), sa = Math.sin(al), cosA = 1 / Math.sqrt(1 + c.e * c.e), sinA = c.e * cosA;
+    const N = cosA + c.c * sinA, F = c.c * cosA - sinA; // 단위: W = 1
+    AL.arrow(ctx, ox, oy, ox, oy + sc, P.accent2, 2.6); AL.text(ctx, "W", ox + 14, oy + sc, P.accent2);
+    AL.arrow(ctx, ox, oy, ox - sa * N * sc, oy - ca * N * sc, P.ok, 2.6); AL.text(ctx, "N " + CB.num(N, 2) + "W", ox - sa * N * sc + 40, oy - ca * N * sc + 8, P.ok, { size: 11 });
+    const K = 3, fx = -ca * F * sc * K, fy = sa * F * sc * K; // 노면 방향(곡선 중심 쪽 = 왼쪽 아래 방향), 3배 확대
+    const bx = ox, by = oy + 40;
+    if (Math.abs(F) > 0.005) { AL.arrow(ctx, bx, by, bx + fx, by + fy, P.blue, 2.6); AL.text(ctx, "F = " + CB.num(F, 3) + "W", bx + fx + (F > 0 ? -6 : 40), by + fy + 16, P.blue, { size: 11 }); }
+    const ty = oy - 95; AL.arrow(ctx, ox, ty, ox - c.c * sc * K, ty, P.accent, 2.4); AL.text(ctx, "mv²/R = " + CB.num(c.c, 3) + "W", ox - (c.c * sc * K) / 2, ty - 14, P.accent, { size: 11 });
+    AL.text(ctx, "F, mv²/R 화살표는 3배 확대", 80, Hh - 12, P.faint, { size: 10, bold: false });
+    AL.text(ctx, "← 곡선 중심", 50, 18, P.dim, { size: 11, bold: false });
+    AL.text(ctx, "노면 기울기 3배 과장", W - 80, 18, P.faint, { size: 10, bold: false });
+    // gauge
+    const gx = W - 40, gy0 = H - 24, gh = H * 0.6, top = Math.max(0.3, c.fm * 1.6), Y = (f) => gy0 - (CB.clamp(f, -0.1, top) + 0.1) / (top + 0.1) * gh;
+    ctx.fillStyle = AL.alpha(P.dim, 0.15); ctx.fillRect(gx - 9, Y(top), 18, Y(-0.1) - Y(top));
+    ctx.fillStyle = c.f > c.fm ? P.bad : c.f < 0 ? P.warn : P.ok; ctx.fillRect(gx - 9, Y(Math.max(0, c.f)), 18, Math.abs(Y(Math.max(0, c.f)) - Y(Math.min(0, c.f))) || 1);
+    AL.line(ctx, [[gx - 16, Y(c.fm)], [gx + 16, Y(c.fm)]], P.warn, 2, [4, 3]); AL.text(ctx, "f max", gx - 34, Y(c.fm), P.warn, { size: 10 });
+    AL.line(ctx, [[gx - 12, Y(0)], [gx + 12, Y(0)]], P.axis, 1); AL.text(ctx, "f", gx, Y(top) - 10, P.text, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.52), minHeight: 260, maxHeight: 360 });
+  function go() {
+    const c = calc(); cv.redraw();
+    CB.stat("al-f-o-a", CB.num(c.c, 3)); CB.stat("al-f-o-f", "<b>" + CB.num(c.f, 3) + "</b>"); CB.stat("al-f-o-rmin", CB.num(c.rmin, 0) + " m"); CB.stat("al-f-o-vl", CB.num(c.vl, 0) + " km/h");
+    if (c.f > c.fm) AL.msg("al-f-msg", `필요 마찰 ${CB.num(c.f, 3)} &gt; 허용 ${c.fm.toFixed(2)}: <b>부족</b>. 반지름을 ${CB.num(c.rmin, 0)} m 이상으로 키우거나 속도를 ${CB.num(c.vl, 0)} km/h 이하로 낮춰야 합니다.`, "bad");
+    else if (c.f < 0) AL.msg("al-f-msg", `필요 마찰이 음수(${CB.num(c.f, 3)}): 편경사가 이 속도에 비해 커서 타이어가 차를 <b>바깥쪽으로</b> 붙잡아야 합니다. 결빙 노면에서 느린 차가 안쪽으로 미끄러질 수 있습니다.`, "bad");
+    else AL.msg("al-f-msg", `e + f = ${c.V}²/(127 × ${c.R}) = ${CB.num(c.c, 3)} → f = ${CB.num(c.c, 3)} − ${c.e.toFixed(3)} = <b>${CB.num(c.f, 3)}</b> ≤ ${c.fm.toFixed(2)}: 만족(허용의 ${CB.num((100 * c.f) / c.fm, 0)} %). 횡가속도 ${CB.num(c.c * 9.81, 2)} m/s² 중 편경사가 ${CB.num(c.c > 0 ? (100 * c.e) / c.c : 0, 0)} %를 맡습니다.`, "ok");
+  }
+  go();
+})();
+
+/* ---------- 3. 원곡선 요소와 측설표 ---------- */
+(function () {
+  const gr = CB.range("al-c-r", (v) => v + " m", go), gd = CB.range("al-c-d", (v) => v.toFixed(1) + "°", go), gi = CB.range("al-c-ip", (v) => AL.sta(v), go), gn = CB.range("al-c-int", (v) => v + " m", go);
+  let G = null;
+  function geom() {
+    const R = gr(), D = gd(), d = (D * Math.PI) / 180, c = CB.civ.curve(R, D), T = c.T, BC = gi() - T, EC = BC + c.Lc;
+    const O = [-T, -R], arc = [];
+    for (let i = 0; i <= 80; i++) { const p = (d * i) / 80; arc.push([O[0] + R * Math.sin(p), O[1] + R * Math.cos(p)]); }
+    const stakes = []; const iv = gn();
+    stakes.push(BC);
+    for (let s = Math.ceil((BC + 1e-6) / iv) * iv; s < EC - 1e-6; s += iv) stakes.push(s);
+    stakes.push(EC);
+    return { R, D, d, c, T, BC, EC, O, arc, stakes };
+  }
+  const cv = CB.canvas("#al-cv-curve", (ctx, W, H) => {
+    const P = CB.palette(), g = G; if (!g) return;
+    const ext = Math.max(g.T * 0.6, 20), ev = [Math.cos(g.d), -Math.sin(g.d)];
+    const pts = [[-g.T - ext, 0], [0, 0], [g.T * ev[0] + ext * ev[0], g.T * ev[1] + ext * ev[1]], ...g.arc];
+    let xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const xa = Math.min(...xs), xb = Math.max(...xs), ya = Math.min(...ys), yb = Math.max(...ys), pad = 34;
+    const s = Math.min((W - 2 * pad) / (xb - xa || 1), (H - 2 * pad) / (yb - ya || 1));
+    const X = (x) => pad + (x - xa) * s + ((W - 2 * pad) - (xb - xa) * s) / 2, Y = (y) => pad + (yb - y) * s + ((H - 2 * pad) - (yb - ya) * s) / 2;
+    AL.line(ctx, [[X(-g.T - ext), Y(0)], [X(0), Y(0)], [X(pts[2][0]), Y(pts[2][1])]], P.dim, 1.6, [6, 4]);
+    AL.line(ctx, [[X(-g.T - ext), Y(0)], [X(-g.T), Y(0)]], P.text, 3);
+    AL.line(ctx, [[X(g.T * ev[0]), Y(g.T * ev[1])], [X(pts[2][0]), Y(pts[2][1])]], P.text, 3);
+    AL.line(ctx, g.arc.map(([x, y]) => [X(x), Y(y)]), P.accent, 3.4);
+    const bc = g.arc[0], ec = g.arc[80];
+    AL.line(ctx, [[X(bc[0]), Y(bc[1])], [X(ec[0]), Y(ec[1])]], P.faint, 1.2, [3, 3]);
+    // E and M
+    const mid = [g.O[0] + g.R * Math.sin(g.d / 2), g.O[1] + g.R * Math.cos(g.d / 2)], chm = [(bc[0] + ec[0]) / 2, (bc[1] + ec[1]) / 2];
+    AL.line(ctx, [[X(0), Y(0)], [X(mid[0]), Y(mid[1])]], P.accent2, 2); AL.line(ctx, [[X(mid[0]), Y(mid[1])], [X(chm[0]), Y(chm[1])]], P.blue, 2);
+    // stakes
+    g.stakes.forEach((st) => { const p = (st - g.BC) / g.R, x = g.O[0] + g.R * Math.sin(p), y = g.O[1] + g.R * Math.cos(p); ctx.fillStyle = P.warn; ctx.beginPath(); ctx.arc(X(x), Y(y), 3, 0, 7); ctx.fill(); });
+    ctx.fillStyle = P.warn; ctx.beginPath(); ctx.arc(X(0), Y(0), 5, 0, 7); ctx.fill();
+    AL.text(ctx, "IP " + AL.sta(gi()), X(0), Y(0) - 14, P.warn, { size: 11 });
+    AL.text(ctx, "BC", X(bc[0]), Y(bc[1]) + 16, P.accent, { size: 11 }); AL.text(ctx, "EC", X(ec[0]) + 16, Y(ec[1]) + 4, P.accent, { size: 11 });
+    AL.text(ctx, "E", (X(0) + X(mid[0])) / 2 + 10, (Y(0) + Y(mid[1])) / 2, P.accent2, { size: 11 });
+    if (Math.abs(Y(mid[1]) - Y(chm[1])) > 14) AL.text(ctx, "M", (X(mid[0]) + X(chm[0])) / 2 - 10, (Y(mid[1]) + Y(chm[1])) / 2, P.blue, { size: 11 });
+    AL.text(ctx, `1 px ≈ ${CB.num(1 / s, 2)} m`, W - 60, H - 12, P.faint, { size: 10, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 250, maxHeight: 360 });
+  function go() {
+    G = geom(); cv.redraw(); const g = G;
+    CB.stat("al-c-o-t", `${CB.num(g.T, 2)} · ${CB.num(g.c.Lc, 2)} m`); CB.stat("al-c-o-e", `${CB.num(g.c.E, 2)} · ${CB.num(g.c.M, 2)} m`);
+    CB.stat("al-c-o-bc", AL.sta(g.BC)); CB.stat("al-c-o-ec", AL.sta(g.EC));
+    let rows = g.stakes.map((st, i) => { const l = st - g.BC, dl = (l / (2 * g.R)) * 180 / Math.PI, ch = 2 * g.R * Math.sin(l / (2 * g.R)); return `<tr><td>${i === 0 ? "BC " : i === g.stakes.length - 1 ? "EC " : ""}${AL.sta(st)}</td><td>${l.toFixed(2)}</td><td>${AL.dms(dl)}</td><td>${ch.toFixed(2)}</td></tr>`; }).join("");
+    document.getElementById("al-c-table").innerHTML = `<table><thead><tr><th>측점</th><th>호 l (m)</th><th>편각 δ</th><th>BC에서 현 (m)</th></tr></thead><tbody>${rows}</tbody></table>`;
+    const rmin = CB.civ.rMin(60, 0.06, 0.15);
+    if (g.BC < 0) AL.msg("al-c-msg", `접선 길이 ${CB.num(g.T, 1)} m가 IP 측점보다 커서 BC가 시점 앞(음수 측점)에 놓입니다. IP를 뒤로 옮기세요.`, "bad");
+    else if (g.R < rmin) AL.msg("al-c-msg", `R = ${g.R} m &lt; R<sub>min</sub> ${CB.num(rmin, 0)} m(60 km/h, e 6 %, f 0.15): 설계 속도 60 km/h에는 <b>부적합</b>합니다.`, "bad");
+    else AL.msg("al-c-msg", `T = ${g.R} tan(${(g.D / 2).toFixed(2)}°) = ${CB.num(g.T, 2)} m, L<sub>c</sub> = ${g.R} × ${g.d.toFixed(4)} = ${CB.num(g.c.Lc, 2)} m, 2T − L<sub>c</sub> = ${CB.num(2 * g.T - g.c.Lc, 2)} m. 말뚝 ${g.stakes.length}개, EC의 편각 = Δ/2 = ${AL.dms(g.D / 2)}.`, "ok");
+  }
+  go();
+})();
+
+/* ---------- 4. 편경사 접속 다이어그램 ---------- */
+(function () {
+  const ge = CB.range("al-e-e", (v) => v.toFixed(1) + " %", go), gw = CB.range("al-e-w", (v) => v.toFixed(2) + " m", go), gn = CB.range("al-e-n", (v) => "1/" + v, go), gs = CB.range("al-e-s", (v) => "", go);
+  const axis = CB.seg("al-e-axis", go), mode = CB.seg("al-e-mode", go);
+  let M = null;
+  function model() {
+    const e = ge() / 100, w = gw(), inner = axis() === "i", nc = 0.02;
+    // 0 → e 구간 길이(접속률 n 기준)
+    const len0e = (n) => (inner ? n * (w * nc + 2 * w * Math.max(0, e - nc)) : n * w * e);
+    let n = gn(); if (mode() === "spiral") n = 50 / ((inner ? w * nc + 2 * w * Math.max(0, e - nc) : w * e));
+    const Lt = n * w * nc, Lr = len0e(n), tot = Lt + Lr;
+    // 바깥쪽 경사 s_o(x): −2 % → e
+    const so = (x) => (x <= 0 ? -nc : x >= tot ? e : x <= Lt ? -nc + (nc * x) / Lt : inner ? (x - Lt <= n * w * nc ? (x - Lt) / (n * w) : nc + (x - Lt - n * w * nc) / (2 * n * w)) : (x - Lt) / (n * w));
+    // 가장자리 높이(중심선 기준이 아닌, 회전축 기준)
+    const edges = (x) => {
+      const s = so(x);
+      if (!inner) return { o: w * s, c: 0, i: -w * Math.max(nc, s), so: s, si: -Math.max(nc, s) };
+      if (s <= nc) return { o: w * nc + w * s, c: w * nc, i: 0, so: s, si: -nc };
+      return { o: 2 * w * s, c: w * s, i: 0, so: s, si: -s };
+    };
+    return { e, w, inner, n, Lt, Lr, tot, so, edges };
+  }
+  const cv = CB.canvas("#al-cv-super", (ctx, W, H) => {
+    const P = CB.palette(), m = M; if (!m) return;
+    const x0 = -15, x1 = m.tot + 20, H1 = H * 0.58;
+    const ymax = (m.inner ? 2 : 1) * m.w * Math.max(m.e, 0.04) * 1.25, ymin = m.inner ? -0.05 : -m.w * Math.max(m.e, 0.02) * 1.25;
+    const C = CB.chart(ctx, { x: 52, y: 12, w: W - 52 - 14, h: H1 - 12 - 30 }, { x: [x0, x1], y: [ymin, ymax], xLabel: "", yFmt: (v) => v.toFixed(2),
+      series: [
+        { data: Array.from({ length: 161 }, (_, i) => { const x = x0 + ((x1 - x0) * i) / 160; return [x, m.edges(x).o]; }), color: P.accent2, width: 2.4 },
+        { data: Array.from({ length: 161 }, (_, i) => { const x = x0 + ((x1 - x0) * i) / 160; return [x, m.edges(x).c]; }), color: P.text, width: 1.6 },
+        { data: Array.from({ length: 161 }, (_, i) => { const x = x0 + ((x1 - x0) * i) / 160; return [x, m.edges(x).i]; }), color: P.blue, width: 2.4, dash: m.inner ? [] : [] },
+      ],
+      vlines: [{ x: 0, color: P.faint, label: "" }, { x: m.Lt, color: P.faint, label: "" }, { x: m.tot, color: P.accent, label: "e 도달" }] });
+    AL.text(ctx, "가장자리 높이 (m, " + (m.inner ? "안쪽 가장자리" : "중심선") + " 기준)", 58, 4, P.dim, { size: 10, align: "left", baseline: "top", bold: false });
+    AL.text(ctx, "바깥", C.X(x1) - 18, C.Y(m.edges(x1).o) - 10, P.accent2, { size: 10 });
+    AL.text(ctx, "안쪽", C.X(x1) - 18, C.Y(m.edges(x1).i) + 12, P.blue, { size: 10 });
+    const xs = x0 + (x1 - x0) * gs();
+    AL.line(ctx, [[C.X(xs), C.box.y], [C.X(xs), C.box.y + C.box.h]], P.warn, 2);
+    AL.text(ctx, "x = " + CB.num(xs, 1) + " m", C.X(xs), C.box.y + C.box.h + 12, P.warn, { size: 10 });
+    // cross-section at xs
+    const E = m.edges(xs), cy = H1 + (H - H1) * 0.55, cx = W / 2, hw = Math.min(W * 0.36, 200), ex = 5 * hw / m.w; // 세로 5배 과장
+    const yc = cy - E.c * ex, yo = cy - E.o * ex, yi = cy - E.i * ex;
+    AL.line(ctx, [[cx - hw, yo], [cx, yc], [cx + hw, yi]], P.text, 4);
+    AL.line(ctx, [[cx, cy - 30], [cx, cy + 30]], P.faint, 1, [2, 3]);
+    AL.text(ctx, "바깥 " + (E.so >= 0 ? "+" : "−") + Math.abs(100 * E.so).toFixed(1) + " %", cx - hw / 2, Math.min(yo, yc) - 14, P.accent2, { size: 11 });
+    AL.text(ctx, "안쪽 " + (E.si >= 0 ? "+" : "−") + Math.abs(100 * E.si).toFixed(1) + " %", cx + hw / 2, Math.min(yi, yc) - 14, P.blue, { size: 11 });
+    AL.text(ctx, "횡단면 (세로 5배 과장, 곡선 중심은 오른쪽)", cx, H - 8, P.faint, { size: 10, bold: false });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.62), minHeight: 320, maxHeight: 440 });
+  function go() {
+    M = model(); cv.redraw(); const m = M, xs = -15 + (m.tot + 35) * gs(), E = m.edges(xs);
+    document.getElementById("al-e-s-out").textContent = CB.num(xs, 1) + " m";
+    CB.stat("al-e-o-lt", CB.num(m.Lt, 1) + " m"); CB.stat("al-e-o-lr", "<b>" + CB.num(m.Lr, 1) + " m</b>"); CB.stat("al-e-o-rg", "1/" + CB.num(m.n, 0));
+    CB.stat("al-e-o-x", `${(E.so >= 0 ? "+" : "−") + Math.abs(100 * E.so).toFixed(1)} / ${(E.si >= 0 ? "+" : "−") + Math.abs(100 * E.si).toFixed(1)} %`);
+    if (mode() === "spiral") AL.msg("al-e-msg", `클로소이드 50 m 전체에서 0 → ${(100 * m.e).toFixed(1)} %: 실제 접속률 1/${CB.num(m.n, 0)}` + (m.n >= gn() ? ` — 허용 1/${gn()}보다 완만, <b>만족</b>.` : ` — 허용 1/${gn()}보다 급함, <b>부족</b>: 완화 곡선을 늘리세요.`), m.n >= gn() ? "ok" : "bad");
+    else AL.msg("al-e-msg", `L<sub>r</sub> = ${m.inner ? "(w·0.02 + 2w(e − 0.02))" : "w·e"}·n = ${CB.num(m.Lr, 1)} m, L<sub>t</sub> = w·0.02·n = ${CB.num(m.Lt, 1)} m. ` + (m.Lr <= 50 ? "R-60의 클로소이드 50 m 안에 들어갑니다." : "클로소이드 50 m보다 길어 일부를 직선이나 원곡선으로 넘겨야 합니다."), m.Lr <= 50 ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 5. 클로소이드 ---------- */
+(function () {
+  const gr = CB.range("al-k-r", (v) => v + " m", go), gl = CB.range("al-k-l", (v) => v + " m", go), gd = CB.range("al-k-d", (v) => v.toFixed(1) + "°", go), gv = CB.range("al-k-v", (v) => v + " km/h", go);
+  let G = null, u = -1, playing = false;
+  function geom() {
+    const R = gr(), d = (gd() * Math.PI) / 180, Lin = gl(), L = Math.min(Lin, R * d), Lc = R * d - L, t0 = 40 + 0.3 * (L + Lc);
+    const kap = (s) => { if (s < t0) return 0; s -= t0; if (s < L) return s / (R * L); s -= L; if (s < Lc) return 1 / R; s -= Lc; if (s < L) return (L - s) / (R * L); return 0; };
+    const tot = 2 * t0 + 2 * L + Lc, ds = 0.5, path = [[0, 0, 0, 0]]; let x = 0, y = 0, th = 0;
+    for (let s = 0; s < tot; s += ds) { const k = kap(s + ds / 2), thm = th - (k * ds) / 2; x += Math.cos(thm) * ds; y += Math.sin(thm) * ds; th -= k * ds; path.push([x, y, s + ds, kap(s + ds)]); }
+    const tau = L / (2 * R), Xs = L * (1 - tau ** 2 / 10 + tau ** 4 / 216), Ys = L * (tau / 3 - tau ** 3 / 42 + tau ** 5 / 1320);
+    const p = L > 0 ? Ys - R * (1 - Math.cos(tau)) : 0, k = L > 0 ? Xs - R * Math.sin(tau) : 0, Ts = (R + p) * Math.tan(d / 2) + k;
+    return { R, d, L, Lin, Lc, t0, tot, path, kap, tau, p, k, Ts, V: gv() };
+  }
+  const cv = CB.canvas("#al-cv-clo", (ctx, W, H) => {
+    const P = CB.palette(), g = G; if (!g) return;
+    const H1 = H * 0.58, pad = 22, xs = g.path.map((q) => q[0]), ys = g.path.map((q) => q[1]);
+    const xa = Math.min(...xs), xb = Math.max(...xs), ya = Math.min(...ys), yb = Math.max(...ys);
+    const s = Math.min((W - 2 * pad) / (xb - xa || 1), (H1 - 2 * pad) / (yb - ya || 1));
+    const X = (x) => pad + (x - xa) * s + ((W - 2 * pad) - (xb - xa) * s) / 2, Y = (y) => pad + (yb - y) * s + ((H1 - 2 * pad) - (yb - ya) * s) / 2;
+    const seg = (a, b, col, w) => AL.line(ctx, g.path.filter((q) => q[2] >= a - 1e-9 && q[2] <= b + 1e-9).map((q) => [X(q[0]), Y(q[1])]), col, w);
+    const s1 = g.t0, s2 = s1 + g.L, s3 = s2 + g.Lc, s4 = s3 + g.L;
+    seg(0, s1, P.text, 3); seg(s1, s2, P.accent2, 3.6); seg(s2, s3, P.accent, 3.6); seg(s3, s4, P.accent2, 3.6); seg(s4, g.tot, P.text, 3);
+    const at = (sv) => g.path[Math.min(g.path.length - 1, Math.round(sv / 0.5))];
+    [[s1, "TS"], [s2, "SC"], [s3, "CS"], [s4, "ST"]].forEach(([sv, lab], i) => { if (g.L <= 0 && i % 2) return; const q = at(sv); ctx.fillStyle = P.warn; ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), 3.5, 0, 7); ctx.fill(); AL.text(ctx, g.L > 0 ? lab : i ? "EC" : "BC", X(q[0]) + (i < 2 ? -6 : 14), Y(q[1]) + (i < 2 ? 14 : -10), P.warn, { size: 10 }); });
+    if (u >= 0) { const q = at(u); ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), 6, 0, 7); ctx.fill(); }
+    // lateral accel plot
+    const v = g.V / 3.6, data = g.path.filter((_, i) => i % 2 === 0).map((q) => [q[2], v * v * q[3]]), amax = (v * v) / g.R;
+    const tr = u >= 0 ? data.filter((q) => q[0] <= u) : [];
+    CB.chart(ctx, { x: 52, y: H1 + 8, w: W - 52 - 14, h: H - H1 - 8 - 46 }, { x: [0, g.tot], y: [0, amax * 1.3 || 1], xLabel: "곡선을 따라 잰 거리 s (m)", yFmt: (q) => q.toFixed(1),
+      series: [{ data, color: P.accent, width: 2.2 }, { data: tr, color: P.accent2, width: 3.2 }], hlines: [{ y: amax, color: P.faint, label: "v²/R = " + CB.num(amax, 2) + " m/s²" }] });
+    AL.text(ctx, "횡가속도 v²κ", 58, H1 + 10, P.dim, { size: 10, align: "left", baseline: "top", bold: false });
+  }, { aspect: (W) => (W < 520 ? 1.05 : 0.66), minHeight: 330, maxHeight: 460 });
+  const loop = CB.loop(cv.canvas, (dt) => { if (!playing || !G) return; u += (G.V / 3.6) * dt * 3; if (u > G.tot) { u = -1; playing = false; btn.set(false); } cv.redraw(); });
+  const btn = CB.playButton("al-k-play", () => { u = 0; playing = true; loop.start(); }, () => { playing = false; u = -1; cv.redraw(); }, ["▶ 차 주행", "■ 정지"]);
+  function go() {
+    G = geom(); cv.redraw(); const g = G, v = g.V / 3.6;
+    const A = Math.sqrt(g.R * g.L), C = g.L > 0 ? v ** 3 / (g.R * g.L) : Infinity;
+    CB.stat("al-k-o-a", g.L > 0 ? "<b>" + CB.num(A, 1) + " m</b>" : "— (완화 없음)");
+    CB.stat("al-k-o-t", `${CB.num((g.tau * 180) / Math.PI, 2)}° · ${CB.num(g.L * g.L / (24 * g.R), 2)} m`);
+    CB.stat("al-k-o-c", isFinite(C) ? CB.num(C, 2) + " m/s³" : "∞");
+    CB.stat("al-k-o-ts", `${CB.num(g.Ts, 2)} · ${CB.num(g.Lc, 2)} m`);
+    if (g.Lin > g.L + 1e-9) AL.msg("al-k-msg", `2τ = L/R가 교각을 넘어 원곡선이 남지 않습니다. 완화 곡선을 RΔ = ${CB.num(g.L, 1)} m로 줄여 그렸습니다(두 클로소이드가 바로 만나는 형태 — 곡률이 한 점에서만 1/R이라 피합니다).`, "bad");
+    else if (g.L === 0) AL.msg("al-k-msg", `완화 곡선이 없으면 곡률이 TS에서 0 → 1/${g.R}로 뜁니다. 횡가속도 ${CB.num(v * v / g.R, 2)} m/s²가 한순간에 생깁니다.`, "bad");
+    else { const ok = C <= 0.9 && A >= g.R / 3 && A <= g.R; AL.msg("al-k-msg", `A = √(${g.R} × ${g.L}) = ${CB.num(A, 1)} m (R/3 = ${CB.num(g.R / 3, 0)} ~ R = ${g.R}), C = v³/RL = ${CB.num(C, 2)} m/s³ ` + (ok ? "— 보기 좋은 범위, 변화율도 허용(0.3–0.9 형태) 안." : C > 0.9 ? "— 변화율이 큽니다. L을 늘리세요." : "— A가 R/3–R 범위 밖입니다(형태)."), ok ? "ok" : "bad"); }
+  }
+  go();
+})();
+
+/* ---------- 6. 오르막 트럭 ---------- */
+(function () {
+  const gg = CB.range("al-g-g", (v) => "+" + v.toFixed(1) + " %", go), gl = CB.range("al-g-l", (v) => v + " m", go), gv = CB.range("al-g-v", (v) => v + " km/h", go), gw = CB.range("al-g-w", (v) => v + " kg/kW", go);
+  let T = null;
+  const cv = CB.canvas("#al-cv-grade", (ctx, W, H) => {
+    const P = CB.palette(); if (!T) return; const len = gl(), V0 = gv(), xmax = len + 400;
+    const C = CB.chart(ctx, { x: 52, y: 14, w: W - 52 - 14, h: H - 14 - 44 }, { x: [0, xmax], y: [0, V0 + 10], xLabel: "경사 시작점에서 거리 (m)", yLabel: "트럭 속도 (km/h)",
+      bands: [{ x0: 0, x1: len, color: AL.alpha(P.warn, 0.1) }],
+      series: [{ data: T.pts, color: P.accent2, width: 2.8 }],
+      hlines: [{ y: V0 - 15, color: P.bad, label: "진입 − 15 km/h" }, { y: T.crawl, color: P.faint, label: "정상 속도 " + CB.num(T.crawl, 1) }],
+      vlines: T.crit != null ? [{ x: T.crit, color: P.bad, label: "임계 " + T.crit + " m" }] : [] });
+    AL.text(ctx, "+" + gg().toFixed(1) + " % 구간", C.X(len / 2), C.Y(8), P.warn, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.48), minHeight: 250, maxHeight: 340 });
+  function go() {
+    T = AL.truck(gg() / 100, gl(), gv(), gw()); cv.redraw();
+    const need = T.crit != null && T.crit <= gl();
+    CB.stat("al-g-o-cr", CB.num(T.crawl, 1) + " km/h"); CB.stat("al-g-o-end", CB.num(T.end, 1) + " km/h");
+    CB.stat("al-g-o-crit", T.crit != null && T.crit <= gl() ? T.crit + " m" : "도달 안 함");
+    CB.stat("al-g-o-v", need ? '<span style="color:var(--bad)">오르막 차로 검토</span>' : '<span style="color:var(--ok)">불필요</span>');
+    AL.msg("al-g-msg", need ? `${T.crit} m에서 진입 속도보다 15 km/h 느려집니다. 오르막이 ${gl()} m이므로 임계 길이를 넘습니다 — 교통량과 트럭 비율을 보고 오르막 차로를 검토합니다(경사 끝에서 다시 가속할 거리까지 연장).` : `경사 끝(${gl()} m)에서 트럭 속도 ${CB.num(T.end, 1)} km/h, 저하 ${CB.num(gv() - T.end, 1)} km/h &lt; 15 km/h. 이 트럭 성능에서는 오르막 차로가 필요 없습니다.`, need ? "bad" : "ok");
+  }
+  go();
+})();
+
+/* ---------- 7. 종단 곡선 ---------- */
+(function () {
+  const sg = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + " %";
+  const g1 = CB.range("al-v-g1", sg, go), g2 = CB.range("al-v-g2", sg, go), gL = CB.range("al-v-l", (v) => v + " m", go), gV = CB.range("al-v-v", (v) => v + " km/h", go), gx = CB.range("al-v-x", (v) => (v < 0 ? "−" : "") + Math.abs(v) + " m", go);
+  let C = null, M = null;
+  function model() {
+    const a = g1(), b = g2(), L = Math.max(0.01, gL()), vc = CB.civ.vcurve(a, b, L, 0), zE = vc.elev(L);
+    const z = (x) => (x <= 0 ? (a / 100) * x : x >= L ? zE + (b / 100) * (x - L) : vc.elev(x));
+    const S = CB.civ.ssd(gV()), A = Math.abs(b - a), crest = b < a;
+    const Lmin = A < 1e-9 ? 0 : crest ? CB.civ.crestL(S, A) : Math.max(AL.sagL(S, A), (A * gV() * gV()) / 395);
+    // 가용 시거: 눈 1.0 m, 물체 0.15 m, 1 m 간격 검사
+    const x0 = gx(), ze = z(x0) + 1.0; let avail = 400;
+    for (let D = 2; D <= 400; D++) { const zo = z(x0 + D) + 0.15; let blocked = false; for (let k = 1; k < D; k++) { const zl = ze + ((zo - ze) * k) / D; if (zl < z(x0 + k)) { blocked = true; break; } } if (blocked) { avail = D - 1; break; } }
+    return { a, b, L, vc, z, S, A, crest, Lmin, x0, avail };
+  }
+  const cv = CB.canvas("#al-cv-vc", (ctx, W, H) => {
+    const P = CB.palette(), m = M; if (!m) return; const xa = -200, xb = m.L + 200;
+    const data = []; for (let i = 0; i <= 300; i++) { const x = xa + ((xb - xa) * i) / 300; data.push([x, m.z(x)]); }
+    const zs = data.map((q) => q[1]), zl = Math.min(...zs), zh = Math.max(...zs), pad = Math.max(1.5, (zh - zl) * 0.25);
+    C = CB.chart(ctx, { x: 52, y: 14, w: W - 52 - 14, h: H - 14 - 44 }, { x: [xa, xb], y: [zl - pad, zh + pad], xLabel: "BVC에서 거리 x (m)", yLabel: "상대 표고 (m)", yFmt: (v) => v.toFixed(1),
+      series: [{ data: [[xa, (m.a / 100) * xa], [m.L / 2, (m.a / 100) * m.L / 2], [xb, m.z(m.L) + (m.b / 100) * (xb - m.L) + 0 * 1]], color: P.faint, width: 1, dash: [5, 4] }, { data, color: P.text, width: 2.8 }],
+      bands: [{ x0: 0, x1: m.L, color: AL.alpha(P.accent, 0.08) }] });
+    const X = C.X, Y = C.Y;
+    // 꺾인 경사선의 실제 PVI 높이
+    const zp = (m.a / 100) * m.L / 2;
+    ctx.fillStyle = P.warn; ctx.beginPath(); ctx.arc(X(m.L / 2), Y(zp), 4, 0, 7); ctx.fill(); AL.text(ctx, "PVI", X(m.L / 2), Y(zp) - 12, P.warn, { size: 10 });
+    [[0, "BVC"], [m.L, "EVC"]].forEach(([x, l]) => { ctx.fillStyle = P.accent; ctx.beginPath(); ctx.arc(X(x), Y(m.z(x)), 4, 0, 7); ctx.fill(); AL.text(ctx, l, X(x), Y(m.z(x)) + 14, P.accent, { size: 10 }); });
+    if (m.vc.xTurn != null && gL() > 0) { const xt = m.vc.xTurn; ctx.fillStyle = P.blue; ctx.beginPath(); ctx.arc(X(xt), Y(m.z(xt)), 4, 0, 7); ctx.fill(); }
+    // sight line
+    const ze = m.z(m.x0) + 1.0, D = Math.min(m.avail, xb - m.x0), zo = m.z(m.x0 + D) + 0.15;
+    AL.line(ctx, [[X(m.x0), Y(ze)], [X(m.x0 + D), Y(zo)]], m.avail >= m.S ? P.ok : P.bad, 1.8, [6, 4]);
+    ctx.fillStyle = P.accent2; ctx.fillRect(X(m.x0) - 7, Y(m.z(m.x0)) - 8, 14, 8);
+    ctx.fillStyle = P.warn; ctx.fillRect(X(m.x0 + D) - 3, Y(zo) - 3, 6, 6);
+    AL.text(ctx, "가용 " + (m.avail >= 400 ? "≥ 400" : m.avail) + " m", Math.min(X(m.x0) + 60, W - 70), Y(ze) - 16, m.avail >= m.S ? P.ok : P.bad, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.48), minHeight: 260, maxHeight: 350 });
+  const el = cv.canvas; let drag = false;
+  const setX = (e) => { if (!C) return; const r = el.getBoundingClientRect(), px = e.clientX - r.left, x = -200 + ((px - C.box.x) / C.box.w) * (M.L + 400); gx.set(Math.round(CB.clamp(x, -200, 200))); };
+  el.addEventListener("pointerdown", (e) => { drag = true; el.setPointerCapture(e.pointerId); setX(e); });
+  el.addEventListener("pointermove", (e) => { if (drag) setX(e); });
+  el.addEventListener("pointerup", () => (drag = false)); el.addEventListener("pointercancel", () => (drag = false));
+  el.style.touchAction = "pan-y";
+  function go() {
+    M = model(); cv.redraw(); const m = M;
+    CB.stat("al-v-o-s", CB.num(m.S, 1) + " m"); CB.stat("al-v-o-lmin", CB.num(m.Lmin, 1) + " m");
+    CB.stat("al-v-o-k", `${m.A > 0 ? CB.num(gL() / m.A, 1) : "—"} · ${m.vc.xTurn != null && gL() > 0 ? CB.num(m.vc.xTurn, 1) + " m" : "없음"}`);
+    CB.stat("al-v-o-av", (m.avail >= 400 ? "≥ 400" : m.avail) + " m");
+    const okL = gL() >= m.Lmin - 1e-6, okS = m.avail >= m.S;
+    const kind = m.A < 1e-9 ? "경사 변화 없음" : m.crest ? "볼록(마루)" : "오목(골짜기)";
+    AL.msg("al-v-msg", `${kind}, A = ${m.A.toFixed(1)} %, L<sub>min</sub> = ${CB.num(m.Lmin, 1)} m(${m.crest ? "볼록: 시거" : "오목: 전조등·승차감"}) → L = ${gL()} m ${okL ? "<b>만족</b>" : "<b>부족</b>"}. 이 위치에서 가용 시거 ${m.avail >= 400 ? "400 m 이상" : m.avail + " m"} ${okS ? "≥" : "&lt;"} 요구 ${CB.num(m.S, 0)} m.` + (!m.crest && m.A > 0 ? " (낮의 시선은 오목 곡선에서 막히지 않으므로 밤 조건으로 판단합니다.)" : ""), okL && (okS || !m.crest) ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 8. R-60 3D 주행 ---------- */
+(function () {
+  const R = 200, LS = 50, TS = 271.28, LC = 54.72, SC = TS + LS, CS = SC + LC, ST = CS + LS, TOT = 1000, E = 0.06;
+  // 평면: 1 m 간격 적분(오른쪽 굽이 → 방위각 감소)
+  const kap = (s) => (s < TS ? 0 : s < SC ? (s - TS) / (R * LS) : s < CS ? 1 / R : s < ST ? (ST - s) / (R * LS) : 0);
+  const H = [{ x: 0, y: 0, th: 0 }];
+  for (let i = 1; i <= TOT + 600; i++) { const p = H[i - 1], k = kap(i - 0.5), thm = p.th - k / 2; H.push({ x: p.x + Math.cos(thm), y: p.y + Math.sin(thm), th: p.th - k }); }
+  const hAt = (s) => { s = CB.clamp(s, 0, H.length - 2); const i = Math.floor(s), f = s - i, a = H[i], b = H[i + 1]; return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, th: a.th + (b.th - a.th) * f }; };
+  const PVI = { r60: 700, bad: 230, good: 349 };
+  let pvi = 700;
+  const zAt = (s) => { const b = pvi - 60, e = pvi + 60; if (s <= b) return 50 - 0.04 * (pvi - s); if (s >= e) return 50 - 0.02 * (s - pvi); const x = s - b; return 50 - 0.04 * 60 + 0.04 * x - 0.00025 * x * x; };
+  const gAt = (s) => (zAt(s + 0.5) - zAt(s - 0.5)) * 100;
+  // 바깥(왼쪽) 경사: 크라운 −2 % → TS에서 0 → SC에서 +6 %, 접속률 0.06/50 per m
+  const rate = E / LS;
+  const so = (s) => { let v = -0.02; if (s > TS - 0.02 / rate && s < ST + 0.02 / rate) { if (s < SC) v = (s - TS) * rate; else if (s <= CS) v = E; else v = (ST - s) * rate; } return CB.clamp(v, -0.02, E); };
+  // 단면 점: o 오른쪽 + (m)
+  const pt = (s, o, dz = 0) => { const h = hAt(s), sv = so(s), cz = o < 0 ? -o * sv : -o * Math.max(0.02, sv); const nx = Math.sin(h.th), ny = -Math.cos(h.th); return [h.x + nx * o, h.y + ny * o, zAt(s) + cz + dz]; };
+  const vSight = (s0) => { const ze = zAt(s0) + 1.0; for (let D = 2; D <= 300; D++) { const zo = zAt(s0 + D) + 0.15; for (let k = 1; k < D; k++) if (ze + ((zo - ze) * k) / D < zAt(s0 + k)) return D - 1; } return 300; };
+
+  const view = CB.seg("al-d-view", () => draw()), combo = CB.seg("al-d-combo", (v) => { pvi = PVI[v]; draw(); });
+  const gs = CB.range("al-d-s", (v) => AL.sta(v), () => draw()), gv = CB.range("al-d-v", (v) => v + " km/h");
+  const gobj = CB.check("al-d-obj", () => draw());
+  let yawOff = 0.6, playing = false;
+  const cv = CB.canvas("#al-cv-drive", (ctx, W, Hh) => {
+    const P = CB.palette(), s0 = gs(), bird = view() === "bird", h0 = hAt(s0);
+    let C, yaw, pitch;
+    if (!bird) { C = pt(s0, 1.75, 1.0); yaw = h0.th; pitch = Math.atan(gAt(s0 + 10) / 100) - 0.02; }
+    else { const ya = h0.th + Math.PI + yawOff, c0 = pt(s0 + 60, 0); C = [c0[0] + 170 * Math.cos(ya), c0[1] + 170 * Math.sin(ya), c0[2] + 95]; yaw = ya + Math.PI; pitch = -Math.atan2(95, 170); }
+    const cf = Math.cos(pitch), f = [cf * Math.cos(yaw), cf * Math.sin(yaw), Math.sin(pitch)], r = [Math.sin(yaw), -Math.cos(yaw), 0];
+    const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+    const F = Math.min(W, Hh * 1.7) * (bird ? 0.9 : 1.2), near = 0.5;
+    const cam = (p) => { const d = [p[0] - C[0], p[1] - C[1], p[2] - C[2]]; return [d[0] * r[0] + d[1] * r[1] + d[2] * r[2], d[0] * u[0] + d[1] * u[1] + d[2] * u[2], d[0] * f[0] + d[1] * f[1] + d[2] * f[2]]; };
+    const scr = (q) => [W / 2 + (F * q[0]) / q[2], Hh / 2 - (F * q[1]) / q[2]];
+    const clip = (pts) => { const out = []; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], ia = a[2] >= near, ib = b[2] >= near; if (ia) out.push(a); if (ia !== ib) { const t = (near - a[2]) / (b[2] - a[2]); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, near]); } } return out; };
+    const poly = (wp, fill) => { const q = clip(wp.map(cam)); if (q.length < 3) return; ctx.beginPath(); q.forEach((p, i) => { const s = scr(p); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); };
+    const seg = (a, b, col, wd) => { let A = cam(a), B = cam(b); if (A[2] < near && B[2] < near) return; if (A[2] < near) { const t = (near - A[2]) / (B[2] - A[2]); A = [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, near]; } if (B[2] < near) { const t = (near - B[2]) / (A[2] - B[2]); B = [B[0] + (A[0] - B[0]) * t, B[1] + (A[1] - B[1]) * t, near]; } const sa = scr(A), sb = scr(B); ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.beginPath(); ctx.moveTo(sa[0], sa[1]); ctx.lineTo(sb[0], sb[1]); ctx.stroke(); };
+    // 하늘·땅
+    const hz = cam([C[0] + 1e5 * Math.cos(yaw), C[1] + 1e5 * Math.sin(yaw), C[2]]), hy = hz[2] > 0 ? scr(hz)[1] : -1;
+    ctx.fillStyle = AL.alpha(P.blue, 0.07); ctx.fillRect(0, 0, W, Hh);
+    ctx.fillStyle = CB.isDark() ? "rgba(120,100,60,.22)" : "rgba(150,125,70,.18)"; ctx.fillRect(0, Math.max(0, hy), W, Hh - Math.max(0, hy));
+    // 도로 띠: 먼 것부터
+    const sA = 2 * Math.floor((bird ? Math.max(0, s0 - 150) : Math.max(0, s0 - 5)) / 2), sB = Math.min(TOT, bird ? s0 + 450 : s0 + 520), step = 2, segs = [];
+    for (let s = sA; s < sB; s += step) segs.push(s);
+    const depth = (s) => cam(pt(s + step / 2, 0))[2];
+    segs.sort((a, b) => depth(b) - depth(a));
+    const road = CB.isDark() ? "#4b5157" : "#8b9198", shoulder = CB.isDark() ? "#3a3f44" : "#a9aeb4", white = CB.isDark() ? "#e8eaed" : "#ffffff";
+    const objS = s0 + 85;
+    segs.forEach((s) => {
+      const s2 = Math.min(s + step, sB);
+      poly([pt(s, -5.5, -1.2), pt(s, -5), pt(s2, -5), pt(s2, -5.5, -1.2)], AL.alpha(P.warn, 0.35));
+      poly([pt(s, 5, 0), pt(s, 5.5, -1.2), pt(s2, 5.5, -1.2), pt(s2, 5, 0)], AL.alpha(P.warn, 0.35));
+      poly([pt(s, -5), pt(s, 5), pt(s2, 5), pt(s2, -5)], shoulder);
+      poly([pt(s, -3.5), pt(s, 3.5), pt(s2, 3.5), pt(s2, -3.5)], road);
+      seg(pt(s, -3.5, 0.01), pt(s2, -3.5, 0.01), white, 1.2); seg(pt(s, 3.5, 0.01), pt(s2, 3.5, 0.01), white, 1.2);
+      if (Math.floor(s / 6) % 2 === 0) seg(pt(s, 0, 0.01), pt(s2, 0, 0.01), P.warn, 1.6);
+      if (Math.abs(s % 20) < 1e-6) { seg(pt(s, -6, 0), pt(s, -6, 1.0), P.text, 1.5); seg(pt(s, 6, 0), pt(s, 6, 1.0), P.text, 1.5); }
+      if (gobj() && objS >= s && objS < s2) { const a = pt(objS, 1.45), b = pt(objS, 2.05); poly([a, b, [b[0], b[1], b[2] + 0.15], [a[0], a[1], a[2] + 0.15]], P.accent2); }
+    });
+    if (bird) { const c = pt(s0, 1.75); const q = cam(c); if (q[2] > near) { const sp = scr(q); ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(sp[0], sp[1], 5, 0, 7); ctx.fill(); } }
+    AL.text(ctx, bird ? "조감 — 좌우로 끌어 돌리기" : "운전자 눈높이 1.0 m", 10, 14, P.dim, { size: 11, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.66), minHeight: 260, maxHeight: 460 });
+  const el = cv.canvas; el.style.touchAction = "pan-y"; let last = null;
+  el.addEventListener("pointerdown", (e) => { if (view() !== "bird") return; last = e.clientX; el.setPointerCapture(e.pointerId); });
+  el.addEventListener("pointermove", (e) => { if (last == null) return; yawOff -= (e.clientX - last) * 0.008; last = e.clientX; cv.redraw(); });
+  const up = () => (last = null); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+  const loop = CB.loop(el, (dt) => { if (!playing) return; let s = gs() + (gv() / 3.6) * dt; if (s > 960) s = 0; gs.set(Math.round(s * 10) / 10, false); draw(); });
+  CB.playButton("al-d-play", () => { playing = true; loop.start(); }, () => { playing = false; });
+  let lastStat = -1;
+  function draw() {
+    cv.redraw(); const s = gs(); if (Math.abs(s - lastStat) < 1 && playing) return; lastStat = s;
+    const k = kap(s), sd = vSight(s);
+    CB.stat("al-d-o-sta", AL.sta(s)); CB.stat("al-d-o-r", k > 1e-6 ? CB.num(1 / k, 0) + " m" : "직선");
+    CB.stat("al-d-o-g", CB.signed(gAt(s), 2) + " %"); CB.stat("al-d-o-sd", (sd >= 300 ? "≥ 300" : sd) + " m");
+    const c = combo(), ahead = s < TS && TS - s < 130;
+    if (c === "bad" && ahead && sd < TS - s + 40) AL.msg("al-d-msg", `마루(${AL.sta(pvi + 20)}) 너머에서 굽이가 시작됩니다(TS ${AL.sta(TS)}). 굽이 시작점은 ${Math.round(TS - s)} m 앞인데 종단 시거는 ${sd} m뿐이라, 길이 휘어 나가는 모습은 마루에 가려 보이지 않습니다 — 운전자는 길이 곧게 이어진다고 착각하기 쉽습니다.`, "bad");
+    else if (c === "good" && ahead) AL.msg("al-d-msg", "평면 곡선(0+271–0+426)이 종단 곡선(0+289–0+409)을 감쌉니다. 마루에 오르기 전부터 굽이의 시작이 보여 속도를 미리 줄일 수 있습니다.", "ok");
+    else AL.msg("al-d-msg", sd < 85 ? `종단 시거 ${sd} m &lt; 85 m — 볼록 곡선이 시야를 막습니다.` : `종단 시거 ${sd >= 300 ? "300 m 이상" : sd + " m"} ≥ 85 m. 평면 곡률 ${k > 1e-6 ? "1/" + CB.num(1 / k, 0) + " m⁻¹" : "0(직선)"}, 바깥 편경사 ${CB.num(100 * so(s), 1)} %.`, sd < 85 ? "bad" : "");
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

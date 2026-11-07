@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>하부 구조와 받침 · CivilBook</title>
+<meta name="description" content="상부의 힘을 땅으로. 교각과 교대의 형식, 교대 토압과 전도·활동·지지력, 기초, 고정·가동·탄성·포트·면진 받침과 받침 반력·들림, 온도 신축량과 신축 이음, 교각 강성에 따른 수평력 분배, 받침 지지 길이와 낙교 방지, 면진 교량, B-130 하부 구조를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .sb-stack { display: grid; grid-template-columns: 1fr; }
+  .sb-stack > div { position: relative; min-width: 0; }
+  .sb-stack > div + div { border-top: 1px solid var(--border); }
+  .sb-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .sb-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .sb-msg b { color: var(--text); }
+  .sb-msg.ok { color: var(--ok); font-weight: 600; }
+  .sb-msg.warn { color: var(--warn); font-weight: 600; }
+  .sb-msg.bad { color: var(--bad); font-weight: 600; }
+  .sb-tbl td, .sb-tbl th { font-variant-numeric: tabular-nums; }
+  .sb-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .sb-tbl td.ok { color: var(--ok); font-weight: 600; }
+  .sb-tbl td.bad { color: var(--bad); font-weight: 600; }
+  .sb-steps { margin: 6px 0 0; }
+  .sb-steps li { margin: 4px 0; }
+  .sb-sup { display: grid; grid-template-columns: 2.6em 1fr; align-items: center; gap: 6px; }
+  .sb-sup b { font: 600 12px var(--mono); color: var(--text-dim); }
+  .sb-sup .seg button { padding-left: 6px; padding-right: 6px; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="civil"></script>
+</head>
+<body data-chapter="substructure">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="sb-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="sb-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="sb-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="sb-ah-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--warn)"/></marker>
+      <marker id="sb-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 06</div>
+    <h1 data-no-glossary>하부 구조와 받침</h1>
+    <p class="lead">3–5장은 다리의 위쪽, 차가 달리는 상부 구조를 다루었습니다. 그 모든 하중은 결국 몇 개의 작은 <b>받침</b>을 지나 <b>교각</b>과 <b>교대</b>로, 그리고 기초를 거쳐 땅으로 내려갑니다. 받침은 상부 구조가 온도에 따라 늘고 줄 수 있게 하면서 수직력은 그대로 전해야 하고, 지진 때는 상부 구조의 관성력을 어느 교각에 얼마나 줄지 결정합니다. 이 장은 교각·교대의 형식, 교대에 작용하는 토압과 안정(GeotechBook과 연결), 받침의 종류와 받침 반력·들림, 온도 신축량 Δ = αLΔT와 신축 이음, 교각 강성에 따른 수평력 분배, 받침 지지 길이와 낙교 방지, 면진 받침의 효과를 기준 교량 <b>B-130</b>의 하부 구조로 계산합니다.</p>
+    <ul class="objectives">
+      <li>하부 구조의 구성(받침·교각·교대·날개벽·기초)과 교각·교대의 형식을 그리고 각각이 쓰이는 조건을 설명한다.</li>
+      <li>역T형 교대에 랭킨 주동 토압을 적용해 전도·활동·지지력을 검토한다(<code>CB.soil</code>).</li>
+      <li>고정·가동 받침과 탄성·포트·면진 받침의 원리를 설명하고, 편재 하중과 짧은 끝 경간에서 받침 반력과 들림을 계산한다.</li>
+      <li>탄성 받침의 형상 계수, 압축 응력, 전단 변형률, 수평 강성을 계산한다.</li>
+      <li>온도·크리프·건조 수축에 의한 신축량과 신축 이음의 유간을 정하고, 고정점의 위치가 신축량에 주는 영향을 설명한다.</li>
+      <li>교각 강성과 받침 배치에 따라 지진 수평력이 교각에 나뉘는 비율, 받침 지지 길이와 낙교 판정, 면진 받침이 교각 전단력과 변위를 바꾸는 효과를 계산한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>받침 위에서 떨어진 상판</b></div>
+      <div class="o-body"><p>지진으로 무너진 다리 사진에는 같은 장면이 되풀이됩니다. 교각은 서 있는데 그 위에 얹혀 있던 상판이 받침에서 미끄러져 강바닥이나 도로 위로 떨어진 모습입니다. 1971년 미국 샌페르난도 지진, 1989년 로마 프리에타 지진, 1995년 고베 지진에서 이런 <b>낙교</b>가 보고되었고, 교량 내진 설계는 그때마다 상판이 받침 자리에서 벗어나지 않도록 받침 지지 길이를 넉넉히 하고 낙교 방지 장치를 다는 쪽으로 바뀌었습니다.</p>
+        <p>평소의 다리에서도 받침과 신축 이음은 가장 손이 많이 가는 부분입니다. 매일 늘고 줄며 차바퀴에 두드려 맞는 신축 이음으로 물과 염화물이 새어 들어가 받침과 교각 머리를 부식시키는 일이 유지관리의 단골 항목입니다. 얼마나 움직이게 할지(신축량), 어디를 붙잡을지(고정점), 힘을 어디로 보낼지(받침 배치)를 계산하는 것이 이 장의 일입니다.</p>
+        <div class="o-chain"><span>상부 반력 · 온도 · 지진 · 토압</span><i>→</i><span class="tool">Δ = αLΔT · k = 3EI/h³ · Rankine K<sub>a</sub> · N = f(L, H, S)</span><i>→</i><span>받침 · 신축 이음 · 교각 · 교대 · 낙교 방지</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="components">
+    <h2>하부 구조의 구성</h2>
+    <div class="problem"><strong>상판의 무게는 어디를 지나 땅으로 가나</strong>
+      <p>B-130의 상부 구조는 약 15,600 kN(고정하중 약 120 kN/m × 130 m, 교육용)입니다. 이 무게와 트럭 하중, 바람과 지진의 수평력이 땅에 닿기까지 거치는 부재를 차례로 그려 봅니다.</p></div>
+    <figure class="diagram" id="fig-sb-parts">
+      <svg viewBox="0 0 860 330" role="img" aria-label="교량 하부 구조의 구성: 받침, 교각 코핑, 교각 기둥, 확대 기초와 말뚝, 교대, 날개벽, 신축 이음">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <rect x="20" y="236" width="820" height="74" style="fill:var(--warn);opacity:.12"/>
+        <path d="M300 236 Q 440 270 580 236 Z" style="fill:var(--blue);opacity:.18"/>
+        <rect x="60" y="80" width="740" height="22" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <text x="430" y="72" text-anchor="middle" class="t-mono">상부 구조(바닥판 + 거더)</text>
+        <g style="fill:var(--accent-2)"><rect x="96" y="102" width="16" height="8"/><rect x="330" y="102" width="16" height="8"/><rect x="514" y="102" width="16" height="8"/><rect x="748" y="102" width="16" height="8"/></g>
+        <text x="338" y="124" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">받침</text>
+        <path d="M40 110 L130 110 L130 132 L104 132 L104 236 L40 236 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <path d="M30 236 L150 236 L150 256 L30 256 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <path d="M30 110 L40 110 L40 236 L30 236 Z" style="fill:var(--warn);opacity:.3"/>
+        <text x="60" y="270" class="t-mono">교대</text>
+        <line x1="60" y1="80" x2="60" y2="102" style="stroke:var(--accent);stroke-width:3"/>
+        <text x="20" y="54" class="t-mono" style="fill:var(--accent)">신축 이음</text>
+        <path d="M310 110 L366 110 L366 128 L352 128 L352 236 L324 236 L324 128 L310 128 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="304" y="236" width="68" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <g style="stroke:var(--text-dim);stroke-width:4"><line x1="314" y1="254" x2="314" y2="306"/><line x1="338" y1="254" x2="338" y2="306"/><line x1="362" y1="254" x2="362" y2="306"/></g>
+        <text x="378" y="132" class="t-mono">코핑(교각 머리)</text>
+        <text x="372" y="190" class="t-mono">교각 기둥</text>
+        <text x="378" y="250" class="t-mono">기초(푸팅)</text>
+        <text x="378" y="296" class="t-mono">말뚝</text>
+        <path d="M494 110 L550 110 L550 128 L536 128 L536 236 L508 236 L508 128 L494 128 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="488" y="236" width="68" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <g style="stroke:var(--text-dim);stroke-width:4"><line x1="498" y1="254" x2="498" y2="306"/><line x1="522" y1="254" x2="522" y2="306"/><line x1="546" y1="254" x2="546" y2="306"/></g>
+        <path d="M730 110 L820 110 L820 236 L756 236 L756 132 L730 132 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <path d="M710 236 L830 236 L830 256 L710 256 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <path d="M820 110 L840 110 L840 236 L820 236 Z" style="fill:var(--warn);opacity:.3"/>
+        <text x="730" y="270" class="t-mono">교대 · 날개벽</text>
+        <line x1="800" y1="80" x2="800" y2="102" style="stroke:var(--accent);stroke-width:3"/>
+        <g class="t-mono" style="fill:var(--accent)"><text x="140" y="96">A1</text><text x="330" y="96">P1</text><text x="514" y="96">P2</text><text x="696" y="96">A2</text></g>
+        <text x="430" y="226" text-anchor="middle" class="t-mono" style="fill:var(--blue)">하천</text>
+      </svg>
+      <figcaption><b>그림 6-1.</b> 교량 하부 구조의 구성(B-130 형태, 축척 무시). 상부 구조는 받침(주황) 위에 얹히고, 받침은 교각의 코핑이나 교대의 받침 자리에 놓인다. 교대는 다리 끝에서 흙(갈색)을 막는 옹벽 역할을 함께 하며, 양쪽 끝의 신축 이음(초록)이 상부 구조의 신축을 받아 준다. 기초는 지반에 따라 직접 기초 또는 말뚝 기초.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 6.1 (하부 구조)</strong> <span class="term">하부 구조</span><span class="en">(substructure)</span>는 상부 구조의 하중을 받아 지반에 전달하는 부분으로, <span class="term">교량 받침</span><span class="en">(bridge bearing)</span> 아래의 <span class="term">교각</span><span class="en">(pier)</span>, <span class="term">교대</span><span class="en">(abutment)</span>, 기초로 이루어진다. 교각은 중간 지점을 받치는 기둥이나 벽이고, 교대는 다리 양 끝에서 상부 구조를 받치면서 뒤쪽의 흙(진입 도로 성토)을 막는 옹벽이다. 교각 꼭대기에서 받침을 올려놓는 넓은 부분을 <span class="term">코핑</span><span class="en">(pier cap, coping)</span>이라 한다.</div>
+    <p>하부 구조가 받는 힘은 세 갈래입니다. ① <b>연직력</b>: 상부 구조의 고정하중과 활하중이 받침을 통해 내려온다. ② <b>교축 방향 수평력</b>: 제동 하중, 온도 신축에 저항하는 받침의 마찰·전단력, 지진 관성력. ③ <b>교축 직각 방향 수평력</b>: 바람, 지진, 유수압(하천 교각, 15장). 그 위에 교대는 토압을, 하천 교각은 세굴(15장)을 더 받습니다. 받침의 종류와 배치가 ②·③을 어느 하부 구조에 얼마나 보낼지를 정한다는 것이 이 장의 핵심입니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="piers">
+    <h2>교각과 교대의 형식</h2>
+    <div class="problem"><strong>같은 하중인데 왜 모양이 다른가</strong>
+      <p>도심 고가교의 교각은 가는 기둥 하나이고, 하천 교각은 물의 흐름 방향으로 긴 벽이며, 넓은 다리는 두 기둥을 보로 이은 문형입니다. 교각 모양은 하중보다 <b>자리</b>(아래 공간, 물, 교폭)가 정합니다.</p></div>
+    <figure class="diagram" id="fig-sb-types">
+      <svg viewBox="0 0 860 280" role="img" aria-label="교각 형식(벽식, 기둥식 T형, 라멘식)과 교대 형식(역T형, 반중력식)">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="60" y="0" text-anchor="middle" class="t-acc">벽식 교각</text>
+          <rect x="0" y="30" width="120" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M20 44 L100 44 L100 160 L20 160 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="6" y="160" width="108" height="16" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="60" y="198" text-anchor="middle" class="t-dim">하천(유선형 끝)</text>
+        </g>
+        <g transform="translate(190,40)">
+          <text x="60" y="0" text-anchor="middle" class="t-acc">기둥식(T형)</text>
+          <path d="M0 30 L120 30 L120 44 L74 56 L46 56 L0 44 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="46" y="56" width="28" height="104" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="22" y="160" width="76" height="16" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="60" y="198" text-anchor="middle" class="t-dim">도심·B-130(원형 φ2.0 m)</text>
+        </g>
+        <g transform="translate(350,40)">
+          <text x="70" y="0" text-anchor="middle" class="t-acc">라멘식(문형)</text>
+          <rect x="0" y="30" width="140" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="14" y="48" width="22" height="112" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="104" y="48" width="22" height="112" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="4" y="160" width="132" height="16" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="70" y="198" text-anchor="middle" class="t-dim">넓은 교폭·아래 도로</text>
+        </g>
+        <line x1="520" y1="30" x2="520" y2="230" style="stroke:var(--border);stroke-dasharray:4 4"/>
+        <g transform="translate(545,40)">
+          <text x="60" y="0" text-anchor="middle" class="t-acc">역T형 교대</text>
+          <path d="M40 30 L64 30 L64 50 L78 50 L78 150 L40 150 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="10" y="150" width="110" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M78 30 L130 30 L130 150 L78 150 Z" style="fill:var(--warn);opacity:.25"/>
+          <text x="60" y="198" text-anchor="middle" class="t-dim">높이 약 5–12 m(형태)</text>
+        </g>
+        <g transform="translate(695,40)">
+          <text x="60" y="0" text-anchor="middle" class="t-acc">반중력식 교대</text>
+          <path d="M40 30 L66 30 L66 50 L74 50 L100 150 L20 150 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M74 50 L74 30 L130 30 L130 150 L100 150 Z" style="fill:var(--warn);opacity:.25"/>
+          <text x="60" y="198" text-anchor="middle" class="t-dim">낮은 교대·좋은 지반</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-2.</b> 교각 형식(왼쪽 셋)과 교대 형식(오른쪽 둘). 하천 교각은 흐름을 덜 막도록 흐름 방향으로 길고 끝을 둥글거나 뾰족하게 만든다. 역T형 교대는 뒤꿈치(힐) 위의 흙 무게로 토압을 버티는 캔틸레버 옹벽이고, 반중력식은 자기 무게로 버틴다. 적용 높이는 경험적 형태.</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="sb-tbl">
+      <thead><tr><th>형식</th><th>장점</th><th>쓰이는 곳</th></tr></thead>
+      <tbody>
+        <tr><td>벽식 교각</td><td>강성·강도 큼, 유수에 유리(유선형)</td><td>하천, 높은 수평력</td></tr>
+        <tr><td>기둥식(T형, 원형·사각 기둥)</td><td>아래 공간이 넓고 보기 좋음, 시공 단순</td><td>도심 고가, 일반 하천교(B-130)</td></tr>
+        <tr><td>라멘식(문형)</td><td>넓은 교폭을 두 기둥으로, 교축 직각 강성 큼</td><td>넓은 교폭, 교각 아래 도로·철도</td></tr>
+        <tr><td>역T형 교대</td><td>흙 무게를 저항에 이용, 재료 경제적</td><td>일반 교대(대부분)</td></tr>
+        <tr><td>반중력식·중력식 교대</td><td>단순, 철근 적음</td><td>낮은 교대, 지지력 좋은 지반</td></tr>
+        <tr><td>라멘 교대(일체식 교대)</td><td>받침·신축 이음 없음, 유지관리 유리</td><td>짧은 교량(신축량 작은 경우)</td></tr>
+      </tbody></table></div>
+    <p>교대 양옆에는 성토 비탈이 흘러내리지 않게 막는 <span class="term">날개벽</span><span class="en">(wing wall)</span>을 둡니다. 교대 뒤 성토는 다짐이 어렵고 시간이 지나며 내려앉기 쉬워(GeotechBook <a href="../../geotech/chapters/consolidation.html">압밀</a>) 다리 들머리에 단차가 생기므로, 교대 뒤에 철근 콘크리트 <span class="term">접속 슬래브</span><span class="en">(approach slab)</span>를 걸쳐 단차를 완화합니다.</p>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="abutment">
+    <h2>교대의 토압과 안정</h2>
+    <div class="problem"><strong>교대는 다리이면서 옹벽이다</strong>
+      <p>B-130의 교대 A1은 높이 8 m의 흙을 막으면서 상부 구조 끝 반력을 받습니다. 흙은 교대를 앞으로 밀어 넘어뜨리거나 미끄러뜨리려 하고, 상부 구조의 무게는 오히려 교대를 눌러 안정시킵니다. 교대는 얼마나 넓어야 할까요?</p></div>
+    <p>교대 안정 검토는 GeotechBook <a href="../../geotech/chapters/retaining.html#wall-stability">11장 옹벽 안정</a>과 같은 세 가지 — <b>전도</b>, <b>활동</b>, <b>지지력</b> — 이고, 토압은 <a href="../../geotech/chapters/earth-pressure.html#rankine">10장 랭킨 토압</a>을 씁니다. 다른 점은 교대 위에 상부 구조 반력(연직)과 받침의 수평력이 얹힌다는 것입니다. <span class="term">역T형 교대</span><span class="en">(inverted-T abutment)</span>에서는 뒤꿈치 끝을 지나는 연직 <span class="term">가상 배면</span><span class="en">(virtual back)</span>에 랭킨 토압을 작용시키고, 가상 배면과 벽체 사이의 흙을 교대 무게에 더합니다.</p>
+    <figure class="diagram" id="fig-sb-abut">
+      <svg viewBox="0 0 860 350" role="img" aria-label="역T형 교대의 자유물체도: 기초·벽체·흙 무게, 상부 반력, 주동 토압과 상재 하중 토압, 받침 수평력, 바닥 반력">
+        <rect x="10" y="10" width="840" height="330" rx="10" class="f-surface"/>
+        <g transform="translate(170,30)">
+          <path d="M150 40 L210 40 L210 228 L150 228 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M60 228 L360 228 L360 262 L60 262 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M210 20 L360 20 L360 228 L210 228 Z" style="fill:var(--warn);opacity:.16"/>
+          <line x1="360" y1="20" x2="360" y2="262" style="stroke:var(--warn);stroke-dasharray:5 4"/>
+          <text x="366" y="16" class="t-mono" style="fill:var(--warn)">가상 배면</text>
+          <path d="M360 20 L360 262 L440 262 Z" style="fill:var(--accent-2);opacity:.15;stroke:var(--accent-2)"/>
+          <line x1="440" y1="182" x2="364" y2="182" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#sb-ah-ld)"/>
+          <text x="446" y="186" class="t-mono" style="fill:var(--accent-2)">P<tspan baseline-shift="sub" font-size="8">a</tspan> = ½γH²K<tspan baseline-shift="sub" font-size="8">a</tspan> (H/3)</text>
+          <line x1="440" y1="141" x2="364" y2="141" style="stroke:var(--accent-2);stroke-width:2;stroke-dasharray:4 3" marker-end="url(#sb-ah-ld)"/>
+          <text x="446" y="145" class="t-mono" style="fill:var(--accent-2)">P<tspan baseline-shift="sub" font-size="8">q</tspan> = qK<tspan baseline-shift="sub" font-size="8">a</tspan>H (H/2)</text>
+          <line x1="180" y1="-4" x2="180" y2="36" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#sb-ah-ld)"/>
+          <text x="186" y="2" class="t-mono" style="fill:var(--accent-2)">상부 반력 R<tspan baseline-shift="sub" font-size="8">d</tspan></text>
+          <line x1="180" y1="54" x2="120" y2="54" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#sb-ah-ld)"/>
+          <text x="40" y="50" class="t-mono" style="fill:var(--accent-2)">받침 H<tspan baseline-shift="sub" font-size="8">b</tspan></text>
+          <g style="stroke:var(--text-dim);stroke-width:2" marker-end="url(#sb-ah-t)"><line x1="180" y1="130" x2="180" y2="170"/><line x1="210" y1="240" x2="210" y2="276"/><line x1="285" y1="110" x2="285" y2="150"/></g>
+          <text x="140" y="190" class="t-mono">W<tspan baseline-shift="sub" font-size="8">벽</tspan></text><text x="218" y="290" class="t-mono">W<tspan baseline-shift="sub" font-size="8">기초</tspan></text><text x="292" y="110" class="t-mono">W<tspan baseline-shift="sub" font-size="8">흙</tspan></text>
+          <path d="M60 262 L60 300 L360 286 L360 262" style="fill:var(--ok);opacity:.15;stroke:var(--ok)"/>
+          <text x="40" y="306" class="t-mono" style="fill:var(--ok)">q<tspan baseline-shift="sub" font-size="8">max</tspan></text>
+          <circle cx="60" cy="262" r="5" style="fill:var(--bad)"/><text x="10" y="258" class="t-mono" style="fill:var(--bad)">앞굽 O</text>
+          <text x="105" y="250" class="t-mono">앞굽</text><text x="280" y="250" class="t-mono">뒤꿈치</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-3.</b> 역T형 교대의 힘(단위 폭). 주동 토압 \(P_a\)와 상재 하중 토압 \(P_q\)는 가상 배면에 수평으로 작용하고, 벽체·기초·뒤꿈치 위 흙의 무게와 상부 구조 반력 \(R_d\)가 저항한다. 전도는 앞굽 O에 대한 모멘트, 활동은 바닥 마찰, 지지력은 바닥 반력 분포의 최대값 \(q_{max}\)로 검토한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.2 (교대의 안정 검토, 교육용)</strong> 단위 폭당 연직력 합 \(V\), 수평력 합 \(\Sigma H = P_a + P_q + H_b\), 앞굽에 대한 저항 모멘트 \(M_r\)와 전도 모멘트 \(M_o\)로
+      <div class="formula">$$FS_{ot} = \frac{M_r}{M_o} \ge 2.0, \qquad FS_{sl} = \frac{V\tan\delta_b}{\Sigma H} \ge 1.5, \qquad e = \frac{B}{2} - \frac{M_r - M_o}{V} \le \frac{B}{6}, \qquad q_{max} = \frac{V}{B}\left(1 + \frac{6e}{B}\right) \le q_a$$<div class="where">\(K_a = \tan^2(45° - \phi/2)\)(랭킨, <code>CB.soil.rankine</code>), \(\tan\delta_b\): 기초 바닥 마찰 계수, \(q_a\): 허용 지지력 = 유효 폭 \(B' = B - 2e\)에 대한 극한 지지력(<code>CB.soil.bearing</code>)에 하중 경사 계수(Meyerhof 형태)를 곱해 3으로 나눈 값. 안전율의 기준값은 형태이며 하중 조합(평상시·지진 시)에 따라 다르다(현행 KDS 24 계열 확인).</div></div></div>
+    <div class="sim" id="sim-sb-abut">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>역T형 교대 안정</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sb-cv-abut" aria-label="교대 단면과 하중, 바닥 반력 분포"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>교대 높이 H <output id="sb-ab-H-out"></output></span><input type="range" id="sb-ab-H" min="4" max="12" step="0.5" value="8"></label>
+          <label class="ctrl"><span>기초 폭 B <output id="sb-ab-B-out"></output></span><input type="range" id="sb-ab-B" min="3" max="9" step="0.1" value="5"></label>
+          <label class="ctrl"><span>앞굽 길이 <output id="sb-ab-t-out"></output></span><input type="range" id="sb-ab-t" min="0.5" max="3" step="0.1" value="1.5"></label>
+          <label class="ctrl"><span>뒤채움 φ <output id="sb-ab-p-out"></output></span><input type="range" id="sb-ab-p" min="25" max="40" step="1" value="30"></label>
+          <label class="ctrl"><span>상재 하중 q <output id="sb-ab-q-out"></output></span><input type="range" id="sb-ab-q" min="0" max="30" step="1" value="10"></label>
+          <label class="ctrl"><span><i style="font-style:normal">상부 반력 R<sub>d</sub></i> <output id="sb-ab-R-out"></output></span><input type="range" id="sb-ab-R" min="0" max="400" step="5" value="160"></label>
+          <label class="ctrl"><span><i style="font-style:normal">받침 수평력 H<sub>b</sub></i> <output id="sb-ab-Hb-out"></output></span><input type="range" id="sb-ab-Hb" min="0" max="80" step="1" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">K<sub>a</sub> · P<sub>a</sub> + P<sub>q</sub></span><span class="v" id="sb-ab-ka">—</span></div>
+        <div class="stat"><span class="k">전도 FS · e</span><span class="v" id="sb-ab-ot">—</span></div>
+        <div class="stat"><span class="k">활동 FS</span><span class="v" id="sb-ab-sl">—</span></div>
+        <div class="stat"><span class="k">q<sub>max</sub> / q<sub>a</sub></span><span class="v" id="sb-ab-q2">—</span></div>
+      </div>
+      <div class="sb-msg" id="sb-ab-msg"></div>
+      <div class="sim-note">해볼 것: 상부 반력 R<sub>d</sub>를 0으로(상부 구조 가설 전) 내려 보세요 — 교대는 가설 전, 뒤채움을 먼저 한 상태가 더 위험할 수 있습니다 · 기초 폭을 줄이면 편심이 B/6를 넘어 바닥 일부가 들립니다 · 받침 수평력(지진·마찰)은 높은 곳에 작용해 전도에 크게 불리합니다 · 모델: 원리 6.2, CB.soil.rankine·CB.soil.bearing(기초 아래 조밀한 모래 자갈 φ 35°, γ 19 kN/m³, 근입 1.5 m, 하중 경사 계수 Meyerhof 형태), 콘크리트 25 kN/m³, 뒤채움 19 kN/m³, 벽체 두께 1.2 m, 기초 두께 1.2 m, 바닥 마찰 계수 0.55(모두 교육용). 직접 기초를 가정한 원리 학습용입니다.</div>
+    </div>
+    <div class="callout"><strong>예제 6.1 (B-130 교대 A1의 안정, 직접 기초 가정)</strong> 단위 폭(1 m)당. \(H = 8\) m, \(B = 5.0\) m(앞굽 1.5, 벽체 1.2, 뒤꿈치 2.3 m), 기초 두께 1.2 m, 뒤채움 \(\gamma = 19\) kN/m³, \(\phi = 30°\), 상재 하중 10 kPa, 상부 고정하중 반력 \(R_d = 1{,}784/11 \approx 162\) kN/m, \(\tan\delta_b = 0.55\)(교육용).
+      <ol class="sb-steps">
+        <li><b>토압.</b> \(K_a = \tan^2 30° = 1/3\). \(P_a = \tfrac12 \times 19 \times 8^2/3 = 202.7\) kN/m(높이 2.67 m), \(P_q = 10 \times 8/3 = 26.7\) kN/m(높이 4.0 m). \(\Sigma H = 229.3\) kN/m.</li>
+        <li><b>연직력.</b> 기초 \(25 \times 5.0 \times 1.2 = 150\), 벽체 \(25 \times 1.2 \times 6.8 = 204\), 뒤꿈치 위 흙 \(19 \times 2.3 \times 6.8 = 297.2\), 상부 반력 162 → \(V = 813\) kN/m.</li>
+        <li><b>전도.</b> \(M_r = 2{,}288\), \(M_o = 202.7 \times 2.67 + 26.7 \times 4.0 = 647\) kN·m/m → \(FS_{ot} = 3.54 \ge 2.0\). 편심 \(e = 2.5 - (2{,}288 - 647)/813 = 0.48\) m \(\le B/6 = 0.83\) m.</li>
+        <li><b>활동.</b> \(FS_{sl} = 813 \times 0.55/229.3 = 1.95 \ge 1.5\).</li>
+        <li><b>지지력.</b> \(q_{max} = (813/5.0)(1 + 6 \times 0.48/5.0) = 257\) kPa. \(B' = 4.04\) m, 하중 경사 15.7°를 반영한 \(q_u \approx 1{,}264\) kPa, \(q_a = 421\) kPa → \(q_{max}/q_a = 0.61\), 합격.</li>
+        <li><b>판정.</b> 세 검토 모두 합격(교육용 계수). 다만 B-130 부지 G-10은 지표 아래 6–14 m에 연약 점토가 있어(GeotechBook 기준 지반), 실제 교대는 직접 기초가 아니라 모래 자갈층 이하에 지지되는 말뚝 기초로 하고, 연약층의 측방 유동(교대 뒤 성토 하중으로 점토가 옆으로 밀려 말뚝을 미는 현상)을 따로 검토한다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="foundations">
+    <h2>기초</h2>
+    <p>하부 구조의 기초는 GeotechBook에서 다룬 그대로입니다. 얕은 곳에 단단한 지반이 있으면 <b>직접 기초</b>(확대 기초, <a href="../../geotech/chapters/bearing.html">지지력</a> 장), 연약층이 깊으면 <b>말뚝 기초</b>(<a href="../../geotech/chapters/piles.html">말뚝</a> 장), 물속이나 큰 하중이면 속을 파내며 가라앉히는 <span class="term">케이슨 기초</span><span class="en">(caisson foundation)</span>를 씁니다. 교량 기초가 건물 기초와 다른 점은 ① 수평력과 모멘트가 크고(지진·제동·토압), ② 하천에서는 <b>세굴</b>로 기초 주변 흙이 쓸려 나가 지지력과 수평 저항이 줄 수 있으며(15장), ③ 교대 뒤 성토가 연약층을 옆으로 밀어 말뚝에 수평력을 주는 <span class="term">측방 유동</span><span class="en">(lateral flow)</span>이 생길 수 있다는 것입니다.</p>
+    <div class="callout site"><strong>B-130의 기초(교육용 형태)</strong> 교각 P1·P2는 높이 약 12 m의 RC 원형 기둥(φ2.0 m)으로, 하천 바닥 아래 확대 기초(푸팅)와 그 아래 강관 말뚝으로 G-10의 모래 자갈층(GL −14–19 m)·풍화암에 지지된다(GeotechBook <a href="../../geotech/chapters/piles.html#pile-groups">무리 말뚝</a> 형태). 연약 점토층(GL −6–14 m)의 부마찰력과 하천 세굴 깊이(15장)를 말뚝 설계에 넣는다. 말뚝 수·지름은 이 책에서 정하지 않으며 3D 장면(10절)의 말뚝 배치는 그림용이다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="bearings">
+    <h2>받침: 고정과 가동, 탄성·포트·면진</h2>
+    <div class="problem"><strong>상판을 붙잡을 것인가, 놓아줄 것인가</strong>
+      <p>130 m의 강합성 상부 구조는 여름과 겨울 사이에 수 cm를 늘고 줍니다. 네 지점을 모두 단단히 붙잡으면 그 신축을 막는 힘이 교각을 밀어 부수고, 모두 놓아주면 바람이나 지진에 상판이 미끄러져 갑니다. 받침은 "어느 방향으로는 움직이게, 어느 방향으로는 붙잡게" 만드는 장치입니다.</p></div>
+    <figure class="diagram" id="fig-sb-bearings">
+      <svg viewBox="0 0 860 300" role="img" aria-label="받침 종류: 고정 받침과 가동 받침의 구속, 탄성 받침, 포트 받침, 납 고무 면진 받침 단면">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="100" y="0" text-anchor="middle" class="t-acc">고정 · 가동(개념)</text>
+          <rect x="10" y="30" width="190" height="12" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M40 42 L60 70 L20 70 Z" style="fill:var(--accent-2);opacity:.6"/>
+          <text x="40" y="90" text-anchor="middle" class="t-mono">고정</text>
+          <path d="M150 42 L170 64 L130 64 Z" style="fill:var(--accent);opacity:.6"/>
+          <circle cx="140" cy="68" r="4" style="fill:var(--accent)"/><circle cx="160" cy="68" r="4" style="fill:var(--accent)"/>
+          <line x1="125" y1="74" x2="175" y2="74" class="s-line"/>
+          <text x="150" y="90" text-anchor="middle" class="t-mono">가동</text>
+          <line x1="130" y1="108" x2="172" y2="108" style="stroke:var(--accent);stroke-width:2" marker-start="url(#sb-ah-acc)" marker-end="url(#sb-ah-acc)"/>
+          <text x="100" y="140" text-anchor="middle" class="t-dim">고정: 연직 + 수평 전달, 회전 허용</text>
+          <text x="100" y="160" text-anchor="middle" class="t-dim">가동: 연직만, 수평 이동 허용</text>
+        </g>
+        <g transform="translate(260,40)">
+          <text x="80" y="0" text-anchor="middle" class="t-acc">탄성(적층 고무) 받침</text>
+          <g style="stroke:var(--text-dim)">
+            <rect x="20" y="30" width="120" height="10" style="fill:var(--surface-2)"/>
+            <rect x="26" y="40" width="108" height="10" style="fill:var(--ok);opacity:.35"/><rect x="26" y="50" width="108" height="3" style="fill:var(--text-dim)"/>
+            <rect x="26" y="53" width="108" height="10" style="fill:var(--ok);opacity:.35"/><rect x="26" y="63" width="108" height="3" style="fill:var(--text-dim)"/>
+            <rect x="26" y="66" width="108" height="10" style="fill:var(--ok);opacity:.35"/>
+            <rect x="20" y="76" width="120" height="10" style="fill:var(--surface-2)"/>
+          </g>
+          <text x="80" y="106" text-anchor="middle" class="t-mono">고무층 + 강판(보강판)</text>
+          <text x="80" y="140" text-anchor="middle" class="t-dim">전단 변형으로 이동·회전</text>
+          <text x="80" y="160" text-anchor="middle" class="t-dim">수평 강성 K = GA/Σt</text>
+        </g>
+        <g transform="translate(460,40)">
+          <text x="80" y="0" text-anchor="middle" class="t-acc">포트 받침</text>
+          <path d="M20 46 L20 86 L140 86 L140 46 L128 46 L128 74 L32 74 L32 46 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="32" y="56" width="96" height="18" style="fill:var(--ok);opacity:.35;stroke:var(--text-dim)"/>
+          <rect x="30" y="40" width="100" height="16" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="10" y="28" width="140" height="8" style="fill:var(--accent);opacity:.4;stroke:var(--text-dim)"/>
+          <text x="80" y="106" text-anchor="middle" class="t-mono">강재 포트 속 고무 + PTFE 미끄럼판</text>
+          <text x="80" y="140" text-anchor="middle" class="t-dim">큰 연직력·회전, 미끄럼으로 이동</text>
+          <text x="80" y="160" text-anchor="middle" class="t-dim">마찰 계수 낮음(형태)</text>
+        </g>
+        <g transform="translate(660,40)">
+          <text x="80" y="0" text-anchor="middle" class="t-acc">면진(납 고무) 받침</text>
+          <g style="stroke:var(--text-dim)">
+            <rect x="20" y="30" width="120" height="10" style="fill:var(--surface-2)"/>
+            <rect x="26" y="40" width="108" height="36" style="fill:var(--ok);opacity:.3"/>
+            <rect x="20" y="76" width="120" height="10" style="fill:var(--surface-2)"/>
+          </g>
+          <rect x="70" y="40" width="20" height="36" style="fill:var(--text-dim);opacity:.7"/>
+          <text x="80" y="106" text-anchor="middle" class="t-mono">적층 고무 + 납 심</text>
+          <text x="80" y="140" text-anchor="middle" class="t-dim">긴 주기(고무) + 감쇠(납 항복)</text>
+          <text x="80" y="160" text-anchor="middle" class="t-dim">StructureBook 9장</text>
+        </g>
+        <text x="430" y="250" text-anchor="middle" class="t-dim">받침의 일: 연직력 전달 · 회전 허용 · 정해진 방향의 이동 허용 또는 구속 · (면진) 주기 연장과 감쇠</text>
+      </svg>
+      <figcaption><b>그림 6-4.</b> 교량 받침의 종류(단면 개념도). 고정 받침은 수평력을 하부 구조로 보내고, 가동 받침은 미끄럼이나 굴림으로 이동을 허용한다. 탄성 받침은 고무의 전단 변형으로 이동과 회전을 함께 받아 주며 그 강성에 비례해 수평력을 나눈다. 포트 받침은 강재 그릇 속 고무가 회전을, 위의 미끄럼판이 이동을 맡는다. 면진 받침은 고무로 주기를 늘리고 납의 항복으로 에너지를 흡수한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 6.3 (고정 받침과 가동 받침)</strong> <span class="term">고정 받침</span><span class="en">(fixed bearing)</span>은 연직력과 수평력을 모두 전달하고 회전만 허용한다. <span class="term">가동 받침</span><span class="en">(expansion bearing, movable bearing)</span>은 연직력을 전달하면서 한 방향(일방향) 또는 모든 방향(양방향)의 수평 이동을 허용한다. 상부 구조 한 연속 단위에서 교축 방향으로 붙잡힌 점을 <span class="term">고정점</span><span class="en">(fixed point)</span>이라 하며, 신축은 고정점에서 양 끝으로 퍼져 나간다. 재료·구조에 따라 <span class="term">탄성 받침</span><span class="en">(elastomeric bearing)</span>, <span class="term">포트 받침</span><span class="en">(pot bearing)</span>, 강재 받침, <span class="term">면진 받침</span><span class="en">(seismic isolation bearing)</span>(대표적으로 <span class="term">납 고무 받침</span><span class="en">(lead rubber bearing, LRB)</span>)으로 나눈다.</div>
+    <p><b>받침 반력과 들림.</b> 받침은 대개 아래로 누르는 힘(압축)만 받도록 만들어집니다. 그런데 ① 활하중이 교폭 한쪽으로 치우치면 반대쪽 받침의 반력이 줄고, ② 연속교의 끝 경간이 짧으면 가운데 경간에 실린 하중이 끝 지점을 들어 올리며(연속보의 부반력), ③ 곡선교·사교에서는 비틀림이 한쪽 받침을 들어 올립니다. 고정하중 반력보다 들어 올리는 힘이 크면 받침이 들리고(<span class="term">들림</span><span class="en">(uplift)</span>) 상판이 덜컹거리며 받침이 빠질 수 있으므로, 들림 방지 장치(앵커·카운터웨이트)를 두거나 경간 비를 바꿉니다.</p>
+    <div class="callout def"><strong>원리 6.4 (편재 하중의 받침 반력, 강체 가로보 가정)</strong> 한 지점에 받침 \(n\)개가 교축 직각 위치 \(x_i\)(교량 중심에서)에 있고, 그 지점의 연직 반력 \(R\)이 편심 \(e\)로 작용하면
+      <div class="formula">$$R_i = \frac{R}{n} + \frac{R\,e\,x_i}{\sum x_j^2}$$<div class="where">가로보(다이아프램)가 강체처럼 돈다고 본 교육용 근사(3장 횡분배의 강체 가정과 같은 꼴). B-130은 거더 4주, \(x = \pm1.4, \pm4.2\) m, \(\sum x^2 = 39.2\) m². 지점 반력 \(R\)은 연속보 해석(<code>CB.beam</code>)으로 구하며, 활하중의 부반력을 따로 찾아 고정하중 반력과 더한다.</div></div></div>
+    <div class="sim" id="sim-sb-bearing">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>받침 반력과 들림</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sb-stack">
+          <div><canvas id="sb-cv-brg-l" aria-label="3경간 연속교 입면과 활하중 재하 위치"></canvas><span class="sb-cap">교축 방향: 끝 지점 A1 반력</span></div>
+          <div><canvas id="sb-cv-brg" aria-label="A1 단면의 받침 네 개와 받침별 반력 막대"></canvas><span class="sb-cap">A1 단면: 받침 반력</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>끝 경간 L₁ (가운데 50 m) <output id="sb-br-L-out"></output></span><input type="range" id="sb-br-L" min="10" max="45" step="1" value="40"></label>
+          <div class="ctrl"><span>활하중 재하</span><div class="seg" id="sb-br-case"><button data-value="max" class="on">끝 경간(최대)</button><button data-value="min">가운데 경간(부반력)</button></div></div>
+          <label class="ctrl"><span>차로 편심 e <output id="sb-br-e-out"></output></span><input type="range" id="sb-br-e" min="0" max="4" step="0.1" value="3.5"></label>
+          <label class="ctrl"><span><i style="font-style:normal">고정하중 w<sub>D</sub></i> <output id="sb-br-w-out"></output></span><input type="range" id="sb-br-w" min="60" max="200" step="5" value="120"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">A1 반력 D · L(1+IM)</span><span class="v" id="sb-br-R">—</span></div>
+        <div class="stat"><span class="k">최대 받침</span><span class="v" id="sb-br-max">—</span></div>
+        <div class="stat"><span class="k">최소 받침</span><span class="v" id="sb-br-min">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="sb-br-ok">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: B-130(끝 경간 40 m)은 어떤 재하에도 들리지 않습니다 · 끝 경간을 20 m로 줄이고 '가운데 경간'을 고르면 끝 지점 고정하중 반력이 150 kN으로 작아지고 부반력이 이겨 받침이 들립니다 · 차로 편심을 0으로 하면 네 받침이 같아집니다 · 모델: 원리 6.4, 끝 지점 반력은 CB.beam 연속보(경간 L₁ + 50 + L₁), 활하중은 1차로 TRUCK(510 kN, 집중으로 단순화) + 차로 하중 12.7 kN/m, 충격 CB.civ.impact(재하 경간), 1차로만(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 6.2 (끝 경간이 짧은 연속교의 들림)</strong> 경간 20 + 50 + 20 m, 고정하중 120 kN/m, 받침 4개(\(\sum x^2 = 39.2\) m²), 1차로 하중이 교량 중심에서 \(e = 3.5\) m 치우쳐 가운데 경간에 실린다(트럭 510 kN을 가운데 경간 중앙에 집중 + 차로 하중 12.7 kN/m, 교육용).
+      <ol class="sb-steps">
+        <li><b>고정하중 반력.</b> 연속보 해석으로 끝 지점 \(D = 150\) kN — 경간 40 m(B-130)일 때의 1,784 kN보다 훨씬 작다. 받침당 37.5 kN.</li>
+        <li><b>활하중 부반력.</b> 가운데 경간 재하로 끝 지점 \(L = -230\) kN, 충격 \(IM = 15/(40 + 50) = 0.167\) → \(-269\) kN.</li>
+        <li><b>가까운 쪽 받침.</b> \(x = 4.2\) m: 계수 \(1/4 + 3.5 \times 4.2/39.2 = 0.625\) → \(R = 37.5 + 0.625 \times (-269) = -130\) kN.</li>
+        <li><b>판정.</b> 음수 = 들림. 끝 경간/가운데 경간 비 0.4에서 들림이 생긴다. B-130(0.8)은 고정하중 반력 446 kN/받침이 커서 같은 재하에도 377 kN 이상 남는다. 대책은 경간 비 조정, 끝 가로보에 카운터웨이트, 들림 방지 앵커다(설계 하중 조합은 기준 확인).</li>
+      </ol></div>
+    <p><b>탄성 받침의 설계.</b> 적층 고무 받침은 얇은 고무층 사이에 강판을 넣어, 연직으로는 단단하고(고무가 옆으로 부풀지 못함) 수평으로는 무르게(고무층 전체가 전단 변형) 만든 것입니다. 고무층 하나가 얼마나 납작한지를 나타내는 <span class="term">형상 계수</span><span class="en">(shape factor)</span>가 클수록 압축 강성과 허용 압축 응력이 커집니다.</p>
+    <div class="callout def"><strong>원리 6.5 (적층 고무 받침, AASHTO 방법 A 형태)</strong> 평면 \(a \times b\), 고무층 두께 \(t\), 층수 \(n\)(총 고무 두께 \(\Sigma t = n t\)), 전단 탄성계수 \(G\)일 때
+      <div class="formula">$$S = \frac{ab}{2t(a + b)}, \qquad \sigma_c = \frac{P}{ab} \le \min(1.0\,GS,\ 약\ 7\ \text{MPa}), \qquad \gamma_s = \frac{\Delta}{\Sigma t} \le 0.5, \qquad K_h = \frac{G\,ab}{\Sigma t}$$<div class="where">\(\gamma_s\): 신축 이동량 \(\Delta\)에 의한 전단 변형률, \(K_h\): 수평 강성(교각 수평력 분배에 쓴다, 7절). 안정을 위해 \(\Sigma t \le \min(a, b)/3\)(형태). 한계값은 AASHTO LRFD 방법 A의 형태이며 국내 기준과 제품 규격을 확인한다. 고무의 \(G\)는 약 0.6–1.2 MPa(경도에 따라, 형태).</div></div></div>
+    <div class="sim" id="sim-sb-elasto">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>적층 고무 받침 설계</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sb-cv-elasto" aria-label="적층 고무 받침의 측면과 전단 변형"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>교축 방향 a <output id="sb-el-a-out"></output></span><input type="range" id="sb-el-a" min="250" max="800" step="10" value="450"></label>
+          <label class="ctrl"><span>교축 직각 b <output id="sb-el-b-out"></output></span><input type="range" id="sb-el-b" min="250" max="900" step="10" value="600"></label>
+          <label class="ctrl"><span>고무층 두께 t <output id="sb-el-t-out"></output></span><input type="range" id="sb-el-t" min="6" max="20" step="1" value="12"></label>
+          <label class="ctrl"><span>층수 n <output id="sb-el-n-out"></output></span><input type="range" id="sb-el-n" min="2" max="14" step="1" value="7"></label>
+          <label class="ctrl"><span>연직 하중 P <output id="sb-el-P-out"></output></span><input type="range" id="sb-el-P" min="100" max="3000" step="10" value="1000"></label>
+          <label class="ctrl"><span>이동량 Δ <output id="sb-el-d-out"></output></span><input type="range" id="sb-el-d" min="0" max="100" step="0.5" value="37.8"></label>
+          <label class="ctrl"><span>전단 탄성계수 G <output id="sb-el-G-out"></output></span><input type="range" id="sb-el-G" min="0.6" max="1.2" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">형상 계수 S</span><span class="v" id="sb-el-S">—</span></div>
+        <div class="stat"><span class="k">σ<sub>c</sub> / 한계</span><span class="v" id="sb-el-sc">—</span></div>
+        <div class="stat"><span class="k">γ<sub>s</sub> / 0.5</span><span class="v" id="sb-el-g">—</span></div>
+        <div class="stat"><span class="k">K<sub>h</sub> · 수평력</span><span class="v" id="sb-el-K">—</span></div>
+      </div>
+      <div class="sb-msg" id="sb-el-msg"></div>
+      <div class="sim-note">해볼 것: 층을 두껍게(t 20 mm) 하면 형상 계수가 떨어져 허용 압축 응력이 줄어듭니다 · 이동량이 커지면 층수를 늘려 Σt를 키워야 하는데, 그러면 수평 강성이 떨어지고 높이 안정 한계(Σt ≤ a/3)에 걸립니다 · 수평력 K<sub>h</sub>Δ는 온도 신축 때 하부 구조에 전해지는 힘입니다 · 모델: 원리 6.5(AASHTO 방법 A 형태, 교육용). 강판 두께와 덮개 고무는 넣지 않았습니다.</div>
+    </div>
+    <div class="callout"><strong>예제 6.3 (B-130 교대 A2 받침)</strong> 450 × 600 mm, 고무층 12 mm × 7층(Σt = 84 mm), \(G = 1.0\) MPa, 연직 하중 1,000 kN(고정 + 활, 교육용), 이동량 37.8 mm(예제 6.4의 수축).
+      <ol class="sb-steps">
+        <li><b>형상 계수.</b> \(S = 450 \times 600/(2 \times 12 \times 1{,}050) = 10.7\).</li>
+        <li><b>압축.</b> \(\sigma_c = 1{,}000 \times 10^3/270{,}000 = 3.70\) MPa ≤ \(\min(10.7, 7) = 7\) MPa — 합격.</li>
+        <li><b>전단.</b> \(\gamma_s = 37.8/84 = 0.45 \le 0.5\) — 합격(여유 작음).</li>
+        <li><b>강성과 수평력.</b> \(K_h = 1.0 \times 270{,}000/84 = 3{,}214\) N/mm(= kN/m). 37.8 mm 수축 때 받침 하나가 \(3{,}214 \times 0.0378 = 121\) kN을 교대에 전한다(4개 486 kN).</li>
+        <li><b>판정.</b> 합격. 안정 \(\Sigma t = 84 \le 450/3 = 150\) mm. 이 받침 4개의 수평 강성 12,860 kN/m가 7절 수평력 분배의 "탄성 받침" 값이다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="joints">
+    <h2>신축 이음과 온도 신축량</h2>
+    <div class="problem"><strong>다리 끝의 틈은 얼마나 벌어지나</strong>
+      <p>B-130의 끝에는 상판과 교대 사이의 틈을 덮는 <span class="term">신축 이음</span><span class="en">(expansion joint)</span>이 있습니다. 겨울에는 틈이 벌어지고 여름에는 좁아집니다. 여름에 틈이 닫혀 상판이 교대를 밀면 안 되고, 겨울에 너무 벌어져 바퀴가 빠지거나 덮개가 빠져나와도 안 됩니다.</p></div>
+    <figure class="diagram" id="fig-sb-joint">
+      <svg viewBox="0 0 860 260" role="img" aria-label="고정점에서 양 끝으로 퍼지는 신축과 신축 이음의 유간">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="40" y="40" width="700" height="16" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:var(--accent)"><path d="M48 56 L58 72 L38 72 Z"/><path d="M732 56 L742 72 L722 72 Z"/><path d="M473 56 L483 72 L463 72 Z"/></g>
+          <path d="M255 56 L265 72 L245 72 Z" style="fill:var(--accent-2)"/>
+          <text x="255" y="92" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">고정점(P1)</text>
+          <text x="48" y="92" text-anchor="middle" class="t-mono">A1</text><text x="473" y="92" text-anchor="middle" class="t-mono">P2</text><text x="732" y="92" text-anchor="middle" class="t-mono">A2</text>
+          <line x1="245" y1="20" x2="60" y2="20" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#sb-ah-ld)"/>
+          <line x1="265" y1="20" x2="720" y2="20" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#sb-ah-ld)"/>
+          <text x="150" y="12" text-anchor="middle" class="t-mono">40 m → Δ 작음</text>
+          <text x="490" y="12" text-anchor="middle" class="t-mono">90 m → Δ 큼</text>
+          <rect x="20" y="40" width="20" height="60" style="fill:var(--warn);opacity:.25"/><rect x="740" y="40" width="20" height="60" style="fill:var(--warn);opacity:.25"/>
+          <g transform="translate(560,120)">
+            <rect x="0" y="0" width="120" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+            <rect x="150" y="0" width="80" height="18" style="fill:var(--warn);opacity:.3;stroke:var(--text-dim)"/>
+            <line x1="120" y1="34" x2="150" y2="34" style="stroke:var(--accent);stroke-width:2" marker-start="url(#sb-ah-acc)" marker-end="url(#sb-ah-acc)"/>
+            <text x="135" y="54" text-anchor="middle" class="t-mono" style="fill:var(--accent)">유간 g</text>
+            <text x="-20" y="80" class="t-dim">설치 유간 = 최대 팽창량 + 최소 여유</text>
+          </g>
+          <text x="20" y="160" class="t-dim">Δ = α · L(고정점에서 거리) · ΔT  +  크리프·건조 수축</text>
+          <text x="20" y="184" class="t-dim">가동 받침과 신축 이음은 고정점에서 먼 쪽일수록 큰 이동을 받는다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-5.</b> 고정점과 신축. 상부 구조는 고정점(주황 받침)을 기준으로 양쪽으로 늘고 준다. B-130에서 P1을 고정하면 A1 쪽 이음은 40 m, A2 쪽 이음은 90 m만큼의 신축을 받는다. 신축 이음의 설치 유간은 설치 온도에서 최대 팽창까지 닫히는 양에 최소 여유를 더한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.6 (신축량과 유간)</strong> 고정점에서 이음까지 거리 \(L\), 선팽창 계수 \(\alpha\), 설치 온도 \(T_0\), 설계 온도 범위 \(T_{min}\)–\(T_{max}\), 크리프·건조 수축의 등가 수축 변형률 \(\varepsilon_{cs}\)일 때
+      <div class="formula">$$\Delta_{+} = \alpha L (T_{max} - T_0), \qquad \Delta_{-} = \alpha L (T_0 - T_{min}) + \varepsilon_{cs} L, \qquad g_0 = \Delta_{+} + g_{min}$$<div class="where">\(\Delta_+\): 팽창(유간이 닫힘), \(\Delta_-\): 수축(유간이 벌어짐), \(g_0\): 설치 <span class="term">유간</span><span class="en">(joint gap)</span>, \(g_{min}\): 최대 팽창 때 남길 여유. 강 \(\alpha \approx 1.2 \times 10^{-5}\)/°C, 콘크리트 약 \(1.0 \times 10^{-5}\)/°C. 강합성교는 크리프·수축의 영향이 작고, PSC 교는 수백 \(\mu\)의 수축이 더해진다(MaterialsBook <a href="../../materials/chapters/shrinkage.html">수축·크리프</a>). 설계 온도 범위는 지역과 교량 형식에 따라 기준이 정한다(현행 KDS 24 12 확인, 이 장의 −20–+45 °C는 교육용).</div></div></div>
+    <div class="sim" id="sim-sb-thermal">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>온도 신축량과 신축 이음 유간</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sb-cv-thermal" aria-label="교량 입면과 고정점, 양 끝의 신축량 화살표, 계절별 유간"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>고정점</span><div class="seg" id="sb-th-fix"><button data-value="0">A1</button><button data-value="40" class="on">P1</button><button data-value="65">중앙(탄성)</button></div></div>
+          <div class="ctrl"><span>재료</span><div class="seg" id="sb-th-mat"><button data-value="steel" class="on">강합성</button><button data-value="psc">PSC</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">최저 기온 T<sub>min</sub></i> <output id="sb-th-lo-out"></output></span><input type="range" id="sb-th-lo" min="-35" max="0" step="1" value="-20"></label>
+          <label class="ctrl"><span><i style="font-style:normal">최고 온도 T<sub>max</sub></i> <output id="sb-th-hi-out"></output></span><input type="range" id="sb-th-hi" min="25" max="60" step="1" value="45"></label>
+          <label class="ctrl"><span><i style="font-style:normal">설치 온도 T<sub>0</sub></i> <output id="sb-th-t0-out"></output></span><input type="range" id="sb-th-t0" min="-10" max="35" step="1" value="15"></label>
+          <label class="ctrl"><span><i style="font-style:normal">크리프·수축 ε<sub>cs</sub></i> <output id="sb-th-cs-out"></output></span><input type="range" id="sb-th-cs" min="0" max="500" step="10" value="0"></label>
+          <label class="ctrl"><span><i style="font-style:normal">최소 여유 g<sub>min</sub></i> <output id="sb-th-g-out"></output></span><input type="range" id="sb-th-g" min="5" max="50" step="1" value="20"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">A2 이음 Δ₊ · Δ₋</span><span class="v" id="sb-th-a2">—</span></div>
+        <div class="stat"><span class="k">A1 이음 Δ₊ · Δ₋</span><span class="v" id="sb-th-a1">—</span></div>
+        <div class="stat"><span class="k">A2 설치 유간 · 최대 유간</span><span class="v" id="sb-th-gap">—</span></div>
+        <div class="stat"><span class="k">이음 형식(형태)</span><span class="v" id="sb-th-type">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 고정점을 A1로 옮기면 A2 이음이 130 m 전체의 신축(약 100 mm)을 받고 A1 이음은 거의 움직이지 않습니다 · 탄성 받침으로 중앙을 고정점으로 만들면 양 끝이 65 m씩 나눕니다 · PSC를 고르면 크리프·수축(기본 300 μ)이 수축 쪽에만 더해집니다 · 설치 온도가 높으면 설치 유간은 줄고 겨울 최대 유간은 커집니다 · 모델: 원리 6.6, B-130 경간 40 + 50 + 40 m(교육용). 이음 형식 구분은 이동량에 따른 대략의 형태입니다(제품 규격 확인).</div>
+    </div>
+    <div class="callout"><strong>예제 6.4 (B-130 신축 이음)</strong> 강합성 \(\alpha = 1.2 \times 10^{-5}\)/°C, 설계 온도 −20–+45 °C, 설치 15 °C, 고정점 P1, \(g_{min} = 20\) mm(모두 교육용).
+      <ol class="sb-steps">
+        <li><b>A2 이음(90 m).</b> \(\Delta_+ = 1.2 \times 10^{-5} \times 90{,}000 \times 30 = 32.4\) mm, \(\Delta_- = 1.2 \times 10^{-5} \times 90{,}000 \times 35 = 37.8\) mm, 합 70.2 mm.</li>
+        <li><b>A1 이음(40 m).</b> \(\Delta_+ = 14.4\) mm, \(\Delta_- = 16.8\) mm, 합 31.2 mm.</li>
+        <li><b>유간.</b> A2 설치 유간 \(g_0 = 32.4 + 20 = 52.4\) mm, 겨울 최대 \(52.4 + 37.8 = 90.2\) mm.</li>
+        <li><b>PSC였다면.</b> \(\alpha = 1.0 \times 10^{-5}\), \(\varepsilon_{cs} = 300 \times 10^{-6}\)이면 A2의 수축 \(31.5 + 27 = 58.5\) mm로 수축 쪽이 크게 늘어난다.</li>
+        <li><b>판정.</b> A2는 이동량 약 70 mm로 고무계 단순 이음보다 큰 이동을 받는 형식(핑거·레일형 등, 형태)이 필요하다. 지진 시 상대 변위(7–9절)가 더해지면 이음이 파손될 수 있으며, 면진 교량에서는 이음이 면진 변위를 받을 수 있어야 한다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="pier-forces">
+    <h2>교각의 수평력 분배</h2>
+    <div class="problem"><strong>지진 때 어느 교각이 일하나</strong>
+      <p>상부 구조는 하나의 덩어리라 지진 때 교축 방향으로 한꺼번에 움직입니다. 그 관성력은 상부 구조를 붙잡고 있는 하부 구조들이 나눠 받는데, 가동 받침 위의 교각은 거의 받지 않고, 고정 받침 위의 교각은 전부를 받습니다. 탄성 받침이면 받침과 교각의 강성에 따라 나눕니다.</p></div>
+    <figure class="diagram" id="fig-sb-springs">
+      <svg viewBox="0 0 860 260" role="img" aria-label="상부 구조를 붙잡는 하부 구조의 스프링: 교각 강성과 받침 강성의 직렬 연결, 병렬 합">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="40" y="20" width="700" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="390" y="14" text-anchor="middle" class="t-mono">상부 구조 질량 m(강체로 함께 움직임) → 변위 d</text>
+          <line x1="20" y1="29" x2="-6" y2="29" style="stroke:var(--accent-2);stroke-width:3" marker-start="url(#sb-ah-ld)"/>
+          <text x="-6" y="56" class="t-mono" style="fill:var(--accent-2)">F</text>
+          <g transform="translate(270,38)">
+            <path d="M0 0 L0 10 L-8 14 L8 20 L-8 26 L8 32 L0 36 L0 44" style="fill:none;stroke:var(--ok);stroke-width:2"/>
+            <text x="12" y="26" class="t-mono" style="fill:var(--ok)">k<tspan baseline-shift="sub" font-size="8">b</tspan> 받침</text>
+            <rect x="-14" y="44" width="28" height="100" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+            <text x="20" y="100" class="t-mono">k<tspan baseline-shift="sub" font-size="8">p</tspan> = 3EI/h³</text>
+          </g>
+          <g transform="translate(500,38)">
+            <path d="M0 0 L0 10 L-8 14 L8 20 L-8 26 L8 32 L0 36 L0 44" style="fill:none;stroke:var(--ok);stroke-width:2"/>
+            <rect x="-14" y="44" width="28" height="70" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+            <text x="20" y="90" class="t-mono">짧은 교각: k 큼</text>
+          </g>
+          <text x="40" y="190" class="t-dim">한 지점: 받침과 교각은 직렬 → 1/k = 1/k<tspan baseline-shift="sub" font-size="8">b</tspan> + 1/k<tspan baseline-shift="sub" font-size="8">p</tspan> · 지점끼리는 병렬 → K = Σk<tspan baseline-shift="sub" font-size="8">i</tspan>, F<tspan baseline-shift="sub" font-size="8">i</tspan> = (k<tspan baseline-shift="sub" font-size="8">i</tspan>/K)F</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-6.</b> 교축 방향 수평력 분배 모형. 상부 구조를 강체 질량으로, 각 지점을 받침 스프링과 교각 스프링의 직렬 연결로 본다. 가동 받침은 \(k_b \approx 0\)(마찰 무시)이라 그 지점은 힘을 받지 않고, 고정 받침은 \(k_b \to \infty\)라 교각 강성이 그대로 들어간다. 짧고 굵은 교각일수록 강성이 커서 더 많은 힘을 받는다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.7 (강성 비에 의한 수평력 분배)</strong> 기초에 고정된 높이 \(h\)의 캔틸레버 교각 강성 \(k_p = 3EI_{eff}/h^3\), 받침의 수평 강성 \(k_b\)일 때 지점 강성 \(k_i = (1/k_b + 1/k_p)^{-1}\), 전체 강성 \(K = \sum k_i\), 상부 구조 무게 \(W\)에 대해
+      <div class="formula">$$T = 2\pi\sqrt{\frac{W}{gK}}, \qquad F = S_a(T)\,W, \qquad F_i = \frac{k_i}{K}F, \qquad M_{base,i} = F_i\,h_i, \qquad d = \frac{F}{K}$$<div class="where">단일 모드(교축 방향 1자유도) 근사. \(I_{eff}\): 균열을 고려한 유효 단면 2차 모멘트(이 장 0.5\(I_g\), 교육용), \(S_a\): 설계 스펙트럼(이 장은 StructureBook 8장의 G-10 값 \(S_{DS} = 0.50\), \(S_{D1} = 0.29\)를 교육용으로 빌린 탄성 스펙트럼, 응답 수정 계수 미적용). 교량의 설계 지진은 KDS 24 17 계열을 확인한다. 교대는 강체(\(k_p \to \infty\))로 본다.</div></div></div>
+    <div class="sim" id="sim-sb-pier">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>교각 수평력 분배(교축 방향 지진)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sb-cv-pier" aria-label="B-130 입면과 지점별 받침 종류, 수평력 분담 막대"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>받침 배치(A1 · P1 · P2 · A2)</span>
+            <div class="sb-sup"><b>A1</b><div class="seg" id="sb-pf-s0"><button data-value="fix">고정</button><button data-value="mov" class="on">가동</button><button data-value="ela">탄성</button></div></div>
+            <div class="sb-sup"><b>P1</b><div class="seg" id="sb-pf-s1"><button data-value="fix" class="on">고정</button><button data-value="mov">가동</button><button data-value="ela">탄성</button></div></div>
+            <div class="sb-sup"><b>P2</b><div class="seg" id="sb-pf-s2"><button data-value="fix">고정</button><button data-value="mov" class="on">가동</button><button data-value="ela">탄성</button></div></div>
+            <div class="sb-sup"><b>A2</b><div class="seg" id="sb-pf-s3"><button data-value="fix">고정</button><button data-value="mov" class="on">가동</button><button data-value="ela">탄성</button></div></div>
+          </div>
+          <label class="ctrl"><span>P1 높이 h₁ <output id="sb-pf-h1-out"></output></span><input type="range" id="sb-pf-h1" min="5" max="30" step="0.5" value="12"></label>
+          <label class="ctrl"><span>P2 높이 h₂ <output id="sb-pf-h2-out"></output></span><input type="range" id="sb-pf-h2" min="5" max="30" step="0.5" value="12"></label>
+          <label class="ctrl"><span>기둥 지름 D <output id="sb-pf-D-out"></output></span><input type="range" id="sb-pf-D" min="1.2" max="3.5" step="0.1" value="2"></label>
+          <div class="btn-row"><button class="btn" id="sb-pf-ela">모두 탄성</button><button class="btn" id="sb-pf-ref">P1 고정(기본)</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">K · T</span><span class="v" id="sb-pf-K">—</span></div>
+        <div class="stat"><span class="k">S<sub>a</sub> · F</span><span class="v" id="sb-pf-F">—</span></div>
+        <div class="stat"><span class="k">최대 교각 밑면 모멘트</span><span class="v" id="sb-pf-M">—</span></div>
+        <div class="stat"><span class="k">상부 변위 d</span><span class="v" id="sb-pf-d">—</span></div>
+      </div>
+      <div class="sb-msg" id="sb-pf-msg"></div>
+      <div class="sim-note">해볼 것: 기본(P1만 고정)에서는 P1 하나가 지진력 전부를 받습니다 · P2도 고정으로 바꾸면 강성이 두 배가 되어 주기가 짧아지고 전체 지진력은 커지지만 교각 하나의 몫은 줄어듭니다 · 두 교각 높이를 다르게(예: 8 m와 16 m) 하면 짧은 교각이 강성이 8배라 거의 다 받습니다 — 짧은 교각에 피해가 몰리는 이유입니다 · '모두 탄성'은 교대도 함께 일하게 합니다 · 모델: 원리 6.7(교육용 1자유도), W = 15,600 kN, E<sub>c</sub> = 27,000 MPa, I<sub>eff</sub> = 0.5I<sub>g</sub>, 탄성 받침 4개 k<sub>b</sub> = 12,860 kN/m(예제 6.3), 교대는 강체, 가동 받침 마찰 무시.</div>
+    </div>
+    <div class="callout"><strong>예제 6.5 (B-130 교축 방향 지진력의 분배)</strong> \(W = 15{,}600\) kN(질량 1,590 t), 교각 φ2.0 m, \(h = 12\) m, \(E_c = 27{,}000\) MPa, \(I_{eff} = 0.5 \times \pi \times 2^4/64 = 0.393\) m⁴(교육용).
+      <ol class="sb-steps">
+        <li><b>교각 강성.</b> \(k_p = 3 \times 27 \times 10^6 \times 0.393/12^3 = 18{,}400\) kN/m.</li>
+        <li><b>P1만 고정.</b> \(K = 18{,}400\), \(T = 2\pi\sqrt{1{,}590/18{,}400} = 1.85\) s, \(S_a = 0.29/1.85 = 0.157\) → \(F = 2{,}450\) kN을 P1 혼자 받아 밑면 모멘트 \(2{,}450 \times 12 = 29{,}400\) kN·m, 상부 변위 133 mm.</li>
+        <li><b>모두 탄성 받침.</b> 교각 지점 \(k = (1/12{,}860 + 1/18{,}400)^{-1} = 7{,}570\), 교대 지점 12,860 kN/m → \(K = 40{,}850\), \(T = 1.24\) s, \(S_a = 0.234\), \(F = 3{,}650\) kN. 교대가 각 31.5 %(1,150 kN), 교각이 각 18.5 %(676 kN) → 교각 모멘트 8,110 kN·m, 변위 89 mm.</li>
+        <li><b>판정.</b> 탄성 받침으로 힘을 고르게 나누면 전체 지진력은 49 % 커지지만(주기가 짧아져서) 교각 하나의 모멘트는 72 % 준다. 어느 쪽이 나은지는 교각·교대·기초의 저항과 변위 허용치가 정한다. 변위가 크면 9절의 면진으로 간다. 탄성 스펙트럼을 그대로 쓴 교육용 계산이며 연성(응답 수정 계수)과 교축 직각 방향은 따로 검토한다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="unseating">
+    <h2>받침 지지 길이와 낙교 방지</h2>
+    <div class="problem"><strong>상판이 받침 자리에서 떨어지지 않으려면</strong>
+      <p>예제 6.5에서 B-130의 상부 구조는 지진 때 89–133 mm 움직였습니다. 교각과 교대가 서로 반대로 흔들리고, 지반이 늘어나거나(액상화), 받침이 부서지면 상대 변위는 훨씬 커집니다. 상판 끝이 걸쳐 있는 받침 자리의 폭이 그보다 좁으면 상판은 떨어집니다.</p></div>
+    <figure class="diagram" id="fig-sb-seat">
+      <svg viewBox="0 0 860 250" role="img" aria-label="받침 지지 길이 N: 거더 끝에서 받침 자리 끝까지의 거리와 지진 시 상대 변위, 낙교 방지 장치">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g transform="translate(120,40)">
+          <path d="M0 80 L300 80 L300 180 L0 180 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="40" y="160" class="t-mono">교대 · 교각 머리</text>
+          <rect x="60" y="20" width="420" height="44" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="380" y="46" class="t-mono">거더</text>
+          <rect x="190" y="64" width="40" height="16" style="fill:var(--accent-2);opacity:.6"/>
+          <text x="210" y="100" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">받침</text>
+          <line x1="60" y1="8" x2="0" y2="8" style="stroke:var(--accent);stroke-width:2" marker-start="url(#sb-ah-acc)" marker-end="url(#sb-ah-acc)"/>
+          <text x="30" y="2" text-anchor="middle" class="t-mono" style="fill:var(--accent)">(앞)</text>
+          <line x1="0" y1="200" x2="300" y2="200" style="stroke:var(--ok);stroke-width:2" marker-start="url(#sb-ah-ok)" marker-end="url(#sb-ah-ok)"/>
+          <text x="150" y="218" text-anchor="middle" class="t-mono" style="fill:var(--ok)">받침 지지 길이 N(거더 끝 ~ 받침 자리 끝)</text>
+          <path d="M60 64 L60 80" style="stroke:var(--bad);stroke-dasharray:3 2"/>
+          <line x1="60" y1="120" x2="0" y2="120" style="stroke:var(--bad);stroke-width:2" marker-end="url(#sb-ah-t)"/>
+          <text x="66" y="124" class="t-mono" style="fill:var(--bad)">지진 상대 변위 d가 N을 넘으면 낙교</text>
+          <g transform="translate(470,60)">
+            <rect x="0" y="0" width="160" height="60" rx="6" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+            <text x="80" y="22" text-anchor="middle" class="t-mono" style="fill:var(--accent)">낙교 방지 장치</text>
+            <text x="80" y="42" text-anchor="middle" class="t-dim">연결 케이블·스토퍼</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-7.</b> <span class="term">받침 지지 길이</span><span class="en">(seat length, support length)</span>. 거더 끝에서 받침 자리(교대 또는 코핑) 끝까지의 거리로, 지진 때 받침이 부서지고 상부 구조가 미끄러져도 떨어지지 않도록 넉넉히 둔다. 그 위에 상부 구조와 하부 구조(또는 이웃 상부 구조)를 잇는 <span class="term">낙교 방지 장치</span><span class="en">(unseating prevention device)</span>를 둔다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.8 (최소 받침 지지 길이, AASHTO LRFD 형태)</strong> 이음까지의 상부 구조 길이 \(L\)(mm), 교각 평균 높이 \(H\)(mm), 사각 \(S\)(°)에 대해
+      <div class="formula">$$N = (200 + 0.0017L + 0.0067H)(1 + 0.000125\,S^2)\ \text{mm}$$<div class="where">미국 AASHTO LRFD의 최소 지지 길이 식(SI 형태)이며 지진 구역에 따라 이 값에 비율을 곱한다. 국내 도로교 내진 설계(KDS 24 17 계열)도 경간·교각 높이·사각에 따른 최소 지지 길이와 낙교 방지 장치를 규정한다(현행 기준 확인). 사각이 크면 상부 구조가 돌며 한쪽 모서리가 빠지기 쉬워 지지 길이를 늘린다.</div></div></div>
+    <div class="sim" id="sim-sb-seat">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>받침 지지 길이와 낙교 판정</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sb-cv-seat" aria-label="거더 끝과 받침 자리, 지진 변위 후 남은 걸침 길이"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>상부 구조 길이 L <output id="sb-se-L-out"></output></span><input type="range" id="sb-se-L" min="20" max="400" step="5" value="130"></label>
+          <label class="ctrl"><span>교각 높이 H <output id="sb-se-H-out"></output></span><input type="range" id="sb-se-H" min="0" max="40" step="0.5" value="12"></label>
+          <label class="ctrl"><span>사각 S <output id="sb-se-S-out"></output></span><input type="range" id="sb-se-S" min="0" max="60" step="1" value="0"></label>
+          <label class="ctrl"><span><i style="font-style:normal">설치 지지 길이 N<sub>prov</sub></i> <output id="sb-se-N-out"></output></span><input type="range" id="sb-se-N" min="200" max="1000" step="10" value="600"></label>
+          <label class="ctrl"><span>지진 상대 변위 d <output id="sb-se-d-out"></output></span><input type="range" id="sb-se-d" min="0" max="900" step="5" value="133"></label>
+          <div class="ctrl"><span>낙교 방지 장치</span><div class="seg" id="sb-se-dev"><button data-value="0" class="on">없음</button><button data-value="1">있음(여유 150 mm)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최소 N(식)</span><span class="v" id="sb-se-req">—</span></div>
+        <div class="stat"><span class="k">N<sub>prov</sub> / N</span><span class="v" id="sb-se-r">—</span></div>
+        <div class="stat"><span class="k">남은 걸침</span><span class="v" id="sb-se-left">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="sb-se-ok">—</span></div>
+      </div>
+      <div class="sb-msg" id="sb-se-msg"></div>
+      <div class="sim-note">해볼 것: B-130(L 130 m, H 12 m)의 최소 지지 길이는 약 500 mm입니다 · 사각을 30°로 하면 11 % 늘어납니다 · 변위를 키워 남은 걸침이 0이 되면 낙교, 낙교 방지 장치를 켜면 장치가 변위를 그 여유 안에 묶습니다(교육용 단순화) · 모델: 원리 6.8(AASHTO 형태), 남은 걸침 = N<sub>prov</sub> − d(받침 폭의 절반 300 mm/2 = 150 mm가 걸침의 하한, 교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 6.6 (B-130 교대의 받침 지지 길이)</strong> 이음 사이 상부 구조 길이 \(L = 130{,}000\) mm, 교각 높이 \(H = 12{,}000\) mm, 사각 0°.
+      <ol class="sb-steps">
+        <li><b>최소 지지 길이.</b> \(N = 200 + 0.0017 \times 130{,}000 + 0.0067 \times 12{,}000 = 200 + 221 + 80 = 501\) mm.</li>
+        <li><b>사각 30°였다면.</b> \(\times (1 + 0.000125 \times 900) = 1.1125\) → 558 mm.</li>
+        <li><b>변위와 비교.</b> 예제 6.5의 133 mm(P1 고정)는 600 mm 지지 길이의 22 %다. 받침이 부서지고 교대와 상부 구조가 반대로 움직여 상대 변위가 커져도 450 mm 이상 여유가 있다.</li>
+        <li><b>판정.</b> \(N_{prov} = 600\) mm ≥ 501 mm, 합격(교육용). 낙교 방지 장치를 더해 이중으로 막는다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="isolation">
+    <h2>면진 교량</h2>
+    <div class="problem"><strong>힘을 키우지 않고 붙잡는 법</strong>
+      <p>7절에서 받침을 단단하게 하면 주기가 짧아져 지진력이 커지고, 무르게 하면 지진력은 줄지만 변위가 커졌습니다. 면진은 이 교환을 의도적으로 씁니다. 받침을 아주 무르게 해 주기를 길게 옮기고, 커지는 변위는 감쇠로 줄입니다.</p></div>
+    <p>StructureBook <a href="../../structure/chapters/isolation.html#period-shift">9장</a>의 건물 면진과 원리는 같습니다. 교량이 건물보다 면진에 잘 맞는 이유는 상부 구조가 이미 받침 위에 얹혀 있어 받침만 바꾸면 되고(기존 교량의 내진 보강에도 쓴다, 16장), 교각이 짧고 단단한 교량일수록 고정 받침에서 지진력이 크기 때문입니다. 대신 면진 변위(수십–수백 mm)를 신축 이음과 받침 지지 길이가 받아 줄 수 있어야 하고, 지반이 연약해 지반 주기가 길면 효과가 줄어듭니다.</p>
+    <div class="callout def"><strong>원리 6.9 (면진의 주기 이동과 감쇠, 교육용)</strong> 면진 후 유효 주기 \(T_{eff}\), 유효 감쇠비 \(\zeta\)일 때
+      <div class="formula">$$F = \frac{S_a(T_{eff})}{B_\zeta}\,W, \qquad d = \frac{S_a(T_{eff})}{B_\zeta}\,g\left(\frac{T_{eff}}{2\pi}\right)^2$$<div class="where">\(B_\zeta\): <span class="term">감쇠 보정 계수</span><span class="en">(damping coefficient)</span>(감쇠 5 %에서 1.0, 10 % 약 1.2, 20 % 약 1.5, 30 % 약 1.7 — AASHTO 면진 지침 형태, 확인). \(S_a\)는 7절과 같은 교육용 탄성 스펙트럼. 납 고무 받침의 유효 주기·감쇠는 변위에 따라 바뀌므로 실제로는 반복 계산한다.</div></div></div>
+    <div class="sim" id="sim-sb-iso">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>면진 받침의 효과</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sb-stack">
+          <div><canvas id="sb-cv-iso" aria-label="감쇠별 설계 스펙트럼과 고정·면진 주기의 점"></canvas><span class="sb-cap">가속도 S<sub>a</sub>/B</span></div>
+          <div><canvas id="sb-cv-iso-d" aria-label="주기에 따른 변위 스펙트럼"></canvas><span class="sb-cap">변위 d</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">면진 주기 T<sub>eff</sub></i> <output id="sb-is-T-out"></output></span><input type="range" id="sb-is-T" min="0.8" max="4" step="0.05" value="2.5"></label>
+          <div class="ctrl"><span>유효 감쇠비 ζ</span><div class="seg" id="sb-is-z"><button data-value="5">5 %</button><button data-value="10">10 %</button><button data-value="20" class="on">20 %</button><button data-value="30">30 %</button></div></div>
+          <label class="ctrl"><span>지진 세기 배율 <output id="sb-is-s-out"></output></span><input type="range" id="sb-is-s" min="0.5" max="1.5" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">고정(T 1.31 s) F</span><span class="v" id="sb-is-F0">—</span></div>
+        <div class="stat"><span class="k">면진 F</span><span class="v" id="sb-is-F">—</span></div>
+        <div class="stat"><span class="k">지진력 감소</span><span class="v" id="sb-is-r">—</span></div>
+        <div class="stat"><span class="k">면진 변위 d</span><span class="v" id="sb-is-d">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 주기를 1.3 s에서 2.5 s로 옮기면 지진력이 절반 아래로, 감쇠 20 %를 더하면 다시 1/1.5로 줍니다 · 감쇠를 5 %로 낮추면 같은 주기에서 변위가 1.5배가 됩니다 — 감쇠가 면진 변위를 이음·지지 길이가 받을 수 있는 범위로 줄입니다 · 주기를 4 s로 늘리면 힘은 더 줄지만 변위가 200 mm를 넘습니다 · 모델: 원리 6.9, W = 15,600 kN, 고정 기준은 P1·P2 고정(T = 1.31 s, 감쇠 5 %), 교육용 탄성 스펙트럼(S<sub>DS</sub> 0.50, S<sub>D1</sub> 0.29).</div>
+    </div>
+    <div class="callout"><strong>예제 6.7 (B-130을 면진하면)</strong> 기준: 두 교각 고정 받침(\(K = 36{,}800\) kN/m, \(T = 1.31\) s, 감쇠 5 %). 면진: 납 고무 받침으로 \(T_{eff} = 2.5\) s, \(\zeta = 20\,\%\)(\(B = 1.5\)), 교육용.
+      <ol class="sb-steps">
+        <li><b>고정.</b> \(S_a = 0.29/1.31 = 0.222\) → \(F = 0.222 \times 15{,}600 = 3{,}460\) kN, 변위 94 mm.</li>
+        <li><b>면진.</b> \(S_a = 0.29/2.5 = 0.116\), \(/1.5 = 0.0773\) → \(F = 1{,}210\) kN(65 % 감소).</li>
+        <li><b>변위.</b> \(d = 0.0773 \times 9.81 \times (2.5/2\pi)^2 = 0.120\) m = 120 mm.</li>
+        <li><b>판정.</b> 교각·기초에 가는 힘이 1/3 수준이 된다. 대신 120 mm의 면진 변위를 신축 이음(예제 6.4의 온도 이동 70 mm에 더해)과 받침 지지 길이(예제 6.6, 600 mm)가 받을 수 있어야 한다. 이음 형식을 키우는 비용과 하부 구조 절감을 비교해 결정한다.</li>
+      </ol></div>
+    <div class="callout warn"><strong>면진이 맞지 않는 경우</strong> 연약 지반 위(지반 주기가 길어 장주기 지진동이 커짐), 교각이 높고 유연해 이미 주기가 긴 교량, 들림이 생기는 받침(면진 받침은 인장에 약하다), 면진 변위를 줄 공간이 없는 교량에서는 효과가 작거나 위험할 수 있다. B-130 부지 G-10은 연약 점토가 있어(GeotechBook <a href="../../geotech/chapters/dynamics.html">15장</a>, 교육용 판정 S5) 부지 응답을 따로 확인해야 한다.</div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="b130">
+    <h2>B-130 하부 구조</h2>
+    <p>이 장의 계산을 B-130 하나로 모으고 3차원으로 봅니다.</p>
+    <div class="callout site"><strong>B-130 하부 구조 요약(교육용)</strong> 3경간 연속 강합성 거더교 40 + 50 + 40 m, 교폭 11.0 m, 거더 4주(간격 2.8 m), 상부 고정하중 약 120 kN/m(이 장의 가정: 바닥판 66 + 거더·가로보 약 17 + 포장 약 17 + 방호벽 등 약 20 kN/m), W ≈ 15,600 kN. 끝 지점 고정하중 반력 1,784 kN(받침당 446 kN), 중간 지점 6,016 kN. ① 교대 A1·A2: 역T형, 높이 8 m. 직접 기초 가정 시 B = 5 m에서 전도 3.5, 활동 1.95, q<sub>max</sub>/q<sub>a</sub> 0.61로 합격하지만 실제로는 연약층 때문에 말뚝 기초. ② 교각 P1·P2: RC 원형 φ2.0 m, 높이 약 12 m, 강관 말뚝 기초. ③ 받침: 기본안 P1 고정·나머지 가동 → 신축 이음 A2 70 mm, A1 31 mm(−20–+45 °C). 대안 모두 적층 고무 받침(450 × 600, 고무 7 × 12 mm) → 지진력이 교대·교각에 나뉘어 교각 모멘트 29,400 → 8,110 kN·m. ④ 받침 지지 길이 최소 약 500 mm → 600 mm + 낙교 방지 장치. ⑤ 면진(T 2.5 s, ζ 20 %)이면 지진력 1,210 kN, 변위 120 mm. 지진 계산은 StructureBook의 G-10 스펙트럼을 빌린 교육용 탄성 해석이며, 실제 설계는 현행 KDS 24 계열(도로교 설계기준·내진 설계)을 따른다.</div>
+    <div class="sim" id="sim-sb-3d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>3D 하부 구조 B-130</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sb-cv-3d" aria-label="B-130 하부 구조 3차원 모형: 끌어서 돌려 보기"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>상부 구조</span><div class="seg" id="sb-3d-deck"><button data-value="on" class="on">보이기</button><button data-value="ghost">반투명</button><button data-value="off">숨기기</button></div></div>
+          <div class="ctrl"><span>받침 배치</span><div class="seg" id="sb-3d-brg"><button data-value="fix" class="on">P1 고정</button><button data-value="ela">모두 탄성</button></div></div>
+          <div class="ctrl"><span>힘 표시</span><div class="seg" id="sb-3d-f"><button data-value="none" class="on">없음</button><button data-value="v">연직 반력</button><button data-value="h">지진 수평력</button></div></div>
+          <div class="btn-row"><button class="btn" id="sb-3d-reset">시점 초기화</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">받침</span><span class="v" id="sb-3d-n">—</span></div>
+        <div class="stat"><span class="k">고정점</span><span class="v" id="sb-3d-fx">—</span></div>
+        <div class="stat"><span class="k">A2 이음 이동량</span><span class="v" id="sb-3d-j">—</span></div>
+        <div class="stat"><span class="k">교각 최대 수평력</span><span class="v" id="sb-3d-h">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 끌어서 돌려 보세요(터치는 가로로) · 상부 구조를 숨기면 받침 16개(지점당 4개)와 코핑, 기둥, 기초, 말뚝이 보입니다 · 받침 색: 주황 고정, 초록 가동, 파랑 탄성 · '지진 수평력'은 예제 6.5의 분배를 화살표로 보여 줍니다 · 모델: B-130 치수(교육용), 반력은 CB.beam 연속보(120 kN/m), 수평력은 원리 6.7. 말뚝 배치(지점당 3 × 3)는 그림용입니다.</div>
+    </div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="bridges.html"><small>CH.01 · 교량의 이해</small>교량의 구성과 하중 경로<br><span>상부 구조 → 받침 → 교각 → 말뚝.</span></a>
+      <a href="girders.html"><small>CH.03 · 거더교와 바닥판</small>B-130 상부 구조<br><span>지점 반력, 가로보와 횡분배.</span></a>
+      <a href="cable-bridges.html"><small>CH.05 · 사장교와 현수교</small>주탑 기초와 앵커리지<br><span>단부 교각의 백스테이와 들림 받침.</span></a>
+      <a href="hydraulics.html"><small>CH.15 · 하천과 수공 구조물</small>교각 세굴<br><span>하천 교각의 유수압과 세굴 깊이.</span></a>
+      <a href="maintenance.html"><small>CH.16 · 유지관리와 성능 개선</small>받침 교체와 면진화<br><span>신축 이음 누수, 받침 부식, 내진 보강.</span></a>
+      <a href="../../geotech/chapters/retaining.html#wall-stability"><small>GeotechBook · CH.11</small>옹벽 안정<br><span>전도·활동·지지력, 배수.</span></a>
+      <a href="../../geotech/chapters/piles.html"><small>GeotechBook · CH.14</small>말뚝 기초<br><span>지지력, 무리 말뚝, 수평 저항, 부마찰력.</span></a>
+      <a href="../../structure/chapters/isolation.html#bearings"><small>StructureBook · CH.09</small>면진 받침<br><span>납 고무 받침의 이선형 모델.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>하부 구조 = 받침 + 교각(벽식·기둥식·라멘식) + 교대(역T형·반중력식, 날개벽) + 기초. 연직력, 교축·교축 직각 수평력, 토압, 유수압·세굴을 받는다. 받침의 배치가 수평력의 행선지를 정한다.</li>
+      <li>교대 안정: 가상 배면에 랭킨 토압 P<sub>a</sub> = ½γH²K<sub>a</sub>, P<sub>q</sub> = qK<sub>a</sub>H. 전도 M<sub>r</sub>/M<sub>o</sub> ≥ 2, 활동 V tanδ/ΣH ≥ 1.5, e ≤ B/6, q<sub>max</sub> ≤ q<sub>a</sub>(형태). 상부 반력은 안정에 유리 — 가설 전 상태를 따로 본다.</li>
+      <li>받침: 고정(수평력 전달)·가동(이동 허용), 탄성·포트·면진(납 고무). 편재 하중 반력 R<sub>i</sub> = R/n + Rex<sub>i</sub>/Σx². 짧은 끝 경간·편재 하중·곡선교에서 들림 → 경간 비, 카운터웨이트, 앵커.</li>
+      <li>적층 고무 받침: S = ab/(2t(a + b)), σ<sub>c</sub> ≤ min(GS, 약 7 MPa), γ<sub>s</sub> = Δ/Σt ≤ 0.5, K<sub>h</sub> = GA/Σt(AASHTO 방법 A 형태). B-130 예: S 10.7, γ<sub>s</sub> 0.45, K<sub>h</sub> 3,214 kN/m.</li>
+      <li>신축량 Δ = αLΔT(L은 고정점에서 거리) + 크리프·수축(PSC). 설치 유간 = Δ₊ + 여유. B-130(P1 고정): A2 이음 32.4 + 37.8 = 70.2 mm.</li>
+      <li>교축 방향 지진력 분배: k<sub>p</sub> = 3EI/h³, 받침과 직렬, 지점끼리 병렬. 짧은 교각이 힘을 몰아 받는다. B-130: P1 고정이면 2,450 kN 전부(29,400 kN·m), 모두 탄성이면 교각당 676 kN.</li>
+      <li>받침 지지 길이 N = (200 + 0.0017L + 0.0067H)(1 + 0.000125S²) mm(AASHTO 형태). B-130 약 500 mm. 낙교 방지 장치로 이중 방어.</li>
+      <li>면진: 주기 이동 + 감쇠(B<sub>ζ</sub>). B-130 T 1.31 → 2.5 s, ζ 20 %: 3,460 → 1,210 kN, 대신 변위 120 mm를 이음·지지 길이가 받아야 한다. 연약 지반·들림 받침에는 신중히.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 강 거더교(α = 1.2 × 10⁻⁵/°C)에서 고정점으로부터 60 m 떨어진 이음이 온도 50 °C 변화에 받는 신축량은?</p><div class="opts">
+        <button class="opt">6 mm</button><button class="opt">18 mm</button><button class="opt" data-correct>36 mm</button><button class="opt">72 mm</button>
+      </div><div class="quiz-exp">Δ = αLΔT = 1.2 × 10⁻⁵ × 60,000 mm × 50 = 36 mm.</div></div>
+      <div class="quiz-q"><p>2. 3경간 연속교에서 P1에만 고정 받침을 두고 나머지를 가동 받침으로 했다. 교축 방향 지진력은 어떻게 나뉘나(가동 받침 마찰 무시)?</p><div class="opts">
+        <button class="opt">네 지점이 똑같이 나눈다</button><button class="opt">교대 둘이 모두 받는다</button><button class="opt" data-correct>P1이 전부 받는다</button><button class="opt">P1과 P2가 높이에 반비례해 나눈다</button>
+      </div><div class="quiz-exp">가동 받침은 수평력을 전달하지 않으므로 상부 구조를 붙잡는 것은 P1 하나다. 그래서 고정 교각은 크게, 가동 교각은 작게 설계한다.</div></div>
+      <div class="quiz-q"><p>3. 지름과 재료가 같은 두 교각의 높이가 8 m와 16 m이고 둘 다 고정 받침이다. 짧은 교각이 받는 수평력은 긴 교각의 몇 배인가?</p><div class="opts">
+        <button class="opt">2배</button><button class="opt">4배</button><button class="opt" data-correct>8배</button><button class="opt">16배</button>
+      </div><div class="quiz-exp">k = 3EI/h³이므로 강성 비 (16/8)³ = 8. 같은 변위에서 힘은 강성에 비례한다. 짧은 교각에 지진 피해가 몰리는 이유.</div></div>
+      <div class="quiz-q"><p>4. 랭킨 주동 토압에서 φ = 30°, γ = 18 kN/m³, 높이 6 m일 때 단위 폭당 주동 토압 합력은?</p><div class="opts">
+        <button class="opt">54 kN/m</button><button class="opt" data-correct>108 kN/m</button><button class="opt">162 kN/m</button><button class="opt">324 kN/m</button>
+      </div><div class="quiz-exp">K<sub>a</sub> = 1/3, P<sub>a</sub> = ½ × 18 × 36 × 1/3 = 108 kN/m, 작용 높이 H/3 = 2 m.</div></div>
+      <div class="quiz-q"><p>5. 450 × 600 mm 적층 고무 받침, 고무층 12 mm의 형상 계수는?</p><div class="opts">
+        <button class="opt">5.4</button><button class="opt" data-correct>10.7</button><button class="opt">21.4</button><button class="opt">37.5</button>
+      </div><div class="quiz-exp">S = ab/(2t(a + b)) = 270,000/(2 × 12 × 1,050) = 10.7. 하중면 면적을 옆으로 부풀 수 있는 면적으로 나눈 값이다.</div></div>
+      <div class="quiz-q"><p>6. 연속교 끝 받침이 들리기 쉬운 경우가 아닌 것은?</p><div class="opts">
+        <button class="opt">끝 경간이 가운데 경간보다 훨씬 짧다</button><button class="opt">활하중이 교폭 한쪽으로 치우친다</button><button class="opt">곡선교에서 비틀림이 생긴다</button><button class="opt" data-correct>끝 경간의 고정하중이 크다</button>
+      </div><div class="quiz-exp">끝 지점의 고정하중 반력이 클수록 들림에 강하다. 그래서 들림 대책으로 카운터웨이트를 얹는다.</div></div>
+      <div class="quiz-q"><p>7. 면진 받침으로 교량 주기를 1.0 s에서 2.5 s로 옮겼다(속도 일정 구간, 감쇠 변화 없음). 지진력과 변위는?</p><div class="opts">
+        <button class="opt">힘과 변위 모두 0.4배</button><button class="opt" data-correct>힘은 0.4배, 변위는 2.5배</button><button class="opt">힘은 2.5배, 변위는 0.4배</button><button class="opt">힘은 변화 없음, 변위 2.5배</button>
+      </div><div class="quiz-exp">S<sub>a</sub> ∝ 1/T이므로 힘은 1/2.5 = 0.4배, 변위 d ∝ S<sub>a</sub>T² ∝ T이므로 2.5배. 감쇠로 변위를 줄이고, 이음·지지 길이가 변위를 받아야 한다.</div></div>
+      <div class="quiz-q"><p>8. 받침 지지 길이 식 N = (200 + 0.0017L + 0.0067H)(1 + 0.000125S²)에서 사각 S가 커지면 N을 늘리는 이유는?</p><div class="opts">
+        <button class="opt">사교는 온도 신축량이 더 크기 때문</button><button class="opt" data-correct>사교는 지진 때 상부 구조가 평면에서 회전해 둔각 쪽 모서리가 받침 자리에서 빠지기 쉽기 때문</button><button class="opt">사교의 받침이 더 크기 때문</button><button class="opt">사교의 교각이 더 높기 때문</button>
+      </div><div class="quiz-exp">사교의 상부 구조는 교대 벽에 부딪히며 평면 회전을 일으키고, 모서리가 받침 자리 밖으로 밀려난다. 지진 피해 조사에서 사교의 낙교가 여러 번 보고되었다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const SBX = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${SBX.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = SBX._c || (SBX._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  rect(ctx, x, y, w, h, fill, stroke) { ctx.save(); if (fill) { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.strokeRect(x, y, w, h); } ctx.restore(); },
+  /** B-130 교육용 값 */
+  W: 15600, g: 9.81, wD: 120, XB: [-4.2, -1.4, 1.4, 4.2], KB: (4 * 1.0 * 450 * 600) / 84,
+  /** 교육용 탄성 설계 스펙트럼(StructureBook G-10 값 차용): S_DS 0.50, S_D1 0.29, T_L 5 s */
+  sa(T, s = 1) { const SDS = 0.5 * s, SD1 = 0.29 * s, TS = SD1 / SDS, T0 = 0.2 * TS; if (T < T0) return SDS * (0.4 + (0.6 * T) / T0); if (T <= TS) return SDS; if (T <= 5) return SD1 / T; return (SD1 * 5) / (T * T); },
+  kp(h, D = 2.0) { return (3 * 27e6 * 0.5 * Math.PI * D ** 4) / 64 / h ** 3; },
+  Bz(z) { const t = [[2, 0.8], [5, 1.0], [10, 1.2], [20, 1.5], [30, 1.7], [40, 1.9], [50, 2.0]]; for (let i = 1; i < t.length; i++) if (z <= t[i][0]) return t[i - 1][1] + ((z - t[i - 1][0]) / (t[i][0] - t[i - 1][0])) * (t[i][1] - t[i - 1][1]); return 2.0; },
+};
+
+/* ---------- 1. 교대 안정 ---------- */
+(function () {
+  const gH = CB.range("sb-ab-H", (v) => v.toFixed(1) + " m", go), gB = CB.range("sb-ab-B", (v) => v.toFixed(1) + " m", go), gt = CB.range("sb-ab-t", (v) => v.toFixed(1) + " m", go);
+  const gp = CB.range("sb-ab-p", (v) => v + "°", go), gq = CB.range("sb-ab-q", (v) => v + " kPa", go), gR = CB.range("sb-ab-R", (v) => v + " kN/m", go), gHb = CB.range("sb-ab-Hb", (v) => v + " kN/m", go);
+  const ts = 1.2, tf = 1.2, gs = 19, mu = 0.55, phif = 35, Df = 1.5;
+  let A = null;
+  function calc() {
+    const H = gH(), B = gB(), toe = Math.min(gt(), B - ts - 0.3), heel = Math.max(0.3, B - toe - ts), hs = H - tf, Ka = CB.soil.rankine(gp()).Ka, q = gq(), Rd = gR(), Hb = gHb();
+    const Ws = [[25 * B * tf, B / 2], [25 * ts * hs, toe + ts / 2], [gs * heel * hs, toe + ts + heel / 2], [Rd, toe + ts / 2]];
+    const V = Ws.reduce((s, w) => s + w[0], 0), Mr = Ws.reduce((s, w) => s + w[0] * w[1], 0);
+    const Pa = 0.5 * gs * H * H * Ka, Pq = q * Ka * H, SH = Pa + Pq + Hb, Mo = (Pa * H) / 3 + (Pq * H) / 2 + Hb * (H - 1);
+    const xr = (Mr - Mo) / V, e = B / 2 - xr, qmax = e <= B / 6 ? (V / B) * (1 + (6 * e) / B) : xr > 0 ? (2 * V) / (3 * xr) : Infinity, qmin = e <= B / 6 ? (V / B) * (1 - (6 * e) / B) : 0;
+    const Bp = Math.max(0.1, B - 2 * Math.abs(e)), d = (Math.atan(SH / V) * 180) / Math.PI, br = CB.soil.bearing({ B: Bp, Df, phi: phif, c: 0, g: 19 });
+    const qu = br.terms[1] * (1 - d / 90) ** 2 + br.terms[2] * Math.max(0, 1 - d / phif) ** 2;
+    A = { H, B, toe, heel, hs, Ka, Pa, Pq, SH, V, Mr, Mo, FSo: Mr / Mo, FSs: (V * mu) / SH, e, qmax, qmin, qa: qu / 3, Rd, Hb, q };
+  }
+  const cv = CB.canvas("#sb-cv-abut", (ctx, W, Hc) => {
+    if (!A) return;
+    const pal = CB.palette(), s = Math.min((W - 170) / (A.B + 1.5), (Hc - 90) / 10.5), x0 = 24, yb = Hc - 40;
+    const X = (x) => x0 + x * s, Y = (z) => yb - z * s;
+    SBX.rect(ctx, X(A.toe + 1.2), Y(A.H), (A.heel + 2.5) * s, (A.H - 1.2) * s, SBX.alpha(pal.warn, 0.14));
+    SBX.rect(ctx, X(0) - 30, Y(0), W, 40, SBX.alpha(pal.warn, 0.08));
+    SBX.rect(ctx, X(0), Y(1.2), A.B * s, 1.2 * s, SBX.alpha(pal.dim, 0.25), pal.dim);
+    SBX.rect(ctx, X(A.toe), Y(A.H), 1.2 * s, A.hs * s, SBX.alpha(pal.dim, 0.25), pal.dim);
+    SBX.line(ctx, [[X(A.B), Y(0)], [X(A.B), Y(A.H)]], pal.warn, 1.2, [5, 4]);
+    const pw = Math.min(110, 20 + 0.6 * A.H * A.Ka * s);
+    SBX.line(ctx, [[X(A.B), Y(A.H)], [X(A.B) + pw, Y(0)], [X(A.B), Y(0)]], pal.accent2, 1.5);
+    ctx.fillStyle = SBX.alpha(pal.accent2, 0.12); ctx.beginPath(); ctx.moveTo(X(A.B), Y(A.H)); ctx.lineTo(X(A.B) + pw, Y(0)); ctx.lineTo(X(A.B), Y(0)); ctx.fill();
+    SBX.arrow(ctx, X(A.B) + pw + 30, Y(A.H / 3), X(A.B) + 2, Y(A.H / 3), pal.accent2, 2.6);
+    SBX.text(ctx, `Pa ${CB.num(A.Pa, 0)}`, Math.min(X(A.B) + pw + 34, W - 64), Y(A.H / 3) - 12, pal.accent2, { size: 11, align: "left" });
+    if (A.Pq > 0) { SBX.arrow(ctx, X(A.B) + pw + 30, Y(A.H / 2), X(A.B) + 2, Y(A.H / 2), pal.accent2, 1.6); SBX.text(ctx, `Pq ${CB.num(A.Pq, 0)}`, Math.min(X(A.B) + pw + 34, W - 64), Y(A.H / 2) - 12, pal.accent2, { size: 11, align: "left" }); }
+    if (A.Rd > 0) { SBX.arrow(ctx, X(A.toe + 0.6), Y(A.H) - 40, X(A.toe + 0.6), Y(A.H) - 2, pal.accent2, 2.6); SBX.text(ctx, `Rd ${A.Rd}`, X(A.toe + 0.6) - 6, Y(A.H) - 44, pal.accent2, { size: 11, align: "right" }); }
+    if (A.Hb > 0) { SBX.arrow(ctx, X(A.toe + 0.6), Y(A.H - 1), X(A.toe + 0.6) - 40, Y(A.H - 1), pal.accent2, 2); SBX.text(ctx, `Hb ${A.Hb}`, X(A.toe + 0.6) - 44, Y(A.H - 1) - 10, pal.accent2, { size: 11, align: "right" }); }
+    const qs = 26 / Math.max(A.qa, A.qmax, 1), x1 = A.e <= A.B / 6 ? A.B : Math.min(A.B, 3 * (A.B / 2 - A.e));
+    const poly = [[X(0), Y(0)], [X(0), Y(0) + A.qmax * qs], [X(x1), Y(0) + (A.e <= A.B / 6 ? A.qmin : 0) * qs], [X(x1), Y(0)]];
+    ctx.fillStyle = SBX.alpha(A.qmax <= A.qa ? pal.ok : pal.bad, 0.25); ctx.beginPath(); poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.fill();
+    SBX.line(ctx, poly, A.qmax <= A.qa ? pal.ok : pal.bad, 1.6);
+    SBX.text(ctx, `q_max ${CB.num(A.qmax, 0)} kPa`, X(0), Y(0) + A.qmax * qs + 12, A.qmax <= A.qa ? pal.ok : pal.bad, { size: 11, align: "left" });
+    ctx.fillStyle = pal.bad; ctx.beginPath(); ctx.arc(X(0), Y(0), 4, 0, 7); ctx.fill();
+    SBX.text(ctx, "단위 kN/m", 10, 14, pal.dim, { size: 10.5, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.6), minHeight: 300, maxHeight: 420 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("sb-ab-ka", `${CB.num(A.Ka, 3)} · ${CB.num(A.Pa + A.Pq, 0)} kN/m`);
+    CB.stat("sb-ab-ot", `${CB.num(A.FSo, 2)} · ${CB.num(A.e, 2)} m`); CB.stat("sb-ab-sl", CB.num(A.FSs, 2));
+    CB.stat("sb-ab-q2", `${CB.num(A.qmax, 0)} / ${CB.num(A.qa, 0)} kPa`);
+    const bad = [];
+    if (A.FSo < 2) bad.push(`전도 ${CB.num(A.FSo, 2)} &lt; 2.0`);
+    if (A.FSs < 1.5) bad.push(`활동 ${CB.num(A.FSs, 2)} &lt; 1.5`);
+    if (A.e > A.B / 6) bad.push(`편심 ${CB.num(A.e, 2)} m &gt; B/6 = ${CB.num(A.B / 6, 2)} m(바닥 일부 들림)`);
+    if (A.qmax > A.qa) bad.push(`지지력 q<sub>max</sub> ${CB.num(A.qmax, 0)} &gt; q<sub>a</sub> ${CB.num(A.qa, 0)} kPa`);
+    const m = document.getElementById("sb-ab-msg");
+    m.className = "sb-msg " + (bad.length ? "bad" : "ok");
+    m.innerHTML = bad.length ? "불합격: " + bad.join(" · ") : `합격: 전도 ${CB.num(A.FSo, 2)}, 활동 ${CB.num(A.FSs, 2)}, e = ${CB.num(A.e, 2)} m ≤ B/6, q<sub>max</sub>/q<sub>a</sub> = ${CB.num(A.qmax / A.qa, 2)} (교육용 기준값).`;
+  }
+  go();
+})();
+
+/* ---------- 2. 받침 반력과 들림 ---------- */
+(function () {
+  const gL = CB.range("sb-br-L", (v) => v + " m", go), cs = CB.seg("sb-br-case", go), ge = CB.range("sb-br-e", (v) => v.toFixed(1) + " m", go), gw = CB.range("sb-br-w", (v) => v + " kN/m", go);
+  const T = CB.civ.TRUCK, P = T.axles.reduce((s, a) => s + a.P, 0), XB = SBX.XB, S2 = XB.reduce((s, x) => s + x * x, 0);
+  let R = null;
+  function calc() {
+    const L1 = gL(), L = 2 * L1 + 50, sup = [{ x: 0, type: "pin" }, { x: L1, type: "roller" }, { x: L1 + 50, type: "roller" }, { x: L, type: "roller" }];
+    const D = CB.beam({ L, EI: 1e7, supports: sup, loads: [{ type: "udl", w: gw(), a: 0, b: L }] }).reactions[0].R;
+    const mx = cs() === "max";
+    const lo = mx ? [{ type: "udl", w: T.lane, a: 0, b: L1 }, { type: "point", P, a: Math.min(L1 * 0.15, 3) }] : [{ type: "udl", w: T.lane, a: L1, b: L1 + 50 }, { type: "point", P, a: L1 + 25 }];
+    const Ll = CB.beam({ L, EI: 1e7, supports: sup, loads: lo }).reactions[0].R, IM = CB.civ.impact(mx ? L1 : 50), LL = Ll * (1 + IM), e = ge();
+    const Ri = XB.map((x) => D / 4 + LL * (0.25 + (e * x) / S2));
+    R = { L1, L, D, Ll, IM, LL, e, Ri, mx, lo };
+  }
+  const ev = CB.canvas("#sb-cv-brg-l", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), s = (W - 40) / R.L, x0 = 20, y = H * 0.55, X = (x) => x0 + x * s;
+    SBX.line(ctx, [[X(0), y], [X(R.L), y]], pal.dim, 4);
+    [0, R.L1, R.L1 + 50, R.L].forEach((x, i) => { ctx.fillStyle = i === 0 ? pal.accent2 : pal.dim; ctx.beginPath(); ctx.moveTo(X(x), y + 3); ctx.lineTo(X(x) - 7, y + 15); ctx.lineTo(X(x) + 7, y + 15); ctx.fill(); });
+    R.lo.forEach((l) => { if (l.type === "udl") { SBX.rect(ctx, X(l.a), y - 16, (l.b - l.a) * s, 10, SBX.alpha(pal.accent2, 0.25), pal.accent2); } else SBX.arrow(ctx, X(l.a), y - 44, X(l.a), y - 4, pal.accent2, 2.6); });
+    SBX.text(ctx, `A1 반력: D ${CB.num(R.D, 0)} + L ${CB.num(R.Ll, 0)} kN`, X(0) + 4, y + 30, R.D + R.LL < 0 ? pal.bad : pal.text, { size: 11, align: "left" });
+    SBX.text(ctx, `${R.L1} + 50 + ${R.L1} m`, W - 16, 16, pal.dim, { size: 11, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.32 : 0.2), minHeight: 110, maxHeight: 150 });
+  const cv = CB.canvas("#sb-cv-brg", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), s = (W - 60) / 12, xc = W / 2, yd = 40, X = (x) => xc + x * s;
+    SBX.rect(ctx, X(-5.5), yd, 11 * s, 10, SBX.alpha(pal.dim, 0.3), pal.dim);
+    XB.forEach((x) => SBX.rect(ctx, X(x) - 3, yd + 10, 6, 26, pal.dim));
+    SBX.arrow(ctx, X(R.e), yd - 34, X(R.e), yd - 2, pal.accent2, 2.6); SBX.text(ctx, `e = ${CB.num(R.e, 1)} m`, X(R.e) + 6, yd - 30, pal.accent2, { size: 11, align: R.e > 3 ? "right" : "left" });
+    const y0 = yd + 44 + (H - yd - 70) * 0.55, m = Math.max(...R.Ri.map(Math.abs), 200), k = ((H - yd - 70) * 0.5) / m;
+    SBX.line(ctx, [[X(-5.8), y0], [X(5.8), y0]], pal.axis, 1);
+    R.Ri.forEach((r, i) => { const bw = Math.min(46, s * 1.6), up = r >= 0; SBX.rect(ctx, X(XB[i]) - bw / 2, up ? y0 - r * k : y0, bw, Math.abs(r) * k, SBX.alpha(up ? pal.ok : pal.bad, 0.7)); SBX.text(ctx, CB.num(r, 0), X(XB[i]), up ? y0 - r * k - 10 : y0 - r * k + 10, up ? pal.text : pal.bad, { size: 11 }); });
+    SBX.text(ctx, "받침 반력 (kN, 위 = 압축, 아래 = 들림)", 10, H - 10, pal.dim, { size: 10.5, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.4), minHeight: 230, maxHeight: 300 });
+  function go() {
+    calc(); ev.redraw(); cv.redraw();
+    const mx = Math.max(...R.Ri), mn = Math.min(...R.Ri);
+    CB.stat("sb-br-R", `${CB.num(R.D, 0)} · ${CB.num(R.LL, 0)} kN <small>(IM ${CB.num(R.IM, 3)})</small>`);
+    CB.stat("sb-br-max", CB.num(mx, 0) + " kN"); CB.stat("sb-br-min", CB.num(mn, 0) + " kN");
+    CB.stat("sb-br-ok", mn < 0 ? `<span style="color:var(--bad)">들림</span>` : `<span style="color:var(--ok)">압축 유지</span>`);
+  }
+  go();
+})();
+
+/* ---------- 3. 적층 고무 받침 ---------- */
+(function () {
+  const ga = CB.range("sb-el-a", (v) => v + " mm", go), gb = CB.range("sb-el-b", (v) => v + " mm", go), gt = CB.range("sb-el-t", (v) => v + " mm", go), gn = CB.range("sb-el-n", (v) => v + "층", go);
+  const gP = CB.range("sb-el-P", (v) => CB.sig(v, 4) + " kN", go), gd = CB.range("sb-el-d", (v) => v.toFixed(1) + " mm", go), gG = CB.range("sb-el-G", (v) => v.toFixed(2) + " MPa", go);
+  let E = null;
+  const cv = CB.canvas("#sb-cv-elasto", (ctx, W, H) => {
+    if (!E) return;
+    const pal = CB.palette(), tot = E.St + (E.n - 1) * 3 + 2 * 20, s = Math.min((W - 120) / (E.a + 120), (H - 60) / tot), xc = W / 2 - (E.d * s) / 2, yb = H - 26;
+    const top = yb - tot * s;
+    SBX.rect(ctx, xc - ((E.a + 60) * s) / 2, yb - 20 * s, (E.a + 60) * s, 20 * s, SBX.alpha(pal.dim, 0.4), pal.dim);
+    let z = 20;
+    for (let i = 0; i < E.n; i++) {
+      const f0 = (z - 20) / E.St, f1 = (z - 20 + E.t) / E.St, x0 = xc + f0 * E.d * s, x1 = xc + f1 * E.d * s, y0 = yb - z * s, y1 = yb - (z + E.t) * s, hw = (E.a * s) / 2;
+      ctx.fillStyle = SBX.alpha(pal.ok, 0.35); ctx.beginPath(); ctx.moveTo(x0 - hw, y0); ctx.lineTo(x0 + hw, y0); ctx.lineTo(x1 + hw, y1); ctx.lineTo(x1 - hw, y1); ctx.closePath(); ctx.fill();
+      z += E.t;
+      if (i < E.n - 1) { const x2 = xc + ((z - 20) / E.St) * E.d * s; SBX.rect(ctx, x2 - hw, yb - (z + 3) * s, 2 * hw, 3 * s, pal.dim); z += 3; }
+    }
+    SBX.rect(ctx, xc + E.d * s - ((E.a + 60) * s) / 2, yb - (z + 20) * s, (E.a + 60) * s, 20 * s, SBX.alpha(pal.dim, 0.4), pal.dim);
+    SBX.arrow(ctx, xc + E.d * s, top - 14, xc + E.d * s, top + 2, pal.accent2, 2.4); SBX.text(ctx, `P ${CB.sig(E.P, 4)} kN`, xc + E.d * s + 8, top - 14, pal.accent2, { size: 11, align: "left" });
+    if (E.d > 0) { SBX.arrow(ctx, xc, top - 4, xc + E.d * s, top - 4, pal.accent, 2); SBX.text(ctx, `Δ ${CB.num(E.d, 1)}`, xc - 6, top - 4, pal.accent, { size: 11, align: "right" }); }
+    SBX.text(ctx, `γs = ${CB.num(E.gs, 2)}`, W - 14, 16, E.gs <= 0.5 ? pal.ok : pal.bad, { size: 12, align: "right" });
+    SBX.text(ctx, "실제 비율(측면)", 12, 16, pal.dim, { size: 10.5, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 240, maxHeight: 320 });
+  function go() {
+    const a = ga(), b = gb(), t = gt(), n = gn(), P = gP(), d = gd(), G = gG(), St = n * t, A = a * b;
+    const S = (a * b) / (2 * t * (a + b)), sc = (P * 1000) / A, lim = Math.min(G * S, 7), gs = d / St, K = (G * A) / St, stab = St <= Math.min(a, b) / 3;
+    E = { a, b, t, n, P, d, G, St, S, sc, lim, gs, K };
+    cv.redraw();
+    CB.stat("sb-el-S", CB.num(S, 1)); CB.stat("sb-el-sc", `${CB.num(sc, 2)} / ${CB.num(lim, 2)} MPa`);
+    CB.stat("sb-el-g", `${CB.num(gs, 2)} <small>(Σt ${St} mm)</small>`); CB.stat("sb-el-K", `${CB.sig(K, 4)} kN/m · ${CB.num((K * d) / 1000, 0)} kN`);
+    const bad = []; if (sc > lim) bad.push("압축 응력 초과(면적·형상 계수 키우기)"); if (gs > 0.5) bad.push("전단 변형률 초과(층수 늘리기)"); if (!stab) bad.push(`높이 안정 Σt ${St} &gt; ${Math.round(Math.min(a, b) / 3)} mm(평면 키우기)`);
+    const m = document.getElementById("sb-el-msg"); m.className = "sb-msg " + (bad.length ? "bad" : "ok");
+    m.innerHTML = bad.length ? "불합격: " + bad.join(" · ") : `합격: σ<sub>c</sub> ${CB.num(sc, 2)} ≤ ${CB.num(lim, 2)} MPa, γ<sub>s</sub> ${CB.num(gs, 2)} ≤ 0.5, Σt ${St} ≤ ${Math.round(Math.min(a, b) / 3)} mm (AASHTO 방법 A 형태, 교육용).`;
+  }
+  go();
+})();
+
+/* ---------- 4. 온도 신축량 ---------- */
+(function () {
+  const fx = CB.seg("sb-th-fix", go), mat = CB.seg("sb-th-mat", (v) => { gcs.set(v === "psc" ? 300 : 0, false); go(); });
+  const glo = CB.range("sb-th-lo", (v) => CB.num(v, 0) + " °C", go), ghi = CB.range("sb-th-hi", (v) => v + " °C", go), gt0 = CB.range("sb-th-t0", (v) => CB.num(v, 0) + " °C", go);
+  const gcs = CB.range("sb-th-cs", (v) => v + " μ", go), gg = CB.range("sb-th-g", (v) => v + " mm", go);
+  let R = null;
+  function calc() {
+    const x0 = +fx(), a = mat() === "psc" ? 1.0e-5 : 1.2e-5, lo = glo(), hi = ghi(), t0 = CB.clamp(gt0(), lo, hi), cs = gcs() * 1e-6;
+    const end = (L) => ({ L, p: a * L * 1000 * (hi - t0), m: a * L * 1000 * (t0 - lo) + cs * L * 1000 });
+    const A1 = end(x0), A2 = end(130 - x0), g0 = A2.p + gg();
+    R = { x0, a, lo, hi, t0, A1, A2, g0, gmax: g0 + A2.m };
+  }
+  const cv = CB.canvas("#sb-cv-thermal", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), s = (W - 80) / 130, x0 = 40, y = H * 0.42, X = (x) => x0 + x * s;
+    SBX.rect(ctx, X(0), y - 8, 130 * s, 12, SBX.alpha(pal.dim, 0.3), pal.dim);
+    [0, 40, 90, 130].forEach((x) => { const fixd = Math.abs(x - R.x0) < 0.1; ctx.fillStyle = fixd ? pal.accent2 : pal.accent; ctx.beginPath(); ctx.moveTo(X(x), y + 4); ctx.lineTo(X(x) - 7, y + 16); ctx.lineTo(X(x) + 7, y + 16); ctx.fill(); });
+    if (R.x0 === 65) { ctx.fillStyle = pal.accent2; ctx.beginPath(); ctx.arc(X(65), y - 2, 5, 0, 7); ctx.fill(); }
+    SBX.text(ctx, "고정점", X(R.x0), y + 30, pal.accent2, { size: 11 });
+    const k = Math.min(1.4, 60 / Math.max(R.A2.m, R.A2.p, 1));
+    SBX.arrow(ctx, X(130), y - 26, X(130) + R.A2.p * k * 0.6 + 4, y - 26, pal.bad, 2); SBX.arrow(ctx, X(130), y - 40, X(130) - R.A2.m * k * 0.6 - 4, y - 40, pal.blue, 2);
+    SBX.arrow(ctx, X(0), y - 26, X(0) - R.A1.p * k * 0.6 - 4, y - 26, pal.bad, 2); SBX.arrow(ctx, X(0), y - 40, X(0) + R.A1.m * k * 0.6 + 4, y - 40, pal.blue, 2);
+    SBX.text(ctx, `+${CB.num(R.A2.p, 1)}`, X(130) - 4, y - 26, pal.bad, { size: 10.5, align: "right" }); SBX.text(ctx, `−${CB.num(R.A2.m, 1)} mm`, X(130) - R.A2.m * k * 0.6 - 10, y - 40, pal.blue, { size: 10.5, align: "right" });
+    SBX.text(ctx, `+${CB.num(R.A1.p, 1)}`, X(0) + 4, y - 26, pal.bad, { size: 10.5, align: "left" }); SBX.text(ctx, `−${CB.num(R.A1.m, 1)}`, X(0) + R.A1.m * k * 0.6 + 10, y - 40, pal.blue, { size: 10.5, align: "left" });
+    // A2 유간 막대: 여름 · 설치 · 겨울
+    const gy = H * 0.72, gs = Math.min(2.2, (W * 0.5) / Math.max(R.gmax, 1)), gx = W * 0.3;
+    [["여름(최대 팽창)", R.g0 - R.A2.p, pal.bad], ["설치", R.g0, pal.text], ["겨울(최대 수축)", R.gmax, pal.blue]].forEach(([lab, g, c], i) => {
+      const yy = gy + i * 18 - 14; SBX.rect(ctx, gx, yy - 5, Math.max(0, g) * gs, 10, SBX.alpha(c, 0.55)); SBX.text(ctx, lab, gx - 8, yy, pal.dim, { size: 10.5, align: "right", bold: false }); SBX.text(ctx, CB.num(g, 1) + " mm", gx + Math.max(0, g) * gs + 6, yy, c, { size: 10.5, align: "left" });
+    });
+    SBX.text(ctx, "A2 이음 유간", gx, gy - 32, pal.dim, { size: 10.5, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.42), minHeight: 240, maxHeight: 320 });
+  function go() {
+    calc(); cv.redraw();
+    const tot = R.A2.p + R.A2.m;
+    CB.stat("sb-th-a2", `${CB.num(R.A2.p, 1)} · ${CB.num(R.A2.m, 1)} mm`); CB.stat("sb-th-a1", `${CB.num(R.A1.p, 1)} · ${CB.num(R.A1.m, 1)} mm`);
+    CB.stat("sb-th-gap", `${CB.num(R.g0, 1)} · ${CB.num(R.gmax, 1)} mm`);
+    CB.stat("sb-th-type", tot <= 50 ? `${CB.num(tot, 0)} mm → 고무계` : tot <= 150 ? `${CB.num(tot, 0)} mm → 핑거·레일형` : `${CB.num(tot, 0)} mm → 모듈러(레일형)`);
+  }
+  go();
+})();
+
+/* ---------- 5. 교각 수평력 분배 ---------- */
+(function () {
+  const segs = [0, 1, 2, 3].map((i) => CB.seg("sb-pf-s" + i, go));
+  const gh1 = CB.range("sb-pf-h1", (v) => v.toFixed(1) + " m", go), gh2 = CB.range("sb-pf-h2", (v) => v.toFixed(1) + " m", go), gD = CB.range("sb-pf-D", (v) => v.toFixed(1) + " m", go);
+  document.getElementById("sb-pf-ela").addEventListener("click", () => { segs.forEach((s) => s.set("ela", false)); go(); });
+  document.getElementById("sb-pf-ref").addEventListener("click", () => { segs.forEach((s, i) => s.set(i === 1 ? "fix" : "mov", false)); gh1.set(12, false); gh2.set(12, false); gD.set(2, false); go(); });
+  const XS = [0, 40, 90, 130], NAMES = ["A1", "P1", "P2", "A2"];
+  let R = null;
+  function calc() {
+    const hs = [0, gh1(), gh2(), 0], D = gD();
+    const ks = segs.map((sg, i) => {
+      const t = sg(), kp = i === 0 || i === 3 ? Infinity : SBX.kp(hs[i], D);
+      if (t === "mov") return 0;
+      if (t === "fix") return isFinite(kp) ? kp : 1e9;
+      return 1 / (1 / SBX.KB + (isFinite(kp) ? 1 / kp : 0));
+    });
+    const K = ks.reduce((a, b) => a + b, 0);
+    if (K <= 0) { R = { K: 0, hs, ks }; return; }
+    const T = 2 * Math.PI * Math.sqrt(SBX.W / SBX.g / K), Sa = SBX.sa(T), F = Sa * SBX.W, Fi = ks.map((k) => (k / K) * F);
+    R = { K, T, Sa, F, Fi, ks, hs, d: (F / K) * 1000, M: Fi.map((f, i) => f * hs[i]) };
+  }
+  const cv = CB.canvas("#sb-cv-pier", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), s = (W - 60) / 130, x0 = 30, yd = 50, X = (x) => x0 + x * s, hs = (H - yd - 60) / 30;
+    SBX.rect(ctx, X(0), yd - 10, 130 * s, 10, SBX.alpha(pal.dim, 0.3), pal.dim);
+    const yg = yd + 30 * hs + 10;
+    SBX.rect(ctx, 0, yg, W, H - yg, SBX.alpha(pal.warn, 0.1));
+    XS.forEach((x, i) => {
+      const t = segs[i](), col = t === "fix" ? pal.accent2 : t === "mov" ? pal.ok : pal.blue;
+      if (i === 1 || i === 2) SBX.rect(ctx, X(x) - 7, yd + 4, 14, R.hs[i] * hs, SBX.alpha(pal.dim, 0.35), pal.dim);
+      else SBX.rect(ctx, X(x) - (i === 0 ? 14 : 0), yd + 4, 14, yg - yd - 4, SBX.alpha(pal.dim, 0.35), pal.dim);
+      ctx.fillStyle = col; ctx.fillRect(X(x) - 6, yd, 12, 5);
+      SBX.text(ctx, NAMES[i] + (t === "fix" ? " 고정" : t === "mov" ? " 가동" : " 탄성"), X(x) + (i === 0 ? 4 : i === 3 ? -4 : 0), yd - 22, col, { size: 10.5, align: i === 0 ? "left" : i === 3 ? "right" : "center" });
+      if (R.K > 0 && R.Fi[i] > 1) { const L = Math.min(60, 8 + (R.Fi[i] / R.F) * 60); SBX.arrow(ctx, X(x) + L, yd + 14 + 14 * (i % 2), X(x) + 2, yd + 14 + 14 * (i % 2), pal.accent2, 2.4); SBX.text(ctx, `${CB.sig(R.Fi[i], 3)} kN`, X(x) + (i === 3 ? -8 : 6), yd + 32 + 14 * (i % 2), pal.accent2, { size: 10.5, align: i === 3 ? "right" : "left" }); }
+      if (i === 1 || i === 2) SBX.text(ctx, `h ${CB.num(R.hs[i], 1)} m`, X(x) + 10, yd + R.hs[i] * hs - 6, pal.dim, { size: 10, align: "left", bold: false });
+    });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 360 });
+  function go() {
+    calc(); cv.redraw();
+    const m = document.getElementById("sb-pf-msg");
+    if (R.K <= 0) { ["sb-pf-K", "sb-pf-F", "sb-pf-M", "sb-pf-d"].forEach((id) => CB.stat(id, "—")); m.className = "sb-msg bad"; m.innerHTML = "모든 받침이 가동: 교축 방향으로 상부 구조를 붙잡는 지점이 없어 불안정합니다. 적어도 한 지점을 고정하거나 탄성 받침을 쓰세요."; return; }
+    CB.stat("sb-pf-K", `${CB.sig(R.K > 1e8 ? Infinity : R.K, 3)} kN/m · ${CB.num(R.T, 2)} s`);
+    CB.stat("sb-pf-F", `${CB.num(R.Sa, 3)} · ${CB.sig(R.F, 4)} kN`);
+    const Mx = Math.max(R.M[1], R.M[2]); CB.stat("sb-pf-M", `${CB.sig(Mx, 4)} kN·m <small>(${R.M[1] >= R.M[2] ? "P1" : "P2"})</small>`);
+    CB.stat("sb-pf-d", CB.num(R.d, 1) + " mm");
+    const ab = R.Fi[0] + R.Fi[3];
+    m.className = "sb-msg"; m.innerHTML = `분담: A1 ${CB.num((100 * R.Fi[0]) / R.F, 1)} % · P1 ${CB.num((100 * R.Fi[1]) / R.F, 1)} % · P2 ${CB.num((100 * R.Fi[2]) / R.F, 1)} % · A2 ${CB.num((100 * R.Fi[3]) / R.F, 1)} %` + (ab > 0.5 * R.F ? " — 교대가 지진력의 절반 이상을 받습니다(교대·기초 검토)." : "");
+  }
+  go();
+})();
+
+/* ---------- 6. 받침 지지 길이 ---------- */
+(function () {
+  const gL = CB.range("sb-se-L", (v) => v + " m", go), gH = CB.range("sb-se-H", (v) => v.toFixed(1) + " m", go), gS = CB.range("sb-se-S", (v) => v + "°", go);
+  const gN = CB.range("sb-se-N", (v) => v + " mm", go), gd = CB.range("sb-se-d", (v) => v + " mm", go), dev = CB.seg("sb-se-dev", go);
+  let R = null;
+  const cv = CB.canvas("#sb-cv-seat", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), xe = W * 0.8, s = Math.min((xe - 40) / 1100, 0.5), y = H * 0.5, X = (mm) => xe - mm * s;
+    SBX.rect(ctx, X(R.Np), y, R.Np * s + 30, H - y - 14, SBX.alpha(pal.dim, 0.3), pal.dim);
+    SBX.rect(ctx, xe, y - 60, 30, H - y + 46, SBX.alpha(pal.dim, 0.3), pal.dim);
+    SBX.text(ctx, "받침 자리", X(R.Np) + 8, H - 26, pal.dim, { size: 11, align: "left", bold: false });
+    SBX.line(ctx, [[X(R.Nr), y - 70], [X(R.Nr), H - 14]], pal.warn, 1.4, [5, 4]); SBX.text(ctx, `최소 N ${CB.num(R.Nr, 0)}`, X(R.Nr) - 4, y - 66, pal.warn, { size: 10.5, align: "right" });
+    SBX.rect(ctx, X(300), y - 6, 300 * s, 6, SBX.alpha(pal.accent2, 0.5));
+    const ge = xe - R.dEff * s, fall = R.left <= 0;
+    ctx.save(); if (fall) { ctx.translate(X(R.Np), y); ctx.rotate(0.3); ctx.translate(-X(R.Np), -y); }
+    SBX.rect(ctx, -2, y - 46, ge + 2, 40, SBX.alpha(fall ? pal.bad : pal.accent, 0.25), fall ? pal.bad : pal.accent);
+    ctx.restore();
+    if (R.dEff > 0) SBX.arrow(ctx, xe, y - 26, ge, y - 26, pal.bad, 2, 7);
+    SBX.text(ctx, `d = ${CB.num(R.dEff, 0)} mm`, Math.min(ge, xe) - 8, y - 56, pal.bad, { size: 11, align: "right" });
+    SBX.text(ctx, fall ? "낙교" : `남은 걸침 ${CB.num(R.left, 0)} mm`, 12, 16, fall ? pal.bad : pal.ok, { size: 13, align: "left" });
+    SBX.text(ctx, "거더", 30, y - 26, pal.text, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.55 : 0.32), minHeight: 190, maxHeight: 260 });
+  function go() {
+    const L = gL() * 1000, H = gH() * 1000, S = gS(), Np = gN(), d = gd(), Nr = (200 + 0.0017 * L + 0.0067 * H) * (1 + 0.000125 * S * S);
+    const lim = dev() === "1" ? 150 : Infinity, dEff = Math.min(d, lim), left = Np - dEff - 150;
+    R = { Np, Nr, d, dEff, left };
+    cv.redraw();
+    CB.stat("sb-se-req", CB.num(Nr, 0) + " mm"); CB.stat("sb-se-r", CB.num(Np / Nr, 2)); CB.stat("sb-se-left", CB.num(Math.max(left, 0), 0) + " mm");
+    CB.stat("sb-se-ok", left <= 0 ? `<span style="color:var(--bad)">낙교</span>` : Np < Nr ? `<span style="color:var(--warn)">걸침 유지 · N 부족</span>` : `<span style="color:var(--ok)">합격</span>`);
+    const m = document.getElementById("sb-se-msg");
+    m.className = "sb-msg " + (left <= 0 ? "bad" : Np < Nr ? "warn" : "ok");
+    m.innerHTML = left <= 0 ? `상대 변위 ${d} mm가 지지 길이 ${Np} mm에서 받침 폭 절반(150 mm)을 뺀 값을 넘었습니다. 지지 길이를 늘리거나 낙교 방지 장치로 변위를 묶으세요.`
+      : Np < Nr ? `이번 변위는 견디지만 설치 지지 길이 ${Np} mm가 최소 ${CB.num(Nr, 0)} mm보다 짧습니다(기준 형태 불만족).`
+      : `설치 ${Np} mm ≥ 최소 ${CB.num(Nr, 0)} mm, 변위 ${CB.num(dEff, 0)} mm 뒤에도 ${CB.num(left, 0)} mm가 남습니다.`;
+  }
+  go();
+})();
+
+/* ---------- 7. 면진 효과 ---------- */
+(function () {
+  const gT = CB.range("sb-is-T", (v) => v.toFixed(2) + " s", go), gz = CB.seg("sb-is-z", go), gs = CB.range("sb-is-s", (v) => "× " + v.toFixed(2), go);
+  const T0 = 2 * Math.PI * Math.sqrt(SBX.W / SBX.g / (2 * SBX.kp(12))), dOf = (sa, T) => sa * SBX.g * (T / (2 * Math.PI)) ** 2 * 1000;
+  let R = null;
+  const ca = CB.canvas("#sb-cv-iso", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), d5 = [], dz = [];
+    for (let T = 0.02; T <= 4.001; T += 0.02) { d5.push([T, SBX.sa(T, R.s)]); dz.push([T, SBX.sa(T, R.s) / R.B]); }
+    CB.chart(ctx, { x: 58, y: 24, w: W - 58 - 16, h: H - 24 - 44 }, { x: [0, 4], y: [0, 0.55 * R.s * 1.1], xLabel: "주기 T (s)", yLabel: "Sa/B (g)",
+      series: [{ data: d5, color: pal.dim, width: 1.6, dash: [5, 4] }, { data: dz, color: pal.accent, width: 2.6 }],
+      points: [{ x: T0, y: SBX.sa(T0, R.s), color: pal.accent2, r: 7, label: "고정" }, { x: R.T, y: R.sa, color: pal.accent, r: 7, label: "면진" }] });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.34), minHeight: 200, maxHeight: 260 });
+  const cd = CB.canvas("#sb-cv-iso-d", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), d = [];
+    for (let T = 0.02; T <= 4.001; T += 0.02) d.push([T, dOf(SBX.sa(T, R.s) / R.B, T)]);
+    CB.chart(ctx, { x: 58, y: 24, w: W - 58 - 16, h: H - 24 - 44 }, { x: [0, 4], y: [0, Math.max(...d.map((p) => p[1])) * 1.15], xLabel: "주기 T (s)", yLabel: "변위 (mm)",
+      series: [{ data: d, color: pal.blue, width: 2.4 }], points: [{ x: R.T, y: R.d, color: pal.blue, r: 7 }], hlines: [{ y: 150, color: pal.warn, label: "150 mm" }] });
+  }, { aspect: (W) => (W < 520 ? 0.55 : 0.3), minHeight: 180, maxHeight: 240 });
+  function go() {
+    const T = gT(), z = +gz(), s = gs(), B = SBX.Bz(z), sa = SBX.sa(T, s) / B, F0 = SBX.sa(T0, s) * SBX.W, F = sa * SBX.W;
+    R = { T, z, s, B, sa, d: dOf(sa, T) };
+    ca.redraw(); cd.redraw();
+    CB.stat("sb-is-F0", CB.sig(F0, 4) + " kN"); CB.stat("sb-is-F", `${CB.sig(F, 4)} kN <small>(B ${CB.num(B, 2)})</small>`);
+    CB.stat("sb-is-r", CB.num((1 - F / F0) * 100, 0) + " %"); CB.stat("sb-is-d", CB.num(R.d, 0) + " mm");
+  }
+  go();
+})();
+
+/* ---------- 8. 3D 하부 구조 ---------- */
+(function () {
+  const deck = CB.seg("sb-3d-deck", go), brg = CB.seg("sb-3d-brg", go), fsh = CB.seg("sb-3d-f", go);
+  const init = { yaw: -0.75, pitch: 0.28, dist: 175, target: [65, 0, -8] };
+  const XS = [0, 40, 90, 130], zb = -2.45, zc = -2.7, zf = -14.7;
+  const beam = CB.beam({ L: 130, EI: 1e7, supports: [{ x: 0, type: "pin" }, { x: 40, type: "roller" }, { x: 90, type: "roller" }, { x: 130, type: "roller" }], loads: [{ type: "udl", w: 120, a: 0, b: 130 }] });
+  const RV = beam.reactions.map((r) => r.R);
+  const box = (x0, x1, y0, y1, z0, z1) => [[[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]]];
+  function shares() {
+    const ela = brg() === "ela", kp = SBX.kp(12);
+    const ks = ela ? [SBX.KB, 1 / (1 / SBX.KB + 1 / kp), 1 / (1 / SBX.KB + 1 / kp), SBX.KB] : [0, kp, 0, 0];
+    const K = ks.reduce((a, b) => a + b, 0), T = 2 * Math.PI * Math.sqrt(SBX.W / SBX.g / K), F = SBX.sa(T) * SBX.W;
+    return ks.map((k) => (k / K) * F);
+  }
+  const orb = CB.orbit("#sb-cv-3d", Object.assign({}, init, {
+    aspect: 0.62, minHeight: 280, maxHeight: 480,
+    draw(V) {
+      const pal = V.P, faces = [], dm = deck(), ela = brg() === "ela";
+      faces.push({ f: [[-25, -30, -9], [155, -30, -9], [155, 30, -9], [-25, 30, -9]], fill: pal.blue, al: 0.12, st: null });
+      [[-25, 6], [124, 155]].forEach(([a, b]) => faces.push({ f: [[a, -14, -0.4], [b, -14, -0.4], [b, 14, -0.4], [a, 14, -0.4]], fill: pal.warn, al: 0.16, st: null }));
+      [40, 90].forEach((x) => {
+        box(x - 1.25, x + 1.25, -5, 5, zc - 2, zc).forEach((f) => faces.push({ f, fill: pal.dim, al: 0.3, st: pal.dim }));
+        const N = 12, r = 1.0, ring = (z) => Array.from({ length: N }, (_, k) => [x + r * Math.cos((2 * Math.PI * k) / N), r * Math.sin((2 * Math.PI * k) / N), z]);
+        const A = ring(zc - 2), B = ring(zf); for (let k = 0; k < N; k++) faces.push({ f: [A[k], A[(k + 1) % N], B[(k + 1) % N], B[k]], fill: pal.dim, al: 0.28, st: null });
+        box(x - 3.5, x + 3.5, -3.5, 3.5, zf - 2, zf).forEach((f) => faces.push({ f, fill: pal.dim, al: 0.22, st: pal.dim }));
+      });
+      [[0, -1], [130, 1]].forEach(([x, sg]) => {
+        box(Math.min(x, x + sg * 1.4), Math.max(x, x + sg * 1.4), -6, 6, -9, zc).forEach((f) => faces.push({ f, fill: pal.dim, al: 0.28, st: pal.dim }));
+        box(Math.min(x - sg * 1.5, x + sg * 3.5), Math.max(x - sg * 1.5, x + sg * 3.5), -6.5, 6.5, -10.2, -9).forEach((f) => faces.push({ f, fill: pal.dim, al: 0.22, st: pal.dim }));
+        [-6, 6].forEach((y) => faces.push({ f: [[x + sg * 1.4, y, -0.4], [x + sg * 8, y, -0.4], [x + sg * 8, y, -6], [x + sg * 1.4, y, -9]], fill: pal.dim, al: 0.22, st: pal.dim }));
+      });
+      if (dm !== "off") {
+        const al = dm === "ghost" ? 0.08 : 0.3;
+        box(0, 130, -5.5, 5.5, -0.24, 0).forEach((f) => faces.push({ f, fill: pal.dim, al, st: dm === "ghost" ? null : pal.dim }));
+        SBX.XB.forEach((y) => faces.push({ f: [[0, y, -0.24], [130, y, -0.24], [130, y, zb], [0, y, zb]], fill: pal.accent, al: dm === "ghost" ? 0.1 : 0.35, st: null }));
+      }
+      faces.sort((p, q) => V.depth(q.f) - V.depth(p.f)).forEach((o) => V.poly3(o.f, { fill: o.fill, fillAlpha: o.al, stroke: !!o.st, color: o.st || undefined, width: 1 }));
+      [40, 90].forEach((x) => { for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) V.line3([x + 2.5 * i, 2.5 * j, zf - 2], [x + 2.5 * i, 2.5 * j, -30], { color: pal.dim, width: 2.5 }); });
+      XS.forEach((x, i) => SBX.XB.forEach((y) => { const c = ela ? pal.blue : i === 1 ? pal.accent2 : pal.ok; box(x - 0.35, x + 0.35, y - 0.35, y + 0.35, zc, zb).forEach((f) => V.poly3(f, { fill: c, fillAlpha: 0.85, stroke: false })); }));
+      const f = fsh();
+      if (f === "v") XS.forEach((x, i) => { const L = 2 + RV[i] / 800; V.line3([x, 7, zb + L], [x, 7, zb], { color: pal.ok, width: 3 }); V.text3(`${CB.sig(RV[i], 4)} kN`, [x, 7, zb + L + 1.5], { color: pal.ok, size: 11, bold: true }); });
+      if (f === "h") shares().forEach((F, i) => { if (F < 1) return; const L = 2 + F / 150; V.line3([XS[i] + L, -7, zc - 1], [XS[i], -7, zc - 1], { color: pal.accent2, width: 3 }); V.text3(`${CB.sig(F, 3)} kN`, [XS[i] + L, -7, zc + 1], { color: pal.accent2, size: 11, bold: true }); });
+      ["A1", "P1", "P2", "A2"].forEach((n, i) => V.text3(n, [XS[i], -9, 2], { color: pal.text, size: 12, bold: true }));
+    },
+  }));
+  document.getElementById("sb-3d-reset").addEventListener("click", () => orb.set(Object.assign({}, init, { target: init.target.slice() })));
+  function go() {
+    orb.redraw();
+    const ela = brg() === "ela", sh = shares();
+    CB.stat("sb-3d-n", "16개 <small>(지점당 4)</small>"); CB.stat("sb-3d-fx", ela ? "탄성 중심(교량 중앙)" : "P1(x = 40 m)");
+    CB.stat("sb-3d-j", ela ? "약 51 mm <small>(65 m)</small>" : "약 70 mm <small>(90 m)</small>");
+    CB.stat("sb-3d-h", CB.sig(Math.max(sh[1], sh[2]), 4) + " kN");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

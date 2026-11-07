@@ -13,7 +13,7 @@
 | `/geotech/` | GeotechBook · 지반공학 | 공개, 4부 16장 + 용어집 |
 | `/structure/` | StructureBook · 건축구조 | 공개, 4부 16장 + 용어집 |
 | `/concrete/` | ConcreteBook · 철근콘크리트 구조 | 공개, 4부 16장 + 용어집 |
-| `/civil/` | CivilBook · 교량·터널·도로 | 준비 예정 |
+| `/civil/` | CivilBook · 교량·터널·도로 | 공개, 4부 16장 + 용어집 |
 | `/site/` | SiteBook · 시공과 건설관리 | 준비 예정 |
 | `/bim/` | BIMBook · BIM·디지털 건설 | 준비 예정 |
 
@@ -43,10 +43,11 @@ tools/materials.test.cjs              재료 모델(배합·강도·내구성·�
 tools/geotech.test.cjs                지반 모델(응력·압밀·토압·지지력·사면·액상화)을 손계산과 대조
 tools/structure.test.cjs              동역학·풍하중 모델(모드·뉴마크·스펙트럼·등가 정적·TMD)을 손계산과 대조
 tools/concrete.test.cjs               RC 설계 함수(휨·T형·전단·정착·균열 단면·P–M·모멘트 확대)를 손계산과 대조
+tools/civil.test.cjs                  토목 모델(영향선·케이블·커쉬·지반 반응 곡선·선형·포장·수리)을 손계산과 대조
 tools/merge-glossary.py               장별 용어 파일 {slug}/js/glossary/*.json → glossary-data.js
 tools/check.py                        메타데이터·링크 정적 검사
 tools/browser-check.cjs               데스크톱·모바일 브라우저 검사(Playwright)
-tools/og.mjs                          공유 이미지 og.png, mechanics/og.png, materials/og.png, geotech/og.png, structure/og.png, concrete/og.png 생성(Playwright)
+tools/og.mjs                          공유 이미지 og.png, mechanics/og.png, materials/og.png, geotech/og.png, structure/og.png, concrete/og.png, civil/og.png 생성(Playwright)
 tools/sim-shots.mjs                   홈 실험 카드 이미지 생성(Playwright)
 ```
 
@@ -57,7 +58,7 @@ npm ci
 npm test                                   # 수식·해석 엔진·링크 검사
 npm run build                              # .book-dist/ 생성
 python3 -m http.server 8000 --directory .book-dist
-node tools/browser-check.cjs --offline mechanics materials geotech structure concrete   # Playwright 필요
+node tools/browser-check.cjs --offline mechanics materials geotech structure concrete civil   # Playwright 필요
 ```
 
 배포물은 `.book-dist/`입니다. GitHub Pages의 Source를 GitHub Actions로 설정하고 커스텀 도메인과 DNS를 연결하면 `main`에 push할 때 Deploy Book 워크플로가 검사·빌드 후 배포합니다. `CNAME`의 `construction.euiyun.com`은 예정 주소이며, 이 파일만으로 DNS나 GitHub 설정이 바뀌지는 않습니다.

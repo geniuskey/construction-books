@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>철도 · CivilBook</title>
+<meta name="description" content="레일 위의 교통. 궤도의 구성과 탄성 지반 위 레일(β), 침목·도상 압력, 평형 캔트와 부족 캔트, 최소 곡선 반지름과 완화 곡선, 고속철도 교량 공진, 궤도 틀림과 차량 응답, 장대 레일을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .rw-stack { display: grid; grid-template-columns: 1fr; }
+  .rw-stack > div { position: relative; min-width: 0; }
+  .rw-stack > div + div { border-top: 1px solid var(--border); }
+  .rw-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .rw-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .rw-msg b { color: var(--text); }
+  .rw-msg.ok { color: var(--ok); font-weight: 600; }
+  .rw-msg.bad { color: var(--bad); font-weight: 600; }
+  .rw-tbl td, .rw-tbl th { font-variant-numeric: tabular-nums; }
+  .rw-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .rw-steps { margin: 6px 0 0; }
+  .rw-steps li { margin: 4px 0; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="civil"></script>
+</head>
+<body data-chapter="railway">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="rw-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="rw-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="rw-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="rw-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="rw-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+      <pattern id="rw-pat-bal" width="12" height="10" patternUnits="userSpaceOnUse"><path d="M1 8 L4 3 L8 6 L11 2" style="fill:none;stroke:var(--text-faint);stroke-width:1"/></pattern>
+      <pattern id="rw-pat-soil" width="16" height="10" patternUnits="userSpaceOnUse"><path d="M0 8 L5 3 M8 9 L13 4" style="stroke:var(--warn);stroke-width:1;opacity:.55"/></pattern>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 14</div>
+    <h1 data-no-glossary>철도</h1>
+    <p class="lead">도로는 바퀴가 길 위 어디로든 갈 수 있지만, 철도는 바퀴가 레일 두 줄을 벗어나지 못합니다. 이 제약이 철도의 힘입니다. 강철 바퀴와 강철 레일의 작은 구름 저항 덕에 같은 에너지로 훨씬 무거운 짐을 나르고, 정해진 궤도 덕에 시속 300 km로 달려도 운전자가 핸들을 잡지 않습니다. 그 대신 레일 아래의 모든 것, 곧 체결 장치·침목·도상·노반이 바퀴 하나의 하중을 흙이 견딜 압력으로 펴 주어야 하고, 곡선에서는 기울기(캔트)가, 고속에서는 진동과 공진이, 긴 레일에서는 온도 응력이 설계를 정합니다. 이 장은 레일을 <b>탄성 지반 위의 보</b>로 풀어 처짐과 휨을 구하는 데서 시작해, 침목과 도상의 압력, 평형 캔트 \(C = GV^2/(127R)\), 최소 곡선 반지름과 완화 곡선, 고속철도 교량의 공진, 궤도 틀림이 차체를 흔드는 원리, 슬래브 궤도와 장대 레일까지 계산과 시뮬레이터로 따라갑니다.</p>
+    <ul class="objectives">
+      <li>궤도의 구성 요소(레일·체결 장치·침목·도상·노반)와 하중이 바퀴에서 노반까지 퍼지는 경로를 설명한다.</li>
+      <li>레일을 빙클러 지반 위의 무한 보로 보고 \(\beta = (k/4EI)^{1/4}\)로 처짐·휨모멘트·레일 좌면 하중을 계산한다.</li>
+      <li>동적 할증과 침목 간격·도상 두께로 도상과 노반의 압력을 추정한다.</li>
+      <li>평형 캔트, 부족·초과 캔트, 미평형 횡가속도를 계산하고 혼합 교통 노선의 캔트를 정한다.</li>
+      <li>최대 캔트와 허용 부족 캔트로 최소 곡선 반지름을, 캔트 변화율로 완화 곡선 길이를 구한다.</li>
+      <li>고속 열차의 주기적 축하중이 교량을 공진시키는 속도를 구하고, 궤도 틀림의 파장·속도와 차체 진동의 관계를 1자유도 모형으로 판단한다.</li>
+      <li>자갈 궤도와 콘크리트 궤도를 비교하고, 장대 레일의 온도 축력·신축 구간·교량 상호 작용의 개념을 설명한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 구조물이 없었다면</small><b>말이 끌던 짐을 증기가 끌기까지</b></div>
+      <div class="o-body"><p>나무나 돌로 된 홈길 위로 수레를 끄는 방법은 오래전부터 광산에서 쓰였습니다. 바퀴가 홈을 따라가니 말 한 마리가 맨땅보다 훨씬 무거운 짐을 끌 수 있었기 때문입니다. 1825년 영국의 스톡턴–달링턴 철도에서 증기 기관차가 공공 철도의 열차를 끌었고, 1830년 리버풀–맨체스터 철도는 증기 기관차만으로 여객과 화물을 정기적으로 실어 나르는 철도의 원형이 되었습니다. 이 철도들이 쓴 궤간 4피트 8½인치(1,435 mm)가 오늘날 세계 철도의 절반 이상이 쓰는 <b>표준궤</b>입니다.</p>
+        <p>국내 첫 철도는 1899년 개통한 경인선(노량진–제물포)입니다. 1964년 일본 도카이도 신칸센이 개통하며 시속 200 km를 넘는 고속철도의 시대가 열렸고, 1981년 프랑스 TGV가 뒤를 이었습니다. 국내에서는 2004년 경부고속철도가 개통해 KTX가 최고 운행 속도 300 km/h로 달리기 시작했습니다. 속도가 오를 때마다 궤도의 처짐, 곡선의 캔트, 교량의 진동이 새로운 설계 문제가 되었고, 그 계산이 이 장의 내용입니다.</p>
+        <div class="o-chain"><span>바퀴 하중 · 속도 · 곡선</span><i>→</i><span class="tool">탄성 지반 위의 보 · 캔트 · 공진 · 온도 축력</span><i>→</i><span>궤도 구조 · 곡선 반지름 · 교량 · 장대 레일</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="features">
+    <h2>철도의 특성과 이 장의 기준 노선</h2>
+    <div class="problem"><strong>왜 철도는 무거운 짐을 적은 에너지로 나르나</strong>
+      <p>트럭 타이어는 굴러가며 고무가 눌렸다 펴지기를 반복해 에너지를 잃습니다. 강철 바퀴는 강철 레일 위에서 거의 변형하지 않아 구름 저항이 훨씬 작습니다(구름 저항 계수가 대략 타이어의 수 분의 1에서 10분의 1, 약). 그 대신 마찰도 작아 가속·제동과 오르막에 약하고, 길은 레일이 놓인 곳뿐입니다.</p></div>
+    <p>철도 바퀴는 안쪽에 플랜지가 있고, 바퀴가 레일에 닿는 면(답면)이 바깥쪽으로 조금 가늘어지는 원뿔 모양입니다. 차축이 한쪽으로 쏠리면 그쪽 바퀴는 굵은 지름으로, 반대쪽은 가는 지름으로 구르게 되어 차축이 다시 가운데로 돌아옵니다. 이 <span class="term">답면 기울기</span><span class="en">(wheel conicity)</span> 덕분에 직선과 완만한 곡선에서는 플랜지가 레일에 닿지 않고도 차량이 궤도를 따라갑니다. 두 레일 안쪽 면 사이의 거리가 <span class="term">궤간</span><span class="en">(track gauge)</span>입니다.</p>
+    <div class="callout def"><strong>정의 14.1 (궤간과 기준 노선)</strong> 궤간은 두 레일 머리 안쪽 면 사이의 최단 거리(레일 윗면 아래 일정 깊이에서 잼)이며, 표준궤는 1,435 mm, 이보다 넓으면 광궤, 좁으면 협궤다. 캔트 계산에 쓰는 좌우 레일 중심 간격 \(G\)는 표준궤에서 약 1,500 mm다. 이 장은 다음 두 기준 노선(가상, 교육용)으로 계산한다.</div>
+    <div class="table-wrap"><table class="rw-tbl">
+      <thead><tr><th>항목</th><th>HS-300 고속선</th><th>CR-120 일반선</th></tr></thead>
+      <tbody>
+        <tr><td>설계 속도</td><td class="hl">300 km/h</td><td class="hl">120 km/h(화물 60 km/h 혼용)</td></tr>
+        <tr><td>궤간 · G</td><td>1,435 mm · 1,500 mm</td><td>1,435 mm · 1,500 mm</td></tr>
+        <tr><td>레일</td><td>60 kg/m 레일(I ≈ 3,050 cm⁴, 하부 단면 계수 약 375 cm³)</td><td>60 kg/m 또는 50 kg/m 레일(I ≈ 2,000 cm⁴, 약)</td></tr>
+        <tr><td>침목 · 간격</td><td>PSC 침목(길이 2.6 m, 바닥 폭 0.28 m) · 0.6 m</td><td>PSC 침목 · 0.6 m</td></tr>
+        <tr><td>궤도 지지 계수 k(레일 한 줄)</td><td>40 MPa(= kN/m/m)</td><td>30 MPa</td></tr>
+        <tr><td>정적 윤하중</td><td>85 kN(축하중 약 17 t)</td><td>110 kN(화물 축하중 약 22 t)</td></tr>
+        <tr><td>기준 곡선</td><td>R = 7,000 m</td><td>R = 800 m</td></tr>
+      </tbody></table></div>
+    <p>모든 값은 학습용 가정입니다. 실제 설계는 철도 설계기준(KDS 47 계열)과 노선별 설계 지침을 따르며, 이 장의 한계값(최대 캔트, 허용 부족 캔트, 도상 압력 등)도 교육용이니 현행 기준을 확인해야 합니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="track">
+    <h2>궤도의 구성과 하중의 경로</h2>
+    <div class="problem"><strong>바퀴 하나가 레일을 누르는 면적은 손톱만 하다</strong>
+      <p>강철 바퀴와 레일이 닿는 면은 타원 모양으로 넓이가 1–2 cm² 정도에 불과합니다. 85 kN이 그 위에 실리니 접촉 압력은 1,000 MPa에 가깝습니다. 그런데 맨 아래 흙은 100 kPa 남짓밖에 견디지 못합니다. 만 배 가까운 차이를 레일 아래 층들이 단계적으로 줄여 줍니다.</p></div>
+    <p>궤도는 위에서부터 다음 층으로 이루어집니다. <b>레일</b>은 바퀴를 안내하고 하중을 받아 휨으로 여러 침목에 나눕니다. <span class="term">체결 장치</span><span class="en">(rail fastening)</span>는 레일을 침목에 고정하고, 그 아래의 탄성 패드가 충격을 줄이고 궤도의 탄성을 정합니다. <span class="term">침목</span><span class="en">(sleeper)</span>은 두 레일의 간격(궤간)을 유지하고 레일 좌면의 하중을 넓은 바닥으로 도상에 전합니다. <span class="term">도상</span><span class="en">(ballast)</span>은 모난 쇄석 층으로, 하중을 더 펴고 침목을 앞뒤·좌우로 붙잡으며 물을 빼고, 틀어진 궤도를 다지기(탬핑)로 바로잡을 수 있게 합니다. 그 아래가 보조 도상(입도 조정 쇄석)과 흙 구조물인 <span class="term">노반</span><span class="en">(formation)</span>입니다. 노반은 성토·절토(GeotechBook)로 만들고, 그 지지력이 궤도의 수명을 좌우합니다.</p>
+    <figure class="diagram" id="fig-rw-section">
+      <svg viewBox="0 0 880 330" role="img" aria-label="자갈 궤도의 횡단면: 레일, 체결 장치, 침목, 도상, 보조 도상, 노반">
+        <rect x="10" y="10" width="860" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(80,40)">
+          <path d="M40 190 L120 110 L600 110 L680 190 Z" style="fill:url(#rw-pat-bal);stroke:var(--text-dim)"/>
+          <path d="M0 236 L60 190 L660 190 L720 236 Z" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <rect x="-20" y="236" width="760" height="40" style="fill:url(#rw-pat-soil);stroke:var(--border)"/>
+          <rect x="140" y="92" width="440" height="24" rx="3" style="fill:var(--text-dim);opacity:.7"/>
+          <g style="fill:var(--text)">
+            <path d="M232 92 L232 86 L240 84 L240 58 L234 54 L234 44 L262 44 L262 54 L256 58 L256 84 L264 86 L264 92 Z"/>
+            <path d="M456 92 L456 86 L464 84 L464 58 L458 54 L458 44 L486 44 L486 54 L480 58 L480 84 L488 86 L488 92 Z"/>
+          </g>
+          <g style="fill:var(--accent-2)"><rect x="220" y="86" width="12" height="6"/><rect x="264" y="86" width="12" height="6"/><rect x="444" y="86" width="12" height="6"/><rect x="488" y="86" width="12" height="6"/></g>
+          <line x1="248" y1="30" x2="472" y2="30" style="stroke:var(--accent);stroke-width:1.4" marker-start="url(#rw-ah-acc)" marker-end="url(#rw-ah-acc)"/>
+          <text x="360" y="22" text-anchor="middle" class="t-mono" style="fill:var(--accent)">G ≈ 1,500 mm (레일 중심 간격) · 궤간 1,435 mm</text>
+          <g class="t-mono">
+            <text x="690" y="56">레일(60 kg/m)</text><line x1="686" y1="52" x2="490" y2="56" style="stroke:var(--text-faint)"/>
+            <text x="690" y="86" style="fill:var(--accent-2)">체결 장치 · 패드</text><line x1="686" y1="82" x2="502" y2="88" style="stroke:var(--text-faint)"/>
+            <text x="690" y="112">침목(PSC, 2.6 m)</text><line x1="686" y1="108" x2="582" y2="104" style="stroke:var(--text-faint)"/>
+            <text x="690" y="160">도상(쇄석)</text>
+            <text x="690" y="214">보조 도상</text>
+            <text x="690" y="262">노반(성토·절토)</text>
+          </g>
+          <text x="360" y="300" text-anchor="middle" class="t-dim">도상 어깨는 침목이 옆으로 밀리지 않게 붙잡는다(횡저항) · 노반 윗면은 배수 경사</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-1.</b> 자갈 궤도의 횡단면(모식, 치수는 교육용 대략값). 레일–체결 장치–침목–도상–보조 도상–노반의 순서로 하중을 펴고, 각 층은 탄성(승차감·충격 흡수)과 강성(처짐 제한)의 균형을 맞춘다.</figcaption>
+    </figure>
+    <figure class="diagram" id="fig-rw-path">
+      <svg viewBox="0 0 880 300" role="img" aria-label="바퀴 하중이 레일, 침목, 도상, 노반으로 퍼지며 압력이 줄어드는 종단면">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <circle cx="400" cy="30" r="26" style="fill:none;stroke:var(--accent-2);stroke-width:2.5"/>
+          <line x1="400" y1="0" x2="400" y2="50" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#rw-ah-ld)"/>
+          <rect x="40" y="58" width="720" height="12" style="fill:var(--text)"/>
+          <path d="M40 70 C 200 70, 320 74, 400 77 C 480 74, 600 70, 760 70" style="fill:none;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 4"/>
+          <g style="fill:var(--text-dim);opacity:.75">
+            <rect x="110" y="76" width="40" height="18"/><rect x="200" y="76" width="40" height="18"/><rect x="290" y="76" width="40" height="18"/><rect x="380" y="76" width="40" height="18"/><rect x="470" y="76" width="40" height="18"/><rect x="560" y="76" width="40" height="18"/><rect x="650" y="76" width="40" height="18"/>
+          </g>
+          <g style="fill:var(--ok)"><rect x="296" y="100" width="28" height="8"/><rect x="206" y="100" width="28" height="3"/><rect x="386" y="100" width="28" height="12"/><rect x="476" y="100" width="28" height="8"/><rect x="566" y="100" width="28" height="3"/></g>
+          <rect x="40" y="94" width="720" height="70" style="fill:url(#rw-pat-bal);stroke:var(--border)"/>
+          <path d="M380 94 L340 164 M420 94 L460 164" style="stroke:var(--accent-2);stroke-width:1.4;stroke-dasharray:5 3;fill:none"/>
+          <rect x="40" y="164" width="720" height="60" style="fill:url(#rw-pat-soil);stroke:var(--border)"/>
+          <g class="t-mono" style="paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round">
+            <text x="440" y="24">접촉 압력 ≈ 1,000 MPa 수준</text>
+            <text x="770" y="50" text-anchor="end">레일 휨 → 여러 침목에 분담</text>
+            <text x="606" y="114" style="fill:var(--ok)">레일 좌면 하중 ≈ 0.34Q</text>
+            <text x="50" y="130">도상 압력 ≈ 200 kPa</text>
+            <text x="50" y="200">노반 압력 ≈ 60 kPa</text>
+          </g>
+        </g>
+        <text x="440" y="276" text-anchor="middle" class="t-dim">HS-300, 정적 윤하중 85 kN × 동적 할증 1.6 기준(교육용) — 14.3·14.4절에서 계산</text>
+      </svg>
+      <figcaption><b>그림 14-2.</b> 바퀴에서 노반까지의 하중 경로(종단면 모식). 레일의 휨 강성이 하중을 여러 침목에 나누고, 도상이 침목 바닥 압력을 다시 펴서 노반에 전한다. 각 단계에서 압력은 몇 분의 1씩 줄어든다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-rw-3d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>3D 궤도 단면 탐색</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rw-cv-3d" aria-label="레일, 침목, 도상, 노반으로 된 궤도 구간의 3차원 보기"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>궤도 형식</span><div class="seg" id="rw-3d-type"><button data-value="bal" class="on">자갈 궤도</button><button data-value="slab">콘크리트 궤도</button></div></div>
+          <label class="ctrl"><span>캔트 C <output id="rw-3d-c-out"></output></span><input type="range" id="rw-3d-c" min="0" max="180" step="5" value="0"></label>
+          <label class="ctrl"><span>침목 간격 <output id="rw-3d-s-out"></output></span><input type="range" id="rw-3d-s" min="0.5" max="0.8" step="0.025" value="0.6"></label>
+          <label class="check"><input type="checkbox" id="rw-3d-lab" checked> 이름표</label>
+          <label class="check"><input type="checkbox" id="rw-3d-load"> 윤하중과 압력 퍼짐</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">캔트 각</span><span class="v" id="rw-3d-ang">—</span></div>
+        <div class="stat"><span class="k">침목 수(km당)</span><span class="v" id="rw-3d-n">—</span></div>
+        <div class="stat"><span class="k">구조 높이(레일 윗면–노반)</span><span class="v" id="rw-3d-h">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 끌어서 돌려 보세요 · 캔트를 올리면 단면이 안쪽 레일을 중심으로 기울어집니다(바깥 레일을 높임) · 콘크리트 궤도로 바꾸면 도상 대신 콘크리트 궤도판과 지지층이 보이고 구조 높이가 줄어듭니다 · 치수는 교육용 대략값(도상 두께 350 mm, 어깨 폭 500 mm, 콘크리트 궤도판 240 mm + 지지층 300 mm)입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="winkler">
+    <h2>탄성 지반 위의 레일</h2>
+    <div class="problem"><strong>레일은 침목 몇 개에 하중을 나누나</strong>
+      <p>레일은 0.6 m 간격의 침목 위에 놓인 연속보입니다. 침목 하나하나를 스프링으로 보고 수십 경간의 연속보를 풀 수도 있지만, 침목 간격이 처짐이 퍼지는 길이보다 충분히 짧으면 스프링을 레일 길이를 따라 고르게 펴서 "연속된 탄성 지반 위의 보"로 볼 수 있습니다. 그러면 닫힌 꼴의 해가 나옵니다.</p></div>
+    <p>빙클러(E. Winkler, 1867)는 지반을 서로 독립된 스프링의 모임으로 보는 모형을 제안했고, 치머만(1888)이 이를 철도 궤도 계산에 정리했다고 알려져 있습니다. 이 <span class="term">빙클러 지반</span><span class="en">(Winkler foundation)</span> 모형에서 레일 단위 길이당 지반 반력은 처짐에 비례합니다. 비례 상수 \(k\)는 레일 한 줄을 1 m 길이에서 1 m 누르는 데 드는 힘으로, <span class="term">궤도 지지 계수</span><span class="en">(track modulus)</span>라 하며 단위는 kN/m/m = kPa = MPa의 천분의 1입니다(이 장은 MPa로 표기: 40 MPa = 40,000 kN/m²). 패드·침목·도상·노반의 탄성을 모두 합친 값으로, 자갈 궤도에서 대략 20–80 MPa 범위입니다(형태). 같은 모형이 GeotechBook 14장의 수평 하중 말뚝과 13장 콘크리트 포장의 웨스터가드 해석에도 쓰였습니다.</p>
+    <figure class="diagram" id="fig-rw-boef">
+      <svg viewBox="0 0 880 320" role="img" aria-label="빙클러 스프링 위의 무한 보와 집중 하중, 처짐과 휨모멘트 분포의 모양">
+        <rect x="10" y="10" width="860" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <line x1="380" y1="0" x2="380" y2="36" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#rw-ah-ld)"/>
+          <text x="390" y="14" class="t-mono" style="fill:var(--accent-2)">Q</text>
+          <rect x="0" y="40" width="760" height="10" style="fill:var(--text)"/>
+          <g style="stroke:var(--warn);stroke-width:1.2;fill:none">
+            <path d="M40 50 l0 5 l-5 4 l10 5 l-10 5 l10 5 l-5 4 l0 6"/><path d="M120 50 l0 5 l-5 4 l10 5 l-10 5 l10 5 l-5 4 l0 6"/><path d="M200 50 l0 5 l-5 4 l10 5 l-10 5 l10 5 l-5 4 l0 6"/><path d="M280 50 l0 5 l-5 4 l10 5 l-10 5 l10 5 l-5 4 l0 6"/><path d="M360 50 l0 5 l-5 4 l10 5 l-10 5 l10 5 l-5 4 l0 6"/><path d="M440 50 l0 5 l-5 4 l10 5 l-10 5 l10 5 l-5 4 l0 6"/><path d="M520 50 l0 5 l-5 4 l10 5 l-10 5 l10 5 l-5 4 l0 6"/><path d="M600 50 l0 5 l-5 4 l10 5 l-10 5 l10 5 l-5 4 l0 6"/><path d="M680 50 l0 5 l-5 4 l10 5 l-10 5 l10 5 l-5 4 l0 6"/>
+          </g>
+          <line x1="0" y1="88" x2="760" y2="88" style="stroke:var(--warn);stroke-width:2"/>
+          <text x="10" y="106" class="t-mono" style="fill:var(--warn)">반력 = k·y (kN/m)</text>
+          <line x1="0" y1="160" x2="760" y2="160" class="s-axis"/>
+          <path d="M0 160 C 120 160, 200 156, 260 160 C 300 165, 340 196, 380 200 C 420 196, 460 165, 500 160 C 560 156, 640 160, 760 160" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <text x="330" y="204" text-anchor="end" class="t-mono" style="fill:var(--accent)">y_max = Qβ/(2k)</text>
+          <text x="210" y="150" class="t-mono" style="fill:var(--accent)">약간 들림(−)</text>
+          <circle cx="262" cy="160" r="3.5" style="fill:var(--accent)"/><text x="262" y="178" text-anchor="middle" class="t-mono">x = 3π/(4β)</text>
+          <line x1="0" y1="250" x2="760" y2="250" class="s-axis"/>
+          <path d="M0 250 C 150 250, 230 252, 290 258 C 320 252, 340 236, 380 214 C 420 236, 440 252, 470 258 C 530 252, 610 250, 760 250" style="fill:none;stroke:var(--accent-2);stroke-width:2.6"/>
+          <text x="470" y="222" class="t-mono" style="fill:var(--accent-2)">M_max = Q/(4β)</text>
+          <circle cx="324" cy="250" r="3.5" style="fill:var(--accent-2)"/><text x="324" y="270" text-anchor="middle" class="t-mono">x = π/(4β)</text>
+          <text x="600" y="150" class="t-mono">처짐 y(x)</text><text x="600" y="240" class="t-mono">휨모멘트 M(x)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-3.</b> 탄성 지반 위 무한 보의 처짐과 휨모멘트(모양). 처짐은 하중에서 3π/(4β)(HS-300에서 약 2.1 m) 떨어진 곳에서 0이 되고 그 너머는 조금 들린다. 휨모멘트는 π/(4β)(약 0.7 m)에서 부호가 바뀐다 — 옆 바퀴가 그 거리에 있으면 서로의 모멘트를 줄인다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 14.2 (빙클러 지반 위 무한 보, 집중 하중)</strong> 휨 강성 \(EI\)인 레일이 궤도 지지 계수 \(k\)의 지반 위에 있고 집중 하중 \(Q\)가 원점에 걸릴 때, 지배 방정식 \(EI\,y'''' + k\,y = 0\)(하중점 밖)의 해는
+      <div class="formula">$$\beta = \left(\frac{k}{4EI}\right)^{1/4}, \qquad y(x) = \frac{Q\beta}{2k}\,e^{-\beta|x|}\left(\cos\beta|x| + \sin\beta|x|\right), \qquad M(x) = \frac{Q}{4\beta}\,e^{-\beta|x|}\left(\cos\beta|x| - \sin\beta|x|\right)$$<div class="where">\(y\): 처짐(아래 +), \(M\): 휨모멘트(새깅 +). 최대값 \(y_0 = Q\beta/(2k)\), \(M_0 = Q/(4\beta)\). \(1/\beta\)는 특성 길이로, 하중이 퍼지는 범위의 척도다. 침목 간격 \(s\)에서 한 침목이 받는 <span class="term">레일 좌면 하중</span><span class="en">(rail seat load)</span>은 \(F = k\,y\,s\)이고 하중 바로 아래에서 \(F_0 = Q\beta s/2\). 여러 바퀴는 겹침으로 더한다(선형). 이 페이지의 시뮬레이터는 이 식을 직접 계산한다(교육용 페이지 내 모델).</div></div></div>
+    <div class="callout"><strong>예제 14.1 (HS-300 레일의 처짐과 휨)</strong> 60 kg 레일 \(E = 210\) GPa, \(I = 3.05 \times 10^{-5}\) m⁴, \(k = 40\) MPa = 40,000 kN/m², 정적 윤하중 \(Q = 85\) kN, 침목 간격 0.6 m.
+      <ol class="rw-steps">
+        <li><b>강성과 β.</b> \(EI = 2.1 \times 10^8 \times 3.05 \times 10^{-5} = 6{,}405\) kN·m², \(\beta = (40{,}000/(4 \times 6{,}405))^{1/4} = 1.118\) m⁻¹, 특성 길이 \(1/\beta = 0.895\) m.</li>
+        <li><b>처짐.</b> \(y_0 = 85 \times 1.118/(2 \times 40{,}000) = 1.19 \times 10^{-3}\) m = <b>1.19 mm</b>. 처짐이 0이 되는 거리 \(3\pi/(4\beta) = 2.11\) m.</li>
+        <li><b>휨모멘트와 응력.</b> \(M_0 = 85/(4 \times 1.118) = 19.0\) kN·m, 레일 하부 \(\sigma = 19.0/(375 \times 10^{-6}) = 50.7\) MPa(정적).</li>
+        <li><b>레일 좌면 하중.</b> \(F_0 = 85 \times 1.118 \times 0.6/2 = 28.5\) kN, 곧 윤하중의 <b>34 %</b>. 이웃 침목은 20.5, 9.0, 1.8 kN을 받아, 침목 5–7개가 한 바퀴를 나눠 진다.</li>
+        <li><b>대차의 두 바퀴(축간 3.0 m).</b> \(\beta x = 3.35\)에서 옆 바퀴의 영향 계수가 처짐 −0.042, 모멘트 −0.027이라 \(y = 1.14\) mm, \(M = 18.5\) kN·m로 오히려 조금 줄어든다.</li>
+      </ol></div>
+    <div class="sim" id="sim-rw-beam">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>레일 처짐·휨모멘트(탄성 지반 위 보)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view rw-stack">
+          <div><canvas id="rw-cv-beam-y" aria-label="레일 길이를 따른 처짐 곡선과 침목 위치, 레일 좌면 하중 막대"></canvas><span class="rw-cap">처짐 y (mm, 아래 +) · 침목 하중</span></div>
+          <div><canvas id="rw-cv-beam-m" aria-label="레일 길이를 따른 휨모멘트 곡선"></canvas><span class="rw-cap">휨모멘트 M (kN·m)</span></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>레일</span><div class="seg" id="rw-bm-rail"><button data-value="60" class="on">60 kg</button><button data-value="50">50 kg</button></div></div>
+          <label class="ctrl"><span>궤도 지지 계수 k <output id="rw-bm-k-out"></output></span><input type="range" id="rw-bm-k" min="10" max="150" step="1" value="40"></label>
+          <label class="ctrl"><span>윤하중 Q <output id="rw-bm-Q-out"></output></span><input type="range" id="rw-bm-Q" min="40" max="200" step="1" value="85"></label>
+          <label class="ctrl"><span>침목 간격 s <output id="rw-bm-s-out"></output></span><input type="range" id="rw-bm-s" min="0.5" max="0.8" step="0.025" value="0.6"></label>
+          <label class="check"><input type="checkbox" id="rw-bm-bogie"> 대차의 두 번째 바퀴</label>
+          <label class="ctrl"><span>축간 거리 <output id="rw-bm-a-out"></output></span><input type="range" id="rw-bm-a" min="1.5" max="3.5" step="0.05" value="3"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">β · 1/β</span><span class="v" id="rw-bm-beta">—</span></div>
+        <div class="stat"><span class="k">최대 처짐</span><span class="v" id="rw-bm-y">—</span></div>
+        <div class="stat"><span class="k">최대 M · 레일 응력</span><span class="v" id="rw-bm-m">—</span></div>
+        <div class="stat"><span class="k">최대 레일 좌면 하중</span><span class="v" id="rw-bm-F">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값이 예제 14.1입니다 · k를 40 → 120 MPa로 세 배 하면(굳은 노반·딱딱한 패드) 처짐은 0.44배, 모멘트는 0.76배, 좌면 하중은 1.32배 — 단단한 궤도는 처짐은 작지만 하중이 한 침목에 몰립니다 · 50 kg 레일은 처짐과 응력이 모두 커집니다 · 두 번째 바퀴를 켜고 축간 거리를 1.5 m로 줄이면 처짐이 더해집니다 · 모델: 원리 14.2(페이지 내 닫힌 꼴, 교육용), 레일 성질 60 kg I 3,050 cm⁴ · W 375 cm³, 50 kg I 2,000 cm⁴ · W 280 cm³(약), 정적 하중(동적 할증은 다음 절).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="sleeper">
+    <h2>침목과 도상의 압력</h2>
+    <div class="problem"><strong>시속 300 km의 바퀴는 정지한 바퀴보다 얼마나 무거운가</strong>
+      <p>달리는 바퀴는 레일 이음매, 바퀴 답면의 평탄 마모, 궤도 틀림을 만날 때마다 위아래로 흔들려 정적 하중보다 큰 힘으로 레일을 때립니다. 설계에서는 이를 정적 하중에 곱하는 할증 계수로 넣습니다.</p></div>
+    <div class="callout def"><strong>원리 14.3 (동적 할증과 도상·노반 압력, 교육용 형태)</strong>
+      <div class="formula">$$\varphi = 1 + t\,n\left(1 + \frac{V - 60}{140}\right), \qquad p_b = \frac{\varphi F_0}{b\,L_e}, \qquad p_s \approx \frac{\varphi F_0}{\min(b + h,\ s)\,(L_e + h)}$$<div class="where">\(\varphi\): <span class="term">동적 할증 계수</span><span class="en">(dynamic amplification factor)</span>(아이젠만 형태, 60–200 km/h에서 쓰는 식으로 이 책은 200 km/h 넘으면 \(V = 200\)을 넣는 교육용 처리). \(n\): 궤도 상태(매우 좋음 0.1, 좋음 0.2, 나쁨 0.3), \(t\): 통계 계수(3이면 약 99.7 %). \(F_0\): 정적 레일 좌면 하중(원리 14.2), \(b\): 침목 바닥 폭, \(L_e\): 레일 하나당 유효 지지 길이(침목 길이의 1/3로 가정), \(h\): 도상(+ 보조 도상) 두께, \(s\): 침목 간격. 노반 압력은 도상 안에서 2:1(수직 2 : 수평 1 양쪽)로 퍼진다고 본 근사이며, 퍼진 폭이 침목 간격을 넘으면 이웃 침목의 압력과 겹치므로 \(s\)로 자른다.</div></div></div>
+    <div class="callout"><strong>예제 14.2 (HS-300의 도상·노반 압력)</strong> \(Q = 85\) kN, 좌면 하중 \(F_0 = 28.5\) kN(예제 14.1), \(V = 300\) km/h(식에는 200), \(n = 0.1\), \(t = 3\). PSC 침목 길이 2.6 m, 바닥 폭 0.28 m, 도상 두께 0.35 m.
+      <ol class="rw-steps">
+        <li><b>동적 할증.</b> \(\varphi = 1 + 3 \times 0.1 \times (1 + 140/140) = 1.6\) → 설계 좌면 하중 \(1.6 \times 28.5 = 45.6\) kN.</li>
+        <li><b>침목 바닥(도상 윗면) 압력.</b> \(L_e = 2.6/3 = 0.867\) m, \(p_b = 45.6/(0.28 \times 0.867) = 188\) kPa.</li>
+        <li><b>노반 압력.</b> 퍼진 폭 \(\min(0.28 + 0.35,\ 0.6) = 0.6\) m, 길이 \(0.867 + 0.35 = 1.22\) m → \(p_s = 45.6/(0.6 \times 1.22) = 62\) kPa.</li>
+        <li><b>판정(교육용 기준).</b> 도상 압력 188 ≤ 300 kPa, 노반 압력 62 ≤ 100 kPa 만족. 노반이 연약하면(GeotechBook의 연약 점토 위 성토) 도상·보조 도상을 두껍게 하거나 노반을 개량한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-rw-sleeper">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>침목 분담과 도상·노반 압력</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rw-cv-sleeper" aria-label="침목별 하중 막대와 도상 속 압력 퍼짐, 도상과 노반 압력"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>정적 윤하중 Q <output id="rw-sl-Q-out"></output></span><input type="range" id="rw-sl-Q" min="50" max="150" step="1" value="85"></label>
+          <label class="ctrl"><span>속도 V <output id="rw-sl-V-out"></output></span><input type="range" id="rw-sl-V" min="0" max="350" step="5" value="300"></label>
+          <div class="ctrl"><span>궤도 상태 n</span><div class="seg" id="rw-sl-n"><button data-value="0.1" class="on">매우 좋음</button><button data-value="0.2">좋음</button><button data-value="0.3">나쁨</button></div></div>
+          <label class="ctrl"><span>침목 간격 s <output id="rw-sl-s-out"></output></span><input type="range" id="rw-sl-s" min="0.5" max="0.8" step="0.025" value="0.6"></label>
+          <label class="ctrl"><span>도상 두께 h <output id="rw-sl-h-out"></output></span><input type="range" id="rw-sl-h" min="0.15" max="0.6" step="0.01" value="0.35"></label>
+          <label class="ctrl"><span>궤도 지지 계수 k <output id="rw-sl-k-out"></output></span><input type="range" id="rw-sl-k" min="10" max="150" step="1" value="40"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">동적 할증 φ</span><span class="v" id="rw-sl-phi">—</span></div>
+        <div class="stat"><span class="k">설계 좌면 하중 φF₀</span><span class="v" id="rw-sl-F">—</span></div>
+        <div class="stat"><span class="k">도상 압력 p<sub>b</sub></span><span class="v" id="rw-sl-pb">—</span></div>
+        <div class="stat"><span class="k">노반 압력 p<sub>s</sub></span><span class="v" id="rw-sl-ps">—</span></div>
+      </div>
+      <div class="rw-msg" id="rw-sl-msg"></div>
+      <div class="sim-note">해볼 것: 기본값이 예제 14.2입니다 · 궤도 상태를 "나쁨"으로 바꾸면 φ가 1.6 → 2.8로 커집니다 — 궤도 보수(다지기)가 노반을 지키는 이유 · 침목 간격을 0.75 m로 넓히면 좌면 하중이 25 % 늘어납니다 · 도상을 0.2 m로 줄이면 노반 압력이 커집니다 · 모델: 원리 14.2·14.3(페이지 내 교육용), 60 kg 레일, 침목 길이 2.6 m, 바닥 폭 0.28 m. 판정선(도상 300 kPa, 노반 100 kPa)은 교육용 값입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="cant">
+    <h2>곡선과 캔트</h2>
+    <div class="problem"><strong>곡선에서 승객이 바깥으로 쏠리지 않게 하려면</strong>
+      <p>곡선을 도는 차량에는 바깥쪽으로 원심 가속도 \(v^2/R\)이 걸립니다. 도로는 편경사와 타이어 마찰로 이것을 받지만(11장), 철도 바퀴의 횡력은 플랜지와 레일 사이의 접촉으로 받아야 하고 그만큼 레일과 바퀴가 닳습니다. 그래서 바깥 레일을 안쪽보다 높여 차량을 기울입니다. 이 높이 차가 캔트입니다.</p></div>
+    <p>바깥 레일과 안쪽 레일의 높이 차를 <span class="term">캔트</span><span class="en">(cant)</span>라 합니다. 어떤 속도에서 차량에 걸리는 중력과 원심력의 합력이 정확히 궤도면에 수직이 되게 하는 캔트를 <span class="term">평형 캔트</span><span class="en">(equilibrium cant)</span>라 합니다. 그때는 승객도 레일도 옆으로 힘을 받지 않습니다.</p>
+    <figure class="diagram" id="fig-rw-cant">
+      <svg viewBox="0 0 880 320" role="img" aria-label="캔트가 있는 궤도 위 차량에 작용하는 중력, 원심력, 합력과 기울기 각">
+        <rect x="10" y="10" width="860" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(200,60) rotate(-6 200 190)">
+          <rect x="70" y="20" width="260" height="150" rx="14" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.5"/>
+          <rect x="90" y="170" width="70" height="16" style="fill:var(--text-dim)"/><rect x="240" y="170" width="70" height="16" style="fill:var(--text-dim)"/>
+          <line x1="40" y1="200" x2="360" y2="200" style="stroke:var(--text);stroke-width:4"/>
+          <circle cx="125" cy="194" r="7" style="fill:var(--text)"/><circle cx="275" cy="194" r="7" style="fill:var(--text)"/>
+          <line x1="200" y1="96" x2="200" y2="190" style="stroke:var(--text-faint);stroke-dasharray:4 3"/>
+          <text x="210" y="120" class="t-mono">궤도면 수직</text>
+        </g>
+        <g transform="translate(0,0)">
+          <line x1="140" y1="268" x2="620" y2="218" style="stroke:var(--text-faint);stroke-dasharray:4 3"/>
+          <line x1="140" y1="268" x2="620" y2="268" class="s-axis"/>
+          <line x1="620" y1="218" x2="620" y2="268" style="stroke:var(--accent);stroke-width:2" marker-start="url(#rw-ah-acc)" marker-end="url(#rw-ah-acc)"/>
+          <text x="630" y="248" class="t-mono" style="fill:var(--accent)">C (캔트)</text>
+          <text x="300" y="290" text-anchor="middle" class="t-mono">G ≈ 1,500 mm, tan θ ≈ C/G</text>
+          <circle cx="400" cy="140" r="5" style="fill:var(--text)"/>
+          <line x1="400" y1="140" x2="400" y2="230" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#rw-ah-ld)"/>
+          <text x="408" y="222" class="t-mono" style="fill:var(--accent-2)">mg</text>
+          <line x1="400" y1="140" x2="490" y2="140" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#rw-ah-ld)"/>
+          <text x="496" y="136" class="t-mono" style="fill:var(--accent-2)">mv²/R (곡선 바깥쪽)</text>
+          <line x1="400" y1="140" x2="490" y2="230" style="stroke:var(--ok);stroke-width:2.5;stroke-dasharray:6 3" marker-end="url(#rw-ah-ok)"/>
+          <text x="500" y="236" class="t-mono" style="fill:var(--ok)">합력</text>
+        </g>
+        <text x="720" y="70" text-anchor="middle" class="t">평형: 합력 ⊥ 궤도면</text>
+        <text x="720" y="94" text-anchor="middle" class="t-mono">tan θ = v²/(gR) = C/G</text>
+        <text x="720" y="124" text-anchor="middle" class="t-mono" style="fill:var(--bad)">더 빠르면: 부족 캔트</text>
+        <text x="720" y="144" text-anchor="middle" class="t-mono" style="fill:var(--bad)">→ 바깥으로 미평형 가속도</text>
+        <text x="720" y="174" text-anchor="middle" class="t-mono" style="fill:var(--blue)">더 느리면: 초과 캔트</text>
+        <text x="720" y="194" text-anchor="middle" class="t-mono" style="fill:var(--blue)">→ 안쪽 레일 과부하·마모</text>
+      </svg>
+      <figcaption><b>그림 14-4.</b> 캔트와 힘의 평형(모식, 기울기 과장). 차량이 평형 속도로 달리면 중력과 원심력의 합력이 궤도면에 수직이다. 실제 열차는 속도가 제각각이라 한 곡선의 캔트는 어느 열차에게는 부족하고 어느 열차에게는 지나치다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 14.4 (평형 캔트와 부족·초과 캔트)</strong> 작은 각에서 \(\tan\theta \approx C/G = v^2/(gR)\)이고, \(v = V/3.6\)(V km/h), \(g = 9.81\)을 넣으면
+      <div class="formula">$$C_{eq} = \frac{G\,V^2}{127\,R} \approx 11.8\,\frac{V^2}{R}\ (\text{mm}), \qquad C_d = C_{eq} - C, \qquad a_{nc} = g\,\frac{C_d}{G}$$<div class="where">\(G\): 좌우 레일 중심 간격(mm, 표준궤 약 1,500), \(R\): 곡선 반지름(m), \(C\): 실제 설정 캔트. \(C_d \gt 0\)이면 <span class="term">부족 캔트</span><span class="en">(cant deficiency)</span>, \(C_d \lt 0\)이면 그 크기가 <span class="term">초과 캔트</span><span class="en">(cant excess)</span>다. \(a_{nc}\): 궤도면 방향의 미평형 횡가속도(m/s²). 127 = 3.6² × 9.81. 최대 캔트(정차 열차의 안쪽 쏠림·전복 여유), 허용 부족 캔트(승차감·횡압), 허용 초과 캔트(안쪽 레일 마모)는 노선 등급별로 기준이 정한다(이 책의 값은 교육용).</div></div></div>
+    <div class="callout"><strong>예제 14.3 (CR-120 혼합 교통 곡선의 캔트)</strong> R = 800 m에 여객 120 km/h와 화물 60 km/h가 함께 다닌다. 최대 캔트 160 mm, 허용 부족 캔트 100 mm, 허용 초과 캔트 110 mm(교육용).
+      <ol class="rw-steps">
+        <li><b>평형 캔트.</b> 여객 \(11.8 \times 120^2/800 = 212\) mm, 화물 \(11.8 \times 60^2/800 = 53\) mm. 여객의 평형 캔트는 최대 캔트 160 mm보다 크다.</li>
+        <li><b>설정 범위.</b> 여객 부족 캔트 ≤ 100 → \(C \ge 112\), 화물 초과 캔트 ≤ 110 → \(C \le 163\), 최대 캔트 → \(C \le 160\). 112–160 mm 사이에서 고른다.</li>
+        <li><b>선택 C = 140 mm.</b> 여객 부족 캔트 72 mm, \(a_{nc} = 9.81 \times 72/1{,}500 = 0.47\) m/s². 화물 초과 캔트 87 mm. <b>둘 다 만족</b>. 두 열차의 평형 캔트 차이(159 mm)가 클수록 고를 수 있는 폭이 좁아진다 — 고속 여객과 저속 화물을 한 선로에 섞기 어려운 이유다.</li>
+      </ol></div>
+    <div class="sim" id="sim-rw-cant">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>평형 캔트와 부족 캔트</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rw-cv-cant" aria-label="캔트로 기울어진 차량 단면과 힘의 방향, 미평형 가속도"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시</span><div class="seg" id="rw-ca-pre"><button data-value="cr" class="on">CR-120</button><button data-value="hs">HS-300</button></div></div>
+          <label class="ctrl"><span>여객 속도 V <output id="rw-ca-V-out"></output></span><input type="range" id="rw-ca-V" min="30" max="350" step="5" value="120"></label>
+          <label class="ctrl"><span><i style="font-style:normal">저속 열차 V<sub>s</sub></i> <output id="rw-ca-Vs-out"></output></span><input type="range" id="rw-ca-Vs" min="0" max="200" step="5" value="60"></label>
+          <label class="ctrl"><span>곡선 반지름 R <output id="rw-ca-R-out"></output></span><input type="range" id="rw-ca-R" min="200" max="10000" step="50" value="800"></label>
+          <label class="ctrl"><span>설정 캔트 C <output id="rw-ca-C-out"></output></span><input type="range" id="rw-ca-C" min="0" max="200" step="5" value="140"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평형 캔트(여객 · 저속)</span><span class="v" id="rw-ca-eq">—</span></div>
+        <div class="stat"><span class="k">부족 캔트 · a<sub>nc</sub></span><span class="v" id="rw-ca-cd">—</span></div>
+        <div class="stat"><span class="k">초과 캔트(저속)</span><span class="v" id="rw-ca-ce">—</span></div>
+        <div class="stat"><span class="k">허용 캔트 범위</span><span class="v" id="rw-ca-rng">—</span></div>
+      </div>
+      <div class="rw-msg" id="rw-ca-msg"></div>
+      <div class="sim-note">해볼 것: 기본값이 예제 14.3입니다 · 저속 열차를 0(정차)으로 하면 초과 캔트가 곧 설정 캔트입니다 — 최대 캔트가 있는 이유 · HS-300 예시(R 7,000 m, 300 km/h)는 평형 캔트 152 mm로 여유가 큽니다 · 그림의 초록 화살표(합력)가 차체 바닥에 수직이 되는 캔트를 찾아보세요 · 모델: 원리 14.4, G = 1,500 mm. 한계(최대 캔트 160, 부족 100, 초과 110 mm)는 교육용 값입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="radius">
+    <h2>최소 곡선 반지름과 완화 곡선</h2>
+    <div class="problem"><strong>시속 350 km로 달리려면 곡선은 얼마나 커야 하나</strong>
+      <p>캔트는 무한히 높일 수 없고(정차한 열차가 안쪽으로 넘어지지 않게), 부족 캔트도 승객이 견딜 만큼만 허용됩니다. 두 한계를 합친 값이 그 속도에서 허용되는 곡선의 "최대 기울기"이고, 그것이 최소 곡선 반지름을 정합니다. 그리고 직선에서 곡선으로 들어갈 때 캔트와 곡률을 서서히 바꾸는 구간이 필요합니다.</p></div>
+    <div class="callout def"><strong>원리 14.5 (최소 곡선 반지름과 완화 곡선 길이)</strong>
+      <div class="formula">$$R_{min} = \frac{11.8\,V^2}{C_{max} + C_{d,max}}, \qquad L_T \ge \frac{C\,V}{3.6\,\dot C_{max}}$$<div class="where">\(C_{max}\): 최대 캔트(mm), \(C_{d,max}\): 허용 부족 캔트(mm). \(L_T\): <span class="term">완화 곡선</span><span class="en">(transition curve)</span> 길이(m). 완화 곡선에서 곡률은 0에서 \(1/R\)까지(클로소이드, 11장), 캔트는 0에서 \(C\)까지 함께 늘어난다. \(\dot C_{max}\): 열차가 느끼는 캔트 변화율의 허용값(mm/s, 승차감). 이 밖에 차량 비틀림을 막는 캔트 체감 경사(\(L_T/C\)를 일정값 이상)와 부족 캔트 변화율 조건도 함께 본다(기준 확인).</div></div></div>
+    <figure class="diagram" id="fig-rw-transition">
+      <svg viewBox="0 0 880 300" role="img" aria-label="직선, 완화 곡선, 원곡선의 평면과 그에 따른 곡률 및 캔트 체감도">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <text x="0" y="8" class="t" style="font-weight:700">평면</text>
+          <path d="M0 80 L220 80 C 320 80, 400 74, 470 56 C 540 36, 620 4, 700 -16" style="fill:none;stroke:var(--text);stroke-width:3"/>
+          <line x1="220" y1="64" x2="220" y2="96" style="stroke:var(--text-faint)"/><line x1="470" y1="40" x2="470" y2="72" style="stroke:var(--text-faint)"/>
+          <g class="t-mono" text-anchor="middle"><text x="110" y="104">직선</text><text x="345" y="104" style="fill:var(--accent)">완화 곡선 L_T</text><text x="600" y="60">원곡선 R</text></g>
+          <line x1="0" y1="200" x2="760" y2="200" class="s-axis"/>
+          <text x="0" y="132" class="t" style="font-weight:700">곡률 1/R · 캔트 C</text>
+          <path d="M0 200 L220 200 L470 150 L760 150" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <path d="M0 200 L220 200 L470 160 L760 160" style="fill:none;stroke:var(--accent-2);stroke-width:2.6;stroke-dasharray:6 4"/>
+          <text x="600" y="142" class="t-mono" style="fill:var(--accent)">곡률 1/R</text>
+          <text x="600" y="178" class="t-mono" style="fill:var(--accent-2)">캔트 C (같은 구간에서 직선 체감)</text>
+          <text x="345" y="232" text-anchor="middle" class="t-mono">통과 시간 3.6L_T/V 동안 캔트가 C만큼 변한다 → 변화율 CV/(3.6L_T)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-5.</b> 완화 곡선(모식). 곡률과 캔트를 같은 구간에서 함께 늘려, 어느 지점에서나 캔트가 그 곡률에 맞게 한다. 도로의 클로소이드(11장)와 같은 생각이지만, 철도는 캔트의 체감까지 같은 구간에서 처리해야 한다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 14.4 (고속선의 최소 곡선 반지름과 완화 곡선)</strong> 최대 캔트 160 mm, 허용 부족 캔트 60 mm(고속선 교육용 값).
+      <ol class="rw-steps">
+        <li><b>300 km/h.</b> \(R_{min} = 11.8 \times 300^2/220 = 4{,}830\) m.</li>
+        <li><b>350 km/h.</b> \(R_{min} = 11.8 \times 350^2/220 = 6{,}570\) m. 경부고속철도(설계 속도 350 km/h) 본선의 최소 곡선 반지름은 7,000 m로 알려져 있어, 이 교육용 한계와 같은 자릿수다.</li>
+        <li><b>완화 곡선.</b> HS-300의 R = 7,000 m에 C = 130 mm(평형 152 mm, 부족 22 mm)를 두고 \(\dot C_{max} = 50\) mm/s(교육용)이면 \(L_T \ge 130 \times 300/(3.6 \times 50) = 217\) m.</li>
+        <li><b>비교.</b> CR-120(최대 캔트 160 + 부족 100 mm)이면 \(R_{min} = 11.8 \times 120^2/260 = 654\) m. 속도가 2.5배면 반지름은 6배 넘게 커진다(V²에 비례 + 고속선의 작은 허용 부족 캔트).</li>
+      </ol></div>
+    <div class="sim" id="sim-rw-rmin">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>최소 곡선 반지름과 완화 곡선 길이</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rw-cv-rmin" aria-label="설계 속도에 따른 최소 곡선 반지름 곡선과 현재 설계점"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>노선</span><div class="seg" id="rw-rm-line"><button data-value="hs" class="on">고속선</button><button data-value="cr">일반선</button></div></div>
+          <label class="ctrl"><span>설계 속도 V <output id="rw-rm-V-out"></output></span><input type="range" id="rw-rm-V" min="60" max="400" step="5" value="350"></label>
+          <label class="ctrl"><span><i style="font-style:normal">최대 캔트 C<sub>max</sub></i> <output id="rw-rm-cm-out"></output></span><input type="range" id="rw-rm-cm" min="80" max="200" step="5" value="160"></label>
+          <label class="ctrl"><span><i style="font-style:normal">허용 부족 캔트 C<sub>d,max</sub></i> <output id="rw-rm-cd-out"></output></span><input type="range" id="rw-rm-cd" min="20" max="150" step="5" value="60"></label>
+          <label class="ctrl"><span>캔트 변화율 허용값 <output id="rw-rm-dc-out"></output></span><input type="range" id="rw-rm-dc" min="20" max="80" step="5" value="50"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">R<sub>min</sub></span><span class="v" id="rw-rm-R">—</span></div>
+        <div class="stat"><span class="k">R<sub>min</sub>에서 평형 캔트</span><span class="v" id="rw-rm-ceq">—</span></div>
+        <div class="stat"><span class="k">완화 곡선 L<sub>T</sub>(C = C<sub>max</sub>)</span><span class="v" id="rw-rm-L">—</span></div>
+        <div class="stat"><span class="k">a<sub>nc</sub>(최대)</span><span class="v" id="rw-rm-a">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 고속선 350 km/h가 예제 14.4의 6,570 m입니다 · 부족 캔트를 60 → 100 mm로 허용하면 반지름이 약 15 % 줄지만 승객의 횡가속도가 0.65 m/s²로 커집니다 · 일반선 120 km/h는 650 m 안팎 · 차체 경사 열차(틸팅)는 차체를 더 기울여 승객이 느끼는 가속도를 줄이므로 더 큰 부족 캔트를 허용받는 방식입니다 · 모델: 원리 14.5. 노선 버튼은 (C<sub>max</sub>, C<sub>d,max</sub>) = (160, 60) · (160, 100) mm의 교육용 조합입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="hsr">
+    <h2>고속철도의 동적 효과와 교량 공진</h2>
+    <div class="problem"><strong>같은 다리가 시속 300 km에서 갑자기 크게 흔들린다</strong>
+      <p>도로 교량에서 트럭 한 대는 충격 계수(2장)로 처리합니다. 고속 열차는 다릅니다. 같은 길이의 차량이 수십 량 줄지어, 축하중이 일정한 간격으로 다리를 두드립니다. 두드리는 주기가 다리의 고유 주기와 맞으면 그네를 밀듯 진동이 한 량씩 쌓입니다.</p></div>
+    <p>차량 길이 \(d\)마다 같은 하중이 지나가므로 가진 진동수는 \(v/d\)입니다. 교량의 1차 고유 진동수 \(n_0\)가 이 값이나 그 정수배와 같아지면 <b>공진</b>이 일어납니다. 이때 처짐이 커질 뿐 아니라 바닥판의 연직 가속도가 커져, 자갈 궤도에서는 도상이 들떠 흐트러질 수 있습니다. 그래서 고속선 교량은 처짐뿐 아니라 바닥판 가속도를 제한합니다(유로코드 형태: 자갈 궤도 3.5 m/s², 현행 기준 확인).</p>
+    <figure class="diagram" id="fig-rw-reso">
+      <svg viewBox="0 0 880 300" role="img" aria-label="일정한 간격의 축하중 열이 단순 교량 위를 지나며 주기적으로 가진하는 모식도와 공진 조건">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <g style="fill:var(--surface-2);stroke:var(--text-dim)">
+            <rect x="0" y="20" width="150" height="50" rx="8"/><rect x="156" y="20" width="150" height="50" rx="8"/><rect x="312" y="20" width="150" height="50" rx="8"/><rect x="468" y="20" width="150" height="50" rx="8"/><rect x="624" y="20" width="150" height="50" rx="8"/>
+          </g>
+          <g style="stroke:var(--accent-2);stroke-width:2.5">
+            <line x1="153" y1="70" x2="153" y2="96" marker-end="url(#rw-ah-ld)"/><line x1="309" y1="70" x2="309" y2="96" marker-end="url(#rw-ah-ld)"/><line x1="465" y1="70" x2="465" y2="96" marker-end="url(#rw-ah-ld)"/><line x1="621" y1="70" x2="621" y2="96" marker-end="url(#rw-ah-ld)"/>
+          </g>
+          <line x1="153" y1="0" x2="309" y2="0" style="stroke:var(--accent);stroke-width:1.4" marker-start="url(#rw-ah-acc)" marker-end="url(#rw-ah-acc)"/>
+          <text x="231" y="-6" text-anchor="middle" class="t-mono" style="fill:var(--accent)">d (차량 길이, KTX 객차 약 18.7 m)</text>
+          <text x="790" y="50" text-anchor="end" class="t-mono">← v</text>
+          <line x1="250" y1="100" x2="560" y2="100" style="stroke:var(--text);stroke-width:5"/>
+          <path d="M250 100 Q 405 130 560 100" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:5 4"/>
+          <path d="M240 118 L250 104 L260 118 Z" style="fill:var(--ok)"/><path d="M550 118 L560 104 L570 118 Z" style="fill:var(--ok)"/>
+          <text x="405" y="150" text-anchor="middle" class="t-mono">경간 L, 1차 고유 진동수 n₀</text>
+          <text x="405" y="186" text-anchor="middle" class="t">공진: v/d = i · n₀ → V<tspan baseline-shift="sub" font-size="9">res,i</tspan> = 3.6 n₀ d / i (km/h)</text>
+          <text x="405" y="212" text-anchor="middle" class="t-dim">n₀ = 5 Hz, d = 18.7 m → 337 km/h(i = 1), 168 km/h(i = 2)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-6.</b> 주기적 축하중에 의한 교량 공진(모식). 실제로는 대차마다 두 축이 있고 관절형·일반형 편성마다 축 배치가 달라 여러 가진 파장이 섞이지만, 가장 큰 공진은 차량 길이에서 온다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 14.6 (교량 공진 속도와 1차 모드 응답, 교육용)</strong>
+      <div class="formula">$$V_{res,i} = \frac{3.6\,n_0\,d}{i}, \qquad n_0 = \frac{\pi}{2L^2}\sqrt{\frac{EI}{m}}, \qquad \ddot q + 2\zeta\omega\dot q + \omega^2 q = \frac{2}{mL}\sum_k P_k \sin\frac{\pi x_k(t)}{L}$$<div class="where">\(n_0\): 단순 교량의 1차 고유 진동수(Hz), \(m\): 단위 길이 질량(t/m), \(\omega = 2\pi n_0\), \(q\): 경간 중앙 처짐(1차 모드 진폭), \(x_k(t)\): 교량 위 k번째 하중의 위치, \(\zeta\): 감쇠비. 동적 증폭 = 동적 최대 처짐 / 같은 하중의 준정적 최대 처짐. 유로코드(EN 1991-2) 형태는 \(n_0\)가 경간별 상·하한 띠(예: 하한 \(80/L\), \(4 \le L \le 20\) m) 밖이거나 노선 속도가 200 km/h를 넘으면 동적 해석으로 공진을 확인하게 한다(현행 기준 확인). 이 페이지의 시뮬레이터는 이 1자유도 식을 시간 적분한다.</div></div></div>
+    <div class="callout"><strong>예제 14.5 (20 m 경간 교량의 공진 속도)</strong> HS-300의 20 m 단순 PSC 교량, \(n_0 = 5.0\) Hz, 차량 길이 18.7 m.
+      <ol class="rw-steps">
+        <li><b>공진 속도.</b> \(V_{res,1} = 3.6 \times 5.0 \times 18.7 = 337\) km/h, \(V_{res,2} = 168\) km/h.</li>
+        <li><b>판정.</b> 설계 속도 300 km/h의 1.2배(360 km/h, 유로코드 형태의 검토 상한)까지 확인해야 하므로 337 km/h 공진이 검토 범위에 든다 → 동적 해석 필요. 진동수 띠: \(L = 20\) m에서 하한 4.0 Hz, 상한 \(94.76 L^{-0.748} = 10.1\) Hz 안에 있다.</li>
+        <li><b>대책.</b> 교량을 단단하게(\(n_0\) 6.5 Hz면 \(V_{res,1} = 438\) km/h로 검토 범위 밖), 질량·감쇠를 늘리거나, 연속 교량으로 바꾼다. 시뮬레이터로 공진에서 동적 증폭이 얼마인지 확인하자.</li>
+      </ol></div>
+    <div class="sim" id="sim-rw-reso">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>고속 열차의 교량 공진(1차 모드, 교육용)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view rw-stack">
+          <div><canvas id="rw-cv-reso" aria-label="열차 속도에 따른 동적 증폭과 바닥판 가속도 곡선, 공진 속도 표시"></canvas><span class="rw-cap">실선: 동적 증폭 · 점선: 가속도(오른쪽 축, m/s²)</span></div>
+          <div><canvas id="rw-cv-reso-t" aria-label="선택한 속도에서 경간 중앙 처짐의 시간 이력"></canvas><span class="rw-cap">중앙 처짐(선택 속도) · 실선 동적, 점선 준정적</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>열차 속도 V <output id="rw-rs-V-out"></output></span><input type="range" id="rw-rs-V" min="100" max="420" step="2" value="300"></label>
+          <label class="ctrl"><span>경간 L <output id="rw-rs-L-out"></output></span><input type="range" id="rw-rs-L" min="10" max="40" step="1" value="20"></label>
+          <label class="ctrl"><span>고유 진동수 n₀ <output id="rw-rs-n-out"></output></span><input type="range" id="rw-rs-n" min="2" max="15" step="0.1" value="5"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="rw-rs-z-out"></output></span><input type="range" id="rw-rs-z" min="0.5" max="5" step="0.1" value="1.5"></label>
+          <label class="ctrl"><span>차량 길이 d <output id="rw-rs-d-out"></output></span><input type="range" id="rw-rs-d" min="15" max="27" step="0.1" value="18.7"></label>
+          <label class="ctrl"><span>차량 수 <output id="rw-rs-N-out"></output></span><input type="range" id="rw-rs-N" min="1" max="20" step="1" value="18"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">공진 속도 i = 1 · 2</span><span class="v" id="rw-rs-vr">—</span></div>
+        <div class="stat"><span class="k">동적 증폭(V)</span><span class="v" id="rw-rs-daf">—</span></div>
+        <div class="stat"><span class="k">바닥판 가속도(V)</span><span class="v" id="rw-rs-acc">—</span></div>
+        <div class="stat"><span class="k">n₀ 띠(형태)</span><span class="v" id="rw-rs-band">—</span></div>
+      </div>
+      <div class="rw-msg" id="rw-rs-msg"></div>
+      <div class="sim-note">해볼 것: 속도를 337 km/h(공진)로 옮기면 처짐 시간 이력이 차량이 지날 때마다 커지는 것이 보입니다 · 차량 수를 1로 하면 공진이 거의 사라집니다 — 공진은 "반복"이 만든다 · 감쇠를 1 → 3 %로 올리면 공진 봉우리가 크게 낮아집니다 · n₀를 6.5 Hz로 올려 공진을 검토 범위 밖으로 옮겨 보세요 · 모델: 원리 14.6, 대차마다 하나의 하중 P = 340 kN(축 2 × 170 kN을 묶음), 단위 길이 질량 15 t/m, 뉴마크 평균 가속도법(페이지 내 교육용). 가속도 판정선 3.5 m/s²는 유로코드 형태. 차량–교량 상호 작용과 고차 모드를 무시한 단순 모형이라 공진 봉우리(기본값에서 동적 증폭 약 11)를 과대평가하기 쉽습니다 — 크기보다 "어느 속도에서 왜 커지는가"를 보세요.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="irregularity">
+    <h2>궤도 틀림과 차량 응답</h2>
+    <div class="problem"><strong>같은 궤도가 저속에서는 괜찮고 고속에서는 출렁인다</strong>
+      <p>레일은 완벽하게 곧지 않습니다. 도상이 조금씩 가라앉고, 레일 용접부가 높고, 노반이 고르지 않게 침하합니다. 이 작은 굴곡을 차량이 달리며 지나면 시간에 따라 바뀌는 지반 진동처럼 차체를 흔듭니다. 흔들림의 진동수는 굴곡의 파장과 속도로 정해집니다.</p></div>
+    <p>설계 궤도 형상에서 실제 궤도가 벗어난 양을 <span class="term">궤도 틀림</span><span class="en">(track irregularity)</span>이라 합니다. 레일 윗면의 높낮이(고저 틀림), 좌우 방향의 굽음(방향 틀림, 줄 틀림), 좌우 레일 높이 차(수평 틀림), 궤간 틀림, 일정 거리 사이의 비틀림(평면성 틀림)으로 나누고, 궤도 검측차로 정기적으로 측정해 기준을 넘으면 다지기·레일 연마로 보수합니다. 파장 \(\lambda\)의 틀림을 속도 \(V\)로 지나면 가진 진동수는 \(f = V/(3.6\lambda)\)입니다. 차체 현가 장치의 고유 진동수(대략 1 Hz 안팎, 약)와 이 값이 가까우면 차체가 크게 흔들립니다.</p>
+    <div class="callout def"><strong>원리 14.7 (기초 가진 1자유도 응답, 교육용)</strong> 차체를 질량–스프링–감쇠기 하나로 보고(현가 장치의 고유 진동수 \(f_n\), 감쇠비 \(\zeta\)), 궤도가 진폭 \(A\)의 정현파로 틀려 있으면 정상 상태에서
+      <div class="formula">$$r = \frac{f}{f_n} = \frac{V}{3.6\,\lambda f_n}, \qquad T_r = \sqrt{\frac{1 + (2\zeta r)^2}{(1-r^2)^2 + (2\zeta r)^2}}, \qquad a_{body} = (2\pi f)^2 A\,T_r$$<div class="where">\(T_r\): 변위 <span class="term">전달률</span><span class="en">(transmissibility)</span>, 차체 변위 진폭 = \(A\,T_r\). \(r \lt \sqrt2\)에서는 \(T_r \gt 1\)(증폭), \(r \gt \sqrt2\)이면 \(T_r \lt 1\)(절연). 공진 속도 \(V = 3.6\lambda f_n\). 구조 동역학의 1자유도(StructureBook 7장)와 같은 식이다. 실제 차량은 1차·2차 현가, 대차, 피치·롤 운동을 가진 다자유도계다.</div></div></div>
+    <div class="callout"><strong>예제 14.6 (파장과 속도)</strong> \(f_n = 1.0\) Hz, \(\zeta = 0.2\), 고저 틀림 진폭 4 mm.
+      <ol class="rw-steps">
+        <li><b>일반선 120 km/h, λ = 30 m.</b> \(f = 120/(3.6 \times 30) = 1.11\) Hz, \(r = 1.11\), \(T_r = \sqrt{1.197/0.251} = 2.18\), \(a = (2\pi \times 1.11)^2 \times 0.004 \times 2.18 = 0.42\) m/s².</li>
+        <li><b>고속선 300 km/h, 같은 λ = 30 m.</b> \(f = 2.78\) Hz, \(r = 2.78\): 차체는 절연되어 \(T_r \approx 0.22\), 가속도는 약 0.27 m/s².</li>
+        <li><b>고속선 300 km/h, λ = 80 m.</b> \(f = 1.04\) Hz로 공진 근처: \(T_r = 2.55\), 진폭이 같다면 약 0.44 m/s². 고속선은 <b>긴 파장</b>의 틀림을 관리해야 한다. 같은 이유로 고속선 검측은 수십–100 m 넘는 파장 대역까지 본다.</li>
+      </ol></div>
+    <div class="sim" id="sim-rw-irreg">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>궤도 틀림 → 차체 진동(1자유도, 교육용)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view rw-stack">
+          <div><canvas id="rw-cv-irr-a" aria-label="굴곡진 궤도 위를 달리는 차체와 현가 스프링의 애니메이션"></canvas><span class="rw-cap">주행 모습(틀림·차체 운동 과장)</span></div>
+          <div><canvas id="rw-cv-irr" aria-label="속도에 따른 차체 가속도 진폭 곡선과 현재 속도"></canvas><span class="rw-cap">차체 가속도 – 속도</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>속도 V <output id="rw-ir-V-out"></output></span><input type="range" id="rw-ir-V" min="20" max="350" step="5" value="120"></label>
+          <label class="ctrl"><span>틀림 파장 λ <output id="rw-ir-L-out"></output></span><input type="range" id="rw-ir-L" min="5" max="150" step="1" value="30"></label>
+          <label class="ctrl"><span>틀림 진폭 A <output id="rw-ir-A-out"></output></span><input type="range" id="rw-ir-A" min="0.5" max="10" step="0.5" value="4"></label>
+          <label class="ctrl"><span><i style="font-style:normal">현가 고유 진동수 f<sub>n</sub></i> <output id="rw-ir-f-out"></output></span><input type="range" id="rw-ir-f" min="0.5" max="2.5" step="0.05" value="1"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="rw-ir-z-out"></output></span><input type="range" id="rw-ir-z" min="0.05" max="0.5" step="0.01" value="0.2"></label>
+          <div class="btn-row"><button class="btn primary" id="rw-ir-play">■ 정지</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">가진 f · 진동수 비 r</span><span class="v" id="rw-ir-r">—</span></div>
+        <div class="stat"><span class="k">전달률 T<sub>r</sub></span><span class="v" id="rw-ir-T">—</span></div>
+        <div class="stat"><span class="k">차체 가속도</span><span class="v" id="rw-ir-a">—</span></div>
+        <div class="stat"><span class="k">공진 속도</span><span class="v" id="rw-ir-vr">—</span></div>
+      </div>
+      <div class="rw-msg" id="rw-ir-msg"></div>
+      <div class="sim-note">해볼 것: 기본값이 예제 14.6의 첫 경우입니다 · 속도를 108 km/h로 맞추면 공진입니다(V = 3.6λf<sub>n</sub>) · 300 km/h에서 파장을 30 m → 80 m로 늘리면 다시 공진에 들어갑니다 · 감쇠를 0.05로 낮추면 공진 봉우리가 뾰족해집니다 · 모델: 원리 14.7(페이지 내 교육용 1자유도), 정상 상태 응답. 승차감 판정선 0.5 m/s²는 교육용 대략값(실제 승차감 평가는 진동수 가중 가속도로 한다).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="slab">
+    <h2>자갈 궤도와 콘크리트 궤도</h2>
+    <div class="problem"><strong>자갈이 날리는 속도</strong>
+      <p>자갈 궤도는 싸고, 틀어지면 다져서 바로잡을 수 있고, 소음과 진동을 잘 흡수합니다. 그런데 고속에서는 자주 다져야 하고, 열차가 일으킨 바람과 진동에 도상 자갈이 튀어 차량 하부를 때리는 일도 생깁니다. 유지 보수 시간을 내기 어려운 고속선과 터널에서는 자갈 대신 콘크리트로 궤도를 받치는 방식이 널리 쓰입니다.</p></div>
+    <p><span class="term">자갈 궤도</span><span class="en">(ballasted track)</span>는 쇄석 도상 위에 침목을 놓은 전통적 궤도입니다. <span class="term">콘크리트 궤도</span><span class="en">(slab track)</span>는 레일을 콘크리트 궤도판이나 콘크리트에 묻은 침목 블록에 고정하고, 그 아래 수경성 지지층(시멘트 처리 기층)과 노반으로 하중을 전합니다. 궤도의 탄성은 자갈 대신 체결 장치의 탄성 패드가 맡습니다. 일본 신칸센의 궤도판 방식, 독일의 매립 침목 방식 등이 대표적이며, 국내 고속선에서도 2단계 구간 이후 콘크리트 궤도가 많이 쓰였습니다(구간별 확인).</p>
+    <figure class="diagram" id="fig-rw-slab">
+      <svg viewBox="0 0 880 300" role="img" aria-label="자갈 궤도와 콘크리트 궤도의 단면 구성 비교">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="180" y="0" text-anchor="middle" class="t" style="font-weight:700">자갈 궤도</text>
+          <path d="M20 140 L80 70 L280 70 L340 140 Z" style="fill:url(#rw-pat-bal);stroke:var(--text-dim)"/>
+          <rect x="70" y="58" width="220" height="16" rx="2" style="fill:var(--text-dim);opacity:.7"/>
+          <rect x="120" y="36" width="10" height="22" style="fill:var(--text)"/><rect x="230" y="36" width="10" height="22" style="fill:var(--text)"/>
+          <rect x="0" y="140" width="360" height="22" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <rect x="0" y="162" width="360" height="50" style="fill:url(#rw-pat-soil);stroke:var(--border)"/>
+          <g class="t-mono"><text x="180" y="110" text-anchor="middle">도상 자갈 350 mm</text><text x="180" y="155" text-anchor="middle">보조 도상</text><text x="180" y="192" text-anchor="middle">노반</text></g>
+          <text x="180" y="230" text-anchor="middle" class="t-mono">탄성: 도상 + 패드 · 보수: 다지기</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="180" y="0" text-anchor="middle" class="t" style="font-weight:700">콘크리트 궤도</text>
+          <rect x="40" y="58" width="280" height="30" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.5"/>
+          <g style="fill:var(--accent-2)"><rect x="112" y="52" width="26" height="6"/><rect x="222" y="52" width="26" height="6"/></g>
+          <rect x="120" y="30" width="10" height="22" style="fill:var(--text)"/><rect x="230" y="30" width="10" height="22" style="fill:var(--text)"/>
+          <rect x="20" y="88" width="320" height="36" style="fill:var(--text-dim);opacity:.3;stroke:var(--border)"/>
+          <rect x="0" y="124" width="360" height="38" style="fill:url(#rw-pat-bal);stroke:var(--border)"/>
+          <rect x="0" y="162" width="360" height="50" style="fill:url(#rw-pat-soil);stroke:var(--border)"/>
+          <g class="t-mono"><text x="180" y="78" text-anchor="middle">궤도판 · 매립 침목</text><text x="180" y="110" text-anchor="middle">수경성 지지층(HSB)</text><text x="180" y="148" text-anchor="middle">동상 방지층</text><text x="180" y="192" text-anchor="middle">노반(침하 엄격 관리)</text></g>
+          <text x="180" y="230" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">탄성: 체결 장치 패드 · 보수: 거의 없음</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-7.</b> 자갈 궤도와 콘크리트 궤도(모식, 두께는 교육용 대략값). 콘크리트 궤도는 틀림이 잘 생기지 않는 대신, 노반이 침하하면 고치기 어려우므로 노반의 잔류 침하를 엄격히 제한한다(GeotechBook 압밀).</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="rw-tbl">
+      <thead><tr><th>항목</th><th>자갈 궤도</th><th>콘크리트 궤도</th></tr></thead>
+      <tbody>
+        <tr><td>초기 건설비</td><td>낮다</td><td>높다(대략 1.3–2배 형태)</td></tr>
+        <tr><td>유지 보수</td><td>주기적 다지기·자갈 보충·교환</td><td>적다(체결 장치·패드 위주)</td></tr>
+        <tr><td>궤도 틀림 · 고속 안정</td><td>시간이 지나며 늘어남, 자갈 비산 대책 필요</td><td>작고 안정적</td></tr>
+        <tr><td>구조 높이 · 무게</td><td>크다(터널 단면 증가)</td><td>작다(터널·교량에 유리)</td></tr>
+        <tr><td>소음 · 진동</td><td>흡수가 좋다</td><td>상대적으로 크다(흡음판 등)</td></tr>
+        <tr><td>노반 침하에 대한 대응</td><td>다지기로 형상 회복</td><td>대응이 어려움 → 노반 품질이 결정적</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="lwr">
+    <h2>장대 레일과 철도 교량</h2>
+    <div class="problem"><strong>"덜컹" 소리가 사라진 이유</strong>
+      <p>예전 철도의 "덜컹덜컹" 소리는 25 m 안팎의 레일 사이 이음매에서 났습니다. 이음매는 바퀴에 충격을 주고 궤도 틀림의 원인이 됩니다. 레일을 용접해 수백 m–수 km를 이으면 충격은 사라지지만, 이번에는 온도가 바뀌어도 레일이 늘거나 줄 수 없어 큰 축력이 생깁니다.</p></div>
+    <p>용접으로 이어 일정 길이 이상으로 만든 레일이 <span class="term">장대 레일</span><span class="en">(continuous welded rail, CWR)</span>입니다. 레일을 체결할 때의 온도(축력이 0인 온도)를 <span class="term">중립 온도</span><span class="en">(stress-free temperature)</span>라 하고, 레일 온도가 이보다 오르면 압축, 내리면 인장이 생깁니다. 레일 끝(이음매나 신축 이음매)에서 가까운 구간은 도상의 종저항을 받으며 조금씩 움직이고, 그 너머는 움직이지 못하고 온도 축력을 모두 받습니다. 움직이는 구간을 <span class="term">신축 구간</span><span class="en">(breathing length)</span>이라 합니다. 여름에 압축 축력이 커지면 궤도가 옆으로 휘어 튀어나오는 <span class="term">궤도 좌굴</span><span class="en">(track buckling)</span>이 생길 수 있어, 중립 온도를 적절히 높게 설정하고 도상 어깨로 횡저항을 확보합니다.</p>
+    <div class="callout def"><strong>원리 14.8 (장대 레일의 온도 축력, 교육용)</strong>
+      <div class="formula">$$N = E A \alpha\,\Delta T, \qquad \sigma = E\alpha\,\Delta T, \qquad l_b = \frac{N}{r}, \qquad u_{end} = \frac{N^2}{2EAr}, \qquad g_{break} = \frac{N^2}{EAr}$$<div class="where">\(\Delta T\): 레일 온도 − 중립 온도(+면 압축), \(A\): 레일 단면적(60 kg 레일 약 76.7 cm²), \(\alpha \approx 1.15 \times 10^{-5}\)/°C, \(r\): 레일 한 줄당 종저항(kN/m, 자갈 궤도 대략 5–10, 하중 없을 때 형태). \(l_b\): 신축 구간 길이, \(u_{end}\): 자유단의 이동량, \(g_{break}\): 인장 상태에서 레일이 끊어졌을 때 벌어지는 틈(양쪽 이동의 합). 레일 길이와 무관하게 축력이 정해진다는 것이 장대 레일의 핵심이다.</div></div></div>
+    <p>장대 레일이 교량 위를 지나면 문제가 하나 더 생깁니다. 교량 거더는 온도에 따라 늘고 줄며(6장의 신축량), 열차의 제동·시동력과 처짐도 레일에 전해집니다. 레일은 궤도를 통해 거더와 연결되어 있으므로 거더의 움직임만큼 레일에 추가 축력이 생기고, 반대로 레일이 받는 힘이 교량 받침과 교각에 전달됩니다. 이 <span class="term">궤도–교량 상호 작용</span><span class="en">(track-bridge interaction)</span> 때문에 신축 길이가 긴 교량에서는 레일 추가 응력이 허용치를 넘지 않도록 고정 받침 배치를 정하거나 교량 끝에 <span class="term">레일 신축 이음매</span><span class="en">(rail expansion joint)</span>를 둡니다(UIC 774-3 형태의 해석, 현행 기준 확인).</p>
+    <figure class="diagram" id="fig-rw-lwr">
+      <svg viewBox="0 0 880 300" role="img" aria-label="장대 레일의 축력 분포: 끝단 신축 구간과 중앙 부동 구간, 교량 위의 추가 축력">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">온도 상승 시 레일 축력(압축)</text>
+          <line x1="0" y1="120" x2="760" y2="120" class="s-axis"/>
+          <path d="M0 120 L140 40 L620 40 L760 120" style="fill:var(--accent-2-soft);stroke:var(--compression);stroke-width:2.6"/>
+          <text x="380" y="32" text-anchor="middle" class="t-mono" style="fill:var(--compression)">N = EAαΔT (부동 구간)</text>
+          <line x1="0" y1="136" x2="140" y2="136" style="stroke:var(--accent);stroke-width:1.4" marker-start="url(#rw-ah-acc)" marker-end="url(#rw-ah-acc)"/>
+          <text x="70" y="152" text-anchor="middle" class="t-mono" style="fill:var(--accent)">신축 구간 l_b = N/r</text>
+          <text x="70" y="104" text-anchor="middle" class="t-mono">기울기 = 종저항 r</text>
+          <text x="0" y="200" class="t" style="font-weight:700">교량 위(개념)</text>
+          <line x1="260" y1="250" x2="500" y2="250" style="stroke:var(--text);stroke-width:5"/>
+          <path d="M250 266 L260 252 L270 266 Z" style="fill:var(--ok)"/><circle cx="500" cy="260" r="7" style="fill:none;stroke:var(--ok);stroke-width:2"/>
+          <line x1="500" y1="236" x2="560" y2="236" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#rw-ah-ld)"/>
+          <text x="566" y="240" class="t-mono" style="fill:var(--accent-2)">거더 신축</text>
+          <path d="M100 220 L260 220 L380 200 L500 240 L660 220" style="fill:none;stroke:var(--compression);stroke-width:2"/>
+          <text x="380" y="192" text-anchor="middle" class="t-mono" style="fill:var(--compression)">레일 추가 축력(상호 작용)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-8.</b> 장대 레일의 축력 분포(위)와 궤도–교량 상호 작용(아래, 개념도). 끝단에서는 종저항이 축력을 조금씩 쌓아 신축 구간 끝에서 온도 축력에 이른다. 교량 위에서는 거더가 레일을 끌고 밀어 축력이 국부적으로 늘거나 준다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 14.7 (장대 레일의 온도 축력과 절손 틈)</strong> 60 kg 레일 \(A = 76.7\) cm², \(E = 210\) GPa, \(\alpha = 1.15 \times 10^{-5}\)/°C, 종저항 \(r = 10\) kN/m(레일 한 줄, 교육용).
+      <ol class="rw-steps">
+        <li><b>여름(ΔT = +30 °C).</b> \(\sigma = 210{,}000 \times 1.15 \times 10^{-5} \times 30 = 72.5\) MPa(압축), \(N = 72.5 \times 7{,}670 = 556\) kN.</li>
+        <li><b>신축 구간.</b> \(l_b = 556/10 = 56\) m. 그 안쪽 레일은 길이가 몇 km든 움직이지 않는다.</li>
+        <li><b>겨울(ΔT = −30 °C)에 레일이 끊어지면.</b> 인장 556 kN이 풀리며 양쪽 레일이 물러나 틈 \(g = 556^2/(2.1 \times 10^8 \times 0.00767 \times 10) = 0.019\) m ≈ <b>19 mm</b>. 바퀴가 넘을 수 있는 틈이지만 즉시 서행·보수가 필요하다. ΔT가 −40 °C면 34 mm로 커진다(ΔT²에 비례).</li>
+      </ol></div>
+    <div class="sim" id="sim-rw-lwr">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>장대 레일의 온도 축력과 신축 구간</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rw-cv-lwr" aria-label="레일 끝에서부터의 축력 분포와 이동량, 절손 시 틈"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>레일 온도 − 중립 온도 ΔT <output id="rw-lw-dT-out"></output></span><input type="range" id="rw-lw-dT" min="-50" max="40" step="1" value="30"></label>
+          <div class="ctrl"><span>레일</span><div class="seg" id="rw-lw-rail"><button data-value="60" class="on">60 kg</button><button data-value="50">50 kg</button></div></div>
+          <label class="ctrl"><span>종저항 r <output id="rw-lw-r-out"></output></span><input type="range" id="rw-lw-r" min="3" max="20" step="0.5" value="10"></label>
+          <label class="check"><input type="checkbox" id="rw-lw-break"> 레일 절손(끝단 = 끊어진 곳)</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">축력 N · 응력</span><span class="v" id="rw-lw-N">—</span></div>
+        <div class="stat"><span class="k">신축 구간 l<sub>b</sub></span><span class="v" id="rw-lw-lb">—</span></div>
+        <div class="stat"><span class="k">끝단 이동 u</span><span class="v" id="rw-lw-u">—</span></div>
+        <div class="stat"><span class="k">절손 틈</span><span class="v" id="rw-lw-g">—</span></div>
+      </div>
+      <div class="rw-msg" id="rw-lw-msg"></div>
+      <div class="sim-note">해볼 것: 기본값이 예제 14.7의 여름 조건입니다 · ΔT를 음수로 바꾸면 인장이 되고, "레일 절손"을 켜면 끊어진 곳의 틈이 보입니다 · 종저항을 반으로 줄이면(도상이 성기거나 들뜬 경우) 신축 구간이 두 배, 틈도 두 배 · 50 kg 레일은 단면적이 작아 축력은 작지만 응력은 같습니다(σ = EαΔT) · 모델: 원리 14.8(페이지 내 교육용, 종저항 일정 가정). 60 kg A = 76.7 cm², 50 kg A = 64.2 cm²(약). 압축 응력 판정선(ΔT +40 °C 형태)은 교육용 대략값이며 실제 좌굴 안정은 횡저항·곡선·틀림을 함께 본다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="capacity">
+    <h2>신호와 선로 용량 맛보기</h2>
+    <p>철도는 앞차를 보고 멈출 수 없습니다. 300 km/h에서 제동 거리는 수 km에 이르므로, 선로를 일정 길이의 <span class="term">폐색 구간</span><span class="en">(block section)</span>으로 나누고 한 구간에는 한 열차만 들어가게 하는 신호 체계로 안전을 지킵니다. 고속선은 지상 신호기 대신 운전실 안의 신호로 허용 속도를 연속적으로 알려 줍니다. 앞뒤 열차의 최소 시간 간격을 <span class="term">운전 시격</span><span class="en">(headway)</span>이라 하며, 한 방향 <span class="term">선로 용량</span><span class="en">(line capacity)</span>은 대략 \(60/h\)(시간당 열차 수, \(h\): 분)입니다. 운전 시격 4분이면 시간당 15회지만, 속도가 서로 다른 열차(급행과 완행, 여객과 화물)가 섞이면 추월 대피 때문에 실제 용량이 크게 줄어듭니다. 예제 14.3에서 본 캔트 설정의 어려움과 함께, 고속선을 별도 선로로 짓는 이유입니다.</p>
+    <div class="callout site"><strong>이 장의 기준 노선 정리(교육용)</strong> <b>HS-300</b>: 60 kg 레일, k 40 MPa, Q 85 kN → β 1.118 m⁻¹, 처짐 1.19 mm, M 19.0 kN·m(σ 50.7 MPa), 좌면 하중 28.5 kN(34 %). 동적 할증 1.6 → 도상 188 kPa, 노반 62 kPa(도상 0.35 m). R 7,000 m 평형 캔트 152 mm, 설정 130 mm, 완화 곡선 217 m 이상. 350 km/h 최소 반지름 6,570 m(캔트 160 + 부족 60 mm). 20 m 교량 n₀ 5 Hz → 공진 337 km/h → 동적 해석 필요. 장대 레일 ΔT 30 °C → 556 kN, 신축 구간 56 m. <b>CR-120</b>: R 800 m, 여객 120 · 화물 60 km/h → 캔트 140 mm(부족 72, 초과 87 mm, a<sub>nc</sub> 0.47 m/s²), 최소 반지름 654 m. 모든 값은 학습용이며 실제 설계는 철도 설계기준(KDS 47 계열)과 노선별 지침을 따른다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="pavement.html"><small>CH.13 · 포장 설계</small>웨스터가드와 상대 강성 반지름<br><span>같은 빙클러 지반 모형, ℓ과 1/β.</span></a>
+      <a href="alignment.html"><small>CH.11 · 도로 선형 설계</small>편경사와 클로소이드<br><span>도로의 마찰 + 편경사 vs 철도의 캔트 + 부족 캔트.</span></a>
+      <a href="bridge-loads.html"><small>CH.02 · 교량 하중과 이동 하중</small>이동 하중과 충격<br><span>트럭 주사와 열차 하중 열의 공진 비교.</span></a>
+      <a href="substructure.html"><small>CH.06 · 하부 구조와 받침</small>온도 신축과 받침 배치<br><span>궤도–교량 상호 작용의 교량 쪽.</span></a>
+      <a href="../../geotech/chapters/piles.html"><small>GeotechBook · CH.14</small>탄성 지반 위의 말뚝<br><span>β = (k<sub>h</sub>D/4EI)<sup>1/4</sup>, 같은 미분 방정식.</span></a>
+      <a href="../../structure/chapters/dynamics.html"><small>StructureBook · CH.07</small>구조 동역학<br><span>1자유도 응답, 공진, 감쇠.</span></a>
+      <a href="../../mechanics/chapters/influence.html"><small>MechanicsBook · CH.06</small>영향선<br><span>철도 교량에서 시작된 이동 하중 해석.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>궤도는 레일–체결 장치–침목–도상–노반으로 바퀴 하중(접촉 압력 약 1,000 MPa)을 노반이 견딜 압력(수십 kPa)으로 편다. 표준궤 1,435 mm, 캔트 계산의 G ≈ 1,500 mm.</li>
+      <li>탄성 지반 위 레일: β = (k/4EI)<sup>1/4</sup>, y<sub>0</sub> = Qβ/(2k), M<sub>0</sub> = Q/(4β), 좌면 하중 F<sub>0</sub> = Qβs/2. HS-300: β 1.118 m⁻¹, 1.19 mm, 19.0 kN·m, 28.5 kN(34 %).</li>
+      <li>단단한 궤도(큰 k)는 처짐이 작지만 하중이 적은 침목에 몰린다. 처짐 ∝ k<sup>−3/4</sup>, 모멘트 ∝ k<sup>−1/4</sup>, 좌면 하중 ∝ k<sup>1/4</sup>.</li>
+      <li>동적 할증 φ = 1 + tn(1 + (V − 60)/140)(아이젠만 형태). 도상 압력 = φF<sub>0</sub>/(bL<sub>e</sub>), 노반은 2:1 퍼짐 근사. 궤도 상태가 나쁘면 φ가 크게 늘어 노반을 상하게 한다.</li>
+      <li>평형 캔트 C = GV²/(127R) ≈ 11.8V²/R(mm). 부족 캔트 C<sub>d</sub> = C<sub>eq</sub> − C, a<sub>nc</sub> = gC<sub>d</sub>/G. 혼합 교통은 빠른 열차의 부족 캔트와 느린 열차의 초과 캔트 사이에서 캔트를 고른다.</li>
+      <li>R<sub>min</sub> = 11.8V²/(C<sub>max</sub> + C<sub>d,max</sub>), 완화 곡선 L<sub>T</sub> ≥ CV/(3.6Ċ). 350 km/h: 약 6,600 m(경부고속철도 최소 7,000 m로 알려짐).</li>
+      <li>고속 열차는 차량 길이 d마다 교량을 두드려 V<sub>res</sub> = 3.6n<sub>0</sub>d/i에서 공진한다. 반복이 진동을 쌓으므로 차량 수와 감쇠가 중요하고, 바닥판 가속도(자갈 궤도 3.5 m/s² 형태)를 확인한다. 궤도 틀림은 f = V/(3.6λ)로 차체를 가진하므로 고속일수록 긴 파장을 관리한다.</li>
+      <li>콘크리트 궤도는 유지 보수가 적고 고속에 안정적이지만 비싸고 노반 침하에 약하다. 장대 레일 N = EAαΔT(길이와 무관), 신축 구간 N/r, 절손 틈 N²/(EAr). 교량 위에서는 궤도–교량 상호 작용을 검토한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 탄성 지반 위 레일에서 궤도 지지 계수 k를 16배로 하면 최대 처짐은?</p><div class="opts">
+        <button class="opt">1/16</button><button class="opt" data-correct>1/8</button><button class="opt">1/4</button><button class="opt">1/2</button>
+      </div><div class="quiz-exp">y<sub>0</sub> = Qβ/(2k), β ∝ k<sup>1/4</sup>이므로 y<sub>0</sub> ∝ k<sup>−3/4</sup>. 16<sup>−3/4</sup> = 1/8.</div></div>
+      <div class="quiz-q"><p>2. β = 1.0 m⁻¹, 윤하중 100 kN일 때 레일의 최대 휨모멘트는?</p><div class="opts">
+        <button class="opt">100 kN·m</button><button class="opt">50 kN·m</button><button class="opt" data-correct>25 kN·m</button><button class="opt">12.5 kN·m</button>
+      </div><div class="quiz-exp">M<sub>0</sub> = Q/(4β) = 100/4 = 25 kN·m.</div></div>
+      <div class="quiz-q"><p>3. G = 1,500 mm, V = 100 km/h, R = 590 m의 평형 캔트는 약?</p><div class="opts">
+        <button class="opt">100 mm</button><button class="opt" data-correct>200 mm</button><button class="opt">20 mm</button><button class="opt">400 mm</button>
+      </div><div class="quiz-exp">11.8 × 100²/590 = 200 mm.</div></div>
+      <div class="quiz-q"><p>4. 설정 캔트 100 mm인 곡선을 평형 캔트 160 mm에 해당하는 속도로 달릴 때 미평형 횡가속도는? (G = 1,500 mm)</p><div class="opts">
+        <button class="opt">0.16 m/s²</button><button class="opt" data-correct>0.39 m/s²</button><button class="opt">0.65 m/s²</button><button class="opt">1.05 m/s²</button>
+      </div><div class="quiz-exp">부족 캔트 60 mm, a = 9.81 × 60/1,500 = 0.39 m/s².</div></div>
+      <div class="quiz-q"><p>5. 최대 캔트 160 mm, 허용 부족 캔트 100 mm에서 200 km/h의 최소 곡선 반지름은?</p><div class="opts">
+        <button class="opt">약 910 m</button><button class="opt" data-correct>약 1,820 m</button><button class="opt">약 2,950 m</button><button class="opt">약 4,700 m</button>
+      </div><div class="quiz-exp">11.8 × 200²/260 = 1,815 m.</div></div>
+      <div class="quiz-q"><p>6. 고유 진동수 4 Hz인 교량을 차량 길이 25 m의 열차가 지날 때 1차 공진 속도는?</p><div class="opts">
+        <button class="opt">100 km/h</button><button class="opt">180 km/h</button><button class="opt" data-correct>360 km/h</button><button class="opt">720 km/h</button>
+      </div><div class="quiz-exp">V = 3.6 × n<sub>0</sub> × d = 3.6 × 4 × 25 = 360 km/h.</div></div>
+      <div class="quiz-q"><p>7. 현가 고유 진동수 1 Hz인 차량이 파장 50 m의 궤도 틀림을 지날 때 차체가 가장 크게 흔들리는 속도는?</p><div class="opts">
+        <button class="opt">50 km/h</button><button class="opt" data-correct>180 km/h</button><button class="opt">300 km/h</button><button class="opt">속도와 무관</button>
+      </div><div class="quiz-exp">공진은 f = V/(3.6λ) = f<sub>n</sub>일 때. V = 3.6 × 50 × 1 = 180 km/h.</div></div>
+      <div class="quiz-q"><p>8. 장대 레일에서 레일 온도가 중립 온도보다 30 °C 높을 때 축력에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">레일이 길수록 축력이 커진다</button><button class="opt" data-correct>신축 구간 밖에서는 레일 길이와 무관하게 EAαΔT의 압축이다</button><button class="opt">종저항이 클수록 축력이 커진다</button><button class="opt">인장 축력이 생긴다</button>
+      </div><div class="quiz-exp">움직이지 못하는 구간의 축력은 EAαΔT로 길이와 무관하다. 종저항은 신축 구간의 길이(N/r)를 정할 뿐이다. 온도가 오르면 압축이다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const RW = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${RW.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 9, dash) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = RW._c || (RW._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  E: 2.1e8, G: 1500, g: 9.81, ALPHA: 1.15e-5,
+  RAIL: { 60: { I: 3.05e-5, W: 375e-6, A: 76.7e-4 }, 50: { I: 2.0e-5, W: 280e-6, A: 64.2e-4 } },
+  /** 빙클러 지반 위 무한 보: k (MPa = 1000 kN/m²), EI kN·m², 하중 [{x, Q}] → y(x) m, M(x) kN·m */
+  boef(kMPa, EI, loads) {
+    const k = kMPa * 1000, b = Math.pow(k / (4 * EI), 0.25);
+    const y = (x) => loads.reduce((s, l) => { const u = b * Math.abs(x - l.x); return s + ((l.Q * b) / (2 * k)) * Math.exp(-u) * (Math.cos(u) + Math.sin(u)); }, 0);
+    const M = (x) => loads.reduce((s, l) => { const u = b * Math.abs(x - l.x); return s + (l.Q / (4 * b)) * Math.exp(-u) * (Math.cos(u) - Math.sin(u)); }, 0);
+    return { b, k, y, M };
+  },
+  phi(V, n, t = 3) { return V <= 60 ? 1 + t * n : 1 + t * n * (1 + (Math.min(V, 200) - 60) / 140); },
+  ceq(V, R) { return (11.8 * V * V) / R; },
+};
+
+/* ---------- 1. 3D 궤도 ---------- */
+(function () {
+  const typ = CB.seg("rw-3d-type", go), gc = CB.range("rw-3d-c", (v) => v + " mm", go), gs = CB.range("rw-3d-s", (v) => v.toFixed(3) + " m", go), lab = CB.check("rw-3d-lab", go), load = CB.check("rw-3d-load", go);
+  const LEN = 12;
+  const v3 = CB.orbit("#rw-cv-3d", {
+    yaw: -0.55, pitch: 0.5, dist: 19, target: [6, 0, 0.2], aspect: 0.6, minHeight: 260, maxHeight: 420,
+    draw(V) {
+      const P = V.P, slab = typ() === "slab", th = Math.asin(gc() / RW.G), zr = slab ? 0.75 : 0.91;
+      const rot = ([x, y, z]) => { const yy = y + 0.75, zz = z - zr, c = Math.cos(th), s = Math.sin(th); return [x, -0.75 + c * yy - s * zz, zr + s * yy + c * zz]; };
+      let faces = [];
+      const flush = () => { faces.sort((a, b) => V.depth(b.f) - V.depth(a.f)).forEach((o) => V.poly3(o.f, { fill: o.fill, color: o.color, width: 0.6, fillAlpha: o.alpha })); faces = []; };
+      const box = (x0, x1, y0, y1, z0, z1, fill, color, alpha = 1) => {
+        const p = (x, y, z) => rot([x, y, z]);
+        [[p(x0, y0, z1), p(x1, y0, z1), p(x1, y1, z1), p(x0, y1, z1)], [p(x0, y0, z0), p(x1, y0, z0), p(x1, y0, z1), p(x0, y0, z1)], [p(x0, y1, z0), p(x1, y1, z0), p(x1, y1, z1), p(x0, y1, z1)],
+         [p(x0, y0, z0), p(x0, y1, z0), p(x0, y1, z1), p(x0, y0, z1)], [p(x1, y0, z0), p(x1, y1, z0), p(x1, y1, z1), p(x1, y0, z1)]].forEach((f) => faces.push({ f, fill, color, alpha }));
+      };
+      const prism = (x0, x1, sec, fill, color, alpha = 1, rotate = true) => { // sec: [[y,z]...] 볼록 단면
+        const p = (x, y, z) => (rotate ? rot([x, y, z]) : [x, y, z]);
+        for (let i = 0; i < sec.length; i++) { const a = sec[i], b = sec[(i + 1) % sec.length]; faces.push({ f: [p(x0, a[0], a[1]), p(x1, a[0], a[1]), p(x1, b[0], b[1]), p(x0, b[0], b[1])], fill, color, alpha }); }
+        faces.push({ f: sec.map(([y, z]) => p(x0, y, z)), fill, color, alpha }); faces.push({ f: sec.map(([y, z]) => p(x1, y, z)), fill, color, alpha });
+      };
+      // 노반(회전 안 함)
+      prism(0, LEN, [[-4.2, -0.6], [4.2, -0.6], [3.6, 0], [-3.6, 0]], RW.alpha(P.warn, 0.35), P.border, 1, false); flush();
+      if (!slab) {
+        prism(0, LEN, [[-3.4, 0], [3.4, 0], [3.2, 0.15], [-3.2, 0.15]], P.surface, P.border); flush();
+        prism(0, LEN, [[-3.15, 0.15], [3.15, 0.15], [1.8, 0.72], [-1.8, 0.72]], RW.alpha(P.dim, 0.3), P.border); flush();
+        for (let x = gs() / 2; x < LEN; x += gs()) box(x - 0.14, x + 0.14, -1.3, 1.3, 0.62, 0.74, RW.alpha(P.dim, 0.9), P.border); flush();
+      } else {
+        prism(0, LEN, [[-1.7, 0], [1.7, 0], [1.6, 0.3], [-1.6, 0.3]], RW.alpha(P.dim, 0.35), P.border); flush();
+        prism(0, LEN, [[-1.4, 0.3], [1.4, 0.3], [1.4, 0.54], [-1.4, 0.54]], P.surface, P.dim); flush();
+      }
+      const rb = slab ? 0.54 : 0.74;
+      for (let x = gs() / 2; x < LEN; x += gs()) [-0.75, 0.75].forEach((y) => box(x - 0.09, x + 0.09, y - 0.1, y + 0.1, rb, rb + 0.03, P.accent2, P.accent2)); flush();
+      [-0.75, 0.75].forEach((y) => { V.line3(rot([0, y, rb + 0.06]), rot([LEN, y, rb + 0.06]), { color: P.text, width: 5 }); V.line3(rot([0, y, zr]), rot([LEN, y, zr]), { color: P.text, width: 3 }); });
+      if (load()) {
+        const top = rot([6, 0.75, zr]); V.line3([top[0], top[1], top[2] + 1.4], top, { color: P.accent2, width: 3 }); V.text3("Q", [top[0], top[1], top[2] + 1.6], { color: P.accent2, bold: true });
+        const zb = slab ? 0.3 : 0.15, zt = rb;
+        [[-1, -1], [1, 1]].forEach(([sx]) => V.line3(rot([6 + sx * 0.6, 0.75, zt]), rot([6 + sx * 1.6, 0.75, zb]), { color: P.accent2, dash: [4, 3], width: 1.4 }));
+        [[-1], [1]].forEach(([sy]) => V.line3(rot([6, 0.75 + sy * 0.5, zt]), rot([6, 0.75 + sy * 1.2, zb]), { color: P.accent2, dash: [4, 3], width: 1.4 }));
+      }
+      if (lab()) {
+        V.text3("레일", rot([1.5, 0.75, zr + 0.35]), { color: P.text, size: 12, bold: true });
+        V.text3("체결 장치·패드", rot([4, -0.75, rb + 0.45]), { color: P.accent2, size: 11 });
+        if (!slab) { V.text3("침목", rot([7, -1.6, 0.8]), { color: P.text, size: 11 }); V.text3("도상", rot([9, -2.6, 0.5]), { color: P.text, size: 11 }); V.text3("보조 도상", [11, -3.5, 0.1], { color: P.text, size: 11 }); }
+        else { V.text3("궤도판", rot([7, -1.6, 0.6]), { color: P.text, size: 11 }); V.text3("지지층(HSB)", rot([9.5, -1.9, 0.15]), { color: P.text, size: 11 }); }
+        V.text3("노반", [11.5, -4.2, -0.4], { color: P.warn, size: 11 });
+      }
+    },
+  });
+  function go() {
+    v3.redraw();
+    CB.stat("rw-3d-ang", `${CB.num((Math.asin(gc() / RW.G) * 180) / Math.PI, 2)}°`);
+    CB.stat("rw-3d-n", CB.sig(1000 / gs(), 4) + " 개");
+    CB.stat("rw-3d-h", typ() === "slab" ? "약 0.75 m" : "약 0.91 m");
+  }
+  go();
+})();
+
+/* ---------- 2. 탄성 지반 위 레일 ---------- */
+(function () {
+  const rail = CB.seg("rw-bm-rail", go), gk = CB.range("rw-bm-k", (v) => v + " MPa", go), gQ = CB.range("rw-bm-Q", (v) => v + " kN", go), gs = CB.range("rw-bm-s", (v) => v.toFixed(3) + " m", go), bog = CB.check("rw-bm-bogie", go), ga = CB.range("rw-bm-a", (v) => v.toFixed(2) + " m", go);
+  let R = null;
+  function calc() {
+    const r = RW.RAIL[rail()], EI = RW.E * r.I, loads = [{ x: 0, Q: gQ() }]; if (bog()) loads.push({ x: ga(), Q: gQ() });
+    const m = RW.boef(gk(), EI, loads), xs = []; for (let i = 0; i <= 400; i++) xs.push(-6 + (15 * i) / 400);
+    const Y = xs.map((x) => [x, m.y(x) * 1000]), M = xs.map((x) => [x, m.M(x)]);
+    const sl = []; for (let x = -Math.ceil(6 / gs()) * gs(); x <= 9; x += gs()) if (x >= -6) sl.push([x, m.k * m.y(x) * gs()]);
+    const ymax = Math.max(...Y.map((p) => p[1])), Mmax = Math.max(...M.map((p) => p[1])), Fmax = Math.max(...sl.map((p) => p[1]));
+    R = { m, Y, M, sl, ymax, Mmax, Fmax, W: r.W };
+  }
+  const cy = CB.canvas("#rw-cv-beam-y", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), top = Math.max(1, R.ymax * 1.25);
+    const C = CB.chart(ctx, { x: 52, y: 26, w: W - 52 - 16, h: H - 26 - 40 }, { x: [-6, 9], y: [top, -top * 0.25], xLabel: "x (m)", yLabel: "y (mm)",
+      series: [{ data: R.Y, color: pal.accent, width: 2.6 }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    // 침목 하중 막대
+    const fs = (top * 0.6) / Math.max(1, R.Fmax);
+    R.sl.forEach(([x, F]) => { const px = C.X(x); ctx.fillStyle = F >= 0 ? RW.alpha(pal.ok, 0.75) : RW.alpha(pal.bad, 0.75); const y0 = C.Y(0), y1 = C.Y(-F * fs * 0.35); ctx.fillRect(px - 3, Math.min(y0, y1), 6, Math.abs(y1 - y0)); });
+    [0].concat(bog() ? [ga()] : []).forEach((x) => RW.arrow(ctx, C.X(x), C.Y(-top * 0.24), C.X(x), C.Y(0) - 2, pal.accent2, 2.5));
+    RW.text(ctx, `y_max ${CB.num(R.ymax, 2)} mm`, C.X(0) + 10, C.Y(R.ymax) + 12, pal.accent, { align: "left", size: 11.5 });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.4), minHeight: 210, maxHeight: 280 });
+  const cm = CB.canvas("#rw-cv-beam-m", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), mn = Math.min(...R.M.map((p) => p[1])), top = Math.max(5, R.Mmax * 1.2);
+    const C = CB.chart(ctx, { x: 52, y: 26, w: W - 52 - 16, h: H - 26 - 40 }, { x: [-6, 9], y: [top, Math.min(-top * 0.3, mn * 1.2)], xLabel: "x (m)", yLabel: "M (kN·m)",
+      series: [{ data: R.M, color: pal.accent2, width: 2.6, fill: RW.alpha(pal.accent2, 0.08) }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    RW.text(ctx, `M_max ${CB.num(R.Mmax, 1)} kN·m`, C.X(0) + 10, C.Y(R.Mmax) + 12, pal.accent2, { align: "left", size: 11.5 });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.34), minHeight: 190, maxHeight: 250 });
+  function go() {
+    calc(); cy.redraw(); cm.redraw();
+    CB.stat("rw-bm-beta", `${CB.num(R.m.b, 3)} m⁻¹ · ${CB.num(1 / R.m.b, 3)} m`); CB.stat("rw-bm-y", CB.num(R.ymax, 2) + " mm");
+    CB.stat("rw-bm-m", `${CB.num(R.Mmax, 1)} kN·m · ${CB.num(R.Mmax / R.W / 1000, 1)} MPa`); CB.stat("rw-bm-F", `${CB.num(R.Fmax, 1)} kN (${CB.num((R.Fmax / gQ()) * 100, 0)} %)`);
+  }
+  go();
+})();
+
+/* ---------- 3. 침목·도상 압력 ---------- */
+(function () {
+  const gQ = CB.range("rw-sl-Q", (v) => v + " kN", go), gV = CB.range("rw-sl-V", (v) => v + " km/h", go), gn = CB.seg("rw-sl-n", go), gs = CB.range("rw-sl-s", (v) => v.toFixed(3) + " m", go), gh = CB.range("rw-sl-h", (v) => v.toFixed(2) + " m", go), gk = CB.range("rw-sl-k", (v) => v + " MPa", go);
+  const B = 0.28, LE = 2.6 / 3, PB = 300, PS = 100;
+  let R = null;
+  function calc() {
+    const m = RW.boef(gk(), RW.E * RW.RAIL[60].I, [{ x: 0, Q: gQ() }]), phi = RW.phi(gV(), +gn()), s = gs(), F0 = m.k * m.y(0) * s, F = phi * F0, h = gh();
+    const pb = F / (B * LE), ps = F / (Math.min(B + h, s) * (LE + h)), sl = []; for (let i = -4; i <= 4; i++) sl.push([i * s, phi * m.k * m.y(i * s) * s]);
+    R = { phi, F0, F, pb, ps, sl, s, h };
+  }
+  const cv = CB.canvas("#rw-cv-sleeper", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), cx = W / 2, sc = Math.min((W - 60) / (8 * 0.8 + 0.6), 80), yr = 70, ys = yr + 10, sh = 16, yb = ys + sh, hb = R.h * sc * 0.9, yf = yb + hb;
+    ctx.fillStyle = RW.alpha(pal.dim, 0.18); ctx.fillRect(10, yb, W - 20, hb); ctx.fillStyle = RW.alpha(pal.warn, 0.18); ctx.fillRect(10, yf, W - 20, H - yf - 26);
+    ctx.fillStyle = pal.text; ctx.fillRect(10, yr, W - 20, 8);
+    RW.arrow(ctx, cx, yr - 40, cx, yr - 2, pal.accent2, 3); RW.text(ctx, `φQ = ${CB.num(R.phi * gQ(), 0)} kN`, cx + 10, yr - 30, pal.accent2, { align: "left" });
+    const fm = Math.max(...R.sl.map((p) => p[1]));
+    R.sl.forEach(([x, F]) => {
+      const px = cx + x * sc, bw = B * sc; ctx.fillStyle = RW.alpha(pal.dim, 0.85); ctx.fillRect(px - bw / 2, ys, bw, sh);
+      if (Math.abs(x) < 3.2 * R.s && px > 20 && px < W - 20) { const hh = (Math.max(0, F) / fm) * 34; ctx.fillStyle = pal.ok; ctx.fillRect(px - 4, yr - hh - 4, 8, hh); if (F > fm * 0.3) RW.text(ctx, CB.num(F, 1), px, yr - hh - 14, pal.ok, { size: 10.5 }); }
+    });
+    // 2:1 퍼짐(가운데 침목)
+    const half = (B / 2) * sc, spread = (R.h / 2) * sc;
+    ctx.strokeStyle = pal.accent2; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - half, yb); ctx.lineTo(cx - half - spread, yf); ctx.moveTo(cx + half, yb); ctx.lineTo(cx + half + spread, yf); ctx.stroke(); ctx.setLineDash([]);
+    const lim = (R.s / 2) * sc; ctx.strokeStyle = pal.faint; ctx.beginPath(); ctx.moveTo(cx - lim, yf); ctx.lineTo(cx - lim, yf + 8); ctx.moveTo(cx + lim, yf); ctx.lineTo(cx + lim, yf + 8); ctx.stroke();
+    RW.text(ctx, `도상 압력 p_b = ${CB.num(R.pb, 0)} kPa`, 18, yb + 14, R.pb <= PB ? pal.text : pal.bad, { align: "left", size: 11.5 });
+    RW.text(ctx, `노반 압력 p_s = ${CB.num(R.ps, 0)} kPa`, 18, yf + 16, R.ps <= PS ? pal.text : pal.bad, { align: "left", size: 11.5 });
+    RW.text(ctx, `도상 ${CB.num(R.h, 2)} m`, W - 18, yb + hb / 2, pal.dim, { align: "right", size: 11 });
+    RW.text(ctx, "막대: 침목별 설계 좌면 하중(kN)", W - 18, H - 12, pal.ok, { align: "right", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.5), minHeight: 250, maxHeight: 340 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("rw-sl-phi", CB.num(R.phi, 2)); CB.stat("rw-sl-F", `${CB.num(R.F, 1)} kN`); CB.stat("rw-sl-pb", CB.num(R.pb, 0) + " kPa"); CB.stat("rw-sl-ps", CB.num(R.ps, 0) + " kPa");
+    const m = document.getElementById("rw-sl-msg"), ok = R.pb <= PB && R.ps <= PS;
+    m.className = ok ? "rw-msg ok" : "rw-msg bad";
+    m.innerHTML = ok ? `만족(교육용 기준): 도상 ${CB.num(R.pb, 0)} ≤ 300 kPa, 노반 ${CB.num(R.ps, 0)} ≤ 100 kPa.` : `초과: ${R.pb > PB ? `도상 압력 ${CB.num(R.pb, 0)} kPa > 300` : ""}${R.pb > PB && R.ps > PS ? ", " : ""}${R.ps > PS ? `노반 압력 ${CB.num(R.ps, 0)} kPa > 100` : ""}. 침목 간격을 줄이거나 도상을 두껍게, 궤도 상태를 개선하세요.`;
+  }
+  go();
+})();
+
+/* ---------- 4. 캔트 ---------- */
+(function () {
+  const PRE = { cr: [120, 60, 800, 140], hs: [300, 170, 7000, 130] }, CMAX = 160, CD = 100, CE = 110;
+  const gV = CB.range("rw-ca-V", (v) => v + " km/h", go), gVs = CB.range("rw-ca-Vs", (v) => v + " km/h", go), gR = CB.range("rw-ca-R", (v) => v.toLocaleString("en-US") + " m", go), gC = CB.range("rw-ca-C", (v) => v + " mm", go);
+  CB.seg("rw-ca-pre", (v) => { const p = PRE[v]; gV.set(p[0], false); gVs.set(p[1], false); gR.set(p[2], false); gC.set(p[3], false); go(); });
+  let R = null;
+  function calc() {
+    const ce = RW.ceq(gV(), gR()), cs = RW.ceq(gVs(), gR()), C = gC(), cd = ce - C, ex = C - cs;
+    const lo = Math.max(0, ce - CD), hi = Math.min(CMAX, cs + CE);
+    R = { ce, cs, C, cd, ex, a: (RW.g * cd) / RW.G, lo, hi };
+  }
+  const cv = CB.canvas("#rw-cv-cant", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), ex = 3, th = Math.asin(Math.min(1, R.C / RW.G)) * ex, cx = W * 0.42, base = H - 50, sc = Math.min(W * 0.14, (H - 90) / 3.3);
+    ctx.save(); ctx.translate(cx, base); ctx.rotate(-th);
+    ctx.fillStyle = RW.alpha(pal.dim, 0.35); ctx.fillRect(-1.3 * sc, 8, 2.6 * sc, 14);
+    ctx.fillStyle = pal.text; ctx.fillRect(-0.78 * sc, -4, 0.06 * sc, 12); ctx.fillRect(0.72 * sc, -4, 0.06 * sc, 12);
+    ctx.fillStyle = RW.alpha(pal.dim, 0.18); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-1.4 * sc, -2.9 * sc, 2.8 * sc, 2.6 * sc, 12) : ctx.rect(-1.4 * sc, -2.9 * sc, 2.8 * sc, 2.6 * sc); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = pal.text; [-0.75, 0.75].forEach((y) => { ctx.beginPath(); ctx.arc(y * sc, -0.3 * sc, 0.22 * sc, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
+    // 지반선
+    ctx.strokeStyle = pal.axis; ctx.beginPath(); ctx.moveTo(20, base + 26); ctx.lineTo(W - 20, base + 26); ctx.stroke();
+    // 힘(차체 중심)
+    const gx = cx + Math.sin(th) * 1.6 * sc * -1 * -1, gy = base - Math.cos(th) * 1.6 * sc, Lg = Math.min(90, H * 0.28), ac = (Math.pow(gV() / 3.6, 2) / gR()) / RW.g, Lc = Lg * ac * ex;
+    const gxx = cx - Math.sin(th) * 1.6 * sc, gyy = base - Math.cos(th) * 1.6 * sc;
+    RW.arrow(ctx, gxx, gyy, gxx, gyy + Lg, pal.accent2, 2.5); RW.text(ctx, "mg", gxx - 12, gyy + Lg - 6, pal.accent2, { align: "right", size: 11 });
+    RW.arrow(ctx, gxx, gyy, gxx + Lc, gyy, pal.accent2, 2.5); RW.text(ctx, `mv²/R(×${ex})`, gxx + Lc + 6, gyy - 10, pal.accent2, { align: "left", size: 11 });
+    RW.arrow(ctx, gxx, gyy, gxx + Lc, gyy + Lg, pal.ok, 2.2, 9, [6, 3]); RW.text(ctx, "합력", gxx + Lc + 6, gyy + Lg, pal.ok, { align: "left", size: 11 });
+    const nx = Math.sin(th), ny = Math.cos(th); RW.arrow(ctx, gxx, gyy, gxx + nx * Lg * 1.05, gyy + ny * Lg * 1.05, pal.faint, 1.2, 7, [3, 3]);
+    RW.text(ctx, "바깥쪽 →", W - 24, 20, pal.dim, { align: "right", size: 11 });
+    RW.text(ctx, `캔트 각 ×${ex} 과장`, 20, 20, pal.dim, { align: "left", size: 11 });
+    // a_nc 게이지
+    const gx0 = W - 40, gyT = 50, gh = H - 120, amax = 1.2, yv = (a) => gyT + gh / 2 - (a / amax) * (gh / 2);
+    ctx.fillStyle = RW.alpha(pal.dim, 0.15); ctx.fillRect(gx0 - 8, gyT, 16, gh);
+    const lim = (RW.g * CD) / RW.G; ctx.fillStyle = RW.alpha(pal.ok, 0.25); ctx.fillRect(gx0 - 8, yv(lim), 16, yv(-(RW.g * CE) / RW.G) - yv(lim));
+    ctx.fillStyle = Math.abs(R.cd) <= CD ? pal.accent : pal.bad; const ya = yv(CB.clamp(R.a, -amax, amax)); ctx.fillRect(gx0 - 10, ya - 2, 20, 4);
+    RW.text(ctx, `a_nc ${CB.num(R.a, 2)}`, gx0 - 14, ya, pal.text, { align: "right", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.52), minHeight: 260, maxHeight: 360 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("rw-ca-eq", `${CB.num(R.ce, 0)} · ${CB.num(R.cs, 0)} mm`);
+    CB.stat("rw-ca-cd", `${CB.num(R.cd, 0)} mm · ${CB.num(R.a, 2)} m/s²`); CB.stat("rw-ca-ce", CB.num(R.ex, 0) + " mm");
+    CB.stat("rw-ca-rng", R.lo <= R.hi ? `${CB.num(R.lo, 0)} – ${CB.num(R.hi, 0)} mm` : "없음");
+    const m = document.getElementById("rw-ca-msg"), bad = [];
+    if (R.C > CMAX) bad.push(`설정 캔트가 최대 ${CMAX} mm 초과`); if (R.cd > CD) bad.push(`부족 캔트 ${CB.num(R.cd, 0)} > ${CD} mm`); if (R.ex > CE) bad.push(`저속 열차 초과 캔트 ${CB.num(R.ex, 0)} > ${CE} mm`);
+    if (R.lo > R.hi) bad.push("두 열차를 모두 만족하는 캔트가 없음 — 속도 차를 줄이거나 반지름을 키워야 함");
+    m.className = bad.length ? "rw-msg bad" : "rw-msg ok";
+    m.innerHTML = bad.length ? bad.join(" · ") : `만족: 부족 캔트 ${CB.num(R.cd, 0)} mm(a<sub>nc</sub> ${CB.num(R.a, 2)} m/s²), 초과 캔트 ${CB.num(R.ex, 0)} mm. 허용 범위 ${CB.num(R.lo, 0)}–${CB.num(R.hi, 0)} mm.`;
+  }
+  go();
+})();
+
+/* ---------- 5. 최소 곡선 반지름 ---------- */
+(function () {
+  const LINE = { hs: [160, 60, 350], cr: [160, 100, 120] };
+  const gV = CB.range("rw-rm-V", (v) => v + " km/h", go), gcm = CB.range("rw-rm-cm", (v) => v + " mm", go), gcd = CB.range("rw-rm-cd", (v) => v + " mm", go), gdc = CB.range("rw-rm-dc", (v) => v + " mm/s", go);
+  CB.seg("rw-rm-line", (v) => { const p = LINE[v]; gcm.set(p[0], false); gcd.set(p[1], false); gV.set(p[2], false); go(); });
+  const rmin = (V, s) => (11.8 * V * V) / s;
+  const cv = CB.canvas("#rw-cv-rmin", (ctx, W, H) => {
+    const pal = CB.palette(), s = gcm() + gcd(), d = [], d1 = [], d2 = [];
+    for (let V = 40; V <= 400; V += 5) { d.push([V, rmin(V, s)]); d1.push([V, rmin(V, 220)]); d2.push([V, rmin(V, 260)]); }
+    const V = gV(), R = rmin(V, s);
+    const C = CB.chart(ctx, { x: 62, y: 16, w: W - 62 - 16, h: H - 16 - 46 }, { x: [40, 400], y: [100, 20000], logY: true, xLabel: "설계 속도 V (km/h)", yLabel: "R_min (m, log)", yFmt: (v) => CB.sig(v, 2),
+      series: [{ data: d1, color: pal.faint, width: 1.2, dash: [5, 4] }, { data: d2, color: pal.faint, width: 1.2, dash: [2, 3] }, { data: d, color: pal.accent, width: 2.8 }],
+      hlines: [{ y: 7000, color: pal.warn, label: "7,000 m" }], points: [{ x: V, y: Math.max(100, R), color: pal.accent2, r: 7 }] });
+    RW.text(ctx, `${CB.sig(R, 3)} m`, C.X(V) - 10, C.Y(Math.max(100, R)) + 16, pal.accent2, { align: "right" });
+    RW.text(ctx, "점선: 160+60 · 160+100 mm", 72, 28, pal.dim, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.48), minHeight: 250, maxHeight: 340 });
+  function go() {
+    cv.redraw();
+    const V = gV(), R = rmin(V, gcm() + gcd());
+    CB.stat("rw-rm-R", CB.sig(R, 4) + " m"); CB.stat("rw-rm-ceq", CB.num(RW.ceq(V, R), 0) + " mm");
+    CB.stat("rw-rm-L", CB.num((gcm() * V) / (3.6 * gdc()), 0) + " m"); CB.stat("rw-rm-a", CB.num((RW.g * gcd()) / RW.G, 2) + " m/s²");
+  }
+  go();
+})();
+
+/* ---------- 6. 교량 공진 ---------- */
+(function () {
+  const gV = CB.range("rw-rs-V", (v) => v + " km/h", hist), gL = CB.range("rw-rs-L", (v) => v + " m", sweep), gn = CB.range("rw-rs-n", (v) => v.toFixed(1) + " Hz", sweep), gz = CB.range("rw-rs-z", (v) => v.toFixed(1) + " %", sweep), gd = CB.range("rw-rs-d", (v) => v.toFixed(1) + " m", sweep), gN = CB.range("rw-rs-N", (v) => v + " 량", sweep);
+  const P = 340, MASS = 15;
+  let S = null, Hh = null;
+  function run(V, keep) {
+    const L = gL(), n0 = gn(), w = 2 * Math.PI * n0, z = gz() / 100, d = gd(), N = gN(), v = V / 3.6, m = MASS;
+    const T = (L + (N - 1) * d) / v + 1.5 / n0, dt = Math.min(1 / (40 * n0), L / (v * 40));
+    const F = (t) => { let s = 0; for (let k = 0; k < N; k++) { const x = v * t - k * d; if (x > 0 && x < L) s += P * Math.sin((Math.PI * x) / L); } return (2 / (m * L)) * s; };
+    let q = 0, qd = 0, qdd = F(0), qmax = 0, amax = 0, smax = 0; const a0 = 4 / (dt * dt), a1 = 2 * z * w * (2 / dt), keff = w * w + a0 + a1, hist = keep ? [[0, 0, 0]] : null;
+    for (let t = dt; t <= T; t += dt) {
+      const f = F(t), rhs = f + a0 * q + (4 / dt) * qd + qdd + 2 * z * w * ((2 / dt) * q + qd), q1 = rhs / keff, qd1 = (2 / dt) * (q1 - q) - qd, qdd1 = a0 * (q1 - q) - (4 / dt) * qd - qdd;
+      q = q1; qd = qd1; qdd = qdd1; const qs = f / (w * w);
+      if (Math.abs(q) > qmax) qmax = Math.abs(q); if (Math.abs(qdd) > amax) amax = Math.abs(qdd); if (qs > smax) smax = qs;
+      if (keep) hist.push([t, q * 1000, qs * 1000]);
+    }
+    return { daf: qmax / Math.max(1e-12, smax), acc: amax, qmax, smax, hist };
+  }
+  function sweep() {
+    const pts = []; for (let V = 100; V <= 420; V += 4) { const r = run(V, false); pts.push([V, r.daf, r.acc]); }
+    S = pts; hist();
+  }
+  function hist() {
+    Hh = run(gV(), true); cs.redraw(); ct.redraw();
+    const n0 = gn(), d = gd(), L = gL(), v1 = 3.6 * n0 * d;
+    CB.stat("rw-rs-vr", `${CB.num(v1, 0)} · ${CB.num(v1 / 2, 0)} km/h`); CB.stat("rw-rs-daf", CB.num(Hh.daf, 2)); CB.stat("rw-rs-acc", CB.num(Hh.acc, 2) + " m/s²");
+    const lo = L <= 20 ? 80 / L : 23.58 * Math.pow(L, -0.592), hi = 94.76 * Math.pow(L, -0.748);
+    CB.stat("rw-rs-band", `${CB.num(lo, 1)} – ${CB.num(hi, 1)} Hz`);
+    const m = document.getElementById("rw-rs-msg"), near = Math.abs(gV() - v1) / v1 < 0.04 || Math.abs(gV() - v1 / 2) / (v1 / 2) < 0.04, accBad = Hh.acc > 3.5;
+    m.className = accBad ? "rw-msg bad" : near ? "rw-msg" : "rw-msg ok";
+    m.innerHTML = accBad ? `바닥판 가속도 ${CB.num(Hh.acc, 2)} m/s² > 3.5 m/s²(자갈 궤도 형태 한계): 도상 불안정 우려. 공진 속도 ${CB.num(v1, 0)} km/h 근처입니다.` : near ? `공진 속도 근처(${CB.num(v1, 0)} 또는 ${CB.num(v1 / 2, 0)} km/h). 동적 증폭 ${CB.num(Hh.daf, 2)}.` : `공진에서 떨어져 있습니다: 동적 증폭 ${CB.num(Hh.daf, 2)}, 가속도 ${CB.num(Hh.acc, 2)} m/s².`;
+  }
+  const cs = CB.canvas("#rw-cv-reso", (ctx, W, H) => {
+    if (!S) return; const pal = CB.palette(), dmax = Math.max(2, ...S.map((p) => p[1])) * 1.1, amax = Math.max(4, ...S.map((p) => p[2])) * 1.1, v1 = 3.6 * gn() * gd();
+    const C = CB.chart(ctx, { x: 50, y: 26, w: W - 50 - 50, h: H - 26 - 46 }, { x: [100, 420], y: [0, dmax], xLabel: "열차 속도 (km/h)", yLabel: "동적 증폭",
+      series: [{ data: S.map((p) => [p[0], p[1]]), color: pal.accent, width: 2.6 }, { data: S.map((p) => [p[0], (p[2] / amax) * dmax]), color: pal.accent2, width: 1.8, dash: [5, 3] }],
+      hlines: [{ y: (3.5 / amax) * dmax, color: pal.bad, label: "3.5 m/s²" }], vlines: [{ x: v1, color: pal.warn, label: "i=1" }, { x: v1 / 2, color: pal.warn, label: "i=2" }, { x: gV(), color: pal.text, dash: [2, 2] }] });
+    ctx.save(); ctx.fillStyle = pal.accent2; ctx.font = `11px ${RW.mono()}`; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    for (let i = 0; i <= 4; i++) { const a = (amax * i) / 4; ctx.fillText(CB.num(a, 1), W - 46, C.Y((a / amax) * dmax)); } ctx.restore();
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.44), minHeight: 230, maxHeight: 320 });
+  const ct = CB.canvas("#rw-cv-reso-t", (ctx, W, H) => {
+    if (!Hh) return; const pal = CB.palette(), h = Hh.hist, tm = h[h.length - 1][0], ym = Math.max(...h.map((p) => Math.max(Math.abs(p[1]), p[2]))) * 1.15 || 1;
+    CB.chart(ctx, { x: 50, y: 26, w: W - 50 - 16, h: H - 26 - 40 }, { x: [0, tm], y: [ym, -ym * 0.6], xLabel: "시간 (s)", yLabel: "처짐 (mm, 아래 +)",
+      series: [{ data: h.map((p) => [p[0], p[2]]), color: pal.faint, width: 1.4, dash: [4, 3] }, { data: h.map((p) => [p[0], p[1]]), color: pal.accent, width: 1.8 }] });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.32), minHeight: 190, maxHeight: 240 });
+  sweep();
+})();
+
+/* ---------- 7. 궤도 틀림 → 차체 ---------- */
+(function () {
+  const gV = CB.range("rw-ir-V", (v) => v + " km/h", go), gL = CB.range("rw-ir-L", (v) => v + " m", go), gA = CB.range("rw-ir-A", (v) => v.toFixed(1) + " mm", go), gf = CB.range("rw-ir-f", (v) => v.toFixed(2) + " Hz", go), gz = CB.range("rw-ir-z", (v) => v.toFixed(2), go);
+  const Tr = (r, z) => Math.sqrt((1 + (2 * z * r) ** 2) / ((1 - r * r) ** 2 + (2 * z * r) ** 2));
+  const resp = (V, lam, A, fn, z) => { const f = V / (3.6 * lam), r = f / fn, T = Tr(r, z); return { f, r, T, a: (2 * Math.PI * f) ** 2 * (A / 1000) * T, ph: Math.atan2(2 * z * r ** 3, 1 - r * r + (2 * z * r) ** 2) }; };
+  let R = null, tt = 0;
+  const cv = CB.canvas("#rw-cv-irr", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), d = []; for (let V = 20; V <= 350; V += 2) d.push([V, resp(V, gL(), gA(), gf(), gz()).a]);
+    const top = Math.max(0.8, ...d.map((p) => p[1])) * 1.1, vr = 3.6 * gL() * gf();
+    CB.chart(ctx, { x: 50, y: 26, w: W - 50 - 16, h: H - 26 - 46 }, { x: [20, 350], y: [0, top], xLabel: "속도 (km/h)", yLabel: "차체 가속도 (m/s²)",
+      series: [{ data: d, color: pal.accent, width: 2.6, fill: RW.alpha(pal.accent, 0.07) }], hlines: [{ y: 0.5, color: pal.warn, label: "0.5 (교육용)" }],
+      vlines: vr <= 350 ? [{ x: vr, color: pal.faint, label: "공진" }] : [], points: [{ x: gV(), y: Math.min(top, R.a), color: pal.accent2, r: 7 }] });
+  }, { aspect: (W) => (W < 520 ? 0.65 : 0.4), minHeight: 210, maxHeight: 290 });
+  const an = CB.canvas("#rw-cv-irr-a", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), v = gV() / 3.6, lam = gL(), A = gA(), om = 2 * Math.PI * R.f, ppm = Math.min(5, 26 / (A * Math.max(1, R.T))), mpp = Math.max(lam * 2.2, 40) / W, cx = W * 0.45, yb = H * 0.76;
+    const s0 = v * tt; ctx.strokeStyle = pal.text; ctx.lineWidth = 3; ctx.beginPath();
+    for (let px = 0; px <= W; px += 3) { const x = s0 + (px - cx) * mpp, y = yb - A * Math.sin((2 * Math.PI * x) / lam) * ppm; px ? ctx.lineTo(px, y) : ctx.moveTo(px, y); }
+    ctx.stroke(); ctx.fillStyle = RW.alpha(pal.dim, 0.15); ctx.fillRect(0, yb + 10, W, H - yb - 10);
+    const wy = yb - A * Math.sin((2 * Math.PI * s0) / lam) * ppm, by = yb - 62 - A * R.T * Math.sin(om * tt - R.ph) * ppm;
+    ctx.fillStyle = pal.text; [-60, 60].forEach((dx) => { const x = s0 + (dx * mpp), y = yb - A * Math.sin((2 * Math.PI * x) / lam) * ppm; ctx.beginPath(); ctx.arc(cx + dx, y - 9, 9, 0, Math.PI * 2); ctx.fill(); });
+    ctx.strokeStyle = pal.ok; ctx.lineWidth = 1.6; ctx.beginPath(); const sx = cx, top = by + 18, bot = wy - 18, seg = 7; ctx.moveTo(sx, bot); for (let i = 1; i < seg; i++) ctx.lineTo(sx + (i % 2 ? 7 : -7), bot + ((top - bot) * i) / seg); ctx.lineTo(sx, top); ctx.stroke();
+    ctx.fillStyle = RW.alpha(pal.accent, 0.25); ctx.strokeStyle = pal.accent; ctx.lineWidth = 1.5; ctx.fillRect(cx - 100, by - 26, 200, 44); ctx.strokeRect(cx - 100, by - 26, 200, 44);
+    RW.text(ctx, `v = ${gV()} km/h →`, 14, 16, pal.dim, { align: "left", size: 11 });
+    RW.text(ctx, `차체 진폭 ${CB.num(A * R.T, 1)} mm (틀림 ${CB.num(A, 1)} mm)`, W - 14, 16, pal.accent, { align: "right", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.72 : 0.3), minHeight: 200, maxHeight: 240 });
+  const loop = CB.loop(an.canvas, (dt) => { tt += dt; an.redraw(); });
+  const pb = CB.playButton("rw-ir-play", () => loop.start(), () => loop.stop()); pb.set(true);
+  function go() {
+    R = resp(gV(), gL(), gA(), gf(), gz()); cv.redraw(); an.redraw();
+    CB.stat("rw-ir-r", `${CB.num(R.f, 2)} Hz · ${CB.num(R.r, 2)}`); CB.stat("rw-ir-T", CB.num(R.T, 2)); CB.stat("rw-ir-a", CB.num(R.a, 2) + " m/s²"); CB.stat("rw-ir-vr", CB.num(3.6 * gL() * gf(), 0) + " km/h");
+    const m = document.getElementById("rw-ir-msg");
+    m.className = R.a > 0.5 ? "rw-msg bad" : "rw-msg ok";
+    m.innerHTML = R.a > 0.5 ? `차체 가속도 ${CB.num(R.a, 2)} m/s² > 0.5(교육용): ${R.r < 1.414 ? "공진 근처 — 이 파장의 틀림을 보수하거나 속도를 바꿔야 합니다" : "가진 진동수가 높아 절연되지만 틀림 진폭이 큽니다"}.` : `차체 가속도 ${CB.num(R.a, 2)} m/s² — ${R.r > 1.414 ? "현가 장치가 진동을 절연하는 구간(r > √2)" : "증폭 구간이지만 허용 범위"}.`;
+  }
+  go();
+})();
+
+/* ---------- 8. 장대 레일 ---------- */
+(function () {
+  const gdT = CB.range("rw-lw-dT", (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) + " °C", go), rail = CB.seg("rw-lw-rail", go), gr = CB.range("rw-lw-r", (v) => v.toFixed(1) + " kN/m", go), brk = CB.check("rw-lw-break", go);
+  let R = null;
+  function calc() {
+    const A = RW.RAIL[rail()].A, EA = RW.E * A, dT = gdT(), N = EA * RW.ALPHA * dT, r = gr(), lb = Math.abs(N) / r, u = (N * N) / (2 * EA * r);
+    R = { A, EA, dT, N, r, lb, u, sig: (RW.E * RW.ALPHA * dT) / 1000, gap: brk() && dT < 0 ? (N * N) / (EA * r) : 0 };
+  }
+  const cv = CB.canvas("#rw-cv-lwr", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), xm = Math.max(150, R.lb * 2.2), Nm = Math.max(300, Math.abs(R.N) * 1.25), col = R.N >= 0 ? pal.compression : pal.tension;
+    const d = []; for (let i = 0; i <= 200; i++) { const x = (xm * i) / 200; d.push([x, Math.sign(R.N) * Math.min(Math.abs(R.N), R.r * x)]); }
+    const C = CB.chart(ctx, { x: 58, y: 40, w: W - 58 - 16, h: H - 40 - 46 }, { x: [0, xm], y: [-Nm, Nm], xLabel: "레일 끝(또는 절손점)에서의 거리 (m)", yLabel: "축력 (kN, 압축 +)",
+      series: [{ data: d, color: col, width: 2.8, fill: RW.alpha(col, 0.12) }], hlines: [{ y: 0, color: pal.axis, dash: [] }], vlines: [{ x: R.lb, color: pal.accent, label: "l_b" }] });
+    RW.text(ctx, `${R.N >= 0 ? "압축" : "인장"} ${CB.num(Math.abs(R.N), 0)} kN`, C.X(Math.min(xm * 0.8, R.lb + (xm - R.lb) / 2)), C.Y(R.N) + (R.N >= 0 ? 16 : -14), col);
+    // 레일 그림
+    const y0 = 20, gap = R.gap * 1000, gpx = Math.min(40, gap * 1.5);
+    ctx.fillStyle = pal.text; ctx.fillRect(C.X(0) + gpx / 2, y0 - 3, W - C.X(0) - 20, 6);
+    if (R.gap > 0) { ctx.fillRect(10, y0 - 3, C.X(0) - 10 - gpx / 2, 6); RW.text(ctx, `틈 ${CB.num(gap, 1)} mm`, C.X(0), y0 + 14, pal.bad, { size: 11 }); }
+    else RW.text(ctx, R.dT >= 0 ? "← 끝단이 늘어나 나감" : "← 끝단이 줄어 들어옴", C.X(0) + 70, y0 + 14, pal.dim, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 240, maxHeight: 320 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("rw-lw-N", `${CB.num(Math.abs(R.N), 0)} kN · ${CB.num(Math.abs(R.sig), 1)} MPa ${R.N > 0 ? "압축" : R.N < 0 ? "인장" : ""}`);
+    CB.stat("rw-lw-lb", CB.num(R.lb, 1) + " m"); CB.stat("rw-lw-u", CB.num(R.u * 1000, 1) + " mm"); CB.stat("rw-lw-g", R.gap > 0 ? CB.num(R.gap * 1000, 1) + " mm" : brk() ? "압축이면 벌어지지 않음" : "—");
+    const m = document.getElementById("rw-lw-msg");
+    if (R.dT > 40) { m.className = "rw-msg bad"; m.innerHTML = `ΔT ${R.dT} °C: 압축 ${CB.num(R.N, 0)} kN. 좌굴 위험이 큰 영역(교육용) — 중립 온도를 높게 설정하고 도상 어깨로 횡저항을 확보합니다.`; }
+    else if (R.gap > 0) { m.className = R.gap > 0.05 ? "rw-msg bad" : "rw-msg"; m.innerHTML = `레일 절손: 인장이 풀리며 양쪽이 물러나 틈 ${CB.num(R.gap * 1000, 1)} mm. 신축 구간 ${CB.num(R.lb, 0)} m 안의 레일이 움직입니다.`; }
+    else { m.className = "rw-msg"; m.innerHTML = `신축 구간 ${CB.num(R.lb, 0)} m 너머의 레일은 움직이지 못하고 축력 ${CB.num(Math.abs(R.N), 0)} kN을 받습니다(레일 길이와 무관).`; }
+  }
+  go();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1165 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>하천과 수공 구조물 · CivilBook</title>
+<meta name="description" content="물을 다스리는 구조물. 합리식 홍수량과 단위도, 매닝 공식과 등류 수심(B-130 하천 600 m³/s → 5.15 m), 비에너지·한계 수심·프루드 수와 도수, 계획 홍수위와 여유고, 제방 침투, 보·수문, 중력식 댐 안정, 교각 세굴을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .hy-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .hy-msg b { color: var(--text); }
+  .hy-msg.ok { color: var(--ok); font-weight: 600; }
+  .hy-msg.bad { color: var(--bad); font-weight: 600; }
+  .hy-tbl td, .hy-tbl th { font-variant-numeric: tabular-nums; }
+  .hy-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .hy-steps { margin: 6px 0 0; }
+  .hy-steps li { margin: 4px 0; }
+  #hy-cv-energy { touch-action: pan-y; cursor: ns-resize; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="civil"></script>
+</head>
+<body data-chapter="hydraulics">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="hy-ah-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+      <marker id="hy-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="hy-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="hy-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="hy-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+      <pattern id="hy-soil" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" style="fill:color-mix(in srgb, var(--warn) 18%, var(--surface))"/><path d="M0 10L10 0" style="stroke:color-mix(in srgb, var(--warn) 45%, transparent);stroke-width:1"/></pattern>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 15</div>
+    <h1 data-no-glossary>하천과 수공 구조물</h1>
+    <p class="lead">B-130은 강을 건넙니다. 1–6장은 다리를 트럭과 지진으로부터 지키는 법을 다뤘지만, 실제로 다리를 무너뜨린 원인을 세어 보면 <b>물</b>이 늘 앞자리에 있습니다. 홍수가 교각 밑의 흙을 파내고(세굴), 넘친 물이 제방을 무너뜨리고, 형하 공간이 모자라면 떠내려온 나무가 다리를 막습니다. 이 장은 비가 유역에 떨어져 하천의 홍수량이 되는 과정(합리식, 단위도)에서 시작해, 그 유량이 하도에서 얼마나 깊고 빠르게 흐르는지(매닝 공식, 등류 수심), 흐름이 느린지 빠른지(비에너지, 프루드 수, 도수)를 계산하고, 그 결과로 계획 홍수위와 여유고, 제방, 보와 수문, 중력식 댐, 교각 세굴을 설계하는 순서로 갑니다. 끝에서 B-130이 건너는 하천의 계획 홍수량 <b>600 m³/s</b>가 수심 <b>약 5.15 m</b>, 유속 <b>약 2.3 m/s</b>, 프루드 수 <b>약 0.36</b>이 되고, 교각 앞 세굴 깊이가 <b>약 3.8 m</b>(교육용 경험식)가 되는 과정을 한 번에 봅니다.</p>
+    <ul class="objectives">
+      <li>수문 순환과 유역의 강우–유출 관계를 설명하고, 합리식 \(Q = CiA/3.6\)과 도달 시간으로 작은 유역의 첨두 홍수량을 구한다. 단위도의 중첩으로 홍수 수문곡선을 만든다.</li>
+      <li>매닝 공식으로 사다리꼴 하도의 유속·유량을 계산하고, 주어진 유량에서 등류 수심을 반복 계산으로 역산한다.</li>
+      <li>비에너지 곡선에서 한계 수심과 상류·사류를 구분하고, 프루드 수와 도수의 공액 수심·에너지 손실을 계산한다.</li>
+      <li>계획 홍수위에 여유고를 더해 제방 마루와 교량 형하 높이를 정하고, 제방의 침윤선과 파이핑 위험을 교육용 식으로 검토한다.</li>
+      <li>보·수문의 유량 공식과 중력식 댐의 전도·활동·양압력·기초 압력을 계산해 판정한다.</li>
+      <li>교각 세굴 깊이를 경험식(HEC-18 형태, 교육용)으로 추정하고 세굴 방지공(사석)의 크기를 정한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>1987년 스코해리 크리크, 물속에서 사라진 교각 기초</b></div>
+      <div class="o-body"><p>1987년 4월 5일 미국 뉴욕주 고속도로(New York State Thruway)의 스코해리 크리크 다리가 봄철 홍수 중에 무너져 차량이 강으로 떨어지고 10명이 숨졌습니다. 미국 국가교통안전위원회(NTSB)의 조사는 홍수가 교각의 얕은 확대 기초 밑 흙을 파내(세굴) 기초가 받침을 잃은 것을 원인으로 들었고, 세굴 방지용 사석이 충분히 유지되지 않았던 점도 지적했습니다. 다리의 철과 콘크리트는 멀쩡했는데, 물속에서 보이지 않던 흙이 먼저 사라진 것입니다.</p>
+        <p>이 사고 뒤 미국 연방도로청(FHWA)은 물을 건너는 교량의 세굴 평가를 체계화했고, 교각 세굴 깊이를 추정하는 지침 HEC-18(1991년 초판, 이후 개정)이 널리 쓰이게 되었습니다. 국내 하천 설계와 교량 설계도 계획 홍수량, 홍수위, 여유고, 세굴 깊이를 함께 검토합니다(현행 KDS 51 계열·도로교 설계기준 확인). 교량 기술자가 수리학을 알아야 하는 이유입니다.</p>
+        <div class="o-chain"><span>강우 · 유역 · 하도</span><i>→</i><span class="tool">합리식 · 매닝 · 등류 수심 · 비에너지 · 세굴 경험식</span><i>→</i><span>홍수위 · 여유고 · 제방 · 댐 · 교각 기초 깊이</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="hydrology">
+    <h2>수문 순환과 홍수량</h2>
+    <div class="problem"><strong>다리 밑으로 얼마나 많은 물이 지나갈까</strong>
+      <p>B-130의 교각 높이, 경간, 기초 깊이를 정하려면 먼저 "백 년에 한 번 올 만한 홍수 때 이 하천에 초당 몇 m³의 물이 흐르는가"를 알아야 합니다. 하천의 유량은 강수량만으로 정해지지 않습니다. 같은 비라도 산림 유역은 천천히, 포장된 도시 유역은 빨리 많이 흘려보냅니다. 물이 어디서 와서 어디로 가는지부터 봅니다.</p></div>
+    <p>바다와 땅에서 증발한 물은 구름이 되어 비나 눈으로 떨어지고, 일부는 식물이 다시 대기로 돌려보내며(증발산), 일부는 땅속으로 스며들어(침투) 지하수가 되고, 나머지는 지표를 따라 흘러 하천으로 모입니다. 이 순환을 <span class="term">수문 순환</span><span class="en">(hydrologic cycle)</span>이라 합니다. 하천의 한 지점으로 물을 모으는 땅의 범위가 그 지점의 <span class="term">유역</span><span class="en">(watershed, catchment)</span>이고, 경계는 산줄기의 능선(분수령)이 정합니다. 국내 연평균 강수량은 약 1,300 mm이고 그 상당 부분(대략 절반 이상)이 6–9월 장마와 태풍철에 내리므로, 짧은 기간의 집중 호우가 하천 설계를 지배합니다(기상 자료 확인).</p>
+    <figure class="diagram" id="fig-hy-cycle">
+      <svg viewBox="0 0 860 330" role="img" aria-label="수문 순환: 증발, 강수, 침투, 지표 유출, 지하수 유출이 하천과 바다로 이어지는 그림">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g>
+          <ellipse cx="250" cy="62" rx="70" ry="24" style="fill:var(--bg-elev);stroke:var(--text-faint)"/>
+          <ellipse cx="300" cy="52" rx="48" ry="20" style="fill:var(--bg-elev);stroke:var(--text-faint)"/>
+          <ellipse cx="620" cy="60" rx="64" ry="22" style="fill:var(--bg-elev);stroke:var(--text-faint)"/>
+          <g style="stroke:var(--blue);stroke-width:1.6" stroke-dasharray="6 6">
+            <line x1="215" y1="92" x2="200" y2="140"/><line x1="245" y1="92" x2="230" y2="140"/><line x1="275" y1="92" x2="260" y2="140"/><line x1="305" y1="88" x2="290" y2="136"/>
+          </g>
+          <text x="330" y="118" class="t-mono" style="fill:var(--blue)">강수(비·눈)</text>
+          <path d="M40 270 L140 150 L210 120 L300 190 L380 230 L470 262 L560 270" style="fill:url(#hy-soil);stroke:var(--warn);stroke-width:1.5"/>
+          <path d="M40 270 L560 270 L560 300 L40 300z" style="fill:url(#hy-soil);stroke:none"/>
+          <path d="M210 120 L215 112" style="stroke:var(--text-dim)"/>
+          <text x="196" y="108" class="t-mono">분수령</text>
+          <path d="M470 262 Q520 255 560 268 L560 270 L470 268z" style="fill:var(--blue);opacity:.55"/>
+          <path d="M560 268 L850 268 L850 300 L560 300z" style="fill:var(--blue);opacity:.35"/>
+          <text x="700" y="290" class="t-mono" style="fill:var(--blue)">바다·호수</text>
+          <text x="485" y="252" class="t-mono" style="fill:var(--blue)">하천</text>
+          <path d="M150 168 Q230 190 300 215 Q380 245 470 258" style="fill:none;stroke:var(--blue);stroke-width:2.2" marker-end="url(#hy-ah-w)"/>
+          <text x="250" y="226" class="t-mono" style="fill:var(--blue)">지표 유출</text>
+          <path d="M240 150 L240 186" style="stroke:var(--blue);stroke-width:1.6" marker-end="url(#hy-ah-w)"/>
+          <text x="248" y="175" class="t-mono">침투</text>
+          <path d="M120 286 Q300 292 540 280" style="fill:none;stroke:var(--blue);stroke-width:1.6;stroke-dasharray:4 4" marker-end="url(#hy-ah-w)"/>
+          <text x="300" y="312" class="t-mono" style="fill:var(--blue)">지하수 유출(기저 유출)</text>
+          <path d="M700 262 Q690 180 650 92" style="fill:none;stroke:var(--accent-2);stroke-width:1.8;stroke-dasharray:5 4" marker-end="url(#hy-ah-ld)"/>
+          <path d="M760 262 Q750 170 690 88" style="fill:none;stroke:var(--accent-2);stroke-width:1.8;stroke-dasharray:5 4" marker-end="url(#hy-ah-ld)"/>
+          <text x="735" y="160" class="t-mono" style="fill:var(--accent-2)">증발</text>
+          <path d="M120 186 Q140 140 170 100" style="fill:none;stroke:var(--ok);stroke-width:1.6;stroke-dasharray:4 4" marker-end="url(#hy-ah-ok)"/>
+          <text x="60" y="140" class="t-mono" style="fill:var(--ok)">증발산</text>
+          <path d="M560 60 L360 58" style="stroke:var(--text-faint);stroke-width:1.4" marker-end="url(#hy-ah-t)"/>
+          <text x="420" y="48" class="t-mono">수증기 이동</text>
+          <rect x="584" y="186" width="246" height="56" rx="8" style="fill:var(--bg-elev);stroke:var(--border)"/>
+          <text x="596" y="208" class="t">유효 우량 = 강수 − 손실</text>
+          <text x="596" y="230" class="t-dim">(손실: 침투·차단·지면 저류·증발산)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-1.</b> 수문 순환. 하천 설계에서 중요한 것은 강수 가운데 짧은 시간에 지표로 흘러 하천에 닿는 몫(직접 유출)이다. 포장·지붕처럼 침투가 적은 면이 늘면 같은 비에도 직접 유출이 커지고 빨리 도달한다(도시화의 영향).</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.1 (합리식)</strong> 면적 \(A\)인 작은 유역에 강우 강도 \(i\)의 비가 <span class="term">도달 시간</span><span class="en">(time of concentration)</span> \(t_c\) 이상 계속 내리면, 유역의 가장 먼 곳의 물까지 출구에 도착하는 순간 유량이 최대가 된다. 그 <span class="term">첨두 유량</span><span class="en">(peak discharge)</span>은
+      <div class="formula">$$Q_p = \frac{C\, i\, A}{3.6} \quad (\text{m}^3/\text{s}), \qquad i = i(t_c,\ T_r)$$<div class="where">\(C\): <span class="term">유출 계수</span><span class="en">(runoff coefficient)</span>(0–1, 포장 도로 0.7–0.95, 잔디·공원 0.1–0.35, 산림 0.1–0.4 정도 — 교육용 범위), \(i\): 지속 시간 \(t_c\)·재현 기간 \(T_r\)의 강우 강도(mm/h), \(A\): 유역 면적(km²), 3.6은 단위 환산(mm/h × km² → m³/s). 이 장의 강우 강도식은 \(i = a/(t + b)\) 형태(교육용 \(a\), \(b\)), 도달 시간은 커피치(Kirpich) 식 형태 \(t_c = 0.0195\,L^{0.77}S^{-0.385}\)(분, \(L\) m, \(S\) 소수)를 쓴다. 합리식은 강우가 유역 전체에 고르게 내리고 저류 효과가 작은 <b>작은 유역</b>(대략 수 km² 이하, 현행 KDS 51 계열과 설계 홍수량 산정 지침 확인)에만 쓴다. 엔진 함수 <code>CB.civ.rational(C, i, A)</code>.</div></div></div>
+    <figure class="diagram" id="fig-hy-tc">
+      <svg viewBox="0 0 860 250" role="img" aria-label="강우 강도와 지속 시간의 관계와 도달 시간에서의 첨두 유량, 그리고 유역 면적별 도달 시간">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g transform="translate(70,30)">
+          <text x="0" y="-4" class="t" style="font-weight:700">강우 강도–지속 시간(IDF, 개념)</text>
+          <line x1="0" y1="170" x2="330" y2="170" style="stroke:var(--axis)"/><line x1="0" y1="10" x2="0" y2="170" style="stroke:var(--axis)"/>
+          <path d="M8 22 Q40 70 90 100 Q170 138 320 156" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+          <path d="M8 52 Q40 92 90 118 Q170 150 320 162" style="fill:none;stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 4"/>
+          <line x1="110" y1="20" x2="110" y2="170" style="stroke:var(--accent-2);stroke-dasharray:4 4"/>
+          <circle cx="110" cy="109" r="5" style="fill:var(--accent-2)"/>
+          <text x="116" y="34" class="t-mono" style="fill:var(--accent-2)">t = t꜀ → i(t꜀)</text>
+          <text x="40" y="58" class="t-mono">T = 100년</text>          <text x="165" y="190" class="t-mono" text-anchor="middle">지속 시간 t (분)</text>
+          <text x="-10" y="90" class="t-mono" text-anchor="end" transform="rotate(-90 -14 90)">i (mm/h)</text>
+          <text x="60" y="128" class="t-mono">T = 10년</text>
+        </g>
+        <g transform="translate(480,30)">
+          <text x="0" y="-4" class="t" style="font-weight:700">왜 t = t꜀에서 최대인가</text>
+          <text x="0" y="26" class="t-dim">· t &lt; t꜀: 유역 일부만 출구에 기여(면적 부족)</text>
+          <text x="0" y="52" class="t-dim">· t = t꜀: 유역 전체가 기여, 강도도 아직 큼</text>
+          <text x="0" y="78" class="t-dim">· t &gt; t꜀: 전체가 기여하지만 강도가 작아짐</text>
+          <rect x="0" y="100" width="320" height="64" rx="8" style="fill:var(--bg-elev);stroke:var(--border)"/>
+          <text x="12" y="124" class="t">Q = C · i(t꜀) · A / 3.6</text>
+          <text x="12" y="148" class="t-mono">C 무차원 · i mm/h · A km² → m³/s</text>
+          <text x="0" y="190" class="t-dim">유역이 클수록 t꜀가 길어져 i는 작아지고 A는 커진다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-2.</b> 합리식의 논리. 강우 강도는 지속 시간이 길수록 작아지고(IDF 곡선), 유역 전체가 출구에 기여하려면 도달 시간만큼 비가 와야 한다. 둘이 만나는 \(t = t_c\)에서 첨두 유량이 최대가 된다. 재현 기간이 길수록(100년) 같은 지속 시간의 강도가 크다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 15.1 (R-60 도로를 가로지르는 소하천의 첨두 유량)</strong> 유역 면적 \(A = 2.0\) km², 유로 길이 \(L = 2{,}500\) m, 평균 경사 \(S = 0.02\), 산림과 밭이 섞여 \(C = 0.55\)(교육용). 50년 빈도 강우 강도식 \(i = 5{,}000/(t + 40)\) mm/h(\(t\) 분, 교육용).
+      <ol class="hy-steps">
+        <li><b>도달 시간.</b> \(t_c = 0.0195 \times 2{,}500^{0.77} \times 0.02^{-0.385} = 36.4\) 분.</li>
+        <li><b>강우 강도.</b> \(i = 5{,}000/(36.4 + 40) = 65.5\) mm/h.</li>
+        <li><b>첨두 유량.</b> \(Q_p = 0.55 \times 65.5 \times 2.0/3.6 = 20.0\) m³/s.</li>
+        <li><b>판정.</b> 이 유량이 12장의 암거·측구 설계의 입력이다. 같은 유역이 개발되어 \(C = 0.8\)이 되면 \(Q_p = 29\) m³/s로 45 % 늘고, 포장으로 \(t_c\)도 짧아져 더 커진다. 도시화가 홍수를 키우는 이유이며, 저류지로 첨두를 낮춘다.</li>
+      </ol></div>
+    <div class="sim" id="sim-hy-rational">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>합리식 첨두 유량</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="hy-cv-rational" aria-label="강우 강도–지속 시간 곡선과 도달 시간, 첨두 유량"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>유역 면적 A <output id="hy-ra-A-out"></output></span><input type="range" id="hy-ra-A" min="0.1" max="10" step="0.1" value="2"></label>
+          <label class="ctrl"><span>유출 계수 C <output id="hy-ra-C-out"></output></span><input type="range" id="hy-ra-C" min="0.1" max="0.95" step="0.01" value="0.55"></label>
+          <label class="ctrl"><span>유로 길이 L <output id="hy-ra-L-out"></output></span><input type="range" id="hy-ra-L" min="200" max="8000" step="50" value="2500"></label>
+          <label class="ctrl"><span>유로 경사 S <output id="hy-ra-S-out"></output></span><input type="range" id="hy-ra-S" min="0.002" max="0.1" step="0.001" value="0.02"></label>
+          <div class="ctrl"><span>재현 기간</span><div class="seg" id="hy-ra-T"><button data-value="10">10년</button><button data-value="50" class="on">50년</button><button data-value="100">100년</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">도달 시간 t<sub>c</sub></span><span class="v" id="hy-ra-tc">—</span></div>
+        <div class="stat"><span class="k">강우 강도 i</span><span class="v" id="hy-ra-i">—</span></div>
+        <div class="stat"><span class="k">첨두 유량 Q<sub>p</sub></span><span class="v" id="hy-ra-Q">—</span></div>
+        <div class="stat"><span class="k">비유량 Q<sub>p</sub>/A</span><span class="v" id="hy-ra-q">—</span></div>
+      </div>
+      <div class="hy-msg" id="hy-ra-msg"></div>
+      <div class="sim-note">해볼 것: C를 0.55 → 0.85로 올려 도시화의 효과를 보세요 · 경사를 키우면 t<sub>c</sub>가 짧아져 i가 커집니다 · 면적을 5 km² 넘게 키우면 합리식의 적용 범위 경고가 나옵니다 · 모델: 원리 15.1, CB.civ.rational, 커피치 t<sub>c</sub> 형태, 강우 강도식 i = a/(t + 40)에서 a = 4,000·5,000·5,600(10·50·100년, 교육용 값 — 실제는 지역별 확률 강우량 분석 결과를 쓴다).</div>
+    </div>
+    <div class="callout deep"><strong>큰 유역: 단위도와 중첩</strong> B-130이 건너는 하천처럼 유역이 수십 km²를 넘으면 비가 고르게 내린다는 가정이 맞지 않고, 하도와 범람원의 저류가 첨두를 늦추고 낮춥니다. 이때는 <span class="term">단위도</span><span class="en">(unit hydrograph)</span>를 씁니다. 단위도는 "유역에 단위 유효 우량(예: 10 mm)이 단위 시간(예: 1시간) 동안 고르게 내렸을 때 출구의 직접 유출 수문곡선"이고(Sherman, 1932), 선형성과 시간 불변성을 가정하면 여러 시간의 유효 우량에 대한 수문곡선은 단위도를 우량 크기만큼 늘리고 시간만큼 늦춰 더한 것(중첩, 합성곱)이 됩니다.
+      <div class="formula">$$Q_n = \sum_{m=1}^{\min(n, M)} P_m\, U_{n-m+1}$$<div class="where">\(P_m\): m번째 시간의 유효 우량(단위 우량의 배수), \(U\): 단위도 세로 거리(m³/s), \(Q_n\): n번째 시간의 직접 유출. 기저 유출은 따로 더한다. 실제 유역의 단위도는 관측 홍수에서 유도하거나, 관측이 없으면 유역 특성으로 만드는 합성 단위도(클라크·나카야스·SCS 형태 등)를 쓴다(현행 설계 홍수량 산정 요령 확인).</div></div></div>
+    <figure class="diagram" id="fig-hy-uh">
+      <svg viewBox="0 0 860 300" role="img" aria-label="1시간 단위도 두 개를 우량 배수만큼 늘리고 한 시간 늦춰 더한 홍수 수문곡선">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(90,40)">
+          <line x1="0" y1="200" x2="560" y2="200" style="stroke:var(--axis)"/><line x1="0" y1="0" x2="0" y2="200" style="stroke:var(--axis)"/>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="218">0</text><text x="70" y="218">1</text><text x="140" y="218">2</text><text x="210" y="218">3</text><text x="280" y="218">4</text><text x="350" y="218">5</text><text x="420" y="218">6</text><text x="490" y="218">7</text><text x="560" y="218">8 h</text></g>
+          <g class="t-mono" text-anchor="end"><text x="-6" y="200">0</text><text x="-6" y="160">50</text><text x="-6" y="120">100</text><text x="-6" y="80">150</text><text x="-6" y="40">200</text><text x="-6" y="4">250</text></g>
+          <rect x="0" y="-20" width="70" height="14" style="fill:var(--blue);opacity:.45"/><rect x="70" y="-20" width="70" height="20" style="fill:var(--blue);opacity:.6"/>
+          <text x="148" y="-8" class="t-mono" style="fill:var(--blue)">유효 우량 20 mm, 30 mm</text>
+          <polyline points="0,200 70,168 140,120 210,144 280,168 350,184 420,193.6 490,200" style="fill:none;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 4"/>
+          <polyline points="70,200 140,152 210,80 280,116 350,152 420,176 490,190.4 560,200" style="fill:none;stroke:var(--accent-2);stroke-width:1.6;stroke-dasharray:5 4"/>
+          <polyline points="0,200 70,168 140,72 210,24 280,84 350,136 420,169.6 490,190.4 560,200" style="fill:none;stroke:var(--blue);stroke-width:2.6"/>
+          <circle cx="210" cy="24" r="5" style="fill:var(--blue)"/>
+          <text x="220" y="22" class="t-mono" style="fill:var(--blue)">첨두 220 m³/s (3시간)</text>
+          <text x="150" y="146" class="t-mono" style="fill:var(--accent)">2 × U(t)</text>
+          <text x="290" y="112" class="t-mono" style="fill:var(--accent-2)">3 × U(t − 1)</text>
+          <text x="-60" y="100" class="t-mono" transform="rotate(-90 -60 100)" text-anchor="middle">Q (m³/s)</text>
+          <text x="580" y="30" class="t-dim">1시간 단위도 U(10 mm)</text>
+          <text x="580" y="50" class="t-mono">0, 20, 50, 35, 20, 10, 4, 0</text>
+          <text x="580" y="76" class="t-dim">직접 유출 Q</text>
+          <text x="580" y="96" class="t-mono">0, 40, 160, 220, 145,</text>
+          <text x="580" y="114" class="t-mono">80, 38, 12, 0</text>
+          <text x="580" y="140" class="t-dim">유역 약 50 km²(교육용)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-3.</b> 단위도의 중첩(교육용 수치). 첫 시간 20 mm(단위 우량의 2배)는 단위도를 2배로, 둘째 시간 30 mm는 3배로 늘려 1시간 늦춘 뒤 더한다. 단위도 세로 거리의 합 139 m³/s × 3,600 s ≈ 50만 m³ = 10 mm × 50 km²로 체적이 맞는다. 이 합성곱이 하천 홍수 해석의 기본 연산이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 15.2 (단위도의 중첩)</strong> 그림 15-3의 1시간 단위도 \(U = 0, 20, 50, 35, 20, 10, 4, 0\) m³/s(10 mm)에 유효 우량 20 mm, 30 mm가 이어 내리면 \(P_1 = 2\), \(P_2 = 3\).
+      <ol class="hy-steps">
+        <li>\(Q_2 = 2 \times 50 + 3 \times 20 = 160\), \(Q_3 = 2 \times 35 + 3 \times 50 = 220\), \(Q_4 = 2 \times 20 + 3 \times 35 = 145\) m³/s.</li>
+        <li><b>첨두 220 m³/s</b>는 3시간 뒤. 우량을 한꺼번에 50 mm로 1시간에 받았다면 \(5 \times 50 = 250\) m³/s로 더 크고 일찍 온다. 같은 총량이라도 강우의 시간 분포가 첨두를 바꾼다.</li>
+        <li>기저 유출(예: 15 m³/s)을 더하면 하천 유량이 된다. B-130 하천의 계획 홍수량 600 m³/s는 이런 해석과 빈도 분석으로 하천 기본 계획에서 정한 값이라고 본다(교육용 가정).</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="open-channel">
+    <h2>개수로 흐름과 매닝 공식</h2>
+    <div class="problem"><strong>600 m³/s는 얼마나 깊게 흐르나</strong>
+      <p>유량을 알아도 다리 설계에 필요한 것은 수위와 유속입니다. 같은 600 m³/s라도 폭이 넓고 경사가 급한 하천은 얕고 빠르게, 좁고 완만한 하천은 깊고 느리게 흐릅니다. 수면이 대기에 열린 흐름, 곧 <span class="term">개수로</span><span class="en">(open channel)</span> 흐름에서 이 관계를 정하는 것이 마찰과 중력의 균형입니다.</p></div>
+    <p>하천처럼 수면이 자유로운 흐름에서 물을 미는 것은 하상 경사 방향의 중력이고 붙잡는 것은 하상·측벽의 마찰입니다. 단면과 수심이 흐름 방향으로 변하지 않는 흐름을 <span class="term">등류</span><span class="en">(uniform flow)</span>라 하며, 이때 수면 경사와 에너지 경사가 하상 경사 \(S\)와 같아 두 힘이 정확히 맞섭니다. 그 균형을 경험적으로 정리한 것이 매닝 공식(아일랜드 기술자 매닝, 1889년 발표)입니다.</p>
+    <figure class="diagram" id="fig-hy-section">
+      <svg viewBox="0 0 860 280" role="img" aria-label="사다리꼴 하도 단면의 바닥 폭 b, 측면 경사 1대 z, 수심 y, 수면 폭 T, 통수 단면적 A와 윤변 P">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <path d="M0 40 L140 180 L440 180 L580 40" style="fill:none;stroke:var(--warn);stroke-width:2.4"/>
+          <path d="M0 40 L140 180 L440 180 L580 40 L600 40 L600 210 L-20 210 L-20 40z" style="fill:url(#hy-soil);stroke:none;opacity:.8"/>
+          <path d="M37 77 L543 77 L440 180 L140 180z" style="fill:var(--blue);opacity:.28"/>
+          <line x1="37" y1="77" x2="543" y2="77" style="stroke:var(--blue);stroke-width:2"/>
+          <path d="M276 69 l8 -10 l8 10z" style="fill:var(--blue)"/>
+          <text x="300" y="66" class="t-mono" style="fill:var(--blue)">수면(▽)</text>
+          <path d="M140 180 L440 180" style="stroke:var(--accent-2);stroke-width:3.2;opacity:.85"/>
+          <path d="M37 77 L140 180 M440 180 L543 77" style="stroke:var(--accent-2);stroke-width:3.2;opacity:.85"/>
+          <line x1="140" y1="200" x2="440" y2="200" style="stroke:var(--text-dim)" marker-start="url(#hy-ah-t)" marker-end="url(#hy-ah-t)"/>
+          <text x="290" y="222" class="t-mono" text-anchor="middle">바닥 폭 b</text>
+          <line x1="37" y1="20" x2="543" y2="20" style="stroke:var(--text-dim)" marker-start="url(#hy-ah-t)" marker-end="url(#hy-ah-t)"/>
+          <text x="290" y="14" class="t-mono" text-anchor="middle">수면 폭 T = b + 2zy</text>
+          <line x1="470" y1="77" x2="470" y2="180" style="stroke:var(--blue)" marker-start="url(#hy-ah-w)" marker-end="url(#hy-ah-w)"/>
+          <text x="478" y="134" class="t-mono" style="fill:var(--blue)">수심 y</text>
+          <path d="M100 140 L140 140 L140 180" style="fill:none;stroke:var(--text-dim);stroke-dasharray:3 3"/>
+          <text x="96" y="134" class="t-mono" text-anchor="end">z</text><text x="146" y="164" class="t-mono">1</text>
+          <text x="210" y="150" class="t" style="fill:var(--blue)">통수 단면적 A = (b + zy)y</text>
+          <text x="150" y="250" class="t-mono" style="fill:var(--accent-2)">윤변 P = b + 2y√(1 + z²)  (물에 닿는 둘레, 주황)</text>
+        </g>
+        <g transform="translate(680,70)">
+          <text x="0" y="0" class="t" style="font-weight:700">B-130 하천</text>
+          <text x="0" y="24" class="t-mono">b = 40 m, z = 2</text>
+          <text x="0" y="44" class="t-mono">n = 0.035</text>
+          <text x="0" y="64" class="t-mono">S = 1/1000</text>
+          <text x="0" y="90" class="t-mono">Q = 600 m³/s</text>
+          <text x="0" y="110" class="t-mono" style="fill:var(--blue)">→ y = 5.15 m</text>
+          <text x="0" y="130" class="t-mono" style="fill:var(--blue)">→ V = 2.32 m/s</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-4.</b> 사다리꼴 하도 단면의 기하. 통수 단면적 \(A\)는 물이 흐르는 면적, 윤변 \(P\)는 물이 바닥·측벽과 닿는 길이, 동수 반경 \(R = A/P\)는 "마찰 둘레 1 m가 맡는 단면적"이다. 같은 면적이면 \(R\)이 큰(넓고 깊은) 단면이 마찰이 상대적으로 작아 잘 흐른다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.2 (매닝 공식)</strong> 등류에서 평균 유속과 유량은
+      <div class="formula">$$V = \frac{1}{n}\,R^{2/3}S^{1/2}, \qquad Q = VA, \qquad R = \frac{A}{P}$$<div class="where">\(V\) m/s, \(R\) m, \(S\) 하상(에너지) 경사(소수), \(n\): <span class="term">매닝 조도 계수</span><span class="en">(Manning's roughness coefficient)</span>(s/m<sup>1/3</sup>). 대략 매끈한 콘크리트 0.012–0.015, 흙 수로 0.020–0.030, 자연 하천(깨끗하고 곧음) 0.025–0.035, 풀·돌이 많은 하천 0.035–0.05, 수목이 무성한 범람원 0.05–0.15(Chow 형태, 교육용 범위). 이 식은 SI 단위 전용이다(미국 단위는 1.49/n). <code>CB.civ.manning({ b, y, z, n, S })</code> → { A, P, R, V, Q }.</div></div></div>
+    <div class="callout"><strong>예제 15.3 (B-130 하천의 유속과 유량, y = 5.15 m)</strong>
+      <ol class="hy-steps">
+        <li>\(A = (40 + 2 \times 5.15) \times 5.15 = 258.9\) m², \(P = 40 + 2 \times 5.15\sqrt{1 + 4} = 63.0\) m, \(R = 258.9/63.0 = 4.11\) m.</li>
+        <li>\(V = \dfrac{1}{0.035} \times 4.11^{2/3} \times 0.001^{1/2} = \dfrac{2.565 \times 0.0316}{0.035} = 2.32\) m/s.</li>
+        <li>\(Q = 2.32 \times 258.9 = 600\) m³/s. 계획 홍수량과 맞는다. 곧 B-130 하천의 계획 홍수 때 <b>등류 수심은 약 5.15 m, 평균 유속 약 2.32 m/s</b>다.</li>
+        <li><b>판정.</b> 흙 하상이 버틸 수 있는 유속(모래 하상은 대략 0.5–1 m/s, 자갈 1–2 m/s 형태)을 넘으므로 홍수 때 하상 토사가 움직이고 교각 주위가 세굴된다(이 장 끝).</li>
+      </ol></div>
+    <div class="sim" id="sim-hy-manning">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>매닝 수로 계산기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="hy-cv-manning" aria-label="사다리꼴 수로 단면과 수심, 유속, 유량"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시</span><div class="seg" id="hy-mn-pre"><button data-value="river" class="on">B-130 하천</button><button data-value="canal">콘크리트 수로</button><button data-value="ditch">측구</button></div></div>
+          <label class="ctrl"><span>바닥 폭 b <output id="hy-mn-b-out"></output></span><input type="range" id="hy-mn-b" min="0.3" max="80" step="0.1" value="40"></label>
+          <label class="ctrl"><span>측면 경사 1 : z <output id="hy-mn-z-out"></output></span><input type="range" id="hy-mn-z" min="0" max="3" step="0.1" value="2"></label>
+          <label class="ctrl"><span>수심 y <output id="hy-mn-y-out"></output></span><input type="range" id="hy-mn-y" min="0.05" max="8" step="0.01" value="5.15"></label>
+          <label class="ctrl"><span>조도 계수 n <output id="hy-mn-n-out"></output></span><input type="range" id="hy-mn-n" min="0.011" max="0.08" step="0.001" value="0.035"></label>
+          <label class="ctrl"><span>경사 1/S <output id="hy-mn-s-out"></output></span><input type="range" id="hy-mn-s" min="50" max="5000" step="10" value="1000"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">A (m²) · P (m)</span><span class="v" id="hy-mn-AP">—</span></div>
+        <div class="stat"><span class="k">동수 반경 R</span><span class="v" id="hy-mn-R">—</span></div>
+        <div class="stat"><span class="k">유속 V</span><span class="v" id="hy-mn-V">—</span></div>
+        <div class="stat"><span class="k">유량 Q</span><span class="v" id="hy-mn-Q">—</span></div>
+        <div class="stat"><span class="k">프루드 수 Fr</span><span class="v" id="hy-mn-Fr">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 수심을 두 배로 하면 유량이 두 배보다 훨씬 커집니다(A와 R이 함께 커짐) · n을 0.035 → 0.05로 올리면(하천에 수목 번성) 같은 수심의 유량이 30 % 줄어 같은 홍수에 수위가 오릅니다 · "측구"를 고르면 12장의 도로 측구 규모가 됩니다 · 모델: 원리 15.2, CB.civ.manning, CB.civ.froude.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="normal-depth">
+    <h2>등류 수심과 수위–유량 관계</h2>
+    <div class="problem"><strong>거꾸로 풀기</strong>
+      <p>매닝 공식은 수심을 알면 유량을 줍니다. 설계에서는 반대로 유량(계획 홍수량)이 주어지고 수심을 구해야 합니다. 그런데 \(A\)와 \(R\)이 모두 수심의 함수라 식을 수심에 대해 정리할 수 없습니다.</p></div>
+    <div class="callout def"><strong>정의 15.3 (등류 수심과 수위–유량 곡선)</strong> 유량 \(Q\)가 흐를 때 등류가 되는 수심을 <span class="term">등류 수심</span><span class="en">(normal depth)</span> \(y_n\)이라 한다. \(y_n\)은 방정식
+      <div class="formula">$$f(y) = \frac{1}{n}\,A(y)\,R(y)^{2/3}S^{1/2} - Q = 0$$<div class="where">의 근이다. \(A R^{2/3}\)은 수심에 대해 단조 증가하므로 근은 하나이고, 이분법·뉴턴법으로 몇 번 만에 구한다(<code>CB.civ.normalDepth(Q, { b, z, n, S })</code>는 이분법 80회). 수심–유량 관계 \(Q(y)\)를 그린 것이 <span class="term">수위–유량 곡선</span><span class="en">(rating curve, stage–discharge curve)</span>이고, 수위 관측소는 이 곡선으로 수위계 읽음을 유량으로 바꾼다.</div></div></div>
+    <div class="callout"><strong>예제 15.4 (B-130 하천의 등류 수심 역산)</strong> \(Q = 600\) m³/s, \(b = 40\) m, \(z = 2\), \(n = 0.035\), \(S = 0.001\).
+      <ol class="hy-steps">
+        <li><b>시산 1.</b> \(y = 5.0\) m: \(A = 250\), \(P = 62.36\), \(R = 4.01\) → \(Q = 570\) m³/s(모자람).</li>
+        <li><b>시산 2.</b> \(y = 5.5\) m: \(A = 280.5\), \(P = 64.60\), \(R = 4.34\) → \(Q = 675\) m³/s(넘침).</li>
+        <li><b>보간.</b> \(y \approx 5.0 + 0.5 \times (600 - 570)/(675 - 570) = 5.14\) m. 한 번 더 고치면 \(y_n = 5.15\) m(\(Q = 600.5\)).</li>
+        <li><b>민감도.</b> 홍수량이 800 m³/s(33 % 증가)로 커지면 \(y_n = 6.05\) m(+0.9 m), 1,000 m³/s면 6.86 m. 수심은 유량보다 훨씬 덜 민감하다(사다리꼴에서 대략 \(y \propto Q^{0.6}\) 안팎).</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="energy">
+    <h2>비에너지와 한계 수심, 프루드 수</h2>
+    <div class="problem"><strong>같은 유량이 두 가지 수심으로 흐를 수 있다</strong>
+      <p>댐 여수로를 내려오는 물은 얇고 빠르게, 그 아래 하천에서는 두껍고 느리게 흐릅니다. 둘은 같은 유량인데 어떻게 수심이 다를까요? 그리고 빠른 흐름이 느린 흐름으로 바뀌는 곳에서 왜 물이 하얗게 솟구칠까요?</p></div>
+    <p>하상을 기준으로 잰 단위 무게당 에너지를 비에너지라 합니다. 위치 에너지(수심)와 운동 에너지(속도 수두)의 합입니다.</p>
+    <div class="callout def"><strong>정의 15.4 (비에너지와 한계 수심)</strong> 단면에서 하상 기준 <span class="term">비에너지</span><span class="en">(specific energy)</span>는
+      <div class="formula">$$E = y + \frac{V^2}{2g} = y + \frac{Q^2}{2gA^2}$$<div class="where">유량 \(Q\)가 정해지면 \(E\)는 수심만의 함수이고, \(E\)가 최소가 되는 수심이 <span class="term">한계 수심</span><span class="en">(critical depth)</span> \(y_c\)다. \(dE/dy = 1 - Q^2T/(gA^3) = 0\)에서
+      $$\frac{Q^2\,T}{g\,A^3} = 1, \qquad \text{직사각형(단위 폭 유량 } q = Q/b\text{):}\quad y_c = \left(\frac{q^2}{g}\right)^{1/3},\ \ E_{min} = \tfrac{3}{2}y_c$$
+      \(T\)는 수면 폭. 같은 \(E\)에 수심이 둘(<span class="term">교대 수심</span><span class="en">(alternate depths)</span>) 있고, \(y \gt y_c\)인 깊고 느린 흐름이 <b>상류</b><span class="en">(subcritical flow, 常流)</span>, \(y \lt y_c\)인 얕고 빠른 흐름이 <b>사류</b><span class="en">(supercritical flow, 射流)</span>다.</div></div></div>
+    <div class="callout def"><strong>정의 15.5 (프루드 수)</strong> 관성력과 중력의 비인 <span class="term">프루드 수</span><span class="en">(Froude number, Fr)</span>
+      <div class="formula">$$Fr = \frac{V}{\sqrt{g\,D}}, \qquad D = \frac{A}{T}\ (\text{수리 수심})$$<div class="where">가 1보다 작으면 상류, 1이면 한계류, 크면 사류다. \(\sqrt{gD}\)는 얕은 물에서 작은 파(교란)가 전파하는 속도이므로, 상류에서는 교란이 상류 쪽으로 거슬러 올라갈 수 있고(하류의 보·교각이 상류 수위를 올린다, 배수), 사류에서는 교란이 모두 하류로 쓸려 내려간다. 그래서 상류의 수면은 하류 조건이, 사류의 수면은 상류 조건이 정한다. <code>CB.civ.froude({ b, y, z, n, S })</code>.</div></div></div>
+    <figure class="diagram" id="fig-hy-energy">
+      <svg viewBox="0 0 860 300" role="img" aria-label="비에너지 곡선과 한계 수심, 상류와 사류의 교대 수심, 그리고 도수">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(70,30)">
+          <line x1="0" y1="230" x2="330" y2="230" style="stroke:var(--axis)"/><line x1="0" y1="0" x2="0" y2="230" style="stroke:var(--axis)"/>
+          <line x1="0" y1="230" x2="230" y2="0" style="stroke:var(--text-faint);stroke-dasharray:4 4"/>
+          <text x="200" y="20" class="t-mono">E = y (45°)</text>
+          <path d="M320 222 C200 214 120 200 95 160 C80 130 110 70 230 20" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <circle cx="88" cy="150" r="5" style="fill:var(--accent-2)"/>
+          <text x="96" y="152" class="t-mono" style="fill:var(--accent-2)">한계(Eₘᵢₙ, y꜀)</text>
+          <line x1="160" y1="10" x2="160" y2="230" style="stroke:var(--text-dim);stroke-dasharray:3 3"/>
+          <circle cx="160" cy="84" r="4.5" style="fill:var(--blue)"/><circle cx="160" cy="210" r="4.5" style="fill:var(--bad)"/>
+          <text x="168" y="80" class="t-mono" style="fill:var(--blue)">상류(깊고 느림)</text>
+          <text x="168" y="206" class="t-mono" style="fill:var(--bad)">사류(얕고 빠름)</text>
+          <text x="165" y="248" class="t-mono" text-anchor="middle">비에너지 E</text>
+          <text x="-14" y="115" class="t-mono" transform="rotate(-90 -14 115)" text-anchor="middle">수심 y</text>
+        </g>
+        <g transform="translate(450,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">도수(사류 → 상류)</text>
+          <path d="M0 200 L380 200" style="stroke:var(--warn);stroke-width:2"/>
+          <path d="M0 176 L140 176 C170 176 175 120 200 100 C215 92 230 92 250 94 L380 94 L380 200 L0 200z" style="fill:var(--blue);opacity:.3"/>
+          <path d="M0 176 L140 176 C170 176 175 120 200 100 C215 92 230 92 250 94 L380 94" style="fill:none;stroke:var(--blue);stroke-width:2"/>
+          <path d="M175 140 q10 -18 20 -4 q10 -18 22 -6" style="fill:none;stroke:var(--text-faint);stroke-width:1.4"/>
+          <line x1="40" y1="186" x2="100" y2="186" style="stroke:var(--bad);stroke-width:2" marker-end="url(#hy-ah-bad)"/>
+          <text x="20" y="166" class="t-mono" style="fill:var(--bad)">y₁, V₁ (Fr₁ &gt; 1)</text>
+          <line x1="280" y1="150" x2="320" y2="150" style="stroke:var(--blue);stroke-width:2" marker-end="url(#hy-ah-w)"/>
+          <text x="270" y="84" class="t-mono" style="fill:var(--blue)">y₂, V₂ (Fr₂ &lt; 1)</text>
+          <text x="140" y="228" class="t-dim">길이 약 6y₂ · 에너지 손실 ΔE</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-5.</b> 왼쪽: 유량이 정해진 수로의 비에너지 곡선. 한 \(E\)에 상류 수심과 사류 수심 두 개가 있고, 꼭짓점이 한계 수심이다. 오른쪽: 사류가 상류로 바뀌는 곳에서 수면이 급히 솟는 도수. 운동량은 보존되지만 소용돌이로 에너지가 크게 사라진다 — 댐·보 아래 감세지(정수지)가 이것을 일부러 만든다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 15.5 (B-130 하천의 한계 수심과 흐름 상태)</strong> \(Q = 600\) m³/s, 사다리꼴 \(b = 40\), \(z = 2\).
+      <ol class="hy-steps">
+        <li><b>등류 상태.</b> \(y_n = 5.15\) m, \(V = 2.32\) m/s, \(T = 40 + 4 \times 5.15 = 60.6\) m, \(D = 258.9/60.6 = 4.27\) m → \(Fr = 2.32/\sqrt{9.81 \times 4.27} = 0.36\). <b>상류</b>다. 비에너지 \(E = 5.15 + 2.32^2/19.62 = 5.42\) m.</li>
+        <li><b>한계 수심.</b> \(Q^2T/(gA^3) = 1\)을 반복으로 풀면 \(y_c = 2.71\) m(\(V_c = 4.87\) m/s), \(E_{min} = 3.92\) m. \(y_n \gt y_c\)이므로 이 하천은 <b>완경사 수로</b>(mild slope)다. 한계 경사(등류가 한계류가 되는 경사)는 약 0.0093으로 실제 경사 0.001보다 9배 급하다.</li>
+        <li><b>뜻.</b> 상류이므로 B-130 교각, 하류의 보가 만드는 수위 상승(배수)이 상류로 전파된다. 교각이 흐름을 막는 비율이 크면 교량 상류의 수위가 올라가므로(교각 저항에 의한 수위 상승) 교각 폭과 수를 줄이는 것이 유리하다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="jump">
+    <h2>도수와 감세</h2>
+    <p>사류가 상류로 바뀌는 곳에서는 수면이 매끄럽게 이어지지 못하고 급히 솟으며 소용돌이칩니다. 이것이 <span class="term">도수</span><span class="en">(hydraulic jump)</span>입니다. 도수 안의 에너지 손실은 크지만 미지수이고, 짧은 구간에서 바닥 마찰은 작으므로 <b>운동량 보존</b>으로 앞뒤 수심을 잇습니다.</p>
+    <div class="callout def"><strong>원리 15.6 (직사각형 수로의 도수)</strong> 도수 앞(사류) 수심 \(y_1\), 프루드 수 \(Fr_1\)이면 뒤(상류)의 <span class="term">공액 수심</span><span class="en">(sequent depth, conjugate depth)</span>은
+      <div class="formula">$$\frac{y_2}{y_1} = \frac12\left(\sqrt{1 + 8Fr_1^2} - 1\right), \qquad \Delta E = \frac{(y_2 - y_1)^3}{4\,y_1y_2}$$<div class="where">\(Fr_1\) 1–1.7 파상 도수, 1.7–2.5 약한 도수, 2.5–4.5 진동 도수(불안정, 피함), 4.5–9 정상 도수(안정, 감세에 좋음), 9 이상 강한 도수(Chow 형태 분류). 도수의 길이는 대략 \(6y_2\)이고, 감세지는 그 길이와 바닥 보호(에이프런)를 갖춘다. 하류 수심이 \(y_2\)보다 낮으면 도수가 하류로 밀려나 보호되지 않은 하상을 판다.</div></div></div>
+    <div class="callout"><strong>예제 15.6 (보 아래 감세지의 도수)</strong> 보 위를 넘은 물이 직사각형 감세지로 단위 폭 유량 \(q = 10\) m²/s, 수심 \(y_1 = 0.80\) m로 들어온다.
+      <ol class="hy-steps">
+        <li>\(V_1 = 10/0.80 = 12.5\) m/s, \(Fr_1 = 12.5/\sqrt{9.81 \times 0.80} = 4.46\) — 진동–정상 경계.</li>
+        <li>\(y_2 = 0.40 \times (\sqrt{1 + 8 \times 4.46^2} - 1) = 4.66\) m, \(V_2 = 2.15\) m/s, \(Fr_2 = 0.32\).</li>
+        <li>\(\Delta E = (4.66 - 0.80)^3/(4 \times 0.80 \times 4.66) = 3.87\) m. 들어온 비에너지 \(E_1 = 0.80 + 12.5^2/19.62 = 8.76\) m의 44 %를 소산한다.</li>
+        <li><b>판정.</b> 하류 하천 수심이 4.66 m 이상이면 도수가 감세지 안에 머문다. 한계 수심은 \(y_c = (100/9.81)^{1/3} = 2.17\) m.</li>
+      </ol></div>
+    <div class="sim" id="sim-hy-energy">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>비에너지 곡선과 도수</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="hy-cv-energy" aria-label="비에너지 곡선 위의 수심 점, 교대 수심과 공액 수심"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>단면</span><div class="seg" id="hy-en-mode"><button data-value="rect" class="on">직사각형(단위 폭)</button><button data-value="river">B-130 하천</button></div></div>
+          <label class="ctrl"><span id="hy-en-q-lab">단위 폭 유량 q <output id="hy-en-q-out"></output></span><input type="range" id="hy-en-q" min="1" max="30" step="0.5" value="10"></label>
+          <label class="ctrl"><span>수심 y <output id="hy-en-y-out"></output></span><input type="range" id="hy-en-y" min="0.2" max="8" step="0.01" value="0.8"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">비에너지 E</span><span class="v" id="hy-en-E">—</span></div>
+        <div class="stat"><span class="k">한계 y<sub>c</sub> · E<sub>min</sub></span><span class="v" id="hy-en-yc">—</span></div>
+        <div class="stat"><span class="k">Fr · 흐름</span><span class="v" id="hy-en-Fr">—</span></div>
+        <div class="stat"><span class="k">교대 수심</span><span class="v" id="hy-en-alt">—</span></div>
+        <div class="stat"><span class="k">공액 수심 y<sub>2</sub> · ΔE</span><span class="v" id="hy-en-jump">—</span></div>
+      </div>
+      <div class="hy-msg" id="hy-en-msg"></div>
+      <div class="sim-note">해볼 것: 그래프를 위아래로 끌어 수심을 옮겨 보세요 · 한계 수심 아래(사류)로 내려가면 도수 뒤의 공액 수심과 에너지 손실이 나옵니다 · 공액 수심(파랑 점선)은 같은 E의 교대 수심(초록)보다 낮습니다 — 도수가 에너지를 잃기 때문입니다 · "B-130 하천"은 유량 Q(m³/s)로 사다리꼴 단면의 곡선을 그립니다(도수는 직사각형 식이라 생략) · 모델: 정의 15.4–15.5, 원리 15.6.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="flood-level">
+    <h2>계획 홍수위와 여유고</h2>
+    <div class="problem"><strong>제방 마루와 다리 밑은 얼마나 높아야 하나</strong>
+      <p>계산한 홍수위에 딱 맞춰 제방을 쌓으면 바람 파랑, 유량 추정의 오차, 퇴적으로 인한 하상 상승, 떠내려오는 나무와 쓰레기 앞에서 여유가 없습니다. 그래서 하천 설계는 <b>계획 홍수위</b>에 <b>여유고</b>를 더한 높이를 제방 마루와 교량 형하의 기준으로 씁니다.</p></div>
+    <p>하천 기본 계획에서 정한 <span class="term">계획 홍수량</span><span class="en">(design flood discharge)</span>이 흐를 때의 수위가 <span class="term">계획 홍수위</span><span class="en">(design flood level, high water level, HWL)</span>입니다. 실제 하천은 단면과 경사가 구간마다 달라 수면이 등류 수심과 다르게 휘므로(배수 곡선, 부등류), 계획 홍수위는 부등류 계산(표준 축차 계산법 등)으로 구간마다 정합니다. 이 장은 B-130 지점이 긴 균일 구간 가운데 있다고 보고 등류 수심을 계획 홍수위로 씁니다(교육용 단순화). 여기에 <span class="term">여유고</span><span class="en">(freeboard)</span>를 더합니다.</p>
+    <div class="table-wrap"><table class="hy-tbl">
+      <thead><tr><th>계획 홍수량 Q (m³/s)</th><th>200 미만</th><th>200–500</th><th>500–2,000</th><th>2,000–5,000</th><th>5,000–10,000</th><th>10,000 이상</th></tr></thead>
+      <tbody><tr><td>제방 여유고 (m)</td><td>0.6</td><td>0.8</td><td class="hl">1.0</td><td>1.2</td><td>1.5</td><td>2.0</td></tr></tbody>
+    </table></div>
+    <p class="t-dim" style="font-size:14px;color:var(--text-dim)">표 15-1. 계획 홍수량에 따른 제방 여유고(국내 하천 설계기준의 형태, 현행 KDS 51 계열 확인). 교량의 형하 여유고도 같은 꼴의 표로 정하며, 유목·유빙이 많은 하천은 더 준다. 교각 사이 경간도 계획 홍수량이 클수록 길게 하도록 정한다(예: \(L \ge 20 + 0.005Q\) m 형태, 현행 기준 확인).</p>
+    <figure class="diagram" id="fig-hy-hwl">
+      <svg viewBox="0 0 880 330" role="img" aria-label="B-130 하천 횡단면: 하상, 계획 홍수위, 여유고, 제방 마루, 교량 형하 높이, 교각">
+        <rect x="10" y="10" width="860" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <!-- scale: x 6 px/m (0..130 m -> 0..780), z: bed z0=250, 18 px/m -->
+          <path d="M0 124 L186 124 L270 250 L510 250 L594 124 L780 124 L780 280 L0 280z" style="fill:url(#hy-soil);stroke:var(--warn);stroke-width:1.6"/>
+          <path d="M208 157.3 L572 157.3 L510 250 L270 250z" style="fill:var(--blue);opacity:.3"/>
+          <line x1="190" y1="157.3" x2="590" y2="157.3" style="stroke:var(--blue);stroke-width:2"/>
+          <path d="M226 150 l7 -9 l7 9z" style="fill:var(--blue)"/>
+          <text x="268" y="176" class="t-mono" style="fill:var(--blue)">계획 홍수위 HWL = 하상 + 5.15 m</text>
+          <line x1="150" y1="139.3" x2="630" y2="139.3" style="stroke:var(--warn);stroke-dasharray:6 4;stroke-width:1.4"/>
+          <text x="268" y="134" class="t-mono" style="fill:var(--warn)">HWL + 여유고 1.0 m = 하상 + 6.15 m</text>
+          <text x="20" y="116" class="t-mono">제방 마루·지반 = 하상 + 7.0 m</text>
+          <rect x="0" y="54" width="780" height="10" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="0" y="64" width="780" height="10" style="fill:none;stroke:var(--text-dim);stroke-dasharray:2 2"/>
+          <text x="300" y="48" class="t-mono">B-130 상부 구조(거더 높이 약 2.2 m + 바닥판)</text>
+          <line x1="0" y1="70" x2="780" y2="70" style="stroke:none"/>
+          <rect x="234" y="74" width="12" height="131" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="534" y="74" width="12" height="131" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="222" y="205" width="36" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="522" y="205" width="36" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="240" y="236" class="t-mono" text-anchor="middle">P1</text><text x="540" y="236" class="t-mono" text-anchor="middle">P2</text>
+          <line x1="660" y1="74" x2="660" y2="157.3" style="stroke:var(--ok);stroke-width:1.6" marker-start="url(#hy-ah-ok)" marker-end="url(#hy-ah-ok)"/>
+          <text x="668" y="96" class="t-mono" style="fill:var(--ok)">형하 여유</text>
+          <text x="668" y="112" class="t-mono" style="fill:var(--ok)">4.85 m ≥ 1.0</text>
+          <text x="390" y="270" class="t-mono" text-anchor="middle">하상(바닥 폭 40 m, 측면 1 : 2)</text>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="300">0</text><text x="240" y="300">40</text><text x="540" y="300">90</text><text x="780" y="300">130 m</text></g>
+          <text x="20" y="68" class="t-mono">형하 = 하상 + 10.0 m</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-6.</b> B-130 하천 횡단면(교육용 배치, 세로 과장). 하도 중심은 교량 중앙(65 m), 하상 바닥 45–85 m, 측면 1 : 2로 하상 + 7.0 m의 제방 마루(양안 지반)에 닿는다. 계획 홍수위는 하상 + 5.15 m, 여유고 1.0 m를 더한 6.15 m보다 제방 마루가 0.85 m 높고, 거더 밑(하상 + 10.0 m)과의 형하 여유는 4.85 m다. 교각 P1·P2(40·90 m)는 홍수 때 측면 비탈 위에서 물에 잠긴다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 15.7 (B-130 지점의 홍수위·제방·형하 검토)</strong> 하상 표고를 EL 20.00 m라 하자(교육용).
+      <ol class="hy-steps">
+        <li><b>계획 홍수위.</b> 등류 수심 5.15 m → HWL = EL 25.15 m.</li>
+        <li><b>여유고.</b> Q = 600 m³/s는 500–2,000 구간 → 1.0 m. 필요한 제방 마루 EL 26.15 m 이상. 제방 마루 EL 27.00 m로 <b>0.85 m 여유 — 만족</b>.</li>
+        <li><b>형하.</b> 거더 밑 EL 30.00 m − HWL 25.15 m = 4.85 m ≥ 1.0 m — <b>만족</b>. 교량 형하는 제방 마루보다 낮지 않게 하는 것이 원칙이며(제방을 끊지 않도록), 여기서는 3.0 m 높다.</li>
+        <li><b>경간.</b> \(20 + 0.005 \times 600 = 23\) m(형태) ≤ 40·50 m — 만족.</li>
+        <li><b>기후 변화.</b> 홍수량이 20 % 늘어 720 m³/s가 되면 \(y_n = 5.71\) m, HWL EL 25.71 m, 제방 여유 1.29 m(필요 1.0) — 아직 만족하지만 여유가 줄어든다. 시뮬레이터로 한계 유량을 찾아보자.</li>
+      </ol></div>
+    <div class="sim" id="sim-hy-normal">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>등류 수심 역산과 홍수위 판정</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="hy-cv-normal" aria-label="수위–유량 곡선과 하천 단면의 계획 홍수위, 여유고, 제방 마루, 형하"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>계획 홍수량 Q <output id="hy-nd-Q-out"></output></span><input type="range" id="hy-nd-Q" min="50" max="2000" step="10" value="600"></label>
+          <label class="ctrl"><span>조도 계수 n <output id="hy-nd-n-out"></output></span><input type="range" id="hy-nd-n" min="0.025" max="0.06" step="0.001" value="0.035"></label>
+          <label class="ctrl"><span>하상 경사 1/S <output id="hy-nd-s-out"></output></span><input type="range" id="hy-nd-s" min="300" max="5000" step="50" value="1000"></label>
+          <label class="ctrl"><span>제방 마루(하상 위) <output id="hy-nd-crest-out"></output></span><input type="range" id="hy-nd-crest" min="4" max="10" step="0.05" value="7"></label>
+          <label class="ctrl"><span>형하(하상 위) <output id="hy-nd-soffit-out"></output></span><input type="range" id="hy-nd-soffit" min="5" max="14" step="0.1" value="10"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">등류 수심 y<sub>n</sub></span><span class="v" id="hy-nd-yn">—</span></div>
+        <div class="stat"><span class="k">V · Fr</span><span class="v" id="hy-nd-VF">—</span></div>
+        <div class="stat"><span class="k">필요 여유고</span><span class="v" id="hy-nd-fb">—</span></div>
+        <div class="stat"><span class="k">제방 여유</span><span class="v" id="hy-nd-levee">—</span></div>
+        <div class="stat"><span class="k">형하 여유</span><span class="v" id="hy-nd-clear">—</span></div>
+      </div>
+      <div class="hy-msg" id="hy-nd-msg"></div>
+      <div class="sim-note">해볼 것: Q를 600에서 올려 제방 판정이 바뀌는 유량을 찾아보세요(약 790 m³/s) · 하천에 수목이 우거져 n이 0.045가 되면 같은 600 m³/s에서 수위가 얼마나 오르는지 보세요 · 위 그래프의 수위–유량 곡선은 위로 볼록합니다 — 큰 홍수일수록 수심 증가가 둔해집니다 · 모델: 정의 15.3, CB.civ.normalDepth, 여유고는 표 15-1 형태(교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="levee">
+    <h2>제방: 넘침, 침투, 활동</h2>
+    <div class="problem"><strong>제방은 흙으로 만든 댐이다</strong>
+      <p>제방은 평소에는 마른 둑이다가 홍수 때 며칠 동안 한쪽에 높은 물을 받는 흙 구조물입니다. 무너지는 길은 여럿입니다. 물이 넘쳐 뒷비탈을 깎거나(월류), 물이 제체와 기초로 스며 뒷비탈이 젖어 무너지거나(침투·활동), 기초 모래를 따라 물길이 생겨 흙을 실어 나르거나(파이핑), 빠른 물이 앞비탈을 깎습니다(침식).</p></div>
+    <figure class="diagram" id="fig-hy-levee">
+      <svg viewBox="0 0 880 320" role="img" aria-label="제방의 네 가지 파괴 양상: 월류, 침윤선과 뒷비탈 활동, 기초 파이핑, 앞비탈 침식">
+        <rect x="10" y="10" width="860" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <path d="M0 200 L280 200 L380 60 L460 60 L600 200 L760 200 L760 240 L0 240z" style="fill:url(#hy-soil);stroke:var(--warn);stroke-width:1.6"/>
+          <path d="M0 200 L0 96 L353 96 L280 200z" style="fill:var(--blue);opacity:.3"/>
+          <line x1="0" y1="96" x2="353" y2="96" style="stroke:var(--blue);stroke-width:2"/>
+          <text x="20" y="88" class="t-mono" style="fill:var(--blue)">홍수위(하천 쪽)</text>
+          <path d="M325 96 C400 112 470 140 560 170 L578 176" style="fill:none;stroke:var(--blue);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="440" y="124" class="t-mono" style="fill:var(--blue)">침윤선</text>
+          <circle cx="578" cy="176" r="4" style="fill:var(--bad)"/>
+          <text x="586" y="170" class="t-mono" style="fill:var(--bad)">② 침출 → 뒷비탈 활동</text>
+          <path d="M500 104 C540 150 560 190 640 205" style="fill:none;stroke:var(--bad);stroke-width:1.6;stroke-dasharray:3 3"/>
+          <path d="M400 56 Q440 30 470 56" style="fill:none;stroke:var(--blue);stroke-width:1.8" marker-end="url(#hy-ah-w)"/>
+          <text x="476" y="40" class="t-mono" style="fill:var(--blue)">① 월류 → 뒷비탈 침식</text>
+          <path d="M120 226 C300 232 500 232 650 214" style="fill:none;stroke:var(--blue);stroke-width:1.8;stroke-dasharray:2 3" marker-end="url(#hy-ah-w)"/>
+          <path d="M650 214 q4 -14 10 -2 q4 -14 10 0" style="fill:none;stroke:var(--bad);stroke-width:1.6"/>
+          <text x="560" y="258" class="t-mono" style="fill:var(--bad)">③ 기초 파이핑(모래 분출)</text>
+          <path d="M300 172 l24 -10 M290 186 l24 -10" style="stroke:var(--accent-2);stroke-width:2"/>
+          <text x="140" y="180" class="t-mono" style="fill:var(--accent-2)">④ 앞비탈 침식</text>
+          <text x="380" y="52" class="t-mono">마루</text>
+          <text x="660" y="194" class="t-mono">제내지(보호되는 땅)</text>
+          <text x="20" y="226" class="t-mono">투수성 기초(모래·자갈)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-7.</b> 제방의 파괴 양상. ① 월류는 흙 제방의 가장 흔하고 치명적인 파괴라 여유고를 준다. ② 침윤선이 뒷비탈에 닿으면 침출수가 비탈을 약화시켜 활동을 일으킨다(GeotechBook 12장). ③ 투수성 기초를 따라 흐르는 물이 제내지에서 모래를 분출시키면 물길이 거꾸로 자라 붕괴한다(GeotechBook 5장 파이핑). ④ 빠른 흐름은 앞비탈을 깎으므로 호안을 둔다.</figcaption>
+    </figure>
+    <p>홍수가 길게 이어지면 제체 속의 물이 정상 상태에 가까워져 위의 <span class="term">침윤선</span><span class="en">(phreatic line, line of seepage)</span>이 생깁니다. 균질한 흙 제방의 침윤선은 카사그란데의 방법으로 어림합니다(GeotechBook 5장 <a href="../../geotech/chapters/seepage.html#dam">흙댐의 침윤선</a>에서 유도). 실제 홍수는 수위가 며칠 만에 오르내려 정상 상태에 이르지 못할 때가 많아, 설계는 비정상 침투 해석으로 확인합니다.</p>
+    <div class="callout def"><strong>원리 15.7 (균질 제방의 침윤선과 침투량, 카사그란데 형태)</strong> 앞비탈의 수면 진입점에서 수평 거리 \(0.3\Delta\)(\(\Delta\): 앞비탈이 물에 잠긴 수평 길이) 상류의 점 B에서 뒷비탈 끝까지의 수평 거리 \(d\), 수위 \(h\), 뒷비탈 각 \(\alpha \lt 30°\)일 때 침윤선이 뒷비탈에 닿는 점의 비탈 길이 \(a\)와 단위 폭 침투량 \(q\)는
+      <div class="formula">$$a = \frac{d}{\cos\alpha} - \sqrt{\frac{d^2}{\cos^2\alpha} - \frac{h^2}{\sin^2\alpha}}, \qquad q = k\,a\,\sin\alpha\,\tan\alpha$$<div class="where">\(k\): 제체의 투수 계수. 뒷비탈 끝에 배수(필터·드레인)를 두면 침윤선은 드레인을 초점으로 하는 코제니 포물선이 되어 비탈에 닿지 않는다: \(y_0 = \sqrt{d^2 + h^2} - d\), \(q = k\,y_0\). 기초를 따라 흐르는 물의 파이핑 위험은 레인의 가중 크리프 비 \(C_w = (L_H/3 + L_V)/h\)를 흙의 종류별 값(가는 모래 7.0, 굵은 모래 5.0, 자갈 3.0–4.0 형태)과 비교해 어림한다. 둘 다 교육용 근사이며 실제는 유선망·수치 침투 해석과 출구 동수경사로 검토한다.</div></div></div>
+    <div class="callout"><strong>예제 15.8 (B-130 상류 제방의 침투)</strong> 제방 높이 7.0 m, 마루 폭 6 m, 앞·뒤 비탈 1 : 2(\(\alpha = 26.6°\)), 밑폭 34 m, 계획 홍수위 \(h = 5.15\) m, 제체 실트질 모래 \(k = 1 \times 10^{-5}\) m/s(교육용).
+      <ol class="hy-steps">
+        <li><b>기하.</b> 앞비탈 잠긴 수평 길이 \(\Delta = 2 \times 5.15 = 10.3\) m → B점은 앞비탈 끝에서 \(10.3 - 0.3 \times 10.3 = 7.21\) m. \(d = 34 - 7.21 = 26.79\) m.</li>
+        <li><b>침출점.</b> \(a = 26.79/0.894 - \sqrt{(26.79/0.894)^2 - (5.15/0.447)^2} = 29.95 - 27.65 = 2.30\) m(비탈 길이), 높이 \(a\sin\alpha = 1.03\) m. 뒷비탈 아래 1 m가 젖는다.</li>
+        <li><b>침투량.</b> \(q = 10^{-5} \times 2.30 \times 0.447 \times 0.5 = 5.1 \times 10^{-6}\) m³/s/m — 제방 100 m당 하루 약 44 m³.</li>
+        <li><b>기초 파이핑.</b> 기초가 가는 모래이고 차수벽이 없으면 \(C_w = (34/3)/5.15 = 2.2 \lt 7.0\) — <b>불만족(교육용 판정)</b>. 차수벽(널말뚝·지중 연속벽)으로 연직 경로를 더하거나, 제내지 쪽에 소단(berm)과 배수를 두거나, 앞쪽에 불투수 블랭킷을 깐다.</li>
+      </ol></div>
+    <div class="sim" id="sim-hy-levee">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>제방 침윤선과 파이핑</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="hy-cv-levee" aria-label="제방 단면의 침윤선, 침출점, 드레인"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>홍수위 h <output id="hy-lv-h-out"></output></span><input type="range" id="hy-lv-h" min="1" max="6.8" step="0.05" value="5.15"></label>
+          <label class="ctrl"><span>비탈 1 : m <output id="hy-lv-m-out"></output></span><input type="range" id="hy-lv-m" min="1.8" max="4" step="0.1" value="2"></label>
+          <label class="ctrl"><span>마루 폭 <output id="hy-lv-c-out"></output></span><input type="range" id="hy-lv-c" min="3" max="12" step="0.5" value="6"></label>
+          <label class="ctrl"><span>차수벽 깊이 <output id="hy-lv-cut-out"></output></span><input type="range" id="hy-lv-cut" min="0" max="15" step="0.5" value="0"></label>
+          <div class="ctrl"><span>뒷비탈 배수</span><div class="seg" id="hy-lv-drain"><button data-value="no" class="on">없음</button><button data-value="toe">끝 드레인</button></div></div>
+          <div class="ctrl"><span>기초 흙</span><div class="seg" id="hy-lv-soil"><button data-value="fine" class="on">가는 모래</button><button data-value="coarse">굵은 모래</button><button data-value="gravel">자갈</button><button data-value="clay">점토</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">침출 높이 a·sinα</span><span class="v" id="hy-lv-a">—</span></div>
+        <div class="stat"><span class="k">침투량 q (k = 10⁻⁵ m/s)</span><span class="v" id="hy-lv-q">—</span></div>
+        <div class="stat"><span class="k">크리프 비 C<sub>w</sub> / 필요</span><span class="v" id="hy-lv-cw">—</span></div>
+      </div>
+      <div class="hy-msg" id="hy-lv-msg"></div>
+      <div class="sim-note">해볼 것: 끝 드레인을 켜면 침윤선이 뒷비탈 안쪽으로 내려가 비탈이 마릅니다(침투량은 오히려 조금 늘어남 — 경로가 짧아지므로) · 기초가 가는 모래일 때 차수벽을 몇 m 넣어야 크리프 비를 만족하는지 찾아보세요 · 비탈을 완만하게(1 : 3) 하면 밑폭이 넓어져 경로가 길어집니다 · 모델: 원리 15.7(카사그란데·코제니 포물선, 레인 크리프 비), 제방 높이 7.0 m 고정, 정상 침투(교육용). 침윤선 그림은 근사입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="weirs-gates">
+    <h2>보와 수문</h2>
+    <p>하천을 가로질러 물을 막아 수위를 올리는 낮은 구조물이 <span class="term">하천 보</span><span class="en">(weir)</span>, 줄여서 보입니다. 농업·생활 용수를 취수하고, 하상 경사를 완만하게(낙차공) 하며, 유량을 잴 때도 씁니다. 보 위를 넘는 흐름은 보 마루에서 한계 수심을 거치므로 상류 수위만으로 유량이 정해집니다. 보에 문을 달아 수위와 유량을 조절하는 것이 <span class="term">수문 게이트</span><span class="en">(gate)</span>이고, 문 아래로 빠르게 나가는 흐름은 사류가 되어 아래에서 도수를 만듭니다.</p>
+    <figure class="diagram" id="fig-hy-weir">
+      <svg viewBox="0 0 880 260" role="img" aria-label="광정 보 위의 흐름과 한계 수심, 수문 아래 흐름과 도수">
+        <rect x="10" y="10" width="860" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">광정 보(broad-crested weir)</text>
+          <path d="M0 190 L380 190" style="stroke:var(--warn);stroke-width:2"/>
+          <rect x="140" y="130" width="120" height="60" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M0 70 L120 72 C150 78 180 100 260 104 C290 108 310 150 380 160 L380 190 L260 190 L260 130 L140 130 L140 190 L0 190z" style="fill:var(--blue);opacity:.3"/>
+          <path d="M0 70 L120 72 C150 78 180 100 260 104 C290 108 310 150 380 160" style="fill:none;stroke:var(--blue);stroke-width:2"/>
+          <line x1="60" y1="70" x2="60" y2="130" style="stroke:var(--text-dim)" marker-start="url(#hy-ah-t)" marker-end="url(#hy-ah-t)"/>
+          <line x1="40" y1="130" x2="140" y2="130" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="66" y="104" class="t-mono">H</text>
+          <text x="186" y="92" class="t-mono" style="fill:var(--blue)">y꜀ ≈ 2H/3</text>
+          <text x="20" y="225" class="t-mono">Q ≈ 1.70 b H³ᐟ² (SI, 형태)</text>
+        </g>
+        <g transform="translate(470,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">수문 아래 흐름(sluice gate)</text>
+          <path d="M0 190 L380 190" style="stroke:var(--warn);stroke-width:2"/>
+          <rect x="120" y="30" width="12" height="130" style="fill:var(--text-dim)"/>
+          <path d="M0 60 L120 60 L120 160 L132 160 C150 166 170 168 200 168 C230 168 240 120 270 110 L380 110 L380 190 L0 190z" style="fill:var(--blue);opacity:.3"/>
+          <path d="M0 60 L120 60 M132 160 C150 166 170 168 200 168 C230 168 240 120 270 110 L380 110" style="fill:none;stroke:var(--blue);stroke-width:2"/>
+          <line x1="60" y1="60" x2="60" y2="190" style="stroke:var(--text-dim)" marker-start="url(#hy-ah-t)" marker-end="url(#hy-ah-t)"/>
+          <text x="66" y="130" class="t-mono">y₁</text>
+          <line x1="140" y1="160" x2="140" y2="190" style="stroke:var(--text-dim)"/>
+          <text x="146" y="184" class="t-mono">a</text>
+          <text x="200" y="150" class="t-mono" style="fill:var(--bad)">사류</text>
+          <text x="280" y="100" class="t-mono" style="fill:var(--blue)">도수 → 상류</text>
+          <text x="10" y="225" class="t-mono">Q = C꜀ b a √(2g y₁), C꜀ ≈ 0.6 (자유 유출, 형태)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-8.</b> 보와 수문의 흐름. 광정 보 위에서는 흐름이 한계 수심(약 \(2H/3\))을 지나므로 유량이 상류 수두 \(H\)만의 함수가 된다(\(Q = b\sqrt{g}\,(2H/3)^{3/2} \approx 1.70\,bH^{3/2}\), 실제는 유량 계수로 보정). 수문 아래로는 빠른 사류가 나가 하류에서 도수로 상류가 된다. 둘 다 아래 하상을 보호하는 감세 시설(에이프런, 바닥 보호공)이 필요하다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 15.9 (B-130 하류 고정보의 월류 수심)</strong> 폭 \(b = 60\) m의 광정 고정보로 계획 홍수량 600 m³/s를 넘기면 \(H = (600/(1.70 \times 60))^{2/3} = 5.88^{2/3} = 3.26\) m. 보 마루가 하상 위 2.0 m라면 보 바로 상류의 수위는 하상 위 약 5.3 m(접근 유속 수두 무시)로, 등류 수심 5.15 m보다 높다. 상류 흐름이므로 이 수위 상승(배수)은 상류로 전파되어 보에서 멀어질수록 등류 수심에 가까워진다. 보가 교량 가까이 있으면 교량 지점의 홍수위를 부등류 계산으로 다시 정해야 한다(교육용 단순 계산).</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="dam">
+    <h2>중력식 댐의 안정</h2>
+    <div class="problem"><strong>물이 미는 힘을 무게로 버틴다</strong>
+      <p>높이 30 m의 저수지 물은 댐 1 m 폭마다 약 3,800 kN(약 390 tf)을 수평으로 밉니다. 중력식 콘크리트 댐은 자기 무게로 이 힘에 맞서 넘어지지도, 밀리지도, 기초를 부수지도 않아야 합니다. 그런데 댐 밑으로 스며든 물이 위로 미는 <b>양압력</b>이 무게를 덜어 냅니다.</p></div>
+    <figure class="diagram" id="fig-hy-dam">
+      <svg viewBox="0 0 880 360" role="img" aria-label="중력식 댐 단면에 작용하는 자중, 수평 수압, 양압력, 합력의 위치와 기초 압력">
+        <rect x="10" y="10" width="860" height="340" rx="10" class="f-surface"/>
+        <g transform="translate(170,30)">
+          <path d="M0 250 L0 0 L50 0 L240 250z" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.6"/>
+          <path d="M-70 250 L-70 18 L0 18 L0 250z" style="fill:var(--blue);opacity:.28"/>
+          <line x1="-70" y1="18" x2="0" y2="18" style="stroke:var(--blue);stroke-width:2"/>
+          <path d="M-60 250 L-60 18" style="stroke:none"/>
+          <path d="M-60 250 L-6 250 L-60 18" style="fill:none"/>
+          <path d="M-62 18 L-62 250 L-10 250z" style="fill:var(--blue);opacity:.18;stroke:var(--blue)"/>
+          <line x1="-50" y1="172" x2="-4" y2="172" style="stroke:var(--blue);stroke-width:3" marker-end="url(#hy-ah-w)"/>
+          <text x="-120" y="166" class="t-mono" style="fill:var(--blue)">P = ½γw h²</text>
+          <text x="-120" y="182" class="t-mono" style="fill:var(--blue)">(h/3 높이)</text>
+          <line x1="25" y1="60" x2="25" y2="130" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#hy-ah-ld)"/>
+          <text x="32" y="80" class="t-mono" style="fill:var(--accent-2)">W₁</text>
+          <line x1="113" y1="140" x2="113" y2="210" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#hy-ah-ld)"/>
+          <text x="120" y="160" class="t-mono" style="fill:var(--accent-2)">W₂</text>
+          <path d="M0 250 L0 300 L240 250z" style="fill:var(--blue);opacity:.25;stroke:var(--blue)"/>
+          <line x1="40" y1="296" x2="40" y2="258" style="stroke:var(--blue);stroke-width:2" marker-end="url(#hy-ah-w)"/>
+          <line x1="110" y1="282" x2="110" y2="258" style="stroke:var(--blue);stroke-width:2" marker-end="url(#hy-ah-w)"/>
+          <text x="40" y="318" class="t-mono" style="fill:var(--blue)">양압력 U(배수공 없으면 삼각형)</text>
+          <line x1="80" y1="250" x2="80" y2="236" style="stroke:var(--text-faint)"/><line x1="160" y1="250" x2="160" y2="236" style="stroke:var(--text-faint)"/>
+          <text x="120" y="232" class="t-mono" text-anchor="middle">중앙 1/3</text>
+          <circle cx="136" cy="250" r="6" style="fill:var(--ok)"/>
+          <text x="-6" y="270" class="t-mono" text-anchor="end">상류 끝(heel)</text>
+          <text x="240" y="268" class="t-mono" text-anchor="middle">하류 끝(toe)</text>
+          <text x="60" y="-6" class="t-mono">마루 폭 b꜀</text>
+        </g>
+        <g transform="translate(490,50)">
+          <text x="0" y="0" class="t" style="font-weight:700">검토 항목(교육용 기준 형태)</text>
+          <text x="0" y="30" class="t-dim">① 전도: 합력이 밑면 중앙 1/3 안(e ≤ B/6)</text>
+          <text x="0" y="52" class="t-mono">   → 상류 끝에 인장 없음, FS₀ = ΣM저항/ΣM전도</text>
+          <text x="0" y="82" class="t-dim">② 활동: FS = f(W − U)/P ≥ 1.5 (마찰만)</text>
+          <text x="0" y="104" class="t-mono">   또는 SSF = (f(W − U) + τ₀B)/P ≥ 4</text>
+          <text x="0" y="134" class="t-dim">③ 기초 압력: q = N/B (1 ± 6e/B) ≤ 허용</text>
+          <text x="0" y="164" class="t-dim">④ 양압력: 배수공·커튼 그라우팅으로 줄임</text>
+          <text x="0" y="194" class="t-mono">지진 관성력·퇴사압·파압은 이 장에서 생략</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-9.</b> 중력식 댐에 작용하는 힘(단위 폭). 자중 \(W\)(직사각형 마루부 \(W_1\) + 삼각형 \(W_2\))은 아래로, 수압 \(P\)는 하류로, 양압력 \(U\)는 위로 작용한다. 합력이 밑면의 중앙 1/3(초록 점)에 들면 기초 전체가 압축 상태다. 기준 수치는 현행 댐 설계기준을 확인할 것.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.8 (중력식 댐의 안정, 단위 폭)</strong> 상류면 연직, 높이 \(H\), 마루 폭 \(b_c\), 밑폭 \(B\), 저수 깊이 \(h\)인 단면에서 하류 끝(toe)에 대한 모멘트로
+      <div class="formula">$$FS_o = \frac{\sum M_R}{\sum M_O}, \quad FS_s = \frac{f\,(W - U)}{P}, \quad e = \frac{B}{2} - \frac{\sum M_R - \sum M_O}{W - U}, \quad q = \frac{W - U}{B}\left(1 \pm \frac{6e}{B}\right)$$<div class="where">\(P = \tfrac12\gamma_w h^2\)(밑에서 \(h/3\)), \(U = \mu\,\tfrac12\gamma_w h B\)(상류 끝 \(\gamma_w h\)에서 하류 끝 0, \(\mu\) = 1 배수공 없음, 배수공이 있으면 줄어든다 — 실제 분포는 배수공 위치에서 꺾인 다각형), \(f\): 콘크리트–암반 마찰 계수(0.65–0.75 형태), \(\tau_0\): 전단 강도. \(e \gt 0\)이면 합력이 하류 쪽으로 치우쳐 하류 끝 압력이 크다. 이 장의 모델은 교육용이며 하류 수위, 지진 관성력(동수압), 퇴사압은 생략했다.</div></div></div>
+    <div class="callout"><strong>예제 15.10 (높이 30 m 중력식 댐)</strong> \(H = 30\) m, \(b_c = 5\) m, \(B = 24\) m(하류 경사 약 0.63 : 1), 저수 깊이 \(h = 28\) m, \(\gamma_c = 23.5\) kN/m³, \(f = 0.7\).
+      <ol class="hy-steps">
+        <li><b>자중.</b> \(W_1 = 23.5 \times 5 \times 30 = 3{,}525\) kN(팔 21.5 m), \(W_2 = 23.5 \times \tfrac12 \times 19 \times 30 = 6{,}698\) kN(팔 24 − (5 + 19/3) = 12.67 m). \(W = 10{,}223\) kN, \(M_R = 160{,}600\) kN·m.</li>
+        <li><b>수압.</b> \(P = \tfrac12 \times 9.81 \times 28^2 = 3{,}846\) kN, 팔 9.33 m → 35,890 kN·m.</li>
+        <li><b>양압력(배수공 없음, μ = 1).</b> \(U = \tfrac12 \times 9.81 \times 28 \times 24 = 3{,}296\) kN, 팔 16 m → 52,740 kN·m. \(M_O = 88{,}630\) kN·m.</li>
+        <li><b>판정(배수공 없음).</b> \(FS_o = 1.81\), \(FS_s = 0.7 \times 6{,}926/3{,}846 = 1.26 \lt 1.5\) — <b>활동 불만족</b>. \(e = 12 - (160{,}600 - 88{,}630)/6{,}926 = 1.61\) m ≤ B/6 = 4 m(중앙 1/3 안), 하류 끝 압력 405 kPa, 상류 끝 173 kPa.</li>
+        <li><b>배수공(μ = 0.5).</b> \(U = 1{,}648\) kN → \(FS_s = 1.56\) — 만족, \(FS_o = 2.58\), \(e = 0.53\) m. 기초 암반의 전단 강도 \(\tau_0 = 500\) kPa를 더한 전단 마찰 안전율은 \((6{,}002 + 12{,}000)/3{,}846 = 4.7 \ge 4\). <b>양압력을 줄이는 배수공이 무게를 더하는 것만큼 효과적</b>이다.</li>
+      </ol></div>
+    <div class="sim" id="sim-hy-dam">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>중력식 댐 안정 검토</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="hy-cv-dam" aria-label="중력식 댐 단면, 작용력, 합력 위치, 기초 압력 분포"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>댐 높이 H <output id="hy-dm-H-out"></output></span><input type="range" id="hy-dm-H" min="10" max="80" step="1" value="30"></label>
+          <label class="ctrl"><span>밑폭 비 B/H <output id="hy-dm-B-out"></output></span><input type="range" id="hy-dm-B" min="0.4" max="1.2" step="0.01" value="0.8"></label>
+          <label class="ctrl"><span><i style="font-style:normal">마루 폭 b<sub>c</sub></i> <output id="hy-dm-c-out"></output></span><input type="range" id="hy-dm-c" min="3" max="12" step="0.5" value="5"></label>
+          <label class="ctrl"><span>저수 깊이 h/H <output id="hy-dm-h-out"></output></span><input type="range" id="hy-dm-h" min="0.3" max="1" step="0.001" value="0.933"></label>
+          <label class="ctrl"><span>양압력 계수 μ <output id="hy-dm-mu-out"></output></span><input type="range" id="hy-dm-mu" min="0" max="1" step="0.05" value="1"></label>
+          <label class="ctrl"><span>마찰 계수 f <output id="hy-dm-f-out"></output></span><input type="range" id="hy-dm-f" min="0.5" max="0.85" step="0.01" value="0.7"></label>
+          <label class="ctrl"><span><i style="font-style:normal">전단 강도 τ<sub>0</sub></i> <output id="hy-dm-t-out"></output></span><input type="range" id="hy-dm-t" min="0" max="1500" step="50" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">FS 전도</span><span class="v" id="hy-dm-fso">—</span></div>
+        <div class="stat"><span class="k">FS 활동 · SSF</span><span class="v" id="hy-dm-fss">—</span></div>
+        <div class="stat"><span class="k">편심 e / (B/6)</span><span class="v" id="hy-dm-e">—</span></div>
+        <div class="stat"><span class="k">기초 압력 하류·상류</span><span class="v" id="hy-dm-q">—</span></div>
+      </div>
+      <div class="hy-msg" id="hy-dm-msg"></div>
+      <div class="sim-note">해볼 것: 예제 15.10(H 30, B/H 0.8, h/H 0.93)에서 μ를 1 → 0.5로 내려 활동 판정이 바뀌는 것을 보세요 · 밑폭을 줄이면 합력이 중앙 1/3을 벗어나 상류 끝에 인장(음의 압력)이 생깁니다 — 콘크리트와 암반의 접합면은 인장을 못 받으므로 균열이 생겨 양압력이 더 커지는 악순환이 됩니다 · 모델: 원리 15.8, γ<sub>c</sub> 23.5 kN/m³, 기준값(1.5, 4, B/6)은 형태(교육용, 현행 기준 확인).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="scour">
+    <h2>교각 세굴과 세굴 방지</h2>
+    <div class="problem"><strong>보이지 않는 곳에서 기초가 드러난다</strong>
+      <p>교각은 흐름을 가로막습니다. 교각 앞에서 물이 내려꽂히며 바닥에서 말굽 모양의 소용돌이를 만들고, 이 소용돌이가 교각 둘레의 모래를 파냅니다. 홍수가 지나면 구덩이가 다시 메워져 평소 점검으로는 잘 보이지 않습니다. 그래서 세굴은 교량 붕괴의 대표 원인으로 꼽힙니다.</p></div>
+    <p>하천 교량의 세굴은 세 가지가 겹칩니다. 하천 전체의 하상이 오랜 시간 낮아지는 <b>장기 하상 변동</b>, 교량이 하폭을 좁혀 유속이 빨라지는 <b>단면 축소 세굴</b>, 그리고 교각·교대 둘레의 <span class="term">국부 세굴</span><span class="en">(local scour)</span>입니다. 설계 <span class="term">세굴 깊이</span><span class="en">(scour depth)</span>는 셋을 더한 값이고, 기초(확대 기초 밑면이나 말뚝의 유효 길이)는 그보다 깊어야 합니다. 이 장은 국부 세굴만 계산합니다.</p>
+    <figure class="diagram" id="fig-hy-scour">
+      <svg viewBox="0 0 880 300" role="img" aria-label="교각 앞의 하강류와 말굽 소용돌이, 세굴공, 사석 보호공">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">국부 세굴의 기구(측면)</text>
+          <path d="M0 40 L380 40" style="stroke:var(--blue);stroke-width:2"/>
+          <path d="M0 40 L380 40 L380 180 L250 180 L240 226 L160 226 L150 180 L0 180z" style="fill:var(--blue);opacity:.22"/>
+          <path d="M0 180 L150 180 L160 226 L240 226 L250 180 L380 180 L380 240 L0 240z" style="fill:url(#hy-soil);stroke:var(--warn);stroke-width:1.4"/>
+          <path d="M150 180 L130 180 L150 180" style="stroke:var(--warn)"/>
+          <rect x="185" y="20" width="30" height="190" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.4"/>
+          <rect x="165" y="210" width="70" height="20" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="30" y1="70" x2="170" y2="70" style="stroke:var(--blue);stroke-width:1.8" marker-end="url(#hy-ah-w)"/>
+          <line x1="30" y1="120" x2="170" y2="120" style="stroke:var(--blue);stroke-width:1.4" marker-end="url(#hy-ah-w)"/>
+          <path d="M178 60 L178 190" style="stroke:var(--bad);stroke-width:2" marker-end="url(#hy-ah-bad)"/>
+          <text x="80" y="58" class="t-mono" style="fill:var(--blue)">접근 유속 V</text>
+          <text x="100" y="150" class="t-mono" style="fill:var(--bad)">하강류</text>
+          <ellipse cx="160" cy="205" rx="20" ry="11" style="fill:none;stroke:var(--bad);stroke-width:1.8"/>
+          <text x="40" y="214" class="t-mono" style="fill:var(--bad)">말굽 소용돌이</text>
+          <line x1="300" y1="180" x2="300" y2="226" style="stroke:var(--text-dim)" marker-start="url(#hy-ah-t)" marker-end="url(#hy-ah-t)"/>
+          <line x1="250" y1="226" x2="306" y2="226" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="308" y="208" class="t-mono">세굴 깊이 yₛ</text>
+          <text x="186" y="14" class="t-mono">교각 폭 a</text>
+        </g>
+        <g transform="translate(480,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">세굴 방지(평면·측면)</text>
+          <path d="M0 160 L340 160" style="stroke:var(--blue);stroke-width:1.4"/>
+          <rect x="155" y="40" width="30" height="120" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:var(--text-faint);stroke:var(--text-dim)">
+            <circle cx="105" cy="168" r="7"/><circle cx="120" cy="170" r="8"/><circle cx="136" cy="167" r="7"/><circle cx="150" cy="171" r="7"/><circle cx="192" cy="170" r="7"/><circle cx="206" cy="167" r="8"/><circle cx="222" cy="170" r="7"/><circle cx="236" cy="168" r="7"/>
+          </g>
+          <text x="80" y="200" class="t-mono">사석 D₅₀, 두께 약 3D₅₀, 폭 2a 이상(형태)</text>
+          <path d="M0 176 L340 176" style="stroke:var(--warn);stroke-width:1.2"/>
+          <text x="0" y="230" class="t-dim">· 기초를 예상 세굴 깊이 아래로(말뚝 기초)</text>
+          <text x="0" y="252" class="t-dim">· 교각 형상 유선형·흐름 방향 정렬, 하상 유지</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 15-10.</b> 교각 국부 세굴. 교각 앞에서 정체된 흐름이 아래로 꽂히는 하강류와 바닥의 말굽 소용돌이가 모래를 실어 간다. 세굴 깊이는 교각 폭에 거의 비례하고(대략 1.5–2.5배), 유속·수심·교각 형상·흐름과의 각도에 따라 달라진다. 방지 공법은 하상을 무거운 돌로 덮거나(사석), 기초를 세굴 깊이보다 깊게 두는 것이다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 15.9 (교각 국부 세굴, HEC-18 CSU 식 형태 — 교육용)</strong>
+      <div class="formula">$$\frac{y_s}{a} = 2.0\,K_1K_2K_3\left(\frac{y_1}{a}\right)^{0.35}Fr_1^{0.43}, \qquad Fr_1 = \frac{V_1}{\sqrt{g\,y_1}}$$<div class="where">\(a\): 교각 폭, \(y_1\)·\(V_1\): 교각 바로 상류의 수심·유속, \(K_1\): 교각 앞면 형상(사각 1.1, 원형·둥근 끝 1.0, 뾰족 0.9), \(K_2 = (\cos\theta + (L/a)\sin\theta)^{0.65}\): 흐름과 교각의 각도 \(\theta\)(원형 교각은 1.0), \(K_3\): 하상 형태(청수 세굴·평탄 하상 1.1, 큰 사구 1.3 형태). 원형 교각은 \(y_s \le 2.4a\)(\(Fr_1 \le 0.8\)) 형태의 상한을 둔다. 세굴 방지 사석의 크기는 \(D_{50} = 0.692\,(KV)^2/((S_s - 1)\,2g)\)(HEC-23 형태, \(K\) 원형 1.5·사각 1.7, \(S_s\) 비중 2.65). 경험식은 실험·현장 자료의 포락에 가깝고 흩어짐이 크므로 실제 설계는 현행 국내 기준과 지침을 따른다.</div></div></div>
+    <div class="callout"><strong>예제 15.11 (B-130 교각 P1의 국부 세굴)</strong> 원형 기둥 \(a = 2.0\) m(\(K_1 = K_2 = 1.0\)), \(K_3 = 1.1\). 홍수 때 P1은 측면 비탈 위에 있어 수심이 얕지만, 하도 최심선(가장 깊은 줄기)은 홍수마다 옮겨 다닐 수 있으므로 하도 중앙의 \(y_1 = 5.15\) m, \(V_1 = 2.32\) m/s를 보수적으로 쓴다.
+      <ol class="hy-steps">
+        <li>\(Fr_1 = 2.32/\sqrt{9.81 \times 5.15} = 0.326\). (원리 15.5의 Fr 0.36은 수리 수심 \(D = A/T\)를 쓴 하도 전체 값, 여기는 교각 앞 수심.)</li>
+        <li>\(y_s/a = 2.0 \times 1.0 \times 1.0 \times 1.1 \times (5.15/2.0)^{0.35} \times 0.326^{0.43} = 2.2 \times 1.392 \times 0.618 = 1.89\).</li>
+        <li>\(y_s = 3.78\) m ≤ 2.4a = 4.8 m(상한 미만). 국부 세굴만 약 <b>3.8 m</b>.</li>
+        <li><b>판정.</b> 확대 기초 윗면이 하상 아래 2.0 m라면 세굴이 기초를 드러낸다 — 스코해리 크리크와 같은 위험. B-130은 강관 말뚝 기초(GeotechBook 14장 형태)이므로 말뚝의 수평 지지 길이에서 세굴 깊이(장기 변동·축소 세굴을 더해)만큼을 빼고 다시 검토한다.</li>
+        <li><b>사석.</b> \(D_{50} = 0.692 \times (1.5 \times 2.32)^2/(1.65 \times 19.62) = 0.26\) m. 지름 약 0.3 m 돌을 두께 0.8–0.9 m로 교각 둘레 4 m 이상 깐다(형태).</li>
+      </ol></div>
+    <div class="sim" id="sim-hy-scour">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>교각 세굴 깊이(경험식 형태)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="hy-cv-scour" aria-label="교각 측면의 세굴공 깊이와 기초 위치, 교각 폭에 따른 세굴 깊이 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>교각 폭 a <output id="hy-sc-a-out"></output></span><input type="range" id="hy-sc-a" min="0.5" max="5" step="0.1" value="2"></label>
+          <label class="ctrl"><span><i style="font-style:normal">수심 y<sub>1</sub></i> <output id="hy-sc-y-out"></output></span><input type="range" id="hy-sc-y" min="0.5" max="10" step="0.05" value="5.15"></label>
+          <label class="ctrl"><span><i style="font-style:normal">유속 V<sub>1</sub></i> <output id="hy-sc-v-out"></output></span><input type="range" id="hy-sc-v" min="0.3" max="5" step="0.01" value="2.32"></label>
+          <div class="ctrl"><span>교각 형상</span><div class="seg" id="hy-sc-shape"><button data-value="round" class="on">원형</button><button data-value="square">사각</button><button data-value="sharp">뾰족</button></div></div>
+          <label class="ctrl"><span>흐름 각도 θ (길이 L = 4a) <output id="hy-sc-th-out"></output></span><input type="range" id="hy-sc-th" min="0" max="45" step="1" value="0"></label>
+          <label class="ctrl"><span>기초 윗면(하상 아래) <output id="hy-sc-ft-out"></output></span><input type="range" id="hy-sc-ft" min="0" max="10" step="0.1" value="2"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">Fr<sub>1</sub> · K<sub>1</sub>K<sub>2</sub>K<sub>3</sub></span><span class="v" id="hy-sc-k">—</span></div>
+        <div class="stat"><span class="k">세굴 깊이 y<sub>s</sub></span><span class="v" id="hy-sc-ys">—</span></div>
+        <div class="stat"><span class="k">y<sub>s</sub>/a</span><span class="v" id="hy-sc-ratio">—</span></div>
+        <div class="stat"><span class="k">사석 D<sub>50</sub></span><span class="v" id="hy-sc-d50">—</span></div>
+      </div>
+      <div class="hy-msg" id="hy-sc-msg"></div>
+      <div class="sim-note">해볼 것: 교각 폭을 두 배로 하면 세굴은 약 2<sup>0.65</sup> = 1.57배가 됩니다 · 사각 교각을 흐름에 30° 비틀어 놓으면(K<sub>2</sub>) 세굴이 두 배 넘게 커집니다 — 하천 교각을 흐름 방향에 맞추고 원형으로 하는 이유입니다 · 기초 윗면을 세굴 깊이보다 깊게 내려 판정을 바꿔 보세요 · 모델: 원리 15.9(HEC-18 CSU 식 형태, 교육용; K<sub>3</sub> = 1.1 고정, 사각 교각만 각도 효과, 원형 상한 2.4a·3.0a), 사석은 HEC-23 형태.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="b130-river">
+    <h2>B-130 하천 종합: 3차원으로 보기</h2>
+    <p>지금까지의 계산을 B-130 하천 한 곳에 모읍니다. 유량을 바꾸면 매닝 공식으로 수심이 다시 계산되고, 수면이 하도를 채워 교각을 잠그며, 교각 둘레의 세굴공 깊이가 함께 바뀝니다. 제방 마루를 넘는 유량, 형하 여유가 줄어드는 유량을 3차원 장면에서 확인합니다.</p>
+    <div class="sim" id="sim-hy-river3d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-130 하천 3D: 홍수위와 세굴</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="hy-cv-river3d" aria-label="B-130 교량과 하천의 3차원 장면, 홍수 수면과 교각 세굴"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>유량 Q <output id="hy-r3-Q-out"></output></span><input type="range" id="hy-r3-Q" min="20" max="1600" step="10" value="600"></label>
+          <div class="ctrl"><span>보기</span><div class="seg" id="hy-r3-view"><button data-value="iso" class="on">비스듬히</button><button data-value="up">상류에서</button><button data-value="top">위에서</button></div></div>
+          <label class="ctrl"><input type="checkbox" id="hy-r3-scour" checked> 세굴공 표시(최심선 이동 가정)</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">수심 y<sub>n</sub> · 수면 폭</span><span class="v" id="hy-r3-y">—</span></div>
+        <div class="stat"><span class="k">유속 · Fr</span><span class="v" id="hy-r3-v">—</span></div>
+        <div class="stat"><span class="k">제방 여유 · 형하 여유</span><span class="v" id="hy-r3-fb">—</span></div>
+        <div class="stat"><span class="k">교각 세굴 y<sub>s</sub></span><span class="v" id="hy-r3-ys">—</span></div>
+      </div>
+      <div class="hy-msg" id="hy-r3-msg"></div>
+      <div class="sim-note">해볼 것: 장면을 끌어 돌려 보세요 · Q를 800 m³/s 넘게 올리면 여유고가 1.0 m 아래로 줄고, 약 1,040 m³/s에서 수면이 제방 마루(하상 + 7.0 m)에 닿습니다 · 평수기(Q 20–50)에는 교각이 물 밖에 있습니다 · 모델: CB.civ.normalDepth·froude(b 40 m, 1 : 2, n 0.035, S 1/1000), 세굴은 원리 15.9(a = 2.0 m, 하도 중앙 수심·유속을 보수적으로 사용), 배치는 그림 15-6(교육용).</div>
+    </div>
+    <div class="callout site"><strong>B-130 하천 요약(교육용)</strong> 사다리꼴 하도 바닥 폭 40 m, 측면 1 : 2, n = 0.035, S = 1/1000. 계획 홍수량 <b>600 m³/s</b> → 등류 수심 <b>5.15 m</b>, A = 258.9 m², R = 4.11 m, 유속 <b>2.32 m/s</b>, 프루드 수 <b>0.36</b>(상류, 완경사 수로), 한계 수심 2.71 m. 하상 EL 20.00 m라 하면 HWL EL 25.15 m, 여유고 1.0 m(500–2,000 m³/s 형태) → 제방 마루 EL 27.00 m로 0.85 m 여유, 거더 밑 EL 30.00 m로 형하 여유 4.85 m. 교각 P1·P2(원형 φ2.0 m) 국부 세굴 약 <b>3.8 m</b>(HEC-18 형태, 교육용), 사석 D<sub>50</sub> 약 0.26 m. 기초는 강관 말뚝이므로 세굴 후 말뚝의 수평 지지를 다시 검토한다(GeotechBook 14장). 제방 침투: 침출 높이 약 1.0 m, 기초가 가는 모래면 차수벽 필요(교육용 판정). 이 모든 값은 학습용이며 실제 설계는 현행 하천 설계기준(KDS 51 계열)과 도로교 설계기준, 하천 기본 계획의 수치를 쓴다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="bridges.html"><small>CH.01 · 교량의 이해</small>교량 높이와 하천 단면 배치<br><span>형하 여유, 경간 배치, B-130의 하천 횡단.</span></a>
+      <a href="substructure.html"><small>CH.06 · 하부 구조와 받침</small>교각·기초와 유수압<br><span>세굴 깊이만큼 줄어든 말뚝 지지, 교각 형상.</span></a>
+      <a href="earthwork.html"><small>CH.12 · 토공과 배수</small>도로 배수와 측구·암거<br><span>합리식 첨두 유량, 매닝 공식으로 측구 단면.</span></a>
+      <a href="maintenance.html"><small>CH.16 · 유지관리와 성능 개선</small>세굴 점검과 기초 보강<br><span>수중 조사, 상태 등급, 세굴 방지공 유지.</span></a>
+      <a href="../../geotech/chapters/seepage.html"><small>GeotechBook · CH.05</small>투수와 침투<br><span>흙댐의 침윤선, 파이핑과 출구 동수경사, 필터.</span></a>
+      <a href="../../geotech/chapters/slope.html"><small>GeotechBook · CH.12</small>사면 안정<br><span>침투 중인 제방 뒷비탈의 활동 검토.</span></a>
+      <a href="../../geotech/chapters/piles.html"><small>GeotechBook · CH.14</small>말뚝 기초<br><span>세굴 후 노출된 말뚝의 수평 저항.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>수문 순환에서 하천 설계를 지배하는 것은 짧은 집중 호우의 직접 유출이다. 작은 유역은 합리식 Q = CiA/3.6(i는 도달 시간 t<sub>c</sub>의 강도), 큰 유역은 단위도의 중첩 Q<sub>n</sub> = ΣP<sub>m</sub>U<sub>n−m+1</sub>로 홍수 수문곡선을 만든다.</li>
+      <li>등류에서 매닝 공식 V = R<sup>2/3</sup>S<sup>1/2</sup>/n, Q = VA, R = A/P. 유량이 주어지면 등류 수심을 반복 계산으로 역산한다. B-130 하천: 600 m³/s → y<sub>n</sub> = 5.15 m, V = 2.32 m/s.</li>
+      <li>비에너지 E = y + V²/2g는 한계 수심(Q²T/gA³ = 1, 직사각형 y<sub>c</sub> = (q²/g)<sup>1/3</sup>)에서 최소다. Fr = V/√(gD) &lt; 1 상류(하류가 수위를 정함), &gt; 1 사류. B-130 하천 Fr ≈ 0.36, y<sub>c</sub> = 2.71 m.</li>
+      <li>도수는 운동량 보존으로 y<sub>2</sub>/y<sub>1</sub> = ½(√(1 + 8Fr<sub>1</sub>²) − 1), 손실 ΔE = (y<sub>2</sub> − y<sub>1</sub>)³/(4y<sub>1</sub>y<sub>2</sub>). 감세지는 도수를 가두어 에너지를 소산시킨다.</li>
+      <li>계획 홍수위에 여유고(계획 홍수량 500–2,000 m³/s에서 1.0 m 형태)를 더해 제방 마루와 교량 형하를 정한다. B-130: HWL + 1.0 m = 하상 + 6.15 m ≤ 제방 7.0 m, 형하 여유 4.85 m.</li>
+      <li>제방은 월류·침투(침윤선과 뒷비탈 활동)·기초 파이핑·침식으로 무너진다. 카사그란데 침윤선, 끝 드레인, 레인 크리프 비로 어림하고 차수벽·소단·블랭킷으로 대책을 세운다.</li>
+      <li>중력식 댐은 전도(합력이 중앙 1/3), 활동(f(W − U)/P ≥ 1.5 또는 전단 마찰 ≥ 4 형태), 기초 압력을 검토한다. 양압력을 줄이는 배수공이 안정에 크게 기여한다.</li>
+      <li>교각 국부 세굴은 HEC-18 형태 y<sub>s</sub>/a = 2.0K<sub>1</sub>K<sub>2</sub>K<sub>3</sub>(y<sub>1</sub>/a)<sup>0.35</sup>Fr<sub>1</sub><sup>0.43</sup>로 어림한다(B-130 교각 약 3.8 m, 교육용). 기초는 세굴 깊이 아래로, 하상은 사석으로 보호하고, 교각은 흐름 방향에 맞춘다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 유출 계수 0.6, 도달 시간에 해당하는 강우 강도 50 mm/h, 유역 면적 3 km²인 유역의 합리식 첨두 유량은?</p><div class="opts">
+        <button class="opt">2.5 m³/s</button><button class="opt" data-correct>25 m³/s</button><button class="opt">90 m³/s</button><button class="opt">250 m³/s</button>
+      </div><div class="quiz-exp">Q = CiA/3.6 = 0.6 × 50 × 3/3.6 = 25 m³/s. 3.6은 mm/h·km²를 m³/s로 바꾸는 환산 계수다.</div></div>
+      <div class="quiz-q"><p>2. 같은 하천에 수목이 우거져 매닝 n이 0.030에서 0.040으로 커졌다. 같은 수심에서 흐르는 유량은?</p><div class="opts">
+        <button class="opt">33 % 늘어난다</button><button class="opt">변하지 않는다</button><button class="opt" data-correct>25 % 줄어든다</button><button class="opt">44 % 줄어든다</button>
+      </div><div class="quiz-exp">Q ∝ 1/n이므로 0.030/0.040 = 0.75배. 같은 유량을 흘리려면 수심이 올라가야 하므로 하도 정비(수목 관리)가 홍수위 관리의 일부다.</div></div>
+      <div class="quiz-q"><p>3. B-130 하천의 계획 홍수 흐름(Fr ≈ 0.36)에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">사류이므로 교각의 영향은 하류로만 전해진다</button><button class="opt" data-correct>상류이므로 하류의 보나 교각이 만드는 수위 상승이 상류로 전파된다</button><button class="opt">한계류이므로 수면이 불안정하다</button><button class="opt">프루드 수는 수위 계산과 무관하다</button>
+      </div><div class="quiz-exp">Fr &lt; 1이면 파의 전파 속도가 유속보다 빨라 교란이 상류로 거슬러 간다. 그래서 상류 흐름의 수면은 하류 조건(보, 교각, 합류점 수위)이 정한다.</div></div>
+      <div class="quiz-q"><p>4. 직사각형 수로의 단위 폭 유량이 4 m²/s일 때 한계 수심과 최소 비에너지는?</p><div class="opts">
+        <button class="opt" data-correct>1.18 m, 1.77 m</button><button class="opt">0.64 m, 0.96 m</button><button class="opt">1.63 m, 2.45 m</button><button class="opt">2.00 m, 3.00 m</button>
+      </div><div class="quiz-exp">y<sub>c</sub> = (q²/g)<sup>1/3</sup> = (16/9.81)<sup>1/3</sup> = 1.18 m, E<sub>min</sub> = 1.5y<sub>c</sub> = 1.77 m.</div></div>
+      <div class="quiz-q"><p>5. 수심 0.5 m, 프루드 수 3.0인 사류에서 도수가 생기면 공액 수심은?</p><div class="opts">
+        <button class="opt">1.0 m</button><button class="opt">1.5 m</button><button class="opt" data-correct>1.89 m</button><button class="opt">4.5 m</button>
+      </div><div class="quiz-exp">y<sub>2</sub> = (0.5/2)(√(1 + 8 × 9) − 1) = 0.25 × (8.544 − 1) = 1.89 m. Fr<sub>1</sub> = 3은 진동 도수 구간(2.5–4.5)이라 감세지 설계에서 피하는 편이다.</div></div>
+      <div class="quiz-q"><p>6. 계획 홍수량 600 m³/s, 계획 홍수위 EL 25.15 m인 구간에서 표 15-1 형태의 여유고를 적용한 제방 마루의 최소 표고는?</p><div class="opts">
+        <button class="opt">EL 25.75 m</button><button class="opt">EL 25.95 m</button><button class="opt" data-correct>EL 26.15 m</button><button class="opt">EL 27.15 m</button>
+      </div><div class="quiz-exp">500–2,000 m³/s 구간의 여유고 1.0 m(형태)를 더해 EL 26.15 m. B-130 지점 제방 마루 EL 27.00 m는 0.85 m 여유가 있다.</div></div>
+      <div class="quiz-q"><p>7. 중력식 댐 기초에 배수공(드레인)을 두는 주된 이유는?</p><div class="opts">
+        <button class="opt">저수량을 늘리기 위해</button><button class="opt" data-correct>양압력을 줄여 활동·전도 안전율을 높이기 위해</button><button class="opt">수평 수압을 줄이기 위해</button><button class="opt">콘크리트의 수화열을 낮추기 위해</button>
+      </div><div class="quiz-exp">양압력은 댐의 유효 무게(W − U)를 줄여 마찰 저항을 떨어뜨리고 전도 모멘트를 키운다. 예제 15.10에서 μ를 1 → 0.5로 줄이자 활동 안전율이 1.26 → 1.56이 되었다.</div></div>
+      <div class="quiz-q"><p>8. HEC-18 형태의 교각 세굴 식에서 다른 조건이 같고 교각 폭만 두 배가 되면 세굴 깊이는?</p><div class="opts">
+        <button class="opt">변하지 않는다</button><button class="opt" data-correct>약 1.57배</button><button class="opt">2배</button><button class="opt">4배</button>
+      </div><div class="quiz-exp">y<sub>s</sub> = 2.0K a (y<sub>1</sub>/a)<sup>0.35</sup>Fr<sup>0.43</sup> ∝ a<sup>1 − 0.35</sup> = a<sup>0.65</sup>. 2<sup>0.65</sup> = 1.57. 세굴 깊이는 교각 폭에 거의 비례하지만 조금 덜 늘어난다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const HY = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${HY.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  poly(ctx, pts, fill, stroke, width = 1.4) {
+    ctx.save(); ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); } ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = HY._c || (HY._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  soil() { return HY.alpha(CB.palette().warn, CB.isDark() ? 0.22 : 0.2); },
+  msg(id, html, cls) { const m = document.getElementById(id); if (!m) return; m.className = "hy-msg" + (cls ? " " + cls : ""); m.innerHTML = html; },
+  g: 9.81,
+  RIVER: { b: 40, z: 2, n: 0.035, S: 0.001 },
+  /** 계획 홍수량에 따른 제방 여유고(표 15-1 형태, 교육용) */
+  freeboard(Q) { return Q < 200 ? 0.6 : Q < 500 ? 0.8 : Q < 2000 ? 1.0 : Q < 5000 ? 1.2 : Q < 10000 ? 1.5 : 2.0; },
+  /** HEC-18 CSU 식 형태(교육용) */
+  scour(a, y, V, K1 = 1, K2 = 1, K3 = 1.1, round = true) {
+    if (!(y > 0) || !(V > 0)) return { ys: 0, Fr: 0, cap: false };
+    const Fr = V / Math.sqrt(HY.g * y); let ys = 2.0 * K1 * K2 * K3 * Math.pow(y / a, 0.35) * Math.pow(Fr, 0.43) * a;
+    let cap = false; if (round) { const lim = (Fr <= 0.8 ? 2.4 : 3.0) * a; if (ys > lim) { ys = lim; cap = true; } }
+    return { ys, Fr, cap };
+  },
+  fit(W) { return W < 560; },
+};
+
+/* ---------- 1. 합리식 ---------- */
+(function () {
+  const AT = { 10: 4000, 50: 5000, 100: 5600 }, B = 40;
+  const gA = CB.range("hy-ra-A", (v) => v.toFixed(1) + " km²", go), gC = CB.range("hy-ra-C", (v) => v.toFixed(2), go), gL = CB.range("hy-ra-L", (v) => CB.sig(v, 4) + " m", go), gS = CB.range("hy-ra-S", (v) => v.toFixed(3), go), gT = CB.seg("hy-ra-T", go);
+  const tcOf = () => Math.max(5, 0.0195 * Math.pow(gL(), 0.77) * Math.pow(gS(), -0.385));
+  const cv = CB.canvas("#hy-cv-rational", (ctx, W, H) => {
+    const pal = CB.palette(), T = +gT(), tc = tcOf(), i = AT[T] / (tc + B);
+    const ser = [10, 50, 100].map((t) => { const d = []; for (let m = 5; m <= 180; m += 1) d.push([m, AT[t] / (m + B)]); return { data: d, color: t === T ? pal.accent : pal.faint, width: t === T ? 2.8 : 1.3, dash: t === T ? [] : [5, 4] }; });
+    const C = CB.chart(ctx, { x: 58, y: 16, w: W - 58 - 16, h: H - 16 - 46 }, { x: [0, 180], y: [0, 140], xLabel: "지속 시간 t (분)", yLabel: "강우 강도 i (mm/h)", series: ser,
+      vlines: [{ x: Math.min(180, tc), color: pal.accent2, label: "t꜀" }], points: [{ x: Math.min(180, tc), y: i, color: pal.accent2, r: 6 }] });
+    [10, 50, 100].forEach((t) => HY.text(ctx, t + "년", C.X(170), C.Y(AT[t] / (170 + B)) - 9, t === T ? pal.accent : pal.dim, { size: 10.5 }));
+    HY.text(ctx, `i = ${CB.num(i, 1)} mm/h`, Math.min(C.X(tc) + 10, W - 110), C.Y(i) - 16, pal.accent2, { align: "left", size: 11.5 });
+  }, { aspect: (W) => (W < 520 ? 0.78 : 0.5), minHeight: 250, maxHeight: 340 });
+  function go() {
+    cv.redraw();
+    const tc = tcOf(), i = AT[+gT()] / (tc + B), Q = CB.civ.rational(gC(), i, gA());
+    CB.stat("hy-ra-tc", CB.num(tc, 1) + " 분"); CB.stat("hy-ra-i", CB.num(i, 1) + " mm/h"); CB.stat("hy-ra-Q", CB.num(Q, 1) + " m³/s"); CB.stat("hy-ra-q", CB.num(Q / gA(), 2) + " m³/s/km²");
+    if (gA() > 4) HY.msg("hy-ra-msg", `유역 ${CB.num(gA(), 1)} km²: 합리식의 일반적 적용 범위(수 km² 이하, 기준 확인)를 넘습니다. 단위도·홍수 추적으로 확인하세요(Q<sub>p</sub> = ${CB.num(Q, 1)} m³/s는 과대 추정일 수 있음).`, "bad");
+    else HY.msg("hy-ra-msg", `Q<sub>p</sub> = ${CB.num(gC(), 2)} × ${CB.num(i, 1)} × ${CB.num(gA(), 1)} / 3.6 = <b>${CB.num(Q, 1)} m³/s</b>. ${gC() >= 0.75 ? "포장 비율이 높은 유역입니다 — 저류지로 첨두를 낮추는 것을 검토합니다." : "C를 올리면(도시화) 첨두가 비례해 커집니다."}`);
+  }
+  go();
+})();
+
+/* ---------- 2. 매닝 수로 계산기 ---------- */
+(function () {
+  const PRE = { river: { b: 40, z: 2, y: 5.15, n: 0.035, s: 1000 }, canal: { b: 3, z: 1, y: 1.2, n: 0.014, s: 1000 }, ditch: { b: 0.4, z: 1.5, y: 0.3, n: 0.015, s: 200 } };
+  const pre = CB.seg("hy-mn-pre", (v) => { const p = PRE[v]; gb.set(p.b, false); gz.set(p.z, false); gy.set(p.y, false); gn.set(p.n, false); gs.set(p.s, false); go(); });
+  const gb = CB.range("hy-mn-b", (v) => v.toFixed(1) + " m", go), gz = CB.range("hy-mn-z", (v) => v.toFixed(1), go), gy = CB.range("hy-mn-y", (v) => v.toFixed(2) + " m", go), gn = CB.range("hy-mn-n", (v) => v.toFixed(3), go), gs = CB.range("hy-mn-s", (v) => "1/" + v, go);
+  const o = () => ({ b: gb(), z: gz(), y: gy(), n: gn(), S: 1 / gs() });
+  const cv = CB.canvas("#hy-cv-manning", (ctx, W, H) => {
+    const pal = CB.palette(), p = o(), Hd = Math.max(p.y * 1.35, p.y + 0.2), top = p.b + 2 * p.z * Hd;
+    const sx = (W - 80) / Math.max(top * 1.1, 0.5), sc = Math.min((H - 90) / Hd, sx * 4), cx = W / 2, by = H - 40;
+    const X = (x) => cx + x * sx, Y = (z) => by - z * sc;
+    HY.poly(ctx, [[X(-top / 2 - 0.05 * top) , Y(Hd)], [X(-top / 2), Y(Hd)], [X(-p.b / 2), Y(0)], [X(p.b / 2), Y(0)], [X(top / 2), Y(Hd)], [X(top / 2 + 0.05 * top), Y(Hd)], [X(top / 2 + 0.05 * top), by + 24], [X(-top / 2 - 0.05 * top), by + 24]], HY.soil(), pal.warn, 1.6);
+    const T = p.b + 2 * p.z * p.y;
+    HY.poly(ctx, [[X(-T / 2), Y(p.y)], [X(T / 2), Y(p.y)], [X(p.b / 2), Y(0)], [X(-p.b / 2), Y(0)]], HY.alpha(pal.blue, 0.3), null);
+    HY.line(ctx, [[X(-T / 2), Y(p.y)], [X(T / 2), Y(p.y)]], pal.blue, 2.2);
+    HY.line(ctx, [[X(-T / 2), Y(p.y)], [X(-p.b / 2), Y(0)], [X(p.b / 2), Y(0)], [X(T / 2), Y(p.y)]], pal.accent2, 3.2);
+    HY.arrow(ctx, X(T / 2) + 22, Y(0), X(T / 2) + 22, Y(p.y), pal.blue, 1.5, 7);
+    HY.text(ctx, `y = ${CB.num(p.y, 2)} m`, cx, Y(p.y / 2), pal.blue, { size: 11.5 });
+    HY.text(ctx, `T = ${CB.num(T, 2)} m`, cx, Y(p.y) - 14, pal.blue, { size: 11.5 });
+    HY.text(ctx, `b = ${CB.num(p.b, 2)} m`, cx, by + 14, pal.dim, { size: 11 });
+    HY.text(ctx, "윤변 P(주황)" + (sc > sx * 1.05 ? " · 세로 " + CB.num(sc / sx, 1) + "배 과장" : ""), 20, 18, pal.accent2, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 230, maxHeight: 320 });
+  function go() {
+    cv.redraw();
+    const p = o(), r = CB.civ.manning(p), Fr = CB.civ.froude(p);
+    CB.stat("hy-mn-AP", `${CB.sig(r.A, 3)} · ${CB.sig(r.P, 3)}`); CB.stat("hy-mn-R", CB.num(r.R, 3) + " m"); CB.stat("hy-mn-V", CB.num(r.V, 2) + " m/s");
+    CB.stat("hy-mn-Q", CB.sig(r.Q, 3) + " m³/s"); CB.stat("hy-mn-Fr", `${CB.num(Fr, 2)} (${Fr < 0.95 ? "상류" : Fr > 1.05 ? "사류" : "한계류 부근"})`);
+  }
+  go();
+})();
+
+/* ---------- 3. 등류 수심과 홍수위 ---------- */
+(function () {
+  const gQ = CB.range("hy-nd-Q", (v) => v + " m³/s", go), gn = CB.range("hy-nd-n", (v) => v.toFixed(3), go), gs = CB.range("hy-nd-s", (v) => "1/" + v, go), gc = CB.range("hy-nd-crest", (v) => v.toFixed(2) + " m", go), gso = CB.range("hy-nd-soffit", (v) => v.toFixed(1) + " m", go);
+  let R = null;
+  function calc() {
+    const o = { b: 40, z: 2, n: gn(), S: 1 / gs() }, Q = gQ(), yn = CB.civ.normalDepth(Q, o), m = CB.civ.manning({ ...o, y: yn }), Fr = CB.civ.froude({ ...o, y: yn }), fb = HY.freeboard(Q);
+    const curve = []; for (let y = 0.05; y <= 10.001; y += 0.05) curve.push([CB.civ.manning({ ...o, y }).Q, y]);
+    R = { o, Q, yn, m, Fr, fb, curve, crest: gc(), soffit: gso() };
+  }
+  const cv = CB.canvas("#hy-cv-normal", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), narrow = HY.fit(W);
+    const b1 = narrow ? { x: 54, y: 14, w: W - 70, h: H * 0.5 - 52 } : { x: 54, y: 14, w: W * 0.45 - 60, h: H - 60 };
+    CB.chart(ctx, b1, { x: [0, 2000], y: [0, 10], xLabel: "유량 Q (m³/s)", yLabel: "수심 y (m)", series: [{ data: R.curve, color: pal.accent, width: 2.4 }],
+      hlines: [{ y: R.crest - R.fb, color: pal.warn, label: "" }, { y: R.crest, color: pal.text, label: "" }], points: [{ x: R.Q, y: R.yn, color: pal.blue, r: 6 }] });
+    const s = narrow ? { x: 20, y: H * 0.5 + 8, w: W - 40, h: H * 0.5 - 18 } : { x: W * 0.47, y: 14, w: W * 0.53 - 16, h: H - 30 };
+    const zmax = Math.max(R.soffit + 3, 12), xw = 130, sx = s.w / xw, sc = Math.min(s.h / (zmax + 1.5), sx * 6);
+    const X = (x) => s.x + x * sx, Y = (z) => s.y + s.h - 4 - (z + 1.2) * sc;
+    const c = R.crest, xl = 45 - 2 * c, xr = 85 + 2 * c;
+    HY.poly(ctx, [[X(0), Y(c)], [X(xl), Y(c)], [X(45), Y(0)], [X(85), Y(0)], [X(xr), Y(c)], [X(130), Y(c)], [X(130), Y(-1.2)], [X(0), Y(-1.2)]], HY.soil(), pal.warn, 1.4);
+    const y = Math.min(R.yn, c + 0.6), over = R.yn > c;
+    const wl = over ? 0 : 45 - 2 * y, wr = over ? 130 : 85 + 2 * y;
+    HY.poly(ctx, over ? [[X(0), Y(y)], [X(130), Y(y)], [X(130), Y(c)], [X(xr), Y(c)], [X(85), Y(0)], [X(45), Y(0)], [X(xl), Y(c)], [X(0), Y(c)]] : [[X(wl), Y(y)], [X(wr), Y(y)], [X(85), Y(0)], [X(45), Y(0)]], HY.alpha(pal.blue, 0.35), null);
+    HY.line(ctx, [[X(wl), Y(y)], [X(wr), Y(y)]], pal.blue, 2);
+    HY.line(ctx, [[X(20), Y(R.yn + R.fb)], [X(110), Y(R.yn + R.fb)]], pal.warn, 1.3, [5, 4]);
+    // 교량
+    ctx.fillStyle = HY.alpha(pal.dim, 0.35); ctx.fillRect(X(0), Y(R.soffit + 2.45), xw * sx, 2.45 * sc);
+    [40, 90].forEach((xp) => { ctx.fillStyle = HY.alpha(pal.dim, 0.5); ctx.fillRect(X(xp - 1), Y(R.soffit), Math.max(3, 2 * sx), (R.soffit - 2.5) * sc); });
+    HY.text(ctx, `HWL +${CB.num(R.yn, 2)}`, X(65), Y(y) - 10, pal.blue, { size: 11 });
+    HY.text(ctx, `+여유고 ${CB.num(R.fb, 1)}`, X(112), Y(R.yn + R.fb) - 8, pal.warn, { size: 10.5, align: "left" });
+    HY.text(ctx, `형하 +${CB.num(R.soffit, 1)}`, X(2), Y(R.soffit + 2.45) - 9, pal.dim, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 560 ? 1.15 : 0.48), minHeight: 300, maxHeight: 520 });
+  function go() {
+    calc(); cv.redraw();
+    const lev = R.crest - (R.yn + R.fb), clr = R.soffit - R.yn;
+    CB.stat("hy-nd-yn", CB.num(R.yn, 2) + " m"); CB.stat("hy-nd-VF", `${CB.num(R.m.V, 2)} m/s · ${CB.num(R.Fr, 2)}`); CB.stat("hy-nd-fb", CB.num(R.fb, 1) + " m");
+    CB.stat("hy-nd-levee", (lev >= 0 ? "+" : "−") + CB.num(Math.abs(lev), 2) + " m"); CB.stat("hy-nd-clear", CB.num(clr, 2) + " m");
+    if (R.yn > R.crest) HY.msg("hy-nd-msg", `수심 ${CB.num(R.yn, 2)} m가 제방 마루(${CB.num(R.crest, 2)} m)를 넘습니다 — <b>월류</b>. 제방을 높이거나 하폭을 넓히거나 상류 저류(댐·홍수 조절지)로 홍수량을 줄여야 합니다.`, "bad");
+    else if (lev < 0 || clr < R.fb) HY.msg("hy-nd-msg", `${lev < 0 ? `제방 여유고 부족(${CB.num(lev, 2)} m)` : ""}${lev < 0 && clr < R.fb ? " · " : ""}${clr < R.fb ? `형하 여유 ${CB.num(clr, 2)} m &lt; ${CB.num(R.fb, 1)} m` : ""} — <b>불만족</b>(표 15-1 형태).`, "bad");
+    else HY.msg("hy-nd-msg", `HWL = 하상 + ${CB.num(R.yn, 2)} m, 필요 마루 ${CB.num(R.yn + R.fb, 2)} m ≤ ${CB.num(R.crest, 2)} m, 형하 여유 ${CB.num(clr, 2)} m ≥ ${CB.num(R.fb, 1)} m — <b>만족</b>.`, "ok");
+  }
+  go();
+})();
+
+/* ---------- 4. 비에너지와 도수 ---------- */
+(function () {
+  const g = HY.g; let mode = "rect";
+  const gq = CB.range("hy-en-q", (v) => (mode === "rect" ? v.toFixed(1) + " m²/s" : v.toFixed(0) + " m³/s"), go), gy = CB.range("hy-en-y", (v) => v.toFixed(2) + " m", go);
+  const md = CB.seg("hy-en-mode", (v) => {
+    mode = v; const el = gq.el;
+    if (v === "rect") { el.min = 1; el.max = 30; el.step = 0.5; document.getElementById("hy-en-q-lab").firstChild.textContent = "단위 폭 유량 q "; gq.set(10, false); gy.set(0.8, false); }
+    else { el.min = 50; el.max = 2000; el.step = 10; document.getElementById("hy-en-q-lab").firstChild.textContent = "유량 Q "; gq.set(600, false); gy.set(5.15, false); }
+    go();
+  });
+  const A = (y) => (mode === "rect" ? y : (40 + 2 * y) * y), T = (y) => (mode === "rect" ? 1 : 40 + 4 * y);
+  const E = (y) => y + gq() ** 2 / (2 * g * A(y) ** 2);
+  const Fr = (y) => gq() / A(y) / Math.sqrt(g * A(y) / T(y));
+  function yc() { let lo = 1e-3, hi = 20; for (let k = 0; k < 80; k++) { const m = (lo + hi) / 2; if (Fr(m) > 1) lo = m; else hi = m; } return (lo + hi) / 2; }
+  function alt(y, c) { const e = E(y); let lo, hi; if (y > c) { lo = 1e-4; hi = c; } else { lo = c; hi = 60; } for (let k = 0; k < 90; k++) { const m = (lo + hi) / 2; const f = E(m) - e; if (y > c) { if (f > 0) lo = m; else hi = m; } else { if (f < 0) lo = m; else hi = m; } } return (lo + hi) / 2; }
+  let C = null, S = null;
+  const cv = CB.canvas("#hy-cv-energy", (ctx, W, H) => {
+    const pal = CB.palette(); if (!S) return;
+    const ymax = S.ymax, xmax = Math.max(10, S.Emin * 2.4), d = [];
+    for (let y = 0.02; y <= ymax; y += 0.01) { const e = E(y); if (e <= xmax * 1.02) d.push([e, y]); else if (d.length) d.push([NaN, NaN]); }
+    C = CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 }, { x: [0, xmax], y: [0, ymax], xLabel: "비에너지 E (m)", yLabel: "수심 y (m)",
+      series: [{ data: d, color: pal.accent, width: 2.6 }, { data: [[0, 0], [ymax, ymax]], color: pal.faint, width: 1, dash: [4, 4] }],
+      hlines: [{ y: S.yc, color: pal.accent2, label: "y꜀" }], points: [{ x: S.Emin, y: S.yc, color: pal.accent2, r: 5 }, { x: S.E, y: S.y, color: S.y >= S.yc ? pal.blue : pal.bad, r: 7 }, { x: S.E, y: S.alt, color: pal.ok, r: 5 }].concat(S.y2 ? [{ x: E(S.y2), y: S.y2, color: pal.blue, r: 5 }] : []) });
+    HY.line(ctx, [[C.X(S.E), C.Y(S.y)], [C.X(S.E), C.Y(S.alt)]], pal.ok, 1.2, [3, 3]);
+    if (S.y2) { HY.line(ctx, [[C.X(S.E), C.Y(S.y)], [C.X(E(S.y2)), C.Y(S.y2)]], pal.blue, 1.4, [5, 4]); HY.text(ctx, `y₂ = ${CB.num(S.y2, 2)}`, C.X(E(S.y2)) + 8, C.Y(S.y2) - 12, pal.blue, { align: "left", size: 11 }); }
+    HY.text(ctx, `y = ${CB.num(S.y, 2)}`, C.X(S.E) + 9, C.Y(S.y) + 12, S.y >= S.yc ? pal.blue : pal.bad, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 270, maxHeight: 360 });
+  const el = cv.canvas; let drag = false;
+  const setY = (e) => { if (!C) return; const r = el.getBoundingClientRect(), y = ((C.box.y + C.box.h - (e.clientY - r.top)) / C.box.h) * S.ymax; gy.set(CB.clamp(Math.round(y * 100) / 100, 0.2, 8)); };
+  el.addEventListener("pointerdown", (e) => { drag = true; el.setPointerCapture(e.pointerId); setY(e); });
+  el.addEventListener("pointermove", (e) => { if (drag) setY(e); });
+  el.addEventListener("pointerup", () => (drag = false)); el.addEventListener("pointercancel", () => (drag = false));
+  function go() {
+    const y = gy(), c = yc(), e = E(y), f = Fr(y), a = alt(y, c);
+    S = { y, yc: c, E: e, Emin: E(c), alt: a, y2: null, ymax: Math.min(25, Math.max(8.5, a * 1.08)) };
+    if (mode === "rect" && y < c * 0.999) { S.y2 = (y / 2) * (Math.sqrt(1 + 8 * f * f) - 1); S.dE = (S.y2 - y) ** 3 / (4 * y * S.y2); }
+    cv.redraw();
+    CB.stat("hy-en-E", CB.num(e, 2) + " m"); CB.stat("hy-en-yc", `${CB.num(c, 2)} · ${CB.num(E(c), 2)} m`); CB.stat("hy-en-Fr", `${CB.num(f, 2)} · ${f < 0.98 ? "상류" : f > 1.02 ? "사류" : "한계류"}`);
+    CB.stat("hy-en-alt", CB.num(a, 2) + " m"); CB.stat("hy-en-jump", S.y2 ? `${CB.num(S.y2, 2)} m · ${CB.num(S.dE, 2)} m` : "—");
+    if (S.y2) { const k = f < 1.7 ? "파상 도수" : f < 2.5 ? "약한 도수" : f < 4.5 ? "진동 도수(불안정, 피함)" : f < 9 ? "정상 도수(감세에 좋음)" : "강한 도수"; HY.msg("hy-en-msg", `사류 Fr<sub>1</sub> = ${CB.num(f, 2)} → <b>${k}</b>. 공액 수심 ${CB.num(S.y2, 2)} m로 솟으며 비에너지의 ${CB.num((100 * S.dE) / e, 0)} %를 잃습니다. 하류 수심이 이보다 낮으면 도수가 하류로 밀려납니다.`, f >= 2.5 && f < 4.5 ? "bad" : ""); }
+    else if (mode === "river") HY.msg("hy-en-msg", `B-130 하천 단면, Q = ${CB.num(gq(), 0)} m³/s: 수심 ${CB.num(y, 2)} m는 ${f < 1 ? "상류" : "사류"}. 등류 수심 ${CB.num(CB.civ.normalDepth(gq(), HY.RIVER), 2)} m가 한계 수심 ${CB.num(c, 2)} m보다 커서 완경사 수로입니다.`);
+    else HY.msg("hy-en-msg", `상류(y &gt; y<sub>c</sub>): 같은 E의 사류 수심은 ${CB.num(a, 2)} m. 수심을 한계 수심 아래로 끌어 내려 도수를 보세요.`);
+  }
+  go();
+})();
+
+/* ---------- 5. 제방 침윤선 ---------- */
+(function () {
+  const Hl = 7.0, k = 1e-5, REQ = { fine: 7.0, coarse: 5.0, gravel: 3.5, clay: 2.0 }, NAME = { fine: "가는 모래", coarse: "굵은 모래", gravel: "자갈", clay: "점토(중간)" };
+  const gh = CB.range("hy-lv-h", (v) => v.toFixed(2) + " m", go), gm = CB.range("hy-lv-m", (v) => v.toFixed(1), go), gc = CB.range("hy-lv-c", (v) => v.toFixed(1) + " m", go), gcut = CB.range("hy-lv-cut", (v) => v.toFixed(1) + " m", go), dr = CB.seg("hy-lv-drain", go), so = CB.seg("hy-lv-soil", go);
+  let S = null;
+  function calc() {
+    const h = Math.min(gh(), Hl - 0.2), m = gm(), c = gc(), X = 2 * m * Hl + c, xA = m * h, xB = 0.7 * m * h, al = Math.atan(1 / m), ca = Math.cos(al), sa = Math.sin(al);
+    const drain = dr() === "toe"; let xf, d, y0, q, xE, yE, a = 0;
+    if (drain) { xf = X - (m * Hl) / 3; d = xf - xB; y0 = Math.sqrt(d * d + h * h) - d; q = k * y0; xE = xf + y0 / 2; yE = 0; }
+    else { d = X - xB; const t = (d * d) / (ca * ca) - (h * h) / (sa * sa); a = d / ca - Math.sqrt(Math.max(0, t)); q = k * a * sa * Math.tan(al); xE = X - a * ca; yE = a * sa; xf = X; y0 = Math.sqrt(d * d + h * h) - d; }
+    const par = (x) => Math.sqrt(Math.max(0, y0 * y0 + 2 * y0 * (xf - x)));
+    const line = []; const n = 60;
+    for (let i = 0; i <= n; i++) { const x = xA + ((xE - xA) * i) / n, t = (x - xA) / Math.max(1e-6, xE - xA); let y = par(x); if (!drain) y -= (par(xE) - yE) * t * t; else if (x > xf) y = par(x); line.push([x, Math.min(h, Math.max(0, y))]); }
+    const cw = (X / 3 + 2 * gcut()) / h, req = REQ[so()];
+    S = { h, m, c, X, xA, xE, yE, a, q, line, drain, cw, req, sa, xf };
+  }
+  const cv = CB.canvas("#hy-cv-levee", (ctx, W, H) => {
+    if (!S) return; const pal = CB.palette(), pad = 22, xmin = -8, xmax = S.X + 8, zmin = -Math.max(3, gcut() + 1), zmax = Hl + 1.2;
+    const sc = Math.min((W - 2 * pad) / (xmax - xmin), (H - 2 * pad) / (zmax - zmin)), ox = pad + ((W - 2 * pad) - (xmax - xmin) * sc) / 2;
+    const X = (x) => ox + (x - xmin) * sc, Y = (z) => pad + (zmax - z) * sc;
+    HY.poly(ctx, [[X(xmin), Y(0)], [X(xmax), Y(0)], [X(xmax), Y(zmin)], [X(xmin), Y(zmin)]], HY.alpha(pal.warn, 0.1), null);
+    const body = [[X(0), Y(0)], [X(S.m * Hl), Y(Hl)], [X(S.m * Hl + S.c), Y(Hl)], [X(S.X), Y(0)]];
+    HY.poly(ctx, body, HY.soil(), pal.warn, 1.6);
+    // 물
+    HY.poly(ctx, [[X(xmin), Y(S.h)], [X(S.xA), Y(S.h)], [X(0), Y(0)], [X(xmin), Y(0)]], HY.alpha(pal.blue, 0.32), null);
+    HY.line(ctx, [[X(xmin), Y(S.h)], [X(S.xA), Y(S.h)]], pal.blue, 2);
+    // 젖은 영역
+    const wet = [[X(S.xA), Y(S.h)]].concat(S.line.map(([x, y]) => [X(x), Y(y)])).concat([[X(S.drain ? S.xE : S.X), Y(0)], [X(0), Y(0)]]);
+    HY.poly(ctx, wet, HY.alpha(pal.blue, 0.13), null);
+    HY.line(ctx, S.line.map(([x, y]) => [X(x), Y(y)]), pal.blue, 2.2, [6, 4]);
+    if (S.drain) { ctx.fillStyle = HY.alpha(pal.dim, 0.45); ctx.fillRect(X(S.xf), Y(0) - 5, X(S.X) - X(S.xf), 5); HY.text(ctx, "드레인", X((S.xf + S.X) / 2), Y(0) + 11, pal.dim, { size: 10.5 }); }
+    else { ctx.fillStyle = pal.bad; ctx.beginPath(); ctx.arc(X(S.xE), Y(S.yE), 5, 0, 7); ctx.fill(); HY.text(ctx, `침출 ${CB.num(S.yE, 2)} m`, X(S.xE) + 8, Y(S.yE) - 12, pal.bad, { align: "left", size: 11 }); HY.line(ctx, [[X(S.xE), Y(S.yE)], [X(S.X), Y(0)]], pal.bad, 3); }
+    if (gcut() > 0) { ctx.fillStyle = pal.dim; ctx.fillRect(X(S.m * Hl * 0.4) - 2, Y(0), 4, gcut() * sc); HY.text(ctx, "차수벽", X(S.m * Hl * 0.4) + 6, Y(-gcut() / 2), pal.dim, { align: "left", size: 10.5 }); }
+    HY.text(ctx, `h = ${CB.num(S.h, 2)} m`, X(-4), Y(S.h) - 10, pal.blue, { size: 11 });
+    HY.text(ctx, `기초: ${NAME[so()]}`, X(S.X / 2), Y(zmin) - 10, pal.dim, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.4), minHeight: 210, maxHeight: 330 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("hy-lv-a", S.drain ? "0 (드레인)" : CB.num(S.yE, 2) + " m");
+    CB.stat("hy-lv-q", `${CB.num(S.q * 1e6, 2)}×10⁻⁶ m³/s/m · ${CB.num(S.q * 86400 * 100, 0)} m³/일/100 m`);
+    CB.stat("hy-lv-cw", `${CB.num(S.cw, 1)} / ${CB.num(S.req, 1)}`);
+    const pip = S.cw >= S.req, slope = S.drain || S.yE < 0.5;
+    HY.msg("hy-lv-msg", `${slope ? "뒷비탈 침출이 작거나 드레인으로 처리됨" : `뒷비탈 아래 ${CB.num(S.yE, 2)} m가 젖음 — 비탈 활동 검토 필요(GeotechBook 12장)`} · 기초 파이핑: C<sub>w</sub> = (${CB.num(S.X, 1)}/3 + 2×${CB.num(gcut(), 1)})/${CB.num(S.h, 2)} = ${CB.num(S.cw, 2)} ${pip ? "≥" : "&lt;"} ${CB.num(S.req, 1)} — <b>${pip ? "만족" : "불만족(차수벽·소단·블랭킷)"}</b> (교육용 판정).`, pip && slope ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 6. 중력식 댐 ---------- */
+(function () {
+  const gH = CB.range("hy-dm-H", (v) => v + " m", go), gB = CB.range("hy-dm-B", (v) => v.toFixed(2), go), gc = CB.range("hy-dm-c", (v) => v.toFixed(1) + " m", go), gh = CB.range("hy-dm-h", (v) => v.toFixed(3), go), gmu = CB.range("hy-dm-mu", (v) => v.toFixed(2), go), gf = CB.range("hy-dm-f", (v) => v.toFixed(2), go), gt = CB.range("hy-dm-t", (v) => v + " kPa", go);
+  let D = null;
+  function calc() {
+    const H = gH(), bc = gc(), B = Math.max(gB() * H, bc + 0.5), h = gh() * H, gcw = 23.5, gw = 9.81, mu = gmu(), f = gf(), tau = gt();
+    const W1 = gcw * bc * H, W2 = gcw * 0.5 * (B - bc) * H, W = W1 + W2, P = 0.5 * gw * h * h, U = mu * 0.5 * gw * h * B;
+    const MR = W1 * (B - bc / 2) + W2 * (B - (bc + (B - bc) / 3)), MO = P * (h / 3) + U * (B - B / 3), N = W - U;
+    const xr = (MR - MO) / N, e = B / 2 - xr, qt = (N / B) * (1 + (6 * e) / B), qh = (N / B) * (1 - (6 * e) / B);
+    D = { H, bc, B, h, W, P, U, N, FSo: MR / MO, FSs: (f * N) / P, SSF: (f * N + tau * B) / P, xr, e, qt, qh, tau };
+  }
+  const cv = CB.canvas("#hy-cv-dam", (ctx, W, H) => {
+    if (!D) return; const pal = CB.palette();
+    const span = D.B + D.H * 0.5, sc = Math.min((W - 60) / span, (H - 80) / (D.H * 1.25)), ox = 30 + D.H * 0.35 * sc, by = 30 + D.H * sc;
+    const X = (x) => ox + x * sc, Y = (z) => by - z * sc;
+    HY.poly(ctx, [[X(-D.H * 0.35), Y(0)], [X(D.B + D.H * 0.15), Y(0)], [X(D.B + D.H * 0.15), Y(0) + 46], [X(-D.H * 0.35), Y(0) + 46]], HY.alpha(pal.warn, 0.1), null);
+    HY.poly(ctx, [[X(-D.H * 0.35), Y(D.h)], [X(0), Y(D.h)], [X(0), Y(0)], [X(-D.H * 0.35), Y(0)]], HY.alpha(pal.blue, 0.3), null);
+    HY.line(ctx, [[X(-D.H * 0.35), Y(D.h)], [X(0), Y(D.h)]], pal.blue, 2);
+    HY.poly(ctx, [[X(0), Y(0)], [X(0), Y(D.H)], [X(D.bc), Y(D.H)], [X(D.B), Y(0)]], HY.alpha(pal.dim, 0.25), pal.dim, 1.6);
+    // 수압 삼각형
+    HY.poly(ctx, [[X(0), Y(D.h)], [X(0), Y(0)], [X(-D.h * 0.3), Y(0)]], HY.alpha(pal.blue, 0.15), pal.blue, 1);
+    HY.arrow(ctx, X(-D.h * 0.25), Y(D.h / 3), X(0) - 2, Y(D.h / 3), pal.blue, 2.6, 9);
+    HY.text(ctx, `P ${CB.sig(D.P, 3)}`, X(-D.h * 0.18), Y(D.h / 3) - 12, pal.blue, { size: 11 });
+    // 양압력
+    const uh = (9.81 * D.h * gmu()) / 400 * 30;
+    if (D.U > 0) { HY.poly(ctx, [[X(0), Y(0)], [X(D.B), Y(0)], [X(0), Y(0) + uh]], HY.alpha(pal.blue, 0.22), pal.blue, 1); HY.text(ctx, `U ${CB.sig(D.U, 3)}`, X(D.B / 5), Y(0) + uh + 10, pal.blue, { size: 11 }); }
+    // 자중
+    const xg = (D.B * 0 + (D.bc / 2) * D.bc * D.H + (D.bc + (D.B - D.bc) / 3) * 0.5 * (D.B - D.bc) * D.H) / (D.bc * D.H + 0.5 * (D.B - D.bc) * D.H);
+    HY.arrow(ctx, X(xg), Y(D.H * 0.6), X(xg), Y(D.H * 0.25), pal.accent2, 2.6, 9);
+    HY.text(ctx, `W ${CB.sig(D.W, 3)}`, X(xg) + 8, Y(D.H * 0.62), pal.accent2, { align: "left", size: 11 });
+    // 중앙 1/3, 합력
+    HY.line(ctx, [[X(D.B / 3), Y(0) - 6], [X(D.B / 3), Y(0) + 6]], pal.faint, 1.4); HY.line(ctx, [[X((2 * D.B) / 3), Y(0) - 6], [X((2 * D.B) / 3), Y(0) + 6]], pal.faint, 1.4);
+    const xres = D.B - D.xr, inside = Math.abs(D.e) <= D.B / 6 + 1e-9;
+    ctx.fillStyle = inside ? pal.ok : pal.bad; ctx.beginPath(); ctx.arc(X(CB.clamp(xres, -D.B * 0.2, D.B * 1.2)), Y(0), 6, 0, 7); ctx.fill();
+    // 기초 압력(밑면 아래 위쪽 화살표 대신 선)
+    const qm = Math.max(Math.abs(D.qt), Math.abs(D.qh), 1), ps = 34 / qm, yb = Y(0) + 8;
+    HY.poly(ctx, [[X(0), yb], [X(D.B), yb], [X(D.B), yb + D.qt * ps], [X(0), yb + D.qh * ps]], HY.alpha(D.qh < 0 ? pal.bad : pal.ok, 0.18), D.qh < 0 ? pal.bad : pal.ok, 1.2);
+    HY.text(ctx, `${CB.num(D.qh, 0)}`, X(0) - 4, yb + Math.max(8, D.qh * ps), D.qh < 0 ? pal.bad : pal.dim, { align: "right", size: 10.5 });
+    HY.text(ctx, `${CB.num(D.qt, 0)} kPa`, X(D.B) + 4, yb + Math.max(8, D.qt * ps), pal.dim, { align: "left", size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.55), minHeight: 280, maxHeight: 400 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("hy-dm-fso", CB.num(D.FSo, 2)); CB.stat("hy-dm-fss", `${CB.num(D.FSs, 2)} · ${D.tau > 0 ? CB.num(D.SSF, 2) : "—"}`);
+    CB.stat("hy-dm-e", `${CB.num(D.e, 2)} / ${CB.num(D.B / 6, 2)} m`); CB.stat("hy-dm-q", `${CB.num(D.qt, 0)} · ${CB.num(D.qh, 0)} kPa`);
+    const okO = D.FSo >= 1.5 && Math.abs(D.e) <= D.B / 6, okS = D.FSs >= 1.5 || (D.tau > 0 && D.SSF >= 4), bad = [];
+    if (!okO) bad.push(Math.abs(D.e) > D.B / 6 ? "합력이 중앙 1/3 밖(상류 끝 인장)" : "전도 안전율 &lt; 1.5");
+    if (!okS) bad.push(`활동 FS ${CB.num(D.FSs, 2)} &lt; 1.5${D.tau > 0 ? ` · SSF ${CB.num(D.SSF, 2)} &lt; 4` : ""}`);
+    HY.msg("hy-dm-msg", bad.length ? `<b>불만족</b>: ${bad.join(" · ")}. 밑폭을 넓히거나 배수공으로 양압력(μ)을 줄이세요.` : `<b>만족</b>(교육용 기준 형태): 전도 ${CB.num(D.FSo, 2)}, 활동 ${CB.num(D.FSs, 2)}${D.tau > 0 ? `(SSF ${CB.num(D.SSF, 2)})` : ""}, 편심 ${CB.num(D.e, 2)} m ≤ B/6, 하류 끝 압력 ${CB.num(D.qt, 0)} kPa.`, bad.length ? "bad" : "ok");
+  }
+  go();
+})();
+
+/* ---------- 7. 교각 세굴 ---------- */
+(function () {
+  const K1 = { round: 1.0, square: 1.1, sharp: 0.9 }, KR = { round: 1.5, square: 1.7, sharp: 1.5 };
+  const ga = CB.range("hy-sc-a", (v) => v.toFixed(1) + " m", go), gy = CB.range("hy-sc-y", (v) => v.toFixed(2) + " m", go), gv = CB.range("hy-sc-v", (v) => v.toFixed(2) + " m/s", go), sh = CB.seg("hy-sc-shape", go), gth = CB.range("hy-sc-th", (v) => v + "°", go), gft = CB.range("hy-sc-ft", (v) => v.toFixed(1) + " m", go);
+  const K2 = (shape, th) => (shape === "round" ? 1 : Math.pow(Math.cos((th * Math.PI) / 180) + 4 * Math.sin((th * Math.PI) / 180), 0.65));
+  const ysOf = (a) => HY.scour(a, gy(), gv(), K1[sh()], K2(sh(), gth()), 1.1, sh() === "round");
+  let S = null;
+  const cv = CB.canvas("#hy-cv-scour", (ctx, W, H) => {
+    if (!S) return; const pal = CB.palette(), narrow = HY.fit(W);
+    const L = narrow ? { x: 10, y: 10, w: W - 20, h: H * 0.55 - 10 } : { x: 10, y: 10, w: W * 0.5 - 10, h: H - 20 };
+    const zt = gy() + 1, zb = -Math.max(S.ys, gft() + 1.2) - 1, sc = Math.min(L.h / (zt - zb), L.w / 18), cx = L.x + L.w / 2;
+    const X = (x) => cx + x * sc, Y = (z) => L.y + (zt - z) * sc;
+    ctx.fillStyle = HY.alpha(pal.blue, 0.22); ctx.fillRect(L.x, Y(gy()), L.w, Y(0) - Y(gy()));
+    HY.line(ctx, [[L.x, Y(gy())], [L.x + L.w, Y(gy())]], pal.blue, 2);
+    const a = ga(), r = a / 2 + 2 * S.ys;
+    HY.poly(ctx, [[L.x, Y(0)], [X(-r), Y(0)], [X(-a / 2), Y(-S.ys)], [X(a / 2), Y(-S.ys)], [X(r), Y(0)], [L.x + L.w, Y(0)], [L.x + L.w, L.y + L.h], [L.x, L.y + L.h]], HY.soil(), pal.warn, 1.4);
+    const ft = gft(), exposed = S.ys > ft;
+    HY.poly(ctx, [[X(-a * 1.4), Y(-ft)], [X(a * 1.4), Y(-ft)], [X(a * 1.4), Y(-ft - 1.2)], [X(-a * 1.4), Y(-ft - 1.2)]], HY.alpha(exposed ? pal.bad : pal.dim, 0.4), exposed ? pal.bad : pal.dim, 1.2);
+    HY.poly(ctx, [[X(-a / 2), Y(zt)], [X(a / 2), Y(zt)], [X(a / 2), Y(-ft)], [X(-a / 2), Y(-ft)]], HY.alpha(pal.dim, 0.5), pal.dim, 1.2);
+    HY.arrow(ctx, X(-r) - 30, Y(gy() * 0.6), X(-a / 2) - 6, Y(gy() * 0.6), pal.blue, 2, 8);
+    HY.line(ctx, [[X(r) + 10, Y(0)], [X(r) + 10, Y(-S.ys)]], pal.text, 1.2);
+    HY.text(ctx, `yₛ ${CB.num(S.ys, 2)} m`, Math.min(X(r) + 14, L.x + L.w - 70), Y(-S.ys / 2), pal.text, { align: "left", size: 11 });
+    // 오른쪽: yₛ – a 곡선
+    const R = narrow ? { x: 54, y: H * 0.55 + 8, w: W - 70, h: H * 0.45 - 52 } : { x: W * 0.5 + 50, y: 16, w: W * 0.5 - 66, h: H - 62 };
+    const d = []; for (let x = 0.3; x <= 5.001; x += 0.05) d.push([x, ysOf(x).ys]);
+    CB.chart(ctx, R, { x: [0, 5], y: [0, Math.max(8, S.ys * 1.2)], xLabel: "교각 폭 a (m)", yLabel: "yₛ (m)", series: [{ data: d, color: pal.accent, width: 2.4 }, { data: [[0, 0], [5, 12]], color: pal.faint, width: 1, dash: [4, 4] }], hlines: [{ y: ft, color: pal.bad, label: "기초 윗면" }], points: [{ x: a, y: S.ys, color: pal.accent2, r: 6 }] });
+  }, { aspect: (W) => (W < 560 ? 1.2 : 0.5), minHeight: 280, maxHeight: 520 });
+  function go() {
+    const r = ysOf(ga()), k = K1[sh()] * K2(sh(), gth()) * 1.1, D50 = (0.692 * (KR[sh()] * gv()) ** 2) / (1.65 * 2 * HY.g);
+    S = { ys: r.ys, Fr: r.Fr, cap: r.cap }; cv.redraw();
+    CB.stat("hy-sc-k", `${CB.num(r.Fr, 3)} · ${CB.num(k, 2)}`); CB.stat("hy-sc-ys", CB.num(r.ys, 2) + " m" + (r.cap ? " (상한)" : "")); CB.stat("hy-sc-ratio", CB.num(r.ys / ga(), 2)); CB.stat("hy-sc-d50", CB.num(D50, 2) + " m");
+    const ft = gft();
+    HY.msg("hy-sc-msg", r.ys > ft ? `국부 세굴 ${CB.num(r.ys, 2)} m가 기초 윗면(하상 아래 ${CB.num(ft, 1)} m)보다 깊습니다 — <b>기초 노출 위험</b>. 기초를 내리거나(말뚝) 사석 D<sub>50</sub> ≈ ${CB.num(D50, 2)} m로 보호하세요. 장기 하상 변동·축소 세굴은 따로 더합니다.` : `국부 세굴 ${CB.num(r.ys, 2)} m &lt; 기초 윗면 ${CB.num(ft, 1)} m — <b>국부 세굴만으로는 만족</b>(교육용). 축소 세굴·장기 변동을 더해 다시 확인합니다.`, r.ys > ft ? "bad" : "ok");
+  }
+  go();
+})();
+
+/* ---------- 8. B-130 하천 3D ---------- */
+(function () {
+  const gQ = CB.range("hy-r3-Q", (v) => v + " m³/s", go), vw = CB.seg("hy-r3-view", (v) => { view.set(VIEWS[v]); }), sc = CB.check("hy-r3-scour", () => view.redraw());
+  const VIEWS = { iso: { yaw: -0.65, pitch: 0.42, dist: 175 }, up: { yaw: 0, pitch: 0.1, dist: 165 }, top: { yaw: -0.2, pitch: 1.35, dist: 190 } };
+  const CREST = 7, SOFF = 10;
+  const zg = (x) => (x <= 31 || x >= 99 ? CREST : x < 45 ? (45 - x) / 2 : x > 85 ? (x - 85) / 2 : 0);
+  let S = null;
+  function calc() {
+    const Q = gQ(), y = CB.civ.normalDepth(Q, HY.RIVER), m = CB.civ.manning({ ...HY.RIVER, y }), Fr = CB.civ.froude({ ...HY.RIVER, y });
+    const sc = y > 2.5 ? HY.scour(2.0, y, m.V) : { ys: 0 };
+    S = { Q, y, V: m.V, Fr, ys: sc.ys, fb: HY.freeboard(Q) };
+  }
+  const view = CB.orbit("#hy-cv-river3d", { ...VIEWS.iso, target: [65, 0, 4], aspect: 0.62, draw(V) {
+    if (!S) return; const P = V.P, faces = [], Ly = 45;
+    const add = (pts, fill, o = {}) => faces.push({ pts, fill, d: V.depth(pts), ...o });
+    const xs = [0, 31, 45, 85, 99, 130];
+    for (let i = 0; i < xs.length - 1; i++) { const a = xs[i], b = xs[i + 1]; add([[a, -Ly, zg(a)], [b, -Ly, zg(b)], [b, Ly, zg(b)], [a, Ly, zg(a)]], HY.soil(), { color: P.warn, alpha: 0.6 }); }
+    // 하천 단면 끝면(앞)
+    add([[0, -Ly, CREST], [31, -Ly, CREST], [45, -Ly, 0], [85, -Ly, 0], [99, -Ly, CREST], [130, -Ly, CREST], [130, -Ly, -3], [0, -Ly, -3]], HY.alpha(P.warn, 0.25), { color: P.warn });
+    // 세굴공
+    if (sc() && S.ys > 0) [40, 90].forEach((xp) => { const r = 1 + 2 * S.ys, zb = zg(xp), n = 12; for (let k = 0; k < n; k++) { const t0 = (k / n) * 2 * Math.PI, t1 = ((k + 1) / n) * 2 * Math.PI; add([[xp + r * Math.cos(t0), r * Math.sin(t0), zb + 0.02], [xp + r * Math.cos(t1), r * Math.sin(t1), zb + 0.02], [xp + Math.cos(t1), Math.sin(t1), zb - S.ys], [xp + Math.cos(t0), Math.sin(t0), zb - S.ys]], HY.alpha(P.bad, 0.35), { color: P.bad, alpha: 0.4 }); } });
+    // 물
+    const y = S.y; if (y > 0.02) { const over = y > CREST, wl = over ? 0 : 45 - 2 * y, wr = over ? 130 : 85 + 2 * y; add([[wl, -Ly, y], [wr, -Ly, y], [wr, Ly, y], [wl, Ly, y]], HY.alpha(P.blue, 0.42), { color: P.blue, alpha: 0.6 }); }
+    // 교각(8각 기둥)
+    [40, 90].forEach((xp) => { const n = 8, r = 1, z0 = zg(xp) - (sc() ? S.ys : 0); for (let k = 0; k < n; k++) { const t0 = (k / n) * 2 * Math.PI, t1 = ((k + 1) / n) * 2 * Math.PI; add([[xp + r * Math.cos(t0), r * Math.sin(t0), z0], [xp + r * Math.cos(t1), r * Math.sin(t1), z0], [xp + r * Math.cos(t1), r * Math.sin(t1), SOFF], [xp + r * Math.cos(t0), r * Math.sin(t0), SOFF]], HY.alpha(P.dim, 0.75), { color: P.dim, alpha: 0.5 }); } });
+    // 교대
+    [[-2, 0], [130, 132]].forEach(([a, b]) => add([[a, -6, CREST], [b, -6, CREST], [b, -6, SOFF + 2.2], [a, -6, SOFF + 2.2]], HY.alpha(P.dim, 0.6), { color: P.dim }));
+    // 거더 4주 + 바닥판
+    [-4.2, -1.4, 1.4, 4.2].forEach((gy) => add([[0, gy, SOFF], [130, gy, SOFF], [130, gy, SOFF + 2.2], [0, gy, SOFF + 2.2]], HY.alpha(P.accent, 0.35), { color: P.accent, alpha: 0.6 }));
+    add([[0, -5.5, SOFF + 2.2], [130, -5.5, SOFF + 2.2], [130, 5.5, SOFF + 2.2], [0, 5.5, SOFF + 2.2]], HY.alpha(P.dim, 0.55), { color: P.dim });
+    faces.sort((a, b) => b.d - a.d).forEach((f) => V.poly3(f.pts, { fill: f.fill, fillAlpha: 1, color: f.color, alpha: f.alpha != null ? f.alpha : 0.8, width: 1 }));
+    V.text3(`HWL +${CB.num(S.y, 2)} m`, [65, -Ly, S.y + 1.2], { color: P.blue, size: 12, bold: true });
+    V.text3("P1", [40, -3, SOFF + 3.5], { color: P.dim, size: 11 }); V.text3("P2", [90, -3, SOFF + 3.5], { color: P.dim, size: 11 });
+    V.text3("흐름 →", [112, 30, CREST + 1], { color: P.blue, size: 11 });
+  } });
+  function go() {
+    calc(); view.redraw();
+    const lev = CREST - S.y - S.fb, clr = SOFF - S.y;
+    CB.stat("hy-r3-y", `${CB.num(S.y, 2)} m · ${CB.num(Math.min(130, 40 + 4 * S.y), 1)} m`); CB.stat("hy-r3-v", `${CB.num(S.V, 2)} m/s · ${CB.num(S.Fr, 2)}`);
+    CB.stat("hy-r3-fb", `${lev >= 0 ? "+" : "−"}${CB.num(Math.abs(lev), 2)} · ${CB.num(clr, 2)} m`); CB.stat("hy-r3-ys", S.ys > 0 ? CB.num(S.ys, 2) + " m" : "교각 물 밖");
+    if (S.y > CREST) HY.msg("hy-r3-msg", `Q = ${S.Q} m³/s: 수심 ${CB.num(S.y, 2)} m가 제방 마루(7.0 m)를 넘어 <b>월류</b>합니다.`, "bad");
+    else if (lev < 0) HY.msg("hy-r3-msg", `여유고 ${CB.num(S.fb, 1)} m를 확보하지 못합니다(제방 여유 ${CB.num(lev, 2)} m) — <b>불만족</b>. 형하 여유는 ${CB.num(clr, 2)} m.`, "bad");
+    else HY.msg("hy-r3-msg", `Q = ${S.Q} m³/s: HWL 하상 + ${CB.num(S.y, 2)} m, 제방 여유 ${CB.num(lev, 2)} m, 형하 여유 ${CB.num(clr, 2)} m — <b>만족</b>${S.ys > 0 ? `. 교각 세굴(보수적) 약 ${CB.num(S.ys, 2)} m` : ""}.`, "ok");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

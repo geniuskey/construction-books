@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>교량 하중과 이동 하중 · CivilBook</title>
+<meta name="description" content="트럭이 지나갈 때 가장 위험한 순간을 찾는다. 교량 하중의 종류, KL-510 형태 설계 트럭과 차로 하중, 영향선과 트럭 주사, 절대 최대 휨모멘트, 충격 계수와 동적 증폭, 연속교 영향선과 차로 하중 재하 구간, 다차로 재하, 하중 조합과 B-130 경간별 최대 효과를 시뮬레이터로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .bl-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .bl-msg b { color: var(--text); }
+  .bl-msg .ok { color: var(--ok); font-weight: 600; }
+  .bl-msg .bad { color: var(--bad); font-weight: 600; }
+  .bl-tbl td, .bl-tbl th { font-variant-numeric: tabular-nums; }
+  .bl-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .bl-steps { margin: 6px 0 0; }
+  .bl-steps li { margin: 4px 0; }
+  #bl-cv-drive, #bl-cv-il, #bl-cv-lane { touch-action: pan-y; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="civil"></script>
+</head>
+<body data-chapter="bridge-loads">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="bl-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="bl-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="bl-ah-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="bl-ah-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+      <marker id="bl-ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 02</div>
+    <h1 data-no-glossary>교량 하중과 이동 하중</h1>
+    <p class="lead">건물의 바닥 하중은 대개 가만히 있지만, 다리의 가장 중요한 하중은 달립니다. 510 kN 트럭이 B-130을 건너는 몇 초 동안 휨모멘트는 0에서 최대로 올랐다가 다시 0으로 돌아가고, 연속교라면 부호까지 바뀝니다. 이 장은 "언제, 어디서 가장 위험한가"를 계산하는 방법을 세웁니다. 교량에 걸리는 하중의 종류를 정리하고, 설계 트럭과 차로 하중을 정의한 뒤, MechanicsBook 6장의 영향선으로 트럭을 경간 위에서 주사해 최댓값과 그 위치를 찾습니다. 단순보의 절대 최대 휨모멘트, 달리는 차량의 동적 효과(충격), 연속교에서 단위 하중을 옮기며 그린 곡선 영향선, 차로 하중을 어느 구간에 실을지, 여러 차로가 동시에 실릴 확률을 차례로 다루고, 마지막에 B-130의 경간별 설계 휨모멘트를 하중 조합까지 계산합니다.</p>
+    <ul class="objectives">
+      <li>교량 하중(고정·활·충격·원심·제동·풍·온도·지진·수압·유수압)을 영구·변동·극단 하중으로 나누고 하중 기호를 읽는다.</li>
+      <li>KL-510 형태 설계 트럭(축하중 합 510 kN)과 차로 하중(12.7 kN/m)을 놓고, 트럭 단독과 "0.75 트럭 + 차로" 가운데 큰 값을 설계 활하중으로 쓴다(교육용 형태).</li>
+      <li>영향선 \(\eta(x)\)와 \(\sum P_i\eta_i\)로 트럭을 주사해 단면의 최대·최소 효과와 그 트럭 위치를 찾고, 50 m 단순 경간 중앙 5,526 kN·m를 손으로 확인한다.</li>
+      <li>합력과 축의 중앙 규칙으로 절대 최대 휨모멘트(50 m: 5,534 kN·m, 중앙에서 0.9 m)를 구한다.</li>
+      <li>충격 계수 \(IM = 15/(40 + L) \le 0.3\)(교육용 형태)과 이동 하중의 동적 증폭을 비교하고, 충격이 트럭에만 붙는 이유를 설명한다.</li>
+      <li>연속교의 영향선을 <code>CB.beam</code>으로 단위 하중을 옮겨 그리고, 양·음 구간에 차로 하중을 골라 실어 B-130의 지점·경간 최대 효과를 계산한다.</li>
+      <li>다차로 재하 계수와 하중 조합(한계 상태)으로 B-130 중앙 경간·지점의 설계 휨모멘트를 구한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>기차가 지나가는 순간 무너진 다리</b></div>
+      <div class="o-body"><p>1847년 5월, 영국 체스터의 디 교(Dee Bridge)가 열차가 지나가는 도중 무너져 사상자가 났습니다. 주철 거더를 연철 띠로 보강한 경간이었습니다. 사고 뒤 영국 정부는 철도 구조물에 쇠를 쓰는 문제를 조사하는 왕립 위원회를 꾸렸고, 위원회의 실험과 연구(윌리스의 이동 하중 실험, 스토크스의 해석 등으로 알려져 있다)는 "움직이는 하중은 같은 무게가 가만히 있을 때보다 더 큰 처짐과 응력을 줄 수 있다"는 문제를 처음으로 정면에서 다뤘습니다.</p>
+        <p>오늘날의 교량 설계 기준은 그 질문에 두 갈래로 답합니다. 하중이 <b>어디에</b> 있을 때 가장 위험한지는 영향선과 트럭 주사로, 하중이 <b>달려서</b> 생기는 추가 효과는 충격 계수로. 이 장의 시뮬레이터는 둘을 모두 계산합니다.</p>
+        <div class="o-chain"><span>설계 트럭 · 차로 하중</span><i>→</i><span class="tool">영향선 주사 · 절대 최대 · 충격 · 재하 구간 · 다차로</span><i>→</i><span>B-130 설계 휨모멘트</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="load-types">
+    <h2>교량에 걸리는 하중</h2>
+    <div class="problem"><strong>다리는 무엇을 견뎌야 하는가</strong>
+      <p>1장의 B-130은 자기 무게 117 kN/m만으로도 지점 위에 −24,036 kN·m를 받았습니다. 그 위로 트럭이 달리고, 브레이크를 밟고, 바람이 불고, 해가 데우고, 땅이 흔들리고, 홍수가 교각을 밉니다. 이것들을 모두 같은 크기로 더해야 할까요?</p></div>
+    <p>교량 설계 기준(도로교 설계기준 KDS 24 계열, AASHTO LRFD 형태)은 하중을 성격에 따라 나누고 기호를 붙입니다. 기호는 기준마다 조금씩 다르므로 아래 표는 이 책에서 쓰는 형태입니다(현행 KDS 24 12 11·24 12 21 확인).</p>
+    <figure class="diagram" id="fig-bl-loads">
+      <svg viewBox="0 0 860 330" role="img" aria-label="교량에 작용하는 하중: 고정하중, 활하중(트럭), 충격, 제동, 원심, 풍하중, 온도, 지진, 유수압과 그 작용 방향">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <path d="M30 250 L170 250 L250 270 L330 290 L560 290 L640 270 L720 250 L830 250" style="fill:none;stroke:var(--warn);stroke-width:1.4"/>
+        <path d="M270 262 L330 290 L560 290 L620 262 Z" style="fill:var(--blue);opacity:.18"/>
+        <rect x="110" y="140" width="640" height="26" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+        <g style="fill:var(--surface-2);stroke:var(--text-dim)"><rect x="300" y="166" width="16" height="110"/><rect x="560" y="166" width="16" height="110"/><rect x="100" y="166" width="20" height="80"/><rect x="740" y="166" width="20" height="80"/></g>
+        <!-- DC -->
+        <g style="stroke:var(--accent-2);stroke-width:1.3"><line x1="130" y1="120" x2="130" y2="138" marker-end="url(#bl-ah-ld)"/><line x1="200" y1="120" x2="200" y2="138" marker-end="url(#bl-ah-ld)"/><line x1="270" y1="120" x2="270" y2="138" marker-end="url(#bl-ah-ld)"/><line x1="680" y1="120" x2="680" y2="138" marker-end="url(#bl-ah-ld)"/><line x1="730" y1="120" x2="730" y2="138" marker-end="url(#bl-ah-ld)"/></g>
+        <text x="128" y="112" class="t-mono" style="fill:var(--accent-2)">DC · DW 고정하중</text>
+        <!-- truck -->
+        <rect x="390" y="104" width="120" height="32" rx="3" style="fill:var(--accent-2);opacity:.35"/>
+        <g style="fill:var(--accent-2)"><circle cx="402" cy="138" r="5"/><circle cx="440" cy="138" r="5"/><circle cx="452" cy="138" r="5"/><circle cx="492" cy="138" r="5"/><circle cx="504" cy="138" r="5"/></g>
+        <text x="398" y="96" class="t-mono" style="fill:var(--accent-2)">LL 활하중 + IM 충격</text>
+        <line x1="388" y1="150" x2="340" y2="150" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#bl-ah-ld)"/>
+        <text x="300" y="186" class="t-mono" style="fill:var(--accent-2)">BR 제동</text>
+        <!-- wind -->
+        <g style="stroke:var(--blue);stroke-width:1.6"><line x1="40" y1="60" x2="90" y2="60" marker-end="url(#bl-ah-b)"/><line x1="40" y1="78" x2="90" y2="78" marker-end="url(#bl-ah-b)"/><line x1="40" y1="96" x2="90" y2="96" marker-end="url(#bl-ah-b)"/></g>
+        <text x="30" y="46" class="t-mono" style="fill:var(--blue)">WS · WL 풍하중</text>
+        <!-- temperature -->
+        <g style="stroke:var(--warn);stroke-width:2"><line x1="760" y1="153" x2="800" y2="153" marker-end="url(#bl-ah-d)"/></g>
+        <text x="700" y="198" class="t-mono" style="fill:var(--warn)">TU · TG 온도</text>
+        <!-- CF -->
+        <text x="560" y="96" class="t-mono">CF 원심(곡선교)</text>
+        <!-- EQ -->
+        <path d="M320 310 l14 -8 l14 8 l14 -8 l14 8 l14 -8 l14 8" style="fill:none;stroke:var(--bad);stroke-width:1.8"/>
+        <text x="430" y="312" class="t-mono" style="fill:var(--bad)">EQ 지진</text>
+        <!-- water -->
+        <g style="stroke:var(--blue);stroke-width:1.6"><line x1="268" y1="230" x2="296" y2="230" marker-end="url(#bl-ah-b)"/><line x1="268" y1="250" x2="296" y2="250" marker-end="url(#bl-ah-b)"/></g>
+        <text x="190" y="226" class="t-mono" style="fill:var(--blue)">WA 유수압</text>
+        <text x="600" y="240" class="t-mono">지점 침하 SE · 크리프 CR · 건조 수축 SH</text>
+        <g style="fill:var(--ok)"><rect x="301" y="166" width="14" height="5"/><rect x="561" y="166" width="14" height="5"/></g>
+      </svg>
+      <figcaption><b>그림 2-1.</b> 교량에 작용하는 주요 하중(기호는 AASHTO LRFD·KDS 24 형태). 연직 하중(DC, DW, LL + IM)은 거더의 휨을 지배하고, 수평 하중(BR, CF, WS, EQ, WA)은 받침과 하부 구조를 지배한다. 온도·크리프·건조 수축은 늘고 줄며 신축 이음과 받침의 움직임을 정한다(6장).</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="bl-tbl">
+      <caption>표 2-1. 교량 하중의 분류(형태 — 기호와 세부 항목은 현행 KDS 24 12 11 확인)</caption>
+      <thead><tr><th>구분</th><th>기호</th><th>하중</th><th>B-130에서의 어림</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="2">영구</td><td>DC</td><td>구조 부재·부착물의 자중</td><td>약 100 kN/m(교량 전체)</td></tr>
+        <tr><td>DW</td><td>포장·설비 자중(변동성이 커서 따로 둔다)</td><td>약 17 kN/m(포장 80 mm)</td></tr>
+        <tr><td rowspan="6">변동</td><td>LL · IM</td><td>차량 활하중과 동적 하중 허용(충격)</td><td>KL-510 형태 + 차로 하중, IM 0.167(50 m)</td></tr>
+        <tr><td>PL</td><td>보도 하중</td><td>보도 2.0 m(3장)</td></tr>
+        <tr><td>BR</td><td>제동 하중</td><td>차로당 약 128 kN(예제 2.6)</td></tr>
+        <tr><td>CF</td><td>원심 하중(곡선교)</td><td>직선교라 0</td></tr>
+        <tr><td>WS · WL</td><td>구조물·차량에 작용하는 풍하중</td><td>5장(장대교)에서 중요</td></tr>
+        <tr><td>TU · TG</td><td>균일 온도 변화 · 온도 경사</td><td>신축량 약 43 mm(P1에서 90 m, ΔT 40 °C)</td></tr>
+        <tr><td rowspan="2">극단</td><td>EQ</td><td>지진</td><td>6장, StructureBook 8장</td></tr>
+        <tr><td>WA · CT · CV</td><td>유수압·차량 충돌·선박 충돌</td><td>유수압 약 10 kN/교각(예제 2.1)</td></tr>
+      </tbody></table></div>
+    <div class="callout def"><strong>정의 2.1 (영구·변동·극단 하중)</strong> 구조물이 있는 동안 거의 변하지 않는 하중을 영구 하중(<span class="term">고정하중</span><span class="en">(dead load)</span> DC·DW, 토압, 크리프·건조 수축), 크기나 위치가 시간에 따라 바뀌는 하중을 변동 하중(<span class="term">활하중</span><span class="en">(live load)</span> LL과 그 동적 효과 IM, 제동·원심·풍·온도), 드물지만 매우 큰 하중을 극단 하중(지진, 선박·차량 충돌, 큰 홍수)이라 한다. 기준은 각 하중의 불확실성과 동시에 일어날 확률을 하중 계수와 하중 조합으로 반영한다(10절).</div>
+    <div class="callout"><strong>예제 2.1 (B-130 교각의 유수압)</strong> 계획 홍수 때 교각 P1(φ2.0 m) 둘레의 유속 \(V = 2.32\) m/s(1장 예제 1.5), 교각 위치의 하상 높이 2.5 m, 수심 5.15 m.
+      <ol class="bl-steps">
+        <li><b>잠긴 높이.</b> \(5.15 - 2.5 = 2.65\) m.</li>
+        <li><b>압력.</b> 항력 형태 \(p = \tfrac12\rho C_D V^2 = 0.5 \times 1.0 \times 0.7 \times 2.32^2 = 1.88\) kPa(원형 기둥 \(C_D \approx 0.7\), \(\rho = 1.0\) t/m³, 교육용).</li>
+        <li><b>힘.</b> \(F = 1.88 \times 2.0 \times 2.65 \approx 10\) kN, 작용점은 수면 아래 잠긴 높이의 중간쯤.</li>
+        <li><b>판정.</b> 트럭 반력(503 kN)이나 제동 하중(차로당 약 128 kN)에 비해 작다. 그러나 떠내려온 나무가 교각에 걸리면 막힌 면적이 수십 배가 되고, 진짜 위험은 힘보다 교각 둘레 하상이 파이는 <b>세굴</b>이다(15장).</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="truck">
+    <h2>설계 트럭과 차로 하중</h2>
+    <div class="problem"><strong>어떤 차가 다리를 건넌다고 가정할 것인가</strong>
+      <p>실제 도로에는 승용차, 버스, 덤프트럭, 컨테이너 트레일러가 섞여 달립니다. 설계자는 이 모두를 대표하는 <b>하나의 하중 모형</b>이 필요합니다. 무거운 트럭 한 대일까요, 꽉 막힌 차량 행렬일까요?</p></div>
+    <p>도로교 기준은 두 가지 모형을 함께 씁니다. 짧은 경간과 국부 효과(바닥판·짧은 거더)는 무거운 트럭 한 대의 바퀴 집중 하중이 지배하고, 긴 경간은 길게 늘어선 차량 행렬의 평균 무게(등분포)가 지배합니다. 앞엣것을 <span class="term">설계 트럭 하중</span><span class="en">(design truck load)</span>, 뒤엣것을 <span class="term">차로 하중</span><span class="en">(lane load)</span>이라 합니다.</p>
+    <figure class="diagram" id="fig-bl-truck">
+      <svg viewBox="0 0 860 300" role="img" aria-label="KL-510 형태 설계 트럭의 축 배치(앞축에서 0, 3.6, 4.8, 11.0, 12.2 m, 축하중 48, 135, 135, 96, 96 kN)와 합력 위치 6.59 m, 그 아래 등분포 차로 하중 12.7 kN/m">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <!-- scale 40 px/m from x=110 (front at right): front axle at 110+12.2*40=598 ... draw truck heading left: front at 110 -->
+        <g transform="translate(120,0)">
+          <rect x="-14" y="70" width="80" height="54" rx="6" style="fill:var(--accent-2);opacity:.35;stroke:var(--accent-2)"/>
+          <rect x="74" y="58" width="440" height="66" rx="4" style="fill:var(--accent-2);opacity:.2;stroke:var(--accent-2)"/>
+          <g style="fill:var(--text-dim)"><circle cx="0" cy="130" r="9"/><circle cx="144" cy="130" r="9"/><circle cx="192" cy="130" r="9"/><circle cx="440" cy="130" r="9"/><circle cx="488" cy="130" r="9"/></g>
+          <g style="stroke:var(--accent-2);stroke-width:2.2"><line x1="0" y1="150" x2="0" y2="178" marker-end="url(#bl-ah-ld)"/><line x1="144" y1="150" x2="144" y2="190" marker-end="url(#bl-ah-ld)"/><line x1="192" y1="150" x2="192" y2="190" marker-end="url(#bl-ah-ld)"/><line x1="440" y1="150" x2="440" y2="184" marker-end="url(#bl-ah-ld)"/><line x1="488" y1="150" x2="488" y2="184" marker-end="url(#bl-ah-ld)"/></g>
+          <g class="t-mono" text-anchor="middle" style="fill:var(--accent-2)"><text x="0" y="200">48</text><text x="144" y="208">135</text><text x="192" y="208">135</text><text x="440" y="202">96</text><text x="488" y="202">96</text></g>
+          <line x1="0" y1="222" x2="488" y2="222" style="stroke:var(--text-faint)"/>
+          <g style="stroke:var(--text-faint)"><line x1="0" y1="216" x2="0" y2="228"/><line x1="144" y1="216" x2="144" y2="228"/><line x1="192" y1="216" x2="192" y2="228"/><line x1="440" y1="216" x2="440" y2="228"/><line x1="488" y1="216" x2="488" y2="228"/></g>
+          <g class="t-mono" text-anchor="middle"><text x="72" y="238">3.6</text><text x="168" y="238">1.2</text><text x="316" y="238">6.2</text><text x="464" y="238">1.2 m</text></g>
+          <line x1="263.6" y1="40" x2="263.6" y2="112" style="stroke:var(--accent);stroke-width:2;stroke-dasharray:4 3"/>
+          <text x="270" y="44" class="t-mono" style="fill:var(--accent)">합력 R = 510 kN, 앞축에서 6.59 m</text>
+          <text x="-6" y="30" class="t" style="font-weight:700">KL-510 형태 설계 트럭(교육용) ← 진행</text>
+        </g>
+        <g transform="translate(120,252)">
+          <rect x="0" y="0" width="600" height="12" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <text x="610" y="11" class="t-mono" style="fill:var(--accent-2)">차로 하중 12.7 kN/m (형태)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-2.</b> 이 책의 설계 트럭 <code>CB.civ.TRUCK</code>(KL-510 형태, 교육용). 앞축 48 kN, 가운데 2축(135 + 135 kN, 탠덤), 뒤 2축(96 + 96 kN). 합 510 kN, 합력은 앞축에서 6.59 m. 실제 기준 트럭은 일부 축간 거리가 범위로 주어지는 형태이고(가장 불리한 값을 쓴다), 이 책은 고정값으로 단순화했다. 현행 KDS 24 12 21 확인.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 2.2 (설계 활하중, 교육용 형태)</strong> 한 설계 차로의 활하중 효과는 다음 두 경우 가운데 큰 값이다.
+      <div class="formula">$$LL_{lane} = \max\Big[(1 + IM)\,E_{truck},\;\; 0.75\,(1 + IM)\,E_{truck} + E_{lane}\Big]$$<div class="where">\(E_{truck}\)은 설계 트럭을 가장 불리한 위치에 놓은 효과(영향선 주사, 4절), \(E_{lane} = w\int\eta\,dx\)는 차로 하중 \(w = 12.7\) kN/m를 영향선의 같은 부호 구간에만 실은 효과(8절), \(IM\)은 충격 계수(6절)로 트럭에만 곱한다. 국내 한계상태 기준의 형태를 따른 교육용 정의이며, 재하 길이에 따른 차로 하중 감소 등 세부는 현행 KDS 24 12 21 확인. AASHTO LRFD의 HL-93은 설계 트럭(또는 탠덤)과 설계 차로 하중(9.3 kN/m)을 <b>함께</b> 싣는다.</div></div></div>
+    <p>왜 "0.75 트럭 + 차로"일까요? 긴 경간에 트럭 한 대만 있다고 보면 너무 가볍고, 차로 하중만 있다고 보면 그 행렬 안의 무거운 트럭 한 대를 놓칩니다. 기준은 무거운 트럭이 행렬 속에 섞여 있는 상황을 "트럭의 일부 + 등분포"로 나타냅니다. 50 m 단순 경간 중앙에서 계산하면 트럭 단독 \(1.167 \times 5{,}526 = 6{,}447\) kN·m, 조합 \(0.75 \times 6{,}447 + 3{,}969 = 8{,}804\) kN·m로 조합이 37 % 큽니다. 경간이 짧으면 트럭 단독이 이깁니다(시뮬레이터 2.2에서 확인).</p>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="drive">
+    <h2>트럭이 지나가는 몇 초</h2>
+    <div class="problem"><strong>한 단면의 휨모멘트는 시간에 따라 어떻게 변하는가</strong>
+      <p>B-130을 시속 60 km로 건너는 트럭은 약 8초 만에 교량을 지납니다. 그 8초 동안 경간 중앙 단면이 느끼는 휨모멘트를 그래프로 그려 봅시다. 최댓값은 트럭이 어디에 있을 때일까요?</p></div>
+    <p>트럭의 앞축 위치를 \(f\)라 하면, 단면 \(c\)의 휨모멘트는 트럭 위치의 함수 \(M_c(f)\)입니다. 이것을 그린 그래프는 시간 이력과 같은 모양입니다(속도가 일정하면 \(f = vt\)). 단순보에서 축 하나의 효과는 삼각형이고, 다섯 축의 효과를 축간 거리만큼 밀어 더하면 \(M_c(f)\)가 됩니다.</p>
+    <div class="sim" id="sim-bl-drive">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>트럭 주행: 휨모멘트·전단력의 시간 이력과 최댓값</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bl-cv-drive" aria-label="단순보 위를 달리는 트럭, 현재 휨모멘트도, 단면 c의 휨모멘트와 전단력 이력 그래프. 트럭을 끌어 옮길 수 있다"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경간 L <output id="bl-dr-L-out"></output></span><input type="range" id="bl-dr-L" min="10" max="80" step="1" value="50"></label>
+          <label class="ctrl"><span>단면 위치 c / L <output id="bl-dr-c-out"></output></span><input type="range" id="bl-dr-c" min="0.05" max="0.95" step="0.01" value="0.5"></label>
+          <label class="ctrl"><span>트럭 앞축 위치 <output id="bl-dr-f-out"></output></span><input type="range" id="bl-dr-f" min="0" max="92.2" step="0.1" value="29.8"></label>
+          <div class="ctrl"><span>진행 방향</span><div class="seg" id="bl-dr-dir"><button data-value="1" class="on">→ 오른쪽</button><button data-value="-1">← 왼쪽</button></div></div>
+          <div class="btn-row"><button class="btn" id="bl-dr-play">▶ 주행</button><button class="btn" id="bl-dr-max">최대 위치로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">지금 M<sub>c</sub> · V<sub>c</sub></span><span class="v" id="bl-dr-now">—</span></div>
+        <div class="stat"><span class="k">최대 M<sub>c</sub> (앞축 위치)</span><span class="v" id="bl-dr-mmax">—</span></div>
+        <div class="stat"><span class="k">최대 · 최소 V<sub>c</sub></span><span class="v" id="bl-dr-v">—</span></div>
+        <div class="stat"><span class="k">차로 하중 wL²/8 비교</span><span class="v" id="bl-dr-lane">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(50 m, 경간 중앙)에서 앞축 29.8 m — 뒤쪽 135 kN 축(앞축에서 4.8 m)이 정확히 중앙에 왔을 때 5,526 kN·m가 최대입니다 · 이력 곡선의 꺾임점은 축 하나가 단면을 지나는 순간입니다 · 전단력은 축이 단면을 지날 때마다 계단처럼 떨어집니다 · c/L을 0.1로 옮기면 최대 전단력이 커지고 최대 휨모멘트는 작아집니다 · 방향을 바꿔도 경간 중앙의 최대값은 같지만(대칭), 다른 단면에서는 달라질 수 있습니다 · 캔버스의 트럭을 직접 끌어도 됩니다 · 모델: 단순보 정역학, 이력은 <code>CB.civ.truckScan(L, CB.civ.ilSimple(L, "M", c))</code>의 history, 0.05 m 간격.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="influence">
+    <h2>영향선으로 최대값 찾기</h2>
+    <div class="problem"><strong>트럭을 수천 곳에 놓아 보지 않고 최대를 찾을 수 있을까</strong>
+      <p>시뮬레이터 2.1은 트럭을 0.05 m씩 옮겨 가며 매번 보를 풀었습니다. 단면이 수백 개, 하중 모형이 여러 개면 계산이 많아집니다. 단면마다 한 번만 그려 두면 어떤 차량에도 쓸 수 있는 그래프가 있습니다.</p></div>
+    <p>MechanicsBook 6장의 <a href="../../mechanics/chapters/influence.html#simple-beam">영향선</a>을 다시 씁니다. 단면 \(c\)의 어떤 효과(반력·전단력·휨모멘트)의 <span class="term">영향선</span><span class="en">(influence line)</span> \(\eta(x)\)는 단위 하중이 \(x\)에 있을 때의 그 효과입니다. 선형 탄성 구조에서는 중첩이 성립하므로, 축하중 \(P_i\)가 \(x_i\)에 있을 때의 효과는 축마다의 값을 더한 것입니다.</p>
+    <div class="callout def"><strong>원리 2.1 (영향선에 의한 이동 하중 효과)</strong>
+      <div class="formula">$$E(f) = \sum_i P_i\,\eta\!\left(x_i(f)\right), \qquad E_{lane} = w\int_{\eta \gt 0}\eta(x)\,dx \;\;(\text{최대}),\qquad E_{max} = \max_f E(f)$$<div class="where">단순보 경간 \(L\), 단면 \(c\): \(\eta_{R_A} = 1 - x/L\), \(\eta_V = -x/L\) (\(x \lt c\)), \(1 - x/L\) (\(x \gt c\)), \(\eta_M = x(L - c)/L\) (\(x \le c\)), \(c(L - x)/L\) (\(x \ge c\)). 휨모멘트 영향선은 \(x = c\)에서 꼭짓점 \(c(L - c)/L\)인 삼각형이므로, 집중 하중 열의 최대는 <b>어느 한 축이 꼭짓점 위에 있을 때</b> 생긴다(삼각형 위에서 \(E(f)\)는 구간별 1차 함수라 꼭짓점에서만 기울기가 바뀐다). <code>CB.civ.ilSimple</code>이 이 식이고 <code>CB.civ.truckScan</code>이 \(E(f)\)를 주사한다.</div></div></div>
+    <figure class="diagram" id="fig-bl-ilsum">
+      <svg viewBox="0 0 860 280" role="img" aria-label="50 m 단순보 경간 중앙 휨모멘트 영향선(꼭짓점 12.5 m) 위에 트럭 다섯 축을 놓고 각 축의 영향선 값 eta를 읽어 P eta를 더하는 그림">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <!-- x: 60 + 14*x ; L=50 -> 760; IL apex 12.5 at x=25 -> 410; y: 220 - 10*eta -->
+        <line x1="60" y1="220" x2="760" y2="220" class="s-axis"/>
+        <path d="M60 220 L410 95 L760 220 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+        <text x="418" y="90" class="t-mono" style="fill:var(--accent)">η = c(L − c)/L = 12.5 m</text>
+        <!-- axles heading right, front at 29.8: 29.8, 26.2, 25.0, 18.8, 17.6 -->
+        <g style="stroke:var(--accent-2);stroke-width:2.2">
+          <line x1="477.2" y1="40" x2="477.2" y2="66" marker-end="url(#bl-ah-ld)"/><line x1="426.8" y1="40" x2="426.8" y2="72" marker-end="url(#bl-ah-ld)"/><line x1="410" y1="40" x2="410" y2="72" marker-end="url(#bl-ah-ld)"/><line x1="323.2" y1="40" x2="323.2" y2="70" marker-end="url(#bl-ah-ld)"/><line x1="306.4" y1="40" x2="306.4" y2="70" marker-end="url(#bl-ah-ld)"/>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-dasharray:3 3"><line x1="477.2" y1="74" x2="477.2" y2="119"/><line x1="426.8" y1="78" x2="426.8" y2="101"/><line x1="410" y1="78" x2="410" y2="95"/><line x1="323.2" y1="76" x2="323.2" y2="126"/><line x1="306.4" y1="76" x2="306.4" y2="132"/></g>
+        <g style="fill:var(--accent)"><circle cx="477.2" cy="119" r="3.5"/><circle cx="426.8" cy="101" r="3.5"/><circle cx="410" cy="95" r="3.5"/><circle cx="323.2" cy="126" r="3.5"/><circle cx="306.4" cy="132" r="3.5"/></g>
+        <g class="t-mono" text-anchor="middle" style="fill:var(--accent-2)"><text x="484" y="34">48</text><text x="430" y="34">135</text><text x="404" y="34">135</text><text x="330" y="34">96</text><text x="300" y="34">96</text></g>
+        <text x="60" y="244" class="t-mono">0</text><text x="752" y="244" class="t-mono">50 m</text>
+        <rect x="560" y="120" width="270" height="130" rx="8" class="f-elev"/>
+        <g class="t-mono"><text x="574" y="142">48 × 10.1 = 484.8</text><text x="574" y="160">135 × 11.9 = 1,606.5</text><text x="574" y="178">135 × 12.5 = 1,687.5</text><text x="574" y="196">96 × 9.4 = 902.4</text><text x="574" y="214">96 × 8.8 = 844.8</text><text x="574" y="238" style="fill:var(--accent);font-weight:700">Σ Pη = 5,526 kN·m</text></g>
+      </svg>
+      <figcaption><b>그림 2-3.</b> 50 m 단순보 경간 중앙 휨모멘트 영향선과 최대 위치의 트럭(앞축 29.8 m, 오른쪽으로 진행). 뒤쪽 135 kN 축(앞축에서 4.8 m)이 꼭짓점 위에 있다. 각 축 아래의 영향선 값(점)에 축하중을 곱해 더하면 5,526 kN·m — 예제 2.2.</figcaption>
+    </figure>
+    <div class="sim" id="sim-bl-il">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>영향선 그리기: 위치 c → R<sub>A</sub> · V · M 영향선과 트럭 배치</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bl-cv-il" aria-label="단순보의 선택한 효과 영향선과 그 위의 트럭 축, 축마다의 영향선 값과 합. 트럭을 끌어 옮길 수 있다"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>효과</span><div class="seg" id="bl-il-kind"><button data-value="RA">반력 R<sub>A</sub></button><button data-value="V">전단력 V(c)</button><button data-value="M" class="on">휨모멘트 M(c)</button></div></div>
+          <label class="ctrl"><span>경간 L <output id="bl-il-L-out"></output></span><input type="range" id="bl-il-L" min="10" max="80" step="1" value="50"></label>
+          <label class="ctrl"><span>단면 c <output id="bl-il-c-out"></output></span><input type="range" id="bl-il-c" min="0.5" max="49.5" step="0.5" value="25"></label>
+          <div class="btn-row"><button class="btn" id="bl-il-best">최대 위치에 놓기</button><button class="btn" id="bl-il-worst">최소 위치에 놓기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">지금 Σ P<sub>i</sub>η<sub>i</sub></span><span class="v" id="bl-il-now">—</span></div>
+        <div class="stat"><span class="k">주사 최대 · 최소</span><span class="v" id="bl-il-mm">—</span></div>
+        <div class="stat"><span class="k">차로 하중 w·∫η (+ · −)</span><span class="v" id="bl-il-lane">—</span></div>
+        <div class="stat"><span class="k">설계 (정의 2.2, 차로당)</span><span class="v" id="bl-il-des">—</span></div>
+      </div>
+      <div class="bl-msg" id="bl-il-tab">—</div>
+      <div class="sim-note">해볼 것: 휨모멘트 영향선은 꼭짓점이 단면 위에 있는 삼각형이고, "최대 위치에 놓기"를 누르면 언제나 축 하나가 꼭짓점에 옵니다 · 전단력 영향선은 단면에서 1만큼 뛰는 두 직선이라 최대는 트럭 앞축이 막 단면을 넘었을 때(오른쪽 구간)에, 최소는 반대쪽 구간에 생깁니다 · 경간 10 m에서는 트럭 일부만 올라가 트럭 단독이 조합보다 크고, 80 m에서는 차로 하중이 커져 조합이 지배합니다(설계 칸) · 모델: <code>CB.civ.ilSimple</code>, <code>truckScan</code>(0.05 m, 양방향), 차로 하중 12.7 kN/m, 충격 <code>CB.civ.impact(L)</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 2.2 (50 m 단순 경간 중앙의 설계 활하중 휨모멘트)</strong> \(L = 50\) m, 단면 \(c = 25\) m, 한 차로.
+      <ol class="bl-steps">
+        <li><b>트럭 배치.</b> 꼭짓점(\(\eta = 12.5\) m)에 무거운 축을 둔다. 뒤쪽 135 kN 축(앞축에서 4.8 m)을 25 m에 두면 축 위치는 29.8, 26.2, 25.0, 18.8, 17.6 m.</li>
+        <li><b>영향선 값.</b> \(\eta = (50 - x)/2\) 또는 \(x/2\): 10.1, 11.9, 12.5, 9.4, 8.8 m.</li>
+        <li><b>트럭 효과.</b> \(\sum P\eta = 484.8 + 1{,}606.5 + 1{,}687.5 + 902.4 + 844.8 = \mathbf{5{,}526}\) kN·m(그림 2-3). 앞쪽 135 kN 축(앞축에서 3.6 m)을 꼭짓점에 두면 5,440 kN·m로 조금 작다.</li>
+        <li><b>충격.</b> \(IM = 15/(40 + 50) = 0.167\) → \(1.167 \times 5{,}526 = 6{,}447\) kN·m.</li>
+        <li><b>차로 하중.</b> \(w\int\eta = 12.7 \times (\tfrac12 \times 50 \times 12.5) = 12.7 \times 312.5 = 3{,}969\) kN·m(= \(wL^2/8\)).</li>
+        <li><b>설계 활하중(정의 2.2).</b> \(\max(6{,}447,\; 0.75 \times 6{,}447 + 3{,}969 = 8{,}804) = \mathbf{8{,}804}\) kN·m(차로당). 트럭 단독 대비 37 % 크다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="absolute">
+    <h2>절대 최대 휨모멘트</h2>
+    <div class="problem"><strong>경간 중앙이 가장 위험한 단면인가</strong>
+      <p>예제 2.2는 경간 중앙이라는 정해진 단면의 최댓값이었습니다. 트럭이 지나가는 동안 보 전체에서 가장 큰 휨모멘트는 중앙이 아닌 곳에서 생길 수 있습니다.</p></div>
+    <p>모든 단면의 최대 휨모멘트를 이은 곡선을 <span class="term">포락선</span><span class="en">(envelope)</span>이라 하고, 그 꼭대기를 <span class="term">절대 최대 휨모멘트</span><span class="en">(absolute maximum bending moment)</span>라 합니다. MechanicsBook 6장의 <a href="../../mechanics/chapters/influence.html#absolute">원리 6.5</a>가 그 위치를 알려 줍니다.</p>
+    <div class="callout def"><strong>원리 2.2 (단순보 절대 최대 휨모멘트의 위치)</strong> 하중 열의 합력 \(R\)과 어느 축 \(P_k\) 사이 거리를 \(d\)라 할 때, 경간 중앙이 \(P_k\)와 \(R\)의 한가운데에 오도록(곧 \(P_k\)를 중앙에서 \(d/2\) 떨어진 곳에) 놓으면 \(P_k\) 바로 아래 단면의 휨모멘트가 최대다.
+      <div class="formula">$$x_k = \frac{L - d}{2}, \qquad M_{abs} = \frac{R}{L}\left(\frac{L - d}{2}\right)^2 - \sum_{\text{P}_k\text{ 앞쪽 축}} P_j\,a_j$$<div class="where">\(a_j\)는 \(P_k\)보다 지점 쪽(트럭 앞쪽)에 있는 축과 \(P_k\) 사이 거리. 보통 합력에 가장 가까운 무거운 축이 \(P_k\)다. 단, 그 배치에서 트럭의 일부가 경간 밖으로 나가면 \(R\)이 바뀌므로 다시 확인한다(짧은 경간).</div></div></div>
+    <figure class="diagram" id="fig-bl-abs">
+      <svg viewBox="0 0 860 250" role="img" aria-label="50 m 경간에서 135 kN 축과 합력 R 사이 거리 1.79 m를 경간 중앙이 이등분하도록 트럭을 놓은 배치와 그 축 아래의 절대 최대 휨모멘트">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <!-- x: 60 + 14*x; truck heading left, front at 19.305 -->
+        <line x1="60" y1="150" x2="760" y2="150" style="stroke:var(--accent);stroke-width:5"/>
+        <path d="M60 154 l-8 12 h16 z M760 154 l-8 12 h16 z" style="fill:none;stroke:var(--ok)"/>
+        <g style="stroke:var(--accent-2);stroke-width:2.2"><line x1="330.3" y1="100" x2="330.3" y2="146" marker-end="url(#bl-ah-ld)"/><line x1="380.7" y1="86" x2="380.7" y2="146" marker-end="url(#bl-ah-ld)"/><line x1="397.5" y1="86" x2="397.5" y2="146" marker-end="url(#bl-ah-ld)"/><line x1="484.3" y1="94" x2="484.3" y2="146" marker-end="url(#bl-ah-ld)"/><line x1="501.1" y1="94" x2="501.1" y2="146" marker-end="url(#bl-ah-ld)"/></g>
+        <g class="t-mono" text-anchor="middle" style="fill:var(--accent-2)"><text x="330" y="92">48</text><text x="372" y="78">135</text><text x="404" y="78">P<tspan baseline-shift="sub" font-size="8">k</tspan> 135</text><text x="484" y="86">96</text><text x="506" y="86">96</text></g>
+        <line x1="410" y1="40" x2="410" y2="200" style="stroke:var(--text-dim);stroke-dasharray:6 4"/>
+        <text x="414" y="44" class="t-mono">경간 중앙 25 m</text>
+        <line x1="422.5" y1="60" x2="422.5" y2="146" style="stroke:var(--accent);stroke-width:2;stroke-dasharray:3 3"/>
+        <text x="428" y="64" class="t-mono" style="fill:var(--accent)">R = 510 kN</text>
+        <line x1="397.5" y1="180" x2="422.5" y2="180" style="stroke:var(--text-dim)" marker-start="url(#bl-ah-d)" marker-end="url(#bl-ah-d)"/>
+        <text x="410" y="196" text-anchor="middle" class="t-mono">d = 1.79</text>
+        <text x="60" y="230" class="t-dim">P<tspan baseline-shift="sub" font-size="8">k</tspan> 위치 x = (50 − 1.79)/2 = 24.1 m · M<tspan baseline-shift="sub" font-size="8">abs</tspan> = 5,534 kN·m (경간 중앙 최대 5,526보다 0.15 % 큼) · 트럭은 ← 방향</text>
+      </svg>
+      <figcaption><b>그림 2-4.</b> 50 m 경간의 절대 최대 휨모멘트 배치. 트럭이 왼쪽으로 진행해 무거운 뒤 축들이 오른쪽에 있다. 경간 중앙선이 \(P_k\)(앞축에서 4.8 m의 135 kN 축)와 합력 \(R\)의 한가운데를 지난다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-bl-abs">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>절대 최대 모멘트 찾기: 포락선과 규칙 배치</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bl-cv-abs" aria-label="단순보의 휨모멘트 포락선(모든 단면의 최대값)과 현재 트럭 위치의 휨모멘트도, 절대 최대 위치"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경간 L <output id="bl-ab-L-out"></output></span><input type="range" id="bl-ab-L" min="10" max="80" step="1" value="50"></label>
+          <div class="ctrl"><span><span>기준 축 P<sub>k</sub></span></span><div class="seg" id="bl-ab-k"><button data-value="1">135 (둘째)</button><button data-value="2" class="on">135 (셋째)</button><button data-value="3">96 (넷째)</button></div></div>
+          <label class="ctrl"><span>트럭 앞축 위치 <output id="bl-ab-f-out"></output></span><input type="range" id="bl-ab-f" min="0" max="92.2" step="0.05" value="30"></label>
+          <div class="btn-row"><button class="btn" id="bl-ab-rule">규칙대로 놓기</button><button class="btn" id="bl-ab-mid">축 하나를 중앙에</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">지금 최대 M (위치)</span><span class="v" id="bl-ab-now">—</span></div>
+        <div class="stat"><span class="k">절대 최대 (위치)</span><span class="v" id="bl-ab-abs">—</span></div>
+        <div class="stat"><span class="k">경간 중앙 최대</span><span class="v" id="bl-ab-mid2">—</span></div>
+        <div class="stat"><span class="k">차이</span><span class="v" id="bl-ab-diff">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: "규칙대로 놓기"를 누르면 트럭이 오른쪽으로 진행하는 방향(뒤 축들이 왼쪽)으로 놓이고, 경간 중앙선이 P<sub>k</sub>와 합력 R 사이를 이등분합니다. 셋째 축(앞에서 4.8 m, 합력과 1.79 m)이 50 m의 절대 최대(약 5,534 kN·m)를 줍니다 · 넷째 축(96 kN)을 기준으로 하면 규칙은 지켜도 그 축 아래 값이 더 작습니다 · 경간 20 m에서는 트럭(12.2 m)이 경간을 거의 채워 차이가 1 %를 넘습니다 · 모델: 포락선은 단면 L/120 간격마다 <code>truckScan</code>(양방향, 0.05 m)의 최대, 실선은 현재 트럭의 휨모멘트도(단순보 정역학). 진행 방향은 오른쪽으로 고정.</div>
+    </div>
+    <div class="callout"><strong>예제 2.3 (50 m 경간의 절대 최대 휨모멘트)</strong> KL-510 형태 트럭, 단순 경간 50 m.
+      <ol class="bl-steps">
+        <li><b>합력.</b> \(R = 510\) kN, 앞축에서 \(\bar x = (48 \times 0 + 135 \times 3.6 + 135 \times 4.8 + 96 \times 11.0 + 96 \times 12.2)/510 = 3{,}361.2/510 = 6.59\) m.</li>
+        <li><b>기준 축.</b> 합력에 가장 가까운 무거운 축은 앞에서 4.8 m의 135 kN 축, \(d = 6.59 - 4.8 = 1.79\) m.</li>
+        <li><b>배치.</b> 그 축을 \(x_k = (50 - 1.79)/2 = 24.105\) m에 두고 합력은 25.895 m(중앙에서 반대쪽으로 0.895 m). 트럭 전체가 경간 안에 있다.</li>
+        <li><b>크기.</b> \(R_A = 510 \times (50 - 25.895)/50 = 245.9\) kN. 기준 축 아래 \(M = 245.9 \times 24.105 - 48 \times 4.8 - 135 \times 1.2 = 5{,}926.7 - 230.4 - 162.0 = \mathbf{5{,}534}\) kN·m. (여기서는 트럭이 왼쪽으로 진행해 앞축이 지점 A 쪽에 있다.)</li>
+        <li><b>비교.</b> 경간 중앙 최대 5,526 kN·m보다 0.15 % 크고, 위치는 중앙에서 0.9 m. 이 트럭에서는 차이가 작아 실무에서는 경간 중앙값을 쓰는 경우가 많지만, 짧은 경간과 축하중이 고르지 않은 차량에서는 차이가 커진다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="impact">
+    <h2>충격: 달리는 하중의 동적 효과</h2>
+    <div class="problem"><strong>달리는 트럭은 서 있는 트럭보다 무거운가</strong>
+      <p>트럭이 노면의 요철과 신축 이음을 지나면 차체가 출렁이며 바퀴 하중이 커졌다 작아졌다 하고, 교량도 그 리듬에 따라 진동합니다. 그 결과 교량의 처짐과 응력은 같은 트럭이 서 있을 때보다 커집니다.</p></div>
+    <p>기준은 이 동적 효과를 정적 트럭 효과에 곱하는 계수로 다룹니다. 이 계수를 <span class="term">충격 계수</span><span class="en">(dynamic load allowance, IM)</span>라 합니다. 실제 동적 증폭은 경간과 고유 진동수, 차량 속도와 현가 장치, 노면 상태에 따라 달라 하나의 식으로 정확히 나타낼 수 없으므로, 기준은 안전한 쪽의 단순한 값을 줍니다.</p>
+    <div class="callout def"><strong>원리 2.3 (충격 계수, 교육용 형태)</strong>
+      <div class="formula">$$IM = \frac{15}{40 + L} \le 0.3, \qquad LL + IM = (1 + IM)\,E_{truck} + E_{lane}$$<div class="where">\(L\)은 경간(m). 경간이 짧을수록 크다(\(L \le 10\) m에서 상한 0.3). 이 경간 의존 식은 국내 옛 도로교 설계기준(허용 응력 체계)의 형태로, 이 책은 교육용으로 쓴다(<code>CB.civ.impact</code>). 현행 한계상태 기준과 AASHTO LRFD는 경간과 무관한 값(AASHTO: 일반 33 %, 피로 15 %, 바닥판 신축 이음 75 %)을 준다 — 현행 KDS 24 12 21 확인. 충격은 <b>트럭에만</b> 곱하고 차로 하중에는 곱하지 않는다(많은 차량이 동시에 같은 위상으로 출렁일 가능성은 작다). 연속교의 지점 부모멘트에는 이웃 두 경간의 평균 길이를 쓴다(교육용 형태).</div></div></div>
+    <p>충격의 물리를 보려면 교량을 1자유도 진동계(첫째 휨 모드)로 보고 트럭 축들을 움직이는 힘으로 넣으면 됩니다. 모드 좌표 \(q(t)\)는 \(\ddot q + 2\zeta\omega\dot q + \omega^2 q = F(t)/m^*\), \(F(t) = \sum P_i\sin(\pi x_i(t)/L)\)를 따릅니다. 같은 \(F(t)\)를 정적으로 준 응답 \(F/(m^*\omega^2)\)과 동적 응답의 최댓값의 비가 <span class="term">동적 증폭 계수</span><span class="en">(dynamic amplification factor, DAF)</span>입니다. 이 모형은 노면 요철과 차량의 출렁임을 넣지 않아 실제보다 작은 증폭을 줍니다. 기준의 IM이 이 모형보다 큰 것은 그 차이를 덮기 위해서입니다.</p>
+    <div class="sim" id="sim-bl-impact">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>충격 계수 곡선과 이동 하중의 동적 증폭</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bl-cv-imp" aria-label="경간에 따른 충격 계수 곡선(교육용 형태와 AASHTO 상수), 선택한 경간·속도에서 경간 중앙 처짐의 동적·정적 시간 이력"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경간 L <output id="bl-im-L-out"></output></span><input type="range" id="bl-im-L" min="5" max="150" step="1" value="50"></label>
+          <label class="ctrl"><span>트럭 속도 <output id="bl-im-v-out"></output></span><input type="range" id="bl-im-v" min="10" max="150" step="5" value="80"></label>
+          <label class="ctrl"><span><span>고유 진동수 f<sub>1</sub></span> <output id="bl-im-f-out"></output></span><input type="range" id="bl-im-f" min="0.5" max="12" step="0.05" value="2"></label>
+          <label class="ctrl"><span>감쇠비 ζ <output id="bl-im-z-out"></output></span><input type="range" id="bl-im-z" min="0" max="0.1" step="0.005" value="0.02"></label>
+          <div class="btn-row"><button class="btn" id="bl-im-emp">f<sub>1</sub> ≈ 100/L (어림)</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">IM 교육용 형태</span><span class="v" id="bl-im-im">—</span></div>
+        <div class="stat"><span class="k">이동 하중 DAF − 1</span><span class="v" id="bl-im-daf">—</span></div>
+        <div class="stat"><span class="k">속도 매개변수 α = v/(2f<sub>1</sub>L)</span><span class="v" id="bl-im-a">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 50 m, 80 km/h, f<sub>1</sub> 2 Hz에서 이동 하중만으로는 증폭이 몇 % 남짓이고, 기준 형태의 IM 16.7 %가 훨씬 큽니다 — 그 차이가 노면 요철·이음부 충격·차량 출렁임의 몫입니다 · 경간 10 m, 진동수 10 Hz, 속도 150 km/h처럼 짧고 빠르면 증폭이 커집니다 · 감쇠를 0으로 하면 트럭이 떠난 뒤에도 진동이 남습니다(점선 뒤쪽) · 모델: 단순보 첫째 모드 1자유도, F(t) = ΣP<sub>i</sub>sin(πx<sub>i</sub>/L), 시간 적분 <code>CB.rk4</code>(트럭 통과 시간의 1.5배까지), DAF는 경간 중앙 처짐의 동적/정적 최댓값 비. 노면 요철·차량 현가는 넣지 않은 교육용 모형. f<sub>1</sub> ≈ 100/L은 거더교의 대략적인 경험적 어림(형태)이다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="continuous">
+    <h2>연속교의 영향선</h2>
+    <div class="problem"><strong>B-130 지점 위의 최대 부모멘트를 주는 트럭 위치는</strong>
+      <p>단순보의 영향선은 직선이었습니다. B-130은 3경간 연속보라 부정정이고, 한 경간의 하중이 이웃 경간에도 휨모멘트를 만듭니다. 영향선은 어떤 모양일까요?</p></div>
+    <p>부정정 구조의 영향선도 정의는 같습니다. 단위 하중을 \(x\)에 놓고 구조물을 풀어 그 단면의 값을 읽습니다. 다른 점은 한 번의 해석이 강성법(<code>CB.beam</code>)이라는 것뿐입니다. 뮐러-브레슬라우 원리(MechanicsBook 6장)에 따라 모양은 매끄러운 곡선이고, 한 경간에서 양이면 이웃 경간에서 음으로 부호를 바꿉니다.</p>
+    <figure class="diagram" id="fig-bl-b130il">
+      <svg viewBox="0 0 860 400" role="img" aria-label="B-130(40 + 50 + 40 m)의 영향선 세 가지: 중앙 경간 중앙 휨모멘트(최대 8.42 m), 지점 P1 휨모멘트(최소 −4.39 m), 지점 P1 오른쪽 전단력">
+        <rect x="10" y="10" width="840" height="380" rx="10" class="f-surface"/>
+        <g style="stroke:var(--text-faint);stroke-dasharray:2 4"><line x1="60" y1="30" x2="60" y2="370"/><line x1="260" y1="30" x2="260" y2="370"/><line x1="510" y1="30" x2="510" y2="370"/><line x1="710" y1="30" x2="710" y2="370"/></g>
+        <g class="t-mono" text-anchor="middle"><text x="60" y="384">A1</text><text x="260" y="384">P1</text><text x="510" y="384">P2</text><text x="710" y="384">A2</text></g>
+        <g transform="translate(0,136)">
+          <line x1="60" y1="0" x2="710" y2="0" class="s-axis"/>
+          <path d="M60.0 0.0 L65.0 1.0 L70.0 2.1 L75.0 3.1 L80.0 4.1 L85.0 5.1 L90.0 6.1 L95.0 7.1 L100.0 8.0 L105.0 8.9 L110.0 9.8 L115.0 10.6 L120.0 11.4 L125.0 12.1 L130.0 12.8 L135.0 13.5 L140.0 14.0 L145.0 14.5 L150.0 15.0 L155.0 15.4 L160.0 15.7 L165.0 15.9 L170.0 16.0 L175.0 16.1 L180.0 16.0 L185.0 15.9 L190.0 15.7 L195.0 15.3 L200.0 14.9 L205.0 14.4 L210.0 13.7 L215.0 12.9 L220.0 12.0 L225.0 11.0 L230.0 9.8 L235.0 8.6 L240.0 7.1 L245.0 5.6 L250.0 3.9 L255.0 2.0 L260.0 0.0 L265.0 -2.2 L270.0 -4.5 L275.0 -7.0 L280.0 -9.6 L285.0 -12.4 L290.0 -15.3 L295.0 -18.4 L300.0 -21.7 L305.0 -25.1 L310.0 -28.7 L315.0 -32.4 L320.0 -36.3 L325.0 -40.4 L330.0 -44.6 L335.0 -48.9 L340.0 -53.4 L345.0 -58.1 L350.0 -62.9 L355.0 -67.9 L360.0 -73.0 L365.0 -78.3 L370.0 -83.8 L375.0 -89.4 L380.0 -95.2 L385.0 -101.1 L390.0 -95.2 L395.0 -89.4 L400.0 -83.8 L405.0 -78.3 L410.0 -73.0 L415.0 -67.9 L420.0 -62.9 L425.0 -58.1 L430.0 -53.4 L435.0 -48.9 L440.0 -44.6 L445.0 -40.4 L450.0 -36.3 L455.0 -32.4 L460.0 -28.7 L465.0 -25.1 L470.0 -21.7 L475.0 -18.4 L480.0 -15.3 L485.0 -12.4 L490.0 -9.6 L495.0 -7.0 L500.0 -4.5 L505.0 -2.2 L510.0 0.0 L515.0 2.0 L520.0 3.9 L525.0 5.6 L530.0 7.1 L535.0 8.6 L540.0 9.8 L545.0 11.0 L550.0 12.0 L555.0 12.9 L560.0 13.7 L565.0 14.4 L570.0 14.9 L575.0 15.3 L580.0 15.7 L585.0 15.9 L590.0 16.0 L595.0 16.1 L600.0 16.0 L605.0 15.9 L610.0 15.7 L615.0 15.4 L620.0 15.0 L625.0 14.5 L630.0 14.0 L635.0 13.5 L640.0 12.8 L645.0 12.1 L650.0 11.4 L655.0 10.6 L660.0 9.8 L665.0 8.9 L670.0 8.0 L675.0 7.1 L680.0 6.1 L685.0 5.1 L690.0 4.1 L695.0 3.1 L700.0 2.1 L705.0 1.0 L710.0 0.0" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="720" y="-60" class="t" style="font-weight:700">M (중앙 경간 중앙)</text>
+          <text x="720" y="-42" class="t-mono">최대 +8.42 m</text><text x="720" y="-26" class="t-mono">A⁺ 176.6, A⁻ −69.6 m²</text>
+        </g>
+        <g transform="translate(0,200)">
+          <line x1="60" y1="0" x2="710" y2="0" class="s-axis"/>
+          <path d="M60.0 0.0 L65.0 2.9 L70.0 5.8 L75.0 8.6 L80.0 11.4 L85.0 14.2 L90.0 16.9 L95.0 19.6 L100.0 22.2 L105.0 24.7 L110.0 27.1 L115.0 29.4 L120.0 31.6 L125.0 33.6 L130.0 35.5 L135.0 37.2 L140.0 38.8 L145.0 40.3 L150.0 41.5 L155.0 42.5 L160.0 43.3 L165.0 44.0 L170.0 44.3 L175.0 44.5 L180.0 44.4 L185.0 44.0 L190.0 43.4 L195.0 42.5 L200.0 41.3 L205.0 39.8 L210.0 37.9 L215.0 35.8 L220.0 33.3 L225.0 30.5 L230.0 27.3 L235.0 23.7 L240.0 19.8 L245.0 15.4 L250.0 10.7 L255.0 5.6 L260.0 0.0 L265.0 6.0 L270.0 11.6 L275.0 16.8 L280.0 21.5 L285.0 25.9 L290.0 29.9 L295.0 33.6 L300.0 36.8 L305.0 39.8 L310.0 42.4 L315.0 44.7 L320.0 46.6 L325.0 48.3 L330.0 49.7 L335.0 50.8 L340.0 51.6 L345.0 52.2 L350.0 52.5 L355.0 52.6 L360.0 52.5 L365.0 52.2 L370.0 51.6 L375.0 50.9 L380.0 50.0 L385.0 48.9 L390.0 47.7 L395.0 46.3 L400.0 44.8 L405.0 43.2 L410.0 41.4 L415.0 39.6 L420.0 37.6 L425.0 35.6 L430.0 33.5 L435.0 31.4 L440.0 29.2 L445.0 27.0 L450.0 24.7 L455.0 22.5 L460.0 20.2 L465.0 18.0 L470.0 15.8 L475.0 13.6 L480.0 11.4 L485.0 9.3 L490.0 7.3 L495.0 5.3 L500.0 3.4 L505.0 1.7 L510.0 0.0 L515.0 -1.5 L520.0 -3.0 L525.0 -4.3 L530.0 -5.5 L535.0 -6.6 L540.0 -7.6 L545.0 -8.5 L550.0 -9.2 L555.0 -9.9 L560.0 -10.5 L565.0 -11.0 L570.0 -11.5 L575.0 -11.8 L580.0 -12.1 L585.0 -12.2 L590.0 -12.3 L595.0 -12.4 L600.0 -12.3 L605.0 -12.2 L610.0 -12.0 L615.0 -11.8 L620.0 -11.5 L625.0 -11.2 L630.0 -10.8 L635.0 -10.3 L640.0 -9.9 L645.0 -9.3 L650.0 -8.8 L655.0 -8.2 L660.0 -7.5 L665.0 -6.9 L670.0 -6.2 L675.0 -5.4 L680.0 -4.7 L685.0 -4.0 L690.0 -3.2 L695.0 -2.4 L700.0 -1.6 L705.0 -0.8 L710.0 0.0" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:2"/>
+          <text x="720" y="22" class="t" style="font-weight:700">M (지점 P1)</text>
+          <text x="720" y="40" class="t-mono">최소 −4.39 m</text><text x="720" y="56" class="t-mono">A⁺ 26.8, A⁻ −232.2 m²</text>
+        </g>
+        <g transform="translate(0,330)">
+          <line x1="60" y1="0" x2="710" y2="0" class="s-axis"/>
+          <path d="M60.0 0.0 L65.0 -0.2 L70.0 -0.5 L75.0 -0.7 L80.0 -1.0 L85.0 -1.2 L90.0 -1.4 L95.0 -1.7 L100.0 -1.9 L105.0 -2.1 L110.0 -2.3 L115.0 -2.5 L120.0 -2.7 L125.0 -2.9 L130.0 -3.0 L135.0 -3.2 L140.0 -3.3 L145.0 -3.4 L150.0 -3.5 L155.0 -3.6 L160.0 -3.7 L165.0 -3.7 L170.0 -3.8 L175.0 -3.8 L180.0 -3.8 L185.0 -3.7 L190.0 -3.7 L195.0 -3.6 L200.0 -3.5 L205.0 -3.4 L210.0 -3.2 L215.0 -3.0 L220.0 -2.8 L225.0 -2.6 L230.0 -2.3 L235.0 -2.0 L240.0 -1.7 L245.0 -1.3 L250.0 -0.9 L255.0 -0.5 L260.0 0.0 L265.0 -39.5 L270.0 -38.9 L275.0 -38.4 L280.0 -37.8 L285.0 -37.1 L290.0 -36.4 L295.0 -35.7 L300.0 -35.0 L305.0 -34.3 L310.0 -33.5 L315.0 -32.7 L320.0 -31.9 L325.0 -31.0 L330.0 -30.2 L335.0 -29.3 L340.0 -28.4 L345.0 -27.5 L350.0 -26.6 L355.0 -25.7 L360.0 -24.7 L365.0 -23.8 L370.0 -22.9 L375.0 -21.9 L380.0 -21.0 L385.0 -20.0 L390.0 -19.0 L395.0 -18.1 L400.0 -17.1 L405.0 -16.2 L410.0 -15.3 L415.0 -14.3 L420.0 -13.4 L425.0 -12.5 L430.0 -11.6 L435.0 -10.7 L440.0 -9.8 L445.0 -9.0 L450.0 -8.1 L455.0 -7.3 L460.0 -6.5 L465.0 -5.7 L470.0 -5.0 L475.0 -4.3 L480.0 -3.6 L485.0 -2.9 L490.0 -2.2 L495.0 -1.6 L500.0 -1.1 L505.0 -0.5 L510.0 0.0 L515.0 0.5 L520.0 0.9 L525.0 1.3 L530.0 1.7 L535.0 2.0 L540.0 2.3 L545.0 2.6 L550.0 2.8 L555.0 3.0 L560.0 3.2 L565.0 3.4 L570.0 3.5 L575.0 3.6 L580.0 3.7 L585.0 3.8 L590.0 3.8 L595.0 3.8 L600.0 3.8 L605.0 3.7 L610.0 3.7 L615.0 3.6 L620.0 3.5 L625.0 3.4 L630.0 3.3 L635.0 3.2 L640.0 3.0 L645.0 2.9 L650.0 2.7 L655.0 2.5 L660.0 2.3 L665.0 2.1 L670.0 1.9 L675.0 1.7 L680.0 1.4 L685.0 1.2 L690.0 1.0 L695.0 0.7 L700.0 0.5 L705.0 0.2 L710.0 0.0" style="fill:none;stroke:var(--blue);stroke-width:2"/>
+          <text x="720" y="-26" class="t" style="font-weight:700">V (P1 오른쪽)</text>
+          <text x="720" y="-8" class="t-mono">최대 +0.99</text>
+        </g>
+        <text x="70" y="40" class="t-dim">세로 축척은 영향선마다 다름 · 위가 양(+)</text>
+      </svg>
+      <figcaption><b>그림 2-5.</b> B-130의 영향선(<code>CB.beam</code>으로 단위 하중을 0.5 m씩 옮겨 계산). 중앙 경간 중앙의 휨모멘트는 중앙 경간에서 양, 바깥 경간에서 음이다. 지점 P1의 휨모멘트는 P1 양옆 두 경간에서 음이고 A2 쪽 바깥 경간에서 조금 양이다. 전단력 영향선은 지점 바로 오른쪽 단면이라 그 자리에서 거의 1만큼 뛴다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-bl-cont">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>연속교 영향선: 단위 하중을 옮겨 B-130 영향선 그리기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bl-cv-cont" aria-label="B-130 위를 움직이는 단위 하중과 그 처짐 모양, 지금까지 그려진 선택 단면의 영향선, 최대·최소 트럭 배치"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>효과</span><div class="seg" id="bl-co-kind"><button data-value="M" class="on">휨모멘트</button><button data-value="V">전단력</button></div></div>
+          <label class="ctrl"><span>단면 위치 x <output id="bl-co-c-out"></output></span><input type="range" id="bl-co-c" min="0" max="130" step="0.5" value="40"></label>
+          <label class="ctrl"><span>단위 하중 위치 <output id="bl-co-u-out"></output></span><input type="range" id="bl-co-u" min="0" max="130" step="0.5" value="130"></label>
+          <div class="btn-row"><button class="btn" id="bl-co-play">▶ 단위 하중 이동</button><button class="btn" id="bl-co-max">최대 트럭</button><button class="btn" id="bl-co-min">최소 트럭</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">η 최대 · 최소</span><span class="v" id="bl-co-eta">—</span></div>
+        <div class="stat"><span class="k">넓이 A⁺ · A⁻</span><span class="v" id="bl-co-area">—</span></div>
+        <div class="stat"><span class="k">트럭 최대 · 최소</span><span class="v" id="bl-co-tr">—</span></div>
+        <div class="stat"><span class="k">IM (L 기준)</span><span class="v" id="bl-co-im">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(지점 P1, x = 40 m)에서 "단위 하중 이동"을 누르면 하중이 지나는 대로 영향선이 그려집니다. 하중이 중앙 경간에 있을 때 바깥 경간이 들리고 P1 위가 음의 휨을 받습니다 · "최소 트럭"은 P1 양옆에 축을 걸쳐 −2,158 kN·m를 줍니다 · x = 65 m(중앙 경간 중앙)로 옮기면 영향선은 중앙 경간에서 양(최대 8.42 m), 바깥 경간에서 음 — 최대 트럭 3,514 kN·m는 같은 경간 50 m 단순보(5,526)의 64 % · x = 16 m(바깥 경간 0.4L)는 바깥 경간 최대 단면 근처입니다 · 모델: B-130(40 + 50 + 40 m, EI 일정 — 영향선은 EI 크기와 무관), 단위 하중 0.5 m 간격 261회 <code>CB.beam</code>, 트럭 <code>truckScan</code>(양방향, 0.1 m). 처짐 모양은 크기를 맞춰 그린 개략.</div>
+    </div>
+    <div class="callout"><strong>예제 2.4 (B-130 지점 P1의 최대 부모멘트, 한 차로)</strong> 영향선(그림 2-5)의 최소 \(-4.385\) m는 P1 양옆 경간에 있다.
+      <ol class="bl-steps">
+        <li><b>트럭.</b> 주사 결과 최소 \(E_{truck} = -2{,}158\) kN·m. 무거운 축들이 P1 오른쪽(중앙 경간)과 왼쪽(바깥 경간) 영향선의 두 골에 걸친다.</li>
+        <li><b>충격.</b> 지점 부모멘트는 이웃 두 경간 평균 \(L = 45\) m → \(IM = 15/85 = 0.176\) → \(-2{,}158 \times 1.176 = -2{,}539\) kN·m.</li>
+        <li><b>차로 하중.</b> 음의 구간(바깥 경간 1 + 중앙 경간, 재하 길이 90 m)의 넓이 \(A^- = -232.2\) m² → \(12.7 \times (-232.2) = -2{,}948\) kN·m. 양의 구간(A2 쪽 바깥 경간, 넓이 26.8 m²)에는 싣지 않는다.</li>
+        <li><b>설계(정의 2.2).</b> \(\min(-2{,}539,\; 0.75 \times (-2{,}539) - 2{,}948) = \mathbf{-4{,}852}\) kN·m(차로당). 지점에서는 차로 하중이 트럭보다 크다 — 재하 길이가 90 m로 길기 때문이다.</li>
+        <li><b>참고.</b> AASHTO LRFD는 내부 지점 부모멘트에 대해 15 m 이상 떨어진 트럭 두 대의 90 %와 차로 하중 90 %를 함께 싣는 경우도 검토하게 한다(형태). 국내 기준의 해당 규정은 현행 기준 확인.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="lane">
+    <h2>차로 하중은 어디에 싣는가</h2>
+    <div class="problem"><strong>더 많이 실으면 더 위험한가</strong>
+      <p>등분포 차로 하중을 B-130 전체에 실으면 가장 무거운 경우처럼 보입니다. 그런데 중앙 경간 중앙의 휨모멘트는 전체에 실었을 때보다 중앙 경간에만 실었을 때 더 큽니다.</p></div>
+    <p>영향선이 음인 구간에 실린 하중은 그 단면의 양의 효과를 <b>줄입니다</b>. 그래서 최대 효과를 얻으려면 영향선이 같은 부호인 구간에만 싣습니다. MechanicsBook 6장의 <a href="../../mechanics/chapters/influence.html#continuous">패턴 재하</a>와 같은 원리이고, 교량에서는 하중을 실은 구간의 길이를 <span class="term">재하 길이</span><span class="en">(loaded length)</span>라 부릅니다.</p>
+    <div class="callout def"><strong>원리 2.4 (차로 하중의 재하 구간)</strong> 단면의 최대(양) 효과에는 \(\eta \gt 0\)인 모든 구간에, 최소(음) 효과에는 \(\eta \lt 0\)인 모든 구간에 차로 하중을 싣는다. 구간은 떨어져 있어도 된다(한 차로에 차량 행렬이 끊겨 있을 수 있다). 효과는 \(E_{lane} = w\sum_k\int_{\text{구간}\,k}\eta\,dx\). 일부 기준은 재하 길이가 길수록 차로 하중 강도를 줄인다(형태, 현행 기준 확인).</div>
+    <div class="sim" id="sim-bl-lane">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>차로 하중 재하 구간 고르기: 영향선의 양·음 구간</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bl-cv-lane" aria-label="B-130 선택 단면의 영향선을 부호가 바뀌는 점에서 구간으로 나누고, 누른 구간에 차로 하중을 실은 그림"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>단면</span><div class="seg" id="bl-ln-sec"><button data-value="m65" class="on">중앙 경간 중앙 M</button><button data-value="mB">지점 P1 M</button><button data-value="m16">바깥 경간 0.4L M</button><button data-value="rB">P1 반력</button></div></div>
+          <div class="btn-row"><button class="btn" id="bl-ln-pos">최대(+) 구간</button><button class="btn" id="bl-ln-neg">최소(−) 구간</button><button class="btn" id="bl-ln-all">전 구간</button><button class="btn" id="bl-ln-none">비우기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">재하 길이</span><span class="v" id="bl-ln-len">—</span></div>
+        <div class="stat"><span class="k">w Σ ∫η</span><span class="v" id="bl-ln-e">—</span></div>
+        <div class="stat"><span class="k">최대 · 최소 가능값</span><span class="v" id="bl-ln-opt">—</span></div>
+      </div>
+      <div class="bl-msg" id="bl-ln-msg">영향선 아래 구간을 눌러 차로 하중을 싣거나 빼 보세요.</div>
+      <div class="sim-note">해볼 것: 중앙 경간 중앙에서 "전 구간"은 12.7 × (176.6 − 69.6) = 1,360 kN·m, "최대(+) 구간"(중앙 경간만)은 2,243 kN·m로 65 % 큽니다(예제 2.5) · 지점 P1의 최소는 바깥 경간 1 + 중앙 경간(재하 길이 90 m)에서 −2,948 kN·m · P1 반력은 양 구간이 P1 양옆 두 경간이라 676 kN, 반대편 바깥 경간까지 실으면 약간 줍니다 · 모델: B-130 영향선 표(<code>CB.beam</code>, 0.5 m), 구간은 영향선 부호가 바뀌는 점(선형 보간)으로 나눔, w = 12.7 kN/m.</div>
+    </div>
+    <div class="callout"><strong>예제 2.5 (중앙 경간 중앙의 차로 하중)</strong> B-130, 단면 x = 65 m.
+      <ol class="bl-steps">
+        <li><b>영향선 넓이.</b> 중앙 경간 \(A^+ = 176.6\) m², 바깥 두 경간 \(A^- = -34.8 \times 2 = -69.6\) m²(<code>CB.beam</code> 표의 사다리꼴 적분).</li>
+        <li><b>최대 배치.</b> 중앙 경간에만: \(12.7 \times 176.6 = \mathbf{2{,}243}\) kN·m. 같은 경간 50 m 단순보(3,969)의 57 %.</li>
+        <li><b>전 구간.</b> \(12.7 \times (176.6 - 69.6) = 1{,}360\) kN·m — 최대 배치의 61 %. "다 실으면 가장 무겁다"는 직관이 틀린다.</li>
+        <li><b>최소 배치.</b> 바깥 경간 둘에만: \(12.7 \times (-69.6) = -883\) kN·m. 고정하중의 정모멘트(\(107.1 \times 117 = 12{,}527\))가 커서 이 단면이 음이 될 일은 없지만, 피로에서는 이 범위(4절의 트럭 최대·최소 차)가 중요하다(10절).</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="lanes">
+    <h2>차로 수와 다차로 재하</h2>
+    <div class="problem"><strong>두 차로에 동시에 가장 무거운 트럭이 있을 확률</strong>
+      <p>B-130에는 차로가 둘입니다. 두 차로에 동시에 설계 트럭이 가장 불리한 위치에 있을 확률은 한 차로에만 있을 확률보다 작고, 네 차로에 동시에 있을 확률은 더 작습니다. 설계에서 이것을 어떻게 반영할까요?</p></div>
+    <p>먼저 교량에 놓을 수 있는 <span class="term">설계 차로</span><span class="en">(design lane)</span>의 수를 정합니다. 방호벽 사이의 차도 폭 \(W_c\)를 표준 차로 폭(약 3.6 m, 형태)으로 나눈 정수 부분입니다. 실제 차선 표시와 다를 수 있습니다. 그다음 실을 차로 수 \(n\)을 1부터 늘려 가며 효과에 <span class="term">다차로 재하 계수</span><span class="en">(multiple presence factor)</span> \(m(n)\)을 곱하고 가장 큰 값을 씁니다.</p>
+    <div class="callout def"><strong>원리 2.5 (다차로 재하, 형태)</strong> 설계 차로 수 \(N_L = \lfloor W_c/3.6 \rfloor\), 활하중 효과 \(= \max_{1 \le n \le N_L}\, n\,m(n)\,LL_{lane}\) (차로마다 같은 효과로 본 단순화). AASHTO LRFD 형태: \(m(1) = 1.20\), \(m(2) = 1.00\), \(m(3) = 0.85\), \(m(n \gt 3) = 0.65\). 한 차로의 1.20은 기준 트럭보다 무거운 단독 차량을 덮는 몫이다. 국내 기준의 계수와 적용 방식은 현행 KDS 24 12 21 확인. 거더 한 개가 받는 몫(횡분배)은 3장에서 이 결과에 곱한다.</div>
+    <figure class="diagram" id="fig-bl-lanes">
+      <svg viewBox="0 0 860 260" role="img" aria-label="B-130 횡단면 위의 설계 차로 두 개와 트럭 배치 세 경우: 한 차로, 두 차로, 다차로 재하 계수를 곱한 합">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <!-- deck: 11 m -> 33 px/m, from x=70 (y=-5.5) -->
+        <rect x="70" y="120" width="363" height="10" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="70" y="112" width="66" height="8" style="fill:var(--surface-2);stroke:var(--text-dim);opacity:.8"/>
+        <rect x="136" y="96" width="16" height="24" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="417" y="96" width="16" height="24" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <g style="stroke:var(--accent);stroke-width:2.5"><line x1="113" y1="130" x2="113" y2="196"/><line x1="206" y1="130" x2="206" y2="196"/><line x1="298" y1="130" x2="298" y2="196"/><line x1="391" y1="130" x2="391" y2="196"/></g>
+        <rect x="152" y="60" width="132" height="12" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/><rect x="284" y="60" width="133" height="12" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-dasharray:4 3"/>
+        <g class="t-mono" text-anchor="middle"><text x="218" y="54">설계 차로 1 (4.0 m)</text><text x="350" y="54">설계 차로 2 (4.0 m)</text><text x="285" y="222">차도 폭 W<tspan baseline-shift="sub" font-size="8">c</tspan> = 8.0 m → N<tspan baseline-shift="sub" font-size="8">L</tspan> = ⌊8.0/3.6⌋ = 2</text></g>
+        <g style="fill:var(--accent-2)"><rect x="185" y="88" width="10" height="10"/><rect x="245" y="88" width="10" height="10"/><rect x="318" y="88" width="10" height="10"/><rect x="378" y="88" width="10" height="10"/></g>
+        <text x="200" y="84" class="t-mono" style="fill:var(--accent-2)">바퀴 간격 1.8 m (형태)</text>
+        <rect x="480" y="40" width="350" height="190" rx="8" class="f-elev"/>
+        <g class="t-mono"><text x="496" y="66">실은 차로 n   m(n)   n·m(n)</text><text x="496" y="92">1             1.20   1.20</text><text x="496" y="116" style="fill:var(--accent);font-weight:700">2             1.00   2.00  ← 지배</text><text x="496" y="140">3             0.85   2.55</text><text x="496" y="164">4 이상        0.65   2.60 …</text><text x="496" y="196" class="t-dim">B-130은 N<tspan baseline-shift="sub" font-size="8">L</tspan> = 2라 n ≤ 2</text><text x="496" y="216" class="t-dim">(AASHTO 형태, 국내 기준 확인)</text></g>
+      </svg>
+      <figcaption><b>그림 2-6.</b> B-130의 설계 차로. 차도 폭(방호벽 사이) 8.0 m를 3.6 m로 나눠 설계 차로 2개를 두고 각 차로 폭은 8.0/2 = 4.0 m로 본다(형태). 실제 차선 표시(3.5 m × 2 + 길어깨)와 다르다. 표의 \(n\,m(n)\)은 한 차로 효과에 곱할 배수다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-bl-multi">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>다차로 재하 계수 효과: 차도 폭 → 설계 차로 수 → 지배 경우</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bl-cv-multi" aria-label="차도 폭에 놓인 설계 차로와 트럭, 실은 차로 수별 n·m(n) 막대와 지배 경우"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>차도 폭 W<sub>c</sub></span> <output id="bl-mu-w-out"></output></span><input type="range" id="bl-mu-w" min="6" max="25" step="0.1" value="8"></label>
+          <div class="ctrl"><span>계수</span><div class="seg" id="bl-mu-set"><button data-value="aashto" class="on">AASHTO 형태</button><button data-value="none">감소 없음 (m = 1)</button></div></div>
+          <div class="ctrl"><span>한 차로 효과</span><div class="seg" id="bl-mu-eff"><button data-value="m65" class="on">B-130 중앙 M 5,318</button><button data-value="mB">B-130 P1 M −4,852</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">설계 차로 수 N<sub>L</sub></span><span class="v" id="bl-mu-n">—</span></div>
+        <div class="stat"><span class="k">지배 경우 n · m(n)</span><span class="v" id="bl-mu-g">—</span></div>
+        <div class="stat"><span class="k">교량 전체 활하중 효과</span><span class="v" id="bl-mu-e">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: B-130(W<sub>c</sub> 8.0 m)은 2차로 × 1.00 = 2.00이 1차로 × 1.20보다 커서 두 차로 재하가 지배합니다 · 폭을 10.8 m로 넓히면 3차로(2.55)가, 14.4 m 이상이면 4차로 이상이 지배하지만 늘어나는 몫은 점점 작아집니다 · "감소 없음"과 비교하면 4차로에서 n·m = 2.60 대 4.00 — 동시 재하 확률을 반영하지 않으면 넓은 교량을 지나치게 무겁게 설계합니다 · 모델: 원리 2.5, 차로마다 같은 효과(교량 전체 기준, 횡분배 전). 한 차로 효과는 정의 2.2의 B-130 값(예제 2.4·2.7).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="other-loads">
+    <h2>제동·원심·온도·풍·지진 하중</h2>
+    <p>연직 활하중 밖의 하중들은 주로 받침과 하부 구조를 지배합니다. 이 책에서 각각을 자세히 다루는 곳은 다르지만, 크기를 어림하는 방법은 여기서 정리합니다(모두 형태, 현행 KDS 24 12 21 확인).</p>
+    <ul>
+      <li><span class="term">제동 하중</span><span class="en">(braking force)</span> BR — 트럭이 브레이크를 밟을 때 노면에 주는 수평력. AASHTO 형태: 차로마다 설계 트럭 축하중 합의 25 % 또는 (트럭 + 차로 하중)의 5 % 가운데 큰 값, 노면 위 1.8 m에 작용. 다차로 재하 계수를 곱한다.</li>
+      <li><span class="term">원심 하중</span><span class="en">(centrifugal force)</span> CF — 곡선교에서 \(C = f\,v^2/(gR)\) 배의 트럭 하중(AASHTO 형태, \(f = 4/3\)). R-60 도로가 곡선(R 200 m)으로 다리를 지난다면 60 km/h에서 \(C = 1.333 \times 16.7^2/(9.81 \times 200) = 0.19\).</li>
+      <li><span class="term">온도 하중</span><span class="en">(temperature load)</span> TU — 균일한 온도 변화 \(\Delta T\)에 따른 늘음 \(\Delta = \alpha L\Delta T\). 고정 받침(P1)에서 가장 먼 끝 A2까지 90 m, \(\alpha = 12 \times 10^{-6}\)/°C, \(\Delta T = 40\) °C면 43 mm. 연속교를 고정 받침에서 양쪽으로 늘게 하는 이유이고, 신축 이음과 가동 받침이 받는다(6장).</li>
+      <li><span class="term">풍하중</span><span class="en">(wind load)</span> WS — 속도압 \(q = \tfrac12\rho V^2\)(V = 40 m/s면 약 1.0 kPa)에 항력 계수와 투영 면적을 곱한다. 짧은 거더교에서는 횡방향 받침력을, 장대교에서는 플러터·와류 진동을 정한다(5장, StructureBook 6장).</li>
+      <li><span class="term">지진 하중</span><span class="en">(earthquake load)</span> EQ — 상부 구조 질량이 교각을 수평으로 흔든다. 응답 스펙트럼으로 구하고, 받침 배치와 면진으로 교각의 몫을 조절한다(6장, StructureBook 8–9장).</li>
+    </ul>
+    <div class="callout"><strong>예제 2.6 (B-130 제동 하중)</strong> 2차로, 교장 130 m, 트럭 510 kN, 차로 하중 12.7 kN/m.
+      <ol class="bl-steps">
+        <li><b>차로당.</b> \(\max(0.25 \times 510,\; 0.05 \times (510 + 12.7 \times 130)) = \max(127.5,\; 108.1) = 127.5\) kN.</li>
+        <li><b>다차로.</b> 두 차로 × \(m(2) = 1.00\) → 255 kN(한 차로 × 1.20 = 153 kN보다 크다).</li>
+        <li><b>경로.</b> 교축 방향 수평력은 고정 받침이 있는 교각 P1으로 간다(가동 받침은 마찰만큼만). P1 기둥 밑동(높이 약 11.7 m + 받침·거더·노면 위 1.8 m)의 휨모멘트는 약 \(255 \times 16 \approx 4{,}100\) kN·m(교육용 어림). 6장에서 교각 강성 분배와 함께 다시 본다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="combination">
+    <h2>하중 조합과 한계 상태, B-130의 최대 효과</h2>
+    <div class="problem"><strong>고정하중과 트럭과 지진을 모두 1.0배로 더하면 되는가</strong>
+      <p>고정하중은 거의 정확히 알고, 트럭은 가끔 더 무거운 것이 오며, 큰 지진이 올 때 다리 위에 설계 트럭이 꽉 차 있을 가능성은 작습니다. 하중마다 불확실성과 동시 발생 확률이 다릅니다.</p></div>
+    <p>한계상태 설계(MechanicsBook 1장, StructureBook 2장)는 구조물이 기능을 잃는 상태를 <span class="term">한계 상태</span><span class="en">(limit state)</span>로 나누고, 상태마다 하중을 <span class="term">하중 계수</span><span class="en">(load factor)</span>를 곱해 더한 <span class="term">하중 조합</span><span class="en">(load combination)</span>을 씁니다. 교량에서는 강도(파괴), 사용(처짐·균열·응력), 피로(반복 하중), 극단 상황(지진·충돌)의 네 갈래가 기본입니다.</p>
+    <div class="table-wrap"><table class="bl-tbl">
+      <caption>표 2-2. 교량 하중 조합의 형태(AASHTO LRFD 형태 — KDS 24 12 11의 계수는 국내 실정에 맞춰 다를 수 있으므로 현행 기준 확인)</caption>
+      <thead><tr><th>한계 상태</th><th>DC</th><th>DW</th><th>LL + IM</th><th>그 밖</th><th>무엇을 막나</th></tr></thead>
+      <tbody>
+        <tr><td>강도 I (일반 차량)</td><td>1.25 / 0.90</td><td>1.50 / 0.65</td><td>1.75</td><td>TU 0.5–1.2 등</td><td>파괴·좌굴</td></tr>
+        <tr><td>사용 I</td><td>1.00</td><td>1.00</td><td>1.00</td><td>WS 등 1.0 수준</td><td>처짐·균열·응력</td></tr>
+        <tr><td>피로</td><td>—</td><td>—</td><td>0.75–1.5 (트럭 한 대)</td><td>—</td><td>용접부 피로 균열</td></tr>
+        <tr><td>극단 상황 I</td><td>1.25 / 0.90</td><td>1.50 / 0.65</td><td>작은 계수(기준 확인)</td><td>EQ 1.00</td><td>지진 시 붕괴</td></tr>
+      </tbody></table></div>
+    <p>DC와 DW의 두 값(1.25/0.90)은 고정하중이 효과를 키울 때와 줄일 때(예: 들림, 전도)를 구별한 것입니다. DW의 계수가 DC보다 큰 것은 포장이 덧씌우기로 두꺼워질 수 있기 때문입니다. 피로는 강도와 달리 최댓값이 아니라 <b>범위</b>가 중요합니다. 트럭 한 대가 지나갈 때 단면 응력이 \(\sigma_{min}\)에서 \(\sigma_{max}\)까지 오르내리는 폭 \(\Delta\sigma\)와 그 횟수가 용접부 균열을 정합니다(<span class="term">피로 한계 상태</span><span class="en">(fatigue limit state)</span>). B-130 중앙 경간 중앙에서 트럭 한 대의 휨모멘트 범위는 \(3{,}514 - (-651) = 4{,}165\) kN·m(충격 제외, 그림 2-7)이고, 3장에서 강 거더 아래 플랜지 응력 범위로 바꿔 검토합니다.</p>
+    <figure class="diagram" id="fig-bl-fatigue">
+      <svg viewBox="0 0 860 240" role="img" aria-label="트럭 한 대가 B-130을 지나는 동안 중앙 경간 중앙 휨모멘트의 이력: 바깥 경간에 있을 때 음(−651), 중앙 경간에 있을 때 양(3,514), 범위 4,165 kN·m">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <line x1="60" y1="160" x2="800" y2="160" class="s-axis"/>
+        <path d="M60 160 C 120 165, 180 178, 230 182 C 270 184, 300 170, 330 140 C 380 80, 410 50, 440 46 C 470 50, 500 80, 540 140 C 570 172, 610 184, 650 182 C 700 178, 760 165, 800 160" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+        <line x1="440" y1="46" x2="820" y2="46" style="stroke:var(--text-faint);stroke-dasharray:3 3"/><line x1="230" y1="183" x2="820" y2="183" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+        <line x1="812" y1="48" x2="812" y2="181" style="stroke:var(--accent-2);stroke-width:2" marker-start="url(#bl-ah-ld)" marker-end="url(#bl-ah-ld)"/>
+        <g class="t-mono"><text x="446" y="40" style="fill:var(--accent)">+3,514</text><text x="200" y="202" style="fill:var(--accent)">−651</text><text x="700" y="120" style="fill:var(--accent-2)">범위 ΔM = 4,165 kN·m</text><text x="60" y="226">트럭 앞축 위치 → (A1에서 A2 쪽으로 진행)</text></g>
+        <text x="60" y="34" class="t" style="font-weight:700">B-130 중앙 경간 중앙의 M 이력(개략)</text>
+      </svg>
+      <figcaption><b>그림 2-7.</b> 트럭 한 대가 지나갈 때 B-130 중앙 경간 중앙의 휨모멘트 이력(개략, 값은 영향선 주사 결과). 트럭이 바깥 경간에 있으면 음, 중앙 경간에 있으면 양이다. 피로 검토는 이 범위에 하루 통행 트럭 수와 설계 수명(약 75–100년)을 곱한 반복 횟수를 쓴다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-bl-combo">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-130 경간별 최대 효과: 활하중 포락선과 하중 조합</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="bl-cv-combo" aria-label="B-130 전 길이의 고정하중 휨모멘트와 활하중 최대·최소 포락선, 선택한 하중 조합의 설계 휨모멘트 포락선"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>하중 조합</span><div class="seg" id="bl-cb-comb"><button data-value="str" class="on">강도 I 형태</button><button data-value="svc">사용 I</button><button data-value="ll">활하중만</button></div></div>
+          <div class="ctrl"><span>활하중 모형</span><div class="seg" id="bl-cb-ll"><button data-value="des" class="on">정의 2.2 (큰 값)</button><button data-value="truck">트럭 + IM만</button><button data-value="lane">차로 하중만</button></div></div>
+          <div class="ctrl"><span>실은 차로</span><div class="seg" id="bl-cb-n"><button data-value="1">1 (× 1.20)</button><button data-value="2" class="on">2 (× 1.00)</button></div></div>
+          <label class="ctrl"><span>읽을 단면 x <output id="bl-cb-x-out"></output></span><input type="range" id="bl-cb-x" min="0" max="130" step="2.5" value="65"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">이 단면 DC · DW</span><span class="v" id="bl-cb-d">—</span></div>
+        <div class="stat"><span class="k">활하중 최대 · 최소</span><span class="v" id="bl-cb-l">—</span></div>
+        <div class="stat"><span class="k">설계 M 최대 · 최소</span><span class="v" id="bl-cb-u">—</span></div>
+        <div class="stat"><span class="k">전 길이 최대 · 최소</span><span class="v" id="bl-cb-g">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: x = 65 m에서 강도 I 형태 설계 M ≈ 34,700 kN·m, x = 40 m(P1)에서 약 −47,900 kN·m(교량 전체, 거더 4주 합)를 확인하세요 · "활하중만"으로 바꾸면 지점에서 활하중의 음의 포락선이 정모멘트 쪽보다 깁니다 · "차로 하중만"과 "트럭 + IM만"을 바꿔 보면 경간 중앙은 트럭이, 지점은 차로 하중이 더 큰 몫입니다 · 1차로 × 1.20은 2차로 × 1.00보다 작습니다 · 모델: 단면 2.5 m 간격(53개)마다 영향선 표(<code>CB.beam</code>, 0.5 m)에서 트럭 주사(0.25 m, 양방향)와 양·음 넓이로 정의 2.2, IM은 경간(지점은 이웃 경간 평균), DC 100 · DW 17 kN/m, 강도 I = 1.25/0.90 DC + 1.50/0.65 DW + 1.75(LL + IM)(AASHTO 형태). 교량 전체 값이며 거더별 분배는 3장. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 2.7 (B-130 중앙 경간 중앙과 지점 P1의 설계 휨모멘트)</strong> 교량 전체, 2차로(\(m = 1.00\)), 강도 I 형태.
+      <ol class="bl-steps">
+        <li><b>고정하중.</b> 단위 등분포의 영향 \(M_{65} = 107.07\), \(M_{40} = -205.43\) m²(<code>CB.beam</code>) → DC: 10,707 / −20,543, DW: 1,820 / −3,492 kN·m.</li>
+        <li><b>활하중(차로당, 정의 2.2).</b> 중앙: 트럭 3,514 × 1.167 = 4,100, 차로 2,243 → \(\max(4{,}100,\; 3{,}075 + 2{,}243) = 5{,}318\). 지점: −4,852(예제 2.4).</li>
+        <li><b>2차로.</b> 10,636 / −9,704 kN·m.</li>
+        <li><b>강도 I.</b> 중앙 \(1.25 \times 10{,}707 + 1.50 \times 1{,}820 + 1.75 \times 10{,}636 = 13{,}384 + 2{,}730 + 18{,}613 = \mathbf{34{,}727}\) kN·m. 지점 \(1.25 \times (-20{,}543) + 1.50 \times (-3{,}492) + 1.75 \times (-9{,}704) = \mathbf{-47{,}899}\) kN·m.</li>
+        <li><b>사용 I.</b> 중앙 \(10{,}707 + 1{,}820 + 10{,}636 = 23{,}163\), 지점 \(-33{,}739\) kN·m. 거더 4주에 고르게 나누면 중앙 약 8,700, 지점 약 −12,000 kN·m(강도)이지만, 활하중은 편심 때문에 바깥 거더에 더 간다(1장 쿠르봉 0.545, 3장).</li>
+      </ol></div>
+    <div class="callout site"><strong>B-130 경간별 최대 효과(교량 전체, 교육용)</strong>
+      <div class="table-wrap"><table class="bl-tbl">
+        <thead><tr><th>단면</th><th>트럭 최대 / 최소 (1대)</th><th>차로 w·A⁺ / w·A⁻</th><th>LL + IM 차로당</th><th>강도 I (2차로)</th></tr></thead>
+        <tbody>
+          <tr><td>바깥 경간 x = 16 m, M</td><td>3,465 / −863</td><td>2,085 / −690</td><td>5,171 / −1,459</td><td>약 34,600</td></tr>
+          <tr><td>지점 P1 x = 40 m, M</td><td>501 / −2,158</td><td>340 / −2,948</td><td>782 / −4,852</td><td class="hl">−47,899</td></tr>
+          <tr><td>중앙 경간 x = 65 m, M</td><td>3,514 / −651</td><td>2,243 / −883</td><td>5,318 / −1,453</td><td class="hl">34,727</td></tr>
+          <tr><td>P1 반력 R</td><td>503 / −59</td><td>676 / −40</td><td>1,120 (IM, L = 45)</td><td>약 11,500</td></tr>
+        </tbody></table></div>
+      단위 kN·m(반력 kN). 50 m 단순 경간이었다면 중앙 트럭 효과가 5,526(CONTRIBUTING의 약 5,530)이므로 연속으로 64 %가 된다. 바깥 경간 정모멘트는 x ≈ 17.5 m에서 차로당 약 5,200으로 최대다. 강도 I은 고정하중 계수 1.25, 포장 1.50, 활하중 1.75(AASHTO 형태)로 계산했고 국내 기준의 계수는 현행 KDS 24 12 11 확인. 이 값을 3장에서 거더 4주에 나눠 합성 단면을 설계한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="bridges.html"><small>CH.01 · 교량의 이해</small>하중 경로와 B-130<br><span>반력 503 kN과 P1 기초 하중.</span></a>
+      <a href="girders.html"><small>CH.03 · 거더교와 바닥판</small>설계 M을 거더에 나누기<br><span>횡분배, 합성 단면, 피로 응력 범위.</span></a>
+      <a href="arch-truss.html"><small>CH.04 · 아치교와 트러스교</small>트러스 부재력 이력<br><span>truckScan을 부재력 영향선에.</span></a>
+      <a href="substructure.html"><small>CH.06 · 하부 구조와 받침</small>제동·온도·지진 수평력<br><span>고정 받침 P1과 신축 이음.</span></a>
+      <a href="railway.html"><small>CH.14 · 철도</small>열차 하중과 공진<br><span>고속 주행의 동적 증폭.</span></a>
+      <a href="maintenance.html"><small>CH.16 · 유지관리와 성능 개선</small>내하율<br><span>RF = (C − D)/L의 L이 이 장의 LL + IM.</span></a>
+      <a href="../../mechanics/chapters/influence.html"><small>MechanicsBook · CH.06</small>영향선과 이동 하중<br><span>뮐러-브레슬라우, 패턴 재하.</span></a>
+      <a href="../../structure/chapters/loads.html"><small>StructureBook · CH.02</small>설계 하중과 하중 조합<br><span>건물의 하중 조합과 비교.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>교량 하중은 영구(DC·DW), 변동(LL·IM·BR·CF·WS·TU), 극단(EQ·충돌·홍수)으로 나눈다. 연직 하중은 거더를, 수평 하중은 받침·하부 구조를 지배한다.</li>
+      <li>설계 트럭(KL-510 형태: 48 + 135 + 135 + 96 + 96 = 510 kN, 합력 앞축에서 6.59 m)과 차로 하중(12.7 kN/m). 차로당 설계 활하중 = max[(1 + IM)트럭, 0.75(1 + IM)트럭 + 차로](교육용 형태).</li>
+      <li>영향선 주사: \(E = \sum P_i\eta_i\), 차로 하중 \(w\int\eta\). 단순보 휨모멘트의 최대는 어느 축이 영향선 꼭짓점 위에 있을 때. 50 m 중앙: 트럭 5,526, 차로 3,969, 설계 8,804 kN·m.</li>
+      <li>절대 최대 휨모멘트: 경간 중앙이 기준 축과 합력의 한가운데. 50 m: 5,534 kN·m(중앙에서 0.9 m, +0.15 %).</li>
+      <li>충격 IM = 15/(40 + L) ≤ 0.3(교육용 형태, 현행 기준은 상수형). 트럭에만 곱한다. 이동 하중만의 동적 증폭은 몇 %이고, 나머지는 노면·이음부·차량 출렁임의 몫이다.</li>
+      <li>연속교 영향선은 곡선이며 경간마다 부호를 바꾼다. <code>CB.beam</code>으로 단위 하중을 옮겨 그린다. B-130: 중앙 M 최대 η 8.42, P1 M 최소 η −4.39.</li>
+      <li>차로 하중은 영향선이 같은 부호인 구간에만 싣는다. B-130 중앙: 중앙 경간만 2,243 vs 전 구간 1,360 kN·m. 지점: 재하 길이 90 m, −2,948 kN·m.</li>
+      <li>다차로 재하 m(1) 1.20, m(2) 1.00, m(3) 0.85(AASHTO 형태). B-130은 2차로 지배. 강도 I 형태 설계 M: 중앙 34,727, P1 −47,899 kN·m(교량 전체).</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 다음 가운데 영구 하중으로 분류하는 것은?</p><div class="opts">
+        <button class="opt">제동 하중 BR</button><button class="opt" data-correct>포장 자중 DW</button><button class="opt">온도 하중 TU</button><button class="opt">원심 하중 CF</button>
+      </div><div class="quiz-exp">DW(포장·설비 자중)는 DC와 함께 영구 하중이다. 덧씌우기로 두꺼워질 수 있어 DC보다 큰 하중 계수(1.50 형태)를 쓴다.</div></div>
+      <div class="quiz-q"><p>2. 50 m 단순보 경간 중앙 휨모멘트 영향선의 꼭짓점 값은?</p><div class="opts">
+        <button class="opt">0.25 m</button><button class="opt">25 m</button><button class="opt" data-correct>12.5 m</button><button class="opt">6.25 m</button>
+      </div><div class="quiz-exp">η = c(L − c)/L = 25 × 25/50 = 12.5 m. 단위 하중 1 kN이 중앙에 있을 때 PL/4 = 12.5 kN·m와 같다.</div></div>
+      <div class="quiz-q"><p>3. 집중 하중 열이 단순보를 지날 때 한 단면의 휨모멘트가 최대가 되는 트럭 위치의 조건은?</p><div class="opts">
+        <button class="opt">합력이 단면 위에 있을 때</button><button class="opt" data-correct>어느 한 축이 그 단면(영향선 꼭짓점) 위에 있을 때</button><button class="opt">트럭 중심이 경간 중앙에 있을 때</button><button class="opt">앞축이 지점에 있을 때</button>
+      </div><div class="quiz-exp">휨모멘트 영향선은 단면에서 꺾이는 삼각형이라 ΣPη는 구간별 1차 함수이고, 극값은 축이 꺾임점을 지날 때 생긴다. 어느 축인지는 주사로 확인한다.</div></div>
+      <div class="quiz-q"><p>4. 절대 최대 휨모멘트를 주는 배치에서 경간 중앙선은 어디를 지나는가?</p><div class="opts">
+        <button class="opt">트럭의 앞축</button><button class="opt">합력 R</button><button class="opt" data-correct>기준 축 P<sub>k</sub>와 합력 R의 한가운데</button><button class="opt">가장 무거운 두 축의 한가운데</button>
+      </div><div class="quiz-exp">P<sub>k</sub>를 x에 두면 그 아래 모멘트는 R(L − x − d)x/L − 상수이고, dM/dx = 0에서 x = (L − d)/2. 곧 중앙이 P<sub>k</sub>와 R을 이등분한다. 50 m에서 5,534 kN·m.</div></div>
+      <div class="quiz-q"><p>5. 이 책의 교육용 충격 계수로 경간 20 m의 IM은?</p><div class="opts">
+        <button class="opt">0.167</button><button class="opt" data-correct>0.25</button><button class="opt">0.30</button><button class="opt">0.375</button>
+      </div><div class="quiz-exp">IM = 15/(40 + 20) = 0.25 ≤ 0.3. 경간 10 m 이하에서는 상한 0.3이 된다. 충격은 트럭 효과에만 곱한다.</div></div>
+      <div class="quiz-q"><p>6. B-130 중앙 경간 중앙의 최대 정모멘트를 얻으려면 차로 하중을 어디에 실어야 하는가?</p><div class="opts">
+        <button class="opt">세 경간 모두</button><button class="opt" data-correct>중앙 경간만</button><button class="opt">바깥 두 경간만</button><button class="opt">바깥 경간 하나와 중앙 경간</button>
+      </div><div class="quiz-exp">그 단면의 영향선은 중앙 경간에서 양, 바깥 경간에서 음이다. 중앙 경간만 실으면 12.7 × 176.6 = 2,243, 전 구간이면 1,360 kN·m로 줄어든다.</div></div>
+      <div class="quiz-q"><p>7. 차도 폭 11.0 m인 교량의 설계 차로 수와, AASHTO 형태 계수에서 지배하는 실은 차로 수는?</p><div class="opts">
+        <button class="opt">2차로, 1차로 지배</button><button class="opt">3차로, 1차로 지배</button><button class="opt" data-correct>3차로, 3차로 지배(n·m = 2.55)</button><button class="opt">4차로, 4차로 지배</button>
+      </div><div class="quiz-exp">⌊11.0/3.6⌋ = 3. n·m(n) = 1.20, 2.00, 2.55이므로 세 차로 동시 재하가 지배한다.</div></div>
+      <div class="quiz-q"><p>8. 연속교 지점의 최대 부모멘트에서 차로 하중이 트럭보다 큰 몫을 차지하는 주된 이유는?</p><div class="opts">
+        <button class="opt">차로 하중에는 충격을 곱하기 때문</button><button class="opt" data-correct>음의 영향선 구간이 이웃 두 경간에 걸쳐 재하 길이가 길기 때문</button><button class="opt">트럭은 지점 위에 놓을 수 없기 때문</button><button class="opt">다차로 재하 계수가 차로 하중에만 곱해지기 때문</button>
+      </div><div class="quiz-exp">B-130 P1 휨모멘트 영향선은 바깥 경간 1과 중앙 경간에서 음이고 재하 길이가 90 m다. 등분포 효과는 넓이에 비례해 −2,948 kN·m로 트럭(−2,158 × 1.176 = −2,539)보다 크다. 충격은 트럭에만 곱한다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+/* ---------- 이 장의 계산 핵심(연속교 영향선 표, 트럭·차로 하중 최대 효과) ---------- */
+const BLC = {
+  DX: 0.5, LANE: 12.7, DC: 100, DW: 17,
+  /** 연속보 영향선 표: 단위 하중을 DX 간격으로 옮겨 CB.beam으로 한 번씩 푼다 */
+  table(spans) {
+    const sup = [0]; spans.forEach((s) => sup.push(sup[sup.length - 1] + s));
+    const L = sup[sup.length - 1], n = Math.round(L / BLC.DX), beams = [];
+    for (let j = 0; j <= n; j++) beams.push(CB.beam({ L, EI: 1, supports: sup.map((x, i) => ({ x, type: i === 0 ? "pin" : "roller" })), loads: [{ type: "point", P: 1, a: Math.min(L, j * BLC.DX) }] }));
+    return { spans, sup, L, n, beams };
+  },
+  /** 단면 c의 영향선 값 배열. kind: "M" | "V" | "R"(c는 지점 번호) */
+  il(T, kind, c) {
+    return T.beams.map((b) => {
+      if (kind === "R") return b.reactions[c].R;
+      const X = b.X; let k = X.length - 2;
+      for (let q = 0; q < X.length - 1; q++) if (c >= X[q] - 1e-9 && c < X[q + 1] - 1e-9) { k = q; break; }
+      const f = b.frame.at(k, Math.max(0, c - X[k]) + 1e-9);
+      return kind === "M" ? f.M : f.V;
+    });
+  },
+  fn(T, ys) { return (x) => { if (x < 0 || x > T.L) return 0; const i = Math.min(T.n - 1, Math.floor(x / BLC.DX)), u = (x - i * BLC.DX) / BLC.DX; return ys[i] + u * (ys[i + 1] - ys[i]); }; },
+  areas(T, ys) { let p = 0, m = 0; for (let i = 0; i < T.n; i++) { const a = ys[i], b = ys[i + 1]; if (a >= 0 && b >= 0) p += ((a + b) / 2) * BLC.DX; else if (a <= 0 && b <= 0) m += ((a + b) / 2) * BLC.DX; else { const t = a / (a - b); if (a > 0) { p += (a * t * BLC.DX) / 2; m += (b * (1 - t) * BLC.DX) / 2; } else { m += (a * t * BLC.DX) / 2; p += (b * (1 - t) * BLC.DX) / 2; } } } return { p, m }; },
+  scan(T, ys, dx = 0.1) {
+    const f = BLC.fn(T, ys); let mx = -Infinity, mn = Infinity, atMax = 0, atMin = 0, dMax = 1, dMin = 1;
+    [1, -1].forEach((dir) => { const r = CB.civ.truckScan(T.L, f, CB.civ.TRUCK, dx, dir); if (r.max > mx) { mx = r.max; atMax = r.at; dMax = dir; } r.history.forEach(([fr, v]) => { if (v < mn) { mn = v; atMin = fr; dMin = dir; } }); });
+    return { max: mx, min: mn, atMax, atMin, dMax, dMin };
+  },
+  /** 단면이 속한 경간 길이(충격용). 내부 지점이면 이웃 두 경간 평균(교육용 형태) */
+  imL(T, c) { for (let k = 1; k < T.sup.length - 1; k++) if (Math.abs(c - T.sup[k]) < 1e-6) return (T.spans[k - 1] + T.spans[k]) / 2; for (let k = 0; k < T.spans.length; k++) if (c <= T.sup[k + 1] + 1e-9) return T.spans[k]; return T.spans[T.spans.length - 1]; },
+  /** 차로당 설계 활하중 효과(교육용 형태): max(트럭(1+IM), 0.75 트럭(1+IM) + 차로) */
+  design(T, ys, c, o = {}) {
+    const s = BLC.scan(T, ys), a = BLC.areas(T, ys), im = CB.civ.impact(o.Lim != null ? o.Lim : BLC.imL(T, c)), w = o.lane != null ? o.lane : BLC.LANE;
+    const tp = s.max * (1 + im), tn = s.min * (1 + im), lp = w * a.p, ln = w * a.m;
+    return { s, a, im, tp, tn, lp, ln, max: Math.max(tp, 0.75 * tp + lp), min: Math.min(tn, 0.75 * tn + ln) };
+  },
+};
+/* ---------- 이 장의 그리기 도우미 ---------- */
+const BL = {
+  TR: CB.civ.TRUCK, _T: null,
+  T() { return BL._T || (BL._T = BLC.table([40, 50, 40])); },
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  font() { return getComputedStyle(document.body).getPropertyValue("--font"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 11.5}px ${o.sans ? BL.font() : BL.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color || CB.palette().text; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = BL._c || (BL._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?[(]([^)]+)[)]/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  kn(v, d = 0) { if (!isFinite(v)) return "—"; const t = Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }); return (v < -1e-9 && Number(t.replace(/,/g, "")) !== 0 ? "−" : "") + t; },
+  /** 트럭 축의 위치(앞축 위치 f, 방향 dir — CB.civ.truckScan과 같은 약속) */
+  axles(L, f, dir) { return BL.TR.axles.map((a) => ({ P: a.P, x: dir > 0 ? f - a.x : L - (f - a.x) })); },
+  /** 단순보 위 집중 하중들의 휨모멘트·전단력 */
+  simple(L, loads, x) { let RA = 0; loads.forEach((p) => { if (p.x >= 0 && p.x <= L) RA += (p.P * (L - p.x)) / L; }); let M = RA * x, V = RA; loads.forEach((p) => { if (p.x >= 0 && p.x <= L && p.x < x) { M -= p.P * (x - p.x); V -= p.P; } }); return { M, V, RA }; },
+  truckBox(ctx, X, ys, ax, P) {
+    const on = ax.filter((a) => isFinite(a.x));
+    const xs = on.map((a) => a.x), a0 = Math.min(...xs) - 0.6, a1 = Math.max(...xs) + 0.6;
+    ctx.fillStyle = BL.alpha(P.accent2, 0.28); ctx.fillRect(X(a0), ys - 30, X(a1) - X(a0), 14);
+    on.forEach((a) => BL.arrow(ctx, X(a.x), ys - 16, X(a.x), ys - 2, P.accent2, 2, 6));
+  },
+  beamLine(ctx, X, y, L0, L1, sups, P) {
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(X(L0), y); ctx.lineTo(X(L1), y); ctx.stroke();
+    sups.forEach((s) => { ctx.fillStyle = P.ok; ctx.beginPath(); ctx.moveTo(X(s), y + 2); ctx.lineTo(X(s) - 6, y + 12); ctx.lineTo(X(s) + 6, y + 12); ctx.closePath(); ctx.fill(); });
+  },
+  drag(canvas, toX, onX) {
+    let on = false;
+    canvas.addEventListener("pointerdown", (e) => { const r = canvas.getBoundingClientRect(); if (e.clientY - r.top > r.height * 0.42) return; on = true; canvas.setPointerCapture(e.pointerId); onX(toX(e.clientX - r.left)); });
+    canvas.addEventListener("pointermove", (e) => { if (!on) return; const r = canvas.getBoundingClientRect(); onX(toX(e.clientX - r.left)); });
+    const up = () => { on = false; }; canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
+  },
+};
+
+/* ---------- 1. 트럭 주행 ---------- */
+(function () {
+  const gL = CB.range("bl-dr-L", (v) => v + " m", () => { syncF(); upd(); }), gc = CB.range("bl-dr-c", (v) => v.toFixed(2), () => upd());
+  const gf = CB.range("bl-dr-f", (v) => v.toFixed(1) + " m", () => draw()), dir = CB.seg("bl-dr-dir", () => upd());
+  let S = null, playing = false, map = null;
+  function syncF() { gf.el.max = (gL() + 12.2).toFixed(1); if (gf() > gL() + 12.2) gf.set(gL() + 12.2, false); }
+  function upd() {
+    const L = gL(), c = gc() * L, d = Number(dir());
+    const sm = CB.civ.truckScan(L, CB.civ.ilSimple(L, "M", c), BL.TR, 0.05, d), sv = CB.civ.truckScan(L, CB.civ.ilSimple(L, "V", c), BL.TR, 0.05, d);
+    S = { L, c, d, sm, sv };
+    CB.stat("bl-dr-mmax", `${BL.kn(sm.max)} kN·m (${sm.at.toFixed(1)} m)`);
+    CB.stat("bl-dr-v", `${BL.kn(sv.max)} · ${BL.kn(sv.min)} kN`);
+    const lane = (BLC.LANE * c * (L - c)) / 2;
+    CB.stat("bl-dr-lane", `w∫η = ${BL.kn(lane)} (트럭의 ${(100 * lane / sm.max).toFixed(0)} %)`);
+    draw();
+  }
+  function draw() {
+    if (!S) return; const ax = BL.axles(S.L, gf(), S.d), r = BL.simple(S.L, ax, S.c);
+    CB.stat("bl-dr-now", `${BL.kn(r.M)} kN·m · ${BL.kn(r.V)} kN`); cv.redraw();
+  }
+  const cv = CB.canvas("#bl-cv-drive", (ctx, w, h) => {
+    if (!S) return;
+    const P = CB.palette(), L = S.L, padL = 64, padR = 16, X = (x) => padL + ((x + 2) / (L + 4)) * (w - padL - padR);
+    map = (px) => -2 + ((px - padL) / (w - padL - padR)) * (L + 4);
+    const f = gf(), ax = BL.axles(L, f, S.d), yb = 62;
+    BL.beamLine(ctx, X, yb, 0, L, [0, L], P);
+    BL.truckBox(ctx, X, yb - 2, ax.filter((a) => a.x > -14 && a.x < L + 14), P);
+    // 현재 휨모멘트도(아래가 +)
+    const pts = []; let mx = 1; for (let i = 0; i <= 120; i++) { const x = (L * i) / 120, m = BL.simple(L, ax, x).M; pts.push([x, m]); mx = Math.max(mx, Math.abs(m)); }
+    const sc = 46 / Math.max(mx, S.sm.max);
+    ctx.beginPath(); ctx.moveTo(X(0), yb + 14); pts.forEach(([x, m]) => ctx.lineTo(X(x), yb + 14 + m * sc)); ctx.lineTo(X(L), yb + 14); ctx.closePath();
+    ctx.fillStyle = CB.color("accent-soft"); ctx.fill(); ctx.strokeStyle = P.accent; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = P.accent2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(X(S.c), yb - 40); ctx.lineTo(X(S.c), yb + 66); ctx.stroke(); ctx.setLineDash([]);
+    BL.text(ctx, "c", X(S.c) + 8, yb - 36, P.accent2, { size: 11 });
+    BL.text(ctx, "트럭을 끌어 옮기기", w - 16, 14, P.faint, { align: "right", size: 10.5, sans: true, bold: false });
+    // 이력
+    const top = 140, hh = (h - top - 46) / 2, x0 = -12.2, x1 = L + 12.2;
+    const hm = S.sm.history.map(([a, v]) => [a + 12.2, v]), hv = S.sv.history.map(([a, v]) => [a + 12.2, v]);
+    const mlo = Math.min(0, S.sm.min), mhi = S.sm.max;
+    const c1 = CB.chart(ctx, { x: padL, y: top, w: w - padL - padR, h: hh }, { x: [0, x1 - x0], y: [mlo - 0.08 * (mhi - mlo), mhi * 1.12], yLabel: "M(c) (kN·m)", xFmt: () => "", series: [{ data: hm, color: P.accent, width: 2, fill: CB.color("accent-soft") }], vlines: [{ x: f, color: P.accent2, dash: [3, 3] }], points: [{ x: S.sm.at + 12.2, y: S.sm.max, color: P.accent, r: 4, label: BL.kn(S.sm.max) }] });
+    const vr = Math.max(Math.abs(S.sv.max), Math.abs(S.sv.min)) * 1.15 || 1;
+    CB.chart(ctx, { x: padL, y: top + hh + 18, w: w - padL - padR, h: hh }, { x: [0, x1 - x0], y: [-vr, vr], yLabel: "V(c) (kN)", xLabel: "", xFmt: (v) => String(Math.round(v)), series: [{ data: hv, color: P.accent2, width: 2 }], vlines: [{ x: f, color: P.accent2, dash: [3, 3] }], hlines: [{ y: 0, color: P.axis, dash: [] }] });
+    BL.text(ctx, "앞축 위치 f (m) — 트럭이 교량에 들어서는 순간 f = 0", w - 16, h - 8, P.dim, { align: "right", size: 10.5, sans: true, bold: false });
+  }, { aspect: (W) => (W < 520 ? 1.15 : 0.72), minHeight: 360, maxHeight: 540 });
+  BL.drag(cv.canvas, (px) => (map ? map(px) : 0), (x) => { const L = gL(), d = Number(dir()); const f = d > 0 ? x + 6 : L - x + 6; gf.set(CB.clamp(f, 0, L + 12.2)); });
+  CB.loop(cv.canvas, (dt) => { if (!playing) return; let v = gf() + dt * 14; if (v >= gL() + 12.2) { v = gL() + 12.2; playing = false; pb.set(false); } gf.set(v); });
+  const pb = CB.playButton("bl-dr-play", () => { if (gf() >= gL() + 12.1) gf.set(0, false); playing = true; }, () => { playing = false; }, ["▶ 주행", "■ 정지"]);
+  document.getElementById("bl-dr-max").addEventListener("click", () => { playing = false; pb.set(false); gf.set(S.sm.at + 12.2 > gL() + 12.2 ? gL() : S.sm.at); });
+  syncF(); upd();
+})();
+
+/* ---------- 2. 영향선 그리기 ---------- */
+(function () {
+  const kind = CB.seg("bl-il-kind", () => upd(true)), gL = CB.range("bl-il-L", (v) => v + " m", () => { gc.el.max = gL() - 0.5; if (gc() > gL() - 0.5) gc.set(gL() / 2, false); upd(true); });
+  const gc = CB.range("bl-il-c", (v) => v.toFixed(1) + " m", () => upd(true));
+  let S = null, f = 29.8, dir = 1, map = null;
+  function scan() {
+    const L = gL(), k = kind(), c = gc(), fn = CB.civ.ilSimple(L, k, c);
+    let best = { v: -Infinity }, worst = { v: Infinity };
+    [1, -1].forEach((d) => CB.civ.truckScan(L, fn, BL.TR, 0.05, d).history.forEach(([fr, v]) => { if (v > best.v) best = { v, f: fr, d }; if (v < worst.v) worst = { v, f: fr, d }; }));
+    let Ap = 0, Am = 0; for (let i = 0; i < 400; i++) { const a = (L * i) / 400, b = (L * (i + 1)) / 400, m = fn((a + b) / 2) * (b - a); if (m > 0) Ap += m; else Am += m; }
+    return { L, k, c, fn, best, worst, Ap, Am };
+  }
+  function upd(rescan) {
+    if (rescan || !S) { S = scan(); if (rescan) { f = S.best.f; dir = S.best.d; } }
+    const ax = BL.axles(S.L, f, dir), on = ax.filter((a) => a.x >= 0 && a.x <= S.L), sum = on.reduce((s, a) => s + a.P * S.fn(a.x), 0);
+    const u = S.k === "RA" ? "kN" : S.k === "V" ? "kN" : "kN·m";
+    CB.stat("bl-il-now", `${BL.kn(sum, S.k === "M" ? 0 : 1)} ${u}`);
+    CB.stat("bl-il-mm", `${BL.kn(S.best.v, S.k === "M" ? 0 : 1)} · ${BL.kn(S.worst.v, S.k === "M" ? 0 : 1)}`);
+    const w = BLC.LANE, im = CB.civ.impact(S.L), dmax = Math.max(S.best.v * (1 + im), 0.75 * S.best.v * (1 + im) + w * S.Ap);
+    CB.stat("bl-il-lane", `${BL.kn(w * S.Ap, 1)} · ${BL.kn(w * S.Am, 1)}`);
+    CB.stat("bl-il-des", `${BL.kn(dmax, S.k === "M" ? 0 : 1)} (${dmax > S.best.v * (1 + im) + 1e-6 ? "0.75 트럭 + 차로" : "트럭 단독"}, IM ${im.toFixed(3)})`);
+    CB.stat("bl-il-tab", on.length ? "축별 P·η: " + on.map((a) => `${a.P} × ${S.fn(a.x).toFixed(3)} = <b>${BL.kn(a.P * S.fn(a.x), 1)}</b>`).join(" + ") + ` = <b>${BL.kn(sum, 1)}</b> ${u}` : "트럭이 경간 밖에 있습니다.");
+    cv.redraw();
+  }
+  const cv = CB.canvas("#bl-cv-il", (ctx, w, h) => {
+    if (!S) return;
+    const P = CB.palette(), L = S.L, padL = 56, padR = 16, X = (x) => padL + ((x + 2) / (L + 4)) * (w - padL - padR);
+    map = (px) => -2 + ((px - padL) / (w - padL - padR)) * (L + 4);
+    const yb = 60, ax = BL.axles(L, f, dir);
+    BL.beamLine(ctx, X, yb, 0, L, [0, L], P);
+    BL.truckBox(ctx, X, yb - 2, ax.filter((a) => a.x > -14 && a.x < L + 14), P);
+    BL.text(ctx, "트럭을 끌어 옮기기", w - 16, 14, P.faint, { align: "right", size: 10.5, sans: true, bold: false });
+    const vals = []; for (let i = 0; i <= 300; i++) { const x = (L * i) / 300; vals.push([x, S.fn(x)]); }
+    if (S.k === "V") vals.push([S.c, S.fn(S.c - 1e-6)]), vals.sort((a, b) => a[0] - b[0]);
+    const lo = Math.min(0, ...vals.map((p) => p[1])), hi = Math.max(0, ...vals.map((p) => p[1])), pad = (hi - lo) * 0.18 || 1;
+    const box = { x: padL, y: 100, w: w - padL - padR, h: h - 140 };
+    const data = []; for (let i = 0; i <= 600; i++) { const x = (L * i) / 600; data.push([x, S.fn(x)]); }
+    const c = CB.chart(ctx, box, { x: [-2, L + 2], y: [lo - pad, hi + pad], yLabel: S.k === "M" ? "η (m)" : "η", xLabel: "", series: [{ data, color: P.accent, width: 2.2, fill: CB.color("accent-soft") }], hlines: [{ y: 0, color: P.axis, dash: [] }] });
+    ax.forEach((a) => { if (a.x < 0 || a.x > L) return; const y = S.fn(a.x); ctx.strokeStyle = P.accent2; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(c.X(a.x), box.y); ctx.lineTo(c.X(a.x), c.Y(y)); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(c.X(a.x), c.Y(y), 4, 0, Math.PI * 2); ctx.fill(); });
+    ctx.strokeStyle = P.warn; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(c.X(S.c), yb - 26); ctx.lineTo(c.X(S.c), box.y + box.h); ctx.stroke(); ctx.setLineDash([]);
+    BL.text(ctx, "c", c.X(S.c) + 8, yb - 24, P.warn, { size: 11 });
+    BL.text(ctx, "x (m)", box.x, box.y + box.h + 24, P.dim, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.56), minHeight: 300, maxHeight: 440 });
+  BL.drag(cv.canvas, (px) => (map ? map(px) : 0), (x) => { const L = gL(); f = dir > 0 ? x + 6 : L - x + 6; f = CB.clamp(f, 0, L + 12.2); upd(false); });
+  document.getElementById("bl-il-best").addEventListener("click", () => { f = S.best.f; dir = S.best.d; upd(false); });
+  document.getElementById("bl-il-worst").addEventListener("click", () => { f = S.worst.f; dir = S.worst.d; upd(false); });
+  upd(true);
+})();
+
+/* ---------- 3. 절대 최대 휨모멘트 ---------- */
+(function () {
+  const gL = CB.range("bl-ab-L", (v) => v + " m", () => { env = null; gf.el.max = (gL() + 12.2).toFixed(1); upd(); });
+  const gf = CB.range("bl-ab-f", (v) => v.toFixed(2) + " m", () => upd()), kseg = CB.seg("bl-ab-k", () => {});
+  let env = null;
+  const Rbar = BL.TR.axles.reduce((s, a) => s + a.P * a.x, 0) / BL.TR.axles.reduce((s, a) => s + a.P, 0);
+  function envelope() {
+    if (env) return env; const L = gL(), n = 120, pts = []; let best = { v: -1 };
+    for (let i = 1; i < n; i++) { const c = (L * i) / n; let m = -Infinity; [1, -1].forEach((d) => { m = Math.max(m, CB.civ.truckScan(L, CB.civ.ilSimple(L, "M", c), BL.TR, 0.05, d).max); }); pts.push([c, m]); if (m > best.v) best = { v: m, c }; }
+    const mid = CB.civ.truckScan(L, CB.civ.ilSimple(L, "M", L / 2), BL.TR, 0.02, 1).max;
+    // 규칙 배치로 다듬은 절대 최대(축 k 아래 단면을 세밀하게)
+    BL.TR.axles.forEach((a) => { const f = L / 2 + (a.x + Rbar) / 2, xk = f - a.x; if (xk > 0 && xk < L) { const v = BL.simple(L, BL.axles(L, f, 1), xk).M; if (v > best.v) best = { v, c: xk }; } });
+    return (env = { pts: [[0, 0], ...pts, [L, 0]], best, mid });
+  }
+  function upd() {
+    const L = gL(), e = envelope(), ax = BL.axles(L, gf(), 1);
+    let cur = { v: -Infinity, x: 0 }; for (let i = 0; i <= 400; i++) { const x = (L * i) / 400, m = BL.simple(L, ax, x).M; if (m > cur.v) cur = { v: m, x }; }
+    ax.forEach((a) => { if (a.x > 0 && a.x < L) { const m = BL.simple(L, ax, a.x).M; if (m > cur.v) cur = { v: m, x: a.x }; } });
+    CB.stat("bl-ab-now", `${BL.kn(cur.v)} kN·m (x = ${cur.x.toFixed(2)} m)`);
+    CB.stat("bl-ab-abs", `${BL.kn(e.best.v)} kN·m (x = ${e.best.c.toFixed(2)} m)`);
+    CB.stat("bl-ab-mid2", `${BL.kn(e.mid)} kN·m`);
+    CB.stat("bl-ab-diff", `+${(100 * (e.best.v / e.mid - 1)).toFixed(2)} % · 중앙에서 ${Math.abs(e.best.c - L / 2).toFixed(2)} m`);
+    S = { L, e, ax, cur }; cv.redraw();
+  }
+  let S = null;
+  const cv = CB.canvas("#bl-cv-abs", (ctx, w, h) => {
+    if (!S) return; const P = CB.palette(), L = S.L, padL = 64, padR = 16, X = (x) => padL + ((x + 2) / (L + 4)) * (w - padL - padR), yb = 60;
+    BL.beamLine(ctx, X, yb, 0, L, [0, L], P);
+    BL.truckBox(ctx, X, yb - 2, S.ax.filter((a) => a.x > -14 && a.x < L + 14), P);
+    const xR = gf() - Rbar; ctx.strokeStyle = P.accent; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(xR), yb - 44); ctx.lineTo(X(xR), yb); ctx.stroke(); ctx.setLineDash([]); BL.text(ctx, "R", X(xR), yb - 50, P.accent, { size: 11 });
+    ctx.strokeStyle = P.dim; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(X(L / 2), yb - 40); ctx.lineTo(X(L / 2), h - 30); ctx.stroke(); ctx.setLineDash([]);
+    const cur = []; for (let i = 0; i <= 300; i++) { const x = (L * i) / 300; cur.push([x, -BL.simple(L, S.ax, x).M]); }
+    const top = S.e.best.v * 1.12;
+    const c = CB.chart(ctx, { x: padL, y: 92, w: w - padL - padR, h: h - 92 - 34 }, { x: [-2, L + 2], y: [-top, top * 0.08], yLabel: "M (kN·m, 아래가 +)", yFmt: (v) => BL.kn(-v), xLabel: "",
+      series: [{ data: S.e.pts.map(([x, v]) => [x, -v]), color: P.dim, width: 1.6, dash: [5, 4] }, { data: cur, color: P.accent, width: 2.2, fill: CB.color("accent-soft") }],
+      points: [{ x: S.e.best.c, y: -S.e.best.v, color: P.bad, r: 4.5 }, { x: S.cur.x, y: -S.cur.v, color: P.accent, r: 3.5 }] });
+    BL.text(ctx, `절대 최대 ${BL.kn(S.e.best.v)}`, c.X(S.e.best.c), c.Y(-S.e.best.v) - 14, P.bad, { size: 11 });
+    BL.text(ctx, "점선: 포락선 · 실선: 지금 트럭", w - 16, h - 10, P.dim, { align: "right", size: 10.5, sans: true, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 300, maxHeight: 430 });
+  document.getElementById("bl-ab-rule").addEventListener("click", () => { const a = BL.TR.axles[Number(kseg())]; gf.set(gL() / 2 + (a.x + Rbar) / 2); });
+  document.getElementById("bl-ab-mid").addEventListener("click", () => { const a = BL.TR.axles[Number(kseg())]; gf.set(gL() / 2 + a.x); });
+  upd();
+})();
+
+/* ---------- 4. 충격 계수와 동적 증폭 ---------- */
+(function () {
+  const gL = CB.range("bl-im-L", (v) => v + " m", () => upd()), gv = CB.range("bl-im-v", (v) => v + " km/h", () => upd());
+  const gfr = CB.range("bl-im-f", (v) => v.toFixed(2) + " Hz", () => upd()), gz = CB.range("bl-im-z", (v) => (100 * v).toFixed(1) + " %", () => upd());
+  /** 단순보 첫째 모드 1자유도 이동 하중 해: 경간 중앙 처짐의 동적·정적 이력(정적 최대로 정규화) */
+  function daf(L, vkmh, f1, z) {
+    const v = vkmh / 3.6, w = 2 * Math.PI * f1, Tp = (L + 12.2) / v, Tend = 1.5 * Tp, dt = Math.min(Tp / 1500, 1 / (f1 * 40)), n = Math.ceil(Tend / dt);
+    const F = (t) => { let s = 0; BL.TR.axles.forEach((a) => { const x = v * t - a.x; if (x >= 0 && x <= L) s += a.P * Math.sin((Math.PI * x) / L); }); return s; };
+    const out = CB.rk4((t, y) => [y[1], F(t) - 2 * z * w * y[1] - w * w * y[0]], [0, 0], 0, dt, n);
+    let qs = 0, qd = 0; const hs = [], hd = [], step = Math.max(1, Math.floor(out.length / 400));
+    out.forEach(([t, y], i) => { const s = F(t) / (w * w); qs = Math.max(qs, s); qd = Math.max(qd, y[0]); if (i % step === 0) { hs.push([t, s]); hd.push([t, y[0]]); } });
+    return { r: qd / qs, hs: hs.map(([t, s]) => [t, s / qs]), hd: hd.map(([t, s]) => [t, s / qs]), Tp, a: v / (2 * f1 * L) };
+  }
+  let S = null;
+  function upd() {
+    const L = gL(), d = daf(L, gv(), gfr(), gz()), im = CB.civ.impact(L);
+    const curve = []; for (let Lc = 5; Lc <= 150; Lc += 5) curve.push([Lc, 100 * (daf(Lc, gv(), 100 / Lc, gz()).r - 1)]);
+    S = { L, d, im, curve };
+    CB.stat("bl-im-im", (100 * im).toFixed(1) + " %");
+    CB.stat("bl-im-daf", (100 * (d.r - 1)).toFixed(1) + " %");
+    CB.stat("bl-im-a", d.a.toFixed(3));
+    cv.redraw();
+  }
+  const cv = CB.canvas("#bl-cv-imp", (ctx, w, h) => {
+    if (!S) return; const P = CB.palette(), hh = (h - 70) / 2;
+    const ic = []; for (let L = 0; L <= 150; L += 1) ic.push([L, 100 * CB.civ.impact(L)]);
+    CB.chart(ctx, { x: 58, y: 14, w: w - 74, h: hh }, { x: [0, 150], y: [0, 40], yLabel: "IM (%)", xLabel: "",
+      series: [{ data: ic, color: P.accent, width: 2.4 }, { data: S.curve, color: P.accent2, width: 2, dash: [5, 4] }],
+      hlines: [{ y: 33, color: P.dim, label: "AASHTO 형태 33 %" }], vlines: [{ x: S.L, color: P.warn, label: S.L + " m" }],
+      points: [{ x: S.L, y: 100 * S.im, color: P.accent, r: 4.5 }] });
+    BL.text(ctx, "실선: 15/(40 + L) · 점선: 이동 하중 DAF − 1 (f₁ = 100/L)", w - 18, hh + 36, P.dim, { align: "right", size: 10.5, sans: true, bold: false });
+    const tmax = S.d.hd[S.d.hd.length - 1][0];
+    CB.chart(ctx, { x: 58, y: hh + 44, w: w - 74, h: hh }, { x: [0, tmax], y: [-0.4, 1.4], yLabel: "처짐 / 정적 최대", xLabel: "시간 (s)",
+      series: [{ data: S.d.hs, color: P.dim, width: 1.6, dash: [5, 4] }, { data: S.d.hd, color: P.accent2, width: 2 }],
+      hlines: [{ y: 1, color: P.faint }, { y: S.d.r, color: P.accent2, label: "동적 최대 " + S.d.r.toFixed(3) }], vlines: [{ x: S.d.Tp, color: P.faint, label: "트럭 통과" }] });
+  }, { aspect: (W) => (W < 520 ? 1.1 : 0.66), minHeight: 360, maxHeight: 520 });
+  document.getElementById("bl-im-emp").addEventListener("click", () => gfr.set(CB.clamp(100 / gL(), 0.5, 12)));
+  upd();
+})();
+
+/* ---------- 5. 연속교 영향선 ---------- */
+(function () {
+  const kind = CB.seg("bl-co-kind", () => recompute()), gc = CB.range("bl-co-c", (v) => v.toFixed(1) + " m", () => recompute());
+  const gu = CB.range("bl-co-u", (v) => v.toFixed(1) + " m", () => cv.redraw());
+  let S = null, truck = null, playing = false;
+  function recompute() {
+    const T = BL.T(), k = kind(), c = gc(), ys = BLC.il(T, k, c), s = BLC.scan(T, ys, 0.1), a = BLC.areas(T, ys);
+    S = { T, k, c, ys, s, a }; truck = null;
+    const d = k === "M" ? 0 : 1, u = k === "M" ? " kN·m" : " kN";
+    CB.stat("bl-co-eta", `${BL.kn(Math.max(...ys), 3)} · ${BL.kn(Math.min(...ys), 3)}`);
+    CB.stat("bl-co-area", `${BL.kn(a.p, 1)} · ${BL.kn(a.m, 1)} m²`);
+    CB.stat("bl-co-tr", `${BL.kn(s.max, d)} · ${BL.kn(s.min, d)}${u}`);
+    const Lim = BLC.imL(T, c); CB.stat("bl-co-im", `${CB.civ.impact(Lim).toFixed(3)} (L = ${Lim} m)`);
+    cv.redraw();
+  }
+  const cv = CB.canvas("#bl-cv-cont", (ctx, w, h) => {
+    if (!S) return; const P = CB.palette(), T = S.T, padL = 56, padR = 14, X = (x) => padL + ((x + 2) / 134) * (w - padL - padR);
+    const u = gu(), j = Math.round(u / BLC.DX), b = T.beams[j], yb = 58;
+    // 처짐 모양
+    const sm = b.sample(260), vm = Math.max(1e-12, ...sm.map((p) => Math.abs(p.v)));
+    ctx.strokeStyle = BL.alpha(P.accent, 0.35); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(X(0), yb); ctx.lineTo(X(130), yb); ctx.stroke();
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 2; ctx.setLineDash([5, 3]); ctx.beginPath(); sm.forEach((p, i) => { const y = yb - (p.v / vm) * 22; i ? ctx.lineTo(X(p.x), y) : ctx.moveTo(X(p.x), y); }); ctx.stroke(); ctx.setLineDash([]);
+    T.sup.forEach((s) => { ctx.fillStyle = P.ok; ctx.beginPath(); ctx.moveTo(X(s), yb + 2); ctx.lineTo(X(s) - 6, yb + 12); ctx.lineTo(X(s) + 6, yb + 12); ctx.closePath(); ctx.fill(); });
+    if (truck) BL.truckBox(ctx, X, yb - 4, BL.axles(130, truck.f, truck.d).filter((a) => a.x > -14 && a.x < 144), P);
+    else { BL.arrow(ctx, X(u), yb - 40, X(u), yb - 3, P.accent2, 2.4, 8); BL.text(ctx, "1", X(u) + 9, yb - 34, P.accent2, { size: 11 }); }
+    ctx.strokeStyle = P.warn; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(X(S.c), yb - 44); ctx.lineTo(X(S.c), h - 30); ctx.stroke(); ctx.setLineDash([]);
+    BL.text(ctx, "단면", X(S.c), yb - 48, P.warn, { size: 10.5 });
+    // 영향선
+    const all = S.ys.map((v, i) => [i * BLC.DX, v]), drawn = all.filter(([x]) => x <= u + 1e-9);
+    const lo = Math.min(0, ...S.ys), hi = Math.max(0, ...S.ys), pad = (hi - lo) * 0.15 || 1;
+    const c = CB.chart(ctx, { x: padL, y: 96, w: w - padL - padR, h: h - 96 - 34 }, { x: [-2, 132], y: [lo - pad, hi + pad], yLabel: S.k === "M" ? "η (m)" : "η", xLabel: "",
+      series: [{ data: all, color: BL.alpha(P.dim, 0.5), width: 1.2, dash: [3, 3] }, { data: drawn, color: P.accent, width: 2.4, fill: CB.color("accent-soft") }], hlines: [{ y: 0, color: P.axis, dash: [] }] });
+    if (!truck && drawn.length) { const q = drawn[drawn.length - 1]; ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(c.X(q[0]), c.Y(q[1]), 4.5, 0, Math.PI * 2); ctx.fill(); BL.text(ctx, q[1].toFixed(3), c.X(q[0]) + (q[0] > 110 ? -26 : 26), c.Y(q[1]) - 10, P.accent2, { size: 10.5 }); }
+    if (truck) { const fn = BLC.fn(T, S.ys); BL.axles(130, truck.f, truck.d).forEach((a) => { if (a.x < 0 || a.x > 130) return; ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(c.X(a.x), c.Y(fn(a.x)), 4, 0, Math.PI * 2); ctx.fill(); }); BL.text(ctx, `Σ Pη = ${BL.kn(truck.v, S.k === "M" ? 0 : 1)}`, w - 18, 104, P.accent2, { align: "right", size: 11.5 }); }
+    BL.text(ctx, "x (m)", padL, h - 10, P.dim, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.56), minHeight: 300, maxHeight: 440 });
+  CB.loop(cv.canvas, (dt) => { if (!playing) return; let v = gu() + dt * 22; if (v >= 130) { v = 130; playing = false; pb.set(false); } gu.set(v); });
+  const pb = CB.playButton("bl-co-play", () => { truck = null; if (gu() >= 129.9) gu.set(0, false); playing = true; }, () => { playing = false; }, ["▶ 단위 하중 이동", "■ 정지"]);
+  document.getElementById("bl-co-max").addEventListener("click", () => { playing = false; pb.set(false); gu.set(130, false); truck = { f: S.s.atMax, d: S.s.dMax, v: S.s.max }; cv.redraw(); });
+  document.getElementById("bl-co-min").addEventListener("click", () => { playing = false; pb.set(false); gu.set(130, false); truck = { f: S.s.atMin, d: S.s.dMin, v: S.s.min }; cv.redraw(); });
+  recompute();
+})();
+
+/* ---------- 6. 차로 하중 재하 구간 ---------- */
+(function () {
+  const SEC = { m65: ["M", 65], mB: ["M", 40], m16: ["M", 16], rB: ["R", 1] };
+  let S = null, loaded = new Set(), map = null;
+  function zones(T, ys) {
+    const out = []; let a = 0, s = Math.sign(ys[1] || ys[0]) || 1, area = 0;
+    for (let i = 0; i < T.n; i++) {
+      const y0 = ys[i], y1 = ys[i + 1], x0 = i * BLC.DX, x1 = x0 + BLC.DX;
+      if ((y0 >= 0 && y1 >= 0) || (y0 <= 0 && y1 <= 0)) { const sg = Math.sign(y0 + y1) || s; if (sg !== s && Math.abs(y0 + y1) > 1e-9) { out.push({ a, b: x0, s, area }); a = x0; area = 0; s = sg; } area += ((y0 + y1) / 2) * BLC.DX; }
+      else { const t = y0 / (y0 - y1), xm = x0 + t * BLC.DX; area += (y0 * t * BLC.DX) / 2; out.push({ a, b: xm, s, area }); a = xm; s = Math.sign(y1); area = (y1 * (1 - t) * BLC.DX) / 2; }
+    }
+    out.push({ a, b: T.L, s, area });
+    return out.filter((z) => z.b - z.a > 0.05);
+  }
+  const sec = CB.seg("bl-ln-sec", () => { build(); pick(1); });
+  function build() { const T = BL.T(), [k, c] = SEC[sec()], ys = BLC.il(T, k, c); S = { T, k, c, ys, z: zones(T, ys) }; }
+  function pick(sg) { loaded = new Set(S.z.map((z, i) => (sg === 0 ? i : z.s === sg ? i : -1)).filter((i) => i >= 0)); upd(); }
+  function upd() {
+    const w = BLC.LANE, u = S.k === "R" ? "kN" : "kN·m";
+    let len = 0, E = 0; loaded.forEach((i) => { len += S.z[i].b - S.z[i].a; E += w * S.z[i].area; });
+    const pos = S.z.filter((z) => z.s > 0).reduce((s, z) => s + z.area, 0) * w, neg = S.z.filter((z) => z.s < 0).reduce((s, z) => s + z.area, 0) * w;
+    CB.stat("bl-ln-len", `${len.toFixed(1)} m (${loaded.size}구간)`);
+    CB.stat("bl-ln-e", `${BL.kn(E, 0)} ${u}`);
+    CB.stat("bl-ln-opt", `${BL.kn(pos)} · ${BL.kn(neg)} ${u}`);
+    const r = E >= 0 ? E / (pos || 1) : E / (neg || -1);
+    CB.stat("bl-ln-msg", loaded.size ? `지금 배치는 ${E >= 0 ? "최대(+)" : "최소(−)"} 가능값의 <b>${(100 * r).toFixed(0)} %</b>. ${r > 0.999 ? '<span class="ok">같은 부호 구간을 모두 실었다.</span>' : "반대 부호 구간이 섞였거나 빠진 구간이 있다."}` : "영향선 아래 구간을 눌러 차로 하중을 싣거나 빼 보세요.");
+    cv.redraw();
+  }
+  const cv = CB.canvas("#bl-cv-lane", (ctx, w, h) => {
+    if (!S) return; const P = CB.palette(), padL = 56, padR = 14, X = (x) => padL + ((x + 2) / 134) * (w - padL - padR);
+    map = (px) => -2 + ((px - padL) / (w - padL - padR)) * 134;
+    const yb = 54;
+    BL.beamLine(ctx, X, yb, 0, 130, S.T.sup, P);
+    loaded.forEach((i) => { const z = S.z[i]; ctx.fillStyle = BL.alpha(P.accent2, 0.25); ctx.fillRect(X(z.a), yb - 20, X(z.b) - X(z.a), 14); for (let x = z.a + 0.5; x < z.b; x += 3) BL.arrow(ctx, X(x), yb - 20, X(x), yb - 3, P.accent2, 1, 4); });
+    const lo = Math.min(0, ...S.ys), hi = Math.max(0, ...S.ys), pad = (hi - lo) * 0.15 || 1;
+    const all = S.ys.map((v, i) => [i * BLC.DX, v]);
+    const c = CB.chart(ctx, { x: padL, y: 84, w: w - padL - padR, h: h - 84 - 34 }, { x: [-2, 132], y: [lo - pad, hi + pad], yLabel: S.k === "R" ? "η" : "η (m)", xLabel: "", series: [{ data: all, color: P.accent, width: 2 }], hlines: [{ y: 0, color: P.axis, dash: [] }] });
+    S.z.forEach((z, i) => {
+      const pts = all.filter(([x]) => x >= z.a - 1e-9 && x <= z.b + 1e-9); if (!pts.length) return;
+      ctx.beginPath(); ctx.moveTo(c.X(z.a), c.Y(0)); pts.forEach(([x, y]) => ctx.lineTo(c.X(x), c.Y(y))); ctx.lineTo(c.X(z.b), c.Y(0)); ctx.closePath();
+      ctx.fillStyle = loaded.has(i) ? BL.alpha(z.s > 0 ? P.accent : P.accent2, 0.45) : BL.alpha(P.dim, 0.12); ctx.fill();
+      const xm = (z.a + z.b) / 2; if (z.b - z.a > 6) BL.text(ctx, z.area.toFixed(1), c.X(xm), c.Y(0) + (z.s > 0 ? 12 : -12), loaded.has(i) ? P.text : P.dim, { size: 10.5 });
+    });
+    BL.text(ctx, "구간을 눌러 싣기 · 빼기 (숫자 = 넓이 ∫η)", w - 16, 14, P.faint, { align: "right", size: 10.5, sans: true, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.5), minHeight: 280, maxHeight: 400 });
+  cv.canvas.addEventListener("click", (e) => { if (!map) return; const r = cv.canvas.getBoundingClientRect(), x = map(e.clientX - r.left); const i = S.z.findIndex((z) => x >= z.a && x <= z.b); if (i < 0) return; loaded.has(i) ? loaded.delete(i) : loaded.add(i); upd(); });
+  document.getElementById("bl-ln-pos").addEventListener("click", () => pick(1));
+  document.getElementById("bl-ln-neg").addEventListener("click", () => pick(-1));
+  document.getElementById("bl-ln-all").addEventListener("click", () => pick(0));
+  document.getElementById("bl-ln-none").addEventListener("click", () => { loaded.clear(); upd(); });
+  build(); pick(1);
+})();
+
+/* ---------- 7. 다차로 재하 ---------- */
+(function () {
+  const gw = CB.range("bl-mu-w", (v) => v.toFixed(1) + " m", () => upd()), set = CB.seg("bl-mu-set", () => upd()), eff = CB.seg("bl-mu-eff", () => upd());
+  const mA = (n) => (n === 1 ? 1.2 : n === 2 ? 1.0 : n === 3 ? 0.85 : 0.65);
+  let S = null;
+  function upd() {
+    const W = gw(), N = Math.max(1, Math.floor(W / 3.6 + 1e-9)), m = set() === "none" ? () => 1 : mA, E1 = eff() === "m65" ? 5318 : -4852;
+    const cases = []; for (let n = 1; n <= N; n++) cases.push({ n, m: m(n), f: n * m(n) });
+    const g = cases.reduce((a, b) => (b.f > a.f ? b : a));
+    S = { W, N, cases, g, E1 };
+    CB.stat("bl-mu-n", `${N} (폭 ${(W / N).toFixed(2)} m씩)`);
+    CB.stat("bl-mu-g", `${g.n}차로 × ${g.m.toFixed(2)} = ${g.f.toFixed(2)}`);
+    CB.stat("bl-mu-e", `${BL.kn(g.f * E1)} kN·m`);
+    cv.redraw();
+  }
+  const cv = CB.canvas("#bl-cv-multi", (ctx, w, h) => {
+    if (!S) return; const P = CB.palette(), narrow = w < 520;
+    // 횡단면
+    const top = 20, secH = 80, sx = (w - 40) / Math.max(S.W + 1, 9), x0 = 20 + ((w - 40) - S.W * sx) / 2;
+    ctx.fillStyle = BL.alpha(P.dim, 0.2); ctx.fillRect(x0, top + 50, S.W * sx, 10);
+    ctx.fillStyle = BL.alpha(P.dim, 0.4); ctx.fillRect(x0 - 8, top + 30, 8, 30); ctx.fillRect(x0 + S.W * sx, top + 30, 8, 30);
+    const lw = S.W / S.N;
+    for (let i = 0; i < S.N; i++) {
+      const a = x0 + i * lw * sx; ctx.strokeStyle = P.accent2; ctx.setLineDash(i < S.g.n ? [] : [4, 3]); ctx.strokeRect(a + 1, top + 34, lw * sx - 2, 14); ctx.setLineDash([]);
+      if (i < S.g.n) { const cxl = a + (lw * sx) / 2; ctx.fillStyle = BL.alpha(P.accent2, 0.55); ctx.fillRect(cxl - 0.9 * sx - 4, top + 14, 1.8 * sx + 8, 18); BL.arrow(ctx, cxl - 0.9 * sx, top + 30, cxl - 0.9 * sx, top + 48, P.accent2, 1.6, 5); BL.arrow(ctx, cxl + 0.9 * sx, top + 30, cxl + 0.9 * sx, top + 48, P.accent2, 1.6, 5); }
+    }
+    BL.text(ctx, `차도 폭 ${S.W.toFixed(1)} m → 설계 차로 ${S.N}개, ${S.g.n}개 재하가 지배`, w / 2, top + 76, P.text, { size: narrow ? 10.5 : 12, sans: true });
+    // 막대
+    const box = { x: 56, y: top + secH + 24, w: w - 72, h: h - top - secH - 60 };
+    const fmax = Math.max(4.2, ...S.cases.map((c) => c.f)) * 1.1;
+    const c = CB.chart(ctx, box, { x: [0.4, Math.max(S.N, 4) + 0.6], y: [0, fmax], yLabel: "n · m(n)", xLabel: "", xTicks: S.cases.map((c) => c.n), xFmt: (v) => v + "차로" });
+    S.cases.forEach((cs) => { const bw = Math.min(46, (box.w / Math.max(S.N, 4)) * 0.6); ctx.fillStyle = cs === S.g ? P.accent : BL.alpha(P.accent, 0.35); ctx.fillRect(c.X(cs.n) - bw / 2, c.Y(cs.f), bw, c.Y(0) - c.Y(cs.f)); BL.text(ctx, cs.f.toFixed(2), c.X(cs.n), c.Y(cs.f) - 10, cs === S.g ? P.accent : P.dim, { size: 10.5 }); });
+    ctx.strokeStyle = P.faint; ctx.setLineDash([4, 4]); ctx.beginPath(); S.cases.forEach((cs, i) => { const y = c.Y(cs.n); i ? ctx.lineTo(c.X(cs.n), y) : ctx.moveTo(c.X(cs.n), y); }); ctx.stroke(); ctx.setLineDash([]);
+    BL.text(ctx, "점선: m = 1 (감소 없음)", box.x + box.w, box.y + 6, P.faint, { align: "right", size: 10.5, sans: true, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 300, maxHeight: 420 });
+  upd();
+})();
+
+/* ---------- 8. B-130 경간별 최대 효과 ---------- */
+(function () {
+  const comb = CB.seg("bl-cb-comb", () => upd()), llm = CB.seg("bl-cb-ll", () => upd()), nl = CB.seg("bl-cb-n", () => upd());
+  const gx = CB.range("bl-cb-x", (v) => v.toFixed(1) + " m", () => upd());
+  let E = null, S = null;
+  function envelope() {
+    if (E) return E; const T = BL.T(), xs = []; for (let x = 0; x <= 130 + 1e-9; x += 2.5) xs.push(x);
+    const dl = CB.beam({ L: 130, EI: 1, supports: T.sup.map((x, i) => ({ x, type: i === 0 ? "pin" : "roller" })), loads: [{ type: "udl", w: 1, a: 0, b: 130 }] });
+    const rows = xs.map((c) => { const ys = BLC.il(T, "M", Math.min(c, 129.999)); const d = BLC.design(T, ys, c); return { x: c, u: c >= 130 ? 0 : dl.at(c).M, d }; });
+    return (E = rows);
+  }
+  function factors() { const k = comb(); return k === "str" ? { dc: [1.25, 0.9], dw: [1.5, 0.65], ll: 1.75 } : k === "svc" ? { dc: [1, 1], dw: [1, 1], ll: 1 } : { dc: [0, 0], dw: [0, 0], ll: 1 }; }
+  function llOf(d) { const m = llm(); return m === "truck" ? [d.tp, d.tn] : m === "lane" ? [d.lp, d.ln] : [d.max, d.min]; }
+  function upd() {
+    const rows = envelope(), F = factors(), n = Number(nl()), mm = n === 1 ? 1.2 : 2.0;
+    const g = (gm, v, wantMax) => (wantMax ? (v > 0 ? gm[0] : gm[1]) : v < 0 ? gm[0] : gm[1]) * v;
+    S = rows.map((r) => { const DC = BLC.DC * r.u, DW = BLC.DW * r.u, [lp, ln] = llOf(r.d); const LLp = mm * lp, LLn = mm * ln;
+      return { x: r.x, DC, DW, LLp, LLn, up: g(F.dc, DC, true) + g(F.dw, DW, true) + F.ll * LLp, un: g(F.dc, DC, false) + g(F.dw, DW, false) + F.ll * LLn }; });
+    const i = Math.round(gx() / 2.5), r = S[i];
+    CB.stat("bl-cb-d", `${BL.kn(r.DC)} · ${BL.kn(r.DW)}`);
+    CB.stat("bl-cb-l", `${BL.kn(r.LLp)} · ${BL.kn(r.LLn)}`);
+    CB.stat("bl-cb-u", `${BL.kn(r.up)} · ${BL.kn(r.un)}`);
+    const mx = S.reduce((a, b) => (b.up > a.up ? b : a)), mn = S.reduce((a, b) => (b.un < a.un ? b : a));
+    CB.stat("bl-cb-g", `${BL.kn(mx.up)} (x ${mx.x}) · ${BL.kn(mn.un)} (x ${mn.x})`);
+    cv.redraw();
+  }
+  const cv = CB.canvas("#bl-cv-combo", (ctx, w, h) => {
+    if (!S) return; const P = CB.palette();
+    const all = S.flatMap((r) => [r.up, r.un, r.DC + r.DW]), lo = Math.min(0, ...all), hi = Math.max(0, ...all), pad = (hi - lo) * 0.1;
+    const c = CB.chart(ctx, { x: 64, y: 16, w: w - 80, h: h - 56 }, { x: [0, 130], y: [-(hi + pad), -(lo - pad)], yLabel: "M (kN·m, 아래가 +)", yFmt: (v) => BL.kn(-v / 1000) + "k", xLabel: "",
+      series: [{ data: S.map((r) => [r.x, -(r.DC + r.DW)]), color: P.dim, width: 1.6, dash: [5, 4] }, { data: S.map((r) => [r.x, -r.up]), color: P.accent, width: 2.4 }, { data: S.map((r) => [r.x, -r.un]), color: P.accent2, width: 2.4 }],
+      hlines: [{ y: 0, color: P.axis, dash: [] }], vlines: [{ x: gx(), color: P.warn }, { x: 40, color: P.faint, dash: [2, 3] }, { x: 90, color: P.faint, dash: [2, 3] }] });
+    const r = S[Math.round(gx() / 2.5)];
+    [[r.up, P.accent], [r.un, P.accent2]].forEach(([v, col]) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(c.X(r.x), c.Y(-v), 4, 0, Math.PI * 2); ctx.fill(); });
+    BL.text(ctx, "초록: 최대 · 주황: 최소 · 점선: DC + DW", w - 16, h - 10, P.dim, { align: "right", size: 10.5, sans: true, bold: false });
+    BL.text(ctx, "x (m)", 64, h - 10, P.dim, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.52), minHeight: 300, maxHeight: 420 });
+  upd();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>거더교와 바닥판 · CivilBook</title>
+<meta name="description" content="가장 흔한 다리를 설계 순서대로 계산한다. 강합성 거더의 합성 전·후 단계 응력, 유효 폭, 레버 룰과 쿠르봉 횡분배, B-130 연속교의 이동 하중 모멘트 포락선과 부모멘트 구간, 바닥판의 단위 폭 설계, 박스 거더의 비틀림, PSC 거더와 거더 높이를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .gd-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); line-height: 1.7; overflow-wrap: anywhere; }
+  .gd-msg b { color: var(--text); }
+  .gd-msg .ok { color: var(--ok); font-weight: 600; }
+  .gd-msg .bad { color: var(--bad); font-weight: 600; }
+  .gd-msg .warn { color: var(--warn); font-weight: 600; }
+  .gd-steps { margin: 6px 0 0; }
+  .gd-steps li { margin: 4px 0; }
+  .gd-tbl td, .gd-tbl th { font-variant-numeric: tabular-nums; }
+  #gd-cv-lat { touch-action: pan-y; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="civil"></script>
+</head>
+<body data-chapter="girders">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="gd-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="gd-ah-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="gd-ah-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="gd-ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="gd-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--tension)"/></marker>
+      <marker id="gd-ah-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--compression)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 03</div>
+    <h1 data-no-glossary>거더교와 바닥판</h1>
+    <p class="lead">2장에서 트럭이 다리를 건너갈 때 생기는 최대 효과를 영향선으로 찾았습니다. 그 효과는 "다리 전체"에 대한 값이었습니다. 실제 다리는 바닥판 한 장과 그 밑의 거더 몇 줄로 되어 있어, 트럭 한 대의 하중을 거더들이 나눠 받고, 거더는 바닥판과 한 몸이 되기 전과 후에 다른 단면으로 하중을 견딥니다. 이 장은 가장 흔한 교량 형식인 <b>거더교</b>를 B-130(3경간 연속 강합성 거더교, 40 + 50 + 40 m)으로 처음부터 계산합니다. 합성 단면의 단계별 응력, 횡분배, 연속교의 모멘트 포락선과 부모멘트 구간, 바닥판의 단위 폭 설계, 편재 하중을 받는 박스 거더의 비틀림까지 이어서 다룹니다.</p>
+    <ul class="objectives">
+      <li>거더교 형식(강 I형·박스, PSC I형·박스, RC 슬래브교)의 단면과 적용 경간을 비교하고, 형식을 고르는 기준을 설명한다.</li>
+      <li>강합성 거더의 유효 폭과 환산 단면(\(n\), \(3n\))을 계산하고, 합성 전 고정하중 → 합성 후 장기 고정하중 → 활하중의 단계별 응력을 누적한다.</li>
+      <li>레버 룰과 쿠르봉(강체 가로 분배)으로 거더별 활하중 분배 계수를 구하고, 탄성 지지 보 모델로 두 방법의 위치를 이해한다.</li>
+      <li>연속교의 영향선으로 트럭·차로 하중의 모멘트 포락선을 그리고, B-130 중앙 경간과 중간 지점의 설계 모멘트를 계산한다.</li>
+      <li>부모멘트 구간에서 균열 단면(강재 + 종방향 철근)의 응력을 계산하고, 바닥판을 단위 폭 띠로 설계한다.</li>
+      <li>편재 하중에서 박스 거더와 개단면 거더의 비틀림 거동 차이를 계산하고, 거더 높이–경간 비의 근거를 최적 높이 식으로 설명한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>트럭 한 대를 거더 네 줄이 어떻게 나누는가</b></div>
+      <div class="o-body"><p>거더가 여러 줄인 다리에서 트럭은 늘 어느 한쪽 차로를 달립니다. 바로 밑의 거더가 하중을 가장 많이 받고, 바닥판과 가로보가 일부를 옆 거더로 넘깁니다. 이 나눔을 정확히 알려면 바닥판과 거더를 판·격자로 함께 풀어야 하지만, 컴퓨터가 없던 시절 그런 계산을 교량마다 할 수는 없었습니다.</p>
+        <p>그래서 미국의 AASHO(지금의 AASHTO) 교량 시방서는 수십 년 동안 내부 거더가 받는 바퀴 하중의 몫을 \(S/5.5\)(S는 피트 단위 거더 간격, 강 거더 위 콘크리트 바닥판, 2차로 이상) 같은 한 줄짜리 식으로 정했습니다. 경간과 강성은 들어 있지 않았습니다. 1990년대 초 NCHRP 12-26 연구가 많은 교량을 격자 해석으로 풀어 경간·거더 간격·강성을 넣은 분배식을 만들었고, 이것이 AASHTO LRFD 시방서(1994 초판)에 들어갔습니다. 이 장의 레버 룰과 쿠르봉 방법은 그 사이를 이어 주는 손계산이고, 탄성 지지 보 모델은 격자 해석의 가장 작은 모형입니다.</p>
+        <div class="o-chain"><span>트럭 · 차로 · 바닥판</span><i>→</i><span class="tool">횡분배 · 영향선 · 합성 단면</span><i>→</i><span>거더별 M · 단계 응력 · 판정</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="types">
+    <h2>거더교의 형식</h2>
+    <div class="problem"><strong>50 m 경간을 건너는 가장 평범한 방법은 무엇인가</strong>
+      <p>B-130은 하천을 40 + 50 + 40 m로 건넙니다. 아치나 케이블을 쓰지 않고 곧은 보를 걸치는 것이 가장 단순합니다. 그런데 보는 강재로 할까요, 콘크리트로 할까요? I형 몇 줄로 할까요, 상자 하나로 할까요?</p></div>
+    <p><span class="term">거더교</span><span class="en">(girder bridge)</span>는 바닥판을 받치는 주된 부재가 휨을 받는 곧은 보(거더)인 교량입니다. 하중은 바닥판 → 거더 → 받침 → 하부 구조로 흐르고, 거더는 MechanicsBook에서 배운 보 그대로 휨모멘트와 전단을 견딥니다. 경간이 짧으면 RC 슬래브 하나로 충분하고, 길어질수록 깊고 가벼운 단면이 필요해 PSC와 강재로 옮겨 갑니다.</p>
+    <figure class="diagram" id="fig-gd-types">
+      <svg viewBox="0 0 860 300" role="img" aria-label="거더교의 다섯 가지 단면 형식: RC 슬래브교, PSC I형 거더, 강 I형 합성 거더, 강 박스 거더, PSC 박스 거더">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g class="t" style="font-weight:700" text-anchor="middle"><text x="95" y="40">RC 슬래브교</text><text x="260" y="40">PSC I형 거더</text><text x="440" y="40">강 I형 합성 거더</text><text x="610" y="40">강 박스 거더</text><text x="770" y="40">PSC 박스 거더</text></g>
+        <!-- RC slab -->
+        <rect x="30" y="120" width="130" height="34" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <line x1="36" y1="148" x2="154" y2="148" style="stroke:var(--tension);stroke-width:2.5"/>
+        <text x="95" y="190" text-anchor="middle" class="t-mono">두께 ≈ L/20</text>
+        <!-- PSC I -->
+        <rect x="185" y="100" width="150" height="16" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <g style="fill:var(--surface-2);stroke:var(--text-dim)">
+          <path d="M200 116 h30 v6 l-9 6 v42 l9 6 v10 h-30 v-10 l9 -6 v-42 l-9 -6z"/>
+          <path d="M290 116 h30 v6 l-9 6 v42 l9 6 v10 h-30 v-10 l9 -6 v-42 l-9 -6z"/>
+        </g>
+        <path d="M206 176 Q215 160 224 176" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+        <path d="M296 176 Q305 160 314 176" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+        <text x="260" y="220" text-anchor="middle" class="t-mono">강선(파랑)·현장 바닥판</text>
+        <!-- steel I composite -->
+        <rect x="360" y="100" width="160" height="16" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <g style="stroke:var(--text);stroke-width:2.6;fill:none">
+          <path d="M380 118 h22 M391 118 v62 M376 180 h30"/><path d="M478 118 h22 M489 118 v62 M474 180 h30"/>
+        </g>
+        <line x1="391" y1="150" x2="489" y2="150" style="stroke:var(--text-dim);stroke-dasharray:4 3"/>
+        <text x="440" y="146" text-anchor="middle" class="t-mono">가로보</text>
+        <g style="stroke:var(--accent-2);stroke-width:1.6"><line x1="388" y1="110" x2="388" y2="117"/><line x1="394" y1="110" x2="394" y2="117"/><line x1="486" y1="110" x2="486" y2="117"/><line x1="492" y1="110" x2="492" y2="117"/></g>
+        <text x="440" y="220" text-anchor="middle" class="t-mono">전단 연결재(주황)</text>
+        <!-- steel box -->
+        <rect x="540" y="100" width="140" height="16" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <path d="M568 118 L580 180 L640 180 L652 118" style="fill:none;stroke:var(--text);stroke-width:2.6"/>
+        <line x1="562" y1="118" x2="574" y2="118" style="stroke:var(--text);stroke-width:2.6"/><line x1="646" y1="118" x2="658" y2="118" style="stroke:var(--text);stroke-width:2.6"/>
+        <text x="610" y="220" text-anchor="middle" class="t-mono">닫힌 단면 → 비틀림 강성</text>
+        <!-- PSC box -->
+        <path d="M700 104 h140 v10 h-26 l-12 66 h-64 l-12 -66 h-26z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <path d="M748 118 h44 l-8 50 h-28z" style="fill:var(--surface);stroke:var(--text-dim)"/>
+        <text x="770" y="220" text-anchor="middle" class="t-mono">FCM·ILM·MSS 가설</text>
+        <g class="t-dim" text-anchor="middle"><text x="95" y="262">약 10–25 m</text><text x="260" y="262">약 20–40 m</text><text x="440" y="262">약 30–80 m</text><text x="610" y="262">약 50–150 m 이상</text><text x="770" y="262">약 50–200 m 이상</text></g>
+        <text x="430" y="284" text-anchor="middle" class="t-mono">경간은 경험적 범위(교육용, 약) — 지형·가설·경제성에 따라 크게 달라진다</text>
+      </svg>
+      <figcaption><b>그림 3-1.</b> 거더교의 대표 단면. 경간이 길어질수록 단면은 깊어지고 속이 비며(I형 → 박스), 재료는 자중이 작은 PSC·강재로 옮겨 간다. 아래 숫자는 흔히 쓰이는 경간 범위의 대략적인 띠로, 기준값이 아니다.</figcaption>
+    </figure>
+    <p>형식을 고르는 주된 기준은 네 가지입니다. ① <b>경간</b>: 휨모멘트는 경간의 제곱에 비례하므로 긴 경간에는 자중이 작고 깊은 단면이 필요합니다. ② <b>가설</b>: 하천·도로 위에서 동바리를 세울 수 없으면 크레인으로 거는 강 거더나 공장 제작 PSC 거더, 또는 캔틸레버로 뻗어 나가는 PSC 박스(FCM)가 유리합니다(1장). ③ <b>평면 선형</b>: 곡선교는 비틀림을 받으므로 닫힌 단면(박스)이 유리합니다. ④ <b>형하 공간과 미관</b>: 거더 높이가 낮을수록 계획 홍수위 위 여유고(15장)를 확보하기 쉽습니다.</p>
+    <div class="table-wrap"><table class="gd-tbl">
+      <thead><tr><th>형식</th><th>주된 장점</th><th>주의할 점</th><th>높이/경간(경험적, 약)</th></tr></thead>
+      <tbody>
+        <tr><td>RC 슬래브교</td><td>단순, 거푸집만으로 시공, 낮은 높이</td><td>자중이 커서 경간이 짧다, 동바리 필요</td><td>1/15–1/25</td></tr>
+        <tr><td>PSC I형 거더교</td><td>공장(또는 현장) 제작 후 거치, 경제적</td><td>단순 경간 위주, 거치 장비, 솟음 관리</td><td>1/15–1/20</td></tr>
+        <tr><td>강 I형 합성 거더교</td><td>가벼워 크레인 가설 쉬움, 연속화 쉬움</td><td>도장·피로·부모멘트 구간 바닥판 균열</td><td>1/20–1/30(강재부)</td></tr>
+        <tr><td>강 박스 거더교</td><td>비틀림 강성, 곡선교, 긴 경간</td><td>제작비, 내부 점검 공간, 국부 좌굴</td><td>1/20–1/30</td></tr>
+        <tr><td>PSC 박스 거더교</td><td>긴 경간 연속, 캔틸레버 가설</td><td>크리프·건조 수축에 따른 장기 처짐</td><td>지점 1/16–1/20, 중앙 1/30–1/50</td></tr>
+      </tbody></table></div>
+    <p>B-130은 경간 50 m, 하천 위, 직선 평면이라 <b>강 I형 거더 4주 + RC 바닥판</b>을 골랐습니다. 하천 위에 <span class="term">동바리</span><span class="en">(shoring)</span>를 세우지 않고 크레인으로 거더를 거치한 뒤, 거더를 거푸집 지지대로 삼아 바닥판을 타설합니다. 이 순서가 다음 절의 "합성 전·후" 계산을 낳습니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="composite">
+    <h2>강합성 거더: 합성 전과 후</h2>
+    <div class="problem"><strong>같은 거더가 두 번 다른 단면으로 일한다</strong>
+      <p>바닥판 콘크리트를 붓는 날, 젖은 콘크리트의 무게는 강 거더만 받습니다. 콘크리트가 굳고 전단 연결재로 묶인 뒤에 올라오는 포장과 트럭은 강재 + 콘크리트 합성 단면이 받습니다. 하부 플랜지의 최종 응력은 한 번의 \(My/I\)로 계산할 수 없습니다. 왜 그럴까요?</p></div>
+    <p>StructureBook 11장의 <a href="../../structure/chapters/composite.html#composite-beam">합성보</a>에서 유효 폭과 환산 단면을 배웠습니다. 교량의 합성 거더는 같은 원리에 두 가지를 더합니다. 하나는 <b>시공 단계</b>입니다. 동바리 없이 시공하면 바닥판 자중은 합성되기 전의 강재 단면에 실리고, 그 응력은 그대로 남습니다. 다른 하나는 <b>시간</b>입니다. 콘크리트는 지속 하중 아래에서 크리프로 더 줄어들어 장기적으로는 덜 단단하므로, 오래 머무는 하중(포장·방호벽)과 잠깐 지나가는 하중(트럭)에 서로 다른 환산 단면을 씁니다.</p>
+    <div class="callout def"><strong>정의 3.1 (합성 작용과 환산 단면)</strong> 강 거더와 콘크리트 바닥판을 <span class="term">전단 연결재</span><span class="en">(shear connector)</span>로 묶어 두 재료가 같은 평면 유지 변형을 하게 만든 것을 <span class="term">합성 작용</span><span class="en">(composite action)</span>이라 한다. 콘크리트 폭을 탄성 계수비 \(n = E_s/E_c\)로 나눈 강재 등가 단면을 <span class="term">환산 단면</span><span class="en">(transformed section)</span>이라 한다. 단기 하중(활하중)에는 \(n\), 크리프가 생기는 지속 하중(합성 후 고정하중)에는 \(3n\)을 쓰는 것이 흔한 형태다(교육용, 현행 KDS 24 확인).
+      <div class="formula">$$n = \frac{E_s}{E_c}, \qquad b_{tr} = \frac{b_e}{n}\ \text{(단기)}, \qquad b_{tr,LT} = \frac{b_e}{3n}\ \text{(장기)}$$<div class="where">\(E_s = 210{,}000\) MPa, \(f_{ck} = 30\) MPa에서 \(E_c \approx 27{,}500\) MPa이므로 \(n \approx 7.6\). 이 장은 \(n = 8\), \(3n = 24\)으로 둔다.</div></div></div>
+    <p>바닥판 중 얼마만큼을 거더의 플랜지로 셀지가 <span class="term">유효 폭</span><span class="en">(effective width)</span>입니다. 바닥판 속 압축 응력은 거더 바로 위에서 크고 거더 사이로 갈수록 작아지는데(<span class="term">전단 지연</span><span class="en">(shear lag)</span>), 이 고르지 않은 분포를 같은 합력을 내는 균일 폭으로 바꾼 것입니다.</p>
+    <figure class="diagram" id="fig-gd-shearlag">
+      <svg viewBox="0 0 860 260" role="img" aria-label="거더 네 줄 위 바닥판의 압축 응력 분포(전단 지연)와 유효 폭">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <rect x="60" y="150" width="740" height="22" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <g style="stroke:var(--text);stroke-width:3;fill:none">
+          <path d="M160 174 v52 M144 174 h32 M140 226 h40"/><path d="M340 174 v52 M324 174 h32 M320 226 h40"/>
+          <path d="M520 174 v52 M504 174 h32 M500 226 h40"/><path d="M700 174 v52 M684 174 h32 M680 226 h40"/>
+        </g>
+        <path d="M60 128 C 100 120, 130 70, 160 66 C 190 70, 230 112, 250 116 C 270 112, 310 70, 340 66 C 370 70, 410 112, 430 116 C 450 112, 490 70, 520 66 C 550 70, 590 112, 610 116 C 630 112, 670 70, 700 66 C 730 70, 770 110, 800 124 L800 148 L60 148 Z" style="fill:var(--compression);opacity:.22;stroke:var(--compression)"/>
+        <rect x="282" y="66" width="116" height="82" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+        <line x1="282" y1="56" x2="398" y2="56" style="stroke:var(--accent)" marker-start="url(#gd-ah-a)" marker-end="url(#gd-ah-a)"/>
+        <text x="340" y="48" text-anchor="middle" class="t-acc">b<tspan baseline-shift="sub" font-size="9">e</tspan></text>
+        <line x1="340" y1="238" x2="520" y2="238" style="stroke:var(--text-dim)" marker-start="url(#gd-ah-d)" marker-end="url(#gd-ah-d)"/>
+        <text x="430" y="234" text-anchor="middle" class="t-mono">거더 간격 S = 2.8 m</text>
+        <text x="610" y="96" text-anchor="middle" class="t-mono" style="fill:var(--compression)">σ(y) 바닥판 압축</text>
+        <text x="40" y="40" class="t-dim">점선 사각형의 면적 = 곡선 아래 면적(한 거더 몫)</text>
+      </svg>
+      <figcaption><b>그림 3-2.</b> 정모멘트를 받는 합성 거더교의 바닥판 압축 응력(빨강). 전단 연결재를 통해 거더 위에서 들어온 힘이 옆으로 퍼지며 작아진다. 유효 폭 \(b_e\)는 같은 합력을 균일 응력으로 내는 폭이다. 거더 간격이 경간에 비해 작으면 \(b_e\)는 거의 거더 간격과 같다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 3.2 (교량 합성 거더의 유효 폭, 형태)</strong> 과거 AASHTO 기준은 내부 거더의 유효 폭을 다음 중 작은 값으로 두었다.
+      <div class="formula">$$b_e = \min\!\left(\frac{L_{eff}}{4},\ 12t_s + \frac{b_f}{2},\ S\right)$$<div class="where">\(L_{eff}\): 유효 경간(연속교에서는 반곡점 사이 거리 형태), \(t_s\): 바닥판 두께, \(b_f\): 상부 플랜지 폭, \(S\): 거더 간격. 현행 AASHTO LRFD는 보통의 거더 간격에서 내부 거더에 기여 폭 \(S\)를 그대로 쓰는 형태로 바뀌었다. 외측 거더는 내부 쪽 \(S/2\)에 캔틸레버 길이를 더한다. KDS 24 계열의 현행 규정을 확인할 것.</div></div></div>
+    <p>B-130의 내부 거더는 \(L_{eff}/4 \approx 0.7 \times 50/4 = 8.75\) m, \(12t_s + b_f/2 = 12 \times 0.24 + 0.2 = 3.08\) m, \(S = 2.8\) m이므로 어느 형태로 보든 \(b_e = 2.8\) m입니다. 외측 거더 G1은 \(1.4 + 1.3 = 2.7\) m로 거의 같아, 이 장은 네 거더 모두 \(b_e = 2.8\) m로 둡니다.</p>
+    <div class="callout def"><strong>원리 3.3 (단계별 응력의 누적)</strong> 동바리 없이 시공한 합성 거더의 한 점의 응력은 각 하중이 실릴 때의 단면으로 따로 계산해 더한다.
+      <div class="formula">$$\sigma = \frac{M_{D1}\,y_s}{I_s} + \frac{M_{D2}\,y_{3n}}{I_{3n}} + \frac{M_{L}\,y_{n}}{I_{n}}, \qquad \sigma_c = \frac{M_{D2}\,y_{3n}}{3n\,I_{3n}} + \frac{M_L\,y_n}{n\,I_n}$$<div class="where">\(M_{D1}\): 합성 전 고정하중(강재 자중 + 젖은 바닥판), 강재 단면 \(I_s\). \(M_{D2}\): 합성 후 고정하중(방호벽·보도·포장), 장기 환산 단면 \(I_{3n}\). \(M_L\): 활하중(충격 포함), 단기 환산 단면 \(I_n\). \(y\)는 각 단면의 중립축에서 잰 거리로, 세 중립축은 서로 다르다. 콘크리트 응력 \(\sigma_c\)는 합성 뒤 하중만 만든다.</div></div></div>
+    <figure class="diagram" id="fig-gd-stages">
+      <svg viewBox="0 0 860 330" role="img" aria-label="합성 전 강재 단면, 장기 합성 단면, 단기 합성 단면의 응력 분포와 그 합">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g class="t" style="font-weight:700" text-anchor="middle"><text x="110" y="38">단면</text><text x="290" y="38">① 합성 전 D1</text><text x="450" y="38">② 장기 3n D2</text><text x="610" y="38">③ 단기 n 활하중</text><text x="770" y="38">합</text></g>
+        <!-- section -->
+        <rect x="50" y="60" width="120" height="26" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <g style="stroke:var(--text);stroke-width:3;fill:none"><path d="M96 94 h28 M110 94 v196 M92 290 h36"/></g>
+        <line x1="40" y1="190" x2="830" y2="190" style="stroke:var(--text-faint);stroke-dasharray:2 4"/>
+        <g class="t-mono"><text x="176" y="196">y<tspan baseline-shift="sub" font-size="8">s</tspan></text></g>
+        <!-- stage 1: steel only, NA at 190 -->
+        <line x1="290" y1="60" x2="290" y2="300" class="s-axis"/>
+        <path d="M290 94 L248 94 L332 290 L290 290 Z" style="fill:none;stroke:none"/>
+        <path d="M290 94 L246 94 L290 190 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+        <path d="M290 190 L330 290 L290 290 Z" style="fill:var(--tension);opacity:.3;stroke:var(--tension)"/>
+        <text x="298" y="80" class="t-mono">콘크리트 0</text>
+        <line x1="240" y1="190" x2="340" y2="190" style="stroke:var(--warn);stroke-width:1.5"/>
+        <!-- stage 2: NA at ~150 -->
+        <line x1="450" y1="60" x2="450" y2="300" class="s-axis"/>
+        <path d="M450 60 L440 60 L442 86 L450 86 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+        <path d="M450 94 L438 94 L450 150 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+        <path d="M450 150 L480 290 L450 290 Z" style="fill:var(--tension);opacity:.3;stroke:var(--tension)"/>
+        <line x1="420" y1="150" x2="500" y2="150" style="stroke:var(--warn);stroke-width:1.5"/>
+        <!-- stage 3: NA at ~110 -->
+        <line x1="610" y1="60" x2="610" y2="300" class="s-axis"/>
+        <path d="M610 60 L572 60 L582 86 L610 86 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+        <path d="M610 94 L604 94 L610 110 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+        <path d="M610 110 L700 290 L610 290 Z" style="fill:var(--tension);opacity:.3;stroke:var(--tension)"/>
+        <line x1="580" y1="110" x2="680" y2="110" style="stroke:var(--warn);stroke-width:1.5"/>
+        <text x="618" y="104" class="t-mono" style="fill:var(--warn)">중립축이 올라간다</text>
+        <!-- sum -->
+        <line x1="770" y1="60" x2="770" y2="300" class="s-axis"/>
+        <path d="M770 60 L728 60 L736 86 L770 86 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+        <path d="M770 94 L708 94 L770 168 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+        <path d="M770 168 L842 290 L770 290 Z" style="fill:var(--tension);opacity:.3;stroke:var(--tension)"/>
+        <text x="680" y="316" class="t-mono">하부 플랜지 = ① + ② + ③ (각각 다른 I와 y)</text>
+      </svg>
+      <figcaption><b>그림 3-3.</b> 동바리 없이 시공한 합성 거더의 단계별 응력(정모멘트, 압축 빨강·인장 파랑). ① 합성 전에는 강재 단면만 일해 상부 플랜지가 크게 눌린다. ② 합성 후 지속 하중은 \(3n\) 단면, ③ 활하중은 \(n\) 단면이 받는다. 중립축은 단계마다 위로 올라가므로 합(오른쪽)은 직선이 아니다. 동바리를 두고 시공하면 ①의 하중도 합성 단면이 받아 강재 응력이 줄지만, 하천 위에서는 동바리가 어렵다.</figcaption>
+    </figure>
+    <p>아래 시뮬레이터는 B-130 중앙 경간 한가운데(\(x = 65\) m)의 외측 거더 G1입니다. 단면 치수와 \(n\)을 바꾸면 세 환산 단면과 중립축이 다시 계산되고, 단계 모멘트(고정하중은 아래 표의 단위 하중 계수, 활하중은 4절의 포락선과 3절의 분배 계수)로 응력이 누적됩니다.</p>
+    <div class="sim" id="sim-gd-composite">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>합성 단면 계산기: 세 단면, 세 단계의 응력</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gd-cv-comp" aria-label="강합성 거더 단면과 합성 전·장기·단기 단계별 응력 분포"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>바닥판 두께 t<sub>s</sub></span> <output id="gd-cp-ts-out"></output></span><input type="range" id="gd-cp-ts" min="180" max="320" step="10" value="240"></label>
+          <label class="ctrl"><span><span>유효 폭 b<sub>e</sub></span> <output id="gd-cp-be-out"></output></span><input type="range" id="gd-cp-be" min="1000" max="3600" step="100" value="2800"></label>
+          <label class="ctrl"><span>하부 플랜지 두께 <output id="gd-cp-tb-out"></output></span><input type="range" id="gd-cp-tb" min="16" max="60" step="2" value="28"></label>
+          <label class="ctrl"><span>상부 플랜지 두께 <output id="gd-cp-tt-out"></output></span><input type="range" id="gd-cp-tt" min="14" max="50" step="2" value="22"></label>
+          <div class="ctrl"><span>탄성 계수비 n</span><div class="seg" id="gd-cp-n"><button data-value="6">6</button><button data-value="7">7</button><button data-value="8" class="on">8</button><button data-value="10">10</button></div></div>
+          <div class="ctrl"><span>시공</span><div class="seg" id="gd-cp-shore"><button data-value="0" class="on">무동바리</button><button data-value="1">동바리</button></div></div>
+          <label class="ctrl"><span>활하중 분배 계수 <output id="gd-cp-df-out"></output></span><input type="range" id="gd-cp-df" min="0.4" max="1.2" step="0.01" value="0.90"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">I<sub>s</sub> · I<sub>3n</sub> · I<sub>n</sub> (10¹⁰ mm⁴)</span><span class="v" id="gd-cp-i">—</span></div>
+        <div class="stat"><span class="k">M<sub>D1</sub> · M<sub>D2</sub> · M<sub>L</sub> (kN·m)</span><span class="v" id="gd-cp-m">—</span></div>
+        <div class="stat"><span class="k">하부 플랜지 σ (MPa)</span><span class="v" id="gd-cp-sb">—</span></div>
+        <div class="stat"><span class="k">상부 플랜지 · 바닥판 상단</span><span class="v" id="gd-cp-st">—</span></div>
+        <div class="stat"><span class="k">M<sub>u</sub> / M<sub>p</sub></span><span class="v" id="gd-cp-mp">—</span></div>
+      </div>
+      <div class="gd-msg" id="gd-cp-msg">—</div>
+      <div class="sim-note">해볼 것: 동바리로 바꾸면 하부 플랜지 응력이 얼마나 줄어드는지 보세요(합성 전 단계가 없어진다) · 바닥판을 두껍게 하면 I<sub>n</sub>은 커지지만 D1(젖은 콘크리트)도 커집니다 · n을 6에서 10으로 바꿔도 하부 플랜지 응력이 크게 변하지 않는 이유를 생각해 보세요 · 모델: 탄성 환산 단면(<code>CB.section.rects</code>, 콘크리트 폭 b<sub>e</sub>/n·b<sub>e</sub>/3n), 헌치 60 mm는 콘크리트로 세지 않음, 강재 자중 × 1.15(보강재·가로보), 고정하중 모멘트는 B-130 연속보(<code>CB.beam</code>)의 x = 65 m 계수 107.07 × w, 활하중은 4절 포락선(1차로 5,318 kN·m, 트럭 단독과 트럭 75 % + 차로 중 큰 값) × 분배 계수. 판정: 사용 하중 형태 σ<sub>D1</sub> + σ<sub>D2</sub> + 1.3σ<sub>L</sub> ≤ 0.95F<sub>y</sub>, M<sub>u</sub> = 1.25DC + 1.5DW + 1.8LL(KDS 형태), M<sub>p</sub>는 콘크리트 0.85f<sub>ck</sub>·강재 F<sub>y</sub>의 소성 중립축. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 3.1 (B-130 G1 경간 중앙의 단계 응력)</strong> 강 거더 상부 플랜지 400 × 22, 복부 2,150 × 16, 하부 플랜지 500 × 28 mm(높이 2,200 mm, SM355), 헌치 60 mm, 바닥판 240 mm, \(b_e = 2.8\) m, \(n = 8\). 단위 등분포 하중 1 kN/m이 B-130 전체에 실리면 \(x = 65\) m의 휨모멘트는 107.07 kN·m다(<code>CB.beam</code>).
+      <ol class="gd-steps">
+        <li><b>단면 성질.</b> 강재: \(A = 57{,}200\) mm², 아래에서 중립축 \(y_b = 1{,}003.5\) mm, \(I_s = 3.967 \times 10^{10}\) mm⁴. \(3n = 24\): \(y_b = 1{,}455.9\) mm, \(I_{3n} = 7.542 \times 10^{10}\). \(n = 8\): \(y_b = 1{,}822.4\) mm, \(I_n = 10.454 \times 10^{10}\) mm⁴. 합성으로 \(I\)가 2.6배가 되고 중립축이 강재 상단(2,200 mm) 가까이 올라간다.</li>
+        <li><b>하중(거더 한 줄).</b> D1 = 강재 \(0.0572 \times 78.5 \times 1.15 = 5.16\) + 바닥판 \(2.8 \times 0.24 \times 25 = 16.8\) + 헌치 0.6 = <b>22.6 kN/m</b>. D2 = 방호벽·보도 3.0(DC2) + 포장 약 70 mm 4.4(DW) = 7.4 kN/m. 네 거더를 합하면 고정하중 약 120 kN/m(DC 약 102, DW 약 18)로 2·6장의 B-130 값과 같다. 활하중은 4절의 1차로 값 \(\max(4{,}100,\ 0.75 \times 4{,}100 + 2{,}243) = 5{,}318\) kN·m에 G1의 분배 계수 0.90(3절)을 곱한다.</li>
+        <li><b>모멘트.</b> \(M_{D1} = 107.07 \times 22.6 = 2{,}416\), \(M_{D2} = 107.07 \times 7.4 = 792\), \(M_L = 0.90 \times 5{,}318 = 4{,}786\) kN·m.</li>
+        <li><b>하부 플랜지.</b> \(2{,}416 \times 10^6 \times 1{,}003.5/3.967 \times 10^{10} = 61.1\) + \(792 \times 10^6 \times 1{,}455.9/7.542 \times 10^{10} = 15.3\) + \(4{,}786 \times 10^6 \times 1{,}822.4/10.454 \times 10^{10} = 83.4\) → <b>159.8 MPa</b>(인장). 같은 합 모멘트 7,995 kN·m를 \(I_n\) 하나로 계산하면 139.4 MPa로 <b>13 % 작게</b> 나온다.</li>
+        <li><b>상부 플랜지와 바닥판.</b> 상부 플랜지 −72.9 − 7.8 − 17.3 = −98.0 MPa(압축, 그중 74 %가 시공 중에 생긴다). 바닥판 상단 \(-792 \times 10^6 \times 1{,}044/(24 \times 7.542 \times 10^{10}) - 4{,}786 \times 10^6 \times 678/(8 \times 10.454 \times 10^{10}) = -0.5 - 3.9 = -4.3\) MPa.</li>
+        <li><b>판정(형태).</b> 사용 하중 \(61.1 + 15.3 + 1.3 \times 83.4 = 184.9 \le 0.95F_y = 337\) MPa → <span style="color:var(--ok)">만족</span>. 계수 모멘트 \(M_u = 1.25(2{,}416 + 321) + 1.5 \times 471 + 1.8 \times 4{,}786 = 12{,}744\) kN·m, <span class="term">소성 모멘트</span><span class="en">(plastic moment)</span> \(M_p = 27{,}362\) kN·m(소성 중립축은 강재 상단 아래 11 mm) → \(M_u/M_p = 0.47\).</li>
+      </ol>
+      정모멘트 강도에는 여유가 크다. 이 단면을 정하는 것은 시공 중 상부 플랜지(합성 전, 바닥판이 없어 옆으로 좌굴하기 쉬운 압축 플랜지)와 지점부의 부모멘트, 피로다. 모든 기준값은 형태이며 현행 KDS 24 14 31(강교) 계열을 확인한다.</div>
+    <div class="callout warn"><strong>시공 순서가 응력을 바꾼다</strong> 바닥판을 한 번에 붓지 않고 경간 중앙부를 먼저, 지점부를 나중에 타설하는 경우가 많습니다. 먼저 굳은 중앙부가 합성되어 나중 타설 하중의 일부를 합성 단면으로 받고, 지점부 바닥판이 부모멘트 인장을 덜 받게 하려는 것입니다. 이 장의 계산은 "한 번에 타설"로 단순화했습니다. 실제 설계는 타설 순서마다 단면과 경계 조건을 바꿔 가며 누적합니다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="distribution">
+    <h2>횡분배: 거더별 몫</h2>
+    <div class="problem"><strong>트럭이 G1 쪽 차로를 달릴 때 G1은 트럭의 몇 대분을 받는가</strong>
+      <p>2장의 영향선 계산은 "차로 하나"의 효과입니다. B-130에는 거더가 4줄 있습니다. 트럭 한 대가 지나가면 한 거더가 다 받을까요, 넷이 4분의 1씩 받을까요? 둘 다 아닙니다.</p></div>
+    <p>거더 하나가 받는 활하중 효과를 "차로 하중(트럭 + 차로 하중) 몇 개분"으로 나타낸 것이 <span class="term">분배 계수</span><span class="en">(distribution factor)</span>입니다. 거더 설계 모멘트는 \(M_{L,girder} = DF \times M_{L,lane}\)입니다. 분배는 바닥판과 <span class="term">가로보</span><span class="en">(cross beam)</span>가 하중을 옆으로 넘기는 정도, 곧 <b>가로 방향 강성과 거더 강성의 비</b>에 달려 있습니다. 두 극단부터 봅니다.</p>
+    <figure class="diagram" id="fig-gd-lever">
+      <svg viewBox="0 0 860 330" role="img" aria-label="B-130 횡단면에서 레버 룰과 쿠르봉 방법의 하중 분배 비교">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <text x="30" y="38" class="t" style="font-weight:700">B-130 횡단면(교육용 배치)</text>
+        <!-- deck: y -5.5..5.5 -> x 100..760 (60 px/m) -->
+        <rect x="100" y="96" width="660" height="16" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="100" y="70" width="30" height="26" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="610" y="88" width="120" height="8" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="730" y="66" width="30" height="30" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <text x="670" y="82" text-anchor="middle" class="t-mono">보도 2.0 m</text>
+        <g style="stroke:var(--text);stroke-width:3;fill:none">
+          <path d="M178 114 v70 M168 114 h20 M164 184 h28"/><path d="M346 114 v70 M336 114 h20 M332 184 h28"/>
+          <path d="M514 114 v70 M504 114 h20 M500 184 h28"/><path d="M682 114 v70 M672 114 h20 M668 184 h28"/>
+        </g>
+        <g class="t-mono" text-anchor="middle"><text x="178" y="202">G1</text><text x="346" y="202">G2</text><text x="514" y="202">G3</text><text x="682" y="202">G4</text></g>
+        <line x1="130" y1="58" x2="610" y2="58" style="stroke:var(--text-dim)" marker-start="url(#gd-ah-d)" marker-end="url(#gd-ah-d)"/>
+        <text x="370" y="52" text-anchor="middle" class="t-mono">차도 8.0 m (설계 차로 2 × 3.6 m)</text>
+        <line x1="178" y1="222" x2="346" y2="222" style="stroke:var(--text-dim)" marker-start="url(#gd-ah-d)" marker-end="url(#gd-ah-d)"/>
+        <text x="262" y="236" text-anchor="middle" class="t-mono">S = 2.8 m</text>
+        <line x1="100" y1="222" x2="178" y2="222" style="stroke:var(--text-dim)" marker-start="url(#gd-ah-d)" marker-end="url(#gd-ah-d)"/>
+        <text x="139" y="236" text-anchor="middle" class="t-mono">1.3</text>
+        <!-- wheels at y=-4.4 (x=166) and -2.6 (x=274) -->
+        <g style="stroke:var(--accent-2);stroke-width:2.4"><line x1="166" y1="66" x2="166" y2="92" marker-end="url(#gd-ah-ld)"/><line x1="274" y1="66" x2="274" y2="92" marker-end="url(#gd-ah-ld)"/></g>
+        <text x="220" y="80" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">0.5 · 0.5</text>
+        <!-- lever rule FBD -->
+        <text x="30" y="262" class="t" style="font-weight:700">레버 룰</text>
+        <text x="110" y="262" class="t-dim">G1–G2 사이를 단순보로 끊는다 → G1 = 0.5(1 + 0.2/2.8) + 0.5(1.2/2.8) = 0.75</text>
+        <text x="30" y="290" class="t" style="font-weight:700">쿠르봉</text>
+        <text x="110" y="290" class="t-dim">가로 방향이 강체 → R<tspan baseline-shift="sub" font-size="8">i</tspan> = 1/4 + e·y<tspan baseline-shift="sub" font-size="8">i</tspan>/Σy² → G1 = 0.625(같은 트럭)</text>
+        <text x="110" y="310" class="t-mono">바퀴 위치 y = −4.4, −2.6 m(교량 중심에서), 거더 y = ±1.4, ±4.2 m, Σy² = 39.2 m²</text>
+      </svg>
+      <figcaption><b>그림 3-4.</b> B-130의 교육용 횡단면 배치(교폭 11.0 m, 거더 4주 @ 2.8 m, 캔틸레버 1.3 m, 왼쪽 방호벽 0.5 m, 차도 8.0 m, 오른쪽 보도 2.0 m와 난간 0.5 m)와 G1에 가장 불리한 트럭 한 대(바퀴 중심이 차로 끝에서 0.6 m). 레버 룰은 G1을 0.75, 쿠르봉은 0.625로 준다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 3.4 (레버 룰)</strong> <span class="term">레버 룰</span><span class="en">(lever rule)</span>은 바닥판을 거더 위에서 끊어 이웃 거더 사이의 단순보(바깥쪽은 캔틸레버)로 보고, 바퀴 하중을 정역학으로 거더에 나눈다. 거더 \(i\)와 \(i+1\) 사이 거리 \(a\)에 있는 바퀴 \(P\)는
+      <div class="formula">$$R_i = P\,\frac{S - a}{S}, \qquad R_{i+1} = P\,\frac{a}{S}$$<div class="where">가로 방향 강성이 거더보다 아주 작은 극단(바닥판이 거의 힌지처럼 일함)에 해당한다. 외측 거더에 흔히 쓰고, 내부 거더에는 보수적(크게)인 값을 준다.</div></div></div>
+    <div class="callout def"><strong>원리 3.5 (쿠르봉 방법, 강체 가로 분배)</strong> <span class="term">쿠르봉 방법</span><span class="en">(Courbon's method)</span>에서는 가로보·바닥판이 가로 방향으로 강체처럼 움직인다고 보므로, 거더들의 처짐은 단면 위에서 직선이고 거더 강성이 같을 때 거더 \(i\)의 몫은
+      <div class="formula">$$R_i = \frac{P}{N_g} + \frac{P\,e\,y_i}{\sum_j y_j^2}$$<div class="where">\(N_g\): 거더 수, \(e\): 교량 중심에서 하중의 편심, \(y_i\): 거더 \(i\)의 위치. 기둥 군에 편심 하중이 걸릴 때의 식과 같다. 가로보가 촘촘하고 경간이 폭에 비해 길수록(가로 방향이 상대적으로 단단할수록) 맞는다.</div></div></div>
+    <p>실제 교량은 두 극단 사이에 있습니다. 아래 시뮬레이터의 세 번째 막대는 바닥판 띠를 <b>거더 위치의 스프링 위에 놓인 연속보</b>로 푼 것입니다(<code>CB.beam</code>의 스프링 지점). 스프링 강성은 거더 처짐 강성, 연속보의 휨 강성은 가로 방향 강성이며, 그 비 \(\alpha = EI_t/(kS^3)\)를 키우면 쿠르봉에, 줄이면 강체 지점 위 연속보(레버 룰에 가까운 값)에 다가갑니다. 이것이 격자 해석의 가장 작은 모형입니다.</p>
+    <div class="sim" id="sim-gd-lateral">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>횡분배: 트럭을 끌어 거더별 몫 보기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gd-cv-lat" aria-label="B-130 횡단면 위의 트럭 바퀴와 거더별 분배 막대. 트럭을 좌우로 끌 수 있다"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>재하 차로 수</span><div class="seg" id="gd-lt-nl"><button data-value="1" class="on">1차로(m 1.2)</button><button data-value="2">2차로(m 1.0)</button></div></div>
+          <label class="ctrl"><span>가로 방향 강성비 α <output id="gd-lt-a-out"></output></span><input type="range" id="gd-lt-a" min="-3" max="3" step="0.05" value="0.33"></label>
+          <div class="ctrl"><span>최악 위치 찾기</span><div class="btn-row"><button class="btn" id="gd-lt-w1">G1 · 레버</button><button class="btn" id="gd-lt-w1c">G1 · 쿠르봉</button><button class="btn" id="gd-lt-w2">G2 · 쿠르봉</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">G1 레버 · 쿠르봉 · 탄성</span><span class="v" id="gd-lt-g1">—</span></div>
+        <div class="stat"><span class="k">G2 레버 · 쿠르봉 · 탄성</span><span class="v" id="gd-lt-g2">—</span></div>
+        <div class="stat"><span class="k">합(검산, 트럭 수)</span><span class="v" id="gd-lt-sum">—</span></div>
+        <div class="stat"><span class="k">바퀴 위치 y (m)</span><span class="v" id="gd-lt-y">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 트럭(주황 바퀴 한 쌍)을 끌어 G1 바로 위에 올려 보세요 · α를 크게 하면 탄성 막대가 쿠르봉에, 작게 하면 레버 룰 쪽으로 갑니다 · 2차로에서 G2를 최악으로 만드는 위치가 G1의 최악 위치와 다른 것을 확인하세요 · 모델: 바퀴 두 줄 1.8 m 간격, 각 0.5(트럭 1대 = 1), 설계 차로 3.6 m를 차도 안에 놓고 바퀴는 차로 끝에서 0.6 m 이상(AASHTO 형태), 다차로 재하 계수 m = 1.2(1차로)·1.0(2차로)(AASHTO 형태, KDS 확인). 분배 계수 = m × 거더 몫. 탄성 모델은 길이 11 m 바닥판 띠를 거더 위 스프링(k) 4개에 놓은 연속보(<code>CB.beam</code>), α = EI<sub>t</sub>/(kS³), 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 3.2 (B-130 외측 거더 G1의 분배 계수)</strong>
+      <ol class="gd-steps">
+        <li><b>1차로, 레버 룰.</b> 바퀴를 G1 쪽으로 최대한 붙이면 바퀴 \(y = -4.4\)(G1 바깥 0.2 m), \(-2.6\)(G1에서 1.6 m). G1 몫 \(= 0.5(1 + 0.2/2.8) + 0.5(1.2/2.8) = 0.536 + 0.214 = 0.750\). <span class="term">다차로 재하 계수</span><span class="en">(multiple presence factor)</span> 1.2를 곱해 <b>DF = 0.90</b>.</li>
+        <li><b>2차로, 쿠르봉.</b> 두 번째 차로의 트럭은 바퀴 \(y = -0.8, 1.0\). 바퀴마다 \(0.5(1/4 + y\,y_{G1}/\Sigma y^2)\)를 더하면 G1 몫 = 0.5[(0.25 + 0.471) + (0.25 + 0.279) + (0.25 + 0.086) + (0.25 − 0.107)] = 0.864, m = 1.0 → DF = 0.86.</li>
+        <li><b>판정.</b> 외측 거더는 두 값 중 큰 <b>0.90</b>을 쓴다(레버 룰 1차로가 지배). 예제 3.1과 4절의 B-130 계산이 이 값을 쓴다.</li>
+      </ol>
+      내부 거더 G2는 쿠르봉 2차로가 0.62, 레버 룰 2차로가 0.96으로 크게 다르다. 레버 룰은 내부 거더에서 바닥판의 연속성을 버려 지나치게 보수적이다. 그래서 기준은 내부 거더에 격자 해석에서 얻은 경험식을 쓴다(아래 심화).</div>
+    <div class="callout deep"><strong>심화: AASHTO LRFD의 내부 거더 분배식(형태)</strong> 콘크리트 바닥판 위 강·PSC 거더의 내부 거더, 2차로 이상 재하에서 휨모멘트 분배 계수는 다음 형태다(SI, 현행 판 확인).
+      <div class="formula">$$DF = 0.075 + \left(\frac{S}{2900}\right)^{0.6}\left(\frac{S}{L}\right)^{0.2}\left(\frac{K_g}{L\,t_s^3}\right)^{0.1}, \qquad K_g = n\,(I + A e_g^2)$$<div class="where">\(S\), \(L\), \(t_s\)는 mm, \(e_g\)는 강재 도심과 바닥판 도심 사이 거리. B-130(\(S = 2{,}800\), \(L = 50{,}000\), \(t_s = 240\), \(I = 3.967 \times 10^{10}\), \(A = 57{,}200\), \(e_g = 1{,}376\) mm, \(n = 8\))에서 \(K_g = 1.18 \times 10^{12}\) mm⁴, DF ≈ 0.075 + 0.979 × 0.562 × 1.055 ≈ <b>0.66</b>. 쿠르봉 0.62와 가깝다. 다차로 계수는 이 식 안에 이미 들어 있는 것으로 본다.</div></div></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="continuous">
+    <h2>연속교의 모멘트 포락선</h2>
+    <div class="problem"><strong>B-130의 어느 단면이 어떤 트럭 위치에서 가장 큰 모멘트를 받는가</strong>
+      <p>단순교라면 영향선이 삼각형이라 트럭을 경간 가운데 근처에 두면 됩니다. 연속교의 영향선은 곡선이고 이웃 경간에서 부호가 바뀝니다. 한 단면의 최대 정모멘트와 최대 부모멘트는 서로 다른 재하에서 생기고, 단면마다 그 위치가 다릅니다.</p></div>
+    <p>2장에서 <span class="term">영향선</span><span class="en">(influence line)</span>과 트럭 주사(<code>CB.civ.truckScan</code>)를 배웠습니다. 연속교에서는 MechanicsBook 6장의 <a href="../../mechanics/chapters/influence.html#continuous">뮐러–브레슬라우 원리</a>대로 영향선이 매끄러운 곡선이 되고, 단위 하중을 한 칸씩 옮기며 <code>CB.beam</code>을 풀면 수치로 얻을 수 있습니다. 모든 단면에서 트럭과 차로 하중을 가장 불리하게 놓아 얻은 최대·최소 모멘트를 이은 곡선이 <span class="term">모멘트 포락선</span><span class="en">(moment envelope)</span>입니다.</p>
+    <div class="callout def"><strong>원리 3.6 (영향선으로 구하는 연속교의 활하중 효과)</strong> 단면 \(x\)의 휨모멘트 영향선을 \(\eta_x(\xi)\)라 하면
+      <div class="formula">$$T^{\pm}(x) = \operatorname*{max/min}_{\text{트럭 위치}} \sum_k P_k\,\eta_x(\xi_k)\,(1 + IM), \qquad W^{\pm}(x) = w_L \int_{\pm\eta_x \gt 0} \eta_x\,d\xi$$ $$M^{+}(x) = \max\left(T^{+},\ 0.75\,T^{+} + W^{+}\right), \qquad M^{-}(x) = \min\left(T^{-},\ 0.75\,T^{-} + W^{-}\right)$$<div class="where">\(P_k\), \(\xi_k\): 트럭 축하중과 위치(두 방향 주행 모두), \(w_L = 12.7\) kN/m: 차로 하중(형태). 차로 하중은 영향선이 같은 부호인 구간에만 깐다(2장). 충격 \(IM = 15/(40 + L)\)(교육용 형태)은 트럭에만 곱하고, \(L\)은 그 단면이 속한 경간(지점 단면은 이웃 두 경간의 평균). 트럭 단독과 "트럭 75 % + 차로 하중" 중 큰 쪽을 쓰는 것은 2장과 같은 KL-510 형태(교육용)이며, 조합 방식은 기준마다 다르므로 현행 KDS 24 12 21을 확인한다.</div></div></div>
+    <div class="sim" id="sim-gd-envelope">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-130 모멘트 포락선: 트럭이 건너가는 동안</h3></div>
+      <div class="sim-body">
+        <div class="sim-view"><canvas id="gd-cv-env" aria-label="B-130 입면의 트럭 위치와, 아래 그래프의 모멘트 포락선과 선택한 단면의 영향선"></canvas></div>
+      </div>
+      <div class="sim-controls" style="padding:12px 18px">
+        <label class="ctrl"><span>단면 위치 x <output id="gd-ev-x-out"></output></span><input type="range" id="gd-ev-x" min="0" max="130" step="0.5" value="65"></label>
+        <label class="ctrl"><span>트럭 앞축 위치 <output id="gd-ev-t-out"></output></span><input type="range" id="gd-ev-t" min="0" max="142" step="0.5" value="70"></label>
+        <div class="ctrl"><span>분배 계수</span><div class="seg" id="gd-ev-df"><button data-value="1">1차로 그대로</button><button data-value="0.90" class="on">G1 0.90</button><button data-value="0.62">G2 0.62</button></div></div>
+        <div class="ctrl"><span>그래프</span><div class="seg" id="gd-ev-view"><button data-value="ll" class="on">활하중 포락선</button><button data-value="tot">고정 + 활하중</button></div></div>
+        <div class="btn-row"><button class="btn" id="gd-ev-play">▶ 트럭 주행</button><button class="btn" id="gd-ev-max">이 단면 최대 위치로</button></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">M<sup>+</sup> 활하중 (kN·m)</span><span class="v" id="gd-ev-mp">—</span></div>
+        <div class="stat"><span class="k">M<sup>−</sup> 활하중 (kN·m)</span><span class="v" id="gd-ev-mn">—</span></div>
+        <div class="stat"><span class="k">고정 D1 · D2</span><span class="v" id="gd-ev-md">—</span></div>
+        <div class="stat"><span class="k">지금 트럭의 M(x)</span><span class="v" id="gd-ev-now">—</span></div>
+        <div class="stat"><span class="k">IM · 경간</span><span class="v" id="gd-ev-im">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: x를 40 m(중간 지점)로 옮기고 영향선이 세 경간에서 부호를 바꾸는 모양을 보세요 · 트럭 주행 중 선택 단면의 모멘트가 양에서 음으로 바뀌는 순간을 찾으세요 · 경간 중앙의 최대값을 주는 트럭 위치는 중앙이 아니라 무거운 축들이 중앙 근처에 오는 위치입니다 · 모델: 단위 하중을 0.5 m 간격으로 옮기며 <code>CB.beam</code>(EI 일정, 받침 4개)을 풀어 영향선 행렬을 만들고, 트럭(<code>CB.civ.TRUCK</code>)은 두 방향으로 0.25 m씩 <code>CB.civ.truckScan</code>, 차로 하중 12.7 kN/m는 같은 부호 구간 적분, 1차로 값 = max(트럭 × (1 + IM), 0.75 × 트럭 × (1 + IM) + 차로)(2장과 같은 KL-510 형태). 고정하중 D1 22.6, D2 7.4 kN/m(거더 한 줄, 교량 전체 약 120 kN/m). 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 3.3 (B-130 중앙 경간 중앙과 중간 지점의 활하중 모멘트)</strong>
+      <ol class="gd-steps">
+        <li><b>경간 중앙 x = 65 m.</b> 영향선 주사로 트럭 최대 3,514 kN·m, 정의 영향 면적 176.6 m² → 차로 하중 \(12.7 \times 176.6 = 2{,}243\) kN·m. \(IM = 15/(40 + 50) = 0.167\). 트럭 단독 \(3{,}514 \times 1.167 = 4{,}100\), 조합 \(0.75 \times 4{,}100 + 2{,}243 = 5{,}318\) → 1차로 \(M^+ = 5{,}318\) kN·m(2장과 같다).</li>
+        <li><b>비교.</b> 같은 50 m를 단순교로 두면 트럭 5,526, 차로 3,969 kN·m(CONTRIBUTING 기준값)로 1차로 \(\max(6{,}447,\ 0.75 \times 6{,}447 + 3{,}969) = 8{,}805\) kN·m다. 연속으로 만들어 중앙 정모멘트가 40 % 줄었다.</li>
+        <li><b>중간 지점 x = 40 m.</b> 트럭 최소 −2,158, 음의 영향 면적 −232.2 m² → 차로 −2,949 kN·m. \(IM = 15/(40 + 45) = 0.176\). 트럭 단독 \(-2{,}158 \times 1.176 = -2{,}539\), 조합 \(0.75 \times (-2{,}539) - 2{,}949 = -4{,}852\) → 1차로 \(M^- = -4{,}852\) kN·m.</li>
+        <li><b>G1 설계 모멘트.</b> DF 0.90을 곱해 중앙 \(M_L = 4{,}786\), 지점 \(M_L = -4{,}367\) kN·m. 고정하중(\(w = 1\)일 때 중앙 107.07, 지점 −205.43 kN·m)을 더하면 지점 계수 모멘트 \(M_u = 1.25(-205.43 \times 25.6) + 1.5(-205.43 \times 4.4) + 1.8(-4{,}367) = -15{,}782\) kN·m(형태)로 중앙 12,744 kN·m보다 크다.</li>
+      </ol>
+      연속교에서는 <b>지점의 부모멘트가 설계를 지배</b>하는 경우가 많다. 기준에 따라서는 부모멘트에 두 대의 트럭(일정 간격 이상)을 함께 싣는 재하(AASHTO 형태: 15 m 이상 간격 두 트럭의 90 %)를 따로 검토하므로, 실제 값은 이보다 클 수 있다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="negative">
+    <h2>부모멘트 구간: 바닥판이 당겨질 때</h2>
+    <div class="problem"><strong>지점 위에서 합성 단면은 무엇이 일하는가</strong>
+      <p>중간 지점 위에서는 거더가 위로 볼록하게 휘어 바닥판이 당겨집니다. 콘크리트의 인장 강도는 압축의 10분의 1도 되지 않습니다. 바닥판에 금이 가면 합성 단면은 무엇으로 남을까요?</p></div>
+    <p><span class="term">부모멘트 구간</span><span class="en">(negative moment region)</span>에서 바닥판 콘크리트는 균열이 가 인장을 전하지 못한다고 보고, <b>강 거더 + 바닥판 속 <span class="term">종방향 철근</span><span class="en">(longitudinal reinforcement)</span></b>만을 단면으로 칩니다. 이것이 <span class="term">균열 합성 단면</span><span class="en">(cracked composite section)</span>입니다. 철근은 단면에 들어가 강성과 강도를 조금 보태고, 무엇보다 균열 폭을 묶어 둡니다. 하부 플랜지는 압축을 받으므로 좌굴(국부 좌굴·횡비틀림 좌굴)이 문제가 되어, 지점부에서는 플랜지를 두껍고 넓게 합니다(StructureBook <a href="../../structure/chapters/steel-structures.html">강구조</a>).</p>
+    <figure class="diagram" id="fig-gd-negative">
+      <svg viewBox="0 0 860 300" role="img" aria-label="연속 거더의 중간 지점 위 부모멘트 구간에서 바닥판의 균열과 종방향 철근, 균열 합성 단면의 응력">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <path d="M40 120 Q 180 150 300 120 Q 380 92 420 70 Q 460 92 540 120 Q 660 150 800 120" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+        <rect x="40" y="100" width="760" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="40" y="114" width="760" height="40" style="fill:none;stroke:var(--text);stroke-width:2"/>
+        <path d="M410 168 l10 -14 l10 14z" style="fill:none;stroke:var(--text-dim)"/>
+        <g style="stroke:var(--bad);stroke-width:1.6"><line x1="360" y1="100" x2="362" y2="108"/><line x1="380" y1="100" x2="381" y2="110"/><line x1="400" y1="100" x2="401" y2="111"/><line x1="440" y1="100" x2="439" y2="111"/><line x1="460" y1="100" x2="459" y2="110"/><line x1="480" y1="100" x2="478" y2="108"/></g>
+        <line x1="300" y1="106" x2="540" y2="106" style="stroke:var(--tension);stroke-width:2.6"/>
+        <text x="420" y="88" text-anchor="middle" class="t-mono" style="fill:var(--bad)">바닥판 균열</text>
+        <text x="560" y="98" class="t-mono" style="fill:var(--tension)">종방향 철근(바닥판 단면적의 1 % 이상, 형태)</text>
+        <line x1="300" y1="180" x2="540" y2="180" style="stroke:var(--warn)" marker-start="url(#gd-ah-d)" marker-end="url(#gd-ah-d)"/>
+        <text x="420" y="196" text-anchor="middle" class="t-mono">부모멘트 구간(반곡점 사이)</text>
+        <text x="60" y="140" class="t-mono">정모멘트: 합성 단면 n·3n</text>
+        <text x="620" y="140" class="t-mono">정모멘트</text>
+        <!-- cracked section stress -->
+        <g transform="translate(150,210)">
+          <rect x="0" y="0" width="90" height="10" style="fill:none;stroke:var(--text-dim);stroke-dasharray:3 3"/>
+          <circle cx="20" cy="5" r="3" style="fill:var(--tension)"/><circle cx="45" cy="5" r="3" style="fill:var(--tension)"/><circle cx="70" cy="5" r="3" style="fill:var(--tension)"/>
+          <path d="M35 14 h20 M45 14 v50 M30 64 h30" style="stroke:var(--text);stroke-width:2.6;fill:none"/>
+          <text x="100" y="20" class="t-mono">균열 단면 = 강재 + 철근</text>
+        </g>
+        <g transform="translate(470,210)">
+          <line x1="40" y1="0" x2="40" y2="66" class="s-axis"/>
+          <path d="M40 5 L72 5 L40 36 Z" style="fill:var(--tension);opacity:.3;stroke:var(--tension)"/>
+          <path d="M40 36 L4 64 L40 64 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+          <text x="80" y="14" class="t-mono" style="fill:var(--tension)">철근·상부 플랜지 인장</text>
+          <text x="80" y="62" class="t-mono" style="fill:var(--compression)">하부 플랜지 압축 → 좌굴 검토</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-5.</b> 연속 거더의 중간 지점(B-130의 x = 40, 90 m) 위. 처짐 곡선(파랑 점선)이 위로 볼록해 바닥판이 당겨지고 금이 간다. 균열 단면은 강 거더와 바닥판 속 종방향 철근만으로 이루어지며, 하부 플랜지가 압축을 받는다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 3.7 (부모멘트 구간의 단면)</strong> 부모멘트 구간에서 합성 후 하중의 응력은 균열 단면(강재 + 종방향 철근 \(A_r\))으로 계산한다.
+      <div class="formula">$$\sigma_{bf} = \frac{M_{D1}\,y_{s,b}}{I_s} + \frac{(M_{D2} + M_L)\,y_{cr,b}}{I_{cr}}, \qquad \sigma_r = \frac{(M_{D2} + M_L)\,y_{cr,r}}{I_{cr}}$$<div class="where">\(I_{cr}\): 강재와 철근만의 단면 2차 모멘트, \(y_{cr}\): 그 중립축에서의 거리. 종방향 철근은 부모멘트 구간 바닥판 단면적의 1 % 이상, 그중 약 3분의 2를 위쪽 층에 두는 것이 AASHTO 형태다(현행 기준 확인). 콘크리트가 균열 전이라고 보면(비균열 \(n\) 단면) 바닥판 인장 응력이 파괴 계수를 넘는지로 균열 여부를 판단한다.</div></div></div>
+    <div class="sim" id="sim-gd-negative">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>부모멘트 구간: 균열 단면과 종방향 철근</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gd-cv-neg" aria-label="B-130 부모멘트 구간의 위치와, 중간 지점 단면의 균열 단면 응력 분포"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>종방향 철근비 <output id="gd-ng-r-out"></output></span><input type="range" id="gd-ng-r" min="0.4" max="2.4" step="0.1" value="1.0"></label>
+          <div class="ctrl"><span>지점부 단면</span><div class="seg" id="gd-ng-sec"><button data-value="G0">경간부와 같게</button><button data-value="GP" class="on">지점부 보강</button></div></div>
+          <div class="ctrl"><span>바닥판 가정</span><div class="seg" id="gd-ng-crk"><button data-value="cr" class="on">균열(강재 + 철근)</button><button data-value="un">비균열(n)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">하부 플랜지 σ (MPa)</span><span class="v" id="gd-ng-bf">—</span></div>
+        <div class="stat"><span class="k">상부 플랜지 σ</span><span class="v" id="gd-ng-tf">—</span></div>
+        <div class="stat"><span class="k">철근 σ<sub>r</sub> / 바닥판 σ<sub>c</sub></span><span class="v" id="gd-ng-r2">—</span></div>
+        <div class="stat"><span class="k">I<sub>cr</sub> / I<sub>s</sub></span><span class="v" id="gd-ng-i">—</span></div>
+        <div class="stat"><span class="k">부모멘트 구간(고정 + 활)</span><span class="v" id="gd-ng-len">—</span></div>
+      </div>
+      <div class="gd-msg" id="gd-ng-msg">—</div>
+      <div class="sim-note">해볼 것: 비균열로 바꿔 바닥판 상단 인장 응력이 파괴 계수(약 0.63√f<sub>ck</sub> ≈ 3.5 MPa, 형태)를 넘는지 보세요 · 철근비를 0.4 %에서 2 %로 올려도 하부 플랜지 응력이 거의 줄지 않는 이유는 무엇일까요 · 경간부 단면을 그대로 쓰면 하부 플랜지 압축이 얼마나 커지는지 확인하세요 · 모델: x = 40 m의 G1, M<sub>D1</sub> = −4,635(강재), M<sub>D2</sub> = −1,520, M<sub>L</sub> = −4,367 kN·m(예제 3.3), 철근은 바닥판 중앙 높이 한 층으로 단순화, 위 그림의 부모멘트 구간은 4절 포락선의 고정 + 활하중 최소값이 음인 범위. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 3.4 (B-130 중간 지점 단면)</strong> 지점부 강 거더: 상부 플랜지 450 × 36, 복부 2,114 × 16, 하부 플랜지 650 × 50 mm(\(A = 82{,}524\) mm², \(y_b = 891.9\) mm, \(I_s = 6.556 \times 10^{10}\) mm⁴). 종방향 철근 1 % = \(0.01 \times 2{,}800 \times 240 = 6{,}720\) mm²(바닥판 중앙, 강재 바닥에서 2,380 mm).
+      <ol class="gd-steps">
+        <li><b>균열 단면.</b> 강재 + 철근: \(y_b = 1{,}004.0\) mm, \(I_{cr} = 7.932 \times 10^{10}\) mm⁴(\(I_s\)의 1.21배).</li>
+        <li><b>하부 플랜지.</b> D1: \(4{,}635 \times 10^6 \times 891.9/6.556 \times 10^{10} = 63.1\), D2 + 활: \((1{,}520 + 4{,}367) \times 10^6 \times 1{,}004.0/7.932 \times 10^{10} = 74.5\) → <b>137.6 MPa 압축</b>. 경간부 단면을 그대로 쓰면 117 + 132 = 약 250 MPa로 커진다.</li>
+        <li><b>철근.</b> \(5{,}887 \times 10^6 \times (2{,}380 - 1{,}004)/7.932 \times 10^{10} = 102.1\) MPa 인장. 사용 하중에서 철근 응력이 낮을수록 균열 폭이 작다(ConcreteBook 8장).</li>
+        <li><b>균열 여부.</b> 같은 D2 + 활하중을 비균열 \(n\) 단면으로 보면 바닥판 상단의 콘크리트 인장 응력이 약 4.0 MPa로 파괴 계수(약 3.5 MPa)를 넘는다 → 균열 단면 가정이 맞다.</li>
+      </ol>
+      하부 플랜지 137.6 MPa는 항복의 39 %지만, 압축 플랜지의 국부 좌굴과 횡비틀림 좌굴 강도로 판정해야 한다(가로보 간격이 비지지 길이). 계수 모멘트 −15,782 kN·m에 대한 강도 검토는 현행 KDS 24 14 31을 따른다.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="deck">
+    <h2>바닥판: 단위 폭으로 설계하는 판</h2>
+    <div class="problem"><strong>거더 사이 2.8 m를 건너는 240 mm 판은 바퀴 하나를 어떻게 견디나</strong>
+      <p>지금까지 바닥판은 거더의 플랜지였습니다. 그러나 바퀴 바로 밑에서 바닥판은 거더와 거더 사이를 가로 방향으로 건너는 판입니다. 바퀴 하중은 판 속에서 얼마나 넓게 퍼질까요?</p></div>
+    <p>바닥판은 가로 방향(교축 직각)으로 거더 위에 연속된 판입니다. ConcreteBook 9장의 <a href="../../concrete/chapters/slabs.html#one-way">1방향 슬래브</a>처럼 단위 폭 띠로 잘라 설계하되, 집중 하중인 바퀴가 판 속에서 퍼지는 폭을 <span class="term">등가 띠 폭</span><span class="en">(equivalent strip width)</span>으로 정합니다. 바깥 거더 밖으로 뻗은 <span class="term">캔틸레버부</span><span class="en">(deck overhang)</span>는 방호벽 무게와 차량 충돌 하중까지 받으므로 따로 검토합니다.</p>
+    <figure class="diagram" id="fig-gd-deck">
+      <svg viewBox="0 0 860 280" role="img" aria-label="바닥판을 가로 방향 연속보로 본 띠 모델: 바퀴 하중, 거더 지점, 정·부모멘트, 캔틸레버부와 방호벽">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <rect x="70" y="104" width="720" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="70" y="70" width="34" height="34" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <text x="87" y="62" text-anchor="middle" class="t-mono">방호벽</text>
+        <g style="fill:none;stroke:var(--text-dim)"><path d="M155 122 l-9 14 h18 z"/><path d="M335 122 l-9 14 h18 z"/><path d="M515 122 l-9 14 h18 z"/><path d="M695 122 l-9 14 h18 z"/></g>
+        <g style="stroke:var(--accent-2);stroke-width:2.4"><line x1="240" y1="60" x2="240" y2="100" marker-end="url(#gd-ah-ld)"/><line x1="356" y1="60" x2="356" y2="100" marker-end="url(#gd-ah-ld)"/></g>
+        <text x="298" y="54" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">바퀴 P · P (1.8 m)</text>
+        <path d="M155 160 Q 200 200 245 214 Q 290 200 335 160 Q 370 132 395 126" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+        <path d="M285 160 Q 320 120 335 116 Q 350 120 385 160" style="fill:none;stroke:none"/>
+        <path d="M70 160 Q 120 150 155 132 L155 160 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5"/>
+        <line x1="70" y1="160" x2="790" y2="160" class="s-axis"/>
+        <text x="245" y="232" text-anchor="middle" class="t-mono" style="fill:var(--accent)">정모멘트(아래 인장)</text>
+        <text x="340" y="112" text-anchor="middle" class="t-mono" style="fill:var(--accent)">부</text>
+        <text x="96" y="196" text-anchor="middle" class="t-mono" style="fill:var(--accent)">캔틸레버 부모멘트</text>
+        <line x1="155" y1="248" x2="335" y2="248" style="stroke:var(--text-dim)" marker-start="url(#gd-ah-d)" marker-end="url(#gd-ah-d)"/>
+        <text x="245" y="262" text-anchor="middle" class="t-mono">S</text>
+        <g transform="translate(560,40)">
+          <rect x="0" y="0" width="230" height="44" rx="6" style="fill:var(--bg-elev);stroke:var(--border)"/>
+          <text x="10" y="18" class="t-mono">띠 폭(교축 방향, 형태)</text>
+          <text x="10" y="35" class="t-mono">E⁺ = 660 + 0.55S, E⁻ = 1220 + 0.25S (mm)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-6.</b> 바닥판의 띠 모델. 가로 방향 연속보(지점 = 거더)에 바퀴를 놓아 정모멘트(거더 사이)와 부모멘트(거더 위), 캔틸레버부 모멘트를 구하고, 교축 방향으로 하중이 퍼지는 띠 폭 E로 나눠 단위 폭(1 m)당 모멘트로 바꾼다. 휨모멘트도는 인장측에 그렸다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 3.8 (바닥판의 띠 설계, 형태)</strong> 바퀴 하중 \(P\)를 가로 방향 연속보에 놓아 구한 띠 모멘트 \(M_{strip}\)을 띠 폭 \(E\)로 나눈다.
+      <div class="formula">$$m_L = \frac{M_{strip}}{E}(1 + IM), \qquad E^{+} = 660 + 0.55S, \qquad E^{-} = 1220 + 0.25S \ \ (\text{mm, AASHTO LRFD 형태})$$<div class="where">옛 AASHTO 표준 시방서는 주철근이 차량 진행 방향에 직각일 때 \(m_L = 0.8\,(S + 0.61)P/9.75\)(kN·m/m, \(S\) m, \(P\) kN, 연속 계수 0.8)의 경험식을 썼다(피트 식을 SI로 옮긴 형태). 바닥판의 최소 두께는 약 175 mm(형태)이고, 피복은 제설제를 고려해 상면을 크게 둔다. 모두 현행 KDS 24 14 21 계열 확인.</div></div></div>
+    <div class="sim" id="sim-gd-deck">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>바닥판 휨: 거더 간격과 두께 → 단위 폭 모멘트와 철근</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gd-cv-deck" aria-label="바닥판 가로 방향 띠의 바퀴 위치와 단위 폭 휨모멘트도"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>거더 간격 S <output id="gd-dk-s-out"></output></span><input type="range" id="gd-dk-s" min="2.0" max="4.0" step="0.1" value="2.8"></label>
+          <label class="ctrl"><span>바닥판 두께 t <output id="gd-dk-t-out"></output></span><input type="range" id="gd-dk-t" min="180" max="320" step="10" value="240"></label>
+          <label class="ctrl"><span>캔틸레버 길이 <output id="gd-dk-o-out"></output></span><input type="range" id="gd-dk-o" min="0.6" max="2.0" step="0.1" value="1.3"></label>
+          <label class="ctrl"><span>바퀴 하중 P <output id="gd-dk-p-out"></output></span><input type="range" id="gd-dk-p" min="40" max="100" step="2.5" value="67.5"></label>
+          <div class="ctrl"><span>보기</span><div class="seg" id="gd-dk-view"><button data-value="pos" class="on">최대 정모멘트</button><button data-value="neg">최대 부모멘트</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">m<sub>L</sub><sup>+</sup> 띠 해석 · 경험식</span><span class="v" id="gd-dk-ml">—</span></div>
+        <div class="stat"><span class="k">m<sub>u</sub><sup>+</sup> · A<sub>s</sub><sup>+</sup></span><span class="v" id="gd-dk-mp">—</span></div>
+        <div class="stat"><span class="k">m<sub>u</sub><sup>−</sup> · A<sub>s</sub><sup>−</sup></span><span class="v" id="gd-dk-mn">—</span></div>
+        <div class="stat"><span class="k">캔틸레버 m<sub>u</sub></span><span class="v" id="gd-dk-ov">—</span></div>
+      </div>
+      <div class="gd-msg" id="gd-dk-msg">—</div>
+      <div class="sim-note">해볼 것: 거더 간격을 2.0 m에서 4.0 m로 늘려 정모멘트와 철근이 얼마나 느는지 보세요(거더 수는 4로 같고 교폭이 바뀐다) · 띠 해석과 옛 경험식이 10 % 안팎으로 맞는 것을 확인하세요 · 캔틸레버를 2.0 m로 늘리면 무엇이 지배하는지 보세요 · 모델: 거더 위 강체 지점의 가로 방향 연속보(<code>CB.beam</code>), 바퀴 2개(1.8 m 간격)를 0.1 m씩 옮겨 최대·최소, 바퀴는 방호벽 면(0.5 m)에서 0.3 m 이상, 띠 폭 E<sup>+</sup>·E<sup>−</sup>·E<sub>캔틸레버</sub> = 1140 + 833X(mm, X: 바퀴–거더 거리 m)(AASHTO 형태), IM 0.3, 고정하중 판 자중 + 포장 70 mm(1.61 kN/m²) + 방호벽 7 kN/m, m<sub>u</sub> = 1.25DC + 1.5DW + 1.8LL, f<sub>ck</sub> 30·SD400·φ 0.85, 피복 상면 50·하면 30 mm, D16. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 3.5 (B-130 바닥판 정모멘트)</strong> \(S = 2.8\) m, \(t = 240\) mm, 바퀴 \(P = 135/2 = 67.5\) kN.
+      <ol class="gd-steps">
+        <li><b>띠 해석.</b> 바퀴 두 개를 0.1 m씩 옮겨 가며 연속보를 풀면 최대 정모멘트 \(M_{strip} = 37.8\) kN·m(G1–G2 사이). 띠 폭 \(E^+ = 660 + 0.55 \times 2{,}800 = 2{,}200\) mm → \(m_L = 37.8/2.2 \times 1.3 = 22.3\) kN·m/m.</li>
+        <li><b>경험식 비교.</b> \(0.8 \times (2.8 + 0.61) \times 67.5/9.75 \times 1.3 = 24.6\) kN·m/m. 띠 해석보다 약 10 % 크다.</li>
+        <li><b>계수 모멘트.</b> 고정하중 정모멘트 판 자중 2.2, 포장·방호벽 1.9 kN·m/m → \(m_u = 1.25 \times 2.2 + 1.5 \times 1.9 + 1.8 \times 22.3 \approx 45.8\) kN·m/m.</li>
+        <li><b>철근.</b> \(d = 240 - 30 - 8 = 202\) mm, \(R_n = m_u/(\phi b d^2) = 45.8 \times 10^6/(0.85 \times 1000 \times 202^2) = 1.32\) MPa → \(\rho = 0.00339\), \(A_s = 685\) mm²/m → <b>D16 @ 250</b>(795 mm²/m) → <span style="color:var(--ok)">만족</span>.</li>
+      </ol>
+      바닥판은 거더보다 먼저 손상되는 경우가 많다(피로·염해·포트홀). 그래서 실제 기준은 계산보다 큰 최소 두께와 배근, 피복을 요구한다. 수치는 교육용 형태다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="box">
+    <h2>박스 거더와 비틀림</h2>
+    <div class="problem"><strong>트럭이 한쪽으로 치우치면 다리는 비틀린다</strong>
+      <p>트럭이 교량 중심에서 2 m 벗어나 달리면 하중은 수직 힘과 함께 비틀림 모멘트 \(T = Pe\)를 만듭니다. I형 거더 두 줄과 같은 강재로 만든 상자 하나는 이 비틀림을 얼마나 다르게 견딜까요?</p></div>
+    <p>열린 단면(I형·ㄷ형)의 <span class="term">생베낭 비틀림</span><span class="en">(Saint-Venant torsion)</span> 상수는 얇은 판들의 \(\sum bt^3/3\)이라 아주 작습니다. 그래서 I형 거더 교량은 비틀림을 거더 하나하나가 아니라 <b>거더 사이의 처짐 차이</b>(한쪽 거더가 더 받고 다른 쪽이 덜 받는 것)로 견딥니다. 이것이 앞 절의 횡분배입니다. 닫힌 단면은 벽을 따라 도는 <span class="term">전단류</span><span class="en">(shear flow)</span> \(q\)로 비틀림을 견디며, 비틀림 상수가 수백–수천 배 큽니다.</p>
+    <figure class="diagram" id="fig-gd-box">
+      <svg viewBox="0 0 860 280" role="img" aria-label="편심 하중을 받는 박스 거더의 전단류와 I형 거더 두 줄의 처짐 차이 비교">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <text x="40" y="40" class="t" style="font-weight:700">닫힌 단면: 전단류로 비틀림</text>
+        <rect x="90" y="80" width="240" height="130" style="fill:none;stroke:var(--text);stroke-width:3"/>
+        <g style="stroke:var(--accent);stroke-width:2;fill:none">
+          <path d="M120 92 h180" marker-end="url(#gd-ah-a)"/><path d="M318 100 v100" marker-end="url(#gd-ah-a)"/><path d="M300 198 h-180" marker-end="url(#gd-ah-a)"/><path d="M102 190 v-90" marker-end="url(#gd-ah-a)"/>
+        </g>
+        <text x="210" y="150" text-anchor="middle" class="t-acc">q = T/(2A₀)</text>
+        <line x1="290" y1="40" x2="290" y2="74" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#gd-ah-ld)"/>
+        <text x="300" y="52" class="t-mono" style="fill:var(--accent-2)">P (편심 e)</text>
+        <text x="40" y="244" class="t-mono">J = 4A₀²/∮(ds/t) — 둘러싼 면적 A₀의 제곱에 비례</text>
+        <text x="470" y="40" class="t" style="font-weight:700">열린 단면: 처짐 차이로 비틀림</text>
+        <g style="stroke:var(--text);stroke-width:3;fill:none"><path d="M520 90 h40 M540 90 v110 M516 200 h48"/><path d="M740 90 h40 M760 90 v110 M736 200 h48"/></g>
+        <line x1="500" y1="88" x2="800" y2="88" style="stroke:var(--text-dim);stroke-width:6;opacity:.5"/>
+        <line x1="760" y1="40" x2="760" y2="80" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#gd-ah-ld)"/>
+        <line x1="500" y1="230" x2="800" y2="214" style="stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+        <text x="650" y="242" text-anchor="middle" class="t-mono">P/2 − Pe/b   ·   P/2 + Pe/b</text>
+        <text x="470" y="262" class="t-mono">각 거더의 J = Σbt³/3 ≈ 0 → 짝힘(거더 하중 차이)으로 T를 견딘다</text>
+      </svg>
+      <figcaption><b>그림 3-7.</b> 편심 하중에 대한 두 가지 저항 방식. 박스(왼쪽)는 벽을 따라 도는 일정한 전단류로 비틀림을 견디고 단면이 거의 회전하지 않는다. I형 거더 두 줄(오른쪽)은 하중 쪽 거더가 더 많이 처지는 방식으로만 비틀림을 견딘다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 3.9 (얇은 닫힌 단면의 비틀림, 브레트 공식)</strong> 벽 두께가 얇은 한 칸 박스의 전단류와 비틀림 상수는
+      <div class="formula">$$q = \frac{T}{2A_0}, \qquad \tau = \frac{q}{t}, \qquad J = \frac{4A_0^2}{\oint ds/t}, \qquad \theta' = \frac{T}{GJ}$$<div class="where">\(A_0\): 벽 중심선이 둘러싼 면적, \(\oint ds/t\): 벽을 따라 한 바퀴 돈 길이를 두께로 나눈 합, \(G \approx 81{,}000\) MPa(강재). 단순 경간 중앙에 \(T\)가 걸리면 양 끝이 \(T/2\)씩 받아 중앙 회전각은 \(\theta = TL/(4GJ)\)다. 판이 휘어 단면 모양이 찌그러지는 <span class="term">뒤틀림</span><span class="en">(distortion)</span>은 내부 <span class="term">다이어프램</span><span class="en">(diaphragm)</span>으로 막는다.</div></div></div>
+    <div class="sim" id="sim-gd-box">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>편재 하중 비틀림: 박스 vs I형 두 줄</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gd-cv-box" aria-label="편심 하중을 받는 박스 단면과 I형 두 줄 단면의 회전과 가장자리 처짐 비교"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>편심 e <output id="gd-bx-e-out"></output></span><input type="range" id="gd-bx-e" min="0" max="3" step="0.05" value="2"></label>
+          <label class="ctrl"><span>경간 L (단순) <output id="gd-bx-l-out"></output></span><input type="range" id="gd-bx-l" min="20" max="80" step="1" value="50"></label>
+          <label class="ctrl"><span>판 두께 t <output id="gd-bx-t-out"></output></span><input type="range" id="gd-bx-t" min="10" max="30" step="1" value="16"></label>
+          <label class="ctrl"><span>하중 P <output id="gd-bx-p-out"></output></span><input type="range" id="gd-bx-p" min="100" max="1000" step="10" value="510"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">J 박스 / J 열린</span><span class="v" id="gd-bx-j">—</span></div>
+        <div class="stat"><span class="k">박스 회전 θ · τ</span><span class="v" id="gd-bx-th">—</span></div>
+        <div class="stat"><span class="k">가장자리 처짐 박스 · I형</span><span class="v" id="gd-bx-d">—</span></div>
+        <div class="stat"><span class="k">비틀림 몫 처짐 비</span><span class="v" id="gd-bx-r">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: e = 0에서는 두 단면의 처짐이 같고, e를 키우면 I형의 하중 쪽 처짐만 크게 늘어나는 것을 보세요 · 경간이 길수록 박스의 이점(비틀림 몫 처짐 비)이 커집니다 · 모델: 같은 두 복부(2,200 mm)와 플랜지를 쓰는 박스(복부 간격 b = 2.8 m, 모든 판 두께 t, 위·아래 판이 닫음)와 I형 두 줄(같은 간격). 휨은 단순보 중앙 집중 하중 PL³/(48EI), 박스 비틀림은 브레트 공식(뒤틀림·뒴 무시), I형은 J ≈ 0으로 보고 거더 하중 P/2 ± Pe/b. 바닥판 기여 무시, 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 3.6 (박스와 I형 두 줄의 비틀림 비교)</strong> 경간 50 m 단순, 복부 간격 \(b = 2.8\) m, 높이 \(h = 2.2\) m, 모든 판 16 mm, \(P = 510\) kN, \(e = 2.0\) m(\(T = 1{,}020\) kN·m).
+      <ol class="gd-steps">
+        <li><b>박스.</b> \(A_0 = 2.8 \times 2.2 = 6.16\) m², \(\oint ds/t = 2(2.8 + 2.2)/0.016 = 625\) → \(J = 4 \times 6.16^2/625 = 0.243\) m⁴. 전단류 \(q = 1{,}020/(2 \times 6.16) = 82.8\) kN/m, \(\tau = 82.8/0.016 = 5.2\) MPa.</li>
+        <li><b>회전.</b> \(\theta = TL/(4GJ) = 1{,}020 \times 50/(4 \times 8.1 \times 10^7 \times 0.243) = 6.5 \times 10^{-4}\) rad → 복부 위치(±1.4 m)의 처짐 차이 ±0.9 mm.</li>
+        <li><b>I형 두 줄.</b> 하중 쪽 거더가 \(P/2 + Pe/b = 255 + 364 = 619\) kN, 반대쪽 \(-109\) kN을 받는다. 비틀림 몫은 \(\pm 364\) kN의 휨 처짐이다.</li>
+        <li><b>비교.</b> 비틀림 몫 처짐 비(I형/박스) \(= GJL^2/(6EI_g b^2)\)로, 박스를 복부마다 반으로 가른 I형 거더 하나(복부 + 플랜지 폭 1.4 m씩)의 \(I_g = 6.8 \times 10^{10}\) mm⁴를 넣으면 약 73배다. 박스는 편재 하중을 거의 "평균"으로 바꿔 놓는다.</li>
+      </ol></div>
+    <p>그래서 곡선교(자중만으로도 비틀림이 생긴다), 폭이 넓은 교량, 긴 경간에는 <span class="term">박스 거더</span><span class="en">(box girder)</span>가 유리합니다. 대신 박스는 판이 얇고 넓어 국부 좌굴을 막는 보강재가 많고, 내부 점검을 위한 출입구와 환기가 필요하며 제작비가 큽니다. PSC 박스는 이 비틀림 강성 덕분에 캔틸레버 가설(FCM) 중 편측 하중도 견딥니다.</p>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="psc">
+    <h2>PSC 거더와 연속화</h2>
+    <div class="problem"><strong>콘크리트 거더로 35 m를 건너려면</strong>
+      <p>RC 거더는 균열 때문에 깊이에 비해 무겁고, 경간 25 m를 넘기 어렵습니다. 콘크리트를 미리 눌러 두면 어떨까요?</p></div>
+    <p><span class="term">PSC 거더</span><span class="en">(prestressed concrete girder)</span>는 강선을 긴장해 콘크리트에 미리 압축을 넣은 거더입니다. 원리와 손실, 응력 검토는 ConcreteBook 15장의 <a href="../../concrete/chapters/prestressed.html#principle">프리스트레스트 콘크리트</a>를 그대로 씁니다. 교량에서는 두 가지가 더해집니다.</p>
+    <ul>
+      <li><b>제작과 거치.</b> I형 PSC 거더는 공장이나 현장 제작장에서 만들어 크레인으로 거치하고, 그 위에 바닥판을 타설해 합성합니다. 강합성 거더와 같은 "합성 전·후" 단계 계산이 필요합니다. 프리스트레스의 편심이 만든 <span class="term">솟음</span><span class="en">(camber)</span>(캠버)이 바닥판 두께와 포장 높이를 좌우합니다.</li>
+      <li><b>연속화.</b> 단순 경간 PSC 거더를 거치한 뒤 지점 위 바닥판과 가로보를 이어 치면, 합성 후 하중(포장·활하중)에 대해 연속교처럼 일합니다. 신축 이음이 줄어 유지관리가 쉬워지지만, 지점 위에 부모멘트 철근이 필요하고 크리프·건조 수축으로 이차 모멘트가 생깁니다(교육용 개요).</li>
+    </ul>
+    <p>더 긴 경간은 현장 타설 PSC 박스(FCM·ILM·MSS, 1장)로 갑니다. 형식 선택의 핵심은 경간보다 <b>가설</b>입니다. 같은 50 m라도 하천 위에서는 강 거더 크레인 가설이나 PSC 박스 FCM이, 넓은 평지에서는 PSC 거더 거치나 MSS가 유리할 수 있습니다.</p>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="depth">
+    <h2>거더 높이와 경간</h2>
+    <div class="problem"><strong>왜 강 거더의 높이는 경간의 1/20–1/30인가</strong>
+      <p>거더를 깊게 하면 플랜지 힘(\(M/h\))이 줄어 플랜지가 가벼워지지만, 복부가 커집니다. 두 무게의 합이 가장 작은 높이가 있을까요?</p></div>
+    <p>강판을 용접해 만든 <span class="term">판형 거더</span><span class="en">(plate girder)</span>에서 휨모멘트 \(M\)을 플랜지 두 개의 짝힘으로 견딘다고 보면 플랜지 하나의 단면적은 약 \(A_f = M/(\sigma_a h)\)이고, 복부 세장비를 \(\lambda = h/t_w\)로 고정하면 복부 단면적은 \(h^2/\lambda\)입니다. 강재량을 최소로 하는 <span class="term">경제적 높이</span><span class="en">(economical depth)</span>를 미분으로 구할 수 있습니다.</p>
+    <div class="callout def"><strong>원리 3.10 (판형 거더의 경제적 높이)</strong>
+      <div class="formula">$$A(h) = \frac{2M}{\sigma_a h} + \frac{h^2}{\lambda}, \qquad \frac{dA}{dh} = 0 \;\Rightarrow\; h_{opt} = \left(\frac{\lambda M}{\sigma_a}\right)^{1/3}$$<div class="where">최적 높이에서 복부 단면적은 플랜지 둘을 합한 단면적의 절반이다. \(h_{opt}\)은 \(M^{1/3}\), 곧 경간의 약 2/3제곱에 비례하므로 경간이 길수록 \(L/h\)가 커진다(상대적으로 얕아진다). 실제 높이는 처짐, 수송(높이 3 m 안팎 제약 형태), 형하 공간, 바닥판 합성 효과로 조정한다.</div></div></div>
+    <div class="sim" id="sim-gd-depth">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>거더 높이–경간 비: 강재량이 가장 작은 높이</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gd-cv-depth" aria-label="거더 높이에 따른 플랜지·복부·전체 강재량 곡선과 최적 높이"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경간 L <output id="gd-dp-l-out"></output></span><input type="range" id="gd-dp-l" min="20" max="120" step="1" value="50"></label>
+          <label class="ctrl"><span>등가 하중 w (거더 한 줄) <output id="gd-dp-w-out"></output></span><input type="range" id="gd-dp-w" min="15" max="80" step="1" value="40"></label>
+          <label class="ctrl"><span><span>허용 응력 σ<sub>a</sub></span> <output id="gd-dp-s-out"></output></span><input type="range" id="gd-dp-s" min="120" max="300" step="5" value="200"></label>
+          <label class="ctrl"><span><span>복부 세장비 h/t<sub>w</sub></span> <output id="gd-dp-k-out"></output></span><input type="range" id="gd-dp-k" min="80" max="200" step="5" value="135"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">M = wL²/10</span><span class="v" id="gd-dp-m">—</span></div>
+        <div class="stat"><span class="k">h<sub>opt</sub> · L/h<sub>opt</sub></span><span class="v" id="gd-dp-h">—</span></div>
+        <div class="stat"><span class="k">강재 (kg/m) h<sub>opt</sub> · 2.2 m</span><span class="v" id="gd-dp-wt">—</span></div>
+        <div class="stat"><span class="k">최소 높이 형태 0.027L</span><span class="v" id="gd-dp-min">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 경간을 두 배로 늘려도 h<sub>opt</sub>은 두 배가 되지 않는 것을 보세요(L/h가 커진다) · 곡선의 바닥이 평평해 최적에서 ±20 % 벗어나도 강재량은 몇 %만 늘어납니다 · 세장비를 키우면(얇은 복부) 최적 높이가 커집니다 · 모델: M = wL²/10(연속교 지점 근사, 형태), 플랜지 A<sub>f</sub> = M/(σ<sub>a</sub>h), 복부 h²/λ, 강재 7,850 kg/m³, 보강재·가로보 미포함. 점선은 AASHTO LRFD의 선택적 최소 높이 형태(연속 강 I형 강재부 0.027L, 현행 기준 확인)와 B-130의 2.2 m. 교육용.</div>
+    </div>
+    <p>B-130은 \(w \approx 40\) kN/m(고정 + 활하중 등가)로 보면 \(h_{opt} \approx 1.9\) m인데, 실제로는 2.2 m(L/23)를 골랐습니다. 최적 곡선이 평평해 강재량 차이는 몇 %에 불과하고, 더 깊은 거더는 처짐(활하중 처짐 한계 L/800 형태)과 부모멘트 구간의 압축 플랜지 좌굴에 유리하기 때문입니다.</p>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="b130">
+    <h2>B-130 거더: 3D로 보기</h2>
+    <p>지금까지의 계산을 한 장면에 모읍니다. 아래 3D 보기는 B-130의 거더 4주가 트럭 한 대(와 차로 하중)를 받을 때 처지는 모양입니다. 트럭의 가로 위치를 바꾸면 쿠르봉 분배에 따라 거더별 처짐이 달라지고, 세로 위치를 바꾸면 연속교의 처짐이 이웃 경간에서 위로 솟는 것을 볼 수 있습니다.</p>
+    <div class="sim" id="sim-gd-3d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-130 3D: 트럭 아래 거더 네 줄의 처짐</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gd-cv-3d" aria-label="B-130의 3D 투시도. 거더 네 줄, 바닥판, 교각과 트럭, 과장한 처짐 형상. 끌어서 돌릴 수 있다"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>트럭 앞축 위치 <output id="gd-3d-x-out"></output></span><input type="range" id="gd-3d-x" min="0" max="142" step="0.5" value="72"></label>
+          <label class="ctrl"><span>트럭 가로 위치(바퀴 중심) <output id="gd-3d-y-out"></output></span><input type="range" id="gd-3d-y" min="-3.5" max="1.5" step="0.1" value="-3.5"></label>
+          <label class="ctrl"><span>처짐 과장 배율 <output id="gd-3d-k-out"></output></span><input type="range" id="gd-3d-k" min="20" max="200" step="10" value="80"></label>
+          <label class="check"><input type="checkbox" id="gd-3d-lane"> 중앙 경간 차로 하중 12.7 kN/m 함께</label>
+          <div class="btn-row"><button class="btn" id="gd-3d-play">▶ 주행</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">거더별 최대 처짐 (mm)</span><span class="v" id="gd-3d-d">—</span></div>
+        <div class="stat"><span class="k">최대 δ/L</span><span class="v" id="gd-3d-r">—</span></div>
+        <div class="stat"><span class="k">쿠르봉 몫 G1–G4</span><span class="v" id="gd-3d-s">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 트럭을 중앙 경간 가운데에 두고 옆 경간이 위로 솟는 것을 확인하세요 · 가로 위치를 0(교량 중심)으로 옮기면 네 거더 처짐이 거의 같아집니다 · 모델: 각 거더를 단기 합성 단면(EI = 210 GPa × 10.45 × 10¹⁰ mm⁴)의 3경간 연속보(<code>CB.beam</code>)로 보고, 트럭 축하중(충격 제외)에 쿠르봉 몫을 곱해 따로 푼다(가로보가 강체라는 가정). 처짐 판정 L/800은 AASHTO 선택 규정 형태. 교육용.</div>
+    </div>
+    <div class="callout site"><strong>B-130 거더 설계 요약(교육용)</strong> 강 I형 거더 4주 @ 2.8 m, SM355. 경간부: 상부 플랜지 400 × 22, 복부 2,150 × 16, 하부 플랜지 500 × 28 mm(높이 2,200 mm ≈ 중앙 경간 L/23). 지점부: 450 × 36, 2,114 × 16, 650 × 50 mm. RC 바닥판 240 mm(f<sub>ck</sub> 30), 헌치 60 mm, \(b_e = 2.8\) m, \(n = 8\)·\(3n = 24\). 거더 한 줄 하중 D1 22.6, DC2 3.0, DW 4.4 kN/m(교량 전체 약 120 kN/m). 외측 거더 G1 분배 계수 0.90(레버 룰, 1차로 × 1.2). 중앙 경간 중앙: \(M_{D1} = 2{,}416\), \(M_{D2} = 792\), \(M_L = 4{,}786\) kN·m, 하부 플랜지 159.8 MPa, \(M_u = 12{,}744\) kN·m(\(M_p = 27{,}362\)). 중간 지점: \(M_L = -4{,}367\), \(M_u = -15{,}782\) kN·m, 하부 플랜지 −137.6 MPa, 철근 1 %(6,720 mm²) 102.1 MPa. 바닥판 D16 @ 250(정모멘트). 받침·교각·기초는 <a href="substructure.html">6장</a>, 하천 수위와 형하 여유는 <a href="hydraulics.html">15장</a>, 내하력 평가는 <a href="maintenance.html">16장</a>에서 이어진다.</div>
+    <div class="callout site"><strong>B-130 횡단면 배치(이 장의 가정)</strong> 교폭 11.0 m를 교량 중심 기준 y = −5.5 ~ +5.5 m로 둔다. 왼쪽 방호벽 0.5 m(y −5.5 ~ −5.0), 차도 8.0 m(−5.0 ~ +3.0, 설계 차로 2 × 3.6 m), 오른쪽 보도 2.0 m(+3.0 ~ +5.0)와 난간·방호벽 0.5 m. 거더 y = ±1.4, ±4.2 m, 캔틸레버 1.3 m. 차도가 교량 중심에서 왼쪽으로 1.0 m 치우쳐 있어 왼쪽 외측 거더 G1이 활하중을 가장 많이 받는다. 방호벽·보도 하중(DC2)과 포장(DW)은 네 거더에 고르게 나눴다(흔한 단순화, 형태).</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="bridge-loads.html"><small>CH.02 · 교량 하중과 이동 하중</small>트럭·차로 하중·충격<br><span>영향선 주사와 최대 효과의 출발점.</span></a>
+      <a href="arch-truss.html"><small>CH.04 · 아치교와 트러스교</small>휨 대신 축력으로<br><span>같은 하중을 형태로 견디는 다리.</span></a>
+      <a href="substructure.html"><small>CH.06 · 하부 구조와 받침</small>거더 반력 → 받침 → 교각<br><span>B-130 받침 반력과 온도 신축.</span></a>
+      <a href="maintenance.html"><small>CH.16 · 유지관리와 성능 개선</small>내하율과 보강<br><span>합성 단면의 RF, 외부 긴장 보강.</span></a>
+      <a href="../../structure/chapters/composite.html#composite-beam"><small>StructureBook · CH.11</small>합성보·유효 폭·환산 단면<br><span>건물 바닥의 합성보와 같은 원리.</span></a>
+      <a href="../../concrete/chapters/slabs.html#one-way"><small>ConcreteBook · CH.09</small>1방향 슬래브<br><span>바닥판 단위 폭 설계와 배근.</span></a>
+      <a href="../../concrete/chapters/prestressed.html#principle"><small>ConcreteBook · CH.15</small>프리스트레스트 콘크리트<br><span>PSC 거더의 응력·손실·솟음.</span></a>
+      <a href="../../mechanics/chapters/influence.html#continuous"><small>MechanicsBook · CH.06</small>연속보의 영향선<br><span>뮐러–브레슬라우 원리와 재하 구간.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>거더교는 경간이 길수록 깊고 속 빈 단면(RC 슬래브 → PSC I → 강 I·박스 → PSC 박스)으로 가며, 형식은 경간보다 가설·선형·형하 공간이 정하는 경우가 많다.</li>
+      <li>강합성 거더는 시공 단계마다 다른 단면으로 일한다: 합성 전 D1 → 강재 \(I_s\), 합성 후 지속 하중 → \(I_{3n}\), 활하중 → \(I_n\). 응력은 단계별로 계산해 더한다. B-130 중앙 하부 플랜지 61.1 + 15.3 + 83.4 = 159.8 MPa.</li>
+      <li>유효 폭은 전단 지연을 균일 폭으로 바꾼 것이다. 보통 거더 간격 정도이며 B-130은 2.8 m.</li>
+      <li>분배 계수 = 다차로 계수 × 거더 몫. 레버 룰(가로 방향 무강성)과 쿠르봉(강체)이 양 극단이고 실제는 그 사이다. B-130 G1 0.90(레버, 1차로 × 1.2), G2 0.62(쿠르봉, 2차로).</li>
+      <li>연속교의 활하중 효과는 영향선의 같은 부호 구간에 트럭과 차로 하중을 놓아 구한다. B-130 중앙 1차로 5,318 kN·m(단순교 8,805의 60 %), 중간 지점 −4,852 kN·m(트럭 단독과 트럭 75 % + 차로 하중 중 큰 값, KL-510 형태). 지점 부모멘트가 설계를 지배하기 쉽다.</li>
+      <li>부모멘트 구간은 바닥판이 균열한 강재 + 종방향 철근 단면으로 계산하고, 철근은 바닥판 단면적의 1 % 이상(형태)을 두어 균열을 묶는다. 하부 플랜지는 압축 좌굴로 판정한다.</li>
+      <li>바닥판은 가로 방향 연속보 띠로 풀어 띠 폭 E로 나눈다. B-130: m<sub>L</sub> 22.3 kN·m/m, m<sub>u</sub> 45.8 → D16 @ 250.</li>
+      <li>닫힌 박스의 비틀림 상수 \(J = 4A_0^2/\oint ds/t\)는 열린 단면보다 수천 배 크다. 경제적 거더 높이 \(h_{opt} = (\lambda M/\sigma_a)^{1/3}\), 최적 근처에서 강재량은 둔감하다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 동바리 없이 시공한 강합성 거더에서 바닥판 콘크리트(젖은 상태)의 자중이 만드는 응력은 어느 단면으로 계산하는가?</p><div class="opts">
+        <button class="opt" data-correct>강 거더 단면 I<sub>s</sub></button><button class="opt">장기 환산 단면 I<sub>3n</sub></button><button class="opt">단기 환산 단면 I<sub>n</sub></button><button class="opt">균열 단면 I<sub>cr</sub></button>
+      </div><div class="quiz-exp">콘크리트가 굳어 전단 연결재로 묶이기 전이므로 강재만 일한다. 이 응력은 합성 뒤에도 그대로 남아 이후 단계 응력과 더해진다(원리 3.3). 동바리를 쓰면 이 하중도 합성 단면이 받는다.</div></div>
+      <div class="quiz-q"><p>2. 합성 후 포장·방호벽 하중에 n 대신 3n을 쓰는 이유는?</p><div class="opts">
+        <button class="opt">포장이 콘크리트보다 무겁기 때문</button><button class="opt" data-correct>지속 하중에서 콘크리트가 크리프로 더 변형해 유효 탄성 계수가 작아지기 때문</button><button class="opt">강재가 장기적으로 약해지기 때문</button><button class="opt">유효 폭이 3배가 되기 때문</button>
+      </div><div class="quiz-exp">크리프로 콘크리트의 장기 변형이 커지면 같은 응력에 더 많이 줄어든다. 이를 탄성 계수 E<sub>c</sub>/3, 곧 n을 3배로 키운 환산 단면으로 근사한다(형태).</div></div>
+      <div class="quiz-q"><p>3. 거더 4주(y = ±1.4, ±4.2 m)에 트럭 1대(바퀴 0.5씩, y = −4.4, −2.6 m)가 실릴 때 쿠르봉 방법의 외측 거더 G1(y = −4.2) 몫은?</p><div class="opts">
+        <button class="opt">0.25</button><button class="opt">0.50</button><button class="opt" data-correct>0.625</button><button class="opt">0.75</button>
+      </div><div class="quiz-exp">Σy² = 39.2. 바퀴마다 0.5 × (1/4 + y·y<sub>G1</sub>/Σy²): 0.5(0.25 + 18.48/39.2) + 0.5(0.25 + 10.92/39.2) = 0.361 + 0.264 = 0.625. 레버 룰은 0.75를 준다.</div></div>
+      <div class="quiz-q"><p>4. 레버 룰이 내부 거더에 대해 보수적인(큰) 값을 주는 이유는?</p><div class="opts">
+        <button class="opt">다차로 재하 계수를 두 번 곱하기 때문</button><button class="opt" data-correct>바닥판을 거더 위에서 끊어 하중이 멀리 있는 거더로 퍼지는 것을 무시하기 때문</button><button class="opt">충격 계수를 포함하기 때문</button><button class="opt">가로보를 강체로 보기 때문</button>
+      </div><div class="quiz-exp">레버 룰은 바닥판을 이웃 거더 사이의 단순보로 잘라 가로 방향 강성을 0으로 본다. 실제 바닥판·가로보는 하중을 먼 거더까지 넘기므로 내부 거더의 몫은 더 작다. 가로보를 강체로 보는 것은 쿠르봉 방법이다.</div></div>
+      <div class="quiz-q"><p>5. 3경간 연속교 중앙 경간의 최대 정모멘트를 얻으려면 차로 하중(등분포)을 어디에 깔아야 하는가?</p><div class="opts">
+        <button class="opt">세 경간 모두</button><button class="opt" data-correct>중앙 경간에만(영향선이 양인 구간)</button><button class="opt">양 끝 경간에만</button><button class="opt">중앙 경간의 절반에만</button>
+      </div><div class="quiz-exp">중앙 경간 중앙의 영향선은 중앙 경간에서 양, 양 끝 경간에서 음이다. 음의 구간에 하중을 놓으면 정모멘트를 줄이므로 양의 구간에만 싣는다(원리 3.6). 지점 부모멘트는 그 반대로 이웃 두 경간에 싣는다.</div></div>
+      <div class="quiz-q"><p>6. 연속 합성 거더의 중간 지점 위 단면에서 활하중 응력을 계산할 때 보통 쓰는 단면은?</p><div class="opts">
+        <button class="opt">바닥판 전체를 포함한 n 환산 단면</button><button class="opt">바닥판 전체를 포함한 3n 환산 단면</button><button class="opt" data-correct>강 거더 + 바닥판 속 종방향 철근(균열 단면)</button><button class="opt">강 거더의 복부만</button>
+      </div><div class="quiz-exp">부모멘트에서 바닥판은 인장을 받아 균열하므로 콘크리트를 빼고 철근만 넣는다(원리 3.7). 이때 하부 플랜지는 압축을 받아 좌굴 검토가 필요하다.</div></div>
+      <div class="quiz-q"><p>7. 같은 판으로 만든 한 칸 박스와 I형 두 줄을 비교할 때, 편심 하중에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">두 단면의 비틀림 상수는 같다</button><button class="opt">I형 두 줄은 전단류로 비틀림을 견딘다</button><button class="opt" data-correct>박스는 J = 4A<sub>0</sub>²/∮ds/t가 커서 단면이 거의 회전하지 않고, I형은 거더 처짐 차이로 비틀림을 견딘다</button><button class="opt">박스는 비틀림을 받으면 휨 강성이 0이 된다</button>
+      </div><div class="quiz-exp">열린 단면의 J = Σbt³/3은 매우 작아 비틀림을 거더 하중의 차이(P/2 ± Pe/b)로 견딘다. 닫힌 단면은 둘러싼 면적 A<sub>0</sub>의 제곱에 비례하는 J로 비틀림을 직접 견딘다.</div></div>
+      <div class="quiz-q"><p>8. 판형 거더의 경제적 높이 h<sub>opt</sub> = (λM/σ<sub>a</sub>)<sup>1/3</sup>에서 경간이 2배가 되면(등분포 하중, M ∝ L²) 최적 높이는?</p><div class="opts">
+        <button class="opt">2배</button><button class="opt" data-correct>약 1.59배(2<sup>2/3</sup>)</button><button class="opt">약 1.26배(2<sup>1/3</sup>)</button><button class="opt">4배</button>
+      </div><div class="quiz-exp">M이 4배 → h<sub>opt</sub>은 4<sup>1/3</sup> = 2<sup>2/3</sup> ≈ 1.59배. 경간보다 덜 늘어나므로 긴 경간일수록 L/h가 커진다(상대적으로 얕아진다).</div></div>
+    </div>
+  </section>
+</main>
+<script>
+/* ---------- 이 장의 도우미(교육용 모델, 페이지 전용) ---------- */
+const GD = {
+  ES: 210000, FY: 355, FCK: 30,
+  G0: { bft: 400, tft: 22, tw: 16, hw: 2150, bfb: 500, tfb: 28 },
+  GP: { bft: 450, tft: 36, tw: 16, hw: 2114, bfb: 650, tfb: 50 },
+  DECK: { be: 2800, ts: 240, hh: 60 },
+  YG: [-4.2, -1.4, 1.4, 4.2], EDGE: 5.5, ROAD: [-5.0, 3.0], LANE: 3.6, WG: 1.8, CLR: 0.6,
+  SUP: [0, 40, 90, 130], LT: 130, DXL: 0.5,
+  DC1: 22.56, DC2: 3.0, DW: 4.4,
+  mpf: [1.2, 1.0],
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 11.5}px ${GD.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = GD._c || (GD._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = "#000"; ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  /* --- 단면 --- */
+  steel(g) { return [{ x: -g.bfb / 2, y: 0, b: g.bfb, h: g.tfb }, { x: -g.tw / 2, y: g.tfb, b: g.tw, h: g.hw }, { x: -g.bft / 2, y: g.tfb + g.hw, b: g.bft, h: g.tft }]; },
+  hs(g) { return g.tfb + g.hw + g.tft; },
+  /** n = 0: 강재만, rebar(mm²): 강재 + 철근(바닥판 중앙 높이), 그 밖: 바닥판 폭 be/n */
+  sec(g, d, n, rebar) {
+    const st = GD.steel(g), hs = GD.hs(g);
+    if (rebar) return CB.section.rects([...st, { x: -rebar / 20, y: hs + d.hh + d.ts / 2 - 5, b: rebar / 10, h: 10 }]);
+    if (!n) return CB.section.rects(st);
+    return CB.section.rects([...st, { x: -d.be / 2, y: hs + d.hh, b: d.be, h: d.ts, n: 1 / n }]);
+  },
+  dc1(g, d) { const As = GD.steel(g).reduce((s, r) => s + r.b * r.h, 0) / 1e6; return As * 78.5 * 1.15 + (d.be / 1000) * (d.ts / 1000) * 25 + (g.bft / 1000) * (d.hh / 1000) * 25; },
+  /** 인장 + 응력(MPa), M(kN·m, 새깅 +), y(mm, 바닥에서) */
+  sig(M, s, y) { return (-M * 1e6 * (y - s.cy)) / s.Ix; },
+  /* --- 횡분배 --- */
+  courbon(y, i) { const s2 = GD.YG.reduce((s, v) => s + v * v, 0); return 1 / GD.YG.length + (y * GD.YG[i]) / s2; },
+  lever(y, i) {
+    const Y = GD.YG, n = Y.length;
+    if (y <= Y[0]) { const r = (Y[0] - y) / (Y[1] - Y[0]); return i === 0 ? 1 + r : i === 1 ? -r : 0; }
+    if (y >= Y[n - 1]) { const r = (y - Y[n - 1]) / (Y[n - 1] - Y[n - 2]); return i === n - 1 ? 1 + r : i === n - 2 ? -r : 0; }
+    for (let k = 0; k < n - 1; k++) if (y >= Y[k] && y <= Y[k + 1]) { const t = (y - Y[k]) / (Y[k + 1] - Y[k]); return i === k ? 1 - t : i === k + 1 ? t : 0; }
+    return 0;
+  },
+  /** 탄성 지지 띠(스프링 위 연속보): 바퀴 목록 → 거더별 몫 */
+  elastic(wheels, alpha) {
+    const k = 1000, S = 2.8, EI = alpha * k * S ** 3, L = 2 * GD.EDGE;
+    const b = CB.beam({ L, EI, supports: GD.YG.map((y) => ({ x: y + GD.EDGE, type: "spring", k })), loads: wheels.map((y) => ({ type: "point", P: 0.5, a: CB.clamp(y + GD.EDGE, 0, L) })) });
+    return b.ok ? b.reactions.map((r) => r.R) : GD.YG.map(() => NaN);
+  },
+  wheels(lefts) { const w = []; lefts.forEach((t) => w.push(t, t + GD.WG)); return w; },
+  share(wh, i, rule) { return wh.reduce((s, y) => s + 0.5 * (rule === "lever" ? GD.lever(y, i) : GD.courbon(y, i)), 0); },
+  /** 왼쪽 바퀴 위치 목록이 설계 차로(3.6 m, 차로 끝에서 0.6 m) 배치로 가능한가 */
+  feasible(lefts) {
+    const [r0, r1] = GD.ROAD, c = GD.CLR, sl = GD.LANE - GD.CLR - GD.WG;
+    if (lefts.length === 1) return lefts[0] >= r0 + c - 1e-9 && lefts[0] + GD.WG <= r1 - c + 1e-9;
+    const t = lefts.slice().sort((a, b) => a - b);
+    const lo = Math.max(r0, t[0] - sl, t[1] - GD.LANE - sl), hi = Math.min(r1 - 2 * GD.LANE, t[0] - c, t[1] - GD.LANE - c);
+    return lo <= hi + 1e-9;
+  },
+  worst(i, rule, nl) {
+    let best = { v: -1e9, lanes: [] };
+    const [r0, r1] = GD.ROAD, span = nl * GD.LANE;
+    for (let o = r0; o <= r1 - span + 1e-9; o += 0.05) {
+      const rec = (k, acc) => {
+        if (k === nl) { const v = GD.mpf[nl - 1] * GD.share(GD.wheels(acc), i, rule); if (v > best.v + 1e-12) best = { v, lanes: acc.slice() }; return; }
+        for (let t = GD.CLR; t <= GD.LANE - GD.CLR - GD.WG + 1e-9; t += 0.05) rec(k + 1, [...acc, o + k * GD.LANE + t]);
+      };
+      rec(0, []);
+    }
+    return best;
+  },
+  /* --- B-130 연속보 영향선과 포락선 --- */
+  build() {
+    if (GD.xs) return;
+    const xs = []; for (let x = 0; x <= GD.LT + 1e-9; x += GD.DXL) xs.push(+x.toFixed(3));
+    const sup = GD.SUP.map((x, i) => ({ x, type: i ? "roller" : "pin" }));
+    const IL = xs.map((a) => {
+      const b = CB.beam({ L: GD.LT, EI: 1e6, supports: sup, loads: [{ type: "point", P: 1, a }] });
+      const smp = b.sample(300); let k = 1;
+      return xs.map((x) => { while (k < smp.length - 1 && smp[k].x < x - 1e-9) k++; const p = smp[k - 1], q = smp[k]; const t = q.x - p.x > 1e-9 ? CB.clamp((x - p.x) / (q.x - p.x), 0, 1) : 1; return p.M + t * (q.M - p.M); });
+    });
+    GD.xs = xs; GD.IL = IL;
+    const T = CB.civ.TRUCK, n = xs.length;
+    GD.unit = xs.map((_, i) => { let s = 0; for (let j = 0; j < n - 1; j++) s += ((IL[j][i] + IL[j + 1][i]) / 2) * GD.DXL; return s; });
+    GD.env = xs.map((x, i) => {
+      const il = GD.ilFn(i);
+      const r1 = CB.civ.truckScan(GD.LT, il, T, 0.25, 1), r2 = CB.civ.truckScan(GD.LT, il, T, 0.25, -1);
+      let pos = 0, neg = 0; for (let j = 0; j < n - 1; j++) { const a = ((IL[j][i] + IL[j + 1][i]) / 2) * GD.DXL; if (a > 0) pos += a; else neg += a; }
+      const im = GD.IM(x);
+      const tmax = Math.max(r1.max, r2.max, 0), tmin = Math.min(r1.min, r2.min, 0);
+      return { tmax, tmin, at: r1.at, lpos: pos * T.lane, lneg: neg * T.lane, im, pos: Math.max(tmax * (1 + im), 0.75 * tmax * (1 + im) + pos * T.lane), neg: Math.min(tmin * (1 + im), 0.75 * tmin * (1 + im) + neg * T.lane) };
+    });
+  },
+  ilFn(i) { const IL = GD.IL, n = GD.xs.length; return (x) => { const j = x / GD.DXL, j0 = Math.min(n - 2, Math.max(0, Math.floor(j))), t = CB.clamp(j - j0, 0, 1); return IL[j0][i] * (1 - t) + IL[j0 + 1][i] * t; }; },
+  idx(x) { return Math.round(CB.clamp(x, 0, GD.LT) / GD.DXL); },
+  IM(x) {
+    const S = GD.SUP; for (let k = 1; k < S.length - 1; k++) if (Math.abs(x - S[k]) < 0.26) return CB.civ.impact((S[k] - S[k - 1] + S[k + 1] - S[k]) / 2);
+    for (let k = 0; k < S.length - 1; k++) if (x >= S[k] && x <= S[k + 1]) return CB.civ.impact(S[k + 1] - S[k]);
+    return CB.civ.impact(50);
+  },
+  spanOf(x) { const S = GD.SUP; for (let k = 0; k < S.length - 1; k++) if (x <= S[k + 1] + 1e-9) return S[k + 1] - S[k]; return 40; },
+  /** 트럭 앞축 f(오른쪽으로 주행)일 때 단면 i의 모멘트(충격 제외) */
+  truckAt(f, i) { const il = GD.ilFn(i); let v = 0; CB.civ.TRUCK.axles.forEach((a) => { const x = f - a.x; if (x >= 0 && x <= GD.LT) v += a.P * il(x); }); return v; },
+};
+
+/* ======================================================= 1. 합성 단면 */
+(function () {
+  const ts = CB.range("gd-cp-ts", (v) => v + " mm", () => upd()), be = CB.range("gd-cp-be", (v) => (v / 1000).toFixed(1) + " m", () => upd());
+  const tb = CB.range("gd-cp-tb", (v) => v + " mm", () => upd()), tt = CB.range("gd-cp-tt", (v) => v + " mm", () => upd());
+  const nn = CB.seg("gd-cp-n", () => upd()), shore = CB.seg("gd-cp-shore", () => upd()), df = CB.range("gd-cp-df", (v) => v.toFixed(2), () => upd());
+  let R = null;
+  function calc() {
+    GD.build();
+    const i65 = GD.idx(65), e = GD.env[i65], cu = GD.unit[i65];
+    const g = { ...GD.G0, tfb: tb(), tft: tt(), hw: 2200 - tb() - tt() }, d = { be: be(), ts: ts(), hh: 60 }, n = +nn();
+    const s0 = GD.sec(g, d, 0), s3 = GD.sec(g, d, 3 * n), sn = GD.sec(g, d, n);
+    const w1 = GD.dc1(g, d), M1 = cu * w1, M2 = cu * (GD.DC2 + GD.DW), ML = df() * e.pos;
+    const sh = shore() === "1", hs = 2200, top = hs + d.hh + d.ts;
+    const st = [{ M: M1, s: sh ? s3 : s0, n: sh ? 3 * n : 0, lab: sh ? "① D1 (3n)" : "① D1 강재" }, { M: M2, s: s3, n: 3 * n, lab: "② D2 (3n)" }, { M: ML, s: sn, n, lab: "③ 활하중 (n)" }];
+    const at = (y) => st.map((k) => (y > hs + 1 ? (k.n ? GD.sig(k.M, k.s, y) / k.n : 0) : GD.sig(k.M, k.s, y)));
+    const bot = at(0), tsf = at(hs), dtop = at(top);
+    const np = (0.85 * GD.FCK) / GD.FY, sp = CB.section.rects([...GD.steel(g), { x: -d.be / 2, y: hs + d.hh, b: d.be, h: d.ts, n: np }]);
+    const Mp = (sp.Zx * GD.FY) / 1e6, Mu = 1.25 * (M1 + cu * GD.DC2) + 1.5 * cu * GD.DW + 1.8 * ML;
+    R = { g, d, n, s0, s3, sn, st, at, bot, tsf, dtop, Mp, Mu, hs, top, w1, sh };
+  }
+  function draw(ctx, W, H) {
+    if (!R) return;
+    const pal = CB.palette(), narrow = W < 520, pad = 14;
+    const sw = narrow ? W * 0.3 : W * 0.26, top = 40, hgt = H - top - 34;
+    const sy = hgt / R.top, Y = (y) => top + hgt - y * sy;
+    // 단면(가로 축척은 세로와 다름)
+    const sx = (sw - 10) / Math.max(R.d.be, 1), X = (x) => pad + sw / 2 + x * sx;
+    ctx.fillStyle = CB.color("surface-2"); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1;
+    const dk = [X(-R.d.be / 2), Y(R.top), R.d.be * sx, R.d.ts * sy]; ctx.fillRect(...dk); ctx.strokeRect(...dk);
+    ctx.fillStyle = pal.text;
+    GD.steel(R.g).forEach((r) => ctx.fillRect(X(r.x), Y(r.y + r.h), Math.max(2, r.b * sx), Math.max(1.5, r.h * sy)));
+    ctx.fillStyle = GD.alpha(pal.dim, 0.35); ctx.fillRect(X(-R.g.bft / 2), Y(R.hs + 60), Math.max(2, R.g.bft * sx), 60 * sy);
+    const nas = [[R.st[0].s.cy, R.sh ? "3n" : "s", pal.warn], [R.s3.cy, "3n", pal.accent2], [R.sn.cy, "n", pal.accent]];
+    nas.forEach(([y, l, c], k) => { ctx.strokeStyle = c; ctx.setLineDash([5, 3]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(pad, Y(y)); ctx.lineTo(pad + sw, Y(y)); ctx.stroke(); ctx.setLineDash([]); GD.text(ctx, "NA " + l, pad + sw - 4, Y(y) - 7 - (k === 1 && Math.abs(R.s3.cy - R.st[0].s.cy) < 120 ? 10 : 0), c, { size: 10, align: "right" }); });
+    GD.text(ctx, "단면(가로 축척 다름)", pad + sw / 2, 16, pal.dim, { size: 10.5 });
+    // 응력 기둥 4개
+    const cols = [...R.st.map((k) => k.lab), "합"], cw = (W - pad - sw - 16) / 4;
+    const ys = []; for (let k = 0; k <= 60; k++) ys.push((R.hs * k) / 60);
+    const yc = [R.hs + 60, R.top];
+    const vals = (y) => R.at(y);
+    let smax = 1; ys.concat(yc).forEach((y) => { const v = vals(y); smax = Math.max(smax, Math.abs(v[0] + v[1] + v[2]), ...v.map(Math.abs)); });
+    const sc = (cw * 0.42) / smax;
+    cols.forEach((lab, c) => {
+      const x0 = pad + sw + 16 + cw * c + cw / 2;
+      ctx.strokeStyle = pal.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, Y(R.top) - 4); ctx.lineTo(x0, Y(0) + 4); ctx.stroke();
+      GD.text(ctx, narrow ? ["① D1", "② D2", "③ L", "합"][c] : lab, x0, 16, pal.text, { size: narrow ? 10 : 11 });
+      const f = (y) => { const v = vals(y); return c < 3 ? v[c] : v[0] + v[1] + v[2]; };
+      const seg = (list) => {
+        for (let k = 0; k < list.length - 1; k++) {
+          const a = list[k], b = list[k + 1], va = f(a), vb = f(b);
+          ctx.beginPath(); ctx.moveTo(x0, Y(a)); ctx.lineTo(x0 + va * sc, Y(a)); ctx.lineTo(x0 + vb * sc, Y(b)); ctx.lineTo(x0, Y(b)); ctx.closePath();
+          const m = (va + vb) / 2; ctx.fillStyle = GD.alpha(m >= 0 ? pal.tension : pal.compression, 0.3); ctx.fill();
+          ctx.strokeStyle = m >= 0 ? pal.tension : pal.compression; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x0 + va * sc, Y(a)); ctx.lineTo(x0 + vb * sc, Y(b)); ctx.stroke();
+        }
+      };
+      seg(ys); seg([R.hs + 60, R.top]);
+      const vb = f(0), vt = f(R.hs), vd = f(R.top); const lim = narrow ? 0.06 : 0.3;
+      GD.text(ctx, CB.num(vb, 1), x0 + CB.clamp(vb * sc, -cw * lim, cw * lim), Y(0) + 14, vb >= 0 ? pal.tension : pal.compression, { size: 10 });
+      GD.text(ctx, CB.num(vt, 1), x0 + CB.clamp(vt * sc, -cw * lim, cw * lim), Y(R.hs) + 10, vt >= 0 ? pal.tension : pal.compression, { size: 10 });
+      if (Math.abs(vd) > 0.05) GD.text(ctx, CB.num(vd, 1), x0 + CB.clamp(vd * sc, -cw * lim, cw * lim), Y(R.top) - 8, pal.compression, { size: 10 });
+    });
+  }
+  const cv = CB.canvas("#gd-cv-comp", draw, { aspect: (W) => (W < 520 ? 0.95 : 0.6), maxHeight: 440, minHeight: 300 });
+  function upd() {
+    calc(); cv.redraw();
+    const b = R.bot, t = R.tsf, d = R.dtop, sb = b[0] + b[1] + b[2], s2 = b[0] + b[1] + 1.3 * b[2], lim = 0.95 * GD.FY;
+    CB.stat("gd-cp-i", `${(R.s0.Ix / 1e10).toFixed(2)} · ${(R.s3.Ix / 1e10).toFixed(2)} · ${(R.sn.Ix / 1e10).toFixed(2)}`);
+    CB.stat("gd-cp-m", `${CB.sig(R.st[0].M)} · ${CB.sig(R.st[1].M)} · ${CB.sig(R.st[2].M)}`);
+    CB.stat("gd-cp-sb", `${CB.num(b[0], 1)} + ${CB.num(b[1], 1)} + ${CB.num(b[2], 1)} = <b>${CB.num(sb, 1)}</b>`);
+    CB.stat("gd-cp-st", `${CB.num(t[0] + t[1] + t[2], 1)} · ${CB.num(d[0] + d[1] + d[2], 2)} MPa`);
+    CB.stat("gd-cp-mp", `${CB.sig(R.Mu)} / ${CB.sig(R.Mp)} = ${(R.Mu / R.Mp).toFixed(2)}`);
+    const ok = s2 <= lim, oku = R.Mu <= R.Mp;
+    document.getElementById("gd-cp-msg").innerHTML = `D1 = ${R.w1.toFixed(1)} kN/m(${R.sh ? "동바리: D1도 합성 3n 단면" : "무동바리: D1은 강재만"}). 사용 하중 형태 σ<sub>D1</sub> + σ<sub>D2</sub> + 1.3σ<sub>L</sub> = <b>${CB.num(s2, 1)} MPa</b> ${ok ? "≤" : "&gt;"} 0.95F<sub>y</sub> = ${lim.toFixed(0)} MPa → <span class="${ok ? "ok" : "bad"}">${ok ? "만족" : "초과"}</span>. 강도 M<sub>u</sub>/M<sub>p</sub> = ${(R.Mu / R.Mp).toFixed(2)} → <span class="${oku ? "ok" : "bad"}">${oku ? "여유" : "부족"}</span>. 시공 중 상부 플랜지 압축 ${CB.num(R.sh ? 0 : t[0], 1)} MPa는 좌굴로 따로 검토한다.`;
+  }
+  upd();
+})();
+
+/* ======================================================= 2. 횡분배 */
+(function () {
+  const nl = CB.seg("gd-lt-nl", () => { pts[1].hidden = nl() === "1"; if (nl() === "2" && !GD.feasible(lefts())) setLanes(GD.worst(0, "courbon", 2).lanes); upd(); });
+  const al = CB.range("gd-lt-a", (v) => (Math.pow(10, v) < 1 ? Math.pow(10, v).toPrecision(2) : CB.sig(Math.pow(10, v), 2)), () => upd());
+  const pts = [{ x: -3.5, y: 1.95, lock: "y", color: CB.color("accent-2") }, { x: 0.1, y: 1.95, lock: "y", hidden: true, color: CB.color("accent-2") }];
+  let prev = [pts[0].x, pts[1].x];
+  const lefts = () => (nl() === "1" ? [pts[0].x - 0.9] : [pts[0].x - 0.9, pts[1].x - 0.9]);
+  function setLanes(ls) { ls.forEach((t, k) => { pts[k].x = t + 0.9; }); prev = [pts[0].x, pts[1].x]; }
+  let res = null;
+  function calc() {
+    const wh = GD.wheels(lefts()), m = GD.mpf[lefts().length - 1], el = GD.elastic(wh, Math.pow(10, al()));
+    res = { wh, m, lv: GD.YG.map((_, i) => GD.share(wh, i, "lever")), cb: GD.YG.map((_, i) => GD.share(wh, i, "courbon")), el };
+  }
+  const pl = CB.plane("#gd-cv-lat", {
+    x: [-6.3, 6.3], y: [-5.15, 2.7], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.9 : 0.6), minHeight: 280, maxHeight: 440, points: pts,
+    onDrag(p, k) {
+      const two = nl() === "2";
+      p.x = CB.clamp(Math.round(p.x * 20) / 20, -3.5, 1.5);
+      if (!GD.feasible(lefts())) { p.x = prev[k]; } else prev[k] = p.x;
+      if (!two && k === 0) prev[0] = p.x;
+      upd(true);
+    },
+    draw(P) {
+      if (!res) return;
+      const pal = P.P, ctx = P.ctx;
+      // 횡단면
+      P.poly([[-5.5, 0.6], [5.5, 0.6], [5.5, 0.9], [-5.5, 0.9]], { fill: CB.color("surface-2"), color: pal.dim, width: 1 });
+      P.poly([[-5.5, 0.9], [-5.0, 0.9], [-5.0, 1.5], [-5.5, 1.5]], { fill: CB.color("surface-2"), color: pal.dim, width: 1 });
+      P.poly([[3.0, 0.9], [5.0, 0.9], [5.0, 1.05], [3.0, 1.05]], { fill: CB.color("surface-2"), color: pal.dim, width: 1 });
+      P.poly([[5.0, 0.9], [5.5, 0.9], [5.5, 1.6], [5.0, 1.6]], { fill: CB.color("surface-2"), color: pal.dim, width: 1 });
+      P.line(-5.0, 2.45, 3.0, 2.45, { color: pal.faint, width: 1, dash: [3, 3] });
+      P.text("차도 8.0 m", -1.0, 2.58, { color: pal.dim, size: 11, align: "center" });
+      GD.YG.forEach((y, i) => { P.line(y, 0.6, y, -1.0, { color: pal.text, width: 3 }); P.line(y - 0.25, -1.0, y + 0.25, -1.0, { color: pal.text, width: 3 }); P.text("G" + (i + 1), y, -1.25, { color: pal.dim, size: 11, align: "center" }); });
+      res.wh.forEach((y) => P.arrow(y, 1.75, y, 0.95, { color: pal.accent2, width: 2.4, head: 9 }));
+      // 막대
+      const narrow = P.w < 520, base = -3.5, sc = 1.7, bw = 0.6, cols = [pal.warn, pal.accent, pal.ok], names = ["레버", "쿠르봉", "탄성"];
+      P.line(-6.0, base, 6.0, base, { color: pal.axis, width: 1 });
+      GD.YG.forEach((y, i) => {
+        [res.lv[i], res.cb[i], res.el[i]].forEach((v, k) => {
+          const x0 = y - 1.5 * bw + k * bw, h = (isFinite(v) ? v : 0) * res.m * sc;
+          P.poly([[x0 + 0.03, base], [x0 + bw - 0.03, base], [x0 + bw - 0.03, base + h], [x0 + 0.03, base + h]], { fill: GD.alpha(cols[k], 0.55), color: cols[k], width: 1 });
+          if (Math.abs(v) > 0.004) P.text(CB.num(v * res.m, 2), x0 + bw / 2, base + h + (h >= 0 ? 0.18 + (narrow ? k * 0.3 : 0) : -0.18 - (narrow ? k * 0.3 : 0)), { color: cols[k], size: narrow ? 8.5 : 9.5, align: "center" });
+        });
+      });
+      names.forEach((nm, k) => { const x = -6.0 + k * (narrow ? 2.4 : 1.6); P.poly([[x, -4.65], [x + 0.3, -4.65], [x + 0.3, -4.45], [x, -4.45]], { fill: GD.alpha(cols[k], 0.55), color: cols[k], width: 1 }); P.text(nm, x + 0.4, -4.55, { color: pal.dim, size: 10.5 }); });
+      P.text(`분배 계수 = m × 몫 (m = ${res.m})`, 6.0, narrow ? -4.98 : -4.55, { color: pal.dim, size: 10.5, align: "right" });
+    },
+  });
+  function upd(fromDrag) {
+    calc(); if (!fromDrag) pl.redraw();
+    const f = (a, i) => CB.num(a[i] * res.m, 2);
+    CB.stat("gd-lt-g1", `${f(res.lv, 0)} · ${f(res.cb, 0)} · ${f(res.el, 0)}`);
+    CB.stat("gd-lt-g2", `${f(res.lv, 1)} · ${f(res.cb, 1)} · ${f(res.el, 1)}`);
+    const sm = (a) => a.reduce((s, v) => s + v, 0);
+    CB.stat("gd-lt-sum", `${CB.num(sm(res.lv), 2)} · ${CB.num(sm(res.cb), 2)} · ${CB.num(sm(res.el), 2)}`);
+    CB.stat("gd-lt-y", res.wh.map((v) => CB.num(v, 2)).join(", "));
+  }
+  const go = (i, rule) => { const w = GD.worst(i, rule, +nl()); setLanes(w.lanes); upd(); };
+  document.getElementById("gd-lt-w1").addEventListener("click", () => go(0, "lever"));
+  document.getElementById("gd-lt-w1c").addEventListener("click", () => go(0, "courbon"));
+  document.getElementById("gd-lt-w2").addEventListener("click", () => go(1, "courbon"));
+  upd();
+})();
+
+/* ======================================================= 3. 모멘트 포락선 */
+(function () {
+  GD.build();
+  const xr = CB.range("gd-ev-x", (v) => v.toFixed(1) + " m", () => upd()), tr = CB.range("gd-ev-t", (v) => v.toFixed(1) + " m", () => upd());
+  const dfs = CB.seg("gd-ev-df", () => upd()), view = CB.seg("gd-ev-view", () => upd());
+  function draw(ctx, W, H) {
+    const pal = CB.palette(), x = xr(), f = tr(), df = +dfs(), tot = view() === "tot", xs = GD.xs, i = GD.idx(x);
+    const L = GD.LT, left = 62, right = 14, ww = W - left - right, Xp = (v) => left + (v / L) * ww;
+    // 입면
+    const yb = 52;
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(Xp(0), yb); ctx.lineTo(Xp(L), yb); ctx.stroke();
+    GD.SUP.forEach((s, k) => { ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(Xp(s), yb + 2); ctx.lineTo(Xp(s) - 7, yb + 14); ctx.lineTo(Xp(s) + 7, yb + 14); ctx.closePath(); ctx.stroke(); });
+    CB.civ.TRUCK.axles.forEach((a) => { const xa = f - a.x; if (xa < 0 || xa > L) return; GD.arrow(ctx, Xp(xa), yb - 10 - a.P / 6, Xp(xa), yb - 3, pal.accent2, 2, 7); });
+    GD.text(ctx, "주행 →", Xp(CB.clamp(f, 0, L)) + (f > L - 15 ? -8 : 8), 12, pal.accent2, { size: 10.5, align: f > L - 15 ? "right" : "left" });
+    ctx.strokeStyle = pal.accent; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(Xp(x), 18); ctx.lineTo(Xp(x), H - 30); ctx.stroke(); ctx.setLineDash([]);
+    // 포락선
+    const top = 82, h1 = (H - top - 40) * 0.64, h2 = (H - top - 40) * 0.36 - 26;
+    const dead = (k) => GD.unit[k] * (GD.DC1 + GD.DC2 + GD.DW);
+    const pos = xs.map((v, k) => [v, df * GD.env[k].pos + (tot ? dead(k) : 0)]), neg = xs.map((v, k) => [v, df * GD.env[k].neg + (tot ? dead(k) : 0)]);
+    const now = xs.map((v, k) => [v, df * (1 + GD.env[k].im) * GD.truckAt(f, k) + (tot ? dead(k) : 0)]);
+    const all = pos.concat(neg).map((p) => p[1]); const ymax = Math.max(...all) * 1.12, ymin = Math.min(...all) * 1.12;
+    const series = [{ data: pos, color: pal.tension, width: 2.2, fill: GD.alpha(pal.tension, 0.08) }, { data: neg, color: pal.compression, width: 2.2 }, { data: now, color: pal.accent2, width: 1.6, dash: [5, 3] }];
+    if (tot) series.push({ data: xs.map((v, k) => [v, dead(k)]), color: pal.dim, width: 1.3, dash: [2, 3] });
+    CB.chart(ctx, { x: left, y: top, w: ww, h: h1 }, { x: [0, L], y: [ymin, ymax], yLabel: "M (kN·m)", yFmt: (v) => CB.sig(v, 2), xFmt: (v) => String(v), series, hlines: [{ y: 0, color: pal.axis, dash: [] }], vlines: GD.SUP.slice(1, 3).map((s) => ({ x: s, color: pal.faint })) });
+    GD.text(ctx, tot ? "고정 + 활하중 최대(파랑)·최소(빨강) · 지금 트럭(주황 점선) · 고정만(회색)" : "활하중 최대(파랑)·최소(빨강) · 지금 트럭(주황 점선)", left + ww / 2, top - 8, pal.dim, { size: 10, bold: false });
+    // 영향선
+    const y2 = top + h1 + 34, il = xs.map((v, j) => [v, GD.IL[j][i]]), iv = il.map((p) => p[1]);
+    const a = Math.max(0.5, ...iv.map(Math.abs)) * 1.15;
+    CB.chart(ctx, { x: left, y: y2, w: ww, h: Math.max(50, h2) }, { x: [0, L], y: [-a, a], yLabel: "영향선", xLabel: "", yFmt: (v) => CB.num(v, 0), xFmt: (v) => String(v), series: [{ data: il, color: pal.accent, width: 2, fill: GD.alpha(pal.accent, 0.12) }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    GD.text(ctx, `x = ${x.toFixed(1)} m 의 휨모멘트 영향선 (m)`, left + ww / 2, y2 - 8, pal.dim, { size: 10, bold: false });
+  }
+  const cv = CB.canvas("#gd-cv-env", draw, { aspect: (W) => (W < 520 ? 1.15 : 0.62), maxHeight: 560, minHeight: 380 });
+  function upd() {
+    cv.redraw();
+    const x = xr(), i = GD.idx(x), e = GD.env[i], df = +dfs(), cu = GD.unit[i];
+    CB.stat("gd-ev-mp", CB.sig(df * e.pos));
+    CB.stat("gd-ev-mn", CB.sig(df * e.neg));
+    CB.stat("gd-ev-md", `${CB.sig(cu * GD.DC1)} · ${CB.sig(cu * (GD.DC2 + GD.DW))}`);
+    CB.stat("gd-ev-now", CB.sig(df * (1 + e.im) * GD.truckAt(tr(), i)));
+    CB.stat("gd-ev-im", `${e.im.toFixed(3)} · ${GD.spanOf(x)} m`);
+  }
+  const loop = CB.loop(document.getElementById("gd-cv-env"), (dt) => { let v = tr() + dt * 10; if (v > 142) v = 0; tr.set(v); });
+  loop.stop();
+  CB.playButton("gd-ev-play", () => loop.start(), () => loop.stop(), ["▶ 트럭 주행", "■ 정지"]);
+  document.getElementById("gd-ev-max").addEventListener("click", () => { const i = GD.idx(xr()); const r = CB.civ.truckScan(GD.LT, GD.ilFn(i), CB.civ.TRUCK, 0.25, 1); const useMax = Math.abs(r.max) >= Math.abs(r.min); let best = r.history[0]; r.history.forEach((h) => { if (useMax ? h[1] > best[1] : h[1] < best[1]) best = h; }); tr.set(CB.clamp(best[0], 0, 142)); });
+  upd();
+})();
+
+/* ======================================================= 4. 부모멘트 구간 */
+(function () {
+  GD.build();
+  const rr = CB.range("gd-ng-r", (v) => v.toFixed(1) + " %", () => upd()), sec = CB.seg("gd-ng-sec", () => upd()), crk = CB.seg("gd-ng-crk", () => upd());
+  const i40 = GD.idx(40), cu = GD.unit[i40], M1 = cu * GD.DC1, M2 = cu * (GD.DC2 + GD.DW), ML = 0.9 * GD.env[i40].neg;
+  const d = GD.DECK, yr = 2200 + d.hh + d.ts / 2, top = 2200 + d.hh + d.ts;
+  // 부모멘트 구간(고정 + 활하중 최소가 음)
+  const tmin = GD.xs.map((x, k) => GD.unit[k] * (GD.DC1 + GD.DC2 + GD.DW) + 0.9 * GD.env[k].neg);
+  let a = i40, b = i40; while (a > 0 && tmin[a - 1] < 0) a--; while (b < tmin.length - 1 && tmin[b + 1] < 0) b++;
+  const reg = [GD.xs[a], GD.xs[b]];
+  let R = null;
+  function calc() {
+    const g = sec() === "GP" ? GD.GP : GD.G0, Ar = (rr() / 100) * d.be * d.ts;
+    const s0 = GD.sec(g, d, 0), sc = crk() === "cr" ? GD.sec(g, d, 0, Ar) : GD.sec(g, d, 8);
+    const un = crk() !== "cr";
+    const f = (y) => (y <= 2200 ? GD.sig(M1, s0, y) : 0) + GD.sig(M2 + ML, sc, y) / (un && y > 2200 ? 8 : 1);
+    R = { g, Ar, s0, sc, un, f, bf: f(0), tf: f(2200), rb: GD.sig(M2 + ML, sc, yr), dt: un ? GD.sig(M2 + ML, sc, top) / 8 : NaN };
+  }
+  function draw(ctx, W, H) {
+    if (!R) return;
+    const pal = CB.palette(), narrow = W < 520;
+    // 위: 포락선 최소(고정 + 활)
+    const bx = { x: 62, y: 22, w: W - 70, h: narrow ? 90 : 100 };
+    const data = GD.xs.map((x, k) => [x, tmin[k]]);
+    CB.chart(ctx, bx, { x: [0, 130], y: [Math.min(...tmin) * 1.15, Math.max(...tmin) * 1.15], yLabel: "", yFmt: (v) => CB.sig(v, 2), xFmt: (v) => String(v), series: [{ data, color: pal.compression, width: 2 }], hlines: [{ y: 0, color: pal.axis, dash: [] }], bands: [{ x0: reg[0], x1: reg[1], color: GD.alpha(pal.warn, 0.15) }, { x0: 130 - reg[1], x1: 130 - reg[0], color: GD.alpha(pal.warn, 0.15) }] });
+    GD.text(ctx, "고정 + 활하중(G1) 최소 모멘트 · 노란 띠 = 부모멘트 구간", bx.x + bx.w / 2, 10, pal.dim, { size: 10, bold: false });
+    // 아래: 단면과 응력
+    const t0 = bx.y + bx.h + 44, hh = H - t0 - 26, sy = hh / top, Y = (y) => t0 + hh - y * sy;
+    const sw = W * (narrow ? 0.4 : 0.32), cx = 20 + sw / 2, sx = (sw - 10) / d.be, X = (x) => cx + x * sx;
+    ctx.save();
+    ctx.setLineDash(R.un ? [] : [4, 3]); ctx.strokeStyle = pal.dim; ctx.fillStyle = R.un ? CB.color("surface-2") : GD.alpha(pal.dim, 0.12);
+    ctx.fillRect(X(-d.be / 2), Y(top), d.be * sx, d.ts * sy); ctx.strokeRect(X(-d.be / 2), Y(top), d.be * sx, d.ts * sy); ctx.setLineDash([]);
+    if (!R.un) { ctx.strokeStyle = pal.bad; ctx.lineWidth = 1.2; for (let k = 1; k < 8; k++) { const xx = X(-d.be / 2) + (k * d.be * sx) / 8; ctx.beginPath(); ctx.moveTo(xx, Y(top)); ctx.lineTo(xx + 2, Y(top) + d.ts * sy * 0.8); ctx.stroke(); } }
+    ctx.fillStyle = pal.tension; const nb = Math.max(3, Math.round(R.Ar / 400)); for (let k = 0; k < Math.min(nb, 14); k++) { ctx.beginPath(); ctx.arc(X(-d.be / 2) + ((k + 0.5) * d.be * sx) / Math.min(nb, 14), Y(yr), 2.5, 0, 7); ctx.fill(); }
+    ctx.fillStyle = pal.text; GD.steel(R.g).forEach((r) => ctx.fillRect(X(r.x), Y(r.y + r.h), Math.max(2, r.b * sx), Math.max(1.5, r.h * sy)));
+    ctx.strokeStyle = pal.warn; ctx.setLineDash([5, 3]); ctx.beginPath(); ctx.moveTo(10, Y(R.sc.cy)); ctx.lineTo(20 + sw, Y(R.sc.cy)); ctx.stroke(); ctx.setLineDash([]);
+    GD.text(ctx, R.un ? "NA(n)" : "NA(균열)", 20 + sw - 2, Y(R.sc.cy) - 8, pal.warn, { size: 10, align: "right" });
+    ctx.restore();
+    // 응력
+    const x0 = 20 + sw + (W - 20 - sw) * 0.45, smax = Math.max(160, Math.abs(R.bf), Math.abs(R.tf), Math.abs(R.rb)), sc = ((W - 20 - sw) * 0.36) / smax;
+    ctx.strokeStyle = pal.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, Y(top) - 4); ctx.lineTo(x0, Y(0) + 4); ctx.stroke();
+    const ys = []; for (let k = 0; k <= 40; k++) ys.push((2200 * k) / 40);
+    for (let k = 0; k < ys.length - 1; k++) { const va = R.f(ys[k]), vb = R.f(ys[k + 1]), m = (va + vb) / 2; ctx.beginPath(); ctx.moveTo(x0, Y(ys[k])); ctx.lineTo(x0 + va * sc, Y(ys[k])); ctx.lineTo(x0 + vb * sc, Y(ys[k + 1])); ctx.lineTo(x0, Y(ys[k + 1])); ctx.closePath(); ctx.fillStyle = GD.alpha(m >= 0 ? pal.tension : pal.compression, 0.3); ctx.fill(); }
+    GD.text(ctx, `하부 ${CB.num(R.bf, 1)}`, x0 + CB.clamp(R.bf * sc, -90, 90), Y(0) + 13, pal.compression, { size: 10.5 });
+    GD.text(ctx, `상부 ${CB.num(R.tf, 1)}`, x0 + CB.clamp(R.tf * sc, -90, 90), Y(2200) + 12, pal.tension, { size: 10.5 });
+    ctx.fillStyle = pal.tension; ctx.beginPath(); ctx.arc(x0 + R.rb * sc, Y(yr), 4, 0, 7); ctx.fill();
+    GD.text(ctx, `철근 ${CB.num(R.rb, 1)}`, x0 + CB.clamp(R.rb * sc, -90, 60), Y(yr) - 12, pal.tension, { size: 10.5 });
+    GD.text(ctx, "σ (MPa, 인장 +)", x0, t0 - 14, pal.dim, { size: 10.5, bold: false });
+  }
+  const cv = CB.canvas("#gd-cv-neg", draw, { aspect: (W) => (W < 520 ? 1.15 : 0.75), maxHeight: 520, minHeight: 340 });
+  function upd() {
+    calc(); cv.redraw();
+    CB.stat("gd-ng-bf", CB.num(R.bf, 1)); CB.stat("gd-ng-tf", CB.num(R.tf, 1));
+    CB.stat("gd-ng-r2", R.un ? `σ<sub>c</sub> 상단 ${CB.num(R.dt, 2)} MPa` : `σ<sub>r</sub> ${CB.num(R.rb, 1)} MPa`);
+    CB.stat("gd-ng-i", (R.sc.Ix / R.s0.Ix).toFixed(2));
+    CB.stat("gd-ng-len", `${reg[0].toFixed(1)}–${reg[1].toFixed(1)} m`);
+    const fr = 0.63 * Math.sqrt(GD.FCK), lim = 0.95 * GD.FY;
+    const m = R.un ? `비균열 가정: 바닥판 상단 인장 <b>${CB.num(R.dt, 2)} MPa</b> ${R.dt > fr ? `&gt; 파괴 계수 ${fr.toFixed(2)} MPa → <span class="bad">균열한다</span>. 균열 단면으로 계산해야 한다.` : `≤ ${fr.toFixed(2)} MPa → <span class="ok">균열 전</span>.`}`
+      : `균열 단면(A<sub>r</sub> = ${CB.sig(R.Ar)} mm²): 하부 플랜지 압축 <b>${CB.num(-R.bf, 1)} MPa</b>(${(Math.abs(R.bf) / GD.FY * 100).toFixed(0)} % F<sub>y</sub>, 좌굴 강도로 판정), 상부 플랜지 ${CB.num(R.tf, 1)} MPa ${Math.abs(R.tf) <= lim ? '<span class="ok">≤ 0.95F<sub>y</sub></span>' : '<span class="bad">&gt; 0.95F<sub>y</sub></span>'}, 철근 ${CB.num(R.rb, 1)} MPa${R.rb > 0.6 * 400 ? ' <span class="warn">(사용 하중에서 높다 → 균열 폭 주의)</span>' : ""}.`;
+    document.getElementById("gd-ng-msg").innerHTML = m;
+  }
+  upd();
+})();
+
+/* ======================================================= 5. 바닥판 */
+(function () {
+  const sS = CB.range("gd-dk-s", (v) => v.toFixed(1) + " m", () => upd()), tT = CB.range("gd-dk-t", (v) => v + " mm", () => upd());
+  const oO = CB.range("gd-dk-o", (v) => v.toFixed(1) + " m", () => upd()), pP = CB.range("gd-dk-p", (v) => v.toFixed(1) + " kN", () => upd());
+  const view = CB.seg("gd-dk-view", () => cv.redraw());
+  let R = null;
+  const AS = (mu, dd) => { const Rn = (mu * 1e6) / (0.85 * 1000 * dd * dd), q = 1 - (2 * Rn) / (0.85 * GD.FCK); if (q < 0) return NaN; return ((0.85 * GD.FCK) / 400) * (1 - Math.sqrt(q)) * 1000 * dd; };
+  const spc = (As) => (isFinite(As) ? CB.clamp(Math.floor((198.6 * 1000) / As / 50) * 50, 100, 300) : NaN);
+  function calc() {
+    const S = sS(), t = tT(), ov = oO(), P = pP(), n = 4, e = ((n - 1) / 2) * S + ov, L = 2 * e;
+    const X = Array.from({ length: n }, (_, i) => i * S + ov), sup = X.map((x, i) => ({ x, type: i ? "roller" : "pin" }));
+    const beam = (loads) => CB.beam({ L, EI: 1e5, supports: sup, loads });
+    const inner = (s) => s.filter((p) => p.x > X[0] + 0.02 && p.x < X[n - 1] - 0.02);
+    const dl = beam([{ type: "udl", w: (t / 1000) * 25, a: 0, b: L }]).sample(240), dw = beam([{ type: "udl", w: 1.61, a: 0.5, b: L - 0.5 }, { type: "point", P: 7, a: 0.25 }, { type: "point", P: 7, a: L - 0.25 }]).sample(240);
+    let best = { p: -1e9 }, worst = { n: 1e9 };
+    for (let a = 0.8; a <= L - 0.8 - 1.8 + 1e-9; a += 0.1) {
+      const s = inner(beam([{ type: "point", P, a }, { type: "point", P, a: a + 1.8 }]).sample(240));
+      s.forEach((p) => { if (p.M > best.p) best = { p: p.M, a, x: p.x }; if (p.x > X[1] - 0.3 && p.x < X[n - 2] + 0.3 && p.M < worst.n) worst = { n: p.M, a, x: p.x }; });
+    }
+    const Ep = (660 + 550 * S) / 1000, En = (1220 + 250 * S) / 1000, im = 0.3;
+    const mlp = (best.p / Ep) * (1 + im), mln = (worst.n / En) * (1 + im), emp = (0.8 * (S + 0.61) * P) / 9.75 * (1 + im);
+    const pk = (s, f) => f(...inner(s).map((p) => p.M));
+    const mup = 1.25 * pk(dl, Math.max) + 1.5 * pk(dw, Math.max) + 1.8 * mlp;
+    const dln = Math.min(...inner(dl).filter((p) => p.x > X[1] - 0.3 && p.x < X[n - 2] + 0.3).map((p) => p.M)), dwn = Math.min(...inner(dw).filter((p) => p.x > X[1] - 0.3 && p.x < X[n - 2] + 0.3).map((p) => p.M));
+    const mun = 1.25 * dln + 1.5 * dwn + 1.8 * mln;
+    const dp = t - 30 - 8, dn = t - 50 - 8, Asp = AS(mup, dp), Asn = AS(-mun, dn);
+    // 캔틸레버
+    const Xo = ov - 0.8, Eo = (1140 + 833 * Math.max(0, Xo)) / 1000;
+    const mo = 1.25 * (((t / 1000) * 25 * ov * ov) / 2 + 7 * (ov - 0.25)) + 1.5 * ((1.61 * Math.max(0, ov - 0.5) ** 2) / 2) + 1.8 * (Xo > 0 ? ((P * Xo) / Eo) * (1 + im) : 0);
+    const shape = (a) => beam([{ type: "point", P, a }, { type: "point", P, a: a + 1.8 }]).sample(240);
+    R = { S, t, ov, P, L, X, best, worst, Ep, En, mlp, mln, emp, mup, mun, Asp, Asn, dp, dn, mo, Asov: AS(mo, dn), shP: shape(best.a), shN: shape(worst.a), dl, dw };
+  }
+  function draw(ctx, W, H) {
+    if (!R) return;
+    const pal = CB.palette(), pos = view() === "pos", a = pos ? R.best.a : R.worst.a, sh = pos ? R.shP : R.shN, E = pos ? R.Ep : R.En;
+    const left = 58, ww = W - left - 14, Xp = (v) => left + (v / R.L) * ww, yd = 66;
+    ctx.fillStyle = CB.color("surface-2"); ctx.strokeStyle = pal.dim; ctx.fillRect(Xp(0), yd, ww, 10); ctx.strokeRect(Xp(0), yd, ww, 10);
+    ctx.fillRect(Xp(0), yd - 18, Xp(0.5) - Xp(0), 18); ctx.fillRect(Xp(R.L - 0.5), yd - 18, Xp(R.L) - Xp(R.L - 0.5), 18);
+    R.X.forEach((x) => { ctx.fillStyle = pal.text; ctx.fillRect(Xp(x) - 1.5, yd + 10, 3, 22); ctx.fillRect(Xp(x) - 7, yd + 30, 14, 3); });
+    [a, a + 1.8].forEach((x) => GD.arrow(ctx, Xp(x), yd - 40, Xp(x), yd - 2, pal.accent2, 2.4, 8));
+    GD.text(ctx, `P = ${R.P} kN × 2`, Xp(a + 0.9), yd - 48, pal.accent2, { size: 10.5 });
+    const ip = (arr, x) => { let k = 1; while (k < arr.length - 1 && arr[k].x < x) k++; const p0 = arr[k - 1], p1 = arr[k], t = p1.x - p0.x > 1e-9 ? CB.clamp((x - p0.x) / (p1.x - p0.x), 0, 1) : 0; return p0.M + t * (p1.M - p0.M); };
+    const lt = sh.map((p) => [p.x, 1.25 * ip(R.dl, p.x) + 1.5 * ip(R.dw, p.x) + 1.8 * (p.M / E) * 1.3]);
+    const ll = sh.map((p) => [p.x, (p.M / E) * 1.3]);
+    const vals = lt.concat(ll).map((p) => p[1]), lo = Math.min(...vals, -10) * 1.2, hi = Math.max(...vals, 10) * 1.2;
+    CB.chart(ctx, { x: left, y: 132, w: ww, h: H - 132 - 40 }, { x: [0, R.L], y: [lo, hi], yLabel: "m (kN·m/m)", xLabel: "가로 위치 (m)", xFmt: (v) => String(+v.toFixed(1)), yFmt: (v) => CB.num(v, 0), series: [{ data: lt, color: pal.accent, width: 2.2, fill: GD.alpha(pal.accent, 0.1) }, { data: ll, color: pal.accent2, width: 1.5, dash: [5, 3] }], hlines: [{ y: 0, color: pal.axis, dash: [] }], vlines: R.X.map((x) => ({ x, color: pal.faint })) });
+    GD.text(ctx, `m_u(녹색) · 활하중 m_L(주황 점선), 띠 폭 E = ${E.toFixed(2)} m, 그래프 위가 +(정모멘트)`, left + ww / 2, 120, pal.dim, { size: 10, bold: false });
+  }
+  const cv = CB.canvas("#gd-cv-deck", draw, { aspect: (W) => (W < 520 ? 0.95 : 0.6), maxHeight: 440, minHeight: 300 });
+  function upd() {
+    calc(); cv.redraw();
+    CB.stat("gd-dk-ml", `${CB.num(R.mlp, 1)} · ${CB.num(R.emp, 1)}`);
+    const bar = (As) => (isFinite(As) ? `${CB.sig(As)} mm² → D16@${spc(As)}` : "단면 부족");
+    CB.stat("gd-dk-mp", `${CB.num(R.mup, 1)} · ${bar(R.Asp)}`);
+    CB.stat("gd-dk-mn", `${CB.num(R.mun, 1)} · ${bar(R.Asn)}`);
+    CB.stat("gd-dk-ov", `${CB.num(-R.mo, 1)} · ${bar(R.Asov)}`);
+    const tmin = 175, ok = R.t >= tmin && isFinite(R.Asp) && isFinite(R.Asn) && isFinite(R.Asov);
+    const gov = R.mo > -R.mun ? "캔틸레버부 부모멘트" : "거더 위 부모멘트";
+    document.getElementById("gd-dk-msg").innerHTML = `띠 해석 m<sub>L</sub><sup>+</sup> = ${CB.num(R.mlp, 1)} vs 옛 경험식 ${CB.num(R.emp, 1)} kN·m/m(차이 ${((R.emp / R.mlp - 1) * 100).toFixed(0)} %). 상부 철근은 <b>${gov}</b>가 정한다. 두께 ${R.t} mm ${R.t >= tmin ? "≥" : "&lt;"} 최소 약 175 mm(형태) → <span class="${ok ? "ok" : "bad"}">${ok ? "배근 가능" : "두께·배근 다시 검토"}</span>.`;
+  }
+  upd();
+})();
+
+/* ======================================================= 6. 박스 vs I형 */
+(function () {
+  const eE = CB.range("gd-bx-e", (v) => v.toFixed(2) + " m", () => upd()), lL = CB.range("gd-bx-l", (v) => v + " m", () => upd());
+  const tT = CB.range("gd-bx-t", (v) => v + " mm", () => upd()), pP = CB.range("gd-bx-p", (v) => v + " kN", () => upd());
+  const E = 2.1e8, G = 8.1e7, b = 2.8, h = 2.2;
+  let R = null;
+  function calc() {
+    const e = eE(), L = lL(), t = tT() / 1000, P = pP(), T = P * e;
+    const Ig = (t * h ** 3) / 12 + 2 * (b / 2) * t * (h / 2) ** 2, Ib = 2 * Ig;
+    const A0 = b * h, Jb = (4 * A0 * A0) / ((2 * (b + h)) / t), Jo = 2 * ((h * t ** 3) / 3 + 2 * ((b / 2) * t ** 3) / 3);
+    const th = (T * L) / (4 * G * Jb), db = (P * L ** 3) / (48 * E * Ib), dbox = db + (th * b) / 2, dboxo = db - (th * b) / 2;
+    const k = L ** 3 / (48 * E * Ig), dI = (P / 2 + T / b) * k, dIo = (P / 2 - T / b) * k;
+    const q = T / (2 * A0), tau = q / t / 1000;
+    R = { e, L, t, P, T, Ig, Jb, Jo, th, db, dbox, dboxo, dI, dIo, q, tau, ratio: (T / b) * k / Math.max(1e-12, (th * b) / 2) };
+  }
+  function draw(ctx, W, H) {
+    if (!R) return;
+    const pal = CB.palette(), narrow = W < 520, cw = narrow ? W : W / 2, mx = Math.max(R.dI, R.dbox, 1e-6), sc = 46 / mx;
+    const one = (ox, oy, kind) => {
+      const sw = Math.min(cw * 0.5, 190), sh = sw * (h / b), cx = ox + cw / 2, cy = oy + 66;
+      const dl = (kind === "box" ? R.dboxo : R.dIo) * sc, dr = (kind === "box" ? R.dbox : R.dI) * sc;
+      const pL = [cx - sw / 2, cy + dl], pR = [cx + sw / 2, cy + dr];
+      // 하중 쪽 = 오른쪽
+      ctx.strokeStyle = pal.faint; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.strokeRect(cx - sw / 2, cy, sw, sh); ctx.setLineDash([]);
+      ctx.strokeStyle = pal.text; ctx.lineWidth = 3;
+      if (kind === "box") { ctx.beginPath(); ctx.moveTo(...pL); ctx.lineTo(...pR); ctx.lineTo(pR[0], pR[1] + sh); ctx.lineTo(pL[0], pL[1] + sh); ctx.closePath(); ctx.stroke(); }
+      else { [pL, pR].forEach((p) => { ctx.beginPath(); ctx.moveTo(p[0] - 16, p[1]); ctx.lineTo(p[0] + 16, p[1]); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0], p[1] + sh); ctx.moveTo(p[0] - 16, p[1] + sh); ctx.lineTo(p[0] + 16, p[1] + sh); ctx.stroke(); }); ctx.strokeStyle = GD.alpha(pal.dim, 0.6); ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(pL[0] - 20, pL[1] - 3); ctx.lineTo(pR[0] + 20, pR[1] - 3); ctx.stroke(); }
+      const lx = cx + (R.e / b) * sw; GD.arrow(ctx, lx, cy - 46, lx, cy - 6, pal.accent2, 2.4, 8);
+      GD.text(ctx, kind === "box" ? "박스(닫힌 단면)" : "I형 두 줄(열린 단면)", cx, oy + 12, pal.text, { size: 11.5 });
+      GD.text(ctx, `${CB.num(kind === "box" ? R.dboxo * 1000 : R.dIo * 1000, 1)}`, pL[0], cy + sh + 18 + Math.max(0, dl), pal.dim, { size: 10.5 });
+      GD.text(ctx, `${CB.num(kind === "box" ? R.dbox * 1000 : R.dI * 1000, 1)} mm`, pR[0], cy + sh + 18 + Math.max(0, dr), pal.accent, { size: 10.5 });
+    };
+    if (narrow) { one(0, 0, "box"); one(0, H / 2, "I"); } else { one(0, 10, "box"); one(cw, 10, "I"); }
+    GD.text(ctx, "처짐 과장(가장 큰 처짐 = 46 px), 숫자는 실제 mm", W / 2, H - 10, pal.dim, { size: 10, bold: false });
+  }
+  const cv = CB.canvas("#gd-cv-box", draw, { aspect: (W) => (W < 520 ? 1.15 : 0.5), maxHeight: 460, minHeight: 280 });
+  function upd() {
+    calc(); cv.redraw();
+    CB.stat("gd-bx-j", `${R.Jb.toFixed(3)} / ${R.Jo.toExponential(1).replace("e-", " × 10⁻").replace(/(\d+)$/, (m) => m.split("").map((c) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[c]).join(""))} m⁴ → ${CB.sig(R.Jb / R.Jo)}배`);
+    CB.stat("gd-bx-th", `${(R.th * 1e4).toFixed(2)} × 10⁻⁴ rad · ${R.tau.toFixed(1)} MPa`);
+    CB.stat("gd-bx-d", `${CB.num(R.dbox * 1000, 1)} · ${CB.num(R.dI * 1000, 1)} mm`);
+    CB.stat("gd-bx-r", R.e > 0 ? `${CB.sig(R.ratio)}배` : "—(편심 0)");
+  }
+  upd();
+})();
+
+/* ======================================================= 7. 거더 높이 */
+(function () {
+  const lL = CB.range("gd-dp-l", (v) => v + " m", () => upd()), wW = CB.range("gd-dp-w", (v) => v + " kN/m", () => upd());
+  const sS = CB.range("gd-dp-s", (v) => v + " MPa", () => upd()), kK = CB.range("gd-dp-k", (v) => String(v), () => upd());
+  let R = null;
+  function calc() {
+    const L = lL(), M = (wW() * L * L) / 10, s = sS(), lam = kK(), Mn = M * 1e6;
+    const A = (h) => ({ f: (2 * Mn) / (s * h), w: (h * h) / lam });
+    const hopt = Math.cbrt((lam * Mn) / s), kg = (a) => (a * 7850) / 1e6;
+    R = { L, M, s, lam, A, hopt, kg, w22: kg(A(2200).f + A(2200).w), wopt: kg(A(hopt).f + A(hopt).w) };
+  }
+  function draw(ctx, W, H) {
+    if (!R) return;
+    const pal = CB.palette(), hmax = Math.max(4000, R.hopt * 2.2), data = { f: [], w: [], t: [] };
+    for (let h = 300; h <= hmax; h += hmax / 200) { const a = R.A(h); data.f.push([h / 1000, R.kg(a.f)]); data.w.push([h / 1000, R.kg(a.w)]); data.t.push([h / 1000, R.kg(a.f + a.w)]); }
+    const ymax = R.wopt * 3;
+    CB.chart(ctx, null, { x: [0.3, hmax / 1000], y: [0, ymax], xLabel: "거더(강재) 높이 h (m)", yLabel: "강재량 (kg/m)", yFmt: (v) => CB.sig(v, 2), series: [{ data: data.t, color: pal.text, width: 2.4 }, { data: data.f, color: pal.accent, width: 1.6, dash: [5, 3] }, { data: data.w, color: pal.accent2, width: 1.6, dash: [5, 3] }],
+      vlines: [{ x: R.hopt / 1000, color: pal.ok, label: "h_opt", dash: [] }, { x: 0.027 * R.L, color: pal.warn, label: "0.027L" }, { x: 2.2, color: pal.dim, label: "B-130" }], points: [{ x: R.hopt / 1000, y: R.wopt, color: pal.ok }] });
+    GD.text(ctx, "전체(굵은 선) · 플랜지(녹색 점선) · 복부(주황 점선)", W - 18, 12, pal.dim, { size: 10, align: "right", bold: false });
+  }
+  const cv = CB.canvas("#gd-cv-depth", draw, { aspect: (W) => (W < 520 ? 0.85 : 0.58), maxHeight: 420, minHeight: 260 });
+  function upd() {
+    calc(); cv.redraw();
+    CB.stat("gd-dp-m", CB.sig(R.M) + " kN·m");
+    CB.stat("gd-dp-h", `${(R.hopt / 1000).toFixed(2)} m · L/${(R.L / (R.hopt / 1000)).toFixed(0)}`);
+    CB.stat("gd-dp-wt", `${CB.sig(R.wopt)} · ${CB.sig(R.w22)}`);
+    CB.stat("gd-dp-min", `${(0.027 * R.L).toFixed(2)} m`);
+  }
+  upd();
+})();
+
+/* ======================================================= 8. 3D */
+(function () {
+  const xX = CB.range("gd-3d-x", (v) => v.toFixed(1) + " m", () => upd()), yY = CB.range("gd-3d-y", (v) => CB.num(v, 1) + " m", () => upd());
+  const kK = CB.range("gd-3d-k", (v) => "× " + v, () => v3.redraw()), lane = CB.check("gd-3d-lane", () => upd());
+  const EI = 2.1e8 * 0.104543, sup = GD.SUP.map((x, i) => ({ x, type: i ? "roller" : "pin" })), NX = 131;
+  let R = null;
+  function calc() {
+    const f = xX(), c = yY(), wh = [c - 0.9, c + 0.9];
+    const sh = GD.YG.map((_, i) => GD.share(wh, i, "courbon"));
+    const v = sh.map((s) => {
+      const loads = []; CB.civ.TRUCK.axles.forEach((a) => { const x = f - a.x; if (x > 0.01 && x < GD.LT - 0.01) loads.push({ type: "point", P: a.P * s, a: x }); });
+      if (lane()) loads.push({ type: "udl", w: 12.7 * s, a: 40, b: 90 });
+      if (!loads.length) return new Array(NX).fill(0);
+      const b = CB.beam({ L: GD.LT, EI, supports: sup, loads }); if (!b.ok) return new Array(NX).fill(0);
+      const smp = b.sample(260); let k = 1;
+      return Array.from({ length: NX }, (_, j) => { const x = j; while (k < smp.length - 1 && smp[k].x < x) k++; const p = smp[k - 1], q = smp[k], t = q.x - p.x > 1e-9 ? CB.clamp((x - p.x) / (q.x - p.x), 0, 1) : 0; return p.v + t * (q.v - p.v); });
+    });
+    const mins = v.map((a) => Math.min(...a));
+    let best = 0, bi = 0; v.forEach((a) => a.forEach((d, j) => { const span = GD.spanOf(j); if (-d / span > best) { best = -d / span; bi = span; } }));
+    R = { f, c, sh, v, mins, ratio: best, span: bi };
+  }
+  const v3 = CB.orbit("#gd-cv-3d", { yaw: -0.62, pitch: 0.36, dist: 150, target: [65, 0, -4], aspect: 0.62, minHeight: 260, maxHeight: 460, draw(V) {
+    if (!R) return;
+    const P = V.P, k = kK(), z = (i, j) => R.v[i][j] * k;
+    // 물
+    V.poly3([[-5, -22, -10], [135, -22, -10], [135, 22, -10], [-5, 22, -10]], { fill: P.blue, fillAlpha: 0.08, stroke: false });
+    // 교각·교대
+    [40, 90].forEach((x) => [-2.8, 2.8].forEach((y) => V.line3([x, y, -2.6], [x, y, -14], { color: P.dim, width: 4 })));
+    [0, 130].forEach((x) => V.poly3([[x, -6, -2.4], [x, 6, -2.4], [x, 6, -12], [x, -6, -12]], { fill: P.dim, fillAlpha: 0.2, color: P.dim, width: 1 }));
+    // 거더
+    GD.YG.forEach((y, i) => { for (let j = 0; j < NX - 1; j += 2) { const j2 = Math.min(NX - 1, j + 2); V.line3([j, y, -2.3 + z(i, j)], [j2, y, -2.3 + z(i, j2)], { color: i === 0 ? P.accent : P.text, width: 2.2 }); } });
+    // 바닥판(거더 사이 + 캔틸레버, 선형 외삽)
+    const ys = [-5.5, ...GD.YG, 5.5];
+    const zAt = (yi, j) => { if (yi === 0) return z(0, j) + (z(0, j) - z(1, j)) * (1.3 / 2.8); if (yi === 5) return z(3, j) + (z(3, j) - z(2, j)) * (1.3 / 2.8); return z(yi - 1, j); };
+    const polys = [];
+    for (let j = 0; j < NX - 1; j += 5) { const j2 = Math.min(NX - 1, j + 5); for (let a = 0; a < 5; a++) { const pts = [[j, ys[a], zAt(a, j)], [j2, ys[a], zAt(a, j2)], [j2, ys[a + 1], zAt(a + 1, j2)], [j, ys[a + 1], zAt(a + 1, j)]]; polys.push({ pts, d: V.depth(pts) }); } }
+    polys.sort((p, q) => q.d - p.d).forEach((p) => V.poly3(p.pts, { fill: P.accent, fillAlpha: 0.13, color: GD.alpha(P.accent, 0.35), width: 0.6 }));
+    // 트럭
+    const f = R.f, x0 = Math.max(0, f - 12.2), x1 = Math.min(130, f);
+    if (x1 > x0) { const zt = (x) => { const j = Math.round(CB.clamp(x, 0, 130)); return (z(0, j) * R.sh[0] + z(1, j) * R.sh[1] + z(2, j) * R.sh[2] + z(3, j) * R.sh[3]) / Math.max(1e-6, R.sh.reduce((s, v) => s + v, 0)); };
+      const y0 = R.c - 1.2, y1 = R.c + 1.2, h = 3;
+      [[[x0, y0, zt(x0)], [x1, y0, zt(x1)], [x1, y0, zt(x1) + h], [x0, y0, zt(x0) + h]], [[x0, y1, zt(x0)], [x1, y1, zt(x1)], [x1, y1, zt(x1) + h], [x0, y1, zt(x0) + h]], [[x0, y0, zt(x0) + h], [x1, y0, zt(x1) + h], [x1, y1, zt(x1) + h], [x0, y1, zt(x0) + h]]].forEach((q) => V.poly3(q, { fill: P.accent2, fillAlpha: 0.45, color: P.accent2, width: 1.2 }));
+    }
+    if (lane()) V.text3("차로 하중 12.7 kN/m", [65, -7.5, 1.5], { color: P.accent2, size: 11 });
+    V.text3("G1", [-3, -4.2, -2.3], { color: P.accent, size: 11, bold: true });
+  } });
+  let raf = null;
+  const loop = CB.loop(document.getElementById("gd-cv-3d"), (dt) => { let v = xX() + dt * 12; if (v > 142) v = 0; xX.set(v); });
+  loop.stop();
+  CB.playButton("gd-3d-play", () => loop.start(), () => loop.stop(), ["▶ 주행", "■ 정지"]);
+  function upd() {
+    calc(); v3.redraw();
+    CB.stat("gd-3d-d", R.mins.map((m) => CB.num(m * 1000, 1)).join(" · "));
+    CB.stat("gd-3d-r", R.ratio > 0 ? `L/${Math.round(1 / R.ratio)} ${1 / R.ratio >= 800 ? "≥ L/800" : "&lt; L/800"}` : "—");
+    CB.stat("gd-3d-s", R.sh.map((s) => CB.num(s, 2)).join(" · "));
+  }
+  upd();
+})();
+</script>
+</body>
+</html>

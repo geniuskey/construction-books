@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>아치교와 트러스교 · CivilBook</title>
+<meta name="description" content="형태로 버티는 다리. 아치의 추력과 타이드 아치, 편재 하중이 만드는 압력선 편차와 휨, 2힌지·고정 아치, 아치 좌굴, 트러스교의 부재력과 트럭 주행 영향선, 2차 응력, 캔틸레버 가설과 경간 효율을 시뮬레이터로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .at-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); line-height: 1.7; overflow-wrap: anywhere; }
+  .at-msg b { color: var(--text); }
+  .at-msg .ok { color: var(--ok); font-weight: 600; }
+  .at-msg .bad { color: var(--bad); font-weight: 600; }
+  .at-msg .warn { color: var(--warn); font-weight: 600; }
+  .at-steps { margin: 6px 0 0; }
+  .at-steps li { margin: 4px 0; }
+  .at-tbl td, .at-tbl th { font-variant-numeric: tabular-nums; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="civil"></script>
+</head>
+<body data-chapter="arch-truss">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="at-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="at-ah-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="at-ah-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="at-ah-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--compression)"/></marker>
+      <marker id="at-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--tension)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 04</div>
+    <h1 data-no-glossary>아치교와 트러스교</h1>
+    <p class="lead">3장의 거더는 하중을 <b>휨</b>으로 견뎠습니다. 휨은 단면의 가장자리만 크게 쓰고 가운데는 놀리는, 재료를 아끼지 못하는 방식입니다. 경간이 길어지면 같은 일을 <b>축력</b>으로 하는 형태가 유리해집니다. 아치는 하중을 압축으로 바꿔 지점으로 흘리고, 트러스는 휨을 위아래 현재의 인장·압축과 복부재의 축력으로 나눕니다. 이 장은 MechanicsBook에서 배운 추력과 압력선, 트러스 부재력을 교량 규모로 키워, 타이드 아치의 타이, 편재 하중이 만드는 휨, 2힌지·고정 아치의 차이, 아치 좌굴, 트럭이 지나가는 동안 트러스 부재력의 변화와 2차 응력, 그리고 가설과 경간 효율까지 계산합니다.</p>
+    <ul class="objectives">
+      <li>포물선 아치의 추력 \(H = wL^2/(8f)\)를 교량 규모에서 계산하고, 리브 축 변형이 만드는 작은 휨과 상로·중로·하로 아치의 하중 경로를 설명한다.</li>
+      <li>타이드 아치에서 타이가 추력을 내부에서 묶는 원리와, 리브·타이 거더 강성 비가 휨을 나누는 방식(랑거·로제 형태)을 계산한다.</li>
+      <li>편재 활하중에서 압력선이 축선에서 벗어나는 양(편심 e = M/N)을 구하고, 고정하중 추력이 압력선을 핵 안에 붙잡아 두는 원리를 설명한다.</li>
+      <li>3힌지·2힌지·고정 아치의 휨과 지점 변위(벌어짐) 민감도를 비교하고, 아치의 면내 좌굴 하중 \(q_{cr} = \gamma EI/L^3\)을 수치로 구한다.</li>
+      <li>프랫·하우·워런 트러스교의 부재력을 해석하고, 트럭 주행에 따른 부재력 영향선과 사재의 부호 반전을 계산한다.</li>
+      <li>강접 절점이 만드는 2차 응력을 계산하고, 트러스·아치의 가설 공법과 경간에 따른 효율을 비교한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>퀘벡교의 하현재는 왜 휘었나</b></div>
+      <div class="o-body"><p>1907년 8월, 캐나다 세인트로렌스강을 건너던 퀘벡교가 가설 중에 무너졌습니다. 주경간을 약 549 m로 계획한 캔틸레버 트러스였고, 캔틸레버로 뻗어 나가던 남쪽 팔이 강으로 떨어지며 작업자 75명이 목숨을 잃었습니다. 조사 결과 무너짐은 압축을 받는 하현재가 휘면서(좌굴) 시작되었습니다. 설계 도중 경간을 늘렸는데도 자중을 다시 계산하지 않아 실제 자중이 가정보다 컸고, 여러 판을 격자로 엮은 거대한 압축재의 좌굴 거동을 당시의 방법으로는 제대로 평가하지 못했습니다.</p>
+        <p>다시 지은 다리도 1916년 중앙 경간을 들어 올리던 중 받침 부품이 부서져 중앙 경간이 강에 떨어졌고 13명이 숨졌습니다. 두 번의 사고 끝에 1917년 완공된 퀘벡교는 지금도 캔틸레버 트러스 경간으로는 가장 깁니다. 이 장의 계산 — 압축재의 축력, 좌굴, 가설 단계마다 달라지는 부재력 — 은 그런 교훈 위에 서 있습니다.</p>
+        <div class="o-chain"><span>경간 · 하중 · 형태</span><i>→</i><span class="tool">추력 · 압력선 · 부재력 영향선 · 좌굴</span><i>→</i><span>리브 · 타이 · 현재 · 사재 단면</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="arch-principle">
+    <h2>아치의 원리와 추력</h2>
+    <div class="problem"><strong>100 m를 건너는 아치는 양쪽 지점을 얼마나 세게 미는가</strong>
+      <p>MechanicsBook 5장에서 24 m 아치가 240 kN으로 둑을 미는 것을 보았습니다. 같은 원리로 하천 위 100 m를 건너는 강 아치가 다리 바닥의 무게를 받으면, 추력은 몇 kN이 되고 리브는 얼마나 눌릴까요?</p></div>
+    <p><span class="term">아치교</span><span class="en">(arch bridge)</span>는 위로 굽은 주부재인 <span class="term">아치 리브</span><span class="en">(arch rib)</span>가 하중을 주로 축 방향 압축으로 지점에 전하는 교량입니다. MechanicsBook 5장의 <a href="../../mechanics/chapters/frames-arches.html#arch">3힌지 아치</a>에서 유도했듯이, 수평 투영 길이당 등분포 하중 \(w\)를 받는 포물선 아치의 휨모멘트는 0이고, 지점은 수평 반력 <span class="term">추력</span><span class="en">(thrust)</span> \(H\)를 내야 합니다.</p>
+    <figure class="diagram" id="fig-at-thrust">
+      <svg viewBox="0 0 860 300" role="img" aria-label="등분포 하중을 받는 포물선 아치와 지점의 추력, 연직 반력, 리브 축력의 힘 다각형">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <path d="M80 230 Q 300 30 520 230" style="fill:none;stroke:var(--compression);stroke-width:5"/>
+        <g style="stroke:var(--accent-2);stroke-width:1.5">
+          <line x1="110" y1="60" x2="110" y2="84" marker-end="url(#at-ah-ld)"/><line x1="160" y1="60" x2="160" y2="84" marker-end="url(#at-ah-ld)"/><line x1="210" y1="60" x2="210" y2="84" marker-end="url(#at-ah-ld)"/><line x1="260" y1="60" x2="260" y2="84" marker-end="url(#at-ah-ld)"/><line x1="310" y1="60" x2="310" y2="84" marker-end="url(#at-ah-ld)"/><line x1="360" y1="60" x2="360" y2="84" marker-end="url(#at-ah-ld)"/><line x1="410" y1="60" x2="410" y2="84" marker-end="url(#at-ah-ld)"/><line x1="460" y1="60" x2="460" y2="84" marker-end="url(#at-ah-ld)"/>
+        </g>
+        <line x1="90" y1="60" x2="500" y2="60" style="stroke:var(--accent-2);stroke-width:1.5"/>
+        <text x="508" y="64" class="t-mono" style="fill:var(--accent-2)">w (수평 투영 길이당)</text>
+        <line x1="20" y1="230" x2="74" y2="230" style="stroke:var(--ok);stroke-width:3" marker-end="url(#at-ah-r)"/>
+        <text x="26" y="220" class="t-mono" style="fill:var(--ok)">H</text>
+        <line x1="580" y1="230" x2="526" y2="230" style="stroke:var(--ok);stroke-width:3" marker-end="url(#at-ah-r)"/>
+        <text x="566" y="220" class="t-mono" style="fill:var(--ok)">H</text>
+        <line x1="80" y1="280" x2="80" y2="238" style="stroke:var(--ok);stroke-width:3" marker-end="url(#at-ah-r)"/>
+        <text x="88" y="272" class="t-mono" style="fill:var(--ok)">V = wL/2</text>
+        <line x1="300" y1="130" x2="300" y2="230" style="stroke:var(--text-dim)" marker-start="url(#at-ah-d)" marker-end="url(#at-ah-d)"/>
+        <text x="306" y="186" class="t-mono">f</text>
+        <line x1="80" y1="250" x2="520" y2="250" style="stroke:var(--text-dim)" marker-start="url(#at-ah-d)" marker-end="url(#at-ah-d)"/>
+        <text x="300" y="266" text-anchor="middle" class="t-mono">L</text>
+        <!-- force polygon -->
+        <g transform="translate(640,70)">
+          <text x="0" y="-8" class="t" style="font-weight:700">지점의 힘 삼각형</text>
+          <line x1="0" y1="160" x2="110" y2="160" style="stroke:var(--ok);stroke-width:3" marker-end="url(#at-ah-r)"/>
+          <line x1="110" y1="160" x2="110" y2="40" style="stroke:var(--ok);stroke-width:3" marker-end="url(#at-ah-r)"/>
+          <line x1="0" y1="160" x2="106" y2="44" style="stroke:var(--compression);stroke-width:3" marker-end="url(#at-ah-c)"/>
+          <text x="50" y="180" class="t-mono" style="fill:var(--ok)">H</text>
+          <text x="118" y="104" class="t-mono" style="fill:var(--ok)">V</text>
+          <text x="18" y="90" class="t-mono" style="fill:var(--compression)">N = √(H² + V²)</text>
+          <text x="0" y="206" class="t-mono">tan θ = V/H = 4f/L</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-1.</b> 수평 투영 길이당 \(w\)를 받는 포물선 아치. 리브는 전 구간 압축(빨강)이고 휨이 없다. 지점에서는 추력 \(H\)와 연직 반력 \(V\)의 합력이 리브 축 방향으로 들어오며, 그 기울기는 포물선의 지점 기울기 \(4f/L\)와 같다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 4.1 (포물선 아치의 추력과 축력)</strong>
+      <div class="formula">$$H = \frac{wL^2}{8f} = \frac{M_0}{f}, \qquad V = \frac{wL}{2}, \qquad N(x) = \frac{H}{\cos\theta(x)}, \qquad N_{max} = H\sqrt{1 + \left(\frac{4f}{L}\right)^2}$$<div class="where">\(f/L\): <span class="term">라이즈 비</span><span class="en">(rise-to-span ratio)</span>, \(M_0 = wL^2/8\): 같은 경간 단순보의 최대 휨모멘트. 3힌지 아치에서는 정확하고, 2힌지·고정 아치도 리브의 축 변형을 무시하면 같은 결과다. 리브가 줄어들면(축 변형) 크라운이 내려앉아 추력이 조금 줄고 작은 휨이 생긴다(<span class="term">리브 단축</span><span class="en">(rib shortening)</span>).</div></div></div>
+    <p>이 장의 기준 아치는 <b>AR-100</b>(교육용, 이 장에서만 쓰는 가상 교량)입니다. B-130의 중앙 경간 자리를 아치로 건너는 대안이라고 보고 경간 100 m, 라이즈 18 m(\(f/L = 0.18\)), 강 박스 리브 1,200 × 1,400 × 30 mm(\(A = 0.152\) m², \(I = 0.0458\) m⁴), 아치면 2개, 아치면 하나가 받는 고정하중 80 kN/m로 둡니다.</p>
+    <div class="sim" id="sim-at-thrust">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>아치 추력: 라이즈 비 → 추력·반력·리브 축력</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="at-cv-th" aria-label="2힌지 포물선 아치의 축력 색, 지점 반력과, 라이즈 비에 따른 추력 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>라이즈 f <output id="at-th-f-out"></output></span><input type="range" id="at-th-f" min="5" max="50" step="0.5" value="18"></label>
+          <label class="ctrl"><span>하중 w (아치면 하나) <output id="at-th-w-out"></output></span><input type="range" id="at-th-w" min="20" max="160" step="5" value="80"></label>
+          <div class="ctrl"><span>리브 축 강성</span><div class="seg" id="at-th-ea"><button data-value="1" class="on">실제 EA</button><button data-value="0.1">EA × 0.1</button><button data-value="1000">축 변형 무시</button></div></div>
+          <div class="ctrl"><span>그림</span><div class="seg" id="at-th-view"><button data-value="N" class="on">축력 색</button><button data-value="M">휨모멘트</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">H 해석 · wL²/8f (kN)</span><span class="v" id="at-th-h">—</span></div>
+        <div class="stat"><span class="k">V (kN)</span><span class="v" id="at-th-v">—</span></div>
+        <div class="stat"><span class="k">N<sub>max</sub> · σ = N/A</span><span class="v" id="at-th-n">—</span></div>
+        <div class="stat"><span class="k">max|M| (리브 단축)</span><span class="v" id="at-th-m">—</span></div>
+        <div class="stat"><span class="k">크라운 처짐</span><span class="v" id="at-th-d">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: f를 18 m에서 9 m로 낮춰 추력이 두 배가 되는 것을 보세요 · EA를 1/10로 줄이면(리브 단축이 커지면) 추력이 줄고 휨이 생깁니다 · 납작한 아치(f 5 m)에서 리브 단축의 영향이 특히 큰 이유를 생각해 보세요 · 모델: 경간 100 m 2힌지 포물선 아치를 20개 직선 부재로 나눈 <code>CB.frame</code>, 하중은 절점에 모은 수평 투영 등분포(지점 절점의 몫 wΔx/2는 지점으로 바로 들어가 최대 축력이 손계산 6,846 kN보다 약 2 % 작게 나온다), σ는 실제 리브 면적 기준, 강 박스 리브 A 0.152 m², I 0.0458 m⁴, E 210 GPa. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 4.1 (AR-100의 추력)</strong> \(L = 100\) m, \(f = 18\) m, \(w = 80\) kN/m(아치면 하나).
+      <ol class="at-steps">
+        <li><b>추력.</b> \(M_0 = 80 \times 100^2/8 = 100{,}000\) kN·m → \(H = 100{,}000/18 = 5{,}556\) kN.</li>
+        <li><b>연직 반력.</b> \(V = 80 \times 100/2 = 4{,}000\) kN.</li>
+        <li><b>리브 축력.</b> 지점 기울기 \(4f/L = 0.72\) → \(N_{max} = 5{,}556\sqrt{1 + 0.72^2} = 6{,}846\) kN, \(\sigma = 6{,}846/0.1524 = 44.9\) MPa(압축). SM355의 13 %다.</li>
+        <li><b>리브 단축.</b> 실제 EA로 풀면 추력 5,545 kN(0.2 % 감소), 최대 휨 약 180 kN·m(축력 응력의 1 % 남짓)로 무시할 만하다.</li>
+      </ol>
+      리브 단면을 정하는 것은 이 고정하중 축력이 아니라 편재 활하중의 휨(3절)과 좌굴(5절)이다. 같은 하중을 거더로 받으면 중앙 휨모멘트 100,000 kN·m를 단면 깊이로 버텨야 한다.</div>
+    <div class="callout warn"><strong>추력은 땅이 받아야 한다</strong> 5,556 kN의 추력은 아치면 하나의 값이고 교량 전체로는 11,000 kN이 넘습니다. 지점이 몇 mm만 벌어져도 아치는 크라운이 내려앉으며 큰 휨을 받습니다(4절). 그래서 상로 아치는 단단한 암반 계곡에 놓고, 연약 지반의 하천에서는 추력을 타이로 묶는 타이드 아치를 씁니다(GeotechBook의 G-10처럼 모래·자갈 위라면 더욱 그렇다).</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="arch-types">
+    <h2>상로·중로·하로와 타이드 아치</h2>
+    <div class="problem"><strong>바닥판은 아치의 위에 있어야 하나, 아래에 있어야 하나</strong>
+      <p>깊은 계곡이라면 아치를 바닥판 아래에 두면 됩니다. 그러나 낮은 둑 사이 평지 하천에서는 아치를 아래에 둘 공간(형하 공간)이 없습니다. 그럼 아치를 위로 올리고 바닥판을 매달면 될까요? 그 추력은 누가 받을까요?</p></div>
+    <figure class="diagram" id="fig-at-types">
+      <svg viewBox="0 0 860 260" role="img" aria-label="상로 아치, 중로 아치, 하로 타이드 아치의 바닥판 위치와 하중 경로">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g class="t" style="font-weight:700" text-anchor="middle"><text x="150" y="38">상로 아치(deck)</text><text x="430" y="38">중로 아치(half-through)</text><text x="710" y="38">하로 타이드 아치(through)</text></g>
+        <!-- deck arch -->
+        <path d="M40 200 L60 210 L240 210 L260 200" style="fill:none;stroke:var(--warn);stroke-width:2"/>
+        <line x1="40" y1="80" x2="260" y2="80" style="stroke:var(--text);stroke-width:4"/>
+        <path d="M60 205 Q 150 70 240 205" style="fill:none;stroke:var(--compression);stroke-width:4"/>
+        <g style="stroke:var(--compression);stroke-width:1.6"><line x1="85" y1="80" x2="85" y2="160"/><line x1="110" y1="80" x2="110" y2="124"/><line x1="190" y1="80" x2="190" y2="124"/><line x1="215" y1="80" x2="215" y2="160"/></g>
+        <text x="150" y="232" text-anchor="middle" class="t-mono">기둥(압축)으로 받친다 · 계곡 암반이 추력</text>
+        <!-- half through -->
+        <line x1="310" y1="150" x2="550" y2="150" style="stroke:var(--text);stroke-width:4"/>
+        <path d="M330 205 Q 430 30 530 205" style="fill:none;stroke:var(--compression);stroke-width:4"/>
+        <g style="stroke:var(--tension);stroke-width:1.6"><line x1="395" y1="98" x2="395" y2="150"/><line x1="430" y1="74" x2="430" y2="150"/><line x1="465" y1="98" x2="465" y2="150"/></g>
+        <g style="stroke:var(--compression);stroke-width:1.6"><line x1="345" y1="150" x2="345" y2="178"/><line x1="515" y1="150" x2="515" y2="178"/></g>
+        <path d="M310 205 L 330 215 L530 215 L550 205" style="fill:none;stroke:var(--warn);stroke-width:2"/>
+        <text x="430" y="232" text-anchor="middle" class="t-mono">가운데는 매달고(인장) 양끝은 받친다</text>
+        <!-- through tied -->
+        <line x1="590" y1="190" x2="830" y2="190" style="stroke:var(--tension);stroke-width:5"/>
+        <path d="M600 190 Q 710 30 820 190" style="fill:none;stroke:var(--compression);stroke-width:4"/>
+        <g style="stroke:var(--tension);stroke-width:1.6"><line x1="640" y1="122" x2="640" y2="190"/><line x1="675" y1="100" x2="675" y2="190"/><line x1="710" y1="110" x2="710" y2="190"/><line x1="745" y1="100" x2="745" y2="190"/><line x1="780" y1="122" x2="780" y2="190"/></g>
+        <path d="M600 194 l-8 14 h16z" style="fill:none;stroke:var(--text-dim)"/><circle cx="820" cy="200" r="5" style="fill:none;stroke:var(--text-dim)"/><line x1="810" y1="208" x2="830" y2="208" style="stroke:var(--text-dim)"/>
+        <text x="710" y="216" text-anchor="middle" class="t-mono" style="fill:var(--tension)">타이(바닥판 거더)가 추력을 묶는다</text>
+        <text x="710" y="232" text-anchor="middle" class="t-mono">지점은 연직 반력만 → 보통 받침</text>
+      </svg>
+      <figcaption><b>그림 4-2.</b> 바닥판 위치에 따른 아치교의 분류. 상로 아치는 바닥판을 기둥으로 받치고 추력을 지반이 받는다. 하로 타이드 아치는 바닥판 거더가 타이가 되어 추력을 내부에서 묶으므로, 바깥에서 보면 단순 지지 보처럼 연직 반력만 낸다. 인장 파랑, 압축 빨강.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 4.2 (아치교의 분류)</strong> 바닥판이 아치 위에 있으면 <span class="term">상로 아치</span><span class="en">(deck arch)</span>, 아치 중간 높이에 있으면 <span class="term">중로 아치</span><span class="en">(half-through arch)</span>, 아치 밑(지점 높이)에 있으면 <span class="term">하로 아치</span><span class="en">(through arch)</span>다. 아치 양 끝을 인장재로 묶어 추력을 내부에서 해결한 것을 <span class="term">타이드 아치</span><span class="en">(tied arch)</span>, 바닥판을 아치에 매다는 연직 인장재를 <span class="term">행어</span><span class="en">(hanger)</span>라 한다. 휨을 주로 보강 거더(타이)가 받고 아치는 축력만 받게 한 형식을 랑거(Langer), 아치와 거더가 함께 휨을 나누는 형식을 로제(Lohse)라 부르는 것이 국내 관용이다(형태).</div>
+    <p>타이드 아치는 바깥에서 보면 정정 단순보입니다. 지점 하나는 핀, 하나는 롤러로 두어도 되고, 지점은 연직 반력 \(wL/2\)만 받습니다. 대신 타이가 추력 \(H\)를 인장으로 받으며, 타이가 늘어나는 만큼 아치의 두 발이 벌어집니다. 그래서 타이의 축 강성과 휨 강성이 아치의 휨을 정합니다.</p>
+    <div class="sim" id="sim-at-tied">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>타이드 아치: 타이 장력과 리브·타이의 휨 나눔</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="at-cv-tie" aria-label="하로 타이드 아치의 부재 축력 색과 휨모멘트, 지점 반력"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>하중</span><div class="seg" id="at-tie-load"><button data-value="full" class="on">고정하중 전체</button><button data-value="half">차로 하중 절반</button><button data-value="pt">집중 1/4 지점</button></div></div>
+          <label class="ctrl"><span><span>타이 거더 휨 강성 I<sub>t</sub></span> <output id="at-tie-i-out"></output></span><input type="range" id="at-tie-i" min="-3" max="0" step="0.05" value="-1.1"></label>
+          <label class="ctrl"><span>타이 축 강성 배율 <output id="at-tie-a-out"></output></span><input type="range" id="at-tie-a" min="-1.5" max="1" step="0.05" value="0"></label>
+          <div class="ctrl"><span>그림</span><div class="seg" id="at-tie-view"><button data-value="N" class="on">축력 색</button><button data-value="M">휨모멘트</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">타이 장력 (중앙)</span><span class="v" id="at-tie-t">—</span></div>
+        <div class="stat"><span class="k">지점 반력 V<sub>A</sub> · V<sub>B</sub> · H</span><span class="v" id="at-tie-r">—</span></div>
+        <div class="stat"><span class="k">max|M| 리브 · 타이</span><span class="v" id="at-tie-m">—</span></div>
+        <div class="stat"><span class="k">휨 분담(타이 몫)</span><span class="v" id="at-tie-s">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 차로 하중 절반에서 I<sub>t</sub>를 줄이면(랑거 → 아치가 휨을 떠맡음) 리브의 휨이 커지고, 키우면 타이 거더가 휨을 가져갑니다 · 타이 축 강성을 줄이면 고정하중만으로도 휨이 생기는 이유를 생각해 보세요 · 지점 수평 반력이 언제나 0인 것을 확인하세요 · 모델: AR-100 아치면 하나, 행어 간격 5 m(19개, A 0.005 m², 인장·압축 모두 받는 트러스 요소), 리브 A 0.152·I 0.0458 m⁴, 타이 A 0.12 m² × 배율, I<sub>t</sub> = 10<sup>x</sup> m⁴(기준 0.08), 지점 핀 + 롤러, <code>CB.frame</code>. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 4.2 (AR-100 타이드 아치의 타이)</strong> 고정하중 80 kN/m를 타이(바닥판 거더) 절점에 싣는다.
+      <ol class="at-steps">
+        <li><b>반력.</b> 외적으로 단순보: \(V_A = V_B = 4{,}000\) kN, 수평 반력 0.</li>
+        <li><b>타이 장력.</b> 크라운의 자유 물체도에서 \(T \cdot f \approx M_0\) → \(T \approx 5{,}556\) kN. 해석값은 행어·타이가 늘어나 조금 작은 약 5,490 kN이다.</li>
+        <li><b>타이 단면.</b> \(A_t = 0.12\) m²이면 \(\sigma = 5{,}490/0.12 = 45.7\) MPa(인장). 타이는 바닥판 거더를 겸하므로 국부 휨과 함께 검토하고, 끊어지면 아치 전체가 무너지므로(<span class="term">파괴 연쇄</span><span class="en">(fracture-critical)</span> 부재) 피로·용접 상세를 특히 관리한다.</li>
+        <li><b>행어.</b> 행어 하나는 \(80 \times 5 = 400\) kN 정도를 받는다(해석 약 397 kN).</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="pressure-line">
+    <h2>압력선과 편재 하중의 휨</h2>
+    <div class="problem"><strong>트럭이 아치의 왼쪽 절반만 지나가면</strong>
+      <p>포물선은 전 경간 등분포 하중의 퓨니큘러 형태라 휨이 없습니다. 그러나 차로 하중이 왼쪽 절반에만 실리면 하중 모양이 포물선과 어긋납니다. 압력선은 축선에서 얼마나 벗어나고, 그 휨을 리브가 견딜 수 있을까요?</p></div>
+    <p>MechanicsBook 5장의 <a href="../../mechanics/chapters/frames-arches.html#pressure-line">압력선</a>에서 \(M = H\,e\)를 배웠습니다. 편심 \(e\)는 축선과 <span class="term">압력선</span><span class="en">(line of thrust)</span> 사이 거리입니다. 교량 아치에서 중요한 것은 편재 활하중이 만든 휨을 <b>고정하중의 큰 추력</b>이 함께 받는다는 점입니다. 같은 휨모멘트라도 축력이 크면 편심 \(e = M/N\)이 작아집니다.</p>
+    <figure class="diagram" id="fig-at-pline">
+      <svg viewBox="0 0 860 300" role="img" aria-label="절반 재하에서 아치 축선과 압력선의 편차, 리브 단면의 핵">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <path d="M60 240 Q 300 -20 540 240" style="fill:none;stroke:var(--text);stroke-width:4"/>
+        <path d="M60 240 Q 160 60 300 110 Q 420 150 540 240" style="fill:none;stroke:var(--accent-2);stroke-width:2.2;stroke-dasharray:7 4"/>
+        <g style="stroke:var(--accent-2);stroke-width:1.4"><line x1="80" y1="40" x2="80" y2="60" marker-end="url(#at-ah-ld)"/><line x1="130" y1="40" x2="130" y2="60" marker-end="url(#at-ah-ld)"/><line x1="180" y1="40" x2="180" y2="60" marker-end="url(#at-ah-ld)"/><line x1="230" y1="40" x2="230" y2="60" marker-end="url(#at-ah-ld)"/><line x1="280" y1="40" x2="280" y2="60" marker-end="url(#at-ah-ld)"/></g>
+        <line x1="60" y1="40" x2="300" y2="40" style="stroke:var(--accent-2);stroke-width:1.4"/>
+        <text x="66" y="32" class="t-mono" style="fill:var(--accent-2)">q (왼쪽 절반)</text>
+        <line x1="180" y1="94" x2="180" y2="128" style="stroke:var(--warn);stroke-width:2" marker-start="url(#at-ah-d)" marker-end="url(#at-ah-d)"/>
+        <text x="188" y="116" class="t-mono" style="fill:var(--warn)">e = M/N</text>
+        <text x="380" y="118" class="t-mono" style="fill:var(--accent-2)">압력선(활하중만)</text>
+        <text x="400" y="80" class="t-mono">아치 축선</text>
+        <g transform="translate(620,60)">
+          <text x="0" y="0" class="t" style="font-weight:700">리브 단면과 핵</text>
+          <rect x="40" y="20" width="90" height="120" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="40" y="59" width="90" height="42" style="fill:var(--accent-soft);stroke:var(--accent);stroke-dasharray:4 3"/>
+          <line x1="150" y1="59" x2="150" y2="101" style="stroke:var(--accent)" marker-start="url(#at-ah-d)" marker-end="url(#at-ah-d)"/>
+          <text x="156" y="84" class="t-mono" style="fill:var(--accent)">2k</text>
+          <text x="0" y="168" class="t-mono">k = S/A — 압력선이 핵 안에 있으면</text>
+          <text x="0" y="184" class="t-mono">단면 전체가 압축(인장 없음)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-3.</b> 왼쪽 절반에만 실린 활하중의 압력선(주황 점선). 재하 쪽에서는 압력선이 축선 위로, 반대쪽에서는 아래로 지나가며 그 편차 \(e\)가 휨을 만든다. 고정하중을 함께 실으면 축력 \(N\)이 커져 \(e = M/N\)이 작아지고 압력선이 축선에 다가간다. 압력선이 단면의 <span class="term">핵</span><span class="en">(kern)</span> 안에 있으면 리브에 인장이 생기지 않는다(석조·무근 콘크리트 아치의 조건).</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 4.3 (편재 하중의 휨과 편심)</strong> 포물선 2힌지 아치(축 변형 무시)의 왼쪽 절반에 등분포 \(q\)가 실리면, 대칭·반대칭 분해로
+      <div class="formula">$$H_q = \frac{qL^2}{16f}, \qquad M_{max} = \pm\frac{qL^2}{64}\ \ (x = L/4,\ 3L/4), \qquad e = \frac{M}{N} \approx \frac{M}{H_D + H_q}$$<div class="where">대칭 부분(\(q/2\) 전체)은 휨이 없고, 반대칭 부분(\(\pm q/2\))은 크라운에서 \(M = 0\)인 두 반쪽 단순보처럼 휜다. 그래서 3힌지와 2힌지의 결과가 같다. \(H_D\)는 고정하중 추력. 리브 응력은 \(\sigma = N/A \pm M/S\)이고, \(|e| \le k = S/A\)이면 전 단면 압축이다.</div></div></div>
+    <div class="sim" id="sim-at-partial">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>편재 하중의 휨: 압력선 편차와 아치 지지 형식</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="at-cv-pl" aria-label="아치 축선, 압력선, 휨모멘트 분포와 핵 범위"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>지지 형식</span><div class="seg" id="at-pl-sup"><button data-value="3h">3힌지</button><button data-value="2h" class="on">2힌지</button><button data-value="fixed">고정</button></div></div>
+          <div class="ctrl"><span>축선 형상</span><div class="seg" id="at-pl-shape"><button data-value="para" class="on">포물선</button><button data-value="circ">원호</button></div></div>
+          <div class="ctrl"><span>활하중</span><div class="seg" id="at-pl-load"><button data-value="half" class="on">왼쪽 절반 q</button><button data-value="pt">집중 L/4</button><button data-value="none">없음</button></div></div>
+          <label class="check"><input type="checkbox" id="at-pl-dead" checked> 고정하중 80 kN/m 함께</label>
+          <label class="ctrl"><span>지점 벌어짐 δ <output id="at-pl-s-out"></output></span><input type="range" id="at-pl-s" min="0" max="50" step="1" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">추력 H</span><span class="v" id="at-pl-h">—</span></div>
+        <div class="stat"><span class="k">M<sub>max</sub> · M<sub>min</sub></span><span class="v" id="at-pl-m">—</span></div>
+        <div class="stat"><span class="k">max|e| / 핵 k</span><span class="v" id="at-pl-e">—</span></div>
+        <div class="stat"><span class="k">리브 σ 최대 · 최소</span><span class="v" id="at-pl-sg">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 고정하중을 끄면 압력선이 축선에서 크게 벗어나고, 켜면 핵(점선 띠) 안으로 들어오는 것을 보세요 · 3힌지는 지점이 벌어져도 휨이 생기지 않지만 2힌지·고정은 큰 휨을 받습니다 · 원호 축선은 등분포 하중에서도 휨이 생깁니다 · 모델: AR-100(L 100 m, f 18 m) 20분할 <code>CB.frame</code>, q = 12.7 kN/m(차로 하중, 형태), 집중 300 kN, 리브 A 0.152 m², I 0.0458 m⁴, 핵 k = S/A = 0.429 m. 압력선은 y + M/H(수평 투영 하중). 지점 벌어짐은 오른쪽 지점의 수평 강제 변위. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 4.3 (AR-100의 절반 재하)</strong> 차로 하중 \(q = 12.7\) kN/m이 왼쪽 50 m에만 실린다.
+      <ol class="at-steps">
+        <li><b>활하중만.</b> \(H_q = 12.7 \times 100^2/(16 \times 18) = 441\) kN, \(M_{max} = 12.7 \times 100^2/64 = 1{,}984\) kN·m. 편심 \(e = 1{,}984/441 = 4.5\) m — 압력선이 축선에서 4.5 m나 벗어난다.</li>
+        <li><b>고정하중과 함께.</b> \(N \approx 5{,}556 + 441 \approx 6{,}000\) kN → \(e = 1{,}984/6{,}000 = 0.33\) m \(\lt k = 0.429\) m → 압력선이 핵 안, 리브 전체 압축.</li>
+        <li><b>응력.</b> \(S = I/y = 0.0458/0.7 = 0.0654\) m³. \(\sigma = 6{,}000/0.1524 \pm 1{,}984/0.0654 = 39.4 \pm 30.3\) MPa → 69.7, 9.1 MPa(압축). 휨이 축력 응력의 77 %에 이른다. 시뮬레이터(20분할, 패널점 하중, 리브 단축 포함)는 M<sub>max</sub> 약 2,130 kN·m, e 0.34 m, σ 74.9 · 8.7 MPa로 손계산보다 몇 % 크다.</li>
+      </ol>
+      강 아치는 인장을 견디므로 핵 조건이 필수는 아니지만, <b>편재 활하중의 휨</b>이 리브 단면을 정한다는 점은 같다. 석조·무근 콘크리트 아치는 압력선이 핵(넓게는 단면) 안에 있어야 서 있을 수 있다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="hinges">
+    <h2>3힌지·2힌지·고정 아치</h2>
+    <p>아치를 지지하는 방식(<span class="term">3힌지 아치</span><span class="en">(three-hinged arch)</span>, <span class="term">2힌지 아치</span><span class="en">(two-hinged arch)</span>, <span class="term">고정 아치</span><span class="en">(fixed arch)</span>)은 부정정 차수를 바꾸고, 그에 따라 <b>하중에 대한 효율</b>과 <b>지점 변위·온도에 대한 민감도</b>가 반대로 움직입니다.</p>
+    <figure class="diagram" id="fig-at-hinges">
+      <svg viewBox="0 0 860 220" role="img" aria-label="3힌지, 2힌지, 고정 아치의 지점과 크라운 조건, 부정정 차수">
+        <rect x="10" y="10" width="840" height="200" rx="10" class="f-surface"/>
+        <g class="t" style="font-weight:700" text-anchor="middle"><text x="150" y="38">3힌지(정정)</text><text x="430" y="38">2힌지(1차 부정정)</text><text x="710" y="38">고정(3차 부정정)</text></g>
+        <path d="M50 170 Q 150 40 250 170" style="fill:none;stroke:var(--compression);stroke-width:4"/>
+        <circle cx="150" cy="105" r="6" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/>
+        <circle cx="50" cy="170" r="6" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/><circle cx="250" cy="170" r="6" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/>
+        <path d="M330 170 Q 430 40 530 170" style="fill:none;stroke:var(--compression);stroke-width:4"/>
+        <circle cx="330" cy="170" r="6" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/><circle cx="530" cy="170" r="6" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/>
+        <path d="M610 170 Q 710 40 810 170" style="fill:none;stroke:var(--compression);stroke-width:4"/>
+        <g style="stroke:var(--text-dim);stroke-width:1.5"><line x1="596" y1="178" x2="624" y2="178"/><line x1="796" y1="178" x2="824" y2="178"/><line x1="600" y1="178" x2="594" y2="186"/><line x1="608" y1="178" x2="602" y2="186"/><line x1="616" y1="178" x2="610" y2="186"/><line x1="804" y1="178" x2="798" y2="186"/><line x1="812" y1="178" x2="806" y2="186"/><line x1="820" y1="178" x2="814" y2="186"/></g>
+        <g class="t-mono" text-anchor="middle"><text x="150" y="198">지점 침하·온도에 휨 없음, 크라운 힌지 상세 필요</text><text x="430" y="198">가장 흔한 강 아치</text><text x="710" y="198">가장 단단, 지점 변위·온도에 민감</text></g>
+      </svg>
+      <figcaption><b>그림 4-4.</b> 아치의 지지 형식. 힌지가 많을수록 지점 변위와 온도 변화에 둔감하고(정정), 힌지가 적을수록 단단하고 좌굴 하중이 크지만 지점이 벌어지거나 온도가 바뀔 때 휨을 받는다.</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="at-tbl">
+      <thead><tr><th>형식</th><th>부정정 차수</th><th>지점 벌어짐·온도</th><th>좌굴 계수 γ (f/L 0.2, 형태)</th><th>주된 적용</th></tr></thead>
+      <tbody>
+        <tr><td>3힌지</td><td>0</td><td>휨 없음</td><td>약 40</td><td>목재·초기 강 아치, 지반이 약한 곳</td></tr>
+        <tr><td>2힌지</td><td>1</td><td>H 변화 → 휨</td><td>약 45</td><td>강 아치교 대부분</td></tr>
+        <tr><td>고정</td><td>3</td><td>H·지점 모멘트 → 큰 휨</td><td>약 100</td><td>암반 계곡의 콘크리트 아치</td></tr>
+      </tbody></table></div>
+    <p>앞 시뮬레이터에서 지지 형식을 바꾸고 지점 벌어짐 δ를 주어 보면, 3힌지는 기하학만 조금 바뀔 뿐 휨이 없고(정정 구조는 지점 변위에 응력이 생기지 않는다), 2힌지는 추력이 줄며 크라운에 휨이 생기고, 고정 아치는 지점에서도 큰 휨이 생깁니다. 온도 변화도 리브 길이를 바꿔 같은 효과를 냅니다. 큰 콘크리트 아치를 암반 계곡에 고정으로 놓는 이유는 지반이 움직이지 않기 때문이고, 강 아치를 2힌지로 두는 이유는 지점 상세가 간단하면서 온도·변위 휨을 크게 줄이기 때문입니다.</p>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="arch-buckling">
+    <h2>아치 좌굴 맛보기</h2>
+    <div class="problem"><strong>아치는 눌리는 부재다. 그렇다면 기둥처럼 휠 수 있다</strong>
+      <p>AR-100의 리브는 6,000 kN 가까이 눌립니다. 길이가 100 m를 넘는 압축재가 옆으로(아치 평면 안에서) 휘어 버리지는 않을까요? 아치의 좌굴은 기둥과 어떻게 다를까요?</p></div>
+    <p>아치가 <span class="term">면내 좌굴</span><span class="en">(in-plane buckling)</span>을 하면, 보통은 한쪽 반이 내려가고 다른 쪽 반이 올라가는 <b>반대칭 모드</b>가 먼저 옵니다. 이때 아치는 대략 반 경간 길이의 기둥 두 개처럼 휩니다. MechanicsBook의 <a href="../../mechanics/chapters/buckling.html#euler">오일러 좌굴</a>처럼 임계 하중은 \(EI\)에 비례하고 길이의 제곱(하중으로는 세제곱)에 반비례합니다.</p>
+    <figure class="diagram" id="fig-at-modes">
+      <svg viewBox="0 0 860 200" role="img" aria-label="아치 면내 좌굴의 반대칭 모드와 대칭 모드">
+        <rect x="10" y="10" width="840" height="180" rx="10" class="f-surface"/>
+        <path d="M60 160 Q 220 20 380 160" style="fill:none;stroke:var(--text-faint);stroke-width:3"/>
+        <path d="M60 160 C 110 50, 160 40, 220 92 C 280 130, 330 110, 380 160" style="fill:none;stroke:var(--accent);stroke-width:3;stroke-dasharray:7 4"/>
+        <text x="220" y="184" text-anchor="middle" class="t-mono">반대칭 모드(2힌지·고정 아치에서 보통 먼저)</text>
+        <path d="M480 160 Q 640 20 800 160" style="fill:none;stroke:var(--text-faint);stroke-width:3"/>
+        <path d="M480 160 Q 640 60 800 160" style="fill:none;stroke:var(--accent);stroke-width:3;stroke-dasharray:7 4"/>
+        <text x="640" y="184" text-anchor="middle" class="t-mono">대칭 모드(크라운이 내려앉음, 납작한 3힌지 아치)</text>
+      </svg>
+      <figcaption><b>그림 4-5.</b> 아치의 면내 좌굴 모드(파랑 점선, 과장). 반대칭 모드에서 크라운은 거의 제자리이고 두 반쪽이 반대로 휜다. 납작한 3힌지 아치는 크라운 힌지 때문에 대칭 모드가 먼저 올 수 있다. 면외(옆으로) 좌굴은 두 아치 리브를 잇는 횡방향 브레이싱이 막는다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 4.4 (아치의 면내 좌굴 하중, 형태)</strong> 수평 투영 등분포 하중을 받는 포물선 아치의 임계 하중은
+      <div class="formula">$$q_{cr} = \gamma\,\frac{EI}{L^3}, \qquad \gamma = \gamma\!\left(\frac{f}{L},\ \text{지지 형식}\right)$$<div class="where">고전 해(Timoshenko & Gere 형태, 약): 2힌지 \(f/L\) = 0.1, 0.2, 0.3에서 \(\gamma \approx\) 28.5, 45.4, 46.5, 고정 약 60.7, 101, 115. \(f/L\)이 0.3–0.4 근처에서 최대가 된다(라이즈가 너무 낮으면 축력이 크고, 너무 높으면 아치가 길어진다). 아래 시뮬레이터는 이 값을 기하 강성 행렬의 고유값으로 직접 구한다.</div></div></div>
+    <div class="sim" id="sim-at-buckle">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>아치 좌굴 하중: 라이즈 비 → γ와 좌굴 모드</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="at-cv-bk" aria-label="아치의 좌굴 모드 형상과 라이즈 비에 따른 좌굴 계수 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>라이즈 비 f/L <output id="at-bk-r-out"></output></span><input type="range" id="at-bk-r" min="0.05" max="0.5" step="0.01" value="0.18"></label>
+          <div class="ctrl"><span>지지 형식</span><div class="seg" id="at-bk-sup"><button data-value="3h">3힌지</button><button data-value="2h" class="on">2힌지</button><button data-value="fixed">고정</button></div></div>
+          <label class="ctrl"><span>리브 I (AR-100 배율) <output id="at-bk-i-out"></output></span><input type="range" id="at-bk-i" min="0.25" max="3" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">γ = q<sub>cr</sub>L³/EI</span><span class="v" id="at-bk-g">—</span></div>
+        <div class="stat"><span class="k">AR-100 q<sub>cr</sub></span><span class="v" id="at-bk-q">—</span></div>
+        <div class="stat"><span class="k">좌굴 안전율 (고정 + 활)</span><span class="v" id="at-bk-sf">—</span></div>
+        <div class="stat"><span class="k">모드</span><span class="v" id="at-bk-md">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 라이즈 비를 0.05부터 0.5까지 바꿔 γ가 최대가 되는 곳을 찾으세요 · 고정 아치의 γ가 2힌지의 2배를 넘는 것을 확인하세요 · 납작한 3힌지 아치는 대칭 모드가 먼저 옵니다 · 모델: 포물선 아치 32분할, 1차 해석(<code>CB.frame</code>)의 축력으로 기하 강성 행렬을 만들고 (K + λK<sub>G</sub>)의 음의 피벗 수가 바뀌는 λ를 이분법으로 찾는다(페이지 안 고유값 해석, 하중 방향 고정, 처짐 전 형상 기준). 안전율은 고정하중 80 + 활하중 등가 20 kN/m(교육용)에 대한 값. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 4.4 (AR-100의 면내 좌굴)</strong> 2힌지, \(f/L = 0.18\), \(EI = 2.1 \times 10^8 \times 0.0458 = 9.62 \times 10^6\) kN·m².
+      <ol class="at-steps">
+        <li><b>좌굴 계수.</b> 시뮬레이터의 고유값 해석 \(\gamma \approx 43.9\)(고전 표의 0.1–0.2 사이 보간과 비슷하다).</li>
+        <li><b>임계 하중.</b> \(q_{cr} = 43.9 \times 9.62 \times 10^6/100^3 = 422\) kN/m.</li>
+        <li><b>판정.</b> 고정하중 80 + 활하중 등가 약 20 kN/m = 100 kN/m에 대해 \(q_{cr}/q = 4.2\). 실제 설계는 초기 결함과 비탄성을 넣은 기둥 곡선 형태로 리브의 압축 강도를 줄인다(StructureBook 강구조, 형태).</li>
+      </ol>
+      타이드 아치에서는 행어가 리브를 바닥판 쪽으로 붙잡아 주므로, 면내 좌굴 하중이 같은 독립 아치보다 크다. <span class="term">면외 좌굴</span><span class="en">(out-of-plane buckling)</span>은 두 리브 사이의 <span class="term">횡 브레이싱</span><span class="en">(lateral bracing)</span>(8절 3D 그림의 X형 부재)이 정한다.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="truss-types">
+    <h2>트러스교의 형식과 부재력</h2>
+    <div class="problem"><strong>36 m 보도교의 트러스로 60 m 차도교를 만들 수 있을까</strong>
+      <p>T-36은 6패널 × 6 m, 높이 4.5 m의 프랫 트러스였습니다. 경간을 늘리고 차량을 올리면 부재력은 어떻게 커지고, 높이는 얼마로 해야 강재가 가장 적게 들까요?</p></div>
+    <p><span class="term">트러스교</span><span class="en">(truss bridge)</span>는 삼각형으로 엮은 부재들이 축력만으로 하중을 견디는 교량입니다. 경간 전체로 보면 트러스도 보입니다. 휨모멘트 \(M\)은 위·아래 <span class="term">현재</span><span class="en">(chord)</span>가 짝힘(\(N \approx M/h\))으로, 전단력 \(V\)는 <span class="term">복부재</span><span class="en">(web member)</span>(사재·수직재)가 견딥니다. MechanicsBook 3장의 <a href="../../mechanics/chapters/truss.html#types">트러스 형식</a>과 <a href="../../mechanics/chapters/truss.html#t36">T-36</a> 해석이 그대로 출발점입니다. 교량에서 흔한 형식은 <span class="term">프랫 트러스</span><span class="en">(Pratt truss)</span>, <span class="term">워런 트러스</span><span class="en">(Warren truss)</span>, 하우 트러스와 K 트러스입니다(그림 4-6).</p>
+    <figure class="diagram" id="fig-at-trusstypes">
+      <svg viewBox="0 0 860 250" role="img" aria-label="프랫, 하우, 워런, K 트러스의 복부재 배치와 사재의 인장·압축">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g style="stroke:var(--text);stroke-width:2;fill:none">
+          <path d="M40 110 H380 M80 50 H340 M40 110 L80 50 M340 50 L380 110"/>
+          <path d="M480 110 H820 M520 50 H780 M480 110 L520 50 M780 50 L820 110"/>
+          <path d="M40 220 H380 M68 160 H352 M40 220 L68 160"/>
+          <path d="M480 220 H820 M520 160 H780 M480 220 L520 160 M780 160 L820 220"/>
+        </g>
+        <!-- pratt: verticals compression(blue? ) diagonals tension -->
+        <g style="stroke:var(--compression);stroke-width:2"><line x1="80" y1="50" x2="80" y2="110"/><line x1="145" y1="50" x2="145" y2="110"/><line x1="210" y1="50" x2="210" y2="110"/><line x1="275" y1="50" x2="275" y2="110"/><line x1="340" y1="50" x2="340" y2="110"/></g>
+        <g style="stroke:var(--tension);stroke-width:2"><line x1="80" y1="50" x2="145" y2="110"/><line x1="145" y1="50" x2="210" y2="110"/><line x1="275" y1="50" x2="210" y2="110"/><line x1="340" y1="50" x2="275" y2="110"/></g>
+        <text x="210" y="36" text-anchor="middle" class="t" style="font-weight:700">프랫(Pratt) — 사재 인장, 수직재 압축</text>
+        <!-- howe -->
+        <g style="stroke:var(--tension);stroke-width:2"><line x1="520" y1="50" x2="520" y2="110"/><line x1="585" y1="50" x2="585" y2="110"/><line x1="650" y1="50" x2="650" y2="110"/><line x1="715" y1="50" x2="715" y2="110"/><line x1="780" y1="50" x2="780" y2="110"/></g>
+        <g style="stroke:var(--compression);stroke-width:2"><line x1="520" y1="110" x2="585" y2="50"/><line x1="585" y1="110" x2="650" y2="50"/><line x1="715" y1="110" x2="650" y2="50"/><line x1="780" y1="110" x2="715" y2="50"/></g>
+        <text x="650" y="36" text-anchor="middle" class="t" style="font-weight:700">하우(Howe) — 사재 압축, 수직재 인장</text>
+        <!-- warren -->
+        <g style="stroke-width:2"><line x1="68" y1="160" x2="96" y2="220" style="stroke:var(--tension)"/><line x1="96" y1="220" x2="124" y2="160" style="stroke:var(--compression)"/><line x1="124" y1="160" x2="152" y2="220" style="stroke:var(--tension)"/><line x1="152" y1="220" x2="180" y2="160" style="stroke:var(--compression)"/><line x1="180" y1="160" x2="208" y2="220" style="stroke:var(--tension)"/><line x1="240" y1="160" x2="212" y2="220" style="stroke:var(--tension)"/><line x1="268" y1="220" x2="240" y2="160" style="stroke:var(--compression)"/><line x1="296" y1="160" x2="268" y2="220" style="stroke:var(--tension)"/><line x1="324" y1="220" x2="296" y2="160" style="stroke:var(--compression)"/><line x1="352" y1="160" x2="324" y2="220" style="stroke:var(--tension)"/><line x1="352" y1="160" x2="380" y2="220" style="stroke:var(--compression)"/></g>
+        <text x="210" y="148" text-anchor="middle" class="t" style="font-weight:700">워런(Warren) — 사재가 번갈아 인장·압축</text>
+        <!-- K -->
+        <g style="stroke:var(--text-dim);stroke-width:2"><line x1="585" y1="160" x2="585" y2="220"/><line x1="650" y1="160" x2="650" y2="220"/><line x1="715" y1="160" x2="715" y2="220"/><line x1="520" y1="190" x2="585" y2="160"/><line x1="520" y1="190" x2="585" y2="220"/><line x1="585" y1="190" x2="650" y2="160"/><line x1="585" y1="190" x2="650" y2="220"/><line x1="715" y1="190" x2="650" y2="160"/><line x1="715" y1="190" x2="650" y2="220"/><line x1="780" y1="190" x2="715" y2="160"/><line x1="780" y1="190" x2="715" y2="220"/><line x1="520" y1="160" x2="520" y2="220"/><line x1="780" y1="160" x2="780" y2="220"/></g>
+        <text x="650" y="148" text-anchor="middle" class="t" style="font-weight:700">K 트러스 — 높은 트러스의 사재를 짧게</text>
+      </svg>
+      <figcaption><b>그림 4-6.</b> 트러스교의 대표 형식과 등분포 하중에서의 복부재 부호(인장 파랑, 압축 빨강). 프랫은 긴 사재가 인장, 짧은 수직재가 압축이라 강재 트러스에 유리하다. 하우는 반대라 목재(압축 사재) + 강봉(인장 수직재) 시대에 쓰였다. 워런은 부재가 적고 같은 길이라 제작이 쉽다. K 트러스는 높이가 큰 트러스에서 사재의 좌굴 길이를 줄인다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 4.5 (트러스교의 현재력과 복부재력)</strong> 패널점 하중을 받는 평행현 트러스에서, 단면법으로
+      <div class="formula">$$N_{chord} \approx \pm\frac{M(x)}{h}, \qquad N_{diag} = \frac{V_{panel}}{\sin\theta}, \qquad \sum_{members} |N_i|\,\ell_i \;\propto\; \text{강재량(같은 허용 응력)}$$<div class="where">\(M(x)\): 같은 하중을 받는 단순보의 패널점 휨모멘트, \(h\): 트러스 높이, \(V_{panel}\): 패널 전단력, \(\theta\): 사재 경사각. 높이를 키우면 현재력은 줄지만 복부재가 길어진다. 모든 부재를 같은 응력으로 쓴다고 보면 강재량은 \(\sum|N|\ell\)에 비례한다. 이 지표는 높이를 키울수록 줄지만 줄어드는 폭이 점점 작아져, \(L/h\) 약 5보다 깊게 하면 거의 평평하다. 깊게 할수록 얻는 것은 적어지는 반면, 길어진 압축재의 좌굴·풍하중 면적·가로 브레이싱 비용이 커지므로 실무 높이는 \(L/h\) 약 6–10(형태)에 머문다.</div></div></div>
+    <div class="sim" id="sim-at-truss">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>트러스교 해석: 형식·패널 수·높이 → 부재력과 강재량</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="at-cv-tr" aria-label="트러스교의 부재력 색(인장 파랑, 압축 빨강)"></canvas><canvas id="at-cv-tr2" aria-label="트러스 높이에 따른 강재량 지표 Σ|N|ℓ 곡선"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>형식</span><div class="seg" id="at-tr-type"><button data-value="pratt" class="on">프랫</button><button data-value="howe">하우</button><button data-value="warren">워런</button></div></div>
+          <div class="ctrl"><span>패널 수 (6 m 패널)</span><div class="seg" id="at-tr-np"><button data-value="6" class="on">6 (36 m)</button><button data-value="8">8 (48 m)</button><button data-value="10">10 (60 m)</button></div></div>
+          <label class="ctrl"><span>높이 h <output id="at-tr-h-out"></output></span><input type="range" id="at-tr-h" min="2" max="12" step="0.25" value="4.5"></label>
+          <label class="check"><input type="checkbox" id="at-tr-lbl"> 부재력 숫자 보기</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 인장 · 압축 (kN)</span><span class="v" id="at-tr-mx">—</span></div>
+        <div class="stat"><span class="k">상현 중앙 ≈ −M/h</span><span class="v" id="at-tr-ch">—</span></div>
+        <div class="stat"><span class="k">Σ|N|ℓ (kN·m)</span><span class="v" id="at-tr-w">—</span></div>
+        <div class="stat"><span class="k">L/h · 평평해지는 L/h</span><span class="v" id="at-tr-o">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 프랫 6패널, h 4.5 m에서 T-36의 부재력(하현 중앙 +320, 상현 −360, 단부 경사재 −250 kN)을 확인하세요 · 높이를 바꾸며 Σ|N|ℓ 곡선이 평평해지는 곳을 찾으세요(최소값의 110 % 안에 드는 가장 낮은 높이) · 하우로 바꾸면 사재와 수직재의 부호가 뒤집힙니다 · 모델: 하현 패널점마다 60 kN(T-36 사용 하중), 하로교(하중은 하현), <code>CB.truss</code>(축력만). 강재량 지표는 모든 부재를 같은 응력으로 쓴다는 가정(압축재 좌굴·최소 단면 무시). 교육용.</div>
+    </div>
+    <div class="callout site"><strong>T-36에서 차도교로</strong> MechanicsBook의 T-36(36 m, 6패널, 높이 4.5 m = L/8)은 하현 중앙 +320, 상현 중앙 −360 kN을 받는 보도교였습니다. 이 장의 트럭 주행 예(다음 절)는 같은 프랫 형식을 차도교 규모로 키운 <b>TR-60</b>(교육용, 이 장에서만: 경간 60 m = 8패널 × 7.5 m, 높이 7.5 m = L/8, 하로, 트러스 2면, 트러스 한 면 고정하중 30 kN/m)입니다. 패널 길이를 키우면 바닥판을 받치는 세로보·가로보 경간도 길어지므로, 실제 차도 트러스교는 패널 길이와 높이를 함께 정합니다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="truss-moving">
+    <h2>트럭이 지나가는 동안의 부재력</h2>
+    <div class="problem"><strong>가운데 사재는 인장재인가 압축재인가</strong>
+      <p>고정하중에서 프랫 트러스의 사재는 모두 인장입니다. 그러나 트럭이 왼쪽에서 들어와 중앙을 지날 때, 중앙 근처 패널의 전단력은 부호를 바꿉니다. 그 사재는 언제, 얼마나 눌릴까요?</p></div>
+    <p>트러스 부재의 <span class="term">부재력 영향선</span><span class="en">(member force influence line)</span>은 단위 하중을 하현 패널점에 차례로 놓고 그 부재의 축력을 그린 것입니다. 하중은 바닥판 → 세로보 → 가로보 → 패널점으로 전해지므로, 패널점 사이의 영향선은 직선입니다(MechanicsBook 6장 <a href="../../mechanics/chapters/influence.html#truss">트러스의 영향선</a>). 이 함수를 2장의 <code>CB.civ.truckScan</code>에 넣으면 트럭 주행 중 부재력의 최대·최소를 바로 얻습니다.</p>
+    <div class="callout def"><strong>원리 4.6 (부재력 영향선과 응력 반전)</strong>
+      <div class="formula">$$N_{max} = N_D + (1 + IM)\max_{\text{트럭}}\sum_k P_k\,\eta_N(\xi_k) + w_L\!\int_{\eta_N \gt 0}\eta_N\,d\xi, \qquad N_{min} = N_D + (1 + IM)\min_{\text{트럭}}\sum_k P_k\,\eta_N(\xi_k) + w_L\!\int_{\eta_N \lt 0}\eta_N\,d\xi$$<div class="where">\(\eta_N\): 부재력 영향선(패널점 사이 직선), \(N_D\): 고정하중 부재력. 중앙 근처 사재는 영향선이 양·음 구간을 모두 가져, 고정하중 인장이 작으면 \(N_{min} \lt 0\)이 되는 <span class="term">응력 반전</span><span class="en">(stress reversal)</span>이 생긴다. 옛 프랫 트러스는 이런 패널에 반대 방향의 인장 사재(<span class="term">카운터</span><span class="en">(counter)</span>)를 더해 X자로 만들었다. 반전은 피로에도 불리하다(응력 범위가 커진다).</div></div></div>
+    <div class="sim" id="sim-at-moving">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>트럭 주행과 트러스 부재력 이력: TR-60</h3></div>
+      <div class="sim-body">
+        <div class="sim-view"><canvas id="at-cv-mv" aria-label="TR-60 트러스 위를 지나는 트럭, 선택 부재의 부재력 영향선과 트럭 위치에 따른 부재력 이력"></canvas></div>
+      </div>
+      <div class="sim-controls" style="padding:12px 18px">
+        <div class="ctrl"><span>부재</span><div class="seg" id="at-mv-m"><button data-value="d4" class="on">중앙 사재</button><button data-value="d1">단부 쪽 사재</button><button data-value="bc">하현 중앙</button><button data-value="tc">상현 중앙</button><button data-value="ep">단부 경사재</button><button data-value="v1">수직재</button></div></div>
+        <label class="ctrl"><span>트럭 앞축 위치 <output id="at-mv-x-out"></output></span><input type="range" id="at-mv-x" min="0" max="72" step="0.25" value="30"></label>
+        <label class="ctrl"><span>고정하중(트러스 한 면) <output id="at-mv-d-out"></output></span><input type="range" id="at-mv-d" min="0" max="60" step="1" value="30"></label>
+        <div class="btn-row"><button class="btn" id="at-mv-play">▶ 트럭 주행</button></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">지금 부재력 (활하중)</span><span class="v" id="at-mv-now">—</span></div>
+        <div class="stat"><span class="k">트럭 최대 · 최소 (×½, 충격 제외)</span><span class="v" id="at-mv-t">—</span></div>
+        <div class="stat"><span class="k">N<sub>D</sub> · N<sub>max</sub> · N<sub>min</sub></span><span class="v" id="at-mv-n">—</span></div>
+        <div class="stat"><span class="k">응력 반전</span><span class="v" id="at-mv-rv">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 중앙 사재를 고르고 트럭을 주행시켜 부재력이 인장에서 압축으로 바뀌는 순간을 보세요 · 고정하중을 줄이면 반전이 커지고, 키우면 반전이 사라집니다(무거운 다리일수록 반전이 덜하다) · 현재와 단부 경사재는 영향선이 한 부호뿐입니다 · 모델: TR-60(8패널 × 7.5 m, 높이 7.5 m, 프랫, 하로), 단위 하중을 하현 패널점에 놓은 <code>CB.truss</code> 9회로 영향선, 트럭(<code>CB.civ.TRUCK</code>)의 절반이 트러스 한 면에 실린다고 봄(교육용), 두 방향 주행, IM = 15/(40 + 60) = 0.15, 차로 하중 12.7 × ½ kN/m은 같은 부호 구간에만. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 4.5 (TR-60 중앙 사재의 응력 반전)</strong> 중앙 왼쪽 패널(x = 22.5–30 m)의 사재, 경사각 45°.
+      <ol class="at-steps">
+        <li><b>고정하중.</b> 패널점 하중 \(30 \times 7.5 = 225\) kN, 반력 \(3.5 \times 225 = 787.5\) kN. 그 패널의 전단 \(787.5 - 3 \times 225 = 112.5\) kN → \(N_D = 112.5/\sin 45° = +159\) kN(인장).</li>
+        <li><b>활하중.</b> 영향선 주사로 트럭(절반) 최대 +147, 최소 −102 kN. 차로 하중(절반) +77, −43 kN. \(N_{max} = 159 + 1.15 \times 147 + 77 = +405\) kN, \(N_{min} = 159 - 1.15 \times 102 - 43 = -1\) kN.</li>
+        <li><b>판정.</b> 고정하중 30 kN/m에서 이 사재는 거의 0까지 내려가 겨우 반전을 면한다. 고정하중이 20 kN/m이면 \(N_{min} \approx -54\) kN으로 압축이 된다. 인장재로 가늘게 설계한 사재라면 좌굴할 수 있다.</li>
+      </ol>
+      하현 중앙의 최대값은 \(1.15 \times 429 + 357 = 850\) kN(활하중만)이고 영향선이 한 부호뿐이라 반전이 없다. 실제 차도 트러스는 여러 차로·다차로 계수·피로 하중으로 다시 검토한다(형태).</div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="secondary">
+    <h2>2차 응력: 절점은 핀이 아니다</h2>
+    <div class="problem"><strong>용접·볼트로 단단히 붙인 절점에서 부재는 정말 축력만 받을까</strong>
+      <p>트러스 해석은 절점을 마찰 없는 핀으로 봅니다. 실제 절점은 큰 거셋판에 볼트로 꽉 붙어 있습니다. 트러스가 처지며 부재 끝 각도가 바뀌려 할 때, 절점이 그것을 막으면 무슨 일이 생길까요?</p></div>
+    <p>핀 절점 해석으로 구한 축력을 1차 응력이라 하고, 절점이 <span class="term">거셋판</span><span class="en">(gusset plate)</span>으로 강접되어 부재 끝이 함께 회전하도록 묶여 생기는 휨 응력을 <span class="term">2차 응력</span><span class="en">(secondary stress)</span>이라 합니다. 트러스 전체가 처지면 각 삼각형의 각도가 조금씩 바뀌는데, 강접 절점은 모든 부재 끝을 같은 각도로 돌리므로 부재가 S자로 휩니다. 휨 응력은 부재의 높이(단면 깊이)가 길이에 비해 클수록 커집니다.</p>
+    <figure class="diagram" id="fig-at-gusset">
+      <svg viewBox="0 0 860 230" role="img" aria-label="거셋판 절점과, 핀 절점과 강접 절점에서 트러스 부재의 변형 비교">
+        <rect x="10" y="10" width="840" height="210" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">거셋판 절점</text>
+          <path d="M60 40 L200 40 L230 150 L30 150 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="0" y="120" width="280" height="22" style="fill:none;stroke:var(--text);stroke-width:2.4"/>
+          <path d="M110 40 L60 -10" style="stroke:var(--text);stroke-width:12;opacity:.5"/>
+          <path d="M150 40 L200 -10" style="stroke:var(--text);stroke-width:12;opacity:.5"/>
+          <g style="fill:var(--text-dim)"><circle cx="90" cy="70" r="3"/><circle cx="110" cy="70" r="3"/><circle cx="160" cy="70" r="3"/><circle cx="180" cy="70" r="3"/><circle cx="70" cy="131" r="3"/><circle cx="100" cy="131" r="3"/><circle cx="130" cy="131" r="3"/><circle cx="160" cy="131" r="3"/><circle cx="190" cy="131" r="3"/></g>
+          <text x="0" y="176" class="t-mono">볼트 여러 개 → 회전을 묶는다(강접에 가깝다)</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="0" y="-10" class="t" style="font-weight:700">핀 절점 vs 강접 절점의 부재 변형</text>
+          <line x1="20" y1="60" x2="300" y2="60" style="stroke:var(--text-faint);stroke-width:2"/>
+          <path d="M20 90 L300 120" style="stroke:var(--accent);stroke-width:2.4;fill:none"/>
+          <text x="306" y="124" class="t-mono" style="fill:var(--accent)">핀: 곧게 기운다</text>
+          <path d="M20 140 C 100 136, 220 184, 300 170" style="stroke:var(--compression);stroke-width:2.4;fill:none"/>
+          <text x="306" y="174" class="t-mono" style="fill:var(--compression)">강접: S자 휨</text>
+          <text x="0" y="200" class="t-mono">σ₂ ≈ (6EΔθ/ℓ)·(d/2)/r² … 깊이 d/ℓ이 클수록 커진다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 4-7.</b> 거셋판에 여러 볼트로 붙인 절점은 회전을 묶는다. 트러스가 처질 때 핀 절점이라면 부재가 곧게 기울지만, 강접 절점에서는 끝 각도가 절점 회전에 묶여 S자로 휜다. 이 휨이 2차 응력이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-at-secondary">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>2차 응력: 강접 T-36의 부재 휨</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="at-cv-sc" aria-label="강접 절점 T-36의 휨모멘트도와 부재별 2차 응력비 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>부재 단면 깊이 d <output id="at-sc-d-out"></output></span><input type="range" id="at-sc-d" min="100" max="900" step="25" value="200"></label>
+          <div class="ctrl"><span>그림</span><div class="seg" id="at-sc-view"><button data-value="M" class="on">휨모멘트도</button><button data-value="R">응력비 색</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 σ<sub>2</sub>/σ<sub>1</sub></span><span class="v" id="at-sc-r">—</span></div>
+        <div class="stat"><span class="k">최대 σ<sub>2</sub> · d/ℓ</span><span class="v" id="at-sc-m">—</span></div>
+        <div class="stat"><span class="k">하현 중앙 σ<sub>1</sub> · σ<sub>2</sub></span><span class="v" id="at-sc-c">—</span></div>
+        <div class="stat"><span class="k">축력 변화(강접/핀)</span><span class="v" id="at-sc-n">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: d를 200 mm(T-36)에서 600 mm로 키워 응력비가 어떻게 커지는지 보세요 · 축력은 핀 해석과 거의 같은 것을 확인하세요(2차 응력은 축력 분포를 바꾸지 않고 휨을 더한다) · 모델: T-36(36 m, 6패널, h 4.5 m, 하현 패널점 60 kN)을 강접 골조(<code>CB.frame</code>)로 푼다. 부재 면적은 T-36 값(현재 6,208, 복부재 3,910 mm²)으로 고정하고 단면 깊이 d만 바꿔 I = A(0.43d)², S = I/(d/2)(H형강의 회전반경 비 형태). 교육용.</div>
+    </div>
+    <p>응력비 σ<sub>2</sub>/σ<sub>1</sub>은 축력이 작은 부재(T-36의 수직재 C–I, 축력 −30 kN)에서 크게 나오지만 그 휨 응력 자체는 몇 MPa에 그친다. 축력이 큰 현재에서는 응력비가 작다. 그래서 2차 응력은 비율과 절대값을 함께 본다. 옛 리벳 트러스 시대에는 2차 응력을 손으로 계산하기가 무척 어려워, 부재 깊이를 길이의 1/10 안팎 이하로 두면 2차 응력을 따로 검토하지 않아도 된다는 경험칙을 쓰기도 했습니다(형태). 지금은 절점을 강접으로 둔 골조 해석이 쉬워 바로 확인합니다. 2차 응력은 정적 강도보다 <b>피로</b>에 중요합니다. 절점 근처 거셋판과 용접부에서 응력 범위를 키우기 때문입니다.</p>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="erection">
+    <h2>트러스와 아치의 가설</h2>
+    <p>긴 트러스와 아치는 다 지은 뒤보다 <b>짓는 도중</b>이 더 위험한 경우가 많습니다. 완성 구조는 양쪽 지점이 있지만, 가설 중에는 한쪽에만 붙은 캔틸레버이거나, 아치가 크라운에서 닫히기 전이라 추력을 내지 못합니다.</p>
+    <figure class="diagram" id="fig-at-erection">
+      <svg viewBox="0 0 860 240" role="img" aria-label="트러스의 캔틸레버 가설과 아치의 케이블 지지 캔틸레버 가설">
+        <rect x="10" y="10" width="840" height="220" rx="10" class="f-surface"/>
+        <text x="40" y="38" class="t" style="font-weight:700">트러스 캔틸레버 가설</text>
+        <g style="stroke:var(--text);stroke-width:2;fill:none"><path d="M40 170 H330 M70 110 H300 M40 170 L70 110 M70 110 L100 170 L130 110 L160 170 L190 110 L220 170 L250 110 L280 170 L300 110"/></g>
+        <path d="M30 172 l10 -2 l10 2 v20 h-20z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <line x1="70" y1="110" x2="300" y2="110" style="stroke:var(--tension);stroke-width:3"/>
+        <line x1="40" y1="170" x2="330" y2="170" style="stroke:var(--compression);stroke-width:3"/>
+        <text x="190" y="100" text-anchor="middle" class="t-mono" style="fill:var(--tension)">상현 인장(완성 후 압축)</text>
+        <text x="190" y="190" text-anchor="middle" class="t-mono" style="fill:var(--compression)">하현 압축(완성 후 인장)</text>
+        <path d="M330 170 l12 -22" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#at-ah-ld)"/>
+        <text x="300" y="214" text-anchor="middle" class="t-mono">크레인 · 다음 패널 →</text>
+        <text x="470" y="38" class="t" style="font-weight:700">아치 케이블 지지 캔틸레버 가설</text>
+        <line x1="500" y1="60" x2="500" y2="190" style="stroke:var(--text-dim);stroke-width:4"/>
+        <path d="M500 190 Q 560 110 640 90" style="fill:none;stroke:var(--compression);stroke-width:4"/>
+        <g style="stroke:var(--tension);stroke-width:1.6"><line x1="500" y1="64" x2="560" y2="130"/><line x1="500" y1="64" x2="600" y2="104"/><line x1="500" y1="64" x2="640" y2="90"/><line x1="500" y1="64" x2="470" y2="190"/></g>
+        <path d="M800 190 Q 760 120 700 96" style="fill:none;stroke:var(--compression);stroke-width:4;stroke-dasharray:6 4"/>
+        <text x="670" y="76" text-anchor="middle" class="t-mono">크라운 폐합 전 → 추력 없음</text>
+        <text x="640" y="214" text-anchor="middle" class="t-mono">임시 탑 · 백스테이 케이블이 반쪽 아치를 매단다</text>
+      </svg>
+      <figcaption><b>그림 4-8.</b> 가설 중의 구조계. 캔틸레버로 뻗는 트러스는 완성 구조와 반대로 상현이 인장, 하현이 압축을 받는다(지점 근처 하현이 가장 크게 눌린다 — 퀘벡교가 무너진 부재). 아치는 크라운이 닫히기 전까지 추력을 낼 수 없어 임시 탑과 케이블로 매달거나(케이블 지지 캔틸레버), 아래에서 동바리(센터링)로 받친다.</figcaption>
+    </figure>
+    <p><span class="term">캔틸레버 가설</span><span class="en">(cantilever erection)</span>에서는 가설 단계마다 구조계가 바뀌므로 <b>모든 단계의 부재력</b>을 계산해야 합니다. 퀘벡교처럼 지점 근처 하현재는 가설 끝 무렵에 가장 큰 압축을 받고, 그 크기는 설계의 자중 가정에 직접 비례합니다. 1890년 완공한 스코틀랜드의 포스교(주경간 521 m 둘)는 캔틸레버 원리를 거대한 강관 압축재로 보여 준 다리입니다. 사장교의 캔틸레버 가설과 케이블 긴장 순서는 <a href="cable-bridges.html">5장</a>에서 다룹니다.</p>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="efficiency">
+    <h2>효율과 경간: 왜 형태를 바꾸나</h2>
+    <div class="problem"><strong>같은 100 m를 거더·트러스·아치로 건너면</strong>
+      <p>세 형식 모두 같은 휨모멘트 \(M_0 = wL^2/8\)을 어딘가에서 짝힘으로 견뎌야 합니다. 차이는 그 짝힘의 팔 길이입니다.</p></div>
+    <p>보로 보면 모든 형식이 \(M_0\)를 "힘 × 팔 길이"로 나눠 가집니다. 거더는 팔 길이가 단면 높이 \(h \approx L/20\)이고, 트러스는 트러스 높이 \(h \approx L/8\), 아치는 라이즈 \(f \approx L/6\)입니다. 팔 길이가 길수록 필요한 힘(현재력·추력)이 작아집니다.</p>
+    <div class="callout"><strong>예제 4.6 (같은 경간, 세 가지 팔 길이)</strong> \(L = 100\) m, \(w = 100\) kN/m → \(M_0 = 125{,}000\) kN·m.
+      <ol class="at-steps">
+        <li><b>거더(\(h = 5\) m).</b> 플랜지 힘 \(\approx 125{,}000/5 = 25{,}000\) kN — 그리고 복부가 전 높이에 걸쳐 전단을 받는다.</li>
+        <li><b>트러스(\(h = 12.5\) m).</b> 현재력 \(\approx 10{,}000\) kN — 복부는 사재 몇 개로 줄어든다.</li>
+        <li><b>아치(\(f = 16.7\) m).</b> 추력 \(H = 7{,}500\) kN — 리브 하나가 이 힘을 전 경간에서 나르고, 고정하중에는 복부가 필요 없다. 대신 편재 하중의 휨, 좌굴, 그리고 추력을 받을 지점(또는 타이)이 필요하다.</li>
+      </ol>
+      팔 길이를 키우는 대가는 높이다. 트러스와 아치는 바닥판 위·아래로 큰 공간을 차지하고, 부재와 절점이 많아 제작·도장·점검 비용이 크다. 그래서 짧은 경간은 거더가, 긴 경간은 트러스·아치가, 더 긴 경간은 케이블이 유리해진다.</div>
+    <figure class="diagram" id="fig-at-spans">
+      <svg viewBox="0 0 860 250" role="img" aria-label="교량 형식별로 흔히 쓰이는 경간 범위 띠 그래프(로그 축)">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <!-- log axis 10..2000 m : x = 170 + 640*log10(L/10)/log10(200) -->
+        <line x1="170" y1="200" x2="810" y2="200" class="s-axis"/>
+        <g class="t-mono" text-anchor="middle"><text x="170" y="218">10</text><text x="291" y="218">30</text><text x="448" y="218">100</text><text x="569" y="218">300</text><text x="726" y="218">1,000</text><text x="810" y="218">2,000 m</text></g>
+        <g class="t-dim" text-anchor="end"><text x="160" y="44">RC·PSC 거더</text><text x="160" y="72">강 거더·박스</text><text x="160" y="100">트러스</text><text x="160" y="128">아치</text><text x="160" y="156">사장교</text><text x="160" y="184">현수교</text></g>
+        <rect x="170" y="34" width="240" height="14" rx="4" style="fill:var(--accent);opacity:.55"/>
+        <rect x="291" y="62" width="225" height="14" rx="4" style="fill:var(--accent);opacity:.55"/>
+        <rect x="370" y="90" width="285" height="14" rx="4" style="fill:var(--accent-2);opacity:.6"/>
+        <rect x="370" y="118" width="300" height="14" rx="4" style="fill:var(--accent-2);opacity:.6"/>
+        <rect x="526" y="146" width="210" height="14" rx="4" style="fill:var(--warn);opacity:.6"/>
+        <rect x="617" y="174" width="190" height="14" rx="4" style="fill:var(--warn);opacity:.6"/>
+        <line x1="476" y1="28" x2="476" y2="196" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+        <text x="480" y="26" class="t-mono">B-130 중앙 50 m · AR-100 100 m</text>
+      </svg>
+      <figcaption><b>그림 4-9.</b> 교량 형식별로 흔히 쓰이는 경간의 대략적인 띠(로그 축, 교육용·약). 띠의 끝은 기록이 아니라 흔한 범위이며, 기록 경간은 이보다 길다(예: 캔틸레버 트러스 퀘벡교 약 549 m, 강 아치는 500 m를 넘는 예가 있다). 형식의 경계는 경간뿐 아니라 가설·지반·항로·미관이 정한다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="ar100">
+    <h2>AR-100: 3D 하로 아치교</h2>
+    <p>마지막으로 AR-100 하로 타이드 아치를 3D로 봅니다. 두 아치 리브, 행어, 타이(바닥판 거더), 가로보, 리브 사이의 횡 브레이싱이 보이고, 트럭이 지나갈 때 아치면 하나의 2D 해석(<code>CB.frame</code>)으로 구한 행어 장력을 색과 굵기로 표시합니다.</p>
+    <div class="sim" id="sim-at-3d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>AR-100 3D: 트럭이 지나갈 때 행어 장력</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="at-cv-3d" aria-label="하로 타이드 아치교 AR-100의 3D 투시도. 리브, 행어, 바닥판, 브레이싱, 트럭. 끌어서 돌릴 수 있다"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>트럭 앞축 위치 <output id="at-3d-x-out"></output></span><input type="range" id="at-3d-x" min="0" max="112" step="0.5" value="40"></label>
+          <label class="check"><input type="checkbox" id="at-3d-br" checked> 횡 브레이싱</label>
+          <label class="check"><input type="checkbox" id="at-3d-dl"> 행어 색에 고정하중 포함</label>
+          <div class="btn-row"><button class="btn" id="at-3d-play">▶ 주행</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 행어 장력 (활하중)</span><span class="v" id="at-3d-h">—</span></div>
+        <div class="stat"><span class="k">타이 장력 증가</span><span class="v" id="at-3d-t">—</span></div>
+        <div class="stat"><span class="k">리브 max|M|</span><span class="v" id="at-3d-m">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 트럭을 따라 가장 굵게 칠해지는 행어가 옮겨 가는 것을 보세요 · 브레이싱을 끄면 리브 두 개가 옆으로 아무것도 붙잡지 않은 압축재가 되는 것을 상상해 보세요(면외 좌굴) · 모델: AR-100 아치면 하나(행어 19개, 타이 I 0.08 m⁴)의 <code>CB.frame</code>에 트럭(<code>CB.civ.TRUCK</code>)의 절반을 패널점에 나눠 싣고(가로보·세로보는 단순 지지로 봄), 같은 결과를 두 아치면에 그린다. 교육용.</div>
+    </div>
+    <div class="callout site"><strong>AR-100 요약(교육용, 이 장의 가상 교량)</strong> 하로 타이드 아치, 경간 100 m, 라이즈 18 m(f/L 0.18), 아치면 2개(간격 약 11 m), 행어 간격 5 m. 리브 강 박스 1,200 × 1,400 × 30 mm(A 0.152 m², I 0.0458 m⁴), 타이 A 0.12 m²·I 0.08 m⁴. 아치면 하나 고정하중 80 kN/m → 추력(타이 장력) 약 5,556 kN, 리브 최대 축력 6,846 kN(44.9 MPa). 왼쪽 절반 차로 하중 → M<sub>max</sub> 약 1,984 kN·m(독립 2힌지) — 타이드 아치에서는 타이 거더와 나눠 가진다. 면내 좌굴 \(q_{cr} \approx 422\) kN/m(2힌지 독립 아치 기준, 안전율 약 4). B-130의 중앙 50 m 대신 하천을 한 번에 건너는 대안으로, 교각 하나를 줄이는 대신 강재 단가·가설이 더 든다. 하천의 홍수위는 <a href="hydraulics.html">15장</a>, 받침은 <a href="substructure.html">6장</a>.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="girders.html"><small>CH.03 · 거더교와 바닥판</small>휨으로 견디는 다리<br><span>같은 경간을 거더로 건널 때와 비교.</span></a>
+      <a href="cable-bridges.html"><small>CH.05 · 사장교와 현수교</small>아치를 뒤집으면 케이블<br><span>추력 H = wL²/8f가 케이블 장력이 된다.</span></a>
+      <a href="substructure.html"><small>CH.06 · 하부 구조와 받침</small>추력과 반력을 땅으로<br><span>아치 교대, 타이드 아치의 받침.</span></a>
+      <a href="maintenance.html"><small>CH.16 · 유지관리와 성능 개선</small>파괴 연쇄 부재와 피로<br><span>타이·행어·트러스 절점의 점검.</span></a>
+      <a href="../../mechanics/chapters/frames-arches.html#pressure-line"><small>MechanicsBook · CH.05</small>3힌지 아치와 압력선<br><span>M = He, 퓨니큘러 형태.</span></a>
+      <a href="../../mechanics/chapters/truss.html#t36"><small>MechanicsBook · CH.03</small>트러스와 T-36<br><span>절점법·단면법·영부재.</span></a>
+      <a href="../../mechanics/chapters/influence.html#truss"><small>MechanicsBook · CH.06</small>트러스의 영향선<br><span>패널점 하중과 직선 영향선.</span></a>
+      <a href="../../mechanics/chapters/buckling.html#euler"><small>MechanicsBook · CH.13</small>기둥과 좌굴<br><span>압축재의 오일러 좌굴과 유효 길이.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>포물선 아치는 수평 투영 등분포 하중을 휨 없이 압축으로 나른다. \(H = wL^2/(8f)\), \(N_{max} = H\sqrt{1 + (4f/L)^2}\). AR-100: H 5,556 kN, N 6,846 kN(44.9 MPa).</li>
+      <li>상로·중로·하로는 바닥판 위치로 나눈다. 타이드 아치는 타이가 추력을 묶어 외적으로 단순보가 되고, 리브·타이 거더의 휨 강성 비가 활하중 휨을 나눈다(랑거·로제 형태).</li>
+      <li>편재 활하중은 압력선을 축선에서 벗어나게 한다. 절반 재하에서 \(M = \pm qL^2/64\), \(e = M/N\). 고정하중 추력이 크면 \(e\)가 작아져 압력선이 핵(\(k = S/A\)) 안에 머문다.</li>
+      <li>3힌지는 정정이라 지점 변위·온도에 둔감하고, 2힌지·고정은 단단하지만 지점이 벌어지면 휨을 받는다.</li>
+      <li>아치의 면내 좌굴 하중 \(q_{cr} = \gamma EI/L^3\)(2힌지 \(f/L\) 0.2에서 \(\gamma \approx 45\), 고정 약 100). 보통 반대칭 모드가 먼저 온다. AR-100 \(q_{cr} \approx 422\) kN/m.</li>
+      <li>트러스는 현재가 \(M/h\), 복부재가 패널 전단을 받는다. 강재량 지표 \(\sum|N|\ell\)은 깊을수록 줄지만 \(L/h\) 약 5보다 깊어지면 거의 줄지 않고, 압축재 좌굴·풍하중을 생각하면 실무 높이는 \(L/h\) 약 6–10이다(교육용 지표).</li>
+      <li>부재력 영향선 + 트럭 주사로 부재력의 최대·최소를 구한다. 중앙 근처 사재는 응력 반전이 생길 수 있다(TR-60 중앙 사재 +405 / −1 kN).</li>
+      <li>강접 절점의 2차 응력은 부재 깊이/길이 비가 클수록 커지며 피로에 중요하다. 캔틸레버 가설 중에는 완성 상태와 다른 부재가 가장 크게 눌린다(퀘벡교).</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 경간 100 m, 라이즈 18 m인 포물선 아치가 수평 투영 길이당 80 kN/m를 받는다. 추력 H는?</p><div class="opts">
+        <button class="opt">4,000 kN</button><button class="opt" data-correct>약 5,556 kN</button><button class="opt">약 6,846 kN</button><button class="opt">100,000 kN</button>
+      </div><div class="quiz-exp">H = wL²/(8f) = 80 × 10,000/144 = 5,556 kN. 4,000 kN은 연직 반력, 6,846 kN은 지점의 리브 축력 √(H² + V²)이다.</div></div>
+      <div class="quiz-q"><p>2. 하로 타이드 아치의 두 지점이 받는 힘으로 옳은 것은?</p><div class="opts">
+        <button class="opt">큰 추력과 연직 반력</button><button class="opt" data-correct>연직 반력만(추력은 타이가 내부에서 받는다)</button><button class="opt">추력만</button><button class="opt">지점 모멘트와 추력</button>
+      </div><div class="quiz-exp">타이가 아치 양 끝을 묶어 추력을 인장으로 받으므로 외적으로는 단순보와 같다. 그래서 한쪽을 롤러로 두어도 되고 지반이 약해도 쓸 수 있다.</div></div>
+      <div class="quiz-q"><p>3. 포물선 2힌지 아치(축 변형 무시)의 왼쪽 절반에만 등분포 q가 실릴 때 최대 휨모멘트는?</p><div class="opts">
+        <button class="opt">0</button><button class="opt">qL²/8</button><button class="opt">qL²/16</button><button class="opt" data-correct>qL²/64 (L/4 지점)</button>
+      </div><div class="quiz-exp">대칭 부분(q/2 전체)은 휨이 없고, 반대칭 부분(±q/2)은 크라운에서 M = 0인 두 반쪽 보처럼 휜다. 반쪽 경간 L/2의 단순보에 q/2가 실린 것과 같아 (q/2)(L/2)²/8 = qL²/64.</div></div>
+      <div class="quiz-q"><p>4. 같은 활하중 휨모멘트라도 고정하중이 큰 아치에서 리브의 인장이 덜 생기는 이유는?</p><div class="opts">
+        <button class="opt">고정하중이 휨모멘트를 상쇄하기 때문</button><button class="opt" data-correct>축력 N이 커져 편심 e = M/N이 작아지고 압력선이 핵 안에 머물기 때문</button><button class="opt">고정하중이 리브의 단면을 키우기 때문</button><button class="opt">고정하중이 충격 계수를 줄이기 때문</button>
+      </div><div class="quiz-exp">포물선 아치에서 고정하중은 휨을 거의 만들지 않고 축력만 키운다. σ = N/A ± M/S에서 N/A가 M/S보다 크면 전 단면이 압축이다(|e| ≤ k = S/A).</div></div>
+      <div class="quiz-q"><p>5. 오른쪽 지점이 10 mm 벌어졌다. 휨모멘트가 생기지 않는 아치는?</p><div class="opts">
+        <button class="opt" data-correct>3힌지 아치</button><button class="opt">2힌지 아치</button><button class="opt">고정 아치</button><button class="opt">모두 휨이 생긴다</button>
+      </div><div class="quiz-exp">3힌지 아치는 정정 구조라 지점 변위가 응력을 만들지 않는다(기하가 조금 바뀔 뿐). 2힌지·고정 아치는 부정정이라 추력이 줄며 휨이 생긴다.</div></div>
+      <div class="quiz-q"><p>6. 2힌지 포물선 아치(f/L = 0.2)의 면내 좌굴 계수가 γ ≈ 45일 때, EI를 그대로 두고 경간을 2배로 하면 좌굴 하중 q<sub>cr</sub>는?</p><div class="opts">
+        <button class="opt">1/2</button><button class="opt">1/4</button><button class="opt" data-correct>1/8</button><button class="opt">변하지 않는다</button>
+      </div><div class="quiz-exp">q<sub>cr</sub> = γEI/L³이므로 L이 2배면 1/8이다. 같은 라이즈 비를 유지하면 γ는 같다. 긴 아치일수록 리브의 I를 빠르게 키워야 하는 이유다.</div></div>
+      <div class="quiz-q"><p>7. 프랫 트러스교의 중앙 근처 사재에서 응력 반전이 생기는 이유는?</p><div class="opts">
+        <button class="opt">고정하중이 그 사재에 압축을 주기 때문</button><button class="opt" data-correct>그 패널의 전단력 영향선이 양·음 구간을 모두 가져 트럭 위치에 따라 부재력 부호가 바뀌기 때문</button><button class="opt">2차 응력 때문</button><button class="opt">온도 때문</button>
+      </div><div class="quiz-exp">중앙 패널의 전단 영향선은 왼쪽에서 음, 오른쪽에서 양(또는 반대)이다. 고정하중 인장(작다)보다 활하중 압축이 크면 사재가 눌린다. 옛 트러스는 카운터 사재로 대응했다.</div></div>
+      <div class="quiz-q"><p>8. 트러스의 2차 응력에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">핀 절점에서 가장 크다</button><button class="opt">부재 축력을 크게 바꾼다</button><button class="opt" data-correct>강접 절점이 부재 끝 회전을 묶어 생기는 휨 응력으로, 부재 깊이/길이 비가 클수록 크다</button><button class="opt">하중이 패널점 사이에 있을 때만 생긴다</button>
+      </div><div class="quiz-exp">트러스가 처지며 삼각형의 각이 바뀔 때 강접 절점은 모든 부재 끝을 같은 각만큼 돌리므로 부재가 S자로 휜다. 축력은 핀 해석과 거의 같고, 휨 응력은 깊은 부재일수록 크다. 피로 검토에서 중요하다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+/* ---------- 이 장의 도우미(교육용 모델, 페이지 전용) ---------- */
+const AT = {
+  E: 2.1e8, L: 100, F: 18, AR: 0.1524, IR: 0.0458, AT: 0.12, IT: 0.08, AH: 0.005, WD: 80, Q: 12.7,
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 11.5}px ${AT.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = AT._c || (AT._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = "#000"; ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  /** 아치 축선 높이 */
+  yArch(x, L, f, shape) { if (shape === "circ") { const R = (L * L / 4 + f * f) / (2 * f); return Math.sqrt(Math.max(0, R * R - (x - L / 2) ** 2)) - (R - f); } return (4 * f * x * (L - x)) / (L * L); },
+  /** 수평 투영 분포 하중 [{w, a, b}]과 집중 하중 [{P, x}]을 n등분 절점에 나눈다(패널마다 단순 지지 세로보) */
+  lump(n, L, dist, pts) {
+    const p = L / n, F = new Array(n + 1).fill(0);
+    dist.forEach(({ w, a, b }) => { for (let i = 0; i < n; i++) { const x0 = i * p, x1 = x0 + p, s0 = Math.max(a, x0), s1 = Math.min(b, x1); if (s1 <= s0) continue; const W = w * (s1 - s0), c = (s0 + s1) / 2 - x0; F[i] += (W * (p - c)) / p; F[i + 1] += (W * c) / p; } });
+    pts.forEach(({ P, x }) => { if (x < 0 || x > L) return; const i = Math.min(n - 1, Math.floor(x / p)), c = x - i * p; F[i] += (P * (p - c)) / p; F[i + 1] += (P * c) / p; });
+    return F;
+  },
+  /** 독립 아치(2힌지·3힌지·고정) */
+  arch(o) {
+    const L = o.L || AT.L, f = o.f || AT.F, n = o.n || 20, shape = o.shape || "para", sup = o.sup || "2h";
+    const nodes = []; for (let i = 0; i <= n; i++) { const x = (i * L) / n; nodes.push([x, AT.yArch(x, L, f, shape)]); }
+    const members = []; for (let i = 0; i < n; i++) members.push({ i, j: i + 1, E: AT.E, A: AT.AR * (o.EAk || 1), I: AT.IR * (o.Ik || 1), hinge: [false, false] });
+    if (sup === "3h") members[n / 2 - 1].hinge[1] = true;
+    const st = sup === "fixed" ? "fixed" : "pin";
+    const F = AT.lump(n, L, o.dist || [], o.pts || []);
+    const loads = F.map((P, i) => ({ node: i, fy: -P })).filter((l) => Math.abs(l.fy) > 1e-12);
+    const settlements = o.spread ? [{ node: n, dof: 0, value: o.spread }] : [];
+    const r = CB.frame({ nodes, members, supports: { 0: st, [n]: st }, loads, settlements });
+    r.L = L; r.f = f; r.n = n; r.shape = shape;
+    return r;
+  },
+  /** 하로 타이드 아치: 타이 절점 0..n, 리브 절점, 행어 */
+  tied(o) {
+    const L = AT.L, f = AT.F, n = 20;
+    const nodes = []; for (let i = 0; i <= n; i++) nodes.push([(i * L) / n, 0]);
+    const ai = [0]; for (let i = 1; i < n; i++) { const x = (i * L) / n; nodes.push([x, AT.yArch(x, L, f)]); ai.push(nodes.length - 1); } ai.push(n);
+    const members = [];
+    for (let i = 0; i < n; i++) members.push({ i, j: i + 1, E: AT.E, A: AT.AT * (o.Ak || 1), I: o.It ?? AT.IT, hinge: [false, false] });
+    for (let i = 0; i < n; i++) members.push({ i: ai[i], j: ai[i + 1], E: AT.E, A: AT.AR, I: AT.IR, hinge: [false, false] });
+    for (let i = 1; i < n; i++) members.push({ i, j: ai[i], E: AT.E, A: AT.AH, truss: true });
+    const F = AT.lump(n, L, o.dist || [], o.pts || []);
+    const loads = F.map((P, i) => ({ node: i, fy: -P })).filter((l) => Math.abs(l.fy) > 1e-12);
+    const r = CB.frame({ nodes, members, supports: { 0: "pin", [n]: "roller" }, loads });
+    r.n = n; r.ai = ai; return r;
+  },
+  maxM(r, from, to) { let m = 0; for (let k = from; k < to; k++) m = Math.max(m, Math.abs(r.ends[k].M1), Math.abs(r.ends[k].M2)); return m; },
+  truckPts(front, share = 0.5, L = AT.L) { return CB.civ.TRUCK.axles.map((a) => ({ P: a.P * share, x: front - a.x })).filter((p) => p.x >= 0 && p.x <= L); },
+};
+
+/* ======================================================= 1. 아치 추력 */
+(function () {
+  const fF = CB.range("at-th-f", (v) => v.toFixed(1) + " m", () => upd()), wW = CB.range("at-th-w", (v) => v + " kN/m", () => upd());
+  const ea = CB.seg("at-th-ea", () => upd()), view = CB.seg("at-th-view", () => pl.redraw());
+  let r = null;
+  const pl = CB.plane("#at-cv-th", { x: [-18, 118], y: [-14, 62], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.85 : 0.62), minHeight: 260, maxHeight: 440,
+    draw(P) {
+      if (!r || !r.ok) return;
+      const pal = P.P;
+      for (let x = 0; x <= 100; x += 5) P.arrow(x, r.f + 8, x, r.f + 3, { color: pal.accent2, width: 1.4, head: 6 });
+      P.line(0, r.f + 8, 100, r.f + 8, { color: pal.accent2, width: 1.4 });
+      P.text(`w = ${wW()} kN/m`, 50, r.f + 11, { color: pal.accent2, size: 11, align: "center" });
+      CB.drawFrame(P, r, { axialColors: view() === "N", diagram: view() === "M" ? "M" : null, diagramPx: 34, reactions: true, loads: false, labels: view() === "M", supports: true });
+      // 추력 곡선 삽입
+      const ctx = P.ctx, w = P.w, bw = Math.min(210, w * 0.42), box = { x: w - bw - 8, y: 18, w: bw, h: Math.min(110, P.h * 0.32) };
+      ctx.save(); ctx.fillStyle = AT.alpha(pal.bg, 0.85); ctx.fillRect(box.x - 40, box.y - 12, box.w + 46, box.h + 44); ctx.restore();
+      const data = []; for (let f = 5; f <= 50; f += 1) data.push([f, (wW() * 1e4) / (8 * f) / 1000]);
+      CB.chart(ctx, box, { x: [5, 50], y: [0, (wW() * 1e4) / 40 / 1000 * 1.05], series: [{ data, color: pal.ok, width: 1.8 }], points: [{ x: r.f, y: (wW() * 1e4) / (8 * r.f) / 1000, color: pal.ok }], xFmt: (v) => String(v), yFmt: (v) => String(Math.round(v)), xTicks: [10, 30, 50] });
+      AT.text(ctx, "H (MN) – f (m)", box.x + box.w / 2, box.y - 4, pal.dim, { size: 10, bold: false });
+    } });
+  function upd() {
+    r = AT.arch({ f: fF(), dist: [{ w: wW(), a: 0, b: 100 }], EAk: +ea() });
+    pl.redraw(); if (!r.ok) return;
+    const H = r.reactions[0][0], V = r.reactions[0][1], Nm = Math.max(...r.ends.map((e) => Math.max(Math.abs(e.N1), Math.abs(e.N2))));
+    CB.stat("at-th-h", `${CB.sig(H)} · ${CB.sig((wW() * 1e4) / (8 * fF()))}`);
+    CB.stat("at-th-v", CB.sig(V));
+    CB.stat("at-th-n", `${CB.sig(Nm)} kN · ${(Nm / AT.AR / 1000).toFixed(1)} MPa`);
+    CB.stat("at-th-m", CB.sig(r.maxAbs("M")) + " kN·m");
+    CB.stat("at-th-d", CB.num(r.d[10][1] * 1000, 1) + " mm");
+  }
+  upd();
+})();
+
+/* ======================================================= 2. 타이드 아치 */
+(function () {
+  const ld = CB.seg("at-tie-load", () => upd()), view = CB.seg("at-tie-view", () => pl.redraw());
+  const iI = CB.range("at-tie-i", (v) => CB.sig(Math.pow(10, v), 2) + " m⁴", () => upd()), aA = CB.range("at-tie-a", (v) => "× " + CB.sig(Math.pow(10, v), 2), () => upd());
+  let r = null;
+  const pl = CB.plane("#at-cv-tie", { x: [-8, 108], y: [-12, 30], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.7 : 0.45), minHeight: 230, maxHeight: 380,
+    draw(P) {
+      if (!r || !r.ok) return;
+      CB.drawFrame(P, r, { axialColors: view() === "N", diagram: view() === "M" ? "M" : null, diagramPx: 30, reactions: true, loads: true, loadPx: 22, loadLabels: false, labels: false, memberWidth: 2.6 });
+    } });
+  function upd() {
+    const l = ld(), o = { It: Math.pow(10, iI()), Ak: Math.pow(10, aA()) };
+    if (l === "full") o.dist = [{ w: AT.WD, a: 0, b: 100 }]; else if (l === "half") o.dist = [{ w: AT.Q, a: 0, b: 50 }]; else o.pts = [{ P: 300, x: 25 }];
+    r = AT.tied(o); pl.redraw(); if (!r.ok) return;
+    const n = r.n, T = r.ends[n / 2].N1, Mt = AT.maxM(r, 0, n), Mr = AT.maxM(r, n, 2 * n);
+    CB.stat("at-tie-t", CB.sig(T) + " kN");
+    CB.stat("at-tie-r", `${CB.sig(r.reactions[0][1])} · ${CB.sig(r.reactions[n][1])} · ${CB.num(r.reactions[0][0], 0)}`);
+    CB.stat("at-tie-m", `${CB.sig(Mr)} · ${CB.sig(Mt)}`);
+    CB.stat("at-tie-s", `${((Mt / Math.max(1e-9, Mt + Mr)) * 100).toFixed(0)} %`);
+  }
+  upd();
+})();
+
+/* ======================================================= 3. 압력선 */
+(function () {
+  const sup = CB.seg("at-pl-sup", () => upd()), shape = CB.seg("at-pl-shape", () => upd()), load = CB.seg("at-pl-load", () => upd());
+  const dead = CB.check("at-pl-dead", () => upd()), sp = CB.range("at-pl-s", (v) => v + " mm", () => upd());
+  const S = AT.IR / 0.7, k = S / AT.AR;
+  let R = null;
+  function calc() {
+    const dist = [], pts = [];
+    if (dead()) dist.push({ w: AT.WD, a: 0, b: 100 });
+    if (load() === "half") dist.push({ w: AT.Q, a: 0, b: 50 }); else if (load() === "pt") pts.push({ P: 300, x: 25 });
+    const r = AT.arch({ sup: sup(), shape: shape(), dist, pts, spread: sp() / 1000 });
+    if (!r.ok) { R = null; return; }
+    const H = Math.abs(r.reactions[0][0]), smp = [];
+    for (let m = 0; m < r.n; m++) r.sample(m, 6).forEach((p) => smp.push(p));
+    let emax = 0, smaxC = -1e9, sminC = 1e9;
+    smp.forEach((p) => { const N = -p.N, e = Math.abs(p.M) / Math.max(1e-6, Math.abs(N)); if (Math.abs(N) > 1) emax = Math.max(emax, e); const a = N / AT.AR / 1000, b = Math.abs(p.M) / S / 1000; smaxC = Math.max(smaxC, a + b); sminC = Math.min(sminC, a - b); });
+    const Ms = smp.map((p) => p.M);
+    R = { r, H, smp, emax, smaxC, sminC, Mmax: Math.max(...Ms), Mmin: Math.min(...Ms) };
+  }
+  const pl = CB.plane("#at-cv-pl", { x: [-8, 114], y: [-12, 34], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.75 : 0.5), minHeight: 240, maxHeight: 400,
+    draw(P) {
+      const pal = P.P;
+      if (!R) { P.text("하중이 없거나 불안정", 50, 10, { color: pal.dim, align: "center" }); return; }
+      const r = R.r, s = R.H > 1 ? Math.min(6, 9 / Math.max(0.01, R.emax)) : 0;
+      // 축선, 핵
+      const ax = (x) => AT.yArch(x, 100, 18, r.shape);
+      P.curve((x) => ax(x) + k * s, { from: 0, to: 100, color: AT.alpha(pal.accent, 0.5), width: 1, dash: [3, 3] });
+      P.curve((x) => ax(x) - k * s, { from: 0, to: 100, color: AT.alpha(pal.accent, 0.5), width: 1, dash: [3, 3] });
+      P.curve(ax, { from: 0, to: 100, color: pal.text, width: 3.5 });
+      if (s > 0) { const pts = R.smp.map((p) => [p.x, p.y + (p.M / R.H) * s]); P.poly(pts, { close: false, color: pal.accent2, width: 2.2, dash: [7, 4] }); }
+      // 하중
+      if (dead()) { P.line(0, 26, 100, 26, { color: AT.alpha(pal.accent2, 0.5), width: 1 }); for (let x = 0; x <= 100; x += 10) P.arrow(x, 26, x, 23, { color: AT.alpha(pal.accent2, 0.5), width: 1, head: 5 }); P.text("고정 80", 102, 26, { color: pal.dim, size: 10 }); }
+      if (load() === "half") { P.line(0, 30, 50, 30, { color: pal.accent2, width: 1.6 }); for (let x = 0; x <= 50; x += 5) P.arrow(x, 30, x, 26.5, { color: pal.accent2, width: 1.5, head: 6 }); P.text("q 12.7", 52, 30, { color: pal.accent2, size: 10.5 }); }
+      if (load() === "pt") P.arrow(25, 31, 25, AT.yArch(25, 100, 18, r.shape) + 1, { color: pal.accent2, width: 2.4, label: "300 kN" });
+      // 지점
+      [0, 100].forEach((x) => { if (sup() === "fixed") P.line(x - 2.5, -0.6, x + 2.5, -0.6, { color: pal.dim, width: 3 }); else P.poly([[x, 0], [x - 2, -3], [x + 2, -3]], { color: pal.dim, width: 1.4, fill: false }); });
+      if (sup() === "3h") P.dot(50, 18, { r: 5, color: pal.bg, stroke: pal.text });
+      P.text(s > 0 ? `압력선(주황 점선)·핵(파랑 점선)의 편심을 × ${s.toFixed(1)} 과장` : "", 50, -9, { color: pal.dim, size: 10.5, align: "center" });
+      if (sp() > 0) P.arrow(100, 3, 106, 3, { color: pal.bad, width: 2, label: `δ ${sp()} mm` });
+    } });
+  function upd() {
+    calc(); pl.redraw();
+    if (!R) { ["at-pl-h", "at-pl-m", "at-pl-e", "at-pl-sg"].forEach((id) => CB.stat(id, "—")); return; }
+    CB.stat("at-pl-h", CB.sig(R.H) + " kN");
+    CB.stat("at-pl-m", `${CB.sig(R.Mmax)} · ${CB.sig(R.Mmin)}`);
+    CB.stat("at-pl-e", `${R.emax.toFixed(2)} / ${k.toFixed(3)} m ${R.emax <= k ? "(핵 안)" : "(핵 밖)"}`);
+    CB.stat("at-pl-sg", `${CB.num(R.smaxC, 1)} · ${CB.num(R.sminC, 1)} MPa${R.sminC < 0 ? " (인장)" : ""}`);
+  }
+  upd();
+})();
+
+/* ======================================================= 4. 아치 좌굴 */
+const ATB = {
+  /** 포물선 아치(L = 1, EI = 1)의 면내 좌굴: q_cr = γ EI/L³ → { g, mode: [[x, y, ux, uy]] } */
+  solve(fL, sup, nE = 32, wantMode = false) {
+    const EI = 1, EA = 1e6, L = 1, f = fL;
+    const nodes = []; for (let i = 0; i <= nE; i++) { const x = i / nE; nodes.push([x, (4 * f * x * (L - x)) / L / L]); }
+    const members = []; for (let i = 0; i < nE; i++) members.push({ i, j: i + 1, E: 1, A: EA, I: EI, hinge: [false, false] });
+    if (sup === "3h") members[nE / 2 - 1].hinge[1] = true;
+    const st = sup === "fixed" ? "fixed" : "pin";
+    const memberLoads = members.map((m, k) => { const dx = nodes[k + 1][0] - nodes[k][0], ds = Math.hypot(dx, nodes[k + 1][1] - nodes[k][1]); return { member: k, w: [0, -dx / ds] }; });
+    const r = CB.frame({ nodes, members, supports: { 0: st, [nE]: st }, memberLoads });
+    if (!r.ok) return null;
+    const N = r.ends.map((e) => (e.N1 + e.N2) / 2), nd = nodes.length * 3;
+    const K = Array.from({ length: nd }, () => new Float64Array(nd)), G = Array.from({ length: nd }, () => new Float64Array(nd));
+    members.forEach((m, k) => {
+      const [x1, y1] = nodes[m.i], [x2, y2] = nodes[m.j], Le = Math.hypot(x2 - x1, y2 - y1), c = (x2 - x1) / Le, s = (y2 - y1) / Le;
+      const a = EA / Le, b = (12 * EI) / Le ** 3, cc = (6 * EI) / Le ** 2, d = (4 * EI) / Le, e = (2 * EI) / Le;
+      let kl = [[a, 0, 0, -a, 0, 0], [0, b, cc, 0, -b, cc], [0, cc, d, 0, -cc, e], [-a, 0, 0, a, 0, 0], [0, -b, -cc, 0, b, -cc], [0, cc, e, 0, -cc, d]];
+      const Pn = N[k] / (30 * Le);
+      let kg = [[0, 0, 0, 0, 0, 0], [0, 36, 3 * Le, 0, -36, 3 * Le], [0, 3 * Le, 4 * Le * Le, 0, -3 * Le, -Le * Le], [0, 0, 0, 0, 0, 0], [0, -36, -3 * Le, 0, 36, -3 * Le], [0, 3 * Le, -Le * Le, 0, -3 * Le, 4 * Le * Le]].map((row) => row.map((v) => v * Pn));
+      if (m.hinge[1]) {
+        const T = Array.from({ length: 6 }, (_, i) => Array.from({ length: 6 }, (_, j) => (i === j && i !== 5 ? 1 : 0))); for (let j = 0; j < 5; j++) T[5][j] = -kl[5][j] / kl[5][5];
+        const tr = (M) => { const MT = M.map((row) => T[0].map((_, j) => row.reduce((sm, v, q) => sm + v * T[q][j], 0))); return T[0].map((_, i) => T[0].map((_, j) => T.reduce((sm, row, q) => sm + row[i] * MT[q][j], 0))); };
+        kl = tr(kl); kg = tr(kg);
+      }
+      const R = [[c, s, 0, 0, 0, 0], [-s, c, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0], [0, 0, 0, c, s, 0], [0, 0, 0, -s, c, 0], [0, 0, 0, 0, 0, 1]];
+      const glob = (M) => R.map((_, i) => R.map((_, j) => { let v = 0; for (let p = 0; p < 6; p++) { if (!R[p][i]) continue; for (let q = 0; q < 6; q++) v += R[p][i] * M[p][q] * R[q][j]; } return v; }));
+      const Kg = glob(kl), Gg = glob(kg), map = [m.i * 3, m.i * 3 + 1, m.i * 3 + 2, m.j * 3, m.j * 3 + 1, m.j * 3 + 2];
+      for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { K[map[i]][map[j]] += Kg[i][j]; G[map[i]][map[j]] += Gg[i][j]; }
+    });
+    const fixed = new Set([0, 1, nE * 3, nE * 3 + 1]); if (sup === "fixed") { fixed.add(2); fixed.add(nE * 3 + 2); }
+    const free = [...Array(nd).keys()].filter((i) => !fixed.has(i)), n = free.length;
+    const negCount = (lam) => {
+      const A = free.map((i) => Float64Array.from(free, (j) => K[i][j] + lam * G[i][j])); let neg = 0;
+      for (let kk = 0; kk < n; kk++) { const p = A[kk][kk]; if (p < 0) neg++; if (Math.abs(p) < 1e-300) return 1e9; for (let i = kk + 1; i < n; i++) { const fct = A[i][kk] / p; if (fct === 0) continue; const Ai = A[i], Ak = A[kk]; for (let j = kk + 1; j < n; j++) Ai[j] -= fct * Ak[j]; } }
+      return neg;
+    };
+    const n0 = negCount(0); let lo = 0, hi = 10; while (negCount(hi) === n0 && hi < 1e5) hi *= 2;
+    for (let it = 0; it < 40; it++) { const m = (lo + hi) / 2; if (negCount(m) > n0) hi = m; else lo = m; }
+    const g = (lo + hi) / 2, out = { g };
+    if (wantMode) {
+      const lam = g * 0.995, A = free.map((i) => free.map((j) => K[i][j] + lam * G[i][j]));
+      let x = free.map((_, q) => Math.sin(q * 0.37) + 0.3);
+      for (let it = 0; it < 6; it++) { const b = free.map((i) => free.reduce((sm, j, q) => sm + G[i][j] * x[q], 0)); x = CB.solve(A.map((r) => r.slice()), b); const nm = Math.max(...x.map(Math.abs)) || 1; x = x.map((v) => v / nm); }
+      const u = new Array(nd).fill(0); free.forEach((i, q) => (u[i] = x[q]));
+      out.mode = nodes.map(([xx, yy], i) => [xx, yy, u[i * 3], u[i * 3 + 1]]);
+      const um = nodes.map((_, i) => u[i * 3 + 1]); let sym = 0, anti = 0; for (let i = 0; i <= nE; i++) { sym += Math.abs(um[i] - um[nE - i]); anti += Math.abs(um[i] + um[nE - i]); }
+      out.anti = anti < sym;
+    }
+    return out;
+  },
+  curve: {},
+};
+(function () {
+  const rr = CB.range("at-bk-r", (v) => v.toFixed(2), () => upd()), sup = CB.seg("at-bk-sup", () => upd()), ik = CB.range("at-bk-i", (v) => "× " + v.toFixed(2), () => upd());
+  let R = null;
+  function curve(s) { if (!ATB.curve[s]) { const c = []; for (let f = 0.05; f <= 0.5001; f += 0.025) { const o = ATB.solve(f, s, 16); c.push([f, o ? o.g : NaN]); } ATB.curve[s] = c; } return ATB.curve[s]; }
+  function draw(ctx, W, H) {
+    if (!R) return;
+    const pal = CB.palette(), narrow = W < 520, hTop = narrow ? H * 0.48 : H, wl = narrow ? W : W * 0.52;
+    // 모드 형상
+    const L = wl - 40, ox = 20, oy = hTop - 30, sc = L, amp = 0.12;
+    ctx.strokeStyle = pal.faint; ctx.lineWidth = 3; ctx.beginPath(); R.mode.forEach(([x, y], i) => { const px = ox + x * sc, py = oy - y * sc; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.stroke();
+    ctx.strokeStyle = pal.accent; ctx.setLineDash([7, 4]); ctx.lineWidth = 2.5; ctx.beginPath(); R.mode.forEach(([x, y, ux, uy], i) => { const px = ox + (x + amp * ux) * sc, py = oy - (y + amp * uy) * sc; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.stroke(); ctx.setLineDash([]);
+    [0, 1].forEach((x) => { ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(ox + x * sc, oy); ctx.lineTo(ox + x * sc - 7, oy + 12); ctx.lineTo(ox + x * sc + 7, oy + 12); ctx.closePath(); ctx.stroke(); });
+    AT.text(ctx, `좌굴 모드(${R.anti ? "반대칭" : "대칭"}, 과장)`, ox + sc / 2, 16, pal.text, { size: 11.5 });
+    // γ 곡선
+    const box = narrow ? { x: 52, y: hTop + 24, w: W - 66, h: H - hTop - 66 } : { x: wl + 54, y: 24, w: W - wl - 66, h: H - 70 };
+    const series = ["3h", "2h", "fixed"].map((s, i) => ({ data: curve(s), color: [pal.dim, pal.accent, pal.accent2][i], width: s === sup() ? 2.6 : 1.2, dash: s === sup() ? [] : [4, 3] }));
+    CB.chart(ctx, box, { x: [0.05, 0.5], y: [0, 130], xLabel: "f/L", yLabel: "", series, points: [{ x: rr(), y: R.g, color: pal.text }], xFmt: (v) => v.toFixed(1), xTicks: [0.1, 0.2, 0.3, 0.4, 0.5] });
+    AT.text(ctx, "γ — 3힌지(회색) · 2힌지(녹색) · 고정(주황)", box.x + box.w / 2, box.y - 10, pal.dim, { size: 10, bold: false });
+  }
+  const cv = CB.canvas("#at-cv-bk", draw, { aspect: (W) => (W < 520 ? 1.2 : 0.5), maxHeight: 460, minHeight: 280 });
+  function upd() {
+    const o = ATB.solve(rr(), sup(), 32, true); if (!o) return;
+    R = o; cv.redraw();
+    const EI = AT.E * AT.IR * ik(), qcr = (o.g * EI) / AT.L ** 3;
+    CB.stat("at-bk-g", o.g.toFixed(1)); CB.stat("at-bk-q", CB.sig(qcr) + " kN/m");
+    CB.stat("at-bk-sf", (qcr / 100).toFixed(1)); CB.stat("at-bk-md", o.anti ? "반대칭" : "대칭");
+  }
+  upd();
+})();
+
+/* ======================================================= 5. 트러스교 해석 */
+const ATT = {
+  build(type, np, p, h) {
+    const nodes = []; for (let i = 0; i <= np; i++) nodes.push([i * p, 0]);
+    const bars = []; for (let i = 0; i < np; i++) bars.push([i, i + 1]);
+    if (type === "warren") {
+      const T = (i) => np + 1 + i; for (let i = 0; i < np; i++) nodes.push([(i + 0.5) * p, h]);
+      for (let i = 0; i < np - 1; i++) bars.push([T(i), T(i + 1)]);
+      for (let i = 0; i < np; i++) { bars.push([i, T(i)]); bars.push([T(i), i + 1]); }
+      return { nodes, bars };
+    }
+    const T = (i) => np + i; for (let i = 1; i < np; i++) nodes.push([i * p, h]);
+    for (let i = 1; i < np - 1; i++) bars.push([T(i), T(i + 1)]);
+    bars.push([0, T(1)]); bars.push([T(np - 1), np]);
+    for (let i = 1; i < np; i++) bars.push([i, T(i)]);
+    for (let i = 1; i < np - 1; i++) {
+      if (type === "pratt") bars.push(i < np / 2 ? [T(i), i + 1] : [T(i + 1), i]);
+      else bars.push(i < np / 2 ? [i, T(i + 1)] : [T(i), i + 1]);
+    }
+    return { nodes, bars };
+  },
+  solve(g, np, P) { return CB.truss({ nodes: g.nodes, bars: g.bars, supports: { 0: "pin", [np]: "roller" }, loads: Array.from({ length: np - 1 }, (_, k) => ({ node: k + 1, fy: -P })), EA: 1e6 }); },
+  index(g, t) { return g.bars.reduce((s, [i, j], k) => s + Math.abs(t.N[k]) * Math.hypot(g.nodes[j][0] - g.nodes[i][0], g.nodes[j][1] - g.nodes[i][1]), 0); },
+};
+(function () {
+  const type = CB.seg("at-tr-type", () => { cache = null; upd(); }), npS = CB.seg("at-tr-np", () => { cache = null; upd(); });
+  const hH = CB.range("at-tr-h", (v) => v.toFixed(2) + " m", () => upd()), lbl = CB.check("at-tr-lbl", () => pl.redraw());
+  const P = 60, p = 6; let g = null, t = null, cache = null;
+  const pl = CB.plane("#at-cv-tr", { x: [-4, 40], y: [-4, 14], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.62 : 0.4), minHeight: 200, maxHeight: 340,
+    draw(Pl) { if (!t || !t.ok) return; CB.drawFrame(Pl, t, { axialColors: true, reactions: true, loads: true, loadPx: 26, memberLabels: lbl() ? (m) => CB.num(t.N[m], 0) : null, labels: false }); } });
+  const cv2 = CB.canvas("#at-cv-tr2", (ctx, W, H) => {
+    if (!cache) return; const pal = CB.palette(), np = +npS(), L = np * p, ys = cache.map((c) => c[1]);
+    CB.chart(ctx, { x: 64, y: 14, w: W - 80, h: H - 56 }, { x: [2, 12], y: [0, Math.max(...ys) * 1.05], xLabel: "높이 h (m)", yLabel: "Σ|N|ℓ", yFmt: (v) => CB.sig(v, 2), series: [{ data: cache, color: pal.accent, width: 2 }], points: [{ x: hH(), y: ATT.index(g, t), color: pal.accent2 }], vlines: [{ x: L / 8, color: pal.faint, label: "L/8" }] });
+  }, { aspect: (W) => (W < 520 ? 0.5 : 0.28), minHeight: 150, maxHeight: 220 });
+  function upd() {
+    const np = +npS(), L = np * p, h = hH();
+    if (!cache) { cache = []; for (let hh = 2; hh <= 12.0001; hh += 0.25) { const gg = ATT.build(type(), np, p, hh), tt = ATT.solve(gg, np, P); if (tt.ok) cache.push([hh, ATT.index(gg, tt)]); } }
+    g = ATT.build(type(), np, p, h); t = ATT.solve(g, np, P);
+    pl.view({ x: [-4, L + 4], y: [-4, Math.max(14, h + 4)] }); cv2.redraw();
+    if (!t.ok) return;
+    const mx = Math.max(...t.N), mn = Math.min(...t.N);
+    const R = ((np - 1) * P) / 2, xc = L / 2; let Mc = R * xc; for (let k = 1; k < np; k++) if (k * p < xc) Mc -= P * (xc - k * p);
+    const ib = type() === "warren" ? np + np / 2 - 1 : np + np / 2 - 2;
+    CB.stat("at-tr-mx", `${CB.sig(mx)} · ${CB.sig(mn)}`);
+    CB.stat("at-tr-ch", `${CB.sig(t.N[ib])} ≈ −${CB.sig(Mc / h)} kN`);
+    CB.stat("at-tr-w", CB.sig(ATT.index(g, t)));
+    const mn0 = Math.min(...cache.map((c) => c[1])), flat = cache.find((c) => c[1] <= 1.1 * mn0) || cache[cache.length - 1];
+    CB.stat("at-tr-o", `${(L / h).toFixed(1)} · ${(L / flat[0]).toFixed(1)}`);
+  }
+  upd();
+})();
+
+/* ======================================================= 6. TR-60 트럭 주행 */
+(function () {
+  const np = 8, p = 7.5, h = 7.5, L = np * p, g = ATT.build("pratt", np, p, h);
+  const IL = []; for (let j = 0; j <= np; j++) { const t = CB.truss({ nodes: g.nodes, bars: g.bars, supports: { 0: "pin", [np]: "roller" }, loads: j > 0 && j < np ? [{ node: j, fy: -1 }] : [], EA: 1e6 }); IL.push(t.N.map((v) => v || 0)); }
+  const KEY = { d4: 25, d1: 23, bc: 3, tc: 10, ep: 14, v1: 16 }, NAME = { d4: "중앙 사재", d1: "단부 쪽 사재", bc: "하현 중앙", tc: "상현 중앙", ep: "단부 경사재", v1: "수직재(행어)" };
+  const fn = (m) => (x) => { const j = x / p, j0 = Math.min(np - 1, Math.max(0, Math.floor(j))), t = CB.clamp(j - j0, 0, 1); return IL[j0][m] * (1 - t) + IL[j0 + 1][m] * t; };
+  const sel = CB.seg("at-mv-m", () => { calc(); upd(); }), xX = CB.range("at-mv-x", (v) => v.toFixed(1) + " m", () => upd()), dD = CB.range("at-mv-d", (v) => v + " kN/m", () => { calc(); upd(); });
+  const IM = CB.civ.impact(L);
+  let S = null;
+  function calc() {
+    const m = KEY[sel()], f = fn(m), T = CB.civ.TRUCK;
+    const r1 = CB.civ.truckScan(L, f, T, 0.1, 1), r2 = CB.civ.truckScan(L, f, T, 0.1, -1);
+    let pos = 0, neg = 0; for (let x = 0; x < L; x += 0.05) { const v = f(x + 0.025) * 0.05; if (v > 0) pos += v; else neg += v; }
+    const tmax = 0.5 * Math.max(r1.max, r2.max, 0), tmin = 0.5 * Math.min(r1.min, r2.min, 0), lp = 0.5 * T.lane * pos, ln = 0.5 * T.lane * neg;
+    let ND = 0; for (let j = 1; j < np; j++) ND += dD() * p * IL[j][m];
+    S = { m, f, hist: r1.history.map(([x, v]) => [x, 0.5 * v]), tmax, tmin, lp, ln, ND, Nmax: ND + (1 + IM) * tmax + lp, Nmin: ND + (1 + IM) * tmin + ln };
+  }
+  const nowF = (fr) => { let v = 0; CB.civ.TRUCK.axles.forEach((a) => { const x = fr - a.x; if (x >= 0 && x <= L) v += a.P * S.f(x); }); return 0.5 * v; };
+  function draw(ctx, W, H) {
+    if (!S) return;
+    const pal = CB.palette(), left = 60, ww = W - left - 16, X = (x) => left + (x / L) * ww, fr = xX();
+    const th = Math.min(90, H * 0.22), yb = 30 + th, sc = th / h, Y = (y) => yb - y * sc;
+    // 현재 트럭 위치에서 모든 부재력
+    const Ns = g.bars.map((_, m) => { let v = 0; CB.civ.TRUCK.axles.forEach((a) => { const x = fr - a.x; if (x >= 0 && x <= L) v += 0.5 * a.P * fn(m)(x); }); return v; });
+    const nm = Math.max(1, ...Ns.map(Math.abs));
+    g.bars.forEach(([i, j], m) => { const v = Ns[m]; ctx.strokeStyle = Math.abs(v) < 1 ? pal.faint : v > 0 ? pal.tension : pal.compression; ctx.lineWidth = m === S.m ? 5 : 1.2 + (2.5 * Math.abs(v)) / nm; ctx.beginPath(); ctx.moveTo(X(g.nodes[i][0]), Y(g.nodes[i][1])); ctx.lineTo(X(g.nodes[j][0]), Y(g.nodes[j][1])); ctx.stroke(); });
+    const [i0, j0] = g.bars[S.m]; ctx.strokeStyle = pal.accent2; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(g.nodes[i0][0]), Y(g.nodes[i0][1])); ctx.lineTo(X(g.nodes[j0][0]), Y(g.nodes[j0][1])); ctx.stroke(); ctx.setLineDash([]);
+    CB.civ.TRUCK.axles.forEach((a) => { const x = fr - a.x; if (x < 0 || x > L) return; AT.arrow(ctx, X(x), yb - 22, X(x), yb - 2, pal.accent2, 2, 7); });
+    AT.text(ctx, `${NAME[sel()]} ${CB.num(nowF(fr), 0)} kN`, left + ww / 2, 14, pal.text, { size: 11.5 });
+    // 영향선
+    const hh = (H - yb - 40 - 46) / 2, b1 = { x: left, y: yb + 30, w: ww, h: hh }, il = []; for (let x = 0; x <= L; x += 0.5) il.push([x, S.f(x)]);
+    const a = Math.max(0.2, ...il.map((q) => Math.abs(q[1]))) * 1.2;
+    CB.chart(ctx, b1, { x: [0, L], y: [-a, a], yLabel: "영향선", series: [{ data: il, color: pal.accent, width: 2, fill: AT.alpha(pal.accent, 0.12) }], hlines: [{ y: 0, color: pal.axis, dash: [] }], xFmt: (v) => String(v), yFmt: (v) => v.toFixed(1) });
+    const b2 = { x: left, y: yb + 30 + hh + 40, w: ww, h: hh }, hv = S.hist.map((q) => q[1]), lo = Math.min(0, ...hv) * 1.15 - 1, hi = Math.max(0, ...hv) * 1.15 + 1;
+    CB.chart(ctx, b2, { x: [0, L + 12.2], y: [lo, hi], xLabel: "트럭 앞축 위치 (m)", yLabel: "N (kN)", series: [{ data: S.hist, color: pal.accent2, width: 2 }], hlines: [{ y: 0, color: pal.axis, dash: [] }], vlines: [{ x: fr, color: pal.text, dash: [] }], xFmt: (v) => String(v), yFmt: (v) => CB.sig(v, 2) });
+  }
+  const cv = CB.canvas("#at-cv-mv", draw, { aspect: (W) => (W < 520 ? 1.3 : 0.66), maxHeight: 600, minHeight: 400 });
+  function upd() {
+    cv.redraw(); if (!S) return;
+    CB.stat("at-mv-now", CB.num(nowF(xX()), 0) + " kN");
+    CB.stat("at-mv-t", `${CB.num(S.tmax, 0)} · ${CB.num(S.tmin, 0)}`);
+    CB.stat("at-mv-n", `${CB.num(S.ND, 0)} · ${CB.num(S.Nmax, 0)} · ${CB.num(S.Nmin, 0)}`);
+    const tol = 5, rev = S.Nmax > tol && S.Nmin < -tol, edge = !rev && ((S.Nmax > tol && Math.abs(S.Nmin) <= tol) || (S.Nmin < -tol && Math.abs(S.Nmax) <= tol));
+    CB.stat("at-mv-rv", rev ? `<span style="color:var(--bad)">있음</span>` : edge ? `<span style="color:var(--warn)">경계(≈ 0)</span>` : "없음");
+  }
+  const loop = CB.loop(document.getElementById("at-cv-mv"), (dt) => { let v = xX() + dt * 8; if (v > 72) v = 0; xX.set(v); });
+  loop.stop();
+  CB.playButton("at-mv-play", () => loop.start(), () => loop.stop(), ["▶ 트럭 주행", "■ 정지"]);
+  calc(); upd();
+})();
+
+/* ======================================================= 7. 2차 응력 */
+(function () {
+  const dS = CB.range("at-sc-d", (v) => v + " mm", () => upd()), view = CB.seg("at-sc-view", () => pl.redraw());
+  const g = ATT.build("pratt", 6, 6, 4.5), np = 6, chord = (k) => k < 6 || (k >= 6 && k < 10) || k === 10 || k === 11;
+  const pin = ATT.solve(g, np, 60);
+  let R = null;
+  function calc() {
+    const d = dS() / 1000;
+    const members = g.bars.map(([i, j], k) => { const A = (chord(k) ? 6208 : 3910) / 1e6, I = A * (0.43 * d) ** 2; return { i, j, E: AT.E, A, I, hinge: [false, false] }; });
+    const r = CB.frame({ nodes: g.nodes, members, supports: { 0: "pin", 6: "roller" }, loads: [1, 2, 3, 4, 5].map((n) => ({ node: n, fy: -60 })) });
+    const rat = r.ends.map((e, k) => { const A = members[k].A, S = members[k].I / (d / 2), s1 = Math.abs(e.N1) / A / 1000, s2 = Math.max(Math.abs(e.M1), Math.abs(e.M2)) / S / 1000; return { s1, s2, r: s1 > 2 ? s2 / s1 : 0 }; });
+    let best = 0; rat.forEach((q, k) => { if (q.r > rat[best].r) best = k; });
+    let dn = 0; r.ends.forEach((e, k) => { if (Math.abs(pin.N[k]) > 10) dn = Math.max(dn, Math.abs(e.N1 / pin.N[k] - 1)); });
+    R = { r, rat, best, d, dn };
+  }
+  const pl = CB.plane("#at-cv-sc", { x: [-3, 39], y: [-3, 8], grid: false, axes: false, aspect: (W) => (W < 520 ? 0.62 : 0.4), minHeight: 200, maxHeight: 340,
+    draw(P) {
+      if (!R || !R.r.ok) return;
+      if (view() === "M") CB.drawFrame(P, R.r, { diagram: "M", diagramPx: 22, reactions: false, loads: true, loadPx: 22, labels: false, memberWidth: 2.4 });
+      else {
+        const pal = P.P, mx = Math.max(0.05, ...R.rat.map((q) => q.r));
+        g.bars.forEach(([i, j], k) => { const q = R.rat[k], c = CB.colormap(CB.clamp(q.r / mx, 0, 1), "viridis"); P.line(g.nodes[i][0], g.nodes[i][1], g.nodes[j][0], g.nodes[j][1], { color: CB.rgb(c), width: 5 }); const mxp = (g.nodes[i][0] + g.nodes[j][0]) / 2, myp = (g.nodes[i][1] + g.nodes[j][1]) / 2; if (q.r > 0) P.text((q.r * 100).toFixed(0) + "%", mxp, myp + 0.55, { color: pal.text, size: 10, align: "center" }); });
+        P.text("σ₂/σ₁ (밝을수록 큼)", 18, -2.2, { color: pal.dim, size: 11, align: "center" });
+      }
+    } });
+  function upd() {
+    calc(); pl.redraw();
+    const q = R.rat[R.best], [i, j] = g.bars[R.best], len = Math.hypot(g.nodes[j][0] - g.nodes[i][0], g.nodes[j][1] - g.nodes[i][1]);
+    const nm = (k) => "ABCDEFGHIJKL"[k], s2m = R.rat.reduce((b2, x, k) => (x.s2 > R.rat[b2].s2 ? k : b2), 0), [i2, j2] = g.bars[s2m];
+    CB.stat("at-sc-r", `${(q.r * 100).toFixed(0)} % (${nm(i)}–${nm(j)}, σ₁ ${q.s1.toFixed(1)})`);
+    CB.stat("at-sc-m", `${R.rat[s2m].s2.toFixed(1)} MPa (${nm(i2)}–${nm(j2)}) · d/ℓ 1/${Math.round(len / R.d)}`);
+    const c = R.rat[2]; CB.stat("at-sc-c", `${c.s1.toFixed(1)} · ${c.s2.toFixed(1)} MPa`);
+    CB.stat("at-sc-n", `최대 ${(R.dn * 100).toFixed(1)} % 차이`);
+  }
+  upd();
+})();
+
+/* ======================================================= 8. AR-100 3D */
+(function () {
+  const xX = CB.range("at-3d-x", (v) => v.toFixed(1) + " m", () => upd()), br = CB.check("at-3d-br", () => v3.redraw()), dl = CB.check("at-3d-dl", () => upd());
+  const base = AT.tied({ dist: [{ w: AT.WD, a: 0, b: 100 }] }), n = 20, B = 5.5;
+  let R = null;
+  function upd0() {
+    const pts = AT.truckPts(xX(), 0.5);
+    const r = AT.tied({ pts, dist: dl() ? [{ w: AT.WD, a: 0, b: 100 }] : [] });
+    const hg = []; for (let i = 1; i < n; i++) hg.push(r.ends[2 * n + i - 1].N1);
+    const live = pts.length ? AT.tied({ pts }) : null;
+    const hl = live ? Math.max(...Array.from({ length: n - 1 }, (_, i) => live.ends[2 * n + i].N1)) : 0;
+    R = { r, hg, hl, dT: live ? live.ends[n / 2].N1 : 0, Mr: live ? AT.maxM(live, n, 2 * n) : 0 };
+  }
+  const v3 = CB.orbit("#at-cv-3d", { yaw: -0.75, pitch: 0.32, dist: 135, target: [50, 0, 7], aspect: 0.62, minHeight: 260, maxHeight: 460, draw(V) {
+    if (!R) return;
+    const P = V.P, ya = (x) => AT.yArch(x, 100, 18);
+    V.poly3([[-5, -25, -6], [105, -25, -6], [105, 25, -6], [-5, 25, -6]], { fill: P.blue, fillAlpha: 0.08, stroke: false });
+    V.poly3([[0, -B, 0], [100, -B, 0], [100, B, 0], [0, B, 0]], { fill: P.dim, fillAlpha: 0.14, color: P.dim, width: 1 });
+    [-B, B].forEach((y) => { V.line3([0, y, 0], [100, y, 0], { color: P.tension, width: 3.5 }); for (let x = 0; x < 100; x += 2.5) V.line3([x, y, ya(x)], [x + 2.5, y, ya(x + 2.5)], { color: P.compression, width: 4 }); });
+    for (let i = 0; i <= n; i++) V.line3([i * 5, -B, 0], [i * 5, B, 0], { color: P.dim, width: 1.2 });
+    const hm = Math.max(1, ...R.hg.map(Math.abs));
+    R.hg.forEach((N, k) => { const x = (k + 1) * 5, t = CB.clamp(Math.abs(N) / hm, 0, 1); [-B, B].forEach((y) => V.line3([x, y, 0], [x, y, ya(x)], { color: N >= 0 ? P.tension : P.compression, width: 1 + 3.5 * t, alpha: 0.35 + 0.65 * t })); });
+    if (br()) for (let i = 2; i < n - 2; i++) { const x0 = i * 5, x1 = x0 + 5; V.line3([x0, -B, ya(x0)], [x1, B, ya(x1)], { color: P.dim, width: 1 }); V.line3([x0, B, ya(x0)], [x1, -B, ya(x1)], { color: P.dim, width: 1 }); V.line3([x0, -B, ya(x0)], [x0, B, ya(x0)], { color: P.dim, width: 1.4 }); }
+    const f = xX(), x0 = Math.max(0, f - 12.2), x1 = Math.min(100, f);
+    if (x1 > x0) [[[x0, -2.6, 0], [x1, -2.6, 0], [x1, -2.6, 3], [x0, -2.6, 3]], [[x0, -0.2, 0], [x1, -0.2, 0], [x1, -0.2, 3], [x0, -0.2, 3]], [[x0, -2.6, 3], [x1, -2.6, 3], [x1, -0.2, 3], [x0, -0.2, 3]]].forEach((q) => V.poly3(q, { fill: P.accent2, fillAlpha: 0.5, color: P.accent2, width: 1.2 }));
+    V.text3("AR-100", [50, -B, 21], { color: P.text, size: 12, bold: true });
+  } });
+  function upd() { upd0(); v3.redraw(); CB.stat("at-3d-h", CB.sig(R.hl) + " kN"); CB.stat("at-3d-t", "+" + CB.sig(R.dT) + " kN"); CB.stat("at-3d-m", CB.sig(R.Mr) + " kN·m"); }
+  const loop = CB.loop(document.getElementById("at-cv-3d"), (dt) => { let v = xX() + dt * 10; if (v > 112) v = 0; xX.set(v); });
+  loop.stop();
+  CB.playButton("at-3d-play", () => loop.start(), () => loop.stop(), ["▶ 주행", "■ 정지"]);
+  upd();
+})();
+</script>
+</body>
+</html>

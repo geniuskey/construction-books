@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>유지관리와 성능 개선 · CivilBook</title>
+<meta name="description" content="오래 쓰는 기반 시설. 점검 체계와 상태 등급 A–E, 마르코프 열화 예측과 생애 주기 비용, 교량 내하율과 통행 제한, 재하 시험 보정, 외부 긴장·FRP 보강, 면진화 내진 보강, 온도 보정 이상 탐지, B-130·TN-11·R-60 예산 배분을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .mt-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .mt-msg b { color: var(--text); }
+  .mt-msg.ok { color: var(--ok); font-weight: 600; }
+  .mt-msg.bad { color: var(--bad); font-weight: 600; }
+  .mt-tbl td, .mt-tbl th { font-variant-numeric: tabular-nums; }
+  .mt-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .mt-steps { margin: 6px 0 0; }
+  .mt-steps li { margin: 4px 0; }
+  .mt-grade { display: inline-block; min-width: 1.6em; text-align: center; border-radius: 5px; font-weight: 700; padding: 0 4px; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="civil"></script>
+</head>
+<body data-chapter="maintenance">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="mt-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="mt-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="mt-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="mt-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+      <marker id="mt-ah-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--blue)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 16</div>
+    <h1 data-no-glossary>유지관리와 성능 개선</h1>
+    <p class="lead">B-130은 준공하는 날부터 늙기 시작합니다. 바닥판에는 염화물이 스며들고, 신축 이음에서 샌 물이 거더 끝을 녹슬게 하고, 트럭은 해마다 무거워지며, 내진 기준은 판마다 엄격해집니다. 15장까지가 "어떻게 지을까"였다면 이 장은 "어떻게 백 년을 쓸까"입니다. 점검으로 상태를 재고(상태 등급 A–E), 확률 모형으로 앞날을 예측하고(마르코프 열화), 언제 손을 댈지 돈의 시간 가치로 정하고(생애 주기 비용), 지금 이 다리에 몇 톤 트럭까지 다니게 할지 계산하고(내하율), 측정으로 계산을 고치고(재하 시험), 모자라면 보강하고(외부 긴장·FRP·면진화), 센서로 이상을 일찍 잡고(온도 보정 이상 탐지), 마지막으로 한정된 예산을 B-130·TN-11·R-60에 나눕니다.</p>
+    <ul class="objectives">
+      <li>기반 시설 노후화의 양상과 생애 주기 성능 곡선을 설명하고, 국내 점검·진단 체계와 상태 등급 A–E의 뜻을 안다(현행 법령 확인).</li>
+      <li>부재별 상태 점수를 가중 평균해 교량 전체의 상태 등급을 매긴다.</li>
+      <li>마르코프 전이 행렬로 연도별 상태 분포를 예측하고, 할인율을 넣은 생애 주기 비용으로 보수 시점(개입 등급)을 비교한다.</li>
+      <li>내하율 RF = (C − γ<sub>D</sub>D)/(γ<sub>L</sub>L(1 + IM))로 교량을 평가하고 통행 제한 하중을 정한다.</li>
+      <li>재하 시험의 측정 처짐과 계산 처짐으로 응답 보정 계수를 구해 내하력을 조정한다.</li>
+      <li>외부 긴장과 FRP 판 보강의 효과를 단면 계산(<code>CB.section</code>)으로 확인하고, 받침 교체·면진화로 교량 내진 성능을 높이는 원리를 계산한다.</li>
+      <li>계측 자료에서 온도 영향을 회귀로 제거해 손상 신호를 찾고, 여러 시설의 보수 대안을 예산 안에서 최적으로 고른다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>1994년 10월 21일, 성수대교</b></div>
+      <div class="o-body"><p>1994년 10월 21일 아침 서울 성수대교의 가운데 상판 한 구간(약 48 m)이 한강으로 떨어져 출근길 버스와 승용차가 함께 추락했고 32명이 숨졌습니다. 1979년에 준공된 게르버 트러스 교량으로, 조사는 상판을 매단 트러스 연결부(수직재)의 용접 결함과 그곳에서 자란 피로 균열을 직접 원인으로 들었고, 설계 하중을 넘는 차량 통행과 부실한 점검·유지관리가 이를 키웠다고 지적했습니다. 다리는 하루아침에 무너졌지만 균열은 오랫동안 자라고 있었습니다.</p>
+        <p>이 사고를 계기로 1995년 「시설물의 안전관리에 관한 특별법」(현재 「시설물의 안전 및 유지관리에 관한 특별법」, 시설물안전법)이 제정되어 일정 규모 이상의 교량·터널 등에 정기 점검과 정밀안전진단을 의무화했습니다. 해외에서도 2007년 미국 미니애폴리스 I-35W 교량 붕괴(13명 사망, 거셋 플레이트 설계 결함), 2018년 이탈리아 제노바 모란디 교량 붕괴(43명 사망)가 노후 교량 관리의 중요성을 다시 일깨웠습니다. 짓는 계산만큼 <b>지켜보는 계산</b>이 중요합니다.</p>
+        <div class="o-chain"><span>점검 · 계측 · 재하 시험</span><i>→</i><span class="tool">상태 등급 · 마르코프 · LCC · 내하율 · 보정 계수 · 이상 탐지</span><i>→</i><span>보수·보강 시점 · 통행 제한 · 예산 배분</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="ageing">
+    <h2>기반 시설의 노후화와 생애 주기</h2>
+    <div class="problem"><strong>새 다리는 몇 년이나 갈까</strong>
+      <p>설계 수명 100년이라는 말은 "백 년 동안 아무것도 안 해도 된다"는 뜻이 아닙니다. 콘크리트는 탄산화와 염해로, 강재는 부식과 피로로, 받침·신축 이음·포장은 훨씬 빨리 닳습니다. 설계 수명은 <b>적절한 유지관리를 전제로</b> 구조물이 요구 성능을 지키는 기간입니다.</p></div>
+    <p>국내 교량·터널의 상당수는 1970–1990년대 고도 성장기에 지어져, 준공 30년이 넘는 시설의 비율이 빠르게 늘고 있습니다(통계는 국토교통부 시설물 통합 정보 관리 체계 자료 확인). 노후 시설은 재료 열화(MaterialsBook <a href="../../materials/chapters/durability.html">9장 내구성</a>, <a href="../../materials/chapters/corrosion.html">부식과 방식</a>), 하중 증가(차량 대형화), 기준 강화(내진, 2장의 설계 하중 개정)라는 세 방향에서 동시에 성능 여유를 잃습니다. 이 셋에 대응하는 것이 <span class="term">유지관리</span><span class="en">(maintenance)</span>이고, 원래 성능을 되돌리는 <span class="term">보수</span><span class="en">(repair)</span>와 원래보다 높이는 <span class="term">보강</span><span class="en">(strengthening)</span>을 구분합니다.</p>
+    <figure class="diagram" id="fig-mt-life">
+      <svg viewBox="0 0 860 300" role="img" aria-label="시간에 따른 구조물 성능 곡선, 예방 보수와 사후 보수, 요구 성능 수준">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(80,30)">
+          <line x1="0" y1="220" x2="700" y2="220" style="stroke:var(--axis)"/><line x1="0" y1="0" x2="0" y2="220" style="stroke:var(--axis)"/>
+          <text x="350" y="248" class="t-mono" text-anchor="middle">시간(년)</text>
+          <text x="-40" y="110" class="t-mono" text-anchor="middle" transform="rotate(-90 -40 110)">성능(안전·사용성)</text>
+          <line x1="0" y1="170" x2="700" y2="170" style="stroke:var(--bad);stroke-dasharray:6 4"/>
+          <text x="696" y="164" class="t-mono" text-anchor="end" style="fill:var(--bad)">요구 성능(한계)</text>
+          <path d="M0 20 C120 24 220 60 300 120 C340 150 360 168 380 182" style="fill:none;stroke:var(--text-faint);stroke-width:2;stroke-dasharray:4 4"/>
+          <text x="380" y="200" class="t-mono" style="fill:var(--text-dim)">방치(한계 도달)</text>
+          <path d="M0 20 C80 22 140 40 180 60 L180 34 C250 38 300 58 340 76 L340 48 C420 52 480 74 520 94 L520 60 C600 64 650 84 700 100" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <text x="190" y="112" class="t-mono" style="fill:var(--accent)">예방 보수(작고 잦은 개입)</text>
+          <path d="M0 20 C120 24 220 60 300 120 C320 134 330 150 340 160 L340 30 C460 34 560 80 640 140 L640 40" style="fill:none;stroke:var(--accent-2);stroke-width:2"/>
+          <text x="346" y="24" class="t-mono" style="fill:var(--accent-2)">사후 보수·보강(크고 드문 개입)</text>
+          <circle cx="180" cy="60" r="4" style="fill:var(--accent)"/><circle cx="340" cy="76" r="4" style="fill:var(--accent)"/><circle cx="520" cy="94" r="4" style="fill:var(--accent)"/>
+          <circle cx="340" cy="160" r="4" style="fill:var(--accent-2)"/><circle cx="640" cy="140" r="4" style="fill:var(--accent-2)"/>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="236">0</text><text x="175" y="236">25</text><text x="350" y="236">50</text><text x="525" y="236">75</text><text x="700" y="236">100</text></g>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-1.</b> 생애 주기 성능 곡선(개념도). 성능은 처음에 천천히, 열화가 진행되면 빨리 떨어진다. 일찍 자주 손보는 예방 보수(초록)와 한계 가까이 가서 크게 고치는 사후 보수(주황) 가운데 어느 쪽이 싼지는 개입 비용, 성능 저하에 따른 사용자 비용·위험, 할인율이 정한다(이 장의 LCC 계산).</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="inspection">
+    <h2>점검·진단 체계와 상태 등급</h2>
+    <div class="problem"><strong>누가, 언제, 얼마나 자세히 보나</strong>
+      <p>B-130을 매일 한 사람이 들여다볼 수는 없습니다. 시설물안전법은 시설의 규모·중요도(1종·2종·3종)와 상태 등급에 따라 점검의 종류와 주기를 정해, 가볍고 잦은 눈으로 이상을 걸러 내고 무겁고 드문 진단으로 원인과 대책을 찾게 합니다.</p></div>
+    <div class="callout def"><strong>정의 16.1 (점검·진단과 상태 등급, 시설물안전법 형태 — 현행 법령 확인)</strong> <span class="term">정기안전점검</span><span class="en">(regular safety inspection)</span>은 육안으로 시설의 기능·상태를 확인하는 점검, <span class="term">정밀안전점검</span><span class="en">(detailed safety inspection)</span>은 측정·시험 장비를 써서 현재 상태와 사용 요건 만족 여부를 확인하는 점검, <span class="term">정밀안전진단</span><span class="en">(precise safety diagnosis)</span>은 결함의 원인과 범위를 조사·측정·평가해 보수·보강 방법을 제시하는 진단이다. 이와 별도로 재해·사고 우려가 있을 때의 긴급안전점검, 1·2종 시설의 장래 성능을 평가하는 성능평가가 있다. 결과는 <span class="term">상태 등급</span><span class="en">(condition grade)</span> 다섯 단계로 매긴다.
+      <div class="table-wrap"><table class="mt-tbl">
+        <thead><tr><th>등급</th><th>상태(요지)</th><th>정기점검</th><th>정밀점검</th><th>정밀안전진단</th></tr></thead>
+        <tbody>
+          <tr><td><b>A</b> 우수</td><td>문제점이 없는 최상의 상태</td><td rowspan="3">반기 1회 이상</td><td>3년 1회 이상</td><td>6년 1회 이상</td></tr>
+          <tr><td><b>B</b> 양호</td><td>보조 부재에 경미한 결함, 기능 이상 없고 내구성을 위해 일부 보수 필요</td><td rowspan="2">2년 1회 이상</td><td rowspan="2">5년 1회 이상</td></tr>
+          <tr><td><b>C</b> 보통</td><td>주요 부재에 경미한 결함 또는 보조 부재에 광범위한 결함, 안전에 지장 없으나 내구성·기능 저하 방지를 위해 보수·보강 필요</td></tr>
+          <tr><td><b>D</b> 미흡</td><td>주요 부재에 결함, 긴급한 보수·보강 필요, 사용 제한 여부 판단</td><td rowspan="2">1년 3회 이상</td><td rowspan="2">1년 1회 이상</td><td rowspan="2">4년 1회 이상</td></tr>
+          <tr><td><b>E</b> 불량</td><td>주요 부재에 심각한 결함, 안전성에 위험, 즉시 사용 금지하고 보강 또는 개축</td></tr>
+        </tbody></table></div>
+      <div class="where">주기는 건축물 이외 시설물의 형태이며 시설 종류·종별에 따라 다르고 개정될 수 있다(현행 시행령 별표 확인). 교량에서 정밀안전진단 대상은 1종 시설물이며, 1종은 대략 상부 형식이 현수·사장·아치·트러스인 교량이나 최대 경간 50 m 이상(또는 총길이 500 m 이상) 교량 형태다(현행 기준 확인).</div></div>
+    <figure class="diagram" id="fig-mt-system">
+      <svg viewBox="0 0 880 280" role="img" aria-label="점검·진단 체계: 정기점검, 정밀점검, 정밀안전진단, 성능평가와 보수·보강의 순환">
+        <rect x="10" y="10" width="860" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <rect x="0" y="0" width="170" height="64" rx="8" style="fill:var(--bg-elev);stroke:var(--accent)"/>
+          <text x="85" y="26" class="t" text-anchor="middle">정기안전점검</text><text x="85" y="48" class="t-mono" text-anchor="middle">육안 · 반기 1회</text>
+          <rect x="210" y="0" width="170" height="64" rx="8" style="fill:var(--bg-elev);stroke:var(--accent)"/>
+          <text x="295" y="26" class="t" text-anchor="middle">정밀안전점검</text><text x="295" y="48" class="t-mono" text-anchor="middle">장비 · 측정 · 1–3년</text>
+          <rect x="420" y="0" width="170" height="64" rx="8" style="fill:var(--bg-elev);stroke:var(--accent-2)"/>
+          <text x="505" y="26" class="t" text-anchor="middle">정밀안전진단</text><text x="505" y="48" class="t-mono" text-anchor="middle">원인 · 내하력 · 4–6년</text>
+          <rect x="630" y="0" width="170" height="64" rx="8" style="fill:var(--bg-elev);stroke:var(--text-dim)"/>
+          <text x="715" y="26" class="t" text-anchor="middle">성능평가</text><text x="715" y="48" class="t-mono" text-anchor="middle">안전·내구·사용성 · 5년</text>
+          <line x1="170" y1="32" x2="208" y2="32" style="stroke:var(--text-dim)" marker-end="url(#mt-ah-t)"/>
+          <line x1="380" y1="32" x2="418" y2="32" style="stroke:var(--text-dim)" marker-end="url(#mt-ah-t)"/>
+          <line x1="590" y1="32" x2="628" y2="32" style="stroke:var(--text-dim)" marker-end="url(#mt-ah-t)"/>
+          <rect x="120" y="120" width="560" height="56" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <text x="400" y="144" class="t" text-anchor="middle">상태 등급 A · B · C · D · E  →  보수·보강 · 사용 제한 · 다음 점검 주기</text>
+          <text x="400" y="166" class="t-mono" text-anchor="middle">유지관리 이력(데이터베이스) → 열화 예측 · LCC · 예산</text>
+          <path d="M85 64 L85 148 L118 148" style="fill:none;stroke:var(--text-dim)" marker-end="url(#mt-ah-t)"/>
+          <path d="M505 64 L505 116" style="fill:none;stroke:var(--accent-2)" marker-end="url(#mt-ah-ld)"/>
+          <path d="M680 148 L760 148 L760 200 L40 200 L40 70" style="fill:none;stroke:var(--accent);stroke-dasharray:5 4" marker-end="url(#mt-ah-acc)"/>
+          <text x="400" y="218" class="t-mono" text-anchor="middle" style="fill:var(--accent)">등급에 따라 주기가 짧아진다(D·E는 더 자주) — 순환</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-2.</b> 점검·진단 체계(형태). 가벼운 점검이 자주 이상을 거르고, 정밀안전진단이 원인과 내하력을 평가한다. 모든 결과는 상태 등급과 이력으로 쌓여 다음 점검 주기, 열화 예측, 예산 계획의 입력이 된다. 건축물의 진단과 내력 평가 절차는 StructureBook <a href="../../structure/chapters/assessment.html#assessment">16장 안전 진단과 내력 평가</a>를 참고한다.</figcaption>
+    </figure>
+    <p>교량 전체의 등급은 부재마다 매긴 상태(바닥판의 균열·박리, 거더의 부식·도장 열화, 받침의 변형·부식, 신축 이음의 파손·누수, 교각의 균열, 기초의 세굴)를 부재의 중요도로 가중해 모아 정합니다. 국내 세부지침은 부재별 상태를 점수(결함 지수)로 바꾸고 가중 평균한 값을 등급 구간에 대응시키는 방식을 쓰며, 이 장은 그 형태를 교육용 가중치로 따라 합니다.</p>
+    <div class="callout def"><strong>원리 16.2 (교량 전체 상태 평가, 세부지침 형태 — 교육용)</strong>
+      <div class="formula">$$D = \frac{\sum_i w_i\, s_i}{\sum_i w_i}, \qquad s(a, b, c, d, e) = 0.1,\ 0.2,\ 0.4,\ 0.7,\ 1.0$$<div class="where">\(w_i\): 부재 가중치(이 장: 바닥판 20, 거더 20, 교각·교대 20, 기초·세굴 12, 받침 10, 포장·배수 10, 신축 이음 8 — 교육용), \(s_i\): 부재 상태 점수. \(D \lt 0.13\) A, \(0.13 \le D \lt 0.26\) B, \(0.26 \le D \lt 0.49\) C, \(0.49 \le D \lt 0.79\) D, \(D \ge 0.79\) E(형태). 주요 부재(바닥판·거더·교각·기초)가 e이면 평균과 관계없이 전체를 E로 본다(교육용 규칙). 실제 점수·가중치·구간은 현행 「안전점검 및 정밀안전진단 세부지침」을 확인한다.</div></div></div>
+    <div class="callout"><strong>예제 16.1 (준공 25년 차 B-130의 상태 평가)</strong> 정밀점검 결과(교육용): 바닥판 b(망상 균열 일부), 거더 b(도장 열화), 교각·교대 b, 기초 c(P1 주위 하상 저하 — 15장 세굴), 받침 c(부식·이동량 이상), 포장·배수 c(소성 변형, 배수구 막힘), 신축 이음 d(누수·파손).
+      <ol class="mt-steps">
+        <li>\(\sum w_i s_i = 20(0.2) + 20(0.2) + 20(0.2) + 12(0.4) + 10(0.4) + 10(0.4) + 8(0.7) = 30.4\).</li>
+        <li>\(D = 30.4/100 = 0.304\) → <b>C 등급</b>. 정기점검 반기 1회, 정밀점검 2년 1회(형태).</li>
+        <li><b>판단.</b> 등급을 끌어내린 것은 값싼 부재(신축 이음 d)다. 이음에서 새는 물이 거더 끝과 받침을 녹슬게 하므로, 이음 교체는 싸지만 다른 부재의 열화를 늦추는 효과가 크다 — 예방 보수의 전형이다.</li>
+      </ol></div>
+    <div class="sim" id="sim-mt-inspect">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-130 3D 상태 평가</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mt-cv-inspect" aria-label="B-130의 3차원 장면에서 부재별 상태 등급 색"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>부재</span><div class="seg" id="mt-in-part"><button data-value="deck" class="on">바닥판</button><button data-value="girder">거더</button><button data-value="pier">교각·교대</button><button data-value="found">기초</button><button data-value="bearing">받침</button><button data-value="pave">포장</button><button data-value="joint">신축 이음</button></div></div>
+          <div class="ctrl"><span>선택 부재의 상태</span><div class="seg" id="mt-in-grade"><button data-value="a">a</button><button data-value="b" class="on">b</button><button data-value="c">c</button><button data-value="d">d</button><button data-value="e">e</button></div></div>
+          <div class="btn-row"><button class="btn" id="mt-in-reset">예제 16.1로</button><button class="btn" id="mt-in-new">준공 직후</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">결함 지수 D</span><span class="v" id="mt-in-D">—</span></div>
+        <div class="stat"><span class="k">전체 등급</span><span class="v" id="mt-in-G">—</span></div>
+        <div class="stat"><span class="k">가장 큰 기여</span><span class="v" id="mt-in-worst">—</span></div>
+        <div class="stat"><span class="k">정밀점검 주기(형태)</span><span class="v" id="mt-in-next">—</span></div>
+      </div>
+      <div class="mt-msg" id="mt-in-msg"></div>
+      <div class="sim-note">해볼 것: 장면을 끌어 돌려 보세요 · 신축 이음을 d → b로 고치면(교체) 전체 등급이 바뀌는지 보세요 · 거더 하나를 e로 하면 평균이 낮아도 전체가 E가 됩니다(주요 부재 규칙) · 모델: 원리 16.2(세부지침 형태, 가중치·점수는 교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="deterioration">
+    <h2>열화 예측: 마르코프 상태 전이</h2>
+    <div class="problem"><strong>10년 뒤 B-130은 어떤 등급일까</strong>
+      <p>같은 해에 지은 같은 형식의 교량도 몇 년 뒤의 상태는 제각각입니다. 열화는 환경·교통·시공 품질에 따라 흩어지는 확률적 과정입니다. 그래서 관리 기관은 "몇 년 뒤 몇 %의 교량이 D 등급이 될까"를 확률로 예측합니다.</p></div>
+    <div class="callout def"><strong>원리 16.3 (마르코프 열화 모형 — 교육용)</strong> 상태를 A–E 다섯 단계로 나누고, 한 해 동안 상태 \(i\)에 머무를 확률 \(p_i\), 한 단계 나빠질 확률 \(1 - p_i\)로 둔다(보수 없이는 좋아지지 않는다). 상태 분포 벡터 \(\mathbf{x}_t\)(합 1)는 <span class="term">전이 확률 행렬</span><span class="en">(transition probability matrix)</span> \(\mathbf{P}\)로
+      <div class="formula">$$\mathbf{x}_{t+1} = \mathbf{x}_t\,\mathbf{P}, \qquad \mathbf{P} = \begin{bmatrix} p_A & 1-p_A & 0 & 0 & 0\\ 0 & p_B & 1-p_B & 0 & 0\\ 0 & 0 & p_C & 1-p_C & 0\\ 0 & 0 & 0 & p_D & 1-p_D\\ 0&0&0&0&1\end{bmatrix}$$<div class="where">다음 해의 상태가 지난 이력이 아니라 지금 상태에만 달려 있다는 가정이 <span class="term">마르코프 연쇄</span><span class="en">(Markov chain)</span>다. 상태 \(i\)에 머무는 평균 기간은 \(1/(1 - p_i)\)년. 이 장의 값 \(p = 0.93, 0.92, 0.90, 0.86\)은 평균 체류 14.3, 12.5, 10.0, 7.1년(A에서 E까지 평균 약 44년)이 되도록 고른 교육용 값이다. 실제 \(p_i\)는 점검 이력 자료에서 추정하고 부재·환경별로 다르다. 개입(보수)은 그 해 분포의 일부를 좋은 상태로 옮기는 연산으로 넣는다.</div></div></div>
+    <figure class="diagram" id="fig-mt-markov">
+      <svg viewBox="0 0 860 220" role="img" aria-label="상태 A부터 E까지의 마르코프 전이 그림과 보수에 의한 복귀">
+        <rect x="10" y="10" width="840" height="200" rx="10" class="f-surface"/>
+        <g transform="translate(70,60)">
+          <g style="stroke-width:2">
+            <circle cx="0" cy="50" r="30" style="fill:var(--bg-elev);stroke:var(--ok)"/><circle cx="170" cy="50" r="30" style="fill:var(--bg-elev);stroke:var(--accent)"/><circle cx="340" cy="50" r="30" style="fill:var(--bg-elev);stroke:var(--warn)"/><circle cx="510" cy="50" r="30" style="fill:var(--bg-elev);stroke:var(--accent-2)"/><circle cx="680" cy="50" r="30" style="fill:var(--bg-elev);stroke:var(--bad)"/>
+          </g>
+          <g class="t" text-anchor="middle" style="font-weight:700"><text x="0" y="55">A</text><text x="170" y="55">B</text><text x="340" y="55">C</text><text x="510" y="55">D</text><text x="680" y="55">E</text></g>
+          <g style="stroke:var(--text-dim);stroke-width:1.6"><line x1="32" y1="50" x2="136" y2="50" marker-end="url(#mt-ah-t)"/><line x1="202" y1="50" x2="306" y2="50" marker-end="url(#mt-ah-t)"/><line x1="372" y1="50" x2="476" y2="50" marker-end="url(#mt-ah-t)"/><line x1="542" y1="50" x2="646" y2="50" marker-end="url(#mt-ah-t)"/></g>
+          <g class="t-mono" text-anchor="middle"><text x="85" y="42">0.07</text><text x="255" y="42">0.08</text><text x="425" y="42">0.10</text><text x="595" y="42">0.14</text></g>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="0">0.93</text><text x="170" y="0">0.92</text><text x="340" y="0">0.90</text><text x="510" y="0">0.86</text><text x="680" y="0">1</text></g>
+          <path d="M-14 22 q14 -26 28 0 M156 22 q14 -26 28 0 M326 22 q14 -26 28 0 M496 22 q14 -26 28 0 M666 22 q14 -26 28 0" style="fill:none;stroke:var(--text-faint)"/>
+          <path d="M510 82 Q340 150 182 84" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4" marker-end="url(#mt-ah-acc)"/>
+          <text x="340" y="134" class="t-mono" text-anchor="middle" style="fill:var(--accent)">보수(D → B, 개입 비용)</text>
+          <text x="600" y="110" class="t-mono" style="fill:var(--text-dim)">평균 체류 1/(1 − p)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-3.</b> 마르코프 열화 모형. 한 해에 같은 상태에 남거나(위 고리) 한 단계 나빠진다(오른쪽 화살표). E는 보수 없이는 빠져나오지 못하는 흡수 상태다. 보수·보강은 상태를 되돌리는 별도의 이동(초록 점선)으로 넣는다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 16.2 (B-130 바닥판 100 m² 구획의 상태 분포)</strong> 준공 때 모두 A(\(\mathbf{x}_0 = [1, 0, 0, 0, 0]\)), 보수 없음.
+      <ol class="mt-steps">
+        <li>1년 뒤: \([0.93, 0.07, 0, 0, 0]\). 2년 뒤: A \(0.93^2 = 0.865\), B \(0.93 \times 0.07 + 0.07 \times 0.92 = 0.130\), C \(0.07 \times 0.08 = 0.006\).</li>
+        <li>계속 곱하면 20년 뒤 A 23 %, B 32 %, C 22 %, D 11 %, E 11 %(평균 등급 2.5 ≈ B–C), 30년 뒤 E가 30 %로 커진다.</li>
+        <li><b>판단.</b> 평균만 보면 20년 차 B–C지만 구획의 22 %가 이미 D 이하다. 관리 계획은 평균이 아니라 <b>나쁜 꼬리</b>(D·E 비율)를 기준으로 세워야 한다. D에 이른 구획을 그해에 보수하면(D → B) E는 거의 사라진다 — 시뮬레이터에서 확인하자.</li>
+      </ol></div>
+    <div class="sim" id="sim-mt-markov">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>상태 등급 마르코프 예측</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mt-cv-markov" aria-label="연도별 상태 분포 누적 막대와 평균 등급 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>열화 속도 배율(환경) <output id="mt-mk-k-out"></output></span><input type="range" id="mt-mk-k" min="0.5" max="2.5" step="0.05" value="1"></label>
+          <div class="ctrl"><span>보수 정책</span><div class="seg" id="mt-mk-pol"><button data-value="none" class="on">없음</button><button data-value="D">D 도달 시 → B</button><button data-value="C">C 도달 시 → A</button></div></div>
+          <label class="ctrl"><span>확인 연도 t <output id="mt-mk-t-out"></output></span><input type="range" id="mt-mk-t" min="0" max="60" step="1" value="20"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">A · B · C · D · E (%)</span><span class="v" id="mt-mk-dist">—</span></div>
+        <div class="stat"><span class="k">평균 등급</span><span class="v" id="mt-mk-mean">—</span></div>
+        <div class="stat"><span class="k">D 이하 비율</span><span class="v" id="mt-mk-bad">—</span></div>
+        <div class="stat"><span class="k">연평균 보수 면적</span><span class="v" id="mt-mk-act">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 열화 속도를 2배(해안·제설제 환경)로 올리면 E가 언제 절반을 넘는지 보세요 · "D 도달 시 → B"를 고르면 E 비율이 사라지는 대신 해마다 일정 면적을 보수해야 합니다 · 모델: 원리 16.3, p = 0.93, 0.92, 0.90, 0.86(배율 k이면 1 − k(1 − p)), 교육용.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="lcc">
+    <h2>생애 주기 비용과 최적 보수 시점</h2>
+    <div class="problem"><strong>지금 3억을 쓸까, 10년 뒤 12억을 쓸까</strong>
+      <p>예방 보수는 싸지만 자주 해야 하고, 사후 보수는 비싸지만 드뭅니다. 게다가 오늘의 1억과 20년 뒤의 1억은 같은 돈이 아닙니다. 다른 시점의 돈을 같은 저울에 올리는 도구가 할인이고, 그것으로 생애 동안의 총비용을 비교하는 것이 생애 주기 비용 분석입니다.</p></div>
+    <div class="callout def"><strong>정의 16.4 (현재 가치와 생애 주기 비용)</strong> \(t\)년 뒤의 비용 \(C_t\)의 현재 가치는 \(C_t/(1 + r)^t\)이고(\(r\): <span class="term">할인율</span><span class="en">(discount rate)</span>), 분석 기간 \(N\)년 동안의 <span class="term">생애 주기 비용</span><span class="en">(life-cycle cost, LCC)</span>은
+      <div class="formula">$$LCC = C_0 + \sum_{t=1}^{N}\frac{C_{M,t} + C_{R,t} + C_{U,t}}{(1 + r)^t}$$<div class="where">\(C_0\): 초기 건설비, \(C_M\): 일상 유지비, \(C_R\): 보수·보강비, \(C_U\): 사용자 비용(통행 제한·우회·지체)과 위험 비용(파손 확률 × 피해). 국내 공공 사업 경제성 분석의 사회적 할인율은 4.5 % 형태다(예비타당성조사 지침, 현행 확인). 할인율이 높을수록 먼 미래의 비용이 작게 보여 개입을 미루는 쪽이 유리해진다. 이 장은 마르코프 모형(원리 16.3)으로 해마다 상태 분포를 구하고, 정한 등급에 이른 몫을 A로 되돌리며 그 비용을 더하는 방식으로 기대 LCC를 계산한다(교육용 상대 비용).</div></div></div>
+    <figure class="diagram" id="fig-mt-lcc">
+      <svg viewBox="0 0 860 280" role="img" aria-label="개입 시점에 따른 개입 비용, 사용자·위험 비용, 총 생애 주기 비용 곡선과 최적점">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(90,30)">
+          <line x1="0" y1="200" x2="460" y2="200" style="stroke:var(--axis)"/><line x1="0" y1="0" x2="0" y2="200" style="stroke:var(--axis)"/>
+          <path d="M20 30 C120 120 260 160 440 176" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <path d="M20 190 C160 184 300 130 440 20" style="fill:none;stroke:var(--accent-2);stroke-width:2"/>
+          <path d="M20 40 C110 120 190 112 240 108 C320 104 380 80 440 16" style="fill:none;stroke:var(--text);stroke-width:2.8"/>
+          <circle cx="225" cy="108" r="6" style="fill:var(--ok)"/>
+          <text x="150" y="150" class="t-mono" style="fill:var(--ok)">최적 개입 수준</text>
+          <text x="30" y="24" class="t-mono" style="fill:var(--accent)">개입 비용(현재 가치)</text>
+          <text x="300" y="56" class="t-mono" style="fill:var(--accent-2)">사용자·위험 비용</text>
+          <text x="250" y="96" class="t-mono" style="fill:var(--text)">총 LCC</text>
+          <g class="t-mono" text-anchor="middle"><text x="40" y="218">B</text><text x="160" y="218">C</text><text x="300" y="218">D</text><text x="430" y="218">E</text></g>
+          <text x="230" y="240" class="t-mono" text-anchor="middle">개입하는 상태 등급(왼쪽: 일찍·자주, 오른쪽: 늦게·드물게)</text>
+          <text x="-40" y="100" class="t-mono" text-anchor="middle" transform="rotate(-90 -40 100)">현재 가치</text>
+        </g>
+        <g transform="translate(600,60)">
+          <text x="0" y="0" class="t" style="font-weight:700">할인율의 효과</text>
+          <text x="0" y="26" class="t-dim">r ↑ → 먼 미래 비용 ↓</text>
+          <text x="0" y="48" class="t-dim">→ 늦은 개입이 유리해진다</text>
+          <text x="0" y="78" class="t-dim">r ↓ → 미래 위험을 무겁게</text>
+          <text x="0" y="100" class="t-dim">→ 예방 보수가 유리해진다</text>
+          <text x="0" y="132" class="t-mono">PV = C / (1 + r)ᵗ</text>
+          <text x="0" y="152" class="t-mono">20년, 4.5 %: 0.41배</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-4.</b> 개입 시점과 LCC(개념도). 일찍 개입할수록 개입 비용의 합은 커지고 사용자·위험 비용은 작아진다. 둘의 합이 최소인 개입 수준이 경제적 최적이며, 그 위치는 할인율과 비용 비율에 따라 움직인다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 16.3 (B-130 바닥판의 개입 등급 비교, 60년, 교육용 상대 비용)</strong> 개입 비용(교육용 상대 단위, 그 등급에 이른 구획을 A로 되돌리는 비용): B 4, C 7, D 12, E 40. 사용자·위험 비용(연): A 0, B 0.02, C 0.15, D 0.6, E 2.5. 마르코프 \(p\)는 원리 16.3.
+      <ol class="mt-steps">
+        <li><b>r = 4.5 %.</b> 기대 LCC 현재 가치: B에서 개입 5.78, <b>C에서 개입 4.21</b>, D에서 개입 4.53, E까지 방치 후 개입 10.35 → C 개입이 최적.</li>
+        <li><b>r = 7 %.</b> B 3.93, C 2.58, <b>D 2.52</b>, E 5.31 → 최적이 D로 옮겨 간다(미래 비용이 가볍게 보이므로).</li>
+        <li><b>r = 0 %.</b> C 14.44가 최적, E 방치는 46.46으로 세 배 넘게 비싸다.</li>
+        <li><b>판단.</b> 어느 할인율에서도 E까지 방치하는 전략은 가장 비싸다. 예방과 사후 사이의 최적은 비용 비율과 할인율에 민감하므로, 실제 계획은 자기 시설의 이력 자료로 다시 계산한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-mt-lcc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>보수 시점 최적화(LCC)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mt-cv-lcc" aria-label="개입 등급별 누적 현재 가치 곡선과 최적 정책"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>할인율 r <output id="mt-lc-r-out"></output></span><input type="range" id="mt-lc-r" min="0" max="0.1" step="0.0025" value="0.045"></label>
+          <label class="ctrl"><span>예방 보수 비용(C 개입) <output id="mt-lc-c-out"></output></span><input type="range" id="mt-lc-c" min="2" max="14" step="0.5" value="7"></label>
+          <label class="ctrl"><span>위험·사용자 비용 배율 <output id="mt-lc-u-out"></output></span><input type="range" id="mt-lc-u" min="0.2" max="3" step="0.05" value="1"></label>
+          <label class="ctrl"><span>열화 속도 배율 <output id="mt-lc-k-out"></output></span><input type="range" id="mt-lc-k" min="0.5" max="2" step="0.05" value="1"></label>
+          <div class="ctrl"><span>강조할 정책</span><div class="seg" id="mt-lc-pol"><button data-value="1">B</button><button data-value="2" class="on">C</button><button data-value="3">D</button><button data-value="4">E</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">LCC(B · C · D · E 개입)</span><span class="v" id="mt-lc-all">—</span></div>
+        <div class="stat"><span class="k">최적 정책</span><span class="v" id="mt-lc-best">—</span></div>
+        <div class="stat"><span class="k">강조 정책: 개입 + 사용자</span><span class="v" id="mt-lc-split">—</span></div>
+      </div>
+      <div class="mt-msg" id="mt-lc-msg"></div>
+      <div class="sim-note">해볼 것: 할인율을 0 → 10 %로 올리며 최적 정책이 C → D로 옮겨 가는 지점을 찾아보세요 · 위험 비용 배율을 올리면(교통량이 많은 교량) 예방 쪽이 유리해집니다 · 모델: 원리 16.3 + 정의 16.4, 60년 기대값, 개입하면 그 해에 A로 복귀, 비용은 교육용 상대 단위.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="rating">
+    <h2>교량 내하력 평가와 통행 제한</h2>
+    <div class="problem"><strong>이 다리에 40톤 트럭이 지나가도 될까</strong>
+      <p>오래된 교량은 지금의 설계 하중보다 가벼운 트럭을 기준으로 설계되었고, 그 사이 강재는 녹슬고 콘크리트는 갈라졌습니다. 관리자는 "지금 이 다리가 어떤 하중까지 안전한가"를 숫자로 답하고, 모자라면 통행을 제한해야 합니다.</p></div>
+    <p>이 절은 이 장에서만 쓰는 교육용 노후 교량 <b>OB-30</b>(1980년대 형태 단순 강합성 거더교, 경간 30 m, 거더 간격 2.2 m, SM400 형태 F<sub>y</sub> = 235 MPa, 바닥판 200 mm f<sub>ck</sub> 24 MPa)을 예로 듭니다. 강 거더: 하부 플랜지 500 × 28, 복부 1,500 × 12, 상부 플랜지 360 × 22 mm.</p>
+    <div class="callout def"><strong>원리 16.5 (내하율, LRFR 형태)</strong> 부재 단면의 <span class="term">내하율</span><span class="en">(rating factor, RF)</span>은 저항에서 고정하중 효과를 뺀 여유가 활하중 효과의 몇 배인가이다.
+      <div class="formula">$$RF = \frac{C - \gamma_{DC}DC - \gamma_{DW}DW}{\gamma_L\,L(1 + IM)}, \qquad \text{통행 제한 하중 } = \frac{W}{0.7}\,(RF - 0.3)\quad (0.3 \le RF \lt 1)$$<div class="where">\(C\): 단면 저항(강도 한계 상태 \(\phi M_n\)), \(DC\)·\(DW\): 구조체·포장 고정하중 효과(\(\gamma\) 1.25·1.5), \(L(1 + IM)\): 평가 하중의 효과(충격 포함), \(\gamma_L\): 설계 하중 수준(inventory) 1.75, 운용 수준(operating) 1.35, 법정 하중 평가 1.45 형태(AASHTO MBE 형태). RF ≥ 1이면 그 하중이 안전하고, 법정 하중의 RF가 1 미만이면 통행 제한, 0.3 미만이면 통행 금지를 검토한다(통행 제한식은 MBE 형태, W: 평가 트럭 무게). 강 거더는 사용 한계(영구 변형, 하부 플랜지 \(f \le 0.95F_y\), 활하중 계수 1.3 형태)도 평가한다. 국내 교량은 공용 내하력 \(P = RF \times P_{\text{설계}} \times K_s\) 형태로 표현한다(\(K_s\): 재하 시험 보정, 다음 절 — 현행 세부지침 확인). 이 장은 설계 트럭 KL-510 형태(510 kN)를 평가 트럭으로 쓴다(교육용).</div></div></div>
+    <div class="callout"><strong>예제 16.4 (OB-30 경간 중앙의 내하율)</strong> 거더 1본, 횡분배 0.6 차로(교육용).
+      <ol class="mt-steps">
+        <li><b>하중 효과.</b> \(DC = 15 \times 30^2/8 + 1.5 \times 30^2/8 = 1{,}856\) kN·m, \(DW = 4.05 \times 30^2/8 = 455\) kN·m. 트럭 영향선 주사 최대 2,976 kN·m, \(IM = 15/(40 + 30) = 0.214\), 차로 하중 \(12.7 \times 30^2/8 = 1{,}429\) → \(L(1 + IM) = 0.6 \times (2{,}976 \times 1.214 + 1{,}429) = 3{,}026\) kN·m.</li>
+        <li><b>저항.</b> 합성 단면 소성 모멘트(소성 중립축이 상부 플랜지 안) \(M_p = 9{,}685\) kN·m, φ = 1.0.</li>
+        <li><b>강도 RF.</b> 설계 수준 \((9{,}685 - 1.25 \times 1{,}856 - 1.5 \times 455)/(1.75 \times 3{,}026) = 1.26\), 운용 수준 1.64.</li>
+        <li><b>사용 한계 RF.</b> 하부 플랜지 응력: 고정하중(강재 단면 + 3n 합성) 92.7 MPa, 활하중(n 합성) 93.8 MPa. \(RF_s = (0.95 \times 235 - 92.7)/(1.3 \times 93.8) = 1.07\).</li>
+        <li><b>하부 플랜지 두께 20 % 부식.</b> \(M_p = 8{,}654\) → 강도 RF(법정 1.45) 1.29로 여유가 있지만, \(RF_s = (223.3 - 107.7)/(1.3 \times 108.4) = 0.82 \lt 1\). 통행 제한 하중 \(510/0.7 \times (0.819 - 0.3) = 378\) kN(약 39 tf). <b>강도보다 사용 한계(영구 변형)가 먼저 지배한다.</b> 이 장은 두 RF 가운데 작은 값으로 통행 제한을 판단한다(교육용 단순화).</li>
+      </ol></div>
+    <div class="sim" id="sim-mt-rating">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>내하율과 통행 제한 판정</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mt-cv-rating" aria-label="부식 손실에 따른 강도·사용 한계 내하율 곡선과 현재 점"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>하부 플랜지 두께 손실 <output id="mt-rt-loss-out"></output></span><input type="range" id="mt-rt-loss" min="0" max="50" step="1" value="20"></label>
+          <div class="ctrl"><span>평가 수준(강도)</span><div class="seg" id="mt-rt-lvl"><button data-value="1.75">설계 1.75</button><button data-value="1.35">운용 1.35</button><button data-value="1.45" class="on">법정 1.45</button></div></div>
+          <label class="ctrl"><span>교통량 증가(활하중 배율) <output id="mt-rt-ll-out"></output></span><input type="range" id="mt-rt-ll" min="0.8" max="1.5" step="0.01" value="1"></label>
+          <label class="ctrl"><span><i style="font-style:normal">재하 시험 보정 K<sub>s</sub></i> <output id="mt-rt-ks-out"></output></span><input type="range" id="mt-rt-ks" min="0.8" max="1.3" step="0.01" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">강도 RF(M<sub>p</sub>)</span><span class="v" id="mt-rt-rf">—</span></div>
+        <div class="stat"><span class="k">사용 한계 RF<sub>s</sub></span><span class="v" id="mt-rt-rfs">—</span></div>
+        <div class="stat"><span class="k">지배 RF × K<sub>s</sub></span><span class="v" id="mt-rt-gov">—</span></div>
+        <div class="stat"><span class="k">통행 제한</span><span class="v" id="mt-rt-post">—</span></div>
+      </div>
+      <div class="mt-msg" id="mt-rt-msg"></div>
+      <div class="sim-note">해볼 것: 부식 손실 0 %에서 시작해 사용 한계 RF가 1 아래로 내려가는 손실(약 5–6 %)을 찾아보세요 · 다음 절의 재하 시험으로 K<sub>s</sub> = 1.2를 얻으면 통행 제한이 풀리는지 보세요 · 모델: 원리 16.5, OB-30 교육용 단면(CB.section, n = 8, 3n = 24), 소성 모멘트는 단면을 얇은 띠로 나눈 수치 적분, 트럭 주사 CB.civ.truckScan·ilSimple, 충격 CB.civ.impact.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="load-test">
+    <h2>재하 시험으로 계산 고치기</h2>
+    <p>계산의 저항과 강성은 도면과 기준의 가정입니다. 실제 교량은 계산에 넣지 않은 방호벽·포장의 합성 작용, 받침의 마찰, 바닥판의 횡분배 덕분에 대개 계산보다 단단합니다. 무게를 아는 시험 트럭을 올려 처짐·변형률을 재고 계산과 비교하는 것이 <span class="term">재하 시험</span><span class="en">(load test)</span>이고, 그 비로 계산을 보정하는 계수가 <span class="term">응답 보정 계수</span><span class="en">(response correction factor)</span>입니다. 건축물 슬래브의 재하 시험 합격 판정은 StructureBook <a href="../../structure/chapters/assessment.html#assessment">16장</a>에서 다뤘고, 여기서는 교량의 내하력 보정에 집중합니다.</p>
+    <figure class="diagram" id="fig-mt-loadtest">
+      <svg viewBox="0 0 880 270" role="img" aria-label="교량 재하 시험: 시험 트럭 두 대, 처짐계와 변형률계 배치, 정적·동적 시험">
+        <rect x="10" y="10" width="860" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <rect x="0" y="80" width="600" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M0 98 l-10 18 h20z M600 98 l-10 18 h20z" style="fill:none;stroke:var(--text-dim)"/>
+          <path d="M0 98 Q300 128 600 98" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+          <g>
+            <rect x="240" y="44" width="70" height="30" rx="4" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/><rect x="310" y="54" width="22" height="20" rx="3" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+            <circle cx="255" cy="78" r="5" style="fill:var(--accent-2)"/><circle cx="275" cy="78" r="5" style="fill:var(--accent-2)"/><circle cx="322" cy="78" r="5" style="fill:var(--accent-2)"/>
+          </g>
+          <text x="286" y="36" class="t-mono" text-anchor="middle" style="fill:var(--accent-2)">시험 트럭(차로마다 1대, 무게 계량)</text>
+          <line x1="300" y1="140" x2="300" y2="112" style="stroke:var(--text-dim)"/><rect x="290" y="140" width="20" height="16" style="fill:var(--bg-elev);stroke:var(--text-dim)"/>
+          <text x="318" y="154" class="t-mono">처짐계(LVDT·영상·레이저)</text>
+          <circle cx="150" cy="104" r="4" style="fill:var(--blue)"/><circle cx="450" cy="104" r="4" style="fill:var(--blue)"/><circle cx="300" cy="104" r="4" style="fill:var(--blue)"/>
+          <text x="80" y="134" class="t-mono" style="fill:var(--blue)">변형률계(하부 플랜지)</text>
+          <text x="300" y="190" class="t-mono" text-anchor="middle">δ계산 / δ측정 → 응답 보정 · 주행 시험(동적) → 실측 충격</text>
+        </g>
+        <g transform="translate(700,60)">
+          <text x="0" y="0" class="t" style="font-weight:700">순서</text>
+          <text x="0" y="24" class="t-dim">① 무재하 기준값</text>
+          <text x="0" y="46" class="t-dim">② 정적 재하(단계)</text>
+          <text x="0" y="68" class="t-dim">③ 제하 → 잔류</text>
+          <text x="0" y="90" class="t-dim">④ 주행(저속·고속)</text>
+          <text x="0" y="112" class="t-dim">⑤ 계산과 비교</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-5.</b> 교량 재하 시험(형태). 계량한 시험 트럭을 경간 중앙의 최대 효과 위치에 세우고 처짐·변형률을 잰다. 하중을 내린 뒤 원위치로 돌아오는지(잔류 처짐)로 탄성 거동을, 주행 시험의 최대 응답과 정적 응답의 비로 실측 충격을 본다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 16.6 (응답 보정 계수 — 두 가지 형태)</strong>
+      <div class="formula">$$K_s = \frac{\delta_{\text{계산}}}{\delta_{\text{측정}}}\cdot\frac{1 + i_{\text{계산}}}{1 + i_{\text{측정}}}\ \ (\text{국내 세부지침 형태}), \qquad K = 1 + K_aK_b,\ \ K_a = \frac{\varepsilon_{\text{계산}}}{\varepsilon_{\text{측정}}} - 1\ \ (\text{MBE 형태})$$<div class="where">국내 형태는 처짐(또는 응력) 비와 충격 비를 곱한다. MBE 형태의 \(K_b\)는 시험 하중이 평가 하중에 비해 얼마나 큰가(\(T/W\))와 거동을 더 큰 하중으로 외삽할 수 있는가에 따라 0(\(T/W \lt 0.4\)), 0.8(0.4–0.7), 1.0(0.7 초과)로 이익을 줄인다(외삽 가능할 때, 형태). 측정이 계산보다 작게 나온 원인이 받침 마찰이나 비구조 합성처럼 큰 하중에서 사라질 수 있는 것이면 보정을 줄이거나 쓰지 않는다. 잔류 처짐이 크면(이 장은 최대 처짐의 10 % 초과, 교육용) 비탄성 거동이므로 보정하지 않는다.</div></div></div>
+    <div class="callout"><strong>예제 16.5 (OB-30 재하 시험)</strong> 시험 트럭 2대(각 250 kN, 축 60 + 95 + 95 kN, 축 간격 3.5·1.3 m)를 두 차로의 경간 중앙에 세웠다.
+      <ol class="mt-steps">
+        <li><b>계산 처짐.</b> 합성 단면 \(I = 4.07 \times 10^{10}\) mm⁴(n = 8), \(EI = 8.15 \times 10^6\) kN·m². 트럭 1대 단순보 처짐 16.9 mm(<code>CB.beam</code>) × 횡분배 0.6 = <b>10.1 mm</b>(거더 1본).</li>
+        <li><b>측정.</b> 최대 8.4 mm, 제하 후 잔류 0.3 mm(3.6 %) — 탄성 거동. 주행 시험 실측 충격 \(1 + i = 1.10\)(계산 1.214).</li>
+        <li><b>국내 형태.</b> \(K_s = (10.1/8.4) \times (1.214/1.10) = 1.20 \times 1.10 = 1.33\).</li>
+        <li><b>MBE 형태.</b> \(K_a = 0.20\), \(T/W = 250/510 = 0.49\) → \(K_b = 0.8\), \(K = 1.16\).</li>
+        <li><b>판단.</b> 두 형태의 차이가 크다. 충격 보정은 노면 상태에 따라 변하고, 처짐 차이의 일부는 방호벽 합성일 수 있으므로 이 장은 보수적으로 1.16을 쓴다. 부식 20 %의 사용 한계 RF 0.82 × 1.16 = 0.95 — 여전히 1 미만이라 통행 제한(완화된 값)이 필요하다. 보강을 검토한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-mt-loadtest">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>재하 시험 해석: 측정 vs 계산</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mt-cv-loadtest" aria-label="경간 방향 계산 처짐 곡선과 측정점, 보정 계수"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>시험 트럭 무게(대당) <output id="mt-lt-w-out"></output></span><input type="range" id="mt-lt-w" min="150" max="400" step="5" value="250"></label>
+          <label class="ctrl"><span>측정 최대 처짐 <output id="mt-lt-dm-out"></output></span><input type="range" id="mt-lt-dm" min="4" max="16" step="0.1" value="8.4"></label>
+          <label class="ctrl"><span>잔류 처짐 <output id="mt-lt-dr-out"></output></span><input type="range" id="mt-lt-dr" min="0" max="3" step="0.05" value="0.3"></label>
+          <label class="ctrl"><span>실측 동적 증폭 1 + i <output id="mt-lt-im-out"></output></span><input type="range" id="mt-lt-im" min="1" max="1.4" step="0.01" value="1.1"></label>
+          <label class="ctrl"><span>부식 손실(계산 단면) <output id="mt-lt-loss-out"></output></span><input type="range" id="mt-lt-loss" min="0" max="40" step="1" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">계산 처짐 δ<sub>c</sub></span><span class="v" id="mt-lt-dc">—</span></div>
+        <div class="stat"><span class="k">δ<sub>c</sub>/δ<sub>m</sub> · 잔류율</span><span class="v" id="mt-lt-ratio">—</span></div>
+        <div class="stat"><span class="k">K<sub>s</sub>(국내 형태)</span><span class="v" id="mt-lt-ks">—</span></div>
+        <div class="stat"><span class="k">K(MBE 형태, T/W)</span><span class="v" id="mt-lt-k">—</span></div>
+      </div>
+      <div class="mt-msg" id="mt-lt-msg"></div>
+      <div class="sim-note">해볼 것: 측정 처짐을 계산보다 크게(12 mm) 하면 보정 계수가 1보다 작아져 내하력이 오히려 줄어듭니다 — 숨은 손상의 신호입니다 · 트럭 무게를 키우면 T/W가 커져 MBE 형태의 K<sub>b</sub>가 0.8 → 1.0이 됩니다 · 잔류 처짐을 키우면 보정이 거부됩니다 · 모델: 원리 16.6, CB.beam(단순보, 트럭 2대 × 횡분배 0.6/대 → 거더 1본), OB-30 단면(CB.section, E<sub>s</sub> 200 GPa).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="strengthening">
+    <h2>보수·보강: 외부 긴장과 FRP</h2>
+    <div class="problem"><strong>통행을 막지 않고 다리를 강하게</strong>
+      <p>OB-30은 부식으로 사용 한계 RF가 0.82(보정 후 0.95)입니다. 거더를 바꾸려면 통행을 막고 큰돈이 듭니다. 교량에서 흔히 쓰는 두 방법은 거더 밖에 강연선을 걸어 당기는 <b>외부 긴장</b>과, 인장 쪽에 탄소 섬유 판을 붙이는 <b>FRP 보강</b>입니다.</p></div>
+    <p>먼저 손상된 부분을 되돌리는 보수(부식부 녹 제거·재도장, 균열 주입, 단면 복구, 신축 이음·받침 교체)를 하고, 성능이 모자라면 보강합니다. <span class="term">외부 긴장</span><span class="en">(external post-tensioning)</span>은 거더 아래쪽에 편심을 두고 강연선을 긴장해 하부 플랜지에 미리 압축을 넣는 공법으로, 이미 걸려 있는 고정하중 응력까지 줄여 줍니다(ConcreteBook <a href="../../concrete/chapters/prestressed.html">15장 프리스트레스</a>의 원리). <span class="term">FRP 보강</span><span class="en">(fiber-reinforced polymer strengthening)</span>은 가볍고 녹슬지 않는 탄소 섬유 판·시트를 붙여 단면을 키우지만, 붙인 뒤에 오는 하중(활하중)만 나눠 받습니다(MaterialsBook <a href="../../materials/chapters/composites.html">16장 복합재료</a>, RC 보의 FRP 휨 보강은 StructureBook <a href="../../structure/chapters/assessment.html#strengthening">16장</a>).</p>
+    <figure class="diagram" id="fig-mt-strength">
+      <svg viewBox="0 0 880 300" role="img" aria-label="외부 긴장 강연선과 편향부, 정착부, 그리고 하부 플랜지에 붙인 CFRP 판과 응력 분포의 변화">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">외부 긴장(측면)</text>
+          <rect x="0" y="30" width="460" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="0" y="44" width="460" height="60" style="fill:none;stroke:var(--text-dim)"/>
+          <path d="M20 60 L150 96 L310 96 L440 60" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <rect x="12" y="52" width="14" height="16" style="fill:var(--accent)"/><rect x="434" y="52" width="14" height="16" style="fill:var(--accent)"/>
+          <circle cx="150" cy="96" r="5" style="fill:var(--bg-elev);stroke:var(--accent)"/><circle cx="310" cy="96" r="5" style="fill:var(--bg-elev);stroke:var(--accent)"/>
+          <text x="150" y="122" class="t-mono" text-anchor="middle">편향부</text><text x="310" y="122" class="t-mono" text-anchor="middle">편향부</text>
+          <text x="20" y="140" class="t-mono">정착부(거더 끝)</text>
+          <line x1="230" y1="150" x2="230" y2="108" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#mt-ah-ld)"/>
+          <text x="240" y="150" class="t-mono" style="fill:var(--accent-2)">위로 미는 등가 하중</text>
+          <line x1="40" y1="190" x2="140" y2="190" style="stroke:var(--compression);stroke-width:2.2" marker-end="url(#mt-ah-bad)"/>
+          <text x="150" y="194" class="t-mono">하부 플랜지에 압축 −P/A − Pe·y/I</text>
+        </g>
+        <g transform="translate(560,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">FRP 판(단면)</text>
+          <rect x="20" y="30" width="200" height="22" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="95" y="60" width="50" height="10" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <rect x="116" y="70" width="8" height="100" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <rect x="80" y="170" width="80" height="12" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <rect x="84" y="182" width="72" height="5" style="fill:var(--text);stroke:none"/>
+          <text x="166" y="190" class="t-mono">CFRP 판</text>
+          <text x="0" y="216" class="t-dim">붙인 뒤의 하중(활하중)만 분담</text>
+          <text x="0" y="236" class="t-dim">부착·정착·박리가 강도를 정한다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-6.</b> 강합성 거더의 보강. 외부 긴장(왼쪽)은 편향부에서 꺾인 강연선이 거더를 위로 밀고 하부 플랜지에 압축을 넣어 고정하중·활하중 응력을 모두 줄인다. FRP 판(오른쪽, 검은 띠)은 단면 2차 모멘트를 키워 붙인 뒤의 활하중 응력만 줄인다. 강재용 CFRP는 고탄성 판을 쓰고 끝단 박리를 막는 정착이 중요하다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 16.6 (부식된 OB-30의 외부 긴장)</strong> 하부 플랜지 20 % 손실 단면, 강연선을 하부 플랜지 밑면 위 150 mm 높이(편향부 사이 수평)에 두고 \(P = 1{,}000\) kN으로 긴장.
+      <ol class="mt-steps">
+        <li><b>합성 단면(n = 8).</b> \(A = 92{,}120\) mm², 중립축 밑면 위 1,296 mm, \(I = 3.62 \times 10^{10}\) mm⁴. 편심 \(e = 1{,}296 - 150 = 1{,}146\) mm.</li>
+        <li><b>하부 플랜지 긴장 응력.</b> \(-1{,}000{,}000/92{,}120 - 1{,}000{,}000 \times 1{,}146 \times 1{,}296/3.62 \times 10^{10} = -10.9 - 41.0 = -51.9\) MPa.</li>
+        <li><b>사용 한계 RF.</b> \(RF_s = (223.3 - 107.7 + 51.9)/(1.3 \times 108.4) = 1.19 \ge 1\) — <b>통행 제한 해제</b>. 긴장 응력은 상부(바닥판)에 인장을 만들므로 바닥판 균열과 정착부 국부 응력을 따로 검토하고, 장기 손실(이완 등)을 뺀 유효 긴장력을 쓴다.</li>
+        <li><b>비교: CFRP 판 400 × 4 mm(E = 165 GPa).</b> 활하중 응력이 108.4 → 약 101 MPa로 7 % 준다 → \(RF_s \approx 0.88\). RF 1을 얻으려면 판 두께가 약 12 mm는 되어야 한다. 고정하중이 이미 큰 부재에서는 외부 긴장이 훨씬 효과적이다.</li>
+      </ol></div>
+    <div class="sim" id="sim-mt-strengthen">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>보강 효과: 외부 긴장 + FRP 판</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mt-cv-strengthen" aria-label="보강 단면과 하부 플랜지 응력 누적 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>하부 플랜지 손실 <output id="mt-sg-loss-out"></output></span><input type="range" id="mt-sg-loss" min="0" max="40" step="1" value="20"></label>
+          <label class="ctrl"><span>외부 긴장력 P <output id="mt-sg-P-out"></output></span><input type="range" id="mt-sg-P" min="0" max="2500" step="50" value="1000"></label>
+          <label class="ctrl"><span>강연선 높이(밑면 위) <output id="mt-sg-ep-out"></output></span><input type="range" id="mt-sg-ep" min="-300" max="600" step="10" value="150"></label>
+          <label class="ctrl"><span>CFRP 판 두께(폭 400) <output id="mt-sg-tf-out"></output></span><input type="range" id="mt-sg-tf" min="0" max="12" step="0.5" value="0"></label>
+          <label class="ctrl"><span>활하중 배율 <output id="mt-sg-ll-out"></output></span><input type="range" id="mt-sg-ll" min="0.8" max="1.5" step="0.01" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">고정 · 긴장 · 활(×1.3)</span><span class="v" id="mt-sg-f">—</span></div>
+        <div class="stat"><span class="k">하부 플랜지 합계 / 0.95F<sub>y</sub></span><span class="v" id="mt-sg-sum">—</span></div>
+        <div class="stat"><span class="k">사용 한계 RF<sub>s</sub></span><span class="v" id="mt-sg-rf">—</span></div>
+        <div class="stat"><span class="k">바닥판 상연 긴장 응력</span><span class="v" id="mt-sg-top">—</span></div>
+      </div>
+      <div class="mt-msg" id="mt-sg-msg"></div>
+      <div class="sim-note">해볼 것: 긴장력 0에서 시작해 RF<sub>s</sub> = 1이 되는 P를 찾아보세요(약 490 kN) · 강연선 높이를 낮출수록(편심 ↑, 음수는 거더 아래로 내림) 같은 P의 효과가 커집니다 · CFRP 판만으로 같은 효과를 내려면 얼마나 두꺼워야 하는지 비교하세요 · 모델: CB.section.rects로 강재 단면, 3n·n 합성 단면, CFRP 판(n<sub>f</sub> = 165/200)을 조합(교육용), 고정하중은 보강 전 단면에, 긴장력·활하중은 보강 후 n 합성 단면에 작용, 긴장재 응력 증가·장기 손실 무시.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="seismic-retrofit">
+    <h2>교량 내진 보강: 받침 교체와 면진화</h2>
+    <div class="problem"><strong>고정 받침 하나가 지진을 모두 받는다</strong>
+      <p>1990년대 이전의 연속교는 교각 하나에 고정 받침을 두고 나머지는 가동 받침으로 두는 경우가 많았습니다. 온도 신축에는 좋은 배치지만, 지진 때 상부 구조의 관성력이 모두 고정 교각 하나로 몰립니다. 국내 도로교 내진 설계는 1990년대 들어 본격화되었으므로(현행 기준 확인), 그 이전 교량은 내진 성능 평가와 보강 대상이 됩니다.</p></div>
+    <p>교량 내진 보강의 대표적 방법은 셋입니다. ① 교각 자체를 보강한다(강판·FRP 감싸기로 구속과 전단 강도를 높여 연성 확보, StructureBook <a href="../../structure/chapters/assessment.html#seismic-retrofit">16장</a>의 건물 보강과 같은 원리). ② 낙교를 막는다(받침 지지 길이 확보, 낙교 방지 장치, 6장). ③ 받침을 <span class="term">면진 받침</span><span class="en">(seismic isolation bearing)</span>으로 바꿔 주기를 늘리고 감쇠를 더하며 관성력을 여러 교각에 나눈다(StructureBook <a href="../../structure/chapters/isolation.html">9장 면진과 제진</a>). ③은 교각을 건드리지 않고 상부를 잭으로 들어 받침만 바꾸므로 통행 영향이 작다.</p>
+    <figure class="diagram" id="fig-mt-retrofit">
+      <svg viewBox="0 0 880 280" role="img" aria-label="고정·가동 받침 배치의 지진력 집중과 면진 받침 교체 후의 분산">
+        <rect x="10" y="10" width="860" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">보강 전: P1 고정, 나머지 가동</text>
+          <rect x="0" y="30" width="380" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="112" y="52" width="12" height="120" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="256" y="52" width="12" height="120" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M112 44 h12 v8 h-12z" style="fill:var(--bad)"/><path d="M256 44 h12 v8 h-12z" style="fill:var(--surface)"/><circle cx="6" cy="48" r="4" style="fill:var(--surface);stroke:var(--text-dim)"/><circle cx="374" cy="48" r="4" style="fill:var(--surface);stroke:var(--text-dim)"/>
+          <line x1="190" y1="20" x2="290" y2="20" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#mt-ah-ld)"/>
+          <text x="196" y="14" class="t-mono" style="fill:var(--accent-2)">관성력 전부</text>
+          <path d="M118 172 Q140 110 118 52" style="fill:none;stroke:var(--bad);stroke-width:1.6;stroke-dasharray:4 3"/>
+          <text x="60" y="196" class="t-mono" style="fill:var(--bad)">P1에 집중 · T ≈ 1.75 s</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">보강 후: 4곳 모두 면진 받침</text>
+          <rect x="0" y="30" width="380" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="112" y="56" width="12" height="116" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="256" y="56" width="12" height="116" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:var(--accent-soft);stroke:var(--accent)"><rect x="0" y="44" width="14" height="12"/><rect x="111" y="44" width="14" height="12"/><rect x="255" y="44" width="14" height="12"/><rect x="366" y="44" width="14" height="12"/></g>
+          <path d="M113 47 h12 M113 50 h12 M113 53 h12 M257 47 h12 M257 50 h12 M257 53 h12" style="stroke:var(--accent)"/>
+          <line x1="150" y1="20" x2="210" y2="20" style="stroke:var(--accent-2);stroke-width:1.6" marker-end="url(#mt-ah-ld)"/>
+          <text x="216" y="24" class="t-mono" style="fill:var(--accent-2)">작아지고 나뉨</text>
+          <text x="20" y="196" class="t-mono" style="fill:var(--ok)">T ≈ 2.5 s, 감쇠 20 %(형태) · 변위는 받침에 집중</text>
+          <text x="20" y="216" class="t-mono">신축 이음 유간·지지 길이 확인</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-7.</b> 받침 배치와 지진력. 고정 받침 하나에 관성력이 몰리던 배치를 면진 받침으로 바꾸면 주기가 길어지고 감쇠가 더해져 지진력이 줄고, 4개 지점에 나뉜다. 대신 상부 구조가 받침 위에서 크게 움직이므로 신축 이음과 받침 지지 길이를 그 변위에 맞춘다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 16.7 (B-130 형태 연속교의 면진화, 교량 축 방향 — 교육용)</strong> 상부 구조 무게를 110 kN/m로 단순화하면(B-130 표의 고정하중 120 kN/m에서 일부 부착물을 뺀 교육용 값) \(W \approx 130 \times 110 = 14{,}300\) kN(질량 1,458 t). 교각 RC φ2.0 m, 높이 12 m, \(E_c = 27{,}500\) MPa, 균열 단면 \(0.5I_g\) → 캔틸레버 강성 \(k = 3EI/h^3 = 18{,}800\) kN/m. 설계 스펙트럼은 StructureBook의 G-10 값 형태 \(S_{DS} = 0.50g\), \(S_{D1} = 0.29g\)를 빌린다(교량 기준의 스펙트럼은 현행 KDS 24 17 확인).
+      <ol class="mt-steps">
+        <li><b>보강 전(P1 고정).</b> \(T = 2\pi\sqrt{1{,}458/18{,}800} = 1.75\) s, \(S_a = 0.29/1.75 = 0.166g\) → P1 탄성 전단 2,370 kN, 기둥 밑 모멘트 28,400 kN·m, 변위 약 126 mm. 1990년 이전 형태의 기둥 상세(겹침 이음, 띠철근 부족)라면 연성이 모자라 위험하다.</li>
+        <li><b>면진화.</b> 4지점 면진 받침, 유효 주기 2.5 s, 등가 감쇠 20 % → 감쇠 보정 \(\eta = \sqrt{10/(5 + 20)} = 0.63\)(Eurocode 8 형태). \(S_a = (0.29/2.5) \times 0.63 = 0.073g\) → 전체 1,050 kN, 4지점에 나뉘어 교각당 약 260 kN(받침 강성이 같다고 보면), 기둥 밑 모멘트 약 3,100 kN·m — <b>약 1/9</b>.</li>
+        <li><b>변위.</b> \(S_d = 0.073 \times 9.81 \times (2.5/2\pi)^2 = 0.114\) m. 약 115 mm가 받침에서 생기므로 신축 이음 유간과 받침 지지 길이를 그 이상으로 확보한다(6장 낙교 방지).</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="shm">
+    <h2>스마트 계측과 이상 탐지</h2>
+    <div class="problem"><strong>센서는 손상보다 날씨를 더 크게 본다</strong>
+      <p>B-130에 가속도계를 달아 고유 진동수를 매일 잽니다. 손상으로 강성이 2 % 줄면 진동수는 약 1 % 떨어집니다. 그런데 여름과 겨울의 온도 차만으로 진동수가 ±2–3 % 오르내립니다. 손상 신호가 계절 변동 속에 묻혀 버리는 것입니다.</p></div>
+    <p><span class="term">구조 건전성 모니터링</span><span class="en">(structural health monitoring, SHM)</span>은 센서(가속도·변형률·변위·기울기·온도, 영상)로 구조물의 응답을 연속으로 재고, 그 자료에서 손상과 이상을 찾는 일입니다. 장대교(5장)는 대부분 상시 계측 체계를 갖추고, 일반 교량도 무선 센서·드론·영상 점검이 늘고 있습니다. 측정치를 해석 모델과 연결해 실시간으로 상태를 갱신하는 것을 <span class="term">디지털 트윈</span><span class="en">(digital twin)</span>이라 부릅니다(BIMBook 연결 예정).</p>
+    <figure class="diagram" id="fig-mt-shm">
+      <svg viewBox="0 0 880 280" role="img" aria-label="교량 계측 체계: 센서, 자료 수집, 온도 보정 회귀, 잔차 관리도, 경보">
+        <rect x="10" y="10" width="860" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <rect x="0" y="0" width="150" height="70" rx="8" style="fill:var(--bg-elev);stroke:var(--accent)"/>
+          <text x="75" y="28" class="t" text-anchor="middle">센서</text><text x="75" y="50" class="t-mono" text-anchor="middle">가속도·온도·변형률</text>
+          <rect x="190" y="0" width="150" height="70" rx="8" style="fill:var(--bg-elev);stroke:var(--accent)"/>
+          <text x="265" y="28" class="t" text-anchor="middle">특징 추출</text><text x="265" y="50" class="t-mono" text-anchor="middle">고유 진동수 f(일)</text>
+          <rect x="380" y="0" width="170" height="70" rx="8" style="fill:var(--bg-elev);stroke:var(--accent-2)"/>
+          <text x="465" y="28" class="t" text-anchor="middle">환경 보정</text><text x="465" y="50" class="t-mono" text-anchor="middle">f̂ = a + bT (기준 1년)</text>
+          <rect x="590" y="0" width="200" height="70" rx="8" style="fill:var(--bg-elev);stroke:var(--bad)"/>
+          <text x="690" y="28" class="t" text-anchor="middle">관리도 · 경보</text><text x="690" y="50" class="t-mono" text-anchor="middle">잔차 r = f − f̂, ±3σ</text>
+          <line x1="150" y1="35" x2="188" y2="35" style="stroke:var(--text-dim)" marker-end="url(#mt-ah-t)"/><line x1="340" y1="35" x2="378" y2="35" style="stroke:var(--text-dim)" marker-end="url(#mt-ah-t)"/><line x1="550" y1="35" x2="588" y2="35" style="stroke:var(--text-dim)" marker-end="url(#mt-ah-t)"/>
+          <g transform="translate(40,110)">
+            <line x1="0" y1="80" x2="320" y2="80" style="stroke:var(--axis)"/>
+            <path d="M0 50 C40 10 80 10 120 50 C160 90 200 90 240 50 C270 20 300 22 320 40" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+            <text x="0" y="104" class="t-mono">원자료 f: 계절 변동이 손상보다 크다</text>
+          </g>
+          <g transform="translate(420,110)">
+            <line x1="0" y1="40" x2="320" y2="40" style="stroke:var(--text-faint)"/>
+            <line x1="0" y1="18" x2="320" y2="18" style="stroke:var(--bad);stroke-dasharray:4 3"/><line x1="0" y1="62" x2="320" y2="62" style="stroke:var(--bad);stroke-dasharray:4 3"/>
+            <path d="M0 40 L30 36 L60 44 L90 38 L120 42 L150 39 L180 43 L200 40 L210 60 L240 70 L270 72 L300 74 L320 73" style="fill:none;stroke:var(--accent-2);stroke-width:2"/>
+            <text x="0" y="104" class="t-mono">보정 잔차: 손상 뒤 한계선을 벗어난다</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-8.</b> 온도 보정 이상 탐지. 건전한 기간(기준 기간)의 측정으로 진동수–온도 관계를 회귀하고, 이후의 측정에서 온도로 설명되는 몫을 빼면 잔차에는 손상과 잡음만 남는다. 잔차의 이동 평균이 관리 한계를 벗어나면 경보를 내고 현장 점검을 한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 16.7 (온도 보정 회귀와 관리도 — 교육용)</strong> 기준 기간의 측정 \((T_j, f_j)\)에 최소 제곱 직선 \(\hat f = a + bT\)를 맞추고 잔차의 표준편차 \(\sigma_r\)를 구한다. 이후 날마다 잔차 \(r_t = f_t - (a + bT_t)\)의 \(m\)일 이동 평균 \(\bar r_t\)가
+      <div class="formula">$$|\bar r_t| \gt 3\,\frac{\sigma_r}{\sqrt{m}}$$<div class="where">이면 이상으로 판정한다(슈하트 관리도 형태, \(m = 7\)). 강성이 \(\Delta k/k\) 줄면 진동수는 \(\Delta f/f \approx \tfrac12\Delta k/k\) 준다. 원자료에 같은 한계(기준 기간 평균 ± 3 표준편차/√m)를 쓰면 계절 변동이 표준편차를 키워 작은 손상을 놓치고, 기준 기간과 다른 계절에는 거짓 경보를 낸다. 실제 계측은 비선형 온도 효과(동결된 지점·포장 강성), 교통 질량, 습도까지 고려하는 다변수 모델(주성분 분석, 기계 학습)을 쓴다.</div></div></div>
+    <div class="sim" id="sim-mt-shm">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>계측 이상 탐지: 온도 보정</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mt-cv-shm" aria-label="두 해 동안의 고유 진동수 원자료와 온도 보정 잔차 관리도"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>손상 발생일 <output id="mt-sh-d-out"></output></span><input type="range" id="mt-sh-d" min="380" max="700" step="1" value="520"></label>
+          <label class="ctrl"><span>강성 저하 Δk/k <output id="mt-sh-k-out"></output></span><input type="range" id="mt-sh-k" min="0" max="10" step="0.1" value="2"></label>
+          <label class="ctrl"><span>온도 민감도 <output id="mt-sh-b-out"></output></span><input type="range" id="mt-sh-b" min="0" max="0.3" step="0.01" value="0.15"></label>
+          <label class="ctrl"><span>측정 잡음 σ <output id="mt-sh-n-out"></output></span><input type="range" id="mt-sh-n" min="0.001" max="0.02" step="0.001" value="0.005"></label>
+          <div class="btn-row"><button class="btn" id="mt-sh-seed">다른 해 자료</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">회귀 기울기 b</span><span class="v" id="mt-sh-slope">—</span></div>
+        <div class="stat"><span class="k">잔차 σ<sub>r</sub></span><span class="v" id="mt-sh-sig">—</span></div>
+        <div class="stat"><span class="k">원자료 탐지(지연)</span><span class="v" id="mt-sh-raw">—</span></div>
+        <div class="stat"><span class="k">보정 탐지(지연)</span><span class="v" id="mt-sh-cmp">—</span></div>
+      </div>
+      <div class="mt-msg" id="mt-sh-msg"></div>
+      <div class="sim-note">해볼 것: 강성 저하 2 %에서 원자료 방법과 온도 보정 방법의 탐지 지연을 비교하세요 · 손상 발생일을 겨울(약 380–420일)과 여름(약 560–600일)로 옮겨 보세요 · 온도 민감도를 0으로 하면 두 방법이 비슷해집니다 · 거짓 경보는 손상 전에 경보가 난 날 수입니다 · 모델: 원리 16.7, B-130 중앙 경간 1차 진동수 f₀ = 2.10 Hz(교육용), 기온 12 + 13 sin(계절) + 일변동, 첫 365일이 기준 기간, 7일 이동 평균.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="budget">
+    <h2>시설별 유지관리 계획과 예산 배분</h2>
+    <div class="problem"><strong>30억으로 무엇부터 고칠까</strong>
+      <p>관리 기관은 B-130, TN-11, R-60을 함께 관리합니다. 모두 고치고 싶지만 올해 예산은 30억입니다. 가장 나쁜 것부터? 가장 싼 것부터? 가장 많이 다니는 것부터? 답은 "돈 1원당 줄어드는 위험과 사용자 손실이 큰 조합부터"이고, 그 조합은 시설별 순위를 단순히 매기는 것과 다를 수 있습니다.</p></div>
+    <div class="callout def"><strong>원리 16.8 (편익–비용과 예산 제약 최적화 — 교육용)</strong> 시설 \(j\)의 대안 \(k\)(아무것도 안 함·보수·보강)의 편익은 연간 기대 손실(위험 + 사용자 비용) \(L_j(g)\)의 감소를 \(n\)년 할인 합한 값이다.
+      <div class="formula">$$B_{jk} = \left[L_j(g_0) - L_j(g_k)\right]\frac{1 - (1 + r)^{-n}}{r}, \qquad \max \sum_j B_{j,k_j}\quad \text{s.t.}\quad \sum_j C_{j,k_j} \le \text{예산}$$<div class="where">시설마다 대안 하나씩을 고르는 다중 선택 배낭 문제다. 시설이 몇 개면 모든 조합을 따져 정확히 풀고, 많으면 증분 편익–비용 비, 동적 계획법, 정수 계획법을 쓴다. 각 대안의 편익–비용 비(B/C)만 보고 높은 순서로 고르면 예산이 남거나 더 큰 편익의 조합을 놓칠 수 있다. 이 장은 \(r\) = 4.5 %, \(n\) = 10년(연금 현가 계수 7.91), 아무것도 하지 않으면 현재 등급이 유지된다고 보는 교육용 단순화를 쓴다.</div></div></div>
+    <div class="table-wrap"><table class="mt-tbl">
+      <thead><tr><th>시설</th><th>현재 상태</th><th>대안: 보수(비용 → 결과)</th><th>대안: 보강·재시공</th><th>연간 손실 L(A·B·C·D·E), 억원/년</th></tr></thead>
+      <tbody>
+        <tr><td>B-130 교량</td><td>C(신축 이음 d, 받침 c)</td><td>이음·받침 교체, 재도장 8억 → B</td><td>+ 면진 받침·내진 보강 22억 → A, 지진 위험 −1.0억/년</td><td>0.2 · 0.5 · 1.6 · 4.5 · 12</td></tr>
+        <tr><td>TN-11 터널</td><td>C(라이닝 균열·누수)</td><td>균열 주입·배수 개선 5억 → B</td><td>라이닝 보강 + 방재 설비 개량 16억 → A</td><td>0.2 · 0.5 · 1.5 · 4.0 · 10</td></tr>
+        <tr><td>R-60 도로</td><td>D(포장 소성 변형, PSI 약 2.2)</td><td>절삭 덧씌우기 6억 → B</td><td>전면 재포장 + 배수 14억 → A</td><td>0.2 · 0.6 · 1.5 · 3.2 · 6</td></tr>
+      </tbody></table></div>
+    <p class="t-dim" style="font-size:14px;color:var(--text-dim)">표 16-1. 세 시설의 유지관리 대안(교육용 가정). 연간 손실은 상태별 파손·통행 제한 확률 × 피해와 사용자 비용(지체·차량 운행비)을 합한 값의 교육용 수치다.</p>
+    <div class="callout"><strong>예제 16.8 (예산 30억의 배분)</strong> 편익 \(B = \Delta L \times 7.91\).
+      <ol class="mt-steps">
+        <li><b>대안별 B/C.</b> B-130 보수 \((1.6 - 0.5) \times 7.91 = 8.7\)억, B/C 1.09 · 보강 \((1.6 - 0.2 + 1.0) \times 7.91 = 19.0\)억, 0.86 · TN-11 보수 7.9억, 1.58 · 보강 10.3억, 0.64 · R-60 보수 \((3.2 - 0.6) \times 7.91 = 20.6\)억, 3.43 · 재포장 23.7억, 1.70.</li>
+        <li><b>B/C 순으로 고르기.</b> 시설마다 B/C가 가장 큰 대안: R-60 보수(6) + TN-11 보수(5) + B-130 보수(8) = 19억, 편익 37.2억. 11억이 남는다.</li>
+        <li><b>최적 조합(전체 27가지 탐색).</b> R-60 재포장(14) + TN-11 보수(5) + B-130 보수(8) = 27억, <b>편익 40.4억</b>. R-60을 보수에서 재포장으로 올리는 증분 B/C = (23.7 − 20.6)/(14 − 6) = 0.40으로 1보다 작지만, 남은 예산으로 할 수 있는 일 가운데 가장 큰 편익이다.</li>
+        <li><b>판단.</b> 예산이 남으면 B/C가 1보다 작은 증분도 사회적으로 이득일 수 있고(편익 &gt; 0), 예산이 빠듯하면 B/C 순위가 거의 최적이다. B-130의 면진 보강은 편익이 크지만 비용도 커서 예산 22억 이상이 따로 있어야 선택된다. 실제 계획은 법정 등급 하한(D·E는 우선 조치)과 형평·안전 정책을 제약으로 더한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-mt-budget">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>시설별 예산 배분(우선순위)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="mt-cv-budget" aria-label="세 시설의 대안별 비용·편익 막대와 선택된 조합"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>올해 예산 <output id="mt-bg-B-out"></output></span><input type="range" id="mt-bg-B" min="0" max="60" step="1" value="30"></label>
+          <div class="ctrl"><span>B-130 현재 등급</span><div class="seg" id="mt-bg-g"><button data-value="2" class="on">C</button><button data-value="3">D</button></div></div>
+          <label class="ctrl"><span>지진 위험 감소(B-130 보강) <output id="mt-bg-eq-out"></output></span><input type="range" id="mt-bg-eq" min="0" max="3" step="0.1" value="1"></label>
+          <div class="ctrl"><span>선택 방법</span><div class="seg" id="mt-bg-m"><button data-value="opt" class="on">최적 조합</button><button data-value="bc">B/C 순위</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">선택</span><span class="v" id="mt-bg-sel">—</span></div>
+        <div class="stat"><span class="k">비용 / 예산</span><span class="v" id="mt-bg-cost">—</span></div>
+        <div class="stat"><span class="k">편익(10년 현재 가치)</span><span class="v" id="mt-bg-ben">—</span></div>
+        <div class="stat"><span class="k">B/C 순위 대비</span><span class="v" id="mt-bg-cmp">—</span></div>
+      </div>
+      <div class="mt-msg" id="mt-bg-msg"></div>
+      <div class="sim-note">해볼 것: 예산을 0에서 60억까지 올리며 선택이 바뀌는 순서를 보세요 · 예산 30억에서 "B/C 순위"와 "최적 조합"의 편익 차이를 비교하세요 · B-130이 D 등급이 되면 우선순위가 어떻게 바뀌는지 보세요 · 모델: 원리 16.8, 표 16-1(교육용), 3 × 3 = 27 조합 전수 탐색.</div>
+    </div>
+    <div class="callout site"><strong>B-130 · TN-11 · R-60 유지관리 계획 요약(교육용)</strong> <b>B-130</b>: 준공 25년 차 정밀점검 결함 지수 0.304 → C 등급(신축 이음 d, 받침·기초 c). 마르코프 예측으로 20년 차 바닥판의 22 %가 D 이하 → C 도달 시 예방 보수가 LCC 최적(r 4.5 %). 15장 세굴(국부 약 3.8 m) 때문에 기초는 수중 조사를 정밀점검에 포함한다. 1990년 이전 형태의 고정 받침 배치라면 면진 받침 교체로 교각 모멘트를 약 1/9로(예제 16.7). 상시 계측(진동수·온도)은 온도 보정 잔차로 강성 2 % 저하를 몇 주 안에 탐지한다(시뮬레이터). <b>TN-11</b>: 라이닝 균열·누수 C → 균열 주입·배수 개선(5억)이 B/C 1.58로 우선, 내공 변위·라이닝 응력 계측은 8장의 관리 기준을 잇는다. <b>R-60</b>: 포장 D(PSI 약 2.2, 13장) → 절삭 덧씌우기 B/C 3.43로 최우선, 예산이 허락하면 재포장. 올해 30억은 R-60 재포장 + TN-11 보수 + B-130 보수(27억, 편익 40.4억). 노후 강교 OB-30(이 장 예시)은 부식 20 %로 사용 한계 RF 0.82 → 재하 시험 보정(K 1.16) 후에도 0.95 → 외부 긴장 1,000 kN으로 RF 1.19. 모든 수치는 학습용이며 실제 관리는 시설물안전법과 세부지침, 현행 기준을 따른다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="bridge-loads.html"><small>CH.02 · 교량 하중과 이동 하중</small>평가 하중과 영향선 주사<br><span>트럭 주사, 충격 계수, 차로 하중.</span></a>
+      <a href="substructure.html"><small>CH.06 · 하부 구조와 받침</small>받침·신축 이음과 낙교 방지<br><span>면진 받침 교체 후 변위와 지지 길이.</span></a>
+      <a href="hydraulics.html"><small>CH.15 · 하천과 수공 구조물</small>세굴과 기초 점검<br><span>교각 세굴 깊이, 사석 보호공 유지.</span></a>
+      <a href="pavement.html"><small>CH.13 · 포장 설계</small>포장 상태 지수와 보수 시점<br><span>PSI 감소 곡선, 덧씌우기와 재포장.</span></a>
+      <a href="../../structure/chapters/assessment.html"><small>StructureBook · CH.16</small>안전 진단과 보강<br><span>재하 시험 판정, FRP 휨 보강, 내진 보강.</span></a>
+      <a href="../../materials/chapters/durability.html"><small>MaterialsBook · 내구성</small>탄산화와 염해<br><span>피복 두께, 확산 모델, 철근 부식 시작.</span></a>
+      <a href="../../materials/chapters/corrosion.html"><small>MaterialsBook · 부식과 방식</small>강교의 부식과 도장<br><span>대기 부식 d = Atⁿ, 방식과 생애 비용.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>기반 시설은 재료 열화·하중 증가·기준 강화로 성능 여유를 잃는다. 보수는 원래 성능으로, 보강은 그 이상으로 올린다. 성수대교(1994)를 계기로 시설물안전법이 정기·정밀점검과 정밀안전진단을 의무화했다.</li>
+      <li>상태 등급 A(우수)–E(불량). 부재 점수를 가중 평균한 결함 지수로 전체 등급을 매긴다(세부지침 형태). 등급이 낮을수록 점검 주기가 짧아진다. 값싼 부재(신축 이음)가 비싼 부재의 열화를 부른다.</li>
+      <li>마르코프 모형 x<sub>t+1</sub> = x<sub>t</sub>P로 상태 분포를 예측한다. 평균 체류 1/(1 − p). 관리는 평균이 아니라 D·E 꼬리 비율로 판단한다.</li>
+      <li>LCC = C<sub>0</sub> + Σ(유지·보수·사용자 비용)/(1 + r)<sup>t</sup>. 할인율이 높을수록 늦은 개입이 유리해지지만, E까지 방치하는 전략은 어느 할인율에서도 비싸다.</li>
+      <li>내하율 RF = (C − γ<sub>DC</sub>DC − γ<sub>DW</sub>DW)/(γ<sub>L</sub>L(1 + IM)), 설계 1.75·운용 1.35·법정 1.45(MBE 형태). 법정 RF &lt; 1이면 통행 제한 W(RF − 0.3)/0.7. 강 거더는 사용 한계(0.95F<sub>y</sub>)가 먼저 지배할 수 있다(OB-30: 부식 20 %에서 0.82).</li>
+      <li>재하 시험의 보정 계수 K<sub>s</sub> = (δ<sub>계산</sub>/δ<sub>측정</sub>)((1 + i<sub>계산</sub>)/(1 + i<sub>측정</sub>)) 또는 K = 1 + K<sub>a</sub>K<sub>b</sub>. 잔류 처짐이 크거나 측정이 계산보다 크면 보정하지 않는다.</li>
+      <li>외부 긴장은 고정하중 응력까지 줄이고(OB-30: 1,000 kN → −52 MPa, RF 0.82 → 1.19), FRP 판은 붙인 뒤의 활하중 응력만 줄인다. 면진 받침 교체는 주기를 늘리고 감쇠를 더해 교각 지진력을 크게 줄이는 대신 받침 변위를 키운다.</li>
+      <li>계측 자료는 온도 회귀로 환경 영향을 빼야 작은 손상이 보인다(잔차 이동 평균의 ±3σ/√m 관리도). 예산 배분은 시설별 B/C 순위가 아니라 예산 제약 아래 편익 합을 최대로 하는 조합으로 정한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 시설물안전법 형태의 상태 등급에서 "주요 부재에 결함이 있어 긴급한 보수·보강이 필요하고 사용 제한 여부를 판단해야 하는 상태"는?</p><div class="opts">
+        <button class="opt">B</button><button class="opt">C</button><button class="opt" data-correct>D</button><button class="opt">E</button>
+      </div><div class="quiz-exp">D(미흡)이다. E(불량)는 심각한 결함으로 즉시 사용을 금지하고 보강·개축해야 하는 상태, C(보통)는 안전에는 지장이 없으나 내구성·기능 저하 방지를 위한 보수가 필요한 상태다.</div></div>
+      <div class="quiz-q"><p>2. 마르코프 열화 모형에서 상태 C에 머무를 연간 확률이 0.90이면 C에 머무는 평균 기간은?</p><div class="opts">
+        <button class="opt">0.9년</button><button class="opt">9년</button><button class="opt" data-correct>10년</button><button class="opt">90년</button>
+      </div><div class="quiz-exp">기하 분포의 평균 1/(1 − p) = 1/0.1 = 10년.</div></div>
+      <div class="quiz-q"><p>3. 20년 뒤의 보수비 10억의 현재 가치(할인율 4.5 %)는 약?</p><div class="opts">
+        <button class="opt" data-correct>4.1억</button><button class="opt">5.5억</button><button class="opt">8.2억</button><button class="opt">10억</button>
+      </div><div class="quiz-exp">10/1.045<sup>20</sup> = 10/2.41 = 4.15억. 할인율이 높을수록 먼 미래의 비용이 작아 보여 개입을 미루는 쪽이 유리해진다.</div></div>
+      <div class="quiz-q"><p>4. C = 9,000 kN·m, DC = 2,000 kN·m, DW = 400 kN·m, L(1 + IM) = 3,000 kN·m일 때 운용 수준(γ<sub>L</sub> = 1.35) 내하율은? (γ<sub>DC</sub> 1.25, γ<sub>DW</sub> 1.5)</p><div class="opts">
+        <button class="opt">1.02</button><button class="opt">1.12</button><button class="opt" data-correct>1.46</button><button class="opt">2.00</button>
+      </div><div class="quiz-exp">(9,000 − 2,500 − 600)/(1.35 × 3,000) = 5,900/4,050 = 1.46. 같은 단면을 설계 수준(1.75)으로 평가하면 1.12다.</div></div>
+      <div class="quiz-q"><p>5. 법정 하중 내하율이 0.8, 평가 트럭 무게가 510 kN일 때 MBE 형태의 통행 제한 하중은?</p><div class="opts">
+        <button class="opt">255 kN</button><button class="opt" data-correct>364 kN</button><button class="opt">408 kN</button><button class="opt">510 kN</button>
+      </div><div class="quiz-exp">W(RF − 0.3)/0.7 = 510 × 0.5/0.7 = 364 kN(약 37 tf). RF가 0.3 미만이면 통행 금지를 검토한다.</div></div>
+      <div class="quiz-q"><p>6. 재하 시험에서 계산 처짐 12 mm, 측정 처짐 10 mm, 잔류 처짐은 거의 0이었다. 충격 보정을 빼면 응답 보정 계수와 뜻은?</p><div class="opts">
+        <button class="opt">0.83 — 교량이 계산보다 약하다</button><button class="opt" data-correct>1.20 — 교량이 계산보다 강성이 커 내하력을 올려 평가할 수 있다</button><button class="opt">1.20 — 잔류 처짐이 있어 보정할 수 없다</button><button class="opt">2.0 — 하중을 두 배로 올려도 된다</button>
+      </div><div class="quiz-exp">δ<sub>계산</sub>/δ<sub>측정</sub> = 12/10 = 1.2. 다만 받침 마찰·비구조 합성처럼 큰 하중에서 사라질 수 있는 원인이면 MBE 형태처럼 K<sub>b</sub>로 이익을 줄인다.</div></div>
+      <div class="quiz-q"><p>7. 고정하중 응력이 이미 큰 강 거더를 보강할 때 외부 긴장이 FRP 판보다 효과적인 이유는?</p><div class="opts">
+        <button class="opt">FRP는 강재에 붙지 않기 때문</button><button class="opt" data-correct>긴장력은 이미 작용 중인 고정하중 응력까지 상쇄하지만, 부착 보강재는 붙인 뒤의 하중만 분담하기 때문</button><button class="opt">외부 긴장은 단면 2차 모멘트를 크게 키우기 때문</button><button class="opt">FRP는 인장에 약하기 때문</button>
+      </div><div class="quiz-exp">외부 긴장은 하부 플랜지에 −P/A − Pey/I의 압축을 넣어 기존 응력을 직접 줄인다. FRP 판은 붙인 순간의 응력을 그대로 두고 이후 하중의 응력만 단면 증가 비율만큼 줄인다(예제 16.6: RF 1.19 vs 0.88).</div></div>
+      <div class="quiz-q"><p>8. 교량 고유 진동수 계측에서 온도 보정 회귀를 하는 주된 이유는?</p><div class="opts">
+        <button class="opt">센서의 전기 잡음을 없애기 위해</button><button class="opt">진동수를 더 정확히 계산하기 위해</button><button class="opt" data-correct>계절 온도 변화에 따른 진동수 변동이 손상 신호보다 커서 손상을 가리기 때문</button><button class="opt">온도가 높을수록 손상이 커지기 때문</button>
+      </div><div class="quiz-exp">강성 2 % 저하는 진동수 약 1 % 감소지만 온도로 인한 연간 변동은 몇 %다. 온도로 설명되는 몫을 빼고 남은 잔차를 관리도로 보면 작은 손상도 탐지된다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const MT = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${MT.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = MT._c || (MT._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  msg(id, html, cls) { const m = document.getElementById(id); if (!m) return; m.className = "mt-msg" + (cls ? " " + cls : ""); m.innerHTML = html; },
+  GR: ["A", "B", "C", "D", "E"],
+  gradeColor(i) { const P = CB.palette(); return [P.ok, P.accent, P.warn, P.accent2, P.bad][i]; },
+  /** 마르코프 머무름 확률(교육용), 배율 k */
+  P: [0.93, 0.92, 0.90, 0.86],
+  stay(k) { return MT.P.map((p) => CB.clamp(1 - k * (1 - p), 0, 1)); },
+  /** OB-30 교육용 노후 강합성 거더(단위 mm, MPa, kN·m) */
+  OB: { L: 30, Fy: 235, fck: 24, n: 8, Es: 200000 },
+  obSections(loss = 0, tfrp = 0) {
+    const tb = 28 * (1 - loss), bb = 500, hw = 1500, tw = 12, bf = 360, tf = 22, hc = 50, ts = 200, beff = 2200, n = MT.OB.n;
+    const steel = [{ x: -bb / 2, y: 0, b: bb, h: tb }, { x: -tw / 2, y: tb, b: tw, h: hw }, { x: -bf / 2, y: tb + hw, b: bf, h: tf }];
+    const H = tb + hw + tf, deck = { x: -beff / 2, y: H + hc, b: beff, h: ts };
+    const frp = tfrp > 0 ? [{ x: -200, y: -tfrp, b: 400, h: tfrp, n: 165 / 200 }] : [];
+    return { steel, deck, H, tb, s: CB.section.rects(steel), c3: CB.section.rects([...steel, { ...deck, n: 1 / (3 * n) }]), c: CB.section.rects([...steel, { ...deck, n: 1 / n }]), cf: CB.section.rects([...steel, { ...deck, n: 1 / n }, ...frp]), frp };
+  },
+  /** 합성 단면 소성 모멘트(kN·m): 얇은 띠 수치 적분, 콘크리트 0.85fck 압축만 */
+  obMp(loss = 0) {
+    const S = MT.obSections(loss), Fy = MT.OB.Fy, fc = 0.85 * MT.OB.fck, d = { y0: S.deck.y, y1: S.deck.y + S.deck.h, b: S.deck.b }, st = S.steel.map((r) => ({ y0: r.y, y1: r.y + r.h, b: r.b }));
+    const comp = (y) => fc * d.b * Math.max(0, d.y1 - Math.max(y, d.y0)) + st.reduce((s, r) => s + Fy * r.b * Math.max(0, r.y1 - Math.max(y, r.y0)), 0);
+    const ten = (y) => st.reduce((s, r) => s + Fy * r.b * Math.max(0, Math.min(y, r.y1) - r.y0), 0);
+    let lo = 0, hi = d.y1; for (let i = 0; i < 70; i++) { const m = (lo + hi) / 2; if (comp(m) > ten(m)) lo = m; else hi = m; }
+    const yp = (lo + hi) / 2; let M = 0; const add = (f, a, b, w) => { if (b > a) M += f * w * (b - a) * Math.abs((a + b) / 2 - yp); };
+    add(fc, Math.max(yp, d.y0), d.y1, d.b); st.forEach((r) => { add(Fy, Math.max(yp, r.y0), r.y1, r.b); add(Fy, r.y0, Math.min(yp, r.y1), r.b); });
+    return M / 1e6;
+  },
+  obLoads() {
+    if (MT._ld) return MT._ld; const L = MT.OB.L, C = CB.civ, im = C.impact(L), tr = C.truckScan(L, C.ilSimple(L, "M", L / 2)).max, lane = (C.TRUCK.lane * L * L) / 8;
+    return (MT._ld = { DC1: (15 * L * L) / 8, DC2: (1.5 * L * L) / 8, DW: (4.05 * L * L) / 8, LL: 0.6 * (tr * (1 + im) + lane), tr, im, lane });
+  },
+  /** 하부 플랜지(강재 밑면 y = 0) 응력, 인장 + */
+  obStress(loss = 0, P = 0, yt = 150, tfrp = 0, ll = 1) {
+    const S = MT.obSections(loss, tfrp), Ld = MT.obLoads(), fb = (sec, M) => (M * 1e6 * sec.cy) / sec.Ix;
+    const fD = fb(S.s, Ld.DC1) + fb(S.c3, Ld.DC2 + Ld.DW), fL = fb(S.cf, Ld.LL * ll), e = S.c.cy - yt;
+    const fp = -((P * 1e3) / S.c.A + (P * 1e3 * e * S.c.cy) / S.c.Ix);
+    const fpTop = (-(P * 1e3) / S.c.A + (P * 1e3 * e * (S.c.ymax - S.c.cy)) / S.c.Ix) / MT.OB.n;
+    const lim = 0.95 * MT.OB.Fy; return { S, fD, fL, fp, fpTop, lim, rf: (lim - fD - fp) / (1.3 * fL), e };
+  },
+};
+
+/* ---------- 1. B-130 3D 상태 평가 ---------- */
+(function () {
+  const PARTS = { deck: ["바닥판", 20, true], girder: ["거더", 20, true], pier: ["교각·교대", 20, true], found: ["기초·세굴", 12, true], bearing: ["받침", 10, false], pave: ["포장·배수", 10, false], joint: ["신축 이음", 8, false] };
+  const SC = { a: 0.1, b: 0.2, c: 0.4, d: 0.7, e: 1.0 }, EX = { deck: "b", girder: "b", pier: "b", found: "c", bearing: "c", pave: "c", joint: "d" };
+  let G = { ...EX };
+  const gs = CB.seg("mt-in-grade", (v) => { G[part()] = v; go(); });
+  const part = CB.seg("mt-in-part", (v) => { gs.set(G[v], false); go(); });
+  document.getElementById("mt-in-reset").addEventListener("click", () => { G = { ...EX }; gs.set(G[part()], false); go(); });
+  document.getElementById("mt-in-new").addEventListener("click", () => { Object.keys(G).forEach((k) => (G[k] = "a")); gs.set("a", false); go(); });
+  const gi = (k) => "abcde".indexOf(G[k]);
+  const view = CB.orbit("#mt-cv-inspect", { yaw: -0.6, pitch: 0.38, dist: 165, target: [65, 0, 6], aspect: 0.58, draw(V) {
+    const P = V.P, faces = [], sel = part();
+    const col = (k) => MT.gradeColor(gi(k));
+    const add = (pts, k, extra = {}) => faces.push({ pts, k, d: V.depth(pts), ...extra });
+    const box = (x0, x1, y0, y1, z0, z1, k) => { [[[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]]].forEach((f) => add(f, k)); };
+    add([[-10, -14, 0], [140, -14, 0], [140, 14, 0], [-10, 14, 0]], null, { fill: MT.alpha(P.warn, 0.1) });
+    [40, 90].forEach((xp) => { box(xp - 2.5, xp + 2.5, -3, 3, -1.5, 0, "found"); const n = 8; for (let i = 0; i < n; i++) { const a = (i / n) * 2 * Math.PI, b = ((i + 1) / n) * 2 * Math.PI; add([[xp + Math.cos(a), Math.sin(a), 0], [xp + Math.cos(b), Math.sin(b), 0], [xp + Math.cos(b), Math.sin(b), 8.6], [xp + Math.cos(a), Math.sin(a), 8.6]], "pier"); } box(xp - 1.2, xp + 1.2, -5.5, 5.5, 8.6, 9.7, "pier"); });
+    box(-3, 0, -6, 6, 0, 10, "pier"); box(130, 133, -6, 6, 0, 10, "pier");
+    [0, 40, 90, 130].forEach((xs) => [-4.2, -1.4, 1.4, 4.2].forEach((y) => box(xs - 0.4, xs + 0.4, y - 0.4, y + 0.4, 9.7, 10, "bearing")));
+    [-4.2, -1.4, 1.4, 4.2].forEach((y) => add([[0, y, 10], [130, y, 10], [130, y, 12.2], [0, y, 12.2]], "girder"));
+    box(0, 130, -5.5, 5.5, 12.2, 12.44, "deck");
+    add([[0.3, -4.8, 12.47], [129.7, -4.8, 12.47], [129.7, 4.8, 12.47], [0.3, 4.8, 12.47]], "pave");
+    [[-0.2, 0.3], [129.7, 130.2]].forEach(([a, b]) => add([[a, -5.5, 12.5], [b, -5.5, 12.5], [b, 5.5, 12.5], [a, 5.5, 12.5]], "joint"));
+    faces.sort((a, b) => b.d - a.d).forEach((f) => { const c = f.k ? col(f.k) : null, on = f.k === sel; V.poly3(f.pts, { fill: f.fill || MT.alpha(c, on ? 0.75 : 0.42), fillAlpha: 1, color: on ? P.text : c || P.faint, alpha: on ? 0.9 : 0.5, width: on ? 1.6 : 1 }); });
+    V.text3("P1", [40, -7, 9.5], { color: P.dim, size: 11 }); V.text3("P2", [90, -7, 9.5], { color: P.dim, size: 11 });
+    V.text3(PARTS[sel][0] + " " + G[sel], [65, 0, 18], { color: col(sel), size: 13, bold: true });
+  } });
+  function go() {
+    let sw = 0, sum = 0, worst = null, wv = -1, eMain = false;
+    Object.keys(PARTS).forEach((k) => { const w = PARTS[k][1], s = SC[G[k]]; sw += w; sum += w * s; if (w * s > wv) { wv = w * s; worst = k; } if (PARTS[k][2] && G[k] === "e") eMain = true; });
+    const D = sum / sw; let gi2 = D < 0.13 ? 0 : D < 0.26 ? 1 : D < 0.49 ? 2 : D < 0.79 ? 3 : 4; if (eMain) gi2 = 4;
+    const NEXT = ["3년 1회", "2년 1회", "2년 1회", "1년 1회", "1년 1회"];
+    CB.stat("mt-in-D", CB.num(D, 3)); CB.stat("mt-in-G", `<span class="mt-grade" style="color:${MT.gradeColor(gi2)}">${MT.GR[gi2]}</span>${eMain ? " (주요 부재 e)" : ""}`);
+    CB.stat("mt-in-worst", `${PARTS[worst][0]} (${CB.num((100 * wv) / sum, 0)} %)`); CB.stat("mt-in-next", NEXT[gi2]);
+    MT.msg("mt-in-msg", gi2 >= 3 ? `<b>${MT.GR[gi2]} 등급</b>: ${gi2 === 4 ? "즉시 사용 제한·긴급 보강 검토" : "긴급 보수·보강, 사용 제한 여부 판단"}(형태). 가장 큰 기여: ${PARTS[worst][0]}.` : `<b>${MT.GR[gi2]} 등급</b>(결함 지수 ${CB.num(D, 3)}). ${gi2 === 2 ? "보수 계획을 세우고 점검 주기를 지킵니다." : "정상 관리."} 가장 큰 기여: ${PARTS[worst][0]}.`, gi2 >= 3 ? "bad" : gi2 <= 1 ? "ok" : "");
+    view.redraw();
+  }
+  go();
+})();
+
+/* ---------- 2. 마르코프 예측 ---------- */
+(function () {
+  const gk = CB.range("mt-mk-k", (v) => "× " + v.toFixed(2), go), pol = CB.seg("mt-mk-pol", go), gt = CB.range("mt-mk-t", (v) => v + "년", go);
+  let H = null;
+  function sim() {
+    const p = MT.stay(gk()), Y = 60, out = [[1, 0, 0, 0, 0]], act = []; let x = [1, 0, 0, 0, 0];
+    for (let t = 1; t <= Y; t++) {
+      const o = [0, 0, 0, 0, 0]; for (let i = 0; i < 4; i++) { o[i] += x[i] * p[i]; o[i + 1] += x[i] * (1 - p[i]); } o[4] += x[4];
+      let a = 0; if (pol() === "D") { a = o[3] + o[4]; o[1] += a; o[3] = 0; o[4] = 0; } else if (pol() === "C") { a = o[2] + o[3] + o[4]; o[0] += a; o[2] = o[3] = o[4] = 0; }
+      x = o; out.push(o); act.push(a);
+    }
+    H = { out, act };
+  }
+  const cv = CB.canvas("#mt-cv-markov", (ctx, W, Hh) => {
+    if (!H) return; const pal = CB.palette();
+    const C = CB.chart(ctx, { x: 52, y: 14, w: W - 52 - 44, h: Hh - 14 - 46 }, { x: [-0.5, 60.5], y: [0, 1], xLabel: "경과 연수 t", yLabel: "상태 비율", yFmt: (v) => Math.round(v * 100) + "%", series: [] });
+    const bw = Math.max(1, (C.X(1) - C.X(0)) * 0.86);
+    H.out.forEach((d, t) => { let acc = 0; d.forEach((v, i) => { if (v <= 0) return; ctx.fillStyle = MT.alpha(MT.gradeColor(i), t === gt() ? 0.95 : 0.6); ctx.fillRect(C.X(t) - bw / 2, C.Y(acc + v), bw, C.Y(acc) - C.Y(acc + v)); acc += v; }); });
+    const mean = H.out.map((d, t) => [C.X(t), C.Y((d.reduce((s, v, i) => s + v * i, 0)) / 4)]);
+    MT.line(ctx, mean, pal.text, 2.2);
+    ctx.save(); ctx.font = "11px " + MT.mono(); ctx.fillStyle = pal.dim; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    MT.GR.forEach((g, i) => ctx.fillText(g, C.X(60) + 12, C.Y(i / 4))); ctx.restore();
+    MT.text(ctx, "평균 등급(검정 선, 오른쪽 눈금)", C.X(31), C.Y(0.06), pal.text, { align: "left", size: 10.5 });
+    MT.line(ctx, [[C.X(gt()), C.Y(0)], [C.X(gt()), C.Y(1)]], pal.text, 1, [3, 3]);
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.5), minHeight: 260, maxHeight: 360 });
+  function go() {
+    sim(); cv.redraw();
+    const d = H.out[gt()], mean = d.reduce((s, v, i) => s + v * (i + 1), 0), avgAct = H.act.slice(0, Math.max(1, gt())).reduce((s, v) => s + v, 0) / Math.max(1, gt());
+    CB.stat("mt-mk-dist", d.map((v) => Math.round(v * 100)).join(" · ")); CB.stat("mt-mk-mean", `${CB.num(mean, 2)} (${MT.GR[Math.min(4, Math.round(mean) - 1)]})`);
+    CB.stat("mt-mk-bad", CB.num((d[3] + d[4]) * 100, 1) + " %"); CB.stat("mt-mk-act", pol() === "none" ? "—" : CB.num(avgAct * 100, 1) + " %/년");
+  }
+  go();
+})();
+
+/* ---------- 3. LCC ---------- */
+(function () {
+  const gr = CB.range("mt-lc-r", (v) => (v * 100).toFixed(2) + " %", go), gc = CB.range("mt-lc-c", (v) => v.toFixed(1), go), gu = CB.range("mt-lc-u", (v) => "× " + v.toFixed(2), go), gk = CB.range("mt-lc-k", (v) => "× " + v.toFixed(2), go), pol = CB.seg("mt-lc-pol", go);
+  const USER = [0, 0.02, 0.15, 0.6, 2.5], Y = 60;
+  let R = null;
+  function lcc(th) {
+    const p = MT.stay(gk()), cost = [0, 4, gc(), 12, 40], r = gr(), u = gu(); let x = [1, 0, 0, 0, 0], pa = 0, pu = 0; const cum = [[0, 0]];
+    for (let t = 1; t <= Y; t++) {
+      const o = [0, 0, 0, 0, 0]; for (let i = 0; i < 4; i++) { o[i] += x[i] * p[i]; o[i + 1] += x[i] * (1 - p[i]); } o[4] += x[4];
+      let a = 0; for (let i = th; i < 5; i++) { a += o[i] * cost[i]; o[0] += o[i]; o[i] = 0; }
+      const uc = o.reduce((s, v, i) => s + v * USER[i] * u, 0), df = Math.pow(1 + r, -t);
+      pa += a * df; pu += uc * df; x = o; cum.push([t, pa + pu]);
+    }
+    return { pv: pa + pu, pa, pu, cum };
+  }
+  const cv = CB.canvas("#mt-cv-lcc", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), top = Math.max(...R.map((x) => x.pv)) * 1.1 || 1, colors = [pal.accent, pal.ok, pal.accent2, pal.bad];
+    CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 70, h: H - 14 - 46 }, { x: [0, Y], y: [0, top], xLabel: "경과 연수", yLabel: "누적 LCC(현재 가치)", series: R.map((x, i) => ({ data: x.cum, color: colors[i], width: i + 1 === +pol() ? 3 : 1.4, dash: i + 1 === +pol() ? [] : [5, 4] })) });
+    const lab = R.map((x, i) => ({ i, y: 14 + (H - 60) * (1 - x.pv / top) })).sort((a, b) => a.y - b.y); for (let k = 1; k < lab.length; k++) lab[k].y = Math.max(lab[k].y, lab[k - 1].y + 15);
+    lab.forEach(({ i, y }) => MT.text(ctx, "BCDE"[i] + " " + CB.num(R[i].pv, 2), W - 66, y, colors[i], { align: "left", size: 11 }));
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.5), minHeight: 260, maxHeight: 360 });
+  function go() {
+    R = [1, 2, 3, 4].map(lcc); cv.redraw();
+    const bi = R.reduce((b, x, i) => (x.pv < R[b].pv ? i : b), 0), s = R[+pol() - 1];
+    CB.stat("mt-lc-all", R.map((x) => CB.num(x.pv, 2)).join(" · ")); CB.stat("mt-lc-best", `${"BCDE"[bi]}에서 개입`); CB.stat("mt-lc-split", `${CB.num(s.pa, 2)} + ${CB.num(s.pu, 2)}`);
+    MT.msg("mt-lc-msg", `r = ${CB.num(gr() * 100, 2)} %: 최적은 <b>${"BCDE"[bi]} 등급 도달 시 개입</b>(LCC ${CB.num(R[bi].pv, 2)}). E까지 방치하면 최적의 ${CB.num(R[3].pv / R[bi].pv, 1)}배. ${bi <= 1 ? "예방 보수가 유리한 조건입니다." : "할인율·비용 조건이 늦은 개입을 허용합니다 — 단, 등급 하한(D·E 조치) 규정은 별도입니다."}`, bi === 3 ? "bad" : "");
+  }
+  go();
+})();
+
+/* ---------- 4. 내하율 ---------- */
+(function () {
+  const gl = CB.range("mt-rt-loss", (v) => v + " %", go), lvl = CB.seg("mt-rt-lvl", go), gll = CB.range("mt-rt-ll", (v) => "× " + v.toFixed(2), go), gks = CB.range("mt-rt-ks", (v) => v.toFixed(2), go);
+  const W = 510, Ld = MT.obLoads();
+  const rfStr = (loss, g) => (MT.obMp(loss) - 1.25 * (Ld.DC1 + Ld.DC2) - 1.5 * Ld.DW) / (g * Ld.LL * gll());
+  const rfSv = (loss) => MT.obStress(loss, 0, 150, 0, gll()).rf;
+  let curve = null;
+  const cv = CB.canvas("#mt-cv-rating", (ctx, Wc, H) => {
+    if (!curve) return; const pal = CB.palette(), ks = gks();
+    const top = Math.max(2, ...curve.map((c) => c[1] * ks)) * 1.05;
+    CB.chart(ctx, { x: 52, y: 14, w: Wc - 52 - 16, h: H - 14 - 46 }, { x: [0, 50], y: [0, top], xLabel: "하부 플랜지 두께 손실 (%)", yLabel: "RF × Ks",
+      series: [{ data: curve.map((c) => [c[0], c[1] * ks]), color: pal.accent, width: 2.4 }, { data: curve.map((c) => [c[0], c[2] * ks]), color: pal.accent2, width: 2.4 }],
+      hlines: [{ y: 1, color: pal.bad, label: "RF = 1" }, { y: 0.3, color: pal.faint, label: "0.3" }], vlines: [{ x: gl(), color: pal.text, label: "" }],
+      points: [{ x: gl(), y: rfStr(gl() / 100, +lvl()) * ks, color: pal.accent, r: 6 }, { x: gl(), y: rfSv(gl() / 100) * ks, color: pal.accent2, r: 6 }] });
+    MT.text(ctx, "강도(선택 수준)", 64, 26, pal.accent, { align: "left", size: 11 }); MT.text(ctx, "사용 한계(0.95Fy)", 64, 44, pal.accent2, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.5), minHeight: 260, maxHeight: 340 });
+  function go() {
+    curve = []; for (let l = 0; l <= 50; l += 2) curve.push([l, rfStr(l / 100, +lvl()), rfSv(l / 100)]);
+    cv.redraw();
+    const loss = gl() / 100, ks = gks(), rs = rfStr(loss, +lvl()), rv = rfSv(loss), legal = Math.min(rfStr(loss, 1.45), rv) * ks;
+    CB.stat("mt-rt-rf", `${CB.num(rs, 2)} (M<sub>p</sub> ${CB.sig(MT.obMp(loss), 4)})`); CB.stat("mt-rt-rfs", CB.num(rv, 2)); CB.stat("mt-rt-gov", CB.num(legal, 2));
+    let post, cls;
+    if (legal >= 1) { post = "없음"; cls = "ok"; } else if (legal >= 0.3) { post = CB.num((W / 0.7) * (legal - 0.3), 0) + " kN"; cls = "bad"; } else { post = "통행 금지"; cls = "bad"; }
+    CB.stat("mt-rt-post", post);
+    MT.msg("mt-rt-msg", legal >= 1 ? `법정 하중 평가(강도 1.45와 사용 한계 중 작은 값) × K<sub>s</sub> = ${CB.num(legal, 2)} ≥ 1 — <b>통행 제한 불필요</b>.` : legal >= 0.3 ? `지배 RF ${CB.num(legal, 2)} &lt; 1 (${rv < rfStr(loss, 1.45) ? "사용 한계 지배" : "강도 지배"}) — <b>통행 제한 ${post}</b>(약 ${CB.num(((W / 0.7) * (legal - 0.3)) / 9.81, 0)} tf, MBE 형태). 보수·보강 또는 재하 시험으로 확인합니다.` : `지배 RF ${CB.num(legal, 2)} &lt; 0.3 — <b>통행 금지 검토</b>.`, cls);
+  }
+  go();
+})();
+
+/* ---------- 5. 재하 시험 ---------- */
+(function () {
+  const gw = CB.range("mt-lt-w", (v) => v + " kN", go), gm = CB.range("mt-lt-dm", (v) => v.toFixed(1) + " mm", go), gr = CB.range("mt-lt-dr", (v) => v.toFixed(2) + " mm", go), gi = CB.range("mt-lt-im", (v) => v.toFixed(2), go), gl = CB.range("mt-lt-loss", (v) => v + " %", go);
+  const L = MT.OB.L, DF = 0.6;
+  let R = null;
+  function calc() {
+    const S = MT.obSections(gl() / 100), EI = (MT.OB.Es * 1e3 * S.c.Ix) / 1e12, k = gw() / 250, ax = [[0, 60], [3.5, 95], [4.8, 95]], xr = (3.5 * 95 + 4.8 * 95) / 250, front = L / 2 + xr;
+    const b = CB.beam({ L, supports: [{ x: 0, type: "pin" }, { x: L, type: "roller" }], EI, loads: ax.map(([x, P]) => ({ type: "point", P: P * k, a: front - x })) });
+    const pts = []; for (let x = 0; x <= L + 1e-9; x += 0.5) pts.push([x, -b.at(x).v * 1000 * DF]);
+    R = { pts, dc: -b.at(L / 2).v * 1000 * DF, EI };
+  }
+  const cv = CB.canvas("#mt-cv-loadtest", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), m = Math.max(R.dc, gm()) * 1.25;
+    const C = CB.chart(ctx, { x: 52, y: 14, w: W - 52 - 16, h: H - 14 - 46 }, { x: [0, L], y: [-m, 0.5], xLabel: "경간 위치 x (m)", yLabel: "처짐 (mm, 아래 −)", series: [{ data: R.pts.map(([x, v]) => [x, -v]), color: pal.accent, width: 2.4 }, { data: R.pts.map(([x, v]) => [x, (-v * gm()) / R.dc]), color: pal.accent2, width: 1.4, dash: [5, 4] }],
+      points: [{ x: L / 2, y: -gm(), color: pal.accent2, r: 7 }, { x: L / 2, y: -R.dc, color: pal.accent, r: 5 }] });
+    MT.text(ctx, `계산 ${CB.num(R.dc, 1)} mm`, C.X(L / 2) + 10, C.Y(-R.dc) + 14, pal.accent, { align: "left", size: 11 });
+    MT.text(ctx, `측정 ${CB.num(gm(), 1)} mm`, C.X(L / 2) - 10, C.Y(-gm()) + 14, pal.accent2, { align: "right", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 240, maxHeight: 320 });
+  function go() {
+    calc(); cv.redraw();
+    const ratio = R.dc / gm(), res = gr() / gm(), ic = 1 + CB.civ.impact(L), ks = ratio * (ic / gi()), TW = gw() / CB.civ.TRUCK.axles.reduce((s, a) => s + a.P, 0), Kb = TW < 0.4 ? 0 : TW <= 0.7 ? 0.8 : 1.0, K = 1 + (ratio - 1) * Kb;
+    CB.stat("mt-lt-dc", CB.num(R.dc, 2) + " mm"); CB.stat("mt-lt-ratio", `${CB.num(ratio, 2)} · ${CB.num(res * 100, 1)} %`); CB.stat("mt-lt-ks", CB.num(ks, 2)); CB.stat("mt-lt-k", `${CB.num(K, 2)} (${CB.num(TW, 2)}, K<sub>b</sub> ${Kb})`);
+    const rfs = MT.obStress(gl() / 100).rf;
+    if (res > 0.1) MT.msg("mt-lt-msg", `잔류 처짐이 최대 처짐의 ${CB.num(res * 100, 0)} % — 비탄성 거동 의심, <b>보정하지 않음</b>(교육용 기준 10 %). 원인 조사(정밀안전진단)가 먼저입니다.`, "bad");
+    else if (ratio < 1) MT.msg("mt-lt-msg", `측정 처짐이 계산보다 큽니다(비 ${CB.num(ratio, 2)}) — 계산에 넣지 않은 손상·강성 저하가 있을 수 있습니다. 보정 계수 &lt; 1로 내하력을 <b>낮춰</b> 평가하고 원인을 찾습니다.`, "bad");
+    else MT.msg("mt-lt-msg", `탄성 거동(잔류 ${CB.num(res * 100, 1)} %). 보수적으로 MBE 형태 K = ${CB.num(K, 2)}를 쓰면 이 단면의 사용 한계 RF ${CB.num(rfs, 2)} → <b>${CB.num(rfs * K, 2)}</b>. 국내 형태 K<sub>s</sub> = ${CB.num(ks, 2)}는 충격 비(${CB.num(ic, 3)}/${CB.num(gi(), 2)})를 포함합니다.`, rfs * K >= 1 ? "ok" : "");
+  }
+  go();
+})();
+
+/* ---------- 6. 보강 효과 ---------- */
+(function () {
+  const gl = CB.range("mt-sg-loss", (v) => v + " %", go), gP = CB.range("mt-sg-P", (v) => v + " kN", go), ge = CB.range("mt-sg-ep", (v) => v + " mm", go), gt = CB.range("mt-sg-tf", (v) => v.toFixed(1) + " mm", go), gll = CB.range("mt-sg-ll", (v) => "× " + v.toFixed(2), go);
+  let R = null;
+  const cv = CB.canvas("#mt-cv-strengthen", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), narrow = W < 560, S = R.S;
+    const box = narrow ? { x: 10, y: 10, w: W - 20, h: H * 0.5 - 16 } : { x: 10, y: 14, w: W * 0.42, h: H - 28 };
+    const rects = [...S.steel.map((r) => ({ ...r })), { ...S.deck, fill: MT.alpha(pal.dim, 0.25) }, ...S.frp.map((r) => ({ ...r, n: 1, fill: pal.text }))];
+    const sec = CB.section.rects(rects.map((r) => ({ x: r.x, y: r.y, b: r.b, h: r.h, n: 1, fill: r.fill })));
+    const T = CB.drawSection(ctx, sec, box, { centroid: false, fit: 0.9 });
+    MT.line(ctx, [[T.X(-1150), T.Y(S.c.cy)], [T.X(1150), T.Y(S.c.cy)]], pal.accent2, 1.2, [5, 4]);
+    MT.text(ctx, "중립축(n 합성)", T.X(400), T.Y(S.c.cy) - 10, pal.accent2, { size: 10.5, align: "left" });
+    if (gP() > 0) { ctx.fillStyle = pal.accent; [-1, 1].forEach((s) => { ctx.beginPath(); ctx.arc(T.X(s * 300), T.Y(ge()), 5, 0, 7); ctx.fill(); }); MT.text(ctx, `P ${gP()} kN`, T.X(320), T.Y(ge()) + (ge() < 0 ? 12 : -12), pal.accent, { size: 10.5, align: "left" }); }
+    // 응력 막대
+    const B = narrow ? { x: 60, y: H * 0.5 + 10, w: W - 80, h: H * 0.5 - 30 } : { x: W * 0.5 + 40, y: 20, w: W * 0.5 - 60, h: H - 50 };
+    const items = [["고정", R.fD, pal.dim], ["긴장", R.fp, pal.accent], ["1.3 × 활", 1.3 * R.fL, pal.accent2], ["합계", R.fD + R.fp + 1.3 * R.fL, R.fD + R.fp + 1.3 * R.fL > R.lim ? pal.bad : pal.ok]];
+    const vmax = Math.max(R.lim * 1.15, ...items.map((i) => i[1])), vmin = Math.min(0, ...items.map((i) => i[1])) * 1.5, Y = (v) => B.y + B.h * (1 - (v - vmin) / (vmax - vmin)), bw = B.w / items.length;
+    MT.line(ctx, [[B.x, Y(0)], [B.x + B.w, Y(0)]], pal.axis, 1);
+    MT.line(ctx, [[B.x, Y(R.lim)], [B.x + B.w, Y(R.lim)]], pal.bad, 1.4, [5, 4]); MT.text(ctx, `0.95Fy = ${CB.num(R.lim, 0)}`, B.x + B.w, Y(R.lim) - 9, pal.bad, { align: "right", size: 10.5 });
+    items.forEach(([lab, v, c], i) => { const x = B.x + i * bw + bw * 0.2; ctx.fillStyle = MT.alpha(c, 0.7); ctx.fillRect(x, Math.min(Y(0), Y(v)), bw * 0.6, Math.abs(Y(v) - Y(0))); MT.text(ctx, CB.num(v, 0), x + bw * 0.3, Y(v) + (v >= 0 ? -9 : 9), c, { size: 10.5 }); MT.text(ctx, lab, x + bw * 0.3, B.y + B.h + 12, pal.dim, { size: 10.5, bold: false }); });
+    MT.text(ctx, "하부 플랜지 응력 (MPa, 인장 +)", B.x, B.y - 6, pal.dim, { align: "left", size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 560 ? 1.2 : 0.5), minHeight: 300, maxHeight: 480 });
+  function go() {
+    R = MT.obStress(gl() / 100, gP(), ge(), gt(), gll()); cv.redraw();
+    CB.stat("mt-sg-f", `${CB.num(R.fD, 0)} · ${CB.num(R.fp, 0)} · ${CB.num(1.3 * R.fL, 0)} MPa`);
+    const sum = R.fD + R.fp + 1.3 * R.fL; CB.stat("mt-sg-sum", `${CB.num(sum, 0)} / ${CB.num(R.lim, 0)} MPa`); CB.stat("mt-sg-rf", CB.num(R.rf, 2)); CB.stat("mt-sg-top", `${CB.num(R.fpTop, 2)} MPa ${R.fpTop > 0 ? "(인장)" : "(압축)"}`);
+    const crack = R.fpTop > 0.63 * Math.sqrt(MT.OB.fck);
+    MT.msg("mt-sg-msg", `${R.rf >= 1 ? `<b>사용 한계 만족</b>(RF<sub>s</sub> ${CB.num(R.rf, 2)})` : `<b>사용 한계 불만족</b>(RF<sub>s</sub> ${CB.num(R.rf, 2)} &lt; 1)`}. ${R.fp < 0 ? `긴장이 하부 플랜지에 ${CB.num(-R.fp, 1)} MPa 압축을 넣습니다. ` : ""}${crack ? `바닥판 상연 인장 ${CB.num(R.fpTop, 2)} MPa가 균열 강도(0.63√f<sub>ck</sub> ≈ ${CB.num(0.63 * Math.sqrt(MT.OB.fck), 2)})를 넘습니다 — 긴장력 분할·편심 조정 필요.` : ""}`, R.rf >= 1 && !crack ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 7. 계측 이상 탐지 ---------- */
+(function () {
+  const gd = CB.range("mt-sh-d", (v) => v + "일", go), gk = CB.range("mt-sh-k", (v) => v.toFixed(1) + " %", go), gb = CB.range("mt-sh-b", (v) => "−" + v.toFixed(2) + " %/°C", go), gn = CB.range("mt-sh-n", (v) => v.toFixed(3) + " Hz", go);
+  let seed = 7; document.getElementById("mt-sh-seed").addEventListener("click", () => { seed = (seed * 7 + 13) % 997 + 1; go(); });
+  const N = 730, TR = 365, M = 7, F0 = 2.1;
+  let R = null;
+  function calc() {
+    const r = CB.rng(seed), nrm = () => { const u = Math.max(1e-12, r()), v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    const T = [], f = []; let wx = 0;
+    for (let d = 0; d < N; d++) { wx = 0.7 * wx + 2.2 * nrm(); const t = 12 + 13 * Math.sin((2 * Math.PI * (d - 105)) / 365) + wx; T.push(t); const dmg = d >= gd() ? 1 - 0.5 * gk() / 100 : 1; f.push(F0 * (1 - (gb() / 100) * (t - 12)) * dmg + gn() * nrm()); }
+    let sx = 0, sy = 0, sxx = 0, sxy = 0; for (let d = 0; d < TR; d++) { sx += T[d]; sy += f[d]; sxx += T[d] * T[d]; sxy += T[d] * f[d]; }
+    const b = (TR * sxy - sx * sy) / (TR * sxx - sx * sx), a = (sy - b * sx) / TR;
+    const res = f.map((v, d) => v - (a + b * T[d])); let s2 = 0; for (let d = 0; d < TR; d++) s2 += res[d] ** 2; const sig = Math.sqrt(s2 / (TR - 2));
+    const mu = sy / TR; let v2 = 0; for (let d = 0; d < TR; d++) v2 += (f[d] - mu) ** 2; const sf = Math.sqrt(v2 / (TR - 1));
+    const ma = (arr) => arr.map((_, d) => (d < M - 1 ? NaN : arr.slice(d - M + 1, d + 1).reduce((s, v) => s + v, 0) / M));
+    const rma = ma(res), fma = ma(f), lim = (3 * sig) / Math.sqrt(M);
+    let detC = null, detR = null, faC = 0, faR = 0;
+    for (let d = TR; d < N; d++) { const aC = Math.abs(rma[d]) > lim, aR = Math.abs(fma[d] - mu) > 3 * sf; if (d < gd()) { if (aC) faC++; if (aR) faR++; } else { if (aC && detC == null) detC = d; if (aR && detR == null) detR = d; } }
+    R = { T, f, res, rma, fma, a, b, sig, mu, sf, lim, detC, detR, faC, faR };
+  }
+  const cv = CB.canvas("#mt-cv-shm", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), h1 = H * 0.5;
+    const fmin = Math.min(...R.f), fmax = Math.max(...R.f), pad = (fmax - fmin) * 0.1;
+    CB.chart(ctx, { x: 58, y: 12, w: W - 58 - 16, h: h1 - 40 }, { x: [0, N], y: [fmin - pad, fmax + pad], xLabel: "", yLabel: "f (Hz)", yFmt: (v) => v.toFixed(2),
+      series: [{ data: R.f.map((v, d) => [d, v]), color: MT.alpha(pal.accent, 0.5), width: 1 }, { data: R.fma.map((v, d) => [d, v]), color: pal.accent, width: 1.8 }],
+      hlines: [{ y: R.mu + 3 * R.sf, color: pal.bad }, { y: R.mu - 3 * R.sf, color: pal.bad }], vlines: [{ x: TR, color: pal.faint, label: "기준 기간 끝" }, { x: gd(), color: pal.bad, label: "손상" }] });
+    const rr = R.rma.filter(isFinite), m = Math.max(R.lim * 2.5, ...rr.map(Math.abs)) * 1.1;
+    CB.chart(ctx, { x: 58, y: h1 + 6, w: W - 58 - 16, h: H - h1 - 6 - 44 }, { x: [0, N], y: [-m, m], xLabel: "일", yLabel: "잔차 7일 평균", yFmt: (v) => v.toFixed(3),
+      series: [{ data: R.rma.map((v, d) => [d, v]), color: pal.accent2, width: 1.8 }], hlines: [{ y: R.lim, color: pal.bad }, { y: -R.lim, color: pal.bad }, { y: 0, color: pal.faint }],
+      vlines: [{ x: gd(), color: pal.bad }].concat(R.detC != null ? [{ x: R.detC, color: pal.ok, label: "탐지" }] : []) });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.6), minHeight: 320, maxHeight: 460 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("mt-sh-slope", CB.num(R.b * 1000, 2) + " mHz/°C"); CB.stat("mt-sh-sig", CB.num(R.sig * 1000, 2) + " mHz");
+    const fmt = (d) => (d == null ? "미탐지" : `${d}일 (+${d - gd()})`);
+    CB.stat("mt-sh-raw", fmt(R.detR)); CB.stat("mt-sh-cmp", fmt(R.detC));
+    MT.msg("mt-sh-msg", `강성 ${CB.num(gk(), 1)} % 저하 → 진동수 약 ${CB.num(gk() / 2, 2)} % 감소(${CB.num((F0 * gk()) / 200 * 1000, 1)} mHz). 온도 보정: ${R.detC == null ? "<b>미탐지</b>" : `<b>${R.detC - gd()}일 뒤 탐지</b>`}, 거짓 경보 ${R.faC}일 · 원자료: ${R.detR == null ? "미탐지" : `${R.detR - gd()}일 뒤`}, 거짓 경보 ${R.faR}일.`, R.detC != null && R.faC === 0 ? "ok" : "");
+  }
+  go();
+})();
+
+/* ---------- 8. 예산 배분 ---------- */
+(function () {
+  const gB = CB.range("mt-bg-B", (v) => v + "억", go), gg = CB.seg("mt-bg-g", go), geq = CB.range("mt-bg-eq", (v) => v.toFixed(1) + "억/년", go), gm = CB.seg("mt-bg-m", go);
+  const AF = (1 - Math.pow(1.045, -10)) / 0.045;
+  const ASSETS = () => [
+    { name: "B-130", L: [0.2, 0.5, 1.6, 4.5, 12], g: +gg(), opts: [["보수", 8, 1, 0], ["보강", 22, 0, geq()]] },
+    { name: "TN-11", L: [0.2, 0.5, 1.5, 4.0, 10], g: 2, opts: [["보수", 5, 1, 0], ["보강", 16, 0, 0]] },
+    { name: "R-60", L: [0.2, 0.6, 1.5, 3.2, 6], g: 3, opts: [["보수", 6, 1, 0], ["재포장", 14, 0, 0]] },
+  ];
+  let R = null;
+  function calc() {
+    const A = ASSETS().map((a) => ({ ...a, alts: [{ n: "없음", c: 0, b: 0 }].concat(a.opts.map(([n, c, g2, extra]) => ({ n, c, b: (a.L[a.g] - a.L[Math.min(a.g, g2)] + extra) * AF }))) }));
+    const B = gB(); let best = null;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) for (let k = 0; k < 3; k++) { const pick = [i, j, k], c = pick.reduce((s, p, q) => s + A[q].alts[p].c, 0), b = pick.reduce((s, p, q) => s + A[q].alts[p].b, 0); if (c <= B + 1e-9 && (!best || b > best.b + 1e-9 || (Math.abs(b - best.b) < 1e-9 && c < best.c))) best = { pick, c, b }; }
+    // B/C 순위: 각 시설에서 B/C 최대(&gt; 1) 대안을 B/C 높은 순으로 예산 안에서
+    const cand = A.map((a, q) => { const alts = a.alts.slice(1).map((x, i) => ({ q, i: i + 1, r: x.b / x.c, ...x })).filter((x) => x.r >= 1); return alts.sort((u, v) => v.r - u.r)[0]; }).filter(Boolean).sort((u, v) => v.r - u.r);
+    const gp = [0, 0, 0]; let gc = 0, gb = 0; cand.forEach((x) => { if (gc + x.c <= B + 1e-9) { gp[x.q] = x.i; gc += x.c; gb += x.b; } });
+    R = { A, best, greedy: { pick: gp, c: gc, b: gb } };
+  }
+  const cv = CB.canvas("#mt-cv-budget", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), sel = gm() === "opt" ? R.best.pick : R.greedy.pick;
+    const bx = 70, bw = W - bx - 20, rowH = (H - 60) / 3, vmax = 26;
+    R.A.forEach((a, q) => {
+      const y0 = 20 + q * rowH; MT.text(ctx, a.name, 8, y0 + rowH / 2 - 6, pal.text, { align: "left", size: 12 }); MT.text(ctx, "등급 " + MT.GR[a.g], 8, y0 + rowH / 2 + 10, MT.gradeColor(a.g), { align: "left", size: 10.5 });
+      const sf = W < 520 ? 0.28 : 0.5, short = W < 520;
+      a.alts.slice(1).forEach((x, i) => {
+        const yy = y0 + 6 + i * (rowH / 2 - 4), hh = rowH / 2 - 14, on = sel[q] === i + 1;
+        ctx.fillStyle = MT.alpha(pal.dim, on ? 0.6 : 0.25); ctx.fillRect(bx, yy, (x.c / vmax) * bw * sf, hh * 0.45);
+        ctx.fillStyle = MT.alpha(pal.accent, on ? 0.85 : 0.3); ctx.fillRect(bx, yy + hh * 0.5, Math.max(0, (x.b / vmax) * bw * sf), hh * 0.45);
+        if (on) { ctx.strokeStyle = pal.text; ctx.lineWidth = 1.5; ctx.strokeRect(bx - 3, yy - 2, Math.max((x.b / vmax) * bw * sf, (x.c / vmax) * bw * sf) + 6, hh + 4); }
+        MT.text(ctx, short ? `${x.n} ${x.c}→${CB.num(x.b, 1)} (${CB.num(x.b / x.c, 2)})` : `${x.n} ${x.c}억 → ${CB.num(x.b, 1)}억 (B/C ${CB.num(x.b / x.c, 2)})`, bx + Math.max((x.b / vmax) * bw * sf, (x.c / vmax) * bw * sf) + 10, yy + hh / 2, on ? pal.text : pal.dim, { align: "left", size: 10.5, bold: on });
+      });
+    });
+    const used = gm() === "opt" ? R.best.c : R.greedy.c, yb = H - 30;
+    ctx.fillStyle = MT.alpha(pal.faint, 0.3); ctx.fillRect(bx, yb, bw, 12); ctx.fillStyle = pal.accent2; ctx.fillRect(bx, yb, Math.min(1, used / 60) * bw, 12);
+    MT.line(ctx, [[bx + (gB() / 60) * bw, yb - 4], [bx + (gB() / 60) * bw, yb + 16]], pal.text, 2); MT.text(ctx, "예산", 8, yb + 6, pal.dim, { align: "left", size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 300, maxHeight: 400 });
+  function go() {
+    calc(); cv.redraw();
+    const S = gm() === "opt" ? R.best : R.greedy, names = S.pick.map((p, q) => (p ? `${R.A[q].name} ${R.A[q].alts[p].n}` : null)).filter(Boolean);
+    CB.stat("mt-bg-sel", names.length ? names.join(" + ") : "없음"); CB.stat("mt-bg-cost", `${S.c} / ${gB()}억`); CB.stat("mt-bg-ben", CB.num(S.b, 1) + "억");
+    const d = R.best.b - R.greedy.b; CB.stat("mt-bg-cmp", d > 0.05 ? `최적이 +${CB.num(d, 1)}억` : "같음");
+    MT.msg("mt-bg-msg", d > 0.05 ? `B/C 순위로 고르면 ${R.greedy.c}억으로 편익 ${CB.num(R.greedy.b, 1)}억, 예산 안의 최적 조합은 ${R.best.c}억으로 <b>${CB.num(R.best.b, 1)}억</b>. 남는 예산을 증분이 큰 대안에 쓰는 것이 이득입니다.` : `이 예산에서는 B/C 순위와 최적 조합이 같습니다(편익 ${CB.num(R.best.b, 1)}억).`, "");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

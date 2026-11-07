@@ -1,0 +1,1113 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>포장 설계 · CivilBook</title>
+<meta name="description" content="바퀴를 받치는 층. 4제곱 법칙과 누적 ESAL, AASHTO 93 연성 포장 설계(R-60 SN 3.47)와 층 두께, 층 응력·변형률과 역학적–경험적 설계, 웨스터가드 응력과 줄눈·컬링, 파손·PSI와 생애 비용을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .pv-stack { display: grid; grid-template-columns: 1fr; }
+  .pv-stack > div { position: relative; min-width: 0; }
+  .pv-stack > div + div { border-top: 1px solid var(--border); }
+  .pv-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .pv-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .pv-msg b { color: var(--text); }
+  .pv-msg.ok { color: var(--ok); font-weight: 600; }
+  .pv-msg.bad { color: var(--bad); font-weight: 600; }
+  .pv-tbl td, .pv-tbl th { font-variant-numeric: tabular-nums; }
+  .pv-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .pv-steps { margin: 6px 0 0; }
+  .pv-steps li { margin: 4px 0; }
+  .pv-i { font-style: normal; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="civil"></script>
+</head>
+<body data-chapter="pavement">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="pv-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="pv-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="pv-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="pv-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <pattern id="pv-pat-agg" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="2.2" style="fill:var(--text-faint)"/><circle cx="11" cy="10" r="1.6" style="fill:var(--text-faint)"/></pattern>
+      <pattern id="pv-pat-soil" width="16" height="10" patternUnits="userSpaceOnUse"><path d="M0 8 L5 3 M8 9 L13 4" style="stroke:var(--warn);stroke-width:1;opacity:.55"/></pattern>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 13</div>
+    <h1 data-no-glossary>포장 설계</h1>
+    <p class="lead">도로의 차로 폭과 곡선(11장)이 정해지고 흙을 깎고 쌓아 노상을 만들었으면(12장), 이제 그 위에 바퀴를 받칠 층을 올립니다. 트럭 타이어는 노면을 약 0.7 MPa로 누르지만 노상 흙은 그 몇 % 밖에 반복해서 견디지 못합니다. 포장은 그 차이를 두께와 강성으로 메우는 구조물이고, 버티는 대상은 한 번의 큰 하중이 아니라 <b>20년 동안 수백만 번 지나가는 바퀴</b>입니다. 이 장은 무거운 축 하나가 가벼운 축 수천 개만큼 포장을 상하게 하는 <b>4제곱 법칙</b>에서 출발해, 교통량을 표준 축하중의 반복 횟수(ESAL)로 바꾸고, AASHTO 93 식으로 R-60의 소요 구조 지수 <b>SN ≈ 3.47</b>을 구해 층 두께로 나누며, 층 속의 응력·변형률과 콘크리트 포장의 웨스터가드 응력(<b>약 1.75 MPa</b>), 줄눈과 컬링, 파손과 보수, 생애 비용까지 계산과 시뮬레이터로 따라갑니다.</p>
+    <ul class="objectives">
+      <li>연성·강성·반강성 포장의 층 구성과 하중 분산 방식을 비교하고, 각 층의 역할을 설명한다.</li>
+      <li>축하중을 4제곱 법칙으로 등가 단축 하중(ESAL)으로 바꾸고, 차종별 트럭 계수·방향·차로 분배·성장률로 설계 기간 누적 ESAL을 계산한다.</li>
+      <li>AASHTO 93 연성 포장식에서 신뢰도·표준 편차·공용성 손실·노상 회복 탄성계수의 뜻을 알고, 소요 SN을 구해 층 계수와 두께 조합으로 만족시킨다.</li>
+      <li>오데마르크 등가 두께와 부시네스크 해로 층 속 응력·변형률을 근사하고, 전이 함수와 마이너 법칙으로 역학적–경험적 설계의 생각을 따라간다.</li>
+      <li>웨스터가드 식으로 콘크리트 포장의 내부·가장자리·모서리 응력을 계산하고, 줄눈 간격·다웰바·온도 컬링의 영향을 판단한다.</li>
+      <li>포장 파손의 원인과 PSI·PCI를 이해하고, 보수 시점과 생애 주기 비용으로 연성·강성 포장을 비교한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>2년 동안 같은 길을 달린 트럭들</b></div>
+      <div class="o-body"><p>1950년대 미국은 주간 고속도로망 건설을 앞두고 있었지만, 포장 두께를 정하는 방법은 각 주의 경험식이 제각각이었습니다. 어떤 무게의 축이 몇 번 지나가면 포장이 얼마나 나빠지는지에 대한 공통의 자료가 없었습니다. 그래서 당시 미국 주도로 공무원 협회(AASHO, 지금의 AASHTO)는 일리노이주 오타와 근처에 여러 개의 시험 도로 고리를 만들고, 축하중이 서로 다른 트럭을 정해진 고리에서 1958년부터 1960년까지 약 2년 동안 쉬지 않고 반복 주행시켰습니다. 이것이 <b>AASHO 도로 시험</b>입니다.</p>
+        <p>시험에서 나온 두 가지 생각이 지금도 포장 설계의 뼈대입니다. 하나는 포장의 상태를 운전자가 느끼는 승차감으로 매긴 <b>공용성 지수(PSI)</b>이고(캐리와 어윅, 1960), 다른 하나는 축하중이 두 배가 되면 손상이 대략 열여섯 배가 된다는, 이른바 <b>4제곱 법칙</b>입니다. 시험 결과를 정리한 설계 지침은 여러 번 개정되어 1993년판(AASHTO 93)이 오랫동안 세계 여러 나라에서 쓰였고, 국내에서도 한국형 포장 설계법이 나오기 전까지 기준의 바탕이 되었습니다.</p>
+        <div class="o-chain"><span>교통량 · 축하중 · 노상</span><i>→</i><span class="tool">4제곱 법칙 · 누적 ESAL · SN · 웨스터가드</span><i>→</i><span>층 두께 · 줄눈 · 보수 시점 · 생애 비용</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="types">
+    <h2>포장의 형식과 층 구조</h2>
+    <div class="problem"><strong>0.7 MPa의 타이어와 0.05 MPa의 흙 사이</strong>
+      <p>R-60 진입 도로의 노상은 성토 E-4(GeotechBook 7장)의 다진 흙이고, 회복 탄성계수는 약 52 MPa(7,500 psi)입니다. 이 흙 위에 타이어를 바로 굴리면 몇 번 만에 바퀴 자국이 생깁니다. 바퀴 하중을 넓게 펴서 흙이 견딜 만한 압력으로 낮추는 방법은 크게 두 가지입니다. 층을 여러 장 겹쳐 조금씩 펴거나, 단단한 판 하나로 한꺼번에 펴는 것입니다.</p></div>
+    <p>첫째 방법이 <span class="term">연성 포장</span><span class="en">(flexible pavement)</span>입니다. 위에서부터 아스팔트 혼합물의 <span class="term">표층</span><span class="en">(surface course)</span>과 중간층, 쇄석이나 아스팔트 안정 처리의 <span class="term">기층</span><span class="en">(base course)</span>, 자갈·쇄석의 <span class="term">보조 기층</span><span class="en">(subbase)</span>이 놓이고, 그 아래 다진 흙이 <span class="term">노상</span><span class="en">(subgrade)</span>입니다. 각 층은 위층보다 약하고 싸며, 하중이 깊이 갈수록 넓은 면적에 퍼지므로 아래층일수록 약한 재료로도 충분합니다. 재료 자체(바인더, 마샬 배합, P-13 표층)는 <a href="../../materials/chapters/asphalt.html">MaterialsBook 13장</a>에서 다루었으니, 이 장은 두께와 구조를 정하는 일에 집중합니다.</p>
+    <p>둘째 방법이 <span class="term">강성 포장</span><span class="en">(rigid pavement)</span>, 곧 콘크리트 포장입니다. 두께 200–350 mm 안팎의 콘크리트 판이 휨으로 하중을 넓게 펴므로, 그 아래는 얇은 보조 기층(린 콘크리트나 쇄석)과 노상이면 됩니다. 콘크리트는 수축하고 온도에 따라 휘므로 일정 간격으로 줄눈을 두고, 줄눈을 건너 하중을 넘기는 철근(다웰바)을 넣습니다. 두 형식의 중간으로, 시멘트 안정 처리 기층 위에 아스팔트를 깐 <span class="term">반강성 포장</span><span class="en">(semi-rigid pavement)</span>이나 콘크리트 위에 아스팔트를 덧씌운 복합 포장도 쓰입니다.</p>
+    <figure class="diagram" id="fig-pv-types">
+      <svg viewBox="0 0 880 330" role="img" aria-label="연성 포장, 강성 포장, 반강성 포장의 층 구성 단면 비교">
+        <rect x="10" y="10" width="860" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">연성 포장(R-60 예)</text>
+          <rect x="20" y="20" width="180" height="20" style="fill:var(--text-dim);opacity:.9"/>
+          <rect x="20" y="40" width="180" height="28" style="fill:var(--text-dim);opacity:.6"/>
+          <rect x="20" y="68" width="180" height="50" style="fill:url(#pv-pat-agg);stroke:var(--border)"/>
+          <rect x="20" y="118" width="180" height="50" style="fill:var(--accent-soft);stroke:var(--border)"/>
+          <rect x="20" y="168" width="180" height="80" style="fill:url(#pv-pat-soil);stroke:var(--border)"/>
+          <g class="t-mono"><text x="206" y="34">표층 50 (P-13)</text><text x="206" y="58">중간층 70</text><text x="206" y="97">기층 150 (쇄석)</text><text x="206" y="147">보조 기층 150</text><text x="206" y="212">노상 (E-4)</text></g>
+        </g>
+        <g transform="translate(330,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">강성 포장(줄눈 콘크리트)</text>
+          <rect x="20" y="20" width="180" height="62" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.5"/>
+          <line x1="110" y1="20" x2="110" y2="34" style="stroke:var(--text);stroke-width:2"/>
+          <line x1="80" y1="56" x2="140" y2="56" style="stroke:var(--accent-2);stroke-width:4"/>
+          <rect x="20" y="82" width="180" height="22" style="fill:var(--text-dim);opacity:.35;stroke:var(--border)"/>
+          <rect x="20" y="104" width="180" height="40" style="fill:url(#pv-pat-agg);stroke:var(--border)"/>
+          <rect x="20" y="144" width="180" height="104" style="fill:url(#pv-pat-soil);stroke:var(--border)"/>
+          <g class="t-mono"><text x="206" y="50">콘크리트 판 250</text><text x="206" y="66" style="fill:var(--accent-2)">다웰바</text><text x="206" y="97">분리막·린 콘크리트</text><text x="206" y="128">보조 기층 150</text><text x="206" y="200">노상</text></g>
+          <text x="110" y="16" text-anchor="middle" class="t-mono">줄눈</text>
+        </g>
+        <g transform="translate(620,40)">
+          <text x="100" y="0" text-anchor="middle" class="t" style="font-weight:700">반강성·복합 포장</text>
+          <rect x="10" y="20" width="160" height="30" style="fill:var(--text-dim);opacity:.85"/>
+          <rect x="10" y="50" width="160" height="58" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:var(--text-faint)"><circle cx="40" cy="70" r="2"/><circle cx="80" cy="86" r="2"/><circle cx="120" cy="66" r="2"/><circle cx="150" cy="92" r="2"/></g>
+          <rect x="10" y="108" width="160" height="40" style="fill:url(#pv-pat-agg);stroke:var(--border)"/>
+          <rect x="10" y="148" width="160" height="100" style="fill:url(#pv-pat-soil);stroke:var(--border)"/>
+          <g class="t-mono"><text x="176" y="40">아스팔트</text><text x="176" y="82">시멘트 안정</text><text x="176" y="96">처리 기층</text><text x="176" y="132">보조 기층</text><text x="176" y="200">노상</text></g>
+        </g>
+        <text x="440" y="306" text-anchor="middle" class="t-dim">두께 단위 mm, 교육용 예. 연성은 층을 겹쳐 조금씩, 강성은 판의 휨으로 한꺼번에 하중을 편다</text>
+      </svg>
+      <figcaption><b>그림 13-1.</b> 세 포장 형식의 층 구성. 연성 포장의 두께는 이 장 13.5절에서 R-60에 맞춰 정한 값이다(교육용). 강성 포장의 판 두께 250 mm는 이 장의 콘크리트 포장 비교안이다.</figcaption>
+    </figure>
+    <figure class="diagram" id="fig-pv-spread">
+      <svg viewBox="0 0 880 300" role="img" aria-label="연성 포장은 좁은 원뿔로 하중을 퍼뜨리고 강성 포장은 판 전체가 넓게 누르는 하중 분산 비교">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="180" y="4" text-anchor="middle" class="t" style="font-weight:700">연성: 층마다 조금씩 넓힌다</text>
+          <line x1="180" y1="12" x2="180" y2="44" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#pv-ah-ld)"/>
+          <rect x="20" y="48" width="320" height="30" style="fill:var(--text-dim);opacity:.7"/>
+          <rect x="20" y="78" width="320" height="70" style="fill:url(#pv-pat-agg);stroke:var(--border)"/>
+          <rect x="20" y="148" width="320" height="70" style="fill:url(#pv-pat-soil);stroke:var(--border)"/>
+          <path d="M165 48 L140 78 L95 148 M195 48 L220 78 L265 148" style="fill:none;stroke:var(--accent-2);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <path d="M95 148 Q 120 196 180 200 Q 240 196 265 148 Z" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <text x="180" y="234" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">노상 압력: 좁고 높다(수십 kPa)</text>
+        </g>
+        <g transform="translate(470,30)">
+          <text x="180" y="4" text-anchor="middle" class="t" style="font-weight:700">강성: 판이 휘며 넓게 편다</text>
+          <line x1="180" y1="12" x2="180" y2="44" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#pv-ah-ld)"/>
+          <path d="M20 48 L340 48 L340 98 L20 98 Z" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.5"/>
+          <rect x="20" y="98" width="320" height="50" style="fill:url(#pv-pat-agg);stroke:var(--border)"/>
+          <rect x="20" y="148" width="320" height="70" style="fill:url(#pv-pat-soil);stroke:var(--border)"/>
+          <path d="M30 148 Q 100 170 180 172 Q 260 170 330 148 Z" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <text x="180" y="234" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">노상 압력: 넓고 낮다(수 kPa) — 대신 판에 휨 인장</text>
+          <text x="180" y="78" text-anchor="middle" class="t-mono">하면 휨 인장 σ ≈ 1.75 MPa</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-2.</b> 하중 분산 방식의 차이(개념도). 연성 포장은 층 두께와 강성으로 노상의 연직 응력·변형률을 낮추는 것이 설계의 핵심이고, 강성 포장은 판 자체의 휨 인장 응력을 콘크리트 휨강도 아래로 두는 것이 핵심이다. 그래서 두 형식은 설계 식도, 파손 양상도 다르다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 13.1 (포장의 형식)</strong> 하중을 주로 층의 두께와 강성 차이로 퍼뜨리고 각 층이 노상까지 차례로 응력을 낮추는 포장을 연성 포장, 콘크리트 판의 휨 강성으로 넓게 퍼뜨리는 포장을 강성 포장이라 한다. 연성 포장의 설계 변수는 층 두께와 재료 강성(층 계수, 탄성계수), 강성 포장의 설계 변수는 판 두께·콘크리트 휨강도·지지력(지반 반력 계수 k)·줄눈과 하중 전달이다.</div>
+    <div class="table-wrap"><table class="pv-tbl">
+      <thead><tr><th>비교 항목</th><th>연성(아스팔트) 포장</th><th>강성(콘크리트) 포장</th></tr></thead>
+      <tbody>
+        <tr><td>하중 분산</td><td>층마다 조금씩, 노상 응력이 상대적으로 큼</td><td>판의 휨으로 넓게, 노상 응력 작음</td></tr>
+        <tr><td>지배 파손</td><td>노상 소성 변형(바퀴 자국), 아스팔트층 하면 피로 균열</td><td>판의 휨 피로 균열, 줄눈부 단차·펌핑</td></tr>
+        <tr><td>설계 식(이 장)</td><td>AASHTO 93 SN, 역학적–경험적 전이 함수</td><td>웨스터가드 응력, 컬링(브래드버리), 피로 응력비</td></tr>
+        <tr><td>초기 비용 · 수명</td><td>상대적으로 낮음 · 덧씌우기를 주기적으로</td><td>상대적으로 높음 · 긴 수명, 줄눈 관리</td></tr>
+        <tr><td>시공 · 교통 개방</td><td>빠르게 개방, 부분 보수 쉬움</td><td>양생 기간 필요, 보수에 시간이 걸림</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="axle-loads">
+    <h2>축하중과 4제곱 법칙</h2>
+    <div class="problem"><strong>승용차 만 대와 트럭 한 대</strong>
+      <p>R-60에는 하루에 승용차가 약 6,600대, 트럭과 버스가 약 580대 지나갑니다(10장의 교통 조사). 차량 대수로는 승용차가 열 배 넘게 많습니다. 그런데 포장을 상하게 하는 몫으로 따지면 승용차 전부를 합쳐도 대형 트럭 한 대에 못 미칩니다. 왜 그럴까요?</p></div>
+    <p>포장이 받는 하중은 차량 전체 무게가 아니라 <b>축 하나하나</b>가 누르는 하중입니다. 축은 바퀴 수와 배치에 따라 단축(바퀴 하나씩 또는 복륜), 두 축이 1.2–1.5 m 간격으로 붙은 탠덤 축, 세 축이 붙은 트리덤 축으로 나뉩니다. 붙은 축은 응력 구근이 겹쳐 같은 총하중이라도 단축보다 손상이 작습니다. 국내 도로법은 축하중 10톤, 총중량 40톤을 넘는 차량의 운행을 제한합니다(현행 도로법 시행령과 운행 제한 기준 확인).</p>
+    <figure class="diagram" id="fig-pv-axles">
+      <svg viewBox="0 0 880 280" role="img" aria-label="단축 단륜, 단축 복륜, 탠덤 축, 트리덤 축의 배치와 기준 축하중 80 kN">
+        <rect x="10" y="10" width="860" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)" class="t-mono" text-anchor="middle">
+          <g transform="translate(70,0)">
+            <text x="0" y="0" class="t" style="font-weight:700">단축 단륜</text>
+            <rect x="-55" y="40" width="20" height="44" rx="4" style="fill:var(--text-dim)"/><rect x="35" y="40" width="20" height="44" rx="4" style="fill:var(--text-dim)"/>
+            <line x1="-35" y1="62" x2="35" y2="62" style="stroke:var(--text);stroke-width:3"/>
+            <text x="0" y="112">승용차·버스 앞축</text><text x="0" y="130">40 kN 안팎</text>
+          </g>
+          <g transform="translate(270,0)">
+            <text x="0" y="0" class="t" style="font-weight:700">단축 복륜 (ESAL 기준)</text>
+            <rect x="-70" y="40" width="16" height="44" rx="4" style="fill:var(--accent-2)"/><rect x="-50" y="40" width="16" height="44" rx="4" style="fill:var(--accent-2)"/>
+            <rect x="34" y="40" width="16" height="44" rx="4" style="fill:var(--accent-2)"/><rect x="54" y="40" width="16" height="44" rx="4" style="fill:var(--accent-2)"/>
+            <line x1="-34" y1="62" x2="34" y2="62" style="stroke:var(--text);stroke-width:3"/>
+            <text x="0" y="112" style="fill:var(--accent-2)">80 kN (18 kip) = 1 ESAL</text><text x="0" y="130">바퀴 무리 4개 × 20 kN</text>
+          </g>
+          <g transform="translate(500,0)">
+            <text x="0" y="0" class="t" style="font-weight:700">탠덤 축</text>
+            <g><rect x="-60" y="26" width="14" height="30" rx="3" style="fill:var(--text-dim)"/><rect x="46" y="26" width="14" height="30" rx="3" style="fill:var(--text-dim)"/><line x1="-46" y1="41" x2="46" y2="41" style="stroke:var(--text);stroke-width:2.5"/></g>
+            <g><rect x="-60" y="70" width="14" height="30" rx="3" style="fill:var(--text-dim)"/><rect x="46" y="70" width="14" height="30" rx="3" style="fill:var(--text-dim)"/><line x1="-46" y1="85" x2="46" y2="85" style="stroke:var(--text);stroke-width:2.5"/></g>
+            <text x="0" y="122">축 간격 1.2–1.5 m</text><text x="0" y="140">약 146 kN ≈ 1 ESAL(교육용)</text>
+          </g>
+          <g transform="translate(700,0)">
+            <text x="0" y="0" class="t" style="font-weight:700">트리덤 축</text>
+            <g><rect x="-50" y="20" width="12" height="24" rx="3" style="fill:var(--text-dim)"/><rect x="38" y="20" width="12" height="24" rx="3" style="fill:var(--text-dim)"/><line x1="-38" y1="32" x2="38" y2="32" style="stroke:var(--text);stroke-width:2"/></g>
+            <g><rect x="-50" y="52" width="12" height="24" rx="3" style="fill:var(--text-dim)"/><rect x="38" y="52" width="12" height="24" rx="3" style="fill:var(--text-dim)"/><line x1="-38" y1="64" x2="38" y2="64" style="stroke:var(--text);stroke-width:2"/></g>
+            <g><rect x="-50" y="84" width="12" height="24" rx="3" style="fill:var(--text-dim)"/><rect x="38" y="84" width="12" height="24" rx="3" style="fill:var(--text-dim)"/><line x1="-38" y1="96" x2="38" y2="96" style="stroke:var(--text);stroke-width:2"/></g>
+            <text x="0" y="128">세미트레일러 뒤축</text><text x="0" y="146">약 215 kN ≈ 1 ESAL(교육용)</text>
+          </g>
+        </g>
+        <text x="440" y="232" text-anchor="middle" class="t-dim">붙은 축은 응력이 겹쳐 "축 하나당" 손상이 작다 — 같은 손상을 내는 기준 하중이 단축보다 크다</text>
+        <text x="440" y="252" text-anchor="middle" class="t-dim">탠덤·트리덤 기준값은 AASHTO 하중 등가 계수 표의 대략적 경향에 맞춘 교육용 값(포장 두께·종점 PSI에 따라 다름)</text>
+      </svg>
+      <figcaption><b>그림 13-3.</b> 축 배치와 기준 하중(평면, 위가 진행 방향). AASHO 도로 시험의 기준은 복륜 단축 80 kN(18,000 lb)이다. 이 축이 한 번 지나가는 손상을 1 ESAL로 센다.</figcaption>
+    </figure>
+    <p>도로 시험은 하중이 다른 축이 몇 번 지나가야 같은 정도로 포장이 나빠지는지를 쟀습니다. 그 비를 <span class="term">하중 등가 계수</span><span class="en">(load equivalency factor, LEF)</span>라 하고, 기준 축의 반복 횟수로 환산한 교통량을 <span class="term">등가 단축 하중</span><span class="en">(equivalent single axle load, ESAL)</span>이라 합니다. 도로 시험의 결과는 하중 등가 계수가 축하중의 약 네제곱에 비례한다는 것이었습니다.</p>
+    <div class="callout def"><strong>원리 13.2 (4제곱 법칙)</strong> 축하중 \(P\)인 축 하나가 지나갈 때의 손상은 같은 형식의 기준 축 \(P_s\)의
+      <div class="formula">$$\mathrm{LEF} = \left(\frac{P}{P_s}\right)^{n}, \qquad n \approx 4$$<div class="where">배에 해당한다. 단축 \(P_s = 80\) kN. 지수 \(n\)은 포장 형식·두께·파손 기준에 따라 대략 3–6 사이로 달라지며, 4는 도로 시험 자료의 대표값이다. 이 관계를 <span class="term">4제곱 법칙</span><span class="en">(fourth power law)</span>이라 부른다. <code>CB.civ.esal(P, Ps, n)</code>이 이 식이다.</div></div></div>
+    <p>네제곱은 아주 가파릅니다. 축하중이 두 배면 손상은 16배, 10 % 과적이면 1.1⁴ = 1.46배, 30 % 과적이면 2.86배입니다. 반대로 승용차 축(약 8 kN)은 (8/80)⁴ = 0.0001로, 기준 축 하나의 손상을 내려면 승용차 축 1만 개가 필요합니다. 그래서 포장 설계에서 승용차는 사실상 세지 않고, <b>무거운 차량의 축하중 분포와 과적</b>이 포장의 수명을 정합니다.</p>
+    <div class="callout"><strong>예제 13.1 (과적 트럭 한 대)</strong> 뒤축 단축이 100 kN인 2축 트럭과, 같은 트럭이 30 % 과적해 뒤축이 130 kN이 된 경우를 비교하라. 앞축은 각각 40, 52 kN이다.
+      <ol class="pv-steps">
+        <li><b>정상 적재.</b> 앞축 \((40/80)^4 = 0.0625\), 뒤축 \((100/80)^4 = 2.441\). 한 대가 지날 때 2.50 ESAL.</li>
+        <li><b>30 % 과적.</b> 앞축 \((52/80)^4 = 0.179\), 뒤축 \((130/80)^4 = 6.973\). 한 대가 7.15 ESAL로, 정상의 2.86배다.</li>
+        <li><b>판정.</b> 뒤축 130 kN은 축하중 제한 10톤(약 98 kN)을 넘는다. 과적 차량 한 대가 정상 차량 약 세 대 몫의 포장 수명을 쓴다. 이것이 축중 계량과 과적 단속이 포장 관리의 일부인 이유다.</li>
+      </ol></div>
+    <div class="sim" id="sim-pv-fourth">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>4제곱 법칙: 축하중과 손상</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pv-cv-fourth" aria-label="축하중에 따른 하중 등가 계수 곡선(로그 축)과 축 형식별 비교"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>축 형식</span><div class="seg" id="pv-fo-type"><button data-value="s" class="on">단축</button><button data-value="t">탠덤</button><button data-value="r">트리덤</button></div></div>
+          <label class="ctrl"><span>축하중 P <output id="pv-fo-P-out"></output></span><input type="range" id="pv-fo-P" min="10" max="300" step="1" value="100"></label>
+          <label class="ctrl"><span>지수 n <output id="pv-fo-n-out"></output></span><input type="range" id="pv-fo-n" min="2" max="6" step="0.1" value="4"></label>
+          <label class="ctrl"><span>과적률 <output id="pv-fo-ov-out"></output></span><input type="range" id="pv-fo-ov" min="0" max="60" step="1" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기준 하중 P<sub>s</sub></span><span class="v" id="pv-fo-ps">—</span></div>
+        <div class="stat"><span class="k">LEF(과적 반영)</span><span class="v" id="pv-fo-lef">—</span></div>
+        <div class="stat"><span class="k">승용차 축(8 kN) 환산</span><span class="v" id="pv-fo-car">—</span></div>
+        <div class="stat"><span class="k">과적 손상 배율</span><span class="v" id="pv-fo-mul">—</span></div>
+      </div>
+      <div class="pv-msg" id="pv-fo-msg"></div>
+      <div class="sim-note">해볼 것: 단축 80 kN에서 LEF = 1입니다 · 160 kN으로 두 배를 하면 16 · 지수를 3이나 5로 바꿔 보면 무거운 축의 손상 몫이 크게 달라집니다(기준 지수의 불확실성) · 탠덤으로 바꾸면 같은 146 kN이 약 1 ESAL입니다 · 모델: CB.civ.esal(P, P<sub>s</sub>, n). 탠덤 146 kN, 트리덤 215 kN 기준은 교육용 값입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="esal">
+    <h2>누적 ESAL: 20년의 교통을 한 숫자로</h2>
+    <div class="problem"><strong>R-60에 20년 동안 기준 축이 몇 번 지나가나</strong>
+      <p>포장 설계에 필요한 것은 하루 교통량이 아니라 설계 기간 동안 <b>설계 차로</b>를 지나갈 기준 축의 총 횟수입니다. 10장의 교통 조사에서 나온 차종별 교통량을 4제곱 법칙으로 환산하고, 방향과 차로로 나누고, 해마다 늘어나는 교통을 더하면 됩니다.</p></div>
+    <p>먼저 차종마다 축하중 분포를 4제곱 법칙으로 더해 차량 한 대가 지날 때의 ESAL, 곧 <span class="term">트럭 계수</span><span class="en">(truck factor)</span>를 구합니다. 실제로는 축중계(WIM) 자료에서 차종별 축하중 분포를 얻어 평균을 내지만, 이 장은 차종마다 대표 축하중 하나를 씁니다(교육용). 양방향 교통 중 설계 방향의 비율이 <span class="term">방향 분배 계수</span><span class="en">(directional distribution factor)</span> \(D\), 한 방향에 차로가 여럿이면 가장 무거운 차로(보통 바깥 차로)의 비율이 <span class="term">차로 분배 계수</span><span class="en">(lane distribution factor)</span> \(L\)입니다.</p>
+    <div class="callout def"><strong>원리 13.3 (설계 차로 누적 ESAL)</strong>
+      <div class="formula">$$W_{18} = 365 \sum_i \left(N_i\,\mathrm{TF}_i\right) D\,L\;\frac{(1+g)^{Y} - 1}{g}$$<div class="where">\(N_i\): 첫해 차종 \(i\)의 양방향 일 교통량(대/일), \(\mathrm{TF}_i\): 트럭 계수(대당 ESAL), \(D\): 방향 분배(보통 0.5, 방향별 교통이 치우친 R-60은 10장의 0.6), \(L\): 차로 분배(편도 1차로 1.0), \(g\): 연간 교통 성장률, \(Y\): 설계 기간(년). 마지막 분수가 성장 계수 \(G_F\)다(\(g = 0\)이면 \(Y\)). AASHTO 93의 차로 분배 형태: 편도 1차로 100 %, 2차로 80–100 %, 3차로 60–80 %(현행 기준 확인).</div></div></div>
+    <div class="callout"><strong>예제 13.2 (R-60의 20년 누적 ESAL)</strong> R-60(편도 1차로, 개통 첫해 양방향 AADT 7,200대/일, 대형 차 8 %, 성장률 2.6 %/년, 방향 분배 0.6, 20년 — 10장의 교통 계획)의 대형 차 576대/일을 다음 차종과 대표 평균 축하중(빈 차와 실은 차를 섞은 평균)으로 나눈다(교육용). 탠덤 축의 기준 하중은 146 kN이다.
+      <div class="table-wrap"><table class="pv-tbl">
+        <thead><tr><th>차종</th><th>대/일(양방향)</th><th>축하중(kN)</th><th>TF(ESAL/대)</th><th>ESAL/일</th></tr></thead>
+        <tbody>
+          <tr><td>승용차</td><td>6,624</td><td>8 + 8</td><td>0.0002</td><td>1.3</td></tr>
+          <tr><td>버스</td><td>50</td><td>40 + 70</td><td>0.649</td><td>32.4</td></tr>
+          <tr><td>2축 트럭</td><td>380</td><td>25 + 50</td><td>0.162</td><td>61.6</td></tr>
+          <tr><td>3축 트럭</td><td>100</td><td>50 + 탠덤 110</td><td>0.475</td><td>47.5</td></tr>
+          <tr><td>세미트레일러</td><td>46</td><td>50 + 탠덤 115 × 2</td><td>0.922</td><td>42.4</td></tr>
+          <tr><td colspan="4"><b>합계(양방향)</b> — 대형 차 평균 TF ≈ 0.32</td><td class="hl">185.3</td></tr>
+        </tbody></table></div>
+      <ol class="pv-steps">
+        <li><b>설계 차로의 첫해 하루 ESAL.</b> \(185.3 \times D \times L = 185.3 \times 0.6 \times 1.0 = 111.2\).</li>
+        <li><b>성장 계수.</b> \(G_F = (1.026^{20} - 1)/0.026 = 25.80\).</li>
+        <li><b>누적 ESAL.</b> \(W_{18} = 111.2 \times 365 \times 25.80 = 1.05 \times 10^6\). <b>R-60의 설계 누적 ESAL은 약 1 × 10⁶</b>으로 둔다(교육용). 1.05 × 10⁶을 그대로 쓰면 다음 절의 소요 SN은 3.50으로, 1 × 10⁶의 3.47보다 0.03 크다(13.5절 단면 SN 3.56은 둘 다 만족).</li>
+        <li><b>몫.</b> 승용차는 대수의 92 %인데 ESAL의 0.7 %다. 2축 트럭은 대수의 5.3 %로 ESAL의 33 %, 3축 트럭은 대수의 1.4 %로 26 %를 차지한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-pv-esal">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>누적 ESAL 계산기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view pv-stack">
+          <div><canvas id="pv-cv-esal" aria-label="설계 기간 동안의 누적 ESAL 곡선"></canvas><span class="pv-cap">누적 ESAL (설계 차로)</span></div>
+          <div><canvas id="pv-cv-esal-bar" aria-label="차종별 대수 비율과 ESAL 비율 막대"></canvas><span class="pv-cap">대수 몫 vs ESAL 몫</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>AADT(양방향) <output id="pv-es-aadt-out"></output></span><input type="range" id="pv-es-aadt" min="500" max="40000" step="100" value="7200"></label>
+          <label class="ctrl"><span>대형 차 비율 <output id="pv-es-hv-out"></output></span><input type="range" id="pv-es-hv" min="1" max="40" step="0.2" value="8"></label>
+          <label class="ctrl"><span>성장률 g <output id="pv-es-g-out"></output></span><input type="range" id="pv-es-g" min="0" max="8" step="0.1" value="2.6"></label>
+          <label class="ctrl"><span>방향 분배 D <output id="pv-es-d-out"></output></span><input type="range" id="pv-es-d" min="0.5" max="0.7" step="0.05" value="0.6"></label>
+          <label class="ctrl"><span>설계 기간 Y <output id="pv-es-y-out"></output></span><input type="range" id="pv-es-y" min="5" max="40" step="1" value="20"></label>
+          <div class="ctrl"><span>편도 차로 수 (L)</span><div class="seg" id="pv-es-lane"><button data-value="1" class="on">1 (1.0)</button><button data-value="2">2 (0.9)</button><button data-value="3">3 (0.7)</button></div></div>
+          <label class="ctrl"><span>대형 차 과적률 <output id="pv-es-ov-out"></output></span><input type="range" id="pv-es-ov" min="0" max="40" step="1" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">하루 ESAL(설계 차로)</span><span class="v" id="pv-es-day">—</span></div>
+        <div class="stat"><span class="k">성장 계수 G<sub>F</sub></span><span class="v" id="pv-es-gf">—</span></div>
+        <div class="stat"><span class="k">누적 W<sub>18</sub></span><span class="v" id="pv-es-w">—</span></div>
+        <div class="stat"><span class="k">소요 SN(R-60 노상, R 90 %)</span><span class="v" id="pv-es-sn">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값이 예제 13.2(1.05 × 10⁶ ≈ 1 × 10⁶, 10장의 R-60 교통)입니다 · 대형 차 과적률을 20 %로 올리면 누적 ESAL이 약 2배가 되고 소요 SN이 약 0.4 늘어납니다 · 편도 2차로 국도(AADT 20,000, 대형 차 15 %)는 약 5 × 10⁶입니다 · 소요 SN은 CB.civ.sn(W<sub>18</sub>, {MR: 7500})로 다음 절의 식입니다 · 차종 구성 비율은 예제 13.2의 대형 차 구성(버스 : 2축 : 3축 : 세미 = 50 : 380 : 100 : 46)을 유지합니다(교육용).</div>
+    </div>
+    <div class="callout site"><strong>R-60 설계 교통(교육용)</strong> 지방부 2차로, 설계 속도 60 km/h, 편도 1차로. 개통 첫해 AADT 7,200대/일, 대형 차 8 %, 성장률 2.6 %/년, 방향 분배 0.6(10장의 교통 계획), 설계 기간 20년, 대형 차 평균 트럭 계수 약 0.32(이 장의 교육용 차종·축하중 가정) → 설계 차로 누적 ESAL 1.05 × 10⁶ ≈ <b>1 × 10⁶</b>. 실제 설계는 축중계 자료와 지역의 차종별 하중 분포를 쓰며, 국내 포장 설계 지침의 교통 하중 산정 방법을 따른다(현행 기준 확인).</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="aashto">
+    <h2>AASHTO 93 연성 포장 설계</h2>
+    <div class="problem"><strong>1 × 10⁶ ESAL을 견디려면 포장이 얼마나 "강해야" 하나</strong>
+      <p>도로 시험은 여러 두께의 포장을 같은 교통으로 망가뜨려 보고, 포장의 "강함"을 하나의 숫자로 묶었습니다. 층마다 재료의 기여도(층 계수)에 두께를 곱해 더한 이 숫자가 구조 지수 SN입니다. 그러면 남은 질문은 하나입니다. R-60의 교통과 노상에 필요한 SN은 얼마인가?</p></div>
+    <p>도로 시험은 포장이 "망가졌다"는 것을 균열 길이가 아니라 운전자가 느끼는 승차감으로 정의했습니다. 평가단이 차를 타고 0(통행 불가)–5(완벽)점으로 매긴 점수를 평탄성·균열·보수 면적 같은 측정값으로 회귀한 것이 <span class="term">공용성 지수</span><span class="en">(present serviceability index, PSI)</span>입니다. 새 포장은 PSI가 약 4.2(연성), 4.5(강성) 정도이고, 교통이 지나가며 떨어져 종점 PSI \(p_t\)(주요 도로 2.5, 낮은 등급 도로 2.0 형태)에 이르면 수명이 끝났다고 봅니다. 그 차이가 설계 공용성 손실 \(\Delta\mathrm{PSI} = p_0 - p_t\)입니다(R-60: 4.2 − 2.5 = 1.7).</p>
+    <p>노상의 강성은 반복 하중 시험(삼축 반복 재하)으로 잰 <span class="term">회복 탄성계수</span><span class="en">(resilient modulus)</span> \(M_R\)로 나타냅니다. 하중을 뺄 때 되돌아오는 변형만으로 계산한 탄성계수로, 단위는 지침을 따라 psi를 씁니다(1,000 psi = 6.895 MPa). 시험이 없으면 세립토에 대해 \(M_R \approx 1{,}500 \times \mathrm{CBR}\) (psi)라는 경험 관계를 씁니다(AASHTO 93이 소개한 형태, CBR 10 이하 세립토). R-60 노상 \(M_R = 7{,}500\) psi(52 MPa)는 CBR 약 5에 해당하고, CBR 시험은 <a href="../../geotech/chapters/phase.html#cbr">GeotechBook 2장</a>에서 다루었습니다.</p>
+    <div class="callout def"><strong>원리 13.4 (AASHTO 93 연성 포장식)</strong> 소요 <span class="term">구조 지수</span><span class="en">(structural number, SN)</span>는 다음 식을 \(W_{18}\)에 대해 풀어 구한다.
+      <div class="formula">$$\log_{10} W_{18} = Z_R S_0 + 9.36\log_{10}(\mathrm{SN}+1) - 0.20 + \frac{\log_{10}\!\left(\dfrac{\Delta\mathrm{PSI}}{4.2-1.5}\right)}{0.40 + \dfrac{1094}{(\mathrm{SN}+1)^{5.19}}} + 2.32\log_{10} M_R - 8.07$$<div class="where">\(W_{18}\): 설계 차로 누적 ESAL, \(M_R\): 노상 회복 탄성계수(psi), \(\Delta\mathrm{PSI}\): 설계 공용성 손실, \(Z_R\): <span class="term">신뢰도</span><span class="en">(reliability)</span> \(R\)에 대한 표준 정규 편차(R 90 % → −1.282, 95 % → −1.645), \(S_0\): <span class="term">전체 표준 편차</span><span class="en">(overall standard deviation)</span>(연성 0.40–0.50, 이 책 0.45). \(Z_R S_0\)는 교통 예측과 성능의 불확실성을 감안해 설계 교통을 \(10^{-Z_R S_0}\)배로 키우는 효과를 낸다(R 90 %: 3.78배). <code>CB.civ.w18(SN, o)</code>와 역산 <code>CB.civ.sn(W18, o)</code>가 이 식이다(경험식이므로 단위를 바꾸면 안 된다).</div></div></div>
+    <figure class="diagram" id="fig-pv-psi">
+      <svg viewBox="0 0 860 290" role="img" aria-label="누적 교통에 따라 PSI가 초기값에서 종점값으로 떨어지는 곡선과 신뢰도에 따른 설계 여유">
+        <rect x="10" y="10" width="840" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(90,30)">
+          <line x1="0" y1="200" x2="680" y2="200" class="s-axis"/><line x1="0" y1="0" x2="0" y2="200" class="s-axis"/>
+          <text x="676" y="222" text-anchor="end" class="t-mono">누적 ESAL (로그)</text><text x="8" y="8" class="t-mono">PSI</text>
+          <g class="t-mono" text-anchor="end"><text x="-6" y="24">4.2 (p₀)</text><text x="-6" y="114">2.5 (pₜ)</text><text x="-6" y="204">0</text></g>
+          <line x1="0" y1="110" x2="680" y2="110" style="stroke:var(--warn);stroke-dasharray:6 4"/>
+          <path d="M0 20 C 120 22, 220 30, 300 50 C 360 70, 400 100, 430 140" style="fill:none;stroke:var(--accent-2);stroke-width:2.5"/>
+          <path d="M0 20 C 160 22, 300 30, 420 50 C 490 70, 540 100, 570 140" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <line x1="396" y1="110" x2="396" y2="200" style="stroke:var(--accent-2);stroke-dasharray:3 3"/>
+          <line x1="536" y1="110" x2="536" y2="200" style="stroke:var(--accent);stroke-dasharray:3 3"/>
+          <text x="396" y="216" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">설계 W₁₈</text>
+          <text x="536" y="216" text-anchor="middle" class="t-mono" style="fill:var(--accent)">평균 수명</text>
+          <line x1="400" y1="160" x2="532" y2="160" style="stroke:var(--text-dim);stroke-width:1.4" marker-start="url(#pv-ah-dim)" marker-end="url(#pv-ah-dim)"/>
+          <text x="466" y="178" text-anchor="middle" class="t-mono">× 10^(−Z_R S₀) ≈ 3.8</text>
+          <text x="120" y="60" class="t-mono" style="fill:var(--accent)">평균 성능(50 % 신뢰도)</text>
+          <text x="120" y="80" class="t-mono" style="fill:var(--accent-2)">설계가 보장하는 성능(R 90 %)</text>
+          <text x="560" y="104" class="t-mono" style="fill:var(--warn)">종점 PSI — 덧씌우기 시점</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-4.</b> 공용성 곡선과 신뢰도(개념도). 같은 포장이라도 실제 수명은 흩어진다. 신뢰도 90 %로 설계하면 평균적으로는 설계 교통의 약 3.8배(S₀ = 0.45)를 견디는 포장이 되고, 열 개 중 아홉은 설계 교통 전에 종점에 이르지 않는다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 13.3 (R-60의 소요 SN)</strong> \(W_{18} = 1.0 \times 10^6\), \(M_R = 7{,}500\) psi, \(R = 90\) % (\(Z_R = -1.282\)), \(S_0 = 0.45\), \(\Delta\mathrm{PSI} = 1.7\). SN = 3.47을 넣어 식을 확인한다.
+      <ol class="pv-steps">
+        <li><b>신뢰도 항.</b> \(Z_R S_0 = -1.282 \times 0.45 = -0.577\).</li>
+        <li><b>SN 항.</b> \(9.36 \log_{10} 4.47 = 6.087\). 분모 \(0.40 + 1094/4.47^{5.19} = 0.40 + 1094/2{,}369 = 0.862\), 분자 \(\log_{10}(1.7/2.7) = -0.201\) → \(-0.233\).</li>
+        <li><b>노상 항.</b> \(2.32 \log_{10} 7{,}500 = 8.990\).</li>
+        <li><b>합.</b> \(\log_{10} W_{18} = -0.577 + 6.087 - 0.20 - 0.233 + 8.990 - 8.07 = 5.997\) → \(W_{18} = 0.99 \times 10^6\). 그러므로 <b>소요 SN ≈ 3.47</b>(역산 <code>CB.civ.sn</code> = 3.474).</li>
+        <li><b>감도.</b> 노상이 CBR 2(3,000 psi)로 나빠지면 소요 SN 4.83, 교통이 10배면 4.96, 신뢰도 95 %면 3.69. 노상과 교통이 신뢰도보다 훨씬 큰 영향을 준다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="layer-thickness">
+    <h2>층 계수와 두께 조합</h2>
+    <div class="problem"><strong>SN 3.47을 두께로 바꾸는 방법은 하나가 아니다</strong>
+      <p>SN은 무차원의 "강함"일 뿐 두께가 아닙니다. 비싼 아스팔트를 두껍게 깔아도, 싼 쇄석을 두껍게 깔아도 같은 SN을 만들 수 있습니다. 어떤 조합이 맞고 어떤 조합이 틀릴까요?</p></div>
+    <div class="callout def"><strong>원리 13.5 (층 계수와 구조 지수)</strong>
+      <div class="formula">$$\mathrm{SN} = a_1 D_1 + a_2 D_2 m_2 + a_3 D_3 m_3$$<div class="where">\(D_i\): 층 두께(인치, 1 in = 25.4 mm), \(a_i\): <span class="term">층 계수</span><span class="en">(layer coefficient)</span>, 두께 1인치가 SN에 더하는 몫. \(m_i\): <span class="term">배수 계수</span><span class="en">(drainage coefficient)</span>, 입상 층이 물에 젖어 약해지는 정도(배수 양호·포화 시간 짧음 1.0 이상, 불량 0.8 이하 형태). <code>CB.civ.snLayers([{a, D, m}])</code>가 이 합이다.</div></div></div>
+    <div class="table-wrap"><table class="pv-tbl">
+      <thead><tr><th>층</th><th>재료(예)</th><th>층 계수 a(대표값)</th><th>관계(AASHTO 93 형태)</th></tr></thead>
+      <tbody>
+        <tr><td>표층·중간층</td><td>밀입도 아스팔트 콘크리트(20 °C 탄성계수 약 3,100 MPa)</td><td class="hl">0.44</td><td>탄성계수가 클수록 크다(도표)</td></tr>
+        <tr><td>기층</td><td>입상 쇄석(M<sub>R</sub> 약 30,000 psi = 207 MPa)</td><td class="hl">0.14</td><td>a₂ ≈ 0.249 log₁₀E₂ − 0.977</td></tr>
+        <tr><td>기층</td><td>아스팔트 안정 처리</td><td>0.20–0.35</td><td>도표</td></tr>
+        <tr><td>보조 기층</td><td>입상 자갈·쇄석(M<sub>R</sub> 약 15,000 psi = 103 MPa)</td><td class="hl">0.11</td><td>a₃ ≈ 0.227 log₁₀E₃ − 0.839</td></tr>
+      </tbody></table></div>
+    <p>층 계수 값은 AASHTO 93 지침의 대표값이며 실제 설계에서는 현행 국내 지침과 재료 시험으로 확인해야 합니다. 두께를 고를 때 SN의 합만 맞추면 안 되는 이유가 있습니다. 아스팔트를 너무 얇게 하고 쇄석만 두껍게 하면 SN 합은 맞아도 <b>쇄석 기층 자체</b>가 바로 위의 얇은 아스팔트로는 보호받지 못해 기층에서 변형이 납니다. 그래서 AASHTO는 각 층 위의 SN이 그 층을 "노상으로 보고" 구한 소요 SN보다 커야 한다는 층별 검토를 합니다.</p>
+    <figure class="diagram" id="fig-pv-sn">
+      <svg viewBox="0 0 860 300" role="img" aria-label="층별 구조 지수 검토: 기층 위 SN1, 보조 기층 위 SN2, 노상 위 SN3">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,36)">
+          <rect x="0" y="0" width="360" height="40" style="fill:var(--text-dim);opacity:.8"/>
+          <rect x="0" y="40" width="360" height="56" style="fill:url(#pv-pat-agg);stroke:var(--border)"/>
+          <rect x="0" y="96" width="360" height="56" style="fill:var(--accent-soft);stroke:var(--border)"/>
+          <rect x="0" y="152" width="360" height="70" style="fill:url(#pv-pat-soil);stroke:var(--border)"/>
+          <g class="t-mono" style="paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round"><text x="10" y="25">a₁ = 0.44, D₁ = 120 mm</text><text x="10" y="72">a₂ = 0.14, D₂ = 150 mm, m₂</text><text x="10" y="128">a₃ = 0.11, D₃ = 150 mm, m₃</text><text x="10" y="192">노상 M_R = 7,500 psi</text></g>
+          <line x1="380" y1="0" x2="380" y2="40" style="stroke:var(--accent);stroke-width:3"/>
+          <line x1="420" y1="0" x2="420" y2="96" style="stroke:var(--accent);stroke-width:3"/>
+          <line x1="460" y1="0" x2="460" y2="152" style="stroke:var(--accent);stroke-width:3"/>
+          <g class="t-mono"><text x="480" y="24">SN₁(기층 M_R 30,000 psi) = 2.03</text><text x="480" y="80">SN₂(보조 기층 15,000 psi) = 2.66</text><text x="480" y="136">SN₃(노상 7,500 psi) = 3.47</text></g>
+          <g class="t-mono" style="fill:var(--accent)"><text x="480" y="44">a₁D₁ ≥ SN₁</text><text x="480" y="100">a₁D₁ + a₂D₂m₂ ≥ SN₂</text><text x="480" y="156">a₁D₁ + a₂D₂m₂ + a₃D₃m₃ ≥ SN₃</text></g>
+        </g>
+        <text x="430" y="282" text-anchor="middle" class="t-dim">위에서부터 차례로: 아스팔트 두께 → 기층 두께 → 보조 기층 두께 (W₁₈ = 10⁶, R 90 %, S₀ 0.45, ΔPSI 1.7)</text>
+      </svg>
+      <figcaption><b>그림 13-5.</b> 층별 SN 검토. 각 층 위에 놓인 층들의 SN이 그 층의 강성을 노상으로 보고 구한 소요 SN보다 커야 한다. 아래 예제와 시뮬레이터가 이 순서를 따른다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 13.4 (R-60 층 두께)</strong> 소요 SN₁ = 2.03, SN₂ = 2.66, SN₃ = 3.47(각각 <code>CB.civ.sn(1e6, {MR})</code>로 M<sub>R</sub> = 30,000, 15,000, 7,500 psi). 배수는 양호(m = 1.0)로 둔다.
+      <ol class="pv-steps">
+        <li><b>아스팔트층.</b> \(D_1 \ge 2.03/0.44 = 4.62\) in = 117 mm → 표층 P-13 50 mm + 중간층 70 mm = <b>120 mm</b>(4.72 in), \(\mathrm{SN}_1^* = 2.08\).</li>
+        <li><b>쇄석 기층.</b> \(D_2 \ge (2.66 - 2.08)/(0.14 \times 1.0) = 4.1\) in = 105 mm → 시공 최소 두께를 감안해 <b>150 mm</b>(5.91 in), 누계 \(2.08 + 0.83 = 2.91\).</li>
+        <li><b>보조 기층.</b> \(D_3 \ge (3.47 - 2.91)/(0.11 \times 1.0) = 5.1\) in = 130 mm → <b>150 mm</b>, 누계 \(2.91 + 0.65 = 3.56\).</li>
+        <li><b>판정.</b> SN = 3.56 ≥ 3.47 <b>만족</b>, 총두께 420 mm. 이 단면이 견디는 W₁₈(R 90 %)은 <code>CB.civ.w18(3.56)</code> = 1.15 × 10⁶.</li>
+        <li><b>배수가 나쁘면.</b> m₂ = m₃ = 0.8이면 SN = 2.08 + 0.66 + 0.52 = 3.26 \(\lt\) 3.47 <b>불만족</b>. 보조 기층을 250 mm로 늘리거나 배수층·맹암거(12장)로 배수를 개선해야 한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-pv-aashto">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>AASHTO 93 설계: 소요 SN과 층 두께 조합</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pv-cv-aashto" aria-label="포장 단면과 층별 소요 SN, 제공 SN 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">누적 W<sub>18</sub></i> <output id="pv-aa-w-out"></output></span><input type="range" id="pv-aa-w" min="5" max="7.6" step="0.02" value="6"></label>
+          <label class="ctrl"><span><i style="font-style:normal">노상 M<sub>R</sub></i> <output id="pv-aa-mr-out"></output></span><input type="range" id="pv-aa-mr" min="2000" max="20000" step="250" value="7500"></label>
+          <div class="ctrl"><span>신뢰도 R</span><div class="seg" id="pv-aa-r"><button data-value="50">50</button><button data-value="80">80</button><button data-value="90" class="on">90</button><button data-value="95">95</button><button data-value="99">99</button></div></div>
+          <label class="ctrl"><span>ΔPSI <output id="pv-aa-dp-out"></output></span><input type="range" id="pv-aa-dp" min="1" max="2.5" step="0.1" value="1.7"></label>
+          <label class="ctrl"><span><i style="font-style:normal">아스팔트 D<sub>1</sub></i> <output id="pv-aa-d1-out"></output></span><input type="range" id="pv-aa-d1" min="50" max="300" step="10" value="120"></label>
+          <label class="ctrl"><span><i style="font-style:normal">쇄석 기층 D<sub>2</sub></i> <output id="pv-aa-d2-out"></output></span><input type="range" id="pv-aa-d2" min="0" max="400" step="10" value="150"></label>
+          <label class="ctrl"><span><i style="font-style:normal">보조 기층 D<sub>3</sub></i> <output id="pv-aa-d3-out"></output></span><input type="range" id="pv-aa-d3" min="0" max="500" step="10" value="150"></label>
+          <div class="ctrl"><span>배수 m₂ = m₃</span><div class="seg" id="pv-aa-m"><button data-value="1.2">양호 1.2</button><button data-value="1" class="on">보통 1.0</button><button data-value="0.8">불량 0.8</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">소요 SN₁ · SN₂ · SN₃</span><span class="v" id="pv-aa-req">—</span></div>
+        <div class="stat"><span class="k">제공 SN(누계)</span><span class="v" id="pv-aa-prov">—</span></div>
+        <div class="stat"><span class="k">견디는 W<sub>18</sub></span><span class="v" id="pv-aa-cap">—</span></div>
+        <div class="stat"><span class="k">상대 비용(교육용)</span><span class="v" id="pv-aa-cost">—</span></div>
+      </div>
+      <div class="pv-msg" id="pv-aa-msg"></div>
+      <div class="sim-note">해볼 것: 기본값이 예제 13.4(SN 3.56 ≥ 3.47)입니다 · 아스팔트를 80 mm로 줄이고 보조 기층을 400 mm로 늘리면 합은 맞아도 SN₁ 검토에서 떨어집니다 · 배수를 "불량"으로 바꿔 보세요 · 노상 M<sub>R</sub>을 3,000 psi(CBR 2)로 낮추면 같은 교통에 SN이 약 1.4 더 필요합니다 · 상대 비용은 아스팔트 1 : 쇄석 0.25 : 보조 기층 0.15(두께당, 교육용)로 같은 SN의 싼 조합을 찾아보게 하려는 값입니다 · 모델: CB.civ.sn, CB.civ.w18, CB.civ.snLayers. 층 계수 0.44 · 0.14 · 0.11은 AASHTO 93 대표값.</div>
+    </div>
+    <div class="callout site"><strong>R-60 연성 포장 단면(교육용)</strong> 누적 ESAL 1 × 10⁶, 노상(E-4 성토 상부) M<sub>R</sub> 7,500 psi(약 CBR 5), R 90 %, S₀ 0.45, ΔPSI 1.7 → 소요 SN <b>3.47</b>. 표층 P-13 50 mm(MaterialsBook 13장, PG 64-22, Va 4 %) + 중간층 70 mm + 쇄석 기층 150 mm + 보조 기층 150 mm = 420 mm, 제공 SN <b>3.56</b>. 층별 검토 SN₁* 2.08 ≥ 2.03, SN₂* 2.91 ≥ 2.66. 동결 깊이 검토(동상 방지층)와 배수(12장 맹암거)는 별도로 확인한다.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="layered">
+    <h2>층 속의 응력과 변형률</h2>
+    <div class="problem"><strong>SN 3.56 단면의 노상은 실제로 얼마의 압력을 받나</strong>
+      <p>AASHTO 식은 경험식이라 "왜 그 두께인가"를 응력으로 보여 주지 않습니다. 포장을 탄성 층의 겹으로 보면 바퀴 아래 깊이마다 응력과 변형률을 계산할 수 있고, 이것이 역학적 설계의 출발점입니다.</p></div>
+    <p>한 층으로 된 반무한 탄성체 표면에 반지름 \(a\), 압력 \(p\)의 원형 하중이 걸릴 때 중심선 아래의 연직 응력은 부시네스크 해를 적분해 닫힌 꼴로 얻습니다(<a href="../../geotech/chapters/stress-distribution.html">GeotechBook 6장</a>). 실제 포장은 위가 단단하고 아래가 무른 여러 층이라 버미스터(1943)의 다층 탄성 해가 필요하지만, 손으로는 <b>오데마르크의 등가 두께</b>로 근사합니다. 단단한 층을 휨 강성이 같은 아래층 재료의 더 두꺼운 층으로 바꾸어, 전체를 한 재료의 반무한체로 보는 방법입니다.</p>
+    <div class="callout def"><strong>원리 13.6 (오데마르크 등가 두께와 원형 하중의 중심선 해, 교육용 근사)</strong> 위층 \(j\)의 두께 \(h_j\), 탄성계수 \(E_j\)를 \(n\)번째 층 재료로 바꾼 <span class="term">등가 두께</span><span class="en">(Odemark equivalent thickness)</span>와, 그 깊이 \(z_e\)에서의 중심선 응력·변형률은
+      <div class="formula">$$h_e = f\sum_{j \lt n} h_j \left(\frac{E_j}{E_n}\right)^{1/3}, \qquad \sigma_z = p\left[1 - \frac{z_e^3}{(a^2+z_e^2)^{3/2}}\right]$$
+      $$\varepsilon_z = \frac{(1+\nu)\,p}{E_n}\left[1 - 2\nu + \frac{2\nu z_e}{\sqrt{a^2+z_e^2}} - \frac{z_e^3}{(a^2+z_e^2)^{3/2}}\right]$$<div class="where">\(z_e = h_e + (z - z_{\text{층 윗면}})\), \(f\): 보정 계수(0.8–1.0, 이 책 0.9). 휨 강성 \(Eh^3\)이 같도록 바꾸므로 \(1/3\) 제곱이 붙는다. \(\nu\): \(n\)번째 층의 푸아송비. 바퀴 하중 40 kN(기준 축의 한쪽 바퀴 무리를 원 하나로 본 교육용 하중), 타이어 압력 \(p = 700\) kPa → \(a = \sqrt{P/(\pi p)} = 0.135\) m.</div></div></div>
+    <div class="callout"><strong>예제 13.5 (R-60 노상 윗면의 응력과 변형률)</strong> 아스팔트 120 mm(E 3,100 MPa), 쇄석 150 mm(207 MPa), 보조 기층 150 mm(103 MPa), 노상 52 MPa(ν 0.45). \(f = 0.9\).
+      <ol class="pv-steps">
+        <li><b>등가 두께.</b> \(0.12 \times (3100/52)^{1/3} = 0.12 \times 3.91 = 0.469\), \(0.15 \times (207/52)^{1/3} = 0.238\), \(0.15 \times (103/52)^{1/3} = 0.188\). \(h_e = 0.9 \times 0.895 = 0.805\) m. 실제 두께 0.42 m가 노상 재료로는 0.8 m 두께의 일을 한다.</li>
+        <li><b>연직 응력.</b> \(a^2 + z_e^2 = 0.0182 + 0.648 = 0.667\), \(z_e^3/(\cdot)^{3/2} = 0.522/0.545 = 0.959\) → \(\sigma_z = 700 \times 0.041 = 28\) kPa. 타이어 압력의 약 4 %다.</li>
+        <li><b>연직 변형률.</b> \(\varepsilon_z = \tfrac{1.45 \times 700}{52{,}000}[0.10 + 0.888 - 0.959] = 0.0195 \times 0.029 = 5.5 \times 10^{-4}\), 곧 약 <b>550 με</b>(압축).</li>
+        <li><b>의미.</b> 다음 절의 소성 변형 전이 함수에 넣으면 허용 반복 수가 약 5 × 10⁵로, AASHTO 단면(10⁶)과 같은 자릿수지만 작다. \(f = 1.0\)이면 450 με, 1.3 × 10⁶. 근사의 거칠기(\(f\), 단륜 환산, 노상 ν)가 결과를 두 배 넘게 바꾼다는 것이 이 예제의 교훈이다. 실제 역학적 설계는 다층 탄성 해석 프로그램과 지역 보정을 쓴다.</li>
+      </ol></div>
+    <div class="sim" id="sim-pv-layer">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>층별 응력·변형률(오데마르크 + 부시네스크, 교육용)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view pv-stack">
+          <div><canvas id="pv-cv-layer-s" aria-label="깊이에 따른 연직 응력 분포와 층 경계"></canvas><span class="pv-cap">연직 응력 σ<sub>z</sub> (kPa)</span></div>
+          <div><canvas id="pv-cv-layer-e" aria-label="깊이에 따른 연직 변형률 분포"></canvas><span class="pv-cap">연직 변형률 ε<sub>z</sub> (με)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">아스팔트 h<sub>1</sub></i> <output id="pv-ly-h1-out"></output></span><input type="range" id="pv-ly-h1" min="40" max="300" step="10" value="120"></label>
+          <label class="ctrl"><span><i style="font-style:normal">아스팔트 E<sub>1</sub></i> <output id="pv-ly-e1-out"></output></span><input type="range" id="pv-ly-e1" min="1000" max="8000" step="100" value="3100"></label>
+          <label class="ctrl"><span><i style="font-style:normal">쇄석 기층 h<sub>2</sub></i> <output id="pv-ly-h2-out"></output></span><input type="range" id="pv-ly-h2" min="0" max="400" step="10" value="150"></label>
+          <label class="ctrl"><span><i style="font-style:normal">보조 기층 h<sub>3</sub></i> <output id="pv-ly-h3-out"></output></span><input type="range" id="pv-ly-h3" min="0" max="500" step="10" value="150"></label>
+          <label class="ctrl"><span><i style="font-style:normal">노상 E<sub>4</sub></i> <output id="pv-ly-e4-out"></output></span><input type="range" id="pv-ly-e4" min="15" max="150" step="1" value="52"></label>
+          <label class="ctrl"><span>보정 계수 f <output id="pv-ly-f-out"></output></span><input type="range" id="pv-ly-f" min="0.7" max="1.1" step="0.01" value="0.9"></label>
+          <div class="ctrl"><span>바퀴 하중</span><div class="seg" id="pv-ly-P"><button data-value="40" class="on">40 kN</button><button data-value="50">50 kN</button><button data-value="65">65 kN</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">노상 등가 깊이 h<sub>e</sub></span><span class="v" id="pv-ly-he">—</span></div>
+        <div class="stat"><span class="k">노상 윗면 σ<sub>z</sub></span><span class="v" id="pv-ly-sz">—</span></div>
+        <div class="stat"><span class="k">노상 윗면 ε<sub>z</sub></span><span class="v" id="pv-ly-ez">—</span></div>
+        <div class="stat"><span class="k">허용 반복 N<sub>d</sub>(소성 변형)</span><span class="v" id="pv-ly-nd">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 아스팔트 E<sub>1</sub>을 여름철(약 1,000 MPa)과 겨울철(약 8,000 MPa)로 바꿔 보면 같은 단면의 노상 변형률이 크게 달라집니다 — 소성 변형이 여름에 생기는 이유 · 보조 기층을 0으로 하면 노상 변형률이 약 1.6배 · 바퀴 하중을 65 kN(과적)으로 올리면 N<sub>d</sub>가 크게 줄어듭니다 · 층 경계에서 변형률이 뛰는 것은 각 층의 E가 다르기 때문입니다 · 모델: 원리 13.6(페이지 내 교육용 근사, 기층 E<sub>2</sub> = 207 MPa, E<sub>3</sub> = 103 MPa, ν = 0.35 · 0.35 · 0.40 · 0.45 고정), N<sub>d</sub>는 원리 13.7의 아스팔트 협회 형태 전이 함수.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="me-design">
+    <h2>역학적–경험적 설계 맛보기</h2>
+    <div class="problem"><strong>새 재료, 새 하중에는 도로 시험이 없다</strong>
+      <p>AASHO 도로 시험은 1950년대 일리노이의 기후·흙·재료·트럭으로 한 실험입니다. 개질 아스팔트, 광폭 단륜 타이어, 훨씬 많은 교통 앞에서 그 경험식을 그대로 늘려 쓰는 데는 한계가 있습니다. 그래서 응력·변형률은 역학으로 계산하고, 그 변형률이 몇 번 반복되면 파손되는지만 실험과 현장 자료로 맞추는 방법이 나왔습니다.</p></div>
+    <p>이것이 <span class="term">역학적–경험적 설계</span><span class="en">(mechanistic-empirical design, ME)</span>입니다. 역학 부분은 다층 탄성 해석으로 두 개의 "임계 변형률"을 구합니다. 아스팔트층 하면의 수평 인장 변형률 \(\varepsilon_t\)(반복되면 아래에서 위로 올라오는 <b>피로 균열</b>)과 노상 윗면의 연직 압축 변형률 \(\varepsilon_v\)(반복되면 노상이 조금씩 영구 변형해 생기는 <b>소성 변형</b>)입니다. 경험 부분은 이 변형률을 허용 반복 수로 바꾸는 <span class="term">전이 함수</span><span class="en">(transfer function)</span>이고, 서로 다른 하중의 손상은 <span class="term">마이너 법칙</span><span class="en">(Miner's rule)</span>으로 더합니다.</p>
+    <div class="callout def"><strong>원리 13.7 (전이 함수와 누적 손상, 아스팔트 협회 형태)</strong>
+      <div class="formula">$$N_f = 0.0796\,\varepsilon_t^{-3.291}\,E_1^{-0.854}, \qquad N_d = 1.365 \times 10^{-9}\,\varepsilon_v^{-4.477}, \qquad D = \sum_i \frac{n_i}{N_i} \le 1$$<div class="where">\(N_f\): 피로 균열(차로 면적의 약 20 % 균열)까지의 허용 반복 수, \(E_1\): 아스팔트 탄성계수(psi), \(N_d\): 소성 변형(약 13 mm)까지의 허용 반복 수, 변형률은 무차원. 미국 아스팔트 협회(Asphalt Institute)가 쓴 형태로 교재에 널리 실린 식이다(교육용). \(D\): 손상 합, 1이 되면 파손. 실제 ME 설계(미국 MEPDG, 한국형 포장 설계법 등)는 온도·계절별 탄성계수, 축하중 스펙트럼, 지역 보정 계수를 쓴다(현행 지침 확인).</div></div></div>
+    <p>전이 함수의 지수를 보면 4제곱 법칙이 왜 나오는지 짐작할 수 있습니다. 변형률은 하중에 거의 비례하므로 소성 변형 손상은 하중의 약 4.5제곱, 피로 손상은 약 3.3제곱에 비례합니다. 도로 시험의 "4"는 이 두 메커니즘이 섞인 평균인 셈입니다.</p>
+    <div class="sim" id="sim-pv-me">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>역학적–경험적 검토: 피로와 소성 변형 손상</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pv-cv-me" aria-label="연도별 피로 손상과 소성 변형 손상의 누적 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">아스팔트 하면 ε<sub>t</sub></i> <output id="pv-me-et-out"></output></span><input type="range" id="pv-me-et" min="50" max="450" step="5" value="200"></label>
+          <label class="ctrl"><span><i style="font-style:normal">아스팔트 E<sub>1</sub></i> <output id="pv-me-e1-out"></output></span><input type="range" id="pv-me-e1" min="1000" max="8000" step="100" value="3100"></label>
+          <label class="ctrl"><span><i style="font-style:normal">노상 ε<sub>v</sub></i> <output id="pv-me-ev-out"></output></span><input type="range" id="pv-me-ev" min="150" max="1200" step="5" value="550"></label>
+          <label class="check"><input type="checkbox" id="pv-me-link" checked> ε<sub>v</sub>를 위 층 시뮬레이터 값과 연동</label>
+          <label class="ctrl"><span><i style="font-style:normal">20년 누적 W<sub>18</sub></i> <output id="pv-me-w-out"></output></span><input type="range" id="pv-me-w" min="5" max="7.5" step="0.02" value="6"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">N<sub>f</sub>(피로)</span><span class="v" id="pv-me-nf">—</span></div>
+        <div class="stat"><span class="k">N<sub>d</sub>(소성 변형)</span><span class="v" id="pv-me-nd">—</span></div>
+        <div class="stat"><span class="k">20년 손상 D<sub>f</sub> · D<sub>d</sub></span><span class="v" id="pv-me-d">—</span></div>
+        <div class="stat"><span class="k">지배 파손 · 수명</span><span class="v" id="pv-me-life">—</span></div>
+      </div>
+      <div class="pv-msg" id="pv-me-msg"></div>
+      <div class="sim-note">해볼 것: ε<sub>t</sub> = 200 με은 R-60 단면에 대해 다층 탄성 해석 프로그램이 낼 법한 값으로 둔 교육용 입력입니다(이 페이지는 ε<sub>t</sub>를 계산하지 않습니다) · 연동을 켜 두고 위 시뮬레이터에서 보조 기층을 250 mm로 늘리면 소성 변형 손상이 1 아래로 내려옵니다 · 아스팔트를 두껍게 하면 실제로는 ε<sub>t</sub>도 줄어듭니다. 그 효과는 ε<sub>t</sub> 슬라이더로 직접 넣어 보세요 · 모델: 원리 13.7, 교통은 성장률 2 %로 연도별 배분. 결과는 교육용 비교입니다.</div>
+    </div>
+    <div class="callout deep"><strong>다층 탄성 해석과 상향식·하향식 균열</strong> 버미스터의 2층 해(1943) 이후 다층 탄성 해석은 컴퓨터 프로그램(미국의 BISAR, KENLAYER 등)으로 일상화되었다. 탄성 해석은 바퀴 바로 아래 아스팔트 하면에서 수평 인장이 가장 크다고 보고 "아래에서 위로" 올라오는 균열을 예측하지만, 두꺼운 아스팔트 포장에서는 바퀴 가장자리의 표면에서 시작해 내려가는 하향식 균열도 흔하다는 관찰이 쌓였다. 탄성 해석만으로는 이것을 설명하기 어려워, 최근의 설계법은 두 균열을 따로 모델링한다. 이 장의 오데마르크 근사는 노상 연직 변형률의 크기를 감 잡는 용도로만 쓴다.</div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="rigid">
+    <h2>콘크리트 포장과 웨스터가드 응력</h2>
+    <div class="problem"><strong>250 mm 판은 바퀴 하나에 얼마나 휘나</strong>
+      <p>콘크리트 포장은 판 하나가 하중을 받아 휘고, 판 아래 흙이 스프링처럼 되밀어 줍니다. 판이 두꺼울수록, 흙이 단단할수록 덜 휩니다. 그런데 같은 바퀴라도 판 가운데에 있을 때와 줄눈 가장자리, 모서리에 있을 때 응력이 크게 다릅니다.</p></div>
+    <p>1926년 덴마크 출신의 미국 학자 웨스터가드(H. M. Westergaard)는 콘크리트 판을 <b>빙클러 지반</b>(서로 독립된 스프링, <a href="../../geotech/chapters/piles.html">GeotechBook 14장</a>의 수평 말뚝과 같은 모형) 위의 얇은 판으로 보고 세 위치의 최대 응력을 닫힌 꼴로 구했습니다. 스프링 강성은 평판 재하 시험의 압력/침하로 정한 <span class="term">지반 반력 계수</span><span class="en">(modulus of subgrade reaction)</span> \(k\)(MPa/m)이고, 판과 지반의 상대적 강성은 길이 하나로 묶입니다.</p>
+    <div class="callout def"><strong>정의 13.8 (상대 강성 반지름)</strong>
+      <div class="formula">$$\ell = \left[\frac{E h^3}{12(1-\nu^2)\,k}\right]^{1/4}$$<div class="where"><span class="term">상대 강성 반지름</span><span class="en">(radius of relative stiffness)</span>. \(E\), \(\nu\): 콘크리트 탄성계수·푸아송비(0.15), \(h\): 판 두께, \(k\): 지반 반력 계수. 판의 처짐이 퍼지는 길이의 척도로, 하중에서 약 \(3\ell\)–\(4\ell\) 떨어지면 영향이 거의 사라진다. 탄성 지반 위 보의 \(1/\beta\)(14장)와 같은 역할이다.</div></div></div>
+    <div class="callout def"><strong>원리 13.9 (웨스터가드 응력, ν = 0.15)</strong> 바퀴 하중 \(P\), 접지 반지름 \(a\)에서
+      <div class="formula">$$\sigma_i = \frac{0.316P}{h^2}\left[4\log_{10}\frac{\ell}{b} + 1.069\right], \quad \sigma_e = \frac{0.572P}{h^2}\left[4\log_{10}\frac{\ell}{b} + 0.359\right], \quad \sigma_c = \frac{3P}{h^2}\left[1 - \left(\frac{a\sqrt2}{\ell}\right)^{0.6}\right]$$<div class="where">\(\sigma_i\): 내부 재하(판 하면 인장), \(\sigma_e\): 가장자리 재하(하면), \(\sigma_c\): 모서리 재하(판 윗면 인장, 웨스터가드 원식). \(b\): 등가 반지름, \(a \lt 1.724h\)이면 \(b = \sqrt{1.6a^2 + h^2} - 0.675h\), 아니면 \(b = a\)(얇은 판 이론이 바퀴 바로 밑에서 응력을 과대평가하는 것을 보정). 내부식은 <code>CB.civ.westergaard(P, h, E, k, a)</code>, 가장자리·모서리식은 이 페이지의 교육용 구현이다(후속 연구로 모서리식 등이 수정되었으며 계수는 문헌마다 다르다).</div></div></div>
+    <figure class="diagram" id="fig-pv-wg">
+      <svg viewBox="0 0 880 300" role="img" aria-label="콘크리트 판 위 하중 위치: 내부, 가장자리, 모서리와 빙클러 스프링 위의 판 단면">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="170" y="0" text-anchor="middle" class="t" style="font-weight:700">평면: 하중 위치</text>
+          <rect x="20" y="16" width="150" height="100" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="170" y="16" width="150" height="100" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="20" y="116" width="150" height="100" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="170" y="116" width="150" height="100" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <circle cx="95" cy="66" r="10" style="fill:var(--accent-2)"/><text x="95" y="96" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">내부 σᵢ</text>
+          <circle cx="245" cy="105" r="10" style="fill:var(--accent-2)"/><text x="245" y="86" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">가장자리 σₑ</text>
+          <circle cx="33" cy="203" r="10" style="fill:var(--accent-2)"/><text x="50" y="190" class="t-mono" style="fill:var(--accent-2)">모서리 σ_c</text>
+          <text x="170" y="234" text-anchor="middle" class="t-mono">줄눈(판 경계) — 하중 전달이 없으면 자유단</text>
+        </g>
+        <g transform="translate(430,60)">
+          <text x="190" y="-20" text-anchor="middle" class="t" style="font-weight:700">단면: 빙클러 지반 위의 판</text>
+          <path d="M0 40 L380 40 L380 70 L0 70 Z" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.5"/>
+          <path d="M0 40 C 120 40, 150 52, 190 56 C 230 52, 260 40, 380 40" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:5 4"/>
+          <line x1="190" y1="0" x2="190" y2="36" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#pv-ah-ld)"/>
+          <text x="198" y="16" class="t-mono" style="fill:var(--accent-2)">P (반지름 a)</text>
+          <g style="stroke:var(--warn);stroke-width:1.4;fill:none">
+            <path d="M30 70 l0 6 l-6 4 l12 6 l-12 6 l12 6 l-6 4 l0 8"/><path d="M90 70 l0 6 l-6 4 l12 6 l-12 6 l12 6 l-6 4 l0 8"/><path d="M150 72 l0 6 l-6 4 l12 6 l-12 6 l12 6 l-6 4 l0 6"/><path d="M230 72 l0 6 l-6 4 l12 6 l-12 6 l12 6 l-6 4 l0 6"/><path d="M290 70 l0 6 l-6 4 l12 6 l-12 6 l12 6 l-6 4 l0 8"/><path d="M350 70 l0 6 l-6 4 l12 6 l-12 6 l12 6 l-6 4 l0 8"/>
+          </g>
+          <line x1="0" y1="110" x2="380" y2="110" style="stroke:var(--warn);stroke-width:2"/>
+          <text x="190" y="132" text-anchor="middle" class="t-mono" style="fill:var(--warn)">지반 반력 = k × 처짐 (독립 스프링)</text>
+          <text x="190" y="62" text-anchor="middle" class="t-mono">h, E, ν</text>
+          <line x1="110" y1="160" x2="270" y2="160" style="stroke:var(--accent);stroke-width:1.4" marker-start="url(#pv-ah-acc)" marker-end="url(#pv-ah-acc)"/>
+          <text x="190" y="180" text-anchor="middle" class="t-mono" style="fill:var(--accent)">처짐이 퍼지는 폭 ~ 수 ℓ</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-6.</b> 웨스터가드의 세 하중 위치와 계산 모형. 판이 이어지지 않는 가장자리·모서리에서는 받쳐 줄 판이 한쪽에만 있어 응력과 처짐이 커진다. 줄눈에 다웰바를 넣어 옆 판과 하중을 나누면 가장자리 응력을 줄일 수 있다(13.9절).</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 13.6 (250 mm 콘크리트 포장의 웨스터가드 응력)</strong> \(h = 0.25\) m, \(E = 30{,}000\) MPa, \(\nu = 0.15\), \(k = 50\) MPa/m, 바퀴 하중 \(P = 80\) kN(접지 반지름 0.15 m — 탠덤 축 한쪽 바퀴 무리를 묶은 교육용 보수적 하중). 콘크리트 휨강도 4.5 MPa(현행 기준 확인).
+      <ol class="pv-steps">
+        <li><b>상대 강성 반지름.</b> \(\ell = [3\times10^7 \times 0.25^3/(12 \times 0.9775 \times 5\times10^4)]^{1/4} = (468{,}750/586{,}500)^{1/4} = 0.946\) m(kPa 단위로 맞춤).</li>
+        <li><b>등가 반지름.</b> \(a = 0.15 \lt 1.724 \times 0.25\)이므로 \(b = \sqrt{1.6 \times 0.0225 + 0.0625} - 0.169 = 0.145\) m, \(\log_{10}(\ell/b) = 0.814\).</li>
+        <li><b>내부.</b> \(\sigma_i = 0.316 \times 80/0.0625 \times (3.256 + 1.069) = 404.5 \times 4.325 = 1{,}749\) kPa ≈ <b>1.75 MPa</b>.</li>
+        <li><b>가장자리.</b> \(\sigma_e = 732.2 \times (3.256 + 0.359) = 2{,}647\) kPa ≈ <b>2.65 MPa</b>(내부의 1.5배).</li>
+        <li><b>모서리.</b> \((0.212/0.946)^{0.6} = 0.408\), \(\sigma_c = 3{,}840 \times 0.592 = 2{,}274\) kPa ≈ <b>2.27 MPa</b>.</li>
+        <li><b>판정.</b> 가장 큰 가장자리 응력의 휨강도 비(응력비) 0.59. 한 번에 깨지지는 않지만 반복 하중에는 피로가 문제가 된다. PCA(1984) 형태 피로식 \(\log_{10} N = 11.737 - 12.077\,\mathrm{SR}\)(SR ≥ 0.55)이면 약 4 × 10⁴회. 그래서 실제 설계는 가장자리를 다웰바·타이바·넓힌 차로(바퀴가 가장자리에서 멀어지게)로 보호하고, 바퀴 대부분이 지나는 위치의 하중 분포를 따진다.</li>
+      </ol></div>
+    <div class="sim" id="sim-pv-wg">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>웨스터가드 응력과 판의 처짐(3D)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view pv-stack">
+          <div><canvas id="pv-cv-wg3" aria-label="네 장의 콘크리트 판과 하중 위치에 따른 처짐 형상 3차원 보기"></canvas><span class="pv-cap">처짐 형상(과장, 끌어서 회전)</span></div>
+          <div><canvas id="pv-cv-wg" aria-label="판 두께에 따른 내부, 가장자리, 모서리 응력 곡선과 휨강도 선"></canvas><span class="pv-cap">응력 – 판 두께</span></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>하중 위치</span><div class="seg" id="pv-wg-pos"><button data-value="i">내부</button><button data-value="e" class="on">가장자리</button><button data-value="c">모서리</button></div></div>
+          <label class="ctrl"><span>판 두께 h <output id="pv-wg-h-out"></output></span><input type="range" id="pv-wg-h" min="150" max="400" step="5" value="250"></label>
+          <label class="ctrl"><span>지반 반력 계수 k <output id="pv-wg-k-out"></output></span><input type="range" id="pv-wg-k" min="15" max="200" step="1" value="50"></label>
+          <label class="ctrl"><span>탄성계수 E <output id="pv-wg-E-out"></output></span><input type="range" id="pv-wg-E" min="20000" max="40000" step="500" value="30000"></label>
+          <label class="ctrl"><span>바퀴 하중 P <output id="pv-wg-P-out"></output></span><input type="range" id="pv-wg-P" min="20" max="140" step="1" value="80"></label>
+          <label class="ctrl"><span><i style="font-style:normal">휨강도 f<sub>r</sub></i> <output id="pv-wg-fr-out"></output></span><input type="range" id="pv-wg-fr" min="3.5" max="6" step="0.1" value="4.5"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">ℓ</span><span class="v" id="pv-wg-l">—</span></div>
+        <div class="stat"><span class="k">σ<sub>i</sub> · σ<sub>e</sub> · σ<sub>c</sub></span><span class="v" id="pv-wg-s">—</span></div>
+        <div class="stat"><span class="k">처짐(선택 위치)</span><span class="v" id="pv-wg-d">—</span></div>
+        <div class="stat"><span class="k">응력비 · 허용 반복</span><span class="v" id="pv-wg-n">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값의 내부 응력이 예제 13.6의 1.75 MPa입니다 · k를 50 → 100 MPa/m로 두 배 하면 내부 응력은 약 7 %만 줄어듭니다(ℓ이 k<sup>1/4</sup>로만 변하고 응력은 log에 들어 있음) — 콘크리트 포장에서 지지력보다 두께가 효과적인 이유 · 두께 250 → 300 mm면 가장자리 응력이 약 27 % 줄어듭니다 · 모서리 처짐이 내부의 약 7배 — 모서리 펌핑(13.10절)의 원인 · 모델: CB.civ.westergaard(내부), 가장자리·모서리 응력과 처짐 Δ<sub>i</sub> = P/(8kℓ²), Δ<sub>e</sub> = 0.431P/(kℓ²)(1 − 0.82a/ℓ), Δ<sub>c</sub> = P/(kℓ²)(1.1 − 0.88a√2/ℓ)는 페이지 내 웨스터가드 형태(교육용). 3D 처짐 형상은 e<sup>−s</sup>(cos s + sin s) 꼴의 교육용 그림, 허용 반복은 PCA(1984) 형태 피로식.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="joints">
+    <h2>줄눈, 다웰바, 온도 컬링</h2>
+    <div class="problem"><strong>왜 콘크리트 포장은 몇 m마다 잘려 있나</strong>
+      <p>고속도로 콘크리트 포장을 달리면 일정한 간격으로 "턱, 턱" 하는 소리가 납니다. 판을 일부러 잘라 놓은 줄눈입니다. 끊지 않고 길게 치면 더 튼튼할 것 같은데, 왜 자를까요?</p></div>
+    <p>콘크리트는 굳으며 건조 수축하고(MaterialsBook 콘크리트 수축), 하루에도 윗면과 아랫면의 온도가 달라 휩니다. 길게 이어진 판은 이 변형이 지반 마찰에 막혀 아무 데서나 균열이 납니다. 그래서 <span class="term">줄눈 콘크리트 포장</span><span class="en">(jointed plain concrete pavement, JCP)</span>은 일정 간격(국내 고속도로에서 흔히 약 6 m 형태)으로 깊이의 1/4–1/3쯤 톱으로 홈을 내어 균열을 그 자리로 유도하는 <span class="term">수축 줄눈</span><span class="en">(contraction joint)</span>을 두고, 균열면을 건너 하중을 옆 판에 넘기도록 매끈한 원형 강봉인 <span class="term">다웰바</span><span class="en">(dowel bar)</span>를 넣습니다. 다웰바는 한쪽을 미끄러지게 해 판의 길이 변화를 허용합니다. 차로 사이의 세로 줄눈에는 판이 벌어지지 않게 묶는 이형 철근 <span class="term">타이바</span><span class="en">(tie bar)</span>를, 구조물과 만나는 곳에는 판이 늘어날 틈을 주는 팽창 줄눈을 둡니다. 줄눈 대신 세로 철근을 연속으로 넣어 미세한 균열을 촘촘히 분산시키는 <span class="term">연속 철근 콘크리트 포장</span><span class="en">(continuously reinforced concrete pavement, CRCP)</span>도 있습니다.</p>
+    <figure class="diagram" id="fig-pv-joint">
+      <svg viewBox="0 0 880 320" role="img" aria-label="수축 줄눈과 다웰바 단면, 그리고 낮과 밤의 온도 차이로 판이 휘는 컬링">
+        <rect x="10" y="10" width="860" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="180" y="0" text-anchor="middle" class="t" style="font-weight:700">수축 줄눈과 다웰바</text>
+          <rect x="10" y="20" width="170" height="70" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.5"/>
+          <rect x="184" y="20" width="170" height="70" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.5"/>
+          <rect x="178" y="20" width="12" height="20" style="fill:var(--bg-elev);stroke:var(--text-dim)"/>
+          <path d="M182 40 L180 52 L184 64 L181 78 L183 90" style="fill:none;stroke:var(--bad);stroke-width:1.4"/>
+          <rect x="110" y="52" width="150" height="8" rx="3" style="fill:var(--accent-2)"/>
+          <rect x="182" y="50" width="78" height="12" rx="3" style="fill:none;stroke:var(--accent-2);stroke-dasharray:3 2"/>
+          <g class="t-mono"><text x="184" y="14" text-anchor="middle">톱 자른 홈(h/4–h/3) + 실링</text><text x="100" y="112" text-anchor="middle" style="fill:var(--accent-2)">다웰바 φ ≈ h/8, 길이 약 450 mm</text><text x="270" y="112" text-anchor="middle">한쪽 미끄럼(코팅)</text><text x="182" y="132" text-anchor="middle" style="fill:var(--bad)">유도 균열</text></g>
+          <rect x="10" y="90" width="344" height="0" style="stroke:var(--text-dim)"/>
+          <text x="180" y="160" text-anchor="middle" class="t-dim">하중 전달률 LTE = 무재하 판 처짐 / 재하 판 처짐</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="180" y="0" text-anchor="middle" class="t" style="font-weight:700">온도 컬링(판 길이 L)</text>
+          <text x="10" y="30" class="t-mono">낮: 윗면이 뜨겁다 → 위로 볼록, 가장자리가 들림</text>
+          <path d="M10 70 Q 180 44 350 70 L350 92 Q 180 66 10 92 Z" style="fill:var(--surface-2);stroke:var(--accent-2);stroke-width:1.5"/>
+          <text x="180" y="110" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">중앙 하면 인장 + 자중이 끌어내림</text>
+          <text x="10" y="148" class="t-mono">밤: 윗면이 차갑다 → 아래로 오목, 모서리가 들림</text>
+          <path d="M10 170 Q 180 196 350 170 L350 192 Q 180 218 10 192 Z" style="fill:var(--surface-2);stroke:var(--blue);stroke-width:1.5"/>
+          <text x="180" y="240" text-anchor="middle" class="t-mono" style="fill:var(--blue)">윗면 인장 + 들린 모서리에 바퀴 → 모서리 균열·펌핑</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-7.</b> 수축 줄눈의 다웰바(왼쪽)와 온도 차이에 의한 컬링(오른쪽, 과장). 판이 자중으로 지반에 붙어 있으려 하므로 휘려는 변형이 막히면서 응력이 생긴다. 판이 길수록 막히는 정도가 커져 컬링 응력이 커진다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 13.10 (온도 컬링 응력, 브래드버리 형태)</strong> 판 윗면과 아랫면의 온도 차 \(\Delta T\), 열팽창 계수 \(\alpha\)에서 판 가장자리와 내부의 <span class="term">컬링</span><span class="en">(curling)</span> 응력은
+      <div class="formula">$$\sigma_{edge} = \frac{C\,E\,\alpha\,\Delta T}{2}, \qquad \sigma_{int} = \frac{E\,\alpha\,\Delta T}{2(1-\nu^2)}\,(C_1 + \nu C_2), \qquad C = 1 - \frac{2\cos\lambda\cosh\lambda\,(\tan\lambda + \tanh\lambda)}{\sin 2\lambda + \sinh 2\lambda}$$<div class="where">\(\lambda = L/(\ell\sqrt8)\), \(L\): 판 길이(내부식은 \(C_1\)이 계산 방향, \(C_2\)가 직각 방향의 판 치수로 구한 \(C\)). \(C\)는 \(L/\ell \approx 9\)에서 최대 약 1.09이고, 판이 짧을수록 작아진다(웨스터가드의 해석을 브래드버리가 1938년 도표로 정리한 형태). \(\alpha \approx 1 \times 10^{-5}\)/°C.</div></div></div>
+    <p>줄눈의 하중 전달은 <span class="term">하중 전달률</span><span class="en">(load transfer efficiency, LTE)</span>로 잽니다. 낙하 하중 처짐계(FWD)로 줄눈 한쪽을 때려 양쪽 처짐을 재고, 무재하 판 처짐을 재하 판 처짐으로 나눈 값입니다. 다웰바가 건전하면 80–90 % 이상, 다웰바 없이 골재 맞물림만으로는 시간이 지나며 크게 떨어집니다. LTE가 높으면 바퀴가 가장자리에 있어도 옆 판이 하중을 나눠 받아 응력과 처짐이 줄고, 판 끝이 위아래로 덜 움직여 줄눈 아래 흙이 물과 함께 빠져나가는 펌핑과 단차가 줄어듭니다.</p>
+    <div class="callout"><strong>예제 13.7 (줄눈 간격과 컬링)</strong> 예제 13.6의 판(ℓ = 0.946 m), 줄눈 간격 6 m, 판 폭 3.5 m, 낮의 상하 온도 차 10 °C(교육용), \(\alpha = 1 \times 10^{-5}\)/°C.
+      <ol class="pv-steps">
+        <li><b>λ와 C.</b> \(L/\ell = 6.34\), \(\lambda = 6/(0.946 \times 2.828) = 2.24\) → \(C = 0.96\).</li>
+        <li><b>가장자리 컬링 응력.</b> \(\sigma = 0.96 \times 30{,}000 \times 10^{-5} \times 10/2 = 1.44\) MPa.</li>
+        <li><b>하중과 합.</b> 가장자리 하중 응력 2.65 MPa + 1.44 = 4.09 MPa \(\lt\) 4.5 MPa(응력비 0.91, 반복에는 매우 불리). 다웰바로 LTE 80 %를 확보하면 하중 응력이 교육용 근사 \(\sigma_e/(1 + \mathrm{LTE})\)로 약 1.47 MPa → 합 2.91 MPa.</li>
+        <li><b>줄눈 간격.</b> 4.5 m로 줄이면 \(C = 0.65\), 컬링 0.98 MPa. 간격을 \(4\ell\)–\(6\ell\) 정도로 짧게 두는 경험 규칙(형태)이 여기서 나온다.</li>
+      </ol></div>
+    <div class="sim" id="sim-pv-curl">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>줄눈 간격·컬링·하중 전달</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pv-cv-curl" aria-label="판 길이와 상대 강성 반지름의 비에 따른 브래드버리 계수 곡선과 가장자리 응력 합 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>줄눈 간격 L <output id="pv-cu-L-out"></output></span><input type="range" id="pv-cu-L" min="3" max="15" step="0.25" value="6"></label>
+          <label class="ctrl"><span>상하 온도 차 ΔT <output id="pv-cu-dT-out"></output></span><input type="range" id="pv-cu-dT" min="0" max="25" step="0.5" value="10"></label>
+          <label class="ctrl"><span>판 두께 h <output id="pv-cu-h-out"></output></span><input type="range" id="pv-cu-h" min="150" max="400" step="5" value="250"></label>
+          <label class="ctrl"><span>하중 전달률 LTE <output id="pv-cu-lte-out"></output></span><input type="range" id="pv-cu-lte" min="0" max="95" step="1" value="0"></label>
+          <div class="ctrl"><span>줄눈 형식</span><div class="seg" id="pv-cu-type"><button data-value="none" class="on">골재 맞물림</button><button data-value="dowel">다웰바</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">L/ℓ · C</span><span class="v" id="pv-cu-C">—</span></div>
+        <div class="stat"><span class="k">컬링 σ(가장자리)</span><span class="v" id="pv-cu-sc">—</span></div>
+        <div class="stat"><span class="k">하중 σ(LTE 반영)</span><span class="v" id="pv-cu-sl">—</span></div>
+        <div class="stat"><span class="k">합 · 응력비</span><span class="v" id="pv-cu-sum">—</span></div>
+      </div>
+      <div class="pv-msg" id="pv-cu-msg"></div>
+      <div class="sim-note">해볼 것: 기본값은 예제 13.7(다웰바 없음, 합 4.09 MPa)입니다 · "다웰바"를 누르면 LTE가 85 %로 바뀝니다 · 줄눈 간격을 9 m(L/ℓ ≈ 9.5)로 늘리면 C가 최대 근처입니다 · 두께를 늘리면 ℓ이 커져 같은 간격에서 C가 작아지지만 하중 응력이 줄어드는 효과가 더 큽니다 · 다웰바 지름 경험 규칙 φ ≈ h/8(250 mm → 약 32 mm), 간격 약 300 mm(형태) · 모델: 원리 13.10(페이지 내), 하중 응력은 CB.civ.westergaard와 같은 가정의 가장자리식, LTE 반영 σ<sub>e</sub>/(1 + LTE)는 교육용 근사. k = 50 MPa/m, E = 30,000 MPa, P = 80 kN, 휨강도 4.5 MPa 고정.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="distress">
+    <h2>포장의 파손과 상태 지수</h2>
+    <div class="problem"><strong>포트홀은 어느 날 갑자기 생기지 않는다</strong>
+      <p>장마 뒤 도로에 생긴 포트홀은 하룻밤 사이의 사고처럼 보이지만, 그 전에 몇 해 동안 바퀴 자국과 거북등 균열이 자라고, 균열로 물이 들어가 기층이 약해지는 과정이 있었습니다. 파손의 종류를 원인별로 읽을 줄 알아야 맞는 보수를 고를 수 있습니다.</p></div>
+    <figure class="diagram" id="fig-pv-distress">
+      <svg viewBox="0 0 880 300" role="img" aria-label="소성 변형, 피로 균열, 포트홀, 펌핑과 단차의 모식도">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="90" y="0" text-anchor="middle" class="t" style="font-weight:700">소성 변형</text>
+          <path d="M0 50 L40 50 Q 60 70 80 50 L100 50 Q 120 70 140 50 L180 50 L180 90 L0 90 Z" style="fill:var(--text-dim);opacity:.7"/>
+          <path d="M40 50 Q 60 42 80 50 M100 50 Q 120 42 140 50" style="fill:none;stroke:var(--text-faint);stroke-dasharray:3 2"/>
+          <text x="90" y="116" text-anchor="middle" class="t-mono">바퀴 자국 + 옆 솟음</text><text x="90" y="134" text-anchor="middle" class="t-mono">고온·노상 변형</text>
+        </g>
+        <g transform="translate(240,40)">
+          <text x="90" y="0" text-anchor="middle" class="t" style="font-weight:700">피로(거북등) 균열</text>
+          <rect x="0" y="20" width="180" height="80" style="fill:var(--text-dim);opacity:.6"/>
+          <path d="M20 40 L50 35 L80 45 L110 38 L150 44 M30 60 L60 55 L90 66 L130 58 L165 62 M15 80 L55 78 L95 86 L140 80 M50 35 L55 78 M80 45 L90 66 L95 86 M110 38 L130 58 L140 80" style="fill:none;stroke:var(--bad);stroke-width:1.3"/>
+          <text x="90" y="116" text-anchor="middle" class="t-mono">바퀴 자국 속 그물 균열</text><text x="90" y="134" text-anchor="middle" class="t-mono">하면 인장 반복(ε_t)</text>
+        </g>
+        <g transform="translate(450,40)">
+          <text x="90" y="0" text-anchor="middle" class="t" style="font-weight:700">포트홀</text>
+          <path d="M0 50 L60 50 Q 66 78 90 80 Q 114 78 120 50 L180 50 L180 100 L0 100 Z" style="fill:var(--text-dim);opacity:.7"/>
+          <path d="M60 50 Q 90 40 120 50" style="fill:none;stroke:var(--blue);stroke-width:1.5;stroke-dasharray:3 2"/>
+          <g style="fill:var(--blue)"><circle cx="80" cy="74" r="2"/><circle cx="98" cy="76" r="2"/><circle cx="89" cy="70" r="2"/></g>
+          <text x="90" y="116" text-anchor="middle" class="t-mono">균열 + 물 + 바퀴 압력</text><text x="90" y="134" text-anchor="middle" class="t-mono">박리·기층 약화</text>
+        </g>
+        <g transform="translate(660,40)">
+          <text x="90" y="0" text-anchor="middle" class="t" style="font-weight:700">펌핑·단차(콘크리트)</text>
+          <rect x="0" y="40" width="88" height="34" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="92" y="48" width="88" height="34" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M84 74 Q 90 90 100 82" style="fill:none;stroke:var(--blue);stroke-width:1.5"/>
+          <g style="fill:var(--warn)"><circle cx="90" cy="38" r="2"/><circle cx="96" cy="34" r="2"/><circle cx="84" cy="34" r="2"/></g>
+          <line x1="40" y1="20" x2="40" y2="36" style="stroke:var(--accent-2);stroke-width:2.5" marker-end="url(#pv-ah-ld)"/>
+          <text x="90" y="116" text-anchor="middle" class="t-mono">흙·물이 줄눈으로 뿜어 나옴</text><text x="90" y="134" text-anchor="middle" class="t-mono">판 끝 처짐, 낮은 LTE</text>
+        </g>
+        <text x="440" y="200" text-anchor="middle" class="t-dim">원인: 하중(피로·소성 변형) · 환경(온도·수분·노화) · 재료·시공(배합·다짐·줄눈)</text>
+        <text x="440" y="224" text-anchor="middle" class="t-dim">재료 쪽 원인(바인더 PG, 공극률, 박리)은 MaterialsBook 13장 "포장의 파손"</text>
+      </svg>
+      <figcaption><b>그림 13-8.</b> 대표 파손 네 가지(모식도). 연성 포장의 바퀴 자국과 거북등 균열은 이 장의 두 전이 함수(소성 변형, 피로)에 대응하고, 콘크리트 포장의 펌핑·단차는 줄눈의 하중 전달과 배수 문제다.</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="pv-tbl">
+      <thead><tr><th>파손</th><th>형식</th><th>주 원인</th><th>대표 보수</th></tr></thead>
+      <tbody>
+        <tr><td><span class="term">소성 변형</span><span class="en">(rutting)</span></td><td>연성</td><td>고온의 아스팔트 흐름, 노상·기층 영구 변형, 과적</td><td>절삭 후 덧씌우기, 개질 아스팔트</td></tr>
+        <tr><td><span class="term">피로 균열</span><span class="en">(fatigue cracking)</span></td><td>연성</td><td>아스팔트 하면 인장 반복, 부족한 두께, 약한 기층</td><td>부분 재포장, 구조적 덧씌우기</td></tr>
+        <tr><td>저온·반사 균열</td><td>연성·복합</td><td>온도 수축, 아래 판의 줄눈·균열이 비침</td><td>균열 실링, 응력 흡수층</td></tr>
+        <tr><td>포트홀</td><td>연성</td><td>균열로 물 침투, 박리, 동결 융해</td><td>긴급 보수, 원인 균열 처리</td></tr>
+        <tr><td><span class="term">펌핑</span><span class="en">(pumping)</span>·단차</td><td>강성</td><td>판 끝 처짐, 낮은 하중 전달, 침식되는 기층과 물</td><td>다웰바 보강(재설치), 하부 그라우팅, 줄눈 재실링</td></tr>
+        <tr><td>모서리 균열·스폴링</td><td>강성</td><td>모서리 재하·컬링, 줄눈에 끼인 이물질</td><td>부분 단면 보수, 전단면 보수</td></tr>
+      </tbody></table></div>
+    <p>상태를 숫자로 나타내는 방법은 두 갈래입니다. PSI처럼 평탄성 위주로 "승차감"을 재는 방법(오늘날에는 국제 평탄성 지수 IRI를 많이 씀)과, 파손의 종류·심각도·면적을 조사해 점수를 깎는 방법입니다. 뒤의 대표가 <span class="term">포장 상태 지수</span><span class="en">(pavement condition index, PCI)</span>로, 미국 공병단이 개발해 ASTM D6433으로 표준화된 0–100점 지수입니다. 국내 도로 관리 기관은 균열률·소성 변형·평탄성을 합친 자체 지수를 쓰기도 합니다(현행 지침 확인). 상태 지수가 시간에 따라 떨어지는 곡선을 알면, 다음 절처럼 보수 시점과 비용을 따질 수 있습니다.</p>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="rehab-lcc">
+    <h2>보수 시점과 생애 주기 비용</h2>
+    <div class="problem"><strong>싼 포장을 자주 고칠까, 비싼 포장을 오래 쓸까</strong>
+      <p>R-60을 콘크리트로 포장하면 초기 비용이 아스팔트의 약 1.5배라고 합시다(교육용). 대신 덧씌우기 주기가 길고 유지 비용이 적습니다. 40년 동안의 비용을 오늘의 돈으로 바꿔 비교하면 어느 쪽이 쌀까요? 답은 할인율과 보수 시점에 달려 있습니다.</p></div>
+    <p>연성 포장의 대표 보수는 <span class="term">덧씌우기</span><span class="en">(overlay)</span>입니다. 손상된 표층을 깎아 내고(절삭) 새 층을 덮으면 PSI가 초기값 가까이 회복되고 SN도 커집니다. PSI가 너무 떨어진 뒤에는 기층까지 손상되어 재포장이 필요하므로, 비교적 좋은 상태일 때 싼 보수를 하는 <b>예방적 유지 보수</b>가 생애 비용을 줄인다는 것이 포장 관리의 경험입니다. 콘크리트 포장은 줄눈 재실링, 표면 다이아몬드 그라인딩, 다웰바 보강, 부분 단면 보수를 합니다.</p>
+    <div class="callout def"><strong>원리 13.11 (생애 주기 비용, 현재 가치)</strong>
+      <div class="formula">$$\mathrm{LCC} = C_0 + \sum_{t} \frac{C_t}{(1+i)^t} - \frac{S_T}{(1+i)^T}$$<div class="where"><span class="term">생애 주기 비용</span><span class="en">(life-cycle cost, LCC)</span>. \(C_0\): 초기 건설비, \(C_t\): \(t\)년의 보수·유지 비용, \(i\): 실질 할인율(국내 공공 사업 분석에서 4.5 % 형태, 현행 지침 확인), \(S_T\): 분석 기간 끝의 잔존 가치, \(T\): 분석 기간. 할인율이 높을수록 먼 미래의 비용이 작아 보여 초기 비용이 싼 쪽이 유리해진다. 이용자 비용(지체, 차량 운행비)을 넣으면 보수 횟수가 잦은 쪽이 불리해진다.</div></div></div>
+    <div class="callout"><strong>예제 13.8 (덧씌우기 한 번의 현재 가치)</strong> 15년 뒤 m²당 1.5(상대 단위)의 덧씌우기를 할인율 4.5 %로 현재 가치로 바꾸면 \(1.5/1.045^{15} = 1.5/1.935 = 0.78\). 같은 보수를 30년 뒤에 한 번 더 하면 \(1.5/3.745 = 0.40\). 초기 비용 4.0의 아스팔트 포장은 두 번의 덧씌우기를 합쳐 40년 LCC 약 5.2(유지 비용 제외)이고, 초기 비용 6.0의 콘크리트 포장은 보수가 거의 없어도 6.0보다 작아질 수 없다. 할인율이 2 %라면 덧씌우기 두 번의 현재 가치는 1.11 + 0.83 = 1.94로 커져 차이가 줄어든다.</div>
+    <div class="sim" id="sim-pv-lcc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>공용성 곡선과 생애 주기 비용: 연성 vs 강성</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view pv-stack">
+          <div><canvas id="pv-cv-lcc-p" aria-label="연성과 강성 포장의 연도별 PSI 곡선과 보수 시점"></canvas><span class="pv-cap">PSI – 연도 (보수 시 회복)</span></div>
+          <div><canvas id="pv-cv-lcc-c" aria-label="두 포장의 누적 현재 가치 비용 곡선"></canvas><span class="pv-cap">누적 비용(현재 가치, 상대 단위)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>보수 기준 PSI <output id="pv-lc-pt-out"></output></span><input type="range" id="pv-lc-pt" min="2" max="3.5" step="0.05" value="2.5"></label>
+          <label class="ctrl"><span>할인율 i <output id="pv-lc-i-out"></output></span><input type="range" id="pv-lc-i" min="0" max="8" step="0.25" value="4.5"></label>
+          <label class="ctrl"><span>교통 배율(R-60 = 1) <output id="pv-lc-tr-out"></output></span><input type="range" id="pv-lc-tr" min="0.5" max="10" step="0.1" value="1"></label>
+          <label class="ctrl"><span>강성 포장 초기 비용 <output id="pv-lc-c0-out"></output></span><input type="range" id="pv-lc-c0" min="4" max="9" step="0.1" value="6"></label>
+          <label class="ctrl"><span>분석 기간 T <output id="pv-lc-T-out"></output></span><input type="range" id="pv-lc-T" min="20" max="60" step="1" value="40"></label>
+          <label class="check"><input type="checkbox" id="pv-lc-user"> 보수 때 이용자 비용(교통 지체) 포함</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">연성 보수 횟수 · 첫 보수</span><span class="v" id="pv-lc-nf">—</span></div>
+        <div class="stat"><span class="k">강성 보수 횟수 · 첫 보수</span><span class="v" id="pv-lc-nr">—</span></div>
+        <div class="stat"><span class="k">LCC 연성 · 강성</span><span class="v" id="pv-lc-lcc">—</span></div>
+        <div class="stat"><span class="k">유리한 쪽</span><span class="v" id="pv-lc-win">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 할인율을 0 %와 8 %로 바꿔 보면 승자가 바뀌는 구간이 있습니다 · 교통을 5배로 늘리면 연성 포장의 첫 보수가 약 15년에서 9년으로 당겨지고 차이가 크게 줄어듭니다(대형 차 많은 고속도로에서 콘크리트 포장을 고려하는 이유) · 보수 기준 PSI를 3.0으로 높이면(예방적 보수) 보수는 잦지만 회당 비용을 줄인 가정이라 결과를 비교해 보세요 · 모델(페이지 내, 교육용): 연성 PSI는 AASHTO 93 식(Z<sub>R</sub> = 0, 평균 성능)으로 교통에 따른 손실 + 노화 0.09/년, 덧씌우기 50 mm마다 SN +0.87, 강성 PSI는 AASHTO 93 강성 포장식(D 250 mm, S<sub>c</sub> 650 psi, k 184 pci, J 3.2) + 노화 0.06/년. 비용(상대 단위): 연성 초기 4.0, 덧씌우기 1.5(기준 PSI 3.0 이상이면 1.0), 강성 보수 1.2, 연간 유지 0.03 · 0.02, 이용자 비용 보수당 +1.0. 잔존 가치는 마지막 보수 이후 남은 수명 비율로 넣습니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 12 -->
+  <section id="r60">
+    <h2>R-60 포장 설계 정리</h2>
+    <p>이 장의 계산을 R-60 하나로 모으면 다음과 같습니다. 같은 지역의 E-4 성토가 노상이고, 표층은 MaterialsBook의 P-13입니다.</p>
+    <div class="callout site"><strong>R-60 포장 설계 요약(교육용)</strong> ① 교통(10장): AADT 7,200대/일, 대형 차 8 %, 성장 2.6 %, D 0.6, 20년 → 설계 차로 누적 ESAL <b>1.05 × 10⁶ ≈ 1 × 10⁶</b>(2축 트럭 33 %, 3축 트럭 26 %, 승용차 0.7 %). ② AASHTO 93: M<sub>R</sub> 7,500 psi, R 90 %, S₀ 0.45, ΔPSI 1.7 → 소요 SN <b>3.47</b>. ③ 단면: 아스팔트 120 mm(P-13 50 + 중간층 70) + 쇄석 기층 150 + 보조 기층 150 = 420 mm, SN 3.56, 층별 검토 만족, 배수 불량(m 0.8)이면 불만족. ④ 역학적 검토(오데마르크, f 0.9): 노상 윗면 σ<sub>z</sub> ≈ 28 kPa, ε<sub>z</sub> ≈ 550 με → N<sub>d</sub> ≈ 5 × 10⁵(근사에 따라 0.5–1.3 × 10⁶). ⑤ 콘크리트 포장 비교안: 250 mm, E 30,000 MPa, k 50 MPa/m, 바퀴 80 kN → ℓ = 0.95 m, 내부 <b>1.75 MPa</b>, 가장자리 2.65 MPa, 모서리 2.27 MPa, 줄눈 6 m · 다웰바 φ32. ⑥ 생애 비용은 할인율과 교통에 민감하며 R-60 규모의 교통에서는 연성 포장이 유리한 경우가 많다(교육용 비용 가정). 모든 값은 학습용이며 실제 설계는 현행 국내 도로 포장 설계 지침과 기준을 적용한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="traffic.html"><small>CH.10 · 도로 계획과 교통</small>교통량 조사와 AADT<br><span>차종별 교통량이 누적 ESAL의 입력.</span></a>
+      <a href="earthwork.html"><small>CH.12 · 토공과 배수</small>노상 다짐과 배수<br><span>배수 계수 m, 맹암거, 동상 방지층.</span></a>
+      <a href="maintenance.html"><small>CH.16 · 유지관리와 성능 개선</small>상태 등급과 생애 비용<br><span>열화 예측과 보수 시점 최적화.</span></a>
+      <a href="railway.html"><small>CH.14 · 철도</small>탄성 지반 위의 레일<br><span>웨스터가드의 ℓ과 같은 β, 노반 압력.</span></a>
+      <a href="../../materials/chapters/asphalt.html"><small>MaterialsBook · CH.13</small>아스팔트와 포장 재료<br><span>P-13 마샬 배합, PG 64-22, 파손의 재료 원인.</span></a>
+      <a href="../../geotech/chapters/phase.html#cbr"><small>GeotechBook · CH.02</small>다짐과 CBR<br><span>노상 CBR → M<sub>R</sub> ≈ 1,500 CBR.</span></a>
+      <a href="../../geotech/chapters/stress-distribution.html"><small>GeotechBook · CH.06</small>지중 응력 분포<br><span>부시네스크 해, 원형 하중의 중심선 응력.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>연성 포장은 층을 겹쳐 노상 응력·변형률을 낮추고, 강성 포장은 콘크리트 판의 휨으로 넓게 편다. 설계 변수와 지배 파손이 다르다.</li>
+      <li>4제곱 법칙 LEF = (P/P<sub>s</sub>)⁴, 단축 기준 80 kN. 축하중 두 배 → 손상 16배, 30 % 과적 → 2.86배. 포장 수명은 무거운 축이 정한다.</li>
+      <li>누적 ESAL W<sub>18</sub> = 365 Σ(N<sub>i</sub>TF<sub>i</sub>) D L G<sub>F</sub>, G<sub>F</sub> = ((1 + g)<sup>Y</sup> − 1)/g. R-60: 하루 185 ESAL(양방향), D 0.6, g 2.6 % → 20년 약 1 × 10⁶.</li>
+      <li>AASHTO 93: log W<sub>18</sub> = Z<sub>R</sub>S<sub>0</sub> + 9.36 log(SN + 1) − 0.20 + log(ΔPSI/2.7)/(0.40 + 1094/(SN + 1)<sup>5.19</sup>) + 2.32 log M<sub>R</sub> − 8.07. R-60: SN 3.47(M<sub>R</sub> 7,500 psi, R 90 %, S<sub>0</sub> 0.45, ΔPSI 1.7).</li>
+      <li>SN = Σ a<sub>i</sub>D<sub>i</sub>m<sub>i</sub>(D 인치), a = 0.44 · 0.14 · 0.11(대표값). 층별로 SN₁ · SN₂ 검토를 위에서부터. R-60: 120 + 150 + 150 mm → SN 3.56. 배수가 나쁘면 m이 줄어 불만족.</li>
+      <li>오데마르크 h<sub>e</sub> = f Σh(E/E<sub>n</sub>)<sup>1/3</sup> + 부시네스크 중심선 해로 노상 응력·변형률을 근사(R-60: 28 kPa, 550 με). ME 설계는 ε<sub>t</sub>(피로)·ε<sub>v</sub>(소성 변형)를 전이 함수로 허용 반복 수로 바꾸고 마이너 법칙으로 더한다.</li>
+      <li>웨스터가드: ℓ = [Eh³/(12(1 − ν²)k)]<sup>1/4</sup>, 내부 σ = 0.316P/h²[4 log(ℓ/b) + 1.069]. 250 mm 판: ℓ = 0.95 m, 내부 1.75 · 가장자리 2.65 · 모서리 2.27 MPa. k보다 두께가 효과적이다.</li>
+      <li>줄눈은 수축·컬링 균열을 유도하고, 다웰바는 하중을 옆 판에 넘겨 가장자리 응력·펌핑·단차를 줄인다. 컬링 σ = CEαΔT/2(브래드버리), 판이 짧을수록 C가 작다. 보수 시점과 할인율이 연성·강성의 생애 비용 비교를 좌우한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 4제곱 법칙에서 단축 120 kN 축 하나는 기준 축(80 kN) 몇 개 몫의 손상을 주는가?</p><div class="opts">
+        <button class="opt">1.5</button><button class="opt">2.25</button><button class="opt" data-correct>5.06</button><button class="opt">8.0</button>
+      </div><div class="quiz-exp">(120/80)⁴ = 1.5⁴ = 5.06. 하중은 1.5배지만 손상은 다섯 배다.</div></div>
+      <div class="quiz-q"><p>2. 첫해 설계 차로 하루 ESAL이 200, 성장률 0 %, 설계 기간 10년일 때 누적 ESAL은?</p><div class="opts">
+        <button class="opt">2.0 × 10⁴</button><button class="opt">7.3 × 10⁴</button><button class="opt" data-correct>7.3 × 10⁵</button><button class="opt">2.0 × 10⁶</button>
+      </div><div class="quiz-exp">성장률 0이면 G<sub>F</sub> = Y = 10. 200 × 365 × 10 = 730,000 = 7.3 × 10⁵.</div></div>
+      <div class="quiz-q"><p>3. AASHTO 93 설계에서 신뢰도를 90 %에서 95 %로 올리면?</p><div class="opts">
+        <button class="opt">소요 SN이 줄어든다</button><button class="opt" data-correct>Z<sub>R</sub>가 더 작은 음수가 되어 설계 교통을 크게 본 것과 같아지고 소요 SN이 늘어난다</button><button class="opt">노상 M<sub>R</sub>이 커진다</button><button class="opt">ΔPSI가 커진다</button>
+      </div><div class="quiz-exp">Z<sub>R</sub>이 −1.282 → −1.645로 바뀌어 Z<sub>R</sub>S<sub>0</sub>이 더 작아진다. 같은 W<sub>18</sub>을 만족하려면 SN이 커져야 한다(R-60: 3.47 → 3.69).</div></div>
+      <div class="quiz-q"><p>4. 아스팔트 100 mm(a = 0.44), 쇄석 기층 200 mm(a = 0.14, m = 1.0)의 SN은? (1 in = 25.4 mm)</p><div class="opts">
+        <button class="opt">1.73</button><button class="opt" data-correct>2.83</button><button class="opt">3.20</button><button class="opt">4.40</button>
+      </div><div class="quiz-exp">100 mm = 3.94 in → 1.73, 200 mm = 7.87 in → 1.10. 합 2.83.</div></div>
+      <div class="quiz-q"><p>5. SN 합은 충분한데 아스팔트층을 아주 얇게 하고 보조 기층만 두껍게 한 설계의 문제는?</p><div class="opts">
+        <button class="opt">문제없다, SN 합만 맞으면 된다</button><button class="opt">노상이 너무 단단해진다</button><button class="opt" data-correct>기층·보조 기층 위의 SN이 부족해 그 층이 과도한 응력을 받는다(층별 검토 불만족)</button><button class="opt">배수 계수가 1보다 커진다</button>
+      </div><div class="quiz-exp">각 층은 위층들이 보호해야 한다. SN₁(기층 위), SN₂(보조 기층 위) 검토를 위에서부터 차례로 만족해야 한다.</div></div>
+      <div class="quiz-q"><p>6. 콘크리트 포장에서 지반 반력 계수 k를 두 배로 하면 내부 웨스터가드 응력은 대략?</p><div class="opts">
+        <button class="opt">절반이 된다</button><button class="opt">√2분의 1이 된다</button><button class="opt" data-correct>10 % 안팎만 줄어든다</button><button class="opt">두 배가 된다</button>
+      </div><div class="quiz-exp">ℓ ∝ k<sup>−1/4</sup>이므로 ℓ은 약 16 % 줄고, 응력은 4 log(ℓ/b) 항에만 들어 있어 수 % – 10 % 정도만 준다. 응력을 줄이는 데는 두께(1/h²)가 훨씬 효과적이다.</div></div>
+      <div class="quiz-q"><p>7. 줄눈 콘크리트 포장의 다웰바가 하는 일로 옳은 것은?</p><div class="opts">
+        <button class="opt">판을 단단히 묶어 줄눈이 벌어지지 않게 한다</button><button class="opt" data-correct>줄눈을 건너 하중을 옆 판에 전달하면서 판의 길이 변화는 허용한다</button><button class="opt">판의 휨 인장 철근 역할을 한다</button><button class="opt">컬링을 완전히 없앤다</button>
+      </div><div class="quiz-exp">다웰바는 매끈하고 한쪽이 미끄러지므로 수축·팽창을 허용하며 전단으로 하중을 넘긴다(LTE 상승). 판을 묶는 것은 세로 줄눈의 타이바다.</div></div>
+      <div class="quiz-q"><p>8. 생애 주기 비용 분석에서 할인율을 높이면 일반적으로 어떤 쪽이 유리해지는가?</p><div class="opts">
+        <button class="opt" data-correct>초기 비용이 싸고 나중에 보수 비용이 드는 대안</button><button class="opt">초기 비용이 비싸고 보수가 적은 대안</button><button class="opt">차이가 없다</button><button class="opt">이용자 비용이 큰 대안</button>
+      </div><div class="quiz-exp">할인율이 높을수록 미래 비용의 현재 가치가 작아지므로, 비용을 뒤로 미루는 대안(주로 연성 포장)이 유리해 보인다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const PV = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${PV.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  alpha(c, a) { const ctx = PV._c || (PV._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  sup(n) { return String(n).replace(/[-0-9]/g, (d) => "⁻⁰¹²³⁴⁵⁶⁷⁸⁹"[d === "-" ? 0 : +d + 1]); },
+  /** 1.01 × 10⁶ 꼴 */
+  sci(x, d = 2) { if (!isFinite(x) || x <= 0) return "—"; const e = Math.floor(Math.log10(x)), m = x / Math.pow(10, e); if (e >= -1 && e <= 3) return CB.sig(x, 3); return `${m.toFixed(d)} × 10${PV.sup(e)}`; },
+  IN: 25.4,
+  /** 차종(예제 13.2): 대형 차 구성은 버스 : 2축 : 3축 : 세미 = 50 : 380 : 100 : 46 */
+  TYPES: [
+    { name: "승용차", heavy: false, ax: [[8, 80], [8, 80]] },
+    { name: "버스", heavy: true, share: 50, ax: [[40, 80], [70, 80]] },
+    { name: "2축 트럭", heavy: true, share: 380, ax: [[25, 80], [50, 80]] },
+    { name: "3축 트럭", heavy: true, share: 100, ax: [[50, 80], [110, 146]] },
+    { name: "세미트레일러", heavy: true, share: 46, ax: [[50, 80], [115, 146], [115, 146]] },
+  ],
+  tf(t, ov = 0) { const s = t.heavy ? 1 + ov : 1; return t.ax.reduce((a, [P, Ps]) => a + CB.civ.esal(P * s, Ps), 0); },
+  gf(g, Y) { return g > 1e-9 ? (Math.pow(1 + g, Y) - 1) / g : Y; },
+  /** 웨스터가드 세 위치(kN, m, MPa 입력 → kPa, m) */
+  wg(P, h, Emp, kmp, a = 0.15) {
+    const r = CB.civ.westergaard(P, h, Emp * 1000, kmp * 1000, a), l = r.l, b = a < 1.724 * h ? Math.sqrt(1.6 * a * a + h * h) - 0.675 * h : a, k = kmp * 1000;
+    return { l, si: r.sigma, se: ((0.572 * P) / (h * h)) * (4 * Math.log10(l / b) + 0.359), sc: ((3 * P) / (h * h)) * (1 - Math.pow((a * Math.SQRT2) / l, 0.6)),
+      di: P / (8 * k * l * l), de: ((0.431 * P) / (k * l * l)) * (1 - (0.82 * a) / l), dc: (P / (k * l * l)) * (1.1 - (0.88 * a * Math.SQRT2) / l) };
+  },
+  /** PCA(1984) 형태 피로식 */
+  pcaN(SR) { if (SR <= 0.45) return Infinity; if (SR < 0.55) return Math.pow(4.2577 / (SR - 0.4325), 3.268); return Math.pow(10, 11.737 - 12.077 * SR); },
+  /** 브래드버리 계수 */
+  brad(L, l) { const la = L / (l * Math.sqrt(8)); if (la > 6) return 1 + 2 * Math.exp(-la) * 0; const v = 1 - (2 * Math.cos(la) * Math.cosh(la) * (Math.tan(la) + Math.tanh(la))) / (Math.sin(2 * la) + Math.sinh(2 * la)); return Math.max(0, v); },
+  /** 오데마르크 + 부시네스크: layers [{h, E, nu}] (m, MPa), 마지막은 반무한. 깊이 z(m) → {s (kPa), e} */
+  odemark(layers, P, p, f) {
+    const a = Math.sqrt(P / (Math.PI * p)), tops = []; let z0 = 0; layers.forEach((L) => { tops.push(z0); z0 += L.h; });
+    const at = (z) => {
+      let n = layers.length - 1; for (let i = 0; i < layers.length - 1; i++) if (z < tops[i] + layers[i].h - 1e-9) { n = i; break; }
+      let he = 0; for (let j = 0; j < n; j++) he += layers[j].h * Math.cbrt(layers[j].E / layers[n].E);
+      const ze = (n > 0 ? f * he : 0) + (z - tops[n]), q = a * a + ze * ze, nu = layers[n].nu, r3 = ze ** 3 / Math.pow(q, 1.5);
+      return { s: p * (1 - r3), e: ((1 + nu) * p) / (layers[n].E * 1000) * (1 - 2 * nu + (2 * nu * ze) / Math.sqrt(q) - r3), ze, n };
+    };
+    return { at, a, tops, zsub: z0 - (layers[layers.length - 1].h || 0) };
+  },
+  Nf(et, E1mpa) { return 0.0796 * Math.pow(et, -3.291) * Math.pow(E1mpa * 145.04, -0.854); },
+  Nd(ev) { return 1.365e-9 * Math.pow(ev, -4.477); },
+  ev: 5.5e-4, onEv: [],
+};
+
+/* ---------- 1. 4제곱 법칙 ---------- */
+(function () {
+  const PS = { s: 80, t: 146, r: 215 }, NAME = { s: "단축", t: "탠덤", r: "트리덤" };
+  const typ = CB.seg("pv-fo-type", go), gP = CB.range("pv-fo-P", (v) => v + " kN", go), gn = CB.range("pv-fo-n", (v) => v.toFixed(1), go), gov = CB.range("pv-fo-ov", (v) => v + " %", go);
+  const cv = CB.canvas("#pv-cv-fourth", (ctx, W, H) => {
+    const pal = CB.palette(), n = gn(), cols = { s: pal.accent2, t: pal.accent, r: pal.ok };
+    const series = Object.keys(PS).map((k) => { const d = []; for (let P = 10; P <= 300; P += 2) d.push([P, CB.civ.esal(P, PS[k], n)]); return { data: d, color: cols[k], width: k === typ() ? 3 : 1.5, dash: k === typ() ? [] : [5, 4] }; });
+    const P = gP() * (1 + gov() / 100), y = CB.civ.esal(P, PS[typ()], n);
+    const C = CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 }, { x: [0, 300], y: [1e-4, 1e3], logY: true, xLabel: "축하중 P (kN)", yLabel: "LEF (log)",
+      series, hlines: [{ y: 1, color: pal.faint, label: "1 ESAL" }], vlines: [{ x: 98, color: pal.warn, label: "10 t" }],
+      points: [{ x: Math.min(300, P), y: Math.max(1e-4, Math.min(1e3, y)), color: cols[typ()], r: 7 }] });
+    PV.text(ctx, `${NAME[typ()]} ${CB.num(P, 0)} kN → ${CB.sig(y, 3)}`, C.X(Math.min(300, P)) + (P > 200 ? -10 : 10), C.Y(Math.max(1e-4, Math.min(1e3, y))) + 18, cols[typ()], { align: P > 200 ? "right" : "left", size: 11.5 });
+    ["s", "t", "r"].forEach((k, i) => PV.text(ctx, NAME[k], W - 24, C.Y(3e-3) + i * 16, cols[k], { align: "right", size: 11 }));
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 360 });
+  function go() {
+    cv.redraw();
+    const n = gn(), P0 = gP(), P = P0 * (1 + gov() / 100), lef = CB.civ.esal(P, PS[typ()], n);
+    CB.stat("pv-fo-ps", PS[typ()] + " kN"); CB.stat("pv-fo-lef", CB.sig(lef, 3));
+    CB.stat("pv-fo-car", PV.sci(lef / CB.civ.esal(8, 80, n), 1) + " 개");
+    CB.stat("pv-fo-mul", "× " + CB.num(Math.pow(1 + gov() / 100, n), 2));
+    const m = document.getElementById("pv-fo-msg"), over = typ() === "s" && P > 98;
+    m.className = over ? "pv-msg bad" : "pv-msg";
+    m.innerHTML = over ? `단축 ${CB.num(P, 0)} kN은 축하중 제한 10톤(약 98 kN)을 넘습니다. 98 kN 축보다 ${CB.num(lef / CB.civ.esal(98, 80, n), 2)}배의 손상입니다.` : `축 하나가 지날 때 기준 축 <b>${CB.sig(lef, 3)}</b>개 몫의 손상. 하중을 10 % 늘리면 손상은 ${CB.num(Math.pow(1.1, n), 2)}배가 됩니다(지수 ${CB.num(n, 1)}).`;
+  }
+  go();
+})();
+
+/* ---------- 2. 누적 ESAL ---------- */
+(function () {
+  const LF = { 1: 1.0, 2: 0.9, 3: 0.7 };
+  const ga = CB.range("pv-es-aadt", (v) => v.toLocaleString("en-US") + " 대/일", go), gh = CB.range("pv-es-hv", (v) => v.toFixed(1) + " %", go), gg = CB.range("pv-es-g", (v) => v.toFixed(1) + " %", go), gy = CB.range("pv-es-y", (v) => v + " 년", go), lane = CB.seg("pv-es-lane", go), gov = CB.range("pv-es-ov", (v) => v + " %", go), gD = CB.range("pv-es-d", (v) => v.toFixed(2), go);
+  let R = null;
+  function calc() {
+    const A = ga(), hv = gh() / 100, ov = gov() / 100, tot = 576, rows = PV.TYPES.map((t) => { const N = t.heavy ? (A * hv * t.share) / tot : A * (1 - hv); const tf = PV.tf(t, ov); return { name: t.name, N, tf, e: N * tf }; });
+    const day2 = rows.reduce((s, r) => s + r.e, 0), day = day2 * gD() * LF[lane()], g = gg() / 100, Y = gy(), GF = PV.gf(g, Y), W = day * 365 * GF;
+    const curve = []; for (let y = 0; y <= Y; y += 0.25) curve.push([y, day * 365 * PV.gf(g, y)]);
+    R = { rows, day, GF, W, curve, Y };
+  }
+  const cv = CB.canvas("#pv-cv-esal", (ctx, w, H) => {
+    if (!R) return; const pal = CB.palette(), top = Math.max(1.2e6, R.W * 1.15);
+    const C = CB.chart(ctx, { x: 62, y: 28, w: w - 62 - 16, h: H - 28 - 46 }, { x: [0, R.Y], y: [0, top], xLabel: "연도", yLabel: "누적 ESAL", yFmt: (v) => (v === 0 ? "0" : (v / 1e6).toPrecision(3).replace(/\.?0+$/, "") + "M"),
+      series: [{ data: R.curve, color: pal.accent, width: 2.8, fill: PV.alpha(pal.accent, 0.08) }], hlines: [{ y: 1e6, color: pal.warn, label: "10⁶ (R-60)" }], points: [{ x: R.Y, y: R.W, color: pal.accent2, r: 6 }] });
+    PV.text(ctx, PV.sci(R.W), C.X(R.Y) - 8, C.Y(R.W) + 16, pal.accent2, { align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.4), minHeight: 200, maxHeight: 280 });
+  const bv = CB.canvas("#pv-cv-esal-bar", (ctx, w, H) => {
+    if (!R) return; const pal = CB.palette(), Nt = R.rows.reduce((s, r) => s + r.N, 0), Et = R.rows.reduce((s, r) => s + r.e, 0);
+    const x0 = Math.min(118, w * 0.3), bw = w - x0 - 60, rh = (H - 40) / R.rows.length;
+    ctx.font = `12px ${PV.mono()}`;
+    R.rows.forEach((r, i) => {
+      const y = 32 + i * rh; ctx.fillStyle = pal.text; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(r.name, x0 - 8, y + rh * 0.4);
+      const a = r.N / Nt, b = r.e / Et;
+      ctx.fillStyle = PV.alpha(pal.dim, 0.5); ctx.fillRect(x0, y + 2, bw * a, rh * 0.32);
+      ctx.fillStyle = pal.accent2; ctx.fillRect(x0, y + 2 + rh * 0.38, bw * b, rh * 0.32);
+      ctx.fillStyle = pal.dim; ctx.textAlign = "left"; ctx.font = `11px ${PV.mono()}`;
+      ctx.fillText(CB.num(a * 100, 1) + "%", x0 + bw * a + 4, y + 2 + rh * 0.16); ctx.fillStyle = pal.accent2; ctx.fillText(CB.num(b * 100, 1) + "%", x0 + bw * b + 4, y + 2 + rh * 0.54); ctx.font = `12px ${PV.mono()}`;
+    });
+    PV.text(ctx, "■ 대수", w - 150, 16, pal.dim, { align: "left", size: 11 }); PV.text(ctx, "■ ESAL", w - 80, 16, pal.accent2, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.36), minHeight: 190, maxHeight: 250 });
+  function go() {
+    calc(); cv.redraw(); bv.redraw();
+    CB.stat("pv-es-day", CB.num(R.day, 1)); CB.stat("pv-es-gf", CB.num(R.GF, 2)); CB.stat("pv-es-w", PV.sci(R.W));
+    CB.stat("pv-es-sn", CB.num(CB.civ.sn(R.W), 2));
+  }
+  go();
+})();
+
+/* ---------- 3. AASHTO 93 ---------- */
+(function () {
+  const ZR = { 50: 0, 80: -0.841, 90: -1.282, 95: -1.645, 99: -2.327 }, A = [0.44, 0.14, 0.11], COST = [1, 0.25, 0.15];
+  const gw = CB.range("pv-aa-w", (v) => PV.sci(Math.pow(10, v)), go), gmr = CB.range("pv-aa-mr", (v) => `${v.toLocaleString("en-US")} psi · CBR ${CB.num(v / 1500, 1)}`, go), rel = CB.seg("pv-aa-r", go), gdp = CB.range("pv-aa-dp", (v) => v.toFixed(1), go);
+  const gd = [1, 2, 3].map((i) => CB.range("pv-aa-d" + i, (v) => v + " mm", go)), gm = CB.seg("pv-aa-m", go);
+  let R = null;
+  function calc() {
+    const W = Math.pow(10, gw()), o = { ZR: ZR[rel()], S0: 0.45, dPSI: gdp() }, m = +gm();
+    const req = [CB.civ.sn(W, { ...o, MR: 30000 }), CB.civ.sn(W, { ...o, MR: 15000 }), CB.civ.sn(W, { ...o, MR: gmr() })];
+    const D = gd.map((g) => g()), part = [A[0] * D[0] / PV.IN, CB.civ.snLayers([{ a: A[1], D: D[1] / PV.IN, m }]), CB.civ.snLayers([{ a: A[2], D: D[2] / PV.IN, m }])];
+    const cum = [part[0], part[0] + part[1], part[0] + part[1] + part[2]], ok = cum.map((c, i) => c >= req[i] - 1e-9);
+    R = { W, o, req, D, cum, ok, cap: CB.civ.w18(Math.max(0.6, cum[2]), { ...o, MR: gmr() }), cost: D.reduce((s, d, i) => s + (d / 100) * COST[i], 0) };
+  }
+  const cv = CB.canvas("#pv-cv-aashto", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), narrow = W < 520;
+    const sx = 20, sw = narrow ? W * 0.42 : W * 0.38, tot = Math.max(600, R.D.reduce((a, b) => a + b, 0) + 120), sc = (H - 50) / tot;
+    const fills = [PV.alpha(pal.dim, 0.75), PV.alpha(pal.dim, 0.35), PV.alpha(pal.accent, 0.2)];
+    let y = 30; const names = ["아스팔트", "쇄석 기층", "보조 기층"];
+    R.D.forEach((d, i) => { if (d <= 0) return; ctx.fillStyle = fills[i]; ctx.fillRect(sx, y, sw, d * sc); ctx.strokeStyle = pal.border; ctx.strokeRect(sx, y, sw, d * sc); if (d * sc > 13) PV.text(ctx, `${names[i]} ${d}`, sx + sw / 2, y + (d * sc) / 2, pal.text, { size: 11 }); y += d * sc; });
+    ctx.fillStyle = PV.alpha(pal.warn, 0.18); ctx.fillRect(sx, y, sw, H - 10 - y); PV.text(ctx, "노상", sx + sw / 2, Math.min(H - 20, y + 16), pal.warn, { size: 11 });
+    PV.text(ctx, `총 ${R.D.reduce((a, b) => a + b, 0)} mm`, sx + sw / 2, 14, pal.dim, { size: 11 });
+    // 막대
+    const bx = sx + sw + 30, bwid = W - bx - 16, mx = Math.max(6, ...R.req, ...R.cum) * 1.08, rowH = (H - 40) / 3;
+    ["SN₁(기층 위)", "SN₂(보조 기층 위)", "SN₃(노상 위)"].forEach((lab, i) => {
+      const yy = 24 + i * rowH; PV.text(ctx, lab, bx, yy + 6, pal.dim, { align: "left", size: 11 });
+      const h = Math.min(18, rowH * 0.25);
+      ctx.fillStyle = PV.alpha(pal.dim, 0.35); ctx.fillRect(bx, yy + 16, (bwid * R.req[i]) / mx, h);
+      ctx.fillStyle = R.ok[i] ? pal.ok : pal.bad; ctx.fillRect(bx, yy + 20 + h, (bwid * R.cum[i]) / mx, h);
+      PV.text(ctx, "소요 " + CB.num(R.req[i], 2), bx + (bwid * R.req[i]) / mx + 4, yy + 16 + h / 2, pal.dim, { align: "left", size: 11 });
+      PV.text(ctx, "제공 " + CB.num(R.cum[i], 2), bx + Math.min(bwid - 70, (bwid * R.cum[i]) / mx + 4), yy + 20 + 1.5 * h, R.ok[i] ? pal.ok : pal.bad, { align: "left", size: 11 });
+    });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 300, maxHeight: 400 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("pv-aa-req", R.req.map((v) => CB.num(v, 2)).join(" · ")); CB.stat("pv-aa-prov", R.cum.map((v) => CB.num(v, 2)).join(" · "));
+    CB.stat("pv-aa-cap", PV.sci(R.cap)); CB.stat("pv-aa-cost", CB.num(R.cost, 2));
+    const m = document.getElementById("pv-aa-msg"), bad = R.ok.indexOf(false);
+    if (bad < 0) { m.className = "pv-msg ok"; m.innerHTML = `만족: 제공 SN ${CB.num(R.cum[2], 2)} ≥ 소요 ${CB.num(R.req[2], 2)}, 층별 검토도 모두 만족. 이 단면은 ${PV.sci(R.cap)} ESAL(신뢰도 ${rel()} %)까지 견딥니다.`; }
+    else { m.className = "pv-msg bad"; m.innerHTML = `불만족: ${["아스팔트층이 기층을 보호하지 못함(SN₁)", "기층까지의 SN이 보조 기층을 보호하지 못함(SN₂)", "전체 SN이 노상에 부족(SN₃)"][bad]} — 제공 ${CB.num(R.cum[bad], 2)} < 소요 ${CB.num(R.req[bad], 2)}.`; }
+  }
+  go();
+})();
+
+/* ---------- 4. 층별 응력·변형률 ---------- */
+(function () {
+  const g1 = CB.range("pv-ly-h1", (v) => v + " mm", go), ge1 = CB.range("pv-ly-e1", (v) => v.toLocaleString("en-US") + " MPa", go), g2 = CB.range("pv-ly-h2", (v) => v + " mm", go), g3 = CB.range("pv-ly-h3", (v) => v + " mm", go), ge4 = CB.range("pv-ly-e4", (v) => v + " MPa", go), gf = CB.range("pv-ly-f", (v) => v.toFixed(2), go), gP = CB.seg("pv-ly-P", go);
+  let R = null;
+  function calc() {
+    const L = [{ h: g1() / 1000, E: ge1(), nu: 0.35 }, { h: g2() / 1000, E: 207, nu: 0.35 }, { h: g3() / 1000, E: 103, nu: 0.4 }, { h: 0, E: ge4(), nu: 0.45 }].filter((l, i) => i === 3 || l.h > 0);
+    const om = PV.odemark(L, +gP(), 700, gf()), zs = L.slice(0, -1).reduce((s, l) => s + l.h, 0), prof = [];
+    for (let i = 0; i <= 240; i++) { const z = (1.5 * i) / 240 + 1e-6; const r = om.at(z); prof.push([z, r.s, r.e * 1e6]); }
+    // 경계 바로 아래 값
+    const sub = om.at(zs + 1e-6);
+    let he = 0; L.slice(0, -1).forEach((l) => (he += l.h * Math.cbrt(l.E / ge4()))); he *= gf();
+    R = { L, prof, zs, sub, he, bounds: L.slice(0, -1).reduce((a, l) => (a.push((a[a.length - 1] || 0) + l.h), a), []) };
+    PV.ev = sub.e; PV.onEv.forEach((f) => f());
+  }
+  const mk = (id, key, lab, xmaxF) => CB.canvas(id, (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), d = R.prof.map((p) => [p[key], -p[0]]), xm = xmaxF();
+    const C = CB.chart(ctx, { x: 58, y: 26, w: W - 58 - 16, h: H - 26 - 46 }, { x: [0, xm], y: [-1.5, 0], xLabel: lab, yLabel: "깊이 (m)", yFmt: (v) => CB.num(-v, 1),
+      series: [{ data: d, color: key === 1 ? pal.accent2 : pal.accent, width: 2.6 }], hlines: R.bounds.map((b, i) => ({ y: -b, color: i === R.bounds.length - 1 ? pal.warn : pal.faint, label: i === R.bounds.length - 1 ? "노상 윗면" : "" })) });
+    const v = key === 1 ? R.sub.s : R.sub.e * 1e6;
+    C && PV.text(ctx, key === 1 ? `${CB.num(v, 1)} kPa` : `${CB.num(v, 0)} με`, C.X(Math.min(xm, v)) + 8, C.Y(-R.zs) + 12, pal.warn, { align: "left", size: 11.5 });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.42), minHeight: 220, maxHeight: 300 });
+  const cs = mk("#pv-cv-layer-s", 1, "σz (kPa)", () => 760), ce = mk("#pv-cv-layer-e", 2, "εz (με)", () => Math.max(400, Math.min(4000, Math.max(...R.prof.filter((p) => p[0] > 0.02).map((p) => p[2])) * 1.1)));
+  function go() {
+    calc(); cs.redraw(); ce.redraw();
+    CB.stat("pv-ly-he", CB.num(R.he, 3) + " m"); CB.stat("pv-ly-sz", CB.num(R.sub.s, 1) + " kPa"); CB.stat("pv-ly-ez", CB.num(R.sub.e * 1e6, 0) + " με");
+    CB.stat("pv-ly-nd", PV.sci(PV.Nd(R.sub.e)));
+  }
+  go();
+})();
+
+/* ---------- 5. ME 손상 ---------- */
+(function () {
+  const get = CB.range("pv-me-et", (v) => v + " με", go), ge1 = CB.range("pv-me-e1", (v) => v.toLocaleString("en-US") + " MPa", go), gev = CB.range("pv-me-ev", (v) => v + " με", go), gw = CB.range("pv-me-w", (v) => PV.sci(Math.pow(10, v)), go);
+  const link = CB.check("pv-me-link", (on) => { if (on) sync(); go(); });
+  function sync() { gev.set(Math.round(CB.clamp(PV.ev * 1e6, 150, 1200) / 5) * 5, false); }
+  PV.onEv.push(() => { if (link()) { sync(); go(); } });
+  let R = null;
+  function calc() {
+    const Nf = PV.Nf(get() * 1e-6, ge1()), Nd = PV.Nd(gev() * 1e-6), W = Math.pow(10, gw()), g = 0.02, GF = PV.gf(g, 20), a1 = W / GF;
+    const cum = (y) => a1 * PV.gf(g, y), df = [], dd = [];
+    for (let y = 0; y <= 40; y += 0.5) { df.push([y, cum(y) / Nf]); dd.push([y, cum(y) / Nd]); }
+    const life = (N) => { if (cum(40) < N) return Infinity; let lo = 0, hi = 40; for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (cum(m) < N) lo = m; else hi = m; } return lo; };
+    R = { Nf, Nd, W, df, dd, Df: W / Nf, Dd: W / Nd, lf: life(Nf), ld: life(Nd) };
+  }
+  const cv = CB.canvas("#pv-cv-me", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), top = Math.min(3, Math.max(1.3, R.Df * 2.1, R.Dd * 2.1));
+    CB.chart(ctx, { x: 52, y: 16, w: W - 52 - 16, h: H - 16 - 46 }, { x: [0, 40], y: [0, top], xLabel: "연도", yLabel: "손상 D = Σn/N",
+      series: [{ data: R.df, color: pal.accent2, width: 2.6 }, { data: R.dd, color: pal.accent, width: 2.6 }], hlines: [{ y: 1, color: pal.bad, label: "파손 D = 1" }], vlines: [{ x: 20, color: pal.faint, label: "설계 20년" }] });
+    PV.text(ctx, "피로", 70, 30, pal.accent2, { align: "left" }); PV.text(ctx, "소성 변형", 120, 30, pal.accent, { align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.48), minHeight: 240, maxHeight: 340 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("pv-me-nf", PV.sci(R.Nf)); CB.stat("pv-me-nd", PV.sci(R.Nd)); CB.stat("pv-me-d", `${CB.num(R.Df, 2)} · ${CB.num(R.Dd, 2)}`);
+    const gov = R.lf < R.ld ? "피로" : "소성 변형", L = Math.min(R.lf, R.ld);
+    CB.stat("pv-me-life", `${gov} · ${isFinite(L) ? CB.num(L, 1) + " 년" : "40년 넘음"}`);
+    const m = document.getElementById("pv-me-msg"), ok = R.Df <= 1 && R.Dd <= 1;
+    m.className = ok ? "pv-msg ok" : "pv-msg bad";
+    m.innerHTML = ok ? `20년 손상 피로 ${CB.num(R.Df, 2)}, 소성 변형 ${CB.num(R.Dd, 2)} — 둘 다 1 이하로 만족.` : `20년 안에 ${gov}으로 파손(D ${CB.num(Math.max(R.Df, R.Dd), 2)} > 1). ${gov === "피로" ? "아스팔트를 두껍게(ε<sub>t</sub> 감소)" : "기층·보조 기층을 두껍게 하거나 노상을 개량(ε<sub>v</sub> 감소)"} 해야 합니다.`;
+  }
+  go();
+})();
+
+/* ---------- 6. 웨스터가드 + 3D ---------- */
+(function () {
+  const pos = CB.seg("pv-wg-pos", go), gh = CB.range("pv-wg-h", (v) => v + " mm", go), gk = CB.range("pv-wg-k", (v) => v + " MPa/m", go), gE = CB.range("pv-wg-E", (v) => v.toLocaleString("en-US") + " MPa", go), gP = CB.range("pv-wg-P", (v) => v + " kN", go), gfr = CB.range("pv-wg-fr", (v) => v.toFixed(1) + " MPa", go);
+  let R = null;
+  const LOAD = { i: [2.25, 1.75], e: [4.35, 1.75], c: [4.35, 3.35] };
+  function calc() { R = PV.wg(gP(), gh() / 1000, gE(), gk()); }
+  const v3 = CB.orbit("#pv-cv-wg3", {
+    yaw: -0.6, pitch: 0.55, dist: 15, target: [4.5, 3.5, -0.3], aspect: 0.55, minHeight: 230, maxHeight: 340,
+    draw(V) {
+      if (!R) return; const P = V.P, p = pos(), [lx, ly] = LOAD[p], D = { i: R.di, e: R.de, c: R.dc }[p], l = R.l, sc = 400, f = (s) => Math.exp(-s) * (Math.cos(s) + Math.sin(s));
+      const w = (x, y) => { if (x > 4.5 + 1e-6 || y > 3.5 + 1e-6) return 0; const s = Math.hypot(x - lx, y - ly) / (Math.SQRT2 * l); return D * f(s) * sc; };
+      // 지반
+      V.poly3([[-0.5, -0.5, -0.9], [9.5, -0.5, -0.9], [9.5, 7.5, -0.9], [-0.5, 7.5, -0.9]], { fill: PV.alpha(P.warn, 0.12), color: P.border });
+      const N = 18;
+      for (let px = 0; px < 2; px++) for (let py = 0; py < 2; py++) {
+        const x0 = px * 4.5, y0 = py * 3.5, loaded = px === 0 && py === 0, col = loaded ? P.accent : P.dim;
+        for (let i = 0; i <= N; i++) { const xs = x0 + (4.5 * i) / N; let prev = null; for (let j = 0; j <= N; j++) { const ys = y0 + (3.5 * j) / N, pt = [xs, ys, -(loaded ? w(xs, ys) : 0)]; if (prev) V.line3(prev, pt, { color: col, width: i % N === 0 ? 1.6 : 0.7, alpha: i % N === 0 ? 1 : 0.6 }); prev = pt; } }
+        for (let j = 0; j <= N; j++) { const ys = y0 + (3.5 * j) / N; let prev = null; for (let i = 0; i <= N; i++) { const xs = x0 + (4.5 * i) / N, pt = [xs, ys, -(loaded ? w(xs, ys) : 0)]; if (prev) V.line3(prev, pt, { color: col, width: j % N === 0 ? 1.6 : 0.7, alpha: j % N === 0 ? 1 : 0.6 }); prev = pt; } }
+      }
+      V.line3([lx, ly, 1.6], [lx, ly, -w(lx, ly) + 0.05], { color: P.accent2, width: 3 }); V.dot3([lx, ly, -w(lx, ly)], { color: P.accent2, r: 5 });
+      V.text3(`P = ${gP()} kN`, [lx, ly, 1.9], { color: P.accent2, bold: true });
+      V.text3("줄눈(하중 전달 없음)", [4.5, 7.2, 0.1], { color: P.dim, size: 11 });
+    },
+  });
+  const cv = CB.canvas("#pv-cv-wg", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), d = { i: [], e: [], c: [] };
+    for (let h = 150; h <= 400; h += 5) { const r = PV.wg(gP(), h / 1000, gE(), gk()); d.i.push([h, r.si / 1000]); d.e.push([h, r.se / 1000]); d.c.push([h, r.sc / 1000]); }
+    const sel = pos(), cur = { i: R.si, e: R.se, c: R.sc }[sel] / 1000, top = Math.max(gfr() * 1.3, d.e[0][1] * 1.05);
+    const C = CB.chart(ctx, { x: 52, y: 26, w: W - 52 - 16, h: H - 26 - 46 }, { x: [150, 400], y: [0, Math.min(12, top)], xLabel: "판 두께 h (mm)", yLabel: "σ (MPa)",
+      series: [{ data: d.i, color: pal.ok, width: sel === "i" ? 3 : 1.6 }, { data: d.e, color: pal.accent2, width: sel === "e" ? 3 : 1.6 }, { data: d.c, color: pal.accent, width: sel === "c" ? 3 : 1.6 }],
+      hlines: [{ y: gfr(), color: pal.bad, label: "휨강도" }, { y: gfr() * 0.45, color: pal.faint, label: "SR 0.45" }], points: [{ x: gh(), y: cur, color: pal.text, r: 5 }] });
+    PV.text(ctx, "내부", 66, 36, pal.ok, { align: "left", size: 11 }); PV.text(ctx, "가장자리", 104, 36, pal.accent2, { align: "left", size: 11 }); PV.text(ctx, "모서리", 172, 36, pal.accent, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.42), minHeight: 220, maxHeight: 300 });
+  function go() {
+    calc(); v3.redraw(); cv.redraw();
+    CB.stat("pv-wg-l", CB.num(R.l, 3) + " m"); CB.stat("pv-wg-s", `${CB.num(R.si / 1000, 2)} · ${CB.num(R.se / 1000, 2)} · ${CB.num(R.sc / 1000, 2)} MPa`);
+    const p = pos(); CB.stat("pv-wg-d", CB.num({ i: R.di, e: R.de, c: R.dc }[p] * 1000, 2) + " mm");
+    const SR = ({ i: R.si, e: R.se, c: R.sc }[p] / 1000) / gfr(), N = PV.pcaN(SR);
+    CB.stat("pv-wg-n", `${CB.num(SR, 2)} · ${SR >= 1 ? "즉시 파괴" : isFinite(N) ? PV.sci(N, 1) : "무제한"}`);
+  }
+  go();
+})();
+
+/* ---------- 7. 줄눈·컬링 ---------- */
+(function () {
+  const gL = CB.range("pv-cu-L", (v) => v.toFixed(2) + " m", go), gdT = CB.range("pv-cu-dT", (v) => v.toFixed(1) + " °C", go), gh = CB.range("pv-cu-h", (v) => v + " mm", go), glte = CB.range("pv-cu-lte", (v) => v + " %", go);
+  const typ = CB.seg("pv-cu-type", (v) => { glte.set(v === "dowel" ? 85 : 0, false); go(); });
+  const E = 30000, AL = 1e-5, FR = 4.5;
+  let R = null;
+  function calc() {
+    const w = PV.wg(80, gh() / 1000, E, 50), C = PV.brad(gL(), w.l), sc = (C * E * AL * gdT()) / 2, lte = glte() / 100, sl = w.se / 1000 / (1 + lte);
+    R = { l: w.l, C, sc, sl, sum: sc + sl };
+  }
+  const cv = CB.canvas("#pv-cv-curl", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), d = []; for (let r = 0.5; r <= 16; r += 0.1) d.push([r, PV.brad(r, 1)]);
+    const narrow = W < 520, ch = narrow ? H * 0.58 : H - 16 - 46, cw = narrow ? W - 52 - 16 : W * 0.6 - 52;
+    const x = gL() / R.l;
+    CB.chart(ctx, { x: 52, y: 16, w: cw, h: ch }, { x: [0, 16], y: [0, 1.2], xLabel: "L/ℓ", yLabel: "C",
+      series: [{ data: d, color: pal.accent, width: 2.6 }], bands: [{ x0: 4, x1: 6, color: PV.alpha(pal.ok, 0.1) }], points: [{ x: Math.min(16, x), y: R.C, color: pal.accent2, r: 7 }] });
+    // 막대
+    const bx = narrow ? 70 : W * 0.6 + 40, by = narrow ? ch + 16 + 52 : 30, bh = narrow ? H - by - 24 : H - 80, bw = narrow ? W - 140 : W * 0.4 - 80, top = Math.max(FR * 1.15, R.sum * 1.1), sy = (bh) / top;
+    if (narrow) {
+      const s = bw / top; let xx = bx; ctx.fillStyle = pal.accent2; ctx.fillRect(xx, by, R.sl * s, 18); xx += R.sl * s; ctx.fillStyle = pal.blue; ctx.fillRect(xx, by, R.sc * s, 18);
+      ctx.strokeStyle = pal.bad; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(bx + FR * s, by - 6); ctx.lineTo(bx + FR * s, by + 24); ctx.stroke(); ctx.setLineDash([]);
+      PV.text(ctx, `하중 ${CB.num(R.sl, 2)} + 컬링 ${CB.num(R.sc, 2)} = ${CB.num(R.sum, 2)} MPa`, bx, by + 36, R.sum < FR ? pal.ok : pal.bad, { align: "left", size: 11.5 });
+    } else {
+      const base = by + bh; ctx.fillStyle = pal.accent2; ctx.fillRect(bx, base - R.sl * sy, bw, R.sl * sy); ctx.fillStyle = pal.blue; ctx.fillRect(bx, base - R.sum * sy, bw, R.sc * sy);
+      ctx.strokeStyle = pal.bad; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(bx - 10, base - FR * sy); ctx.lineTo(bx + bw + 10, base - FR * sy); ctx.stroke(); ctx.setLineDash([]);
+      PV.text(ctx, "휨강도 4.5", bx + bw / 2, base - FR * sy - 9, pal.bad, { size: 11 });
+      PV.text(ctx, `하중 ${CB.num(R.sl, 2)}`, bx + bw / 2, base - (R.sl * sy) / 2, pal.text, { size: 11 });
+      if (R.sc * sy > 14) PV.text(ctx, `컬링 ${CB.num(R.sc, 2)}`, bx + bw / 2, base - R.sl * sy - (R.sc * sy) / 2, pal.text, { size: 11 });
+      PV.text(ctx, `합 ${CB.num(R.sum, 2)} MPa`, bx + bw / 2, base + 16, R.sum < FR ? pal.ok : pal.bad, { size: 12 });
+    }
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.48), minHeight: 260, maxHeight: 360 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("pv-cu-C", `${CB.num(gL() / R.l, 2)} · ${CB.num(R.C, 3)}`); CB.stat("pv-cu-sc", CB.num(R.sc, 2) + " MPa"); CB.stat("pv-cu-sl", CB.num(R.sl, 2) + " MPa"); CB.stat("pv-cu-sum", `${CB.num(R.sum, 2)} MPa · ${CB.num(R.sum / FR, 2)}`);
+    const m = document.getElementById("pv-cu-msg");
+    if (R.sum >= FR) { m.className = "pv-msg bad"; m.innerHTML = `합 응력 ${CB.num(R.sum, 2)} MPa ≥ 휨강도 4.5 MPa: 하중이 가장자리를 지날 때 균열 위험. 줄눈 간격을 줄이거나 다웰바로 하중을 나누세요.`; }
+    else if (R.sum / FR > 0.75) { m.className = "pv-msg"; m.innerHTML = `합 ${CB.num(R.sum, 2)} MPa, 응력비 ${CB.num(R.sum / FR, 2)}: 한 번에는 버티지만 반복 하중의 피로에 불리합니다.`; }
+    else { m.className = "pv-msg ok"; m.innerHTML = `합 ${CB.num(R.sum, 2)} MPa, 응력비 ${CB.num(R.sum / FR, 2)} — 여유가 있습니다.`; }
+  }
+  go();
+})();
+
+/* ---------- 8. 공용성과 LCC ---------- */
+(function () {
+  const gpt = CB.range("pv-lc-pt", (v) => v.toFixed(2), go), gi = CB.range("pv-lc-i", (v) => v.toFixed(2) + " %", go), gtr = CB.range("pv-lc-tr", (v) => "× " + v.toFixed(1), go), gc0 = CB.range("pv-lc-c0", (v) => v.toFixed(1), go), gT = CB.range("pv-lc-T", (v) => v + " 년", go), user = CB.check("pv-lc-user", go);
+  const AGE_F = 0.09, AGE_R = 0.06, DAY = 111.2, MR = 7500;
+  const Din = 250 / 25.4;
+  function flexLoss(W, SN) { if (W <= 0) return 0; const B = 9.36 * Math.log10(SN + 1) - 0.2 + 2.32 * Math.log10(MR) - 8.07; return 2.7 * Math.pow(10, (Math.log10(W) - B) * (0.4 + 1094 / Math.pow(SN + 1, 5.19))); }
+  function rigLoss(W, pt) { if (W <= 0) return 0; const A = 7.35 * Math.log10(Din + 1) - 0.06 + (4.22 - 0.32 * pt) * Math.log10((650 * (Math.pow(Din, 0.75) - 1.132)) / (215.63 * 3.2 * (Math.pow(Din, 0.75) - 18.42 / Math.pow(4.35e6 / 184, 0.25)))); return 3.0 * Math.pow(10, (Math.log10(W) - A) * (1 + 1.624e7 / Math.pow(Din + 1, 8.46))); }
+  let R = null;
+  function sim(kind) {
+    const pt = gpt(), i = gi() / 100, T = gT(), tr = gtr(), dt = 0.1, out = [], cost = [];
+    const pv = (c, t) => c / Math.pow(1 + i, t);
+    let SN = 3.556, W = 0, tl = 0, p0 = kind === "f" ? 4.2 : 4.5, total = kind === "f" ? 4.0 : gc0(), n = 0, first = null, psi = p0, lastC = total;
+    out.push([0, p0]); cost.push([0, total]);
+    for (let t = dt; t <= T + 1e-9; t += dt) {
+      W += DAY * tr * Math.pow(1.026, t) * 365 * dt;
+      const loss = kind === "f" ? flexLoss(W, SN) : rigLoss(W, pt);
+      psi = p0 - Math.min(5, loss) - (kind === "f" ? AGE_F : AGE_R) * (t - tl);
+      total += pv((kind === "f" ? 0.03 : 0.02) * dt, t);
+      if (psi <= pt && t < T - 0.5) {
+        out.push([t, Math.max(0, psi)]);
+        const c = (kind === "f" ? (pt >= 3.0 ? 1.0 : 1.5) : 1.2) + (user() ? 1.0 : 0);
+        total += pv(c, t); lastC = c; n++; if (first === null) first = t;
+        if (kind === "f") { SN = Math.min(7, SN + 0.87); p0 = 4.2; } else p0 = 4.3;
+        W = 0; tl = t; psi = p0;
+      }
+      out.push([t, Math.max(0, psi)]); cost.push([t, total]);
+    }
+    const rem = CB.clamp((psi - pt) / (p0 - pt), 0, 1), sal = pv(rem * lastC, T);
+    return { out, cost, n, first, lcc: total - sal };
+  }
+  function calc() { R = { f: sim("f"), r: sim("r") }; }
+  const cp = CB.canvas("#pv-cv-lcc-p", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette();
+    CB.chart(ctx, { x: 46, y: 26, w: W - 46 - 16, h: H - 26 - 40 }, { x: [0, gT()], y: [0, 5], xLabel: "연도", yLabel: "PSI",
+      series: [{ data: R.f.out, color: pal.accent2, width: 2.4 }, { data: R.r.out, color: pal.accent, width: 2.4 }], hlines: [{ y: gpt(), color: pal.warn, label: "보수 기준" }] });
+    PV.text(ctx, "연성", 60, 36, pal.accent2, { align: "left", size: 11 }); PV.text(ctx, "강성", 100, 36, pal.accent, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.38), minHeight: 200, maxHeight: 270 });
+  const cc = CB.canvas("#pv-cv-lcc-c", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), top = Math.max(...R.f.cost.map((p) => p[1]), ...R.r.cost.map((p) => p[1])) * 1.12;
+    CB.chart(ctx, { x: 46, y: 26, w: W - 46 - 16, h: H - 26 - 40 }, { x: [0, gT()], y: [0, top], xLabel: "연도", yLabel: "누적 PV",
+      series: [{ data: R.f.cost, color: pal.accent2, width: 2.4 }, { data: R.r.cost, color: pal.accent, width: 2.4 }] });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.38), minHeight: 200, maxHeight: 270 });
+  function go() {
+    calc(); cp.redraw(); cc.redraw();
+    const fy = (s) => `${s.n}회 · ${s.first === null ? "없음" : CB.num(s.first, 1) + "년"}`;
+    CB.stat("pv-lc-nf", fy(R.f)); CB.stat("pv-lc-nr", fy(R.r)); CB.stat("pv-lc-lcc", `${CB.num(R.f.lcc, 2)} · ${CB.num(R.r.lcc, 2)}`);
+    const d = R.r.lcc - R.f.lcc; CB.stat("pv-lc-win", Math.abs(d) < 0.05 ? "비슷함" : d > 0 ? `연성(${CB.num((d / R.r.lcc) * 100, 0)} % 쌈)` : `강성(${CB.num((-d / R.f.lcc) * 100, 0)} % 쌈)`);
+  }
+  go();
+})();
+</script>
+</body>
+</html>

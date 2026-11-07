@@ -1,5 +1,5 @@
 // Copyright (c) 2026 geniuskey and ConstructionBooks contributors. MIT. Based on the MathBooks og renderer.
-// Render the 1200×630 share images: og.png (shelf home), mechanics/, materials/, geotech/, structure/ and concrete/og.png.
+// Render the 1200×630 share images: og.png (shelf home), mechanics/, materials/, geotech/, structure/, concrete/ and civil/og.png.
 // Usage: node tools/og.mjs   (rerun after books, chapters or simulators change). Needs Playwright.
 // Covers use the same shelf.css and covers.js as the home page; stats are counted like shared/js/shelf.js.
 import { chromium } from 'playwright';
@@ -46,6 +46,11 @@ sandbox4.window = sandbox4;
 vm.createContext(sandbox4);
 vm.runInContext(read('concrete/js/common.js'), sandbox4);
 CB.rc = sandbox4.CB.rc;
+const sandbox5 = { ...sandbox, document: { ...sandbox.document, currentScript: { src: 'http://x/civil/js/common.js' } } };
+sandbox5.window = sandbox5;
+vm.createContext(sandbox5);
+vm.runInContext(read('civil/js/common.js'), sandbox5);
+CB.civ = sandbox5.CB.civ;
 
 const base = `
   html, body { margin:0; width:1200px; height:630px; overflow:hidden; }
@@ -276,9 +281,53 @@ const rcPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><styl
   <div class="art">${rcArt}</div>
 </body></html>`;
 
+// CivilBook: the CS-420 cable-stayed elevation (fan stays, tension by angle) above the TN-11 ground reaction curve.
+const civArt = (() => {
+  let s = '';
+  const X = (x) => 60 + (x / 420) * 480, deckY = 230, pyH = 55, Yh = (h) => deckY - h * 2.2;
+  s += `<line x1="${X(0)}" y1="${deckY}" x2="${X(420)}" y2="${deckY}" stroke="#cfd6e4" stroke-width="5"/>`;
+  [100, 320].forEach((px) => {
+    s += `<line x1="${X(px)}" y1="${deckY + 70}" x2="${X(px)}" y2="${Yh(pyH)}" stroke="#cfd6e4" stroke-width="6"/>`;
+    for (let k = 1; k <= 9; k++) {
+      [-1, 1].forEach((sg) => {
+        const ax = px + sg * k * 10 + (sg > 0 ? 0 : 0); if (ax < 2 || ax > 418) return;
+        const top = Yh(pyH - 1.6 * (9 - k)), th = Math.atan2(pyH - 1.6 * (9 - k), k * 10) * 180 / Math.PI, T = CB.civ.stay(2000, th).T;
+        const c = T > 5000 ? '#ff5f57' : T > 3500 ? '#ffa94d' : '#8ce99a';
+        s += `<line x1="${X(px)}" y1="${top}" x2="${X(ax)}" y2="${deckY}" stroke="${c}" stroke-width="2"/>`;
+      });
+    }
+  });
+  s += `<path d="M${X(0)} ${deckY + 70}Q${X(210)} ${deckY + 50} ${X(420)} ${deckY + 70}" fill="none" stroke="#5b8cff" stroke-width="3" opacity=".7"/>`;
+  s += `<text x="300" y="64" text-anchor="middle" fill="#cfd6e4" font-size="17" font-weight="700">CS-420 사장교 · 케이블 장력(경사가 낮을수록 큼)</text>`;
+  // GRC
+  const g = CB.civ.grc({ p0: 1.44, E: 2000, nu: 0.25, c: 0.35, phi: 33, a: 5.5 }), gx = 90, gy = 540, gw = 440, gh = 170, umax = 0.011;
+  const PX = (u) => gx + (u / umax) * gw, PY = (p) => gy - (p / 1.44) * gh;
+  s += `<line x1="${gx}" y1="${gy}" x2="${gx + gw}" y2="${gy}" stroke="#4a5670" stroke-width="2"/><line x1="${gx}" y1="${gy}" x2="${gx}" y2="${gy - gh - 10}" stroke="#4a5670" stroke-width="2"/>`;
+  let d = ''; g.curve.forEach(([p, u], i) => { d += (i ? 'L' : 'M') + PX(u).toFixed(1) + ' ' + PY(p).toFixed(1); });
+  s += `<path d="${d}" fill="none" stroke="#8ce99a" stroke-width="4"/>`;
+  const sc = CB.civ.shotcrete(0.2, 15000, 21, 5.5), u0 = 0.4 * g.at(0).u, u1 = u0 + sc.pmax / sc.K;
+  s += `<path d="M${PX(u0)} ${PY(0)}L${PX(u1)} ${PY(sc.pmax)}L${PX(umax)} ${PY(sc.pmax)}" fill="none" stroke="#ffa94d" stroke-width="3"/>`;
+  s += `<text x="${gx + 8}" y="${gy - gh + 4}" fill="#8ce99a" font-family="monospace" font-size="15">TN-11 지반 반응 곡선</text><text x="${PX(umax) - 4}" y="${PY(sc.pmax) - 8}" text-anchor="end" fill="#ffa94d" font-family="monospace" font-size="15">숏크리트 지보</text>`;
+  return `<svg viewBox="0 0 600 600" width="600" height="600"><defs><clipPath id="c6"><rect x="20" y="20" width="560" height="560" rx="28"/></clipPath></defs><rect x="20" y="20" width="560" height="560" rx="28" fill="#0f1625" stroke="#26324a"/><g clip-path="url(#c6)">${s}</g></svg>`;
+})();
+const civil = books.find((b) => b.id === 'civilbook');
+const civPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>${read('shelf.css')}</style><style>${base}
+  .art { position:absolute; right:40px; top:15px; }
+</style></head><body>
+  <div class="left">
+    <div class="brand">${read('civil/favicon.svg')}<span>CivilBook</span></div>
+    <div class="eyebrow">INTERACTIVE CIVIL INFRASTRUCTURE</div>
+    <h1>강을 건너고<br><span class="soft">산을 뚫는</span><br><span class="warm">구조물</span></h1>
+    <p class="lead">교량 하중과 케이블, 터널 지보와 TBM,<br>도로 선형과 포장을 직접 계산하는 토목 교과서.</p>
+    <div class="stats"><span><b>4</b>부</span><span><b>16</b>개 장</span><span><b>${Math.floor(civil.simulators / 10) * 10}+</b>시뮬레이터</span></div>
+  </div>
+  <div class="url">construction.euiyun.com/civil/</div>
+  <div class="art">${civArt}</div>
+</body></html>`;
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
-for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png'], [strPage, 'structure/og.png'], [rcPage, 'concrete/og.png']]) {
+for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png'], [strPage, 'structure/og.png'], [rcPage, 'concrete/og.png'], [civPage, 'civil/og.png']]) {
   await page.setContent(html, { waitUntil: 'networkidle' });
   await page.addScriptTag({ content: read('shared/js/covers.js') });
   await page.evaluate(async () => {
@@ -288,4 +337,4 @@ for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [m
   await page.screenshot({ path: join(root, out) });
 }
 await browser.close();
-console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators}, structure/og.png: ${structure.simulators}, concrete/og.png: ${concrete.simulators} simulators`);
+console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators}, structure/og.png: ${structure.simulators}, concrete/og.png: ${concrete.simulators}, civil/og.png: ${civil.simulators} simulators`);
