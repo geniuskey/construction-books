@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>적산과 원가 관리 · SiteBook</title>
+<meta name="description" content="얼마가 드나. B-10 기준층의 콘크리트·거푸집·철근 수량 산출, 재료비·노무비·경비의 일위대가, 원가계산서 형태의 원가 구성, 견적 정확도, 기성 지급 지연과 유보금이 만드는 시공자 현금 흐름, NPV·IRR, 생애 주기 비용을 P-B10으로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .es-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .es-msg b { color: var(--text); }
+  .es-msg.ok { color: var(--ok); font-weight: 600; }
+  .es-msg.bad { color: var(--bad); font-weight: 600; }
+  .es-tbl td, .es-tbl th { font-variant-numeric: tabular-nums; }
+  .es-drag { touch-action: pan-x; cursor: ns-resize; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="site"></script>
+</head>
+<body data-chapter="estimating">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="es-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="es-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="es-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="es-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 12</div>
+    <h1 data-no-glossary>적산과 원가 관리</h1>
+    <p class="lead">P-B10의 공사비 244억 원은 어디서 나왔을까요? 도면에서 콘크리트 몇 m³, 거푸집 몇 m², 철근 몇 t을 세고(수량), 한 단위를 만드는 데 드는 재료·사람·장비 값을 정하고(단가), 그 곱에 현장 관리비·회사 관리비·이윤을 정해진 순서로 얹으면(원가 구성) 공사비가 됩니다. 그러나 숫자 하나로 끝나지 않습니다. 설계가 덜 된 단계의 견적은 넓은 범위를 가지고, 시공자는 돈을 먼저 쓰고 나중에 받으므로 공사 중에 현금이 모자라며, 발주자는 짓는 비용과 쓰는 동안의 비용을 시간 가치로 함께 따져야 합니다. 이 장은 B-10 기준층의 수량에서 출발해 P-B10의 원가 구성, 현금 흐름, 경제성까지 계산합니다.</p>
+    <ul class="objectives">
+      <li>적산과 견적을 구별하고, B-10 기준층의 콘크리트·거푸집·철근 수량을 부재별로 산출한다.</li>
+      <li>표준품셈의 형태를 따라 재료비·노무비·경비로 일위대가(단위 단가)를 만들고 층 공사비를 계산한다.</li>
+      <li>원가계산서의 형태(재료비·노무비·경비 → 순공사원가 → 일반관리비 → 이윤 → 부가가치세)로 공사비를 구성한다.</li>
+      <li>설계 성숙도에 따른 견적 등급과 정확도 범위(AACE 형태)를 설명하고 예비비의 의미를 판단한다.</li>
+      <li>비용 S 곡선과 기성 지급 지연·유보금·선급금으로 시공자의 현금 수지와 최대 자금 소요를 계산한다.</li>
+      <li>\(NPV = \sum CF_t/(1+i)^t\)와 IRR로 투자를 평가하고, 생애 주기 비용으로 대안을 비교한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 관리가 없었다면</small><b>짓고 나서야 얼마인지 알았다</b></div>
+      <div class="o-body"><p>공사비를 미리 정하는 일은 건설만큼 오래되었지만, 그것을 하나의 직업으로 세운 것은 19세기 영국입니다. 여러 공종을 한 시공자에게 맡기는 일괄 도급이 퍼지자, 입찰자마다 따로 물량을 세는 낭비를 없애려고 발주자 쪽에서 물량을 세어 <b>수량 명세서</b>(bill of quantities)를 만들어 주고 입찰자는 단가만 적게 했습니다. 이 일을 하는 사람이 적산 전문가(quantity surveyor)였고, 같은 수량에 단가만 겨루는 경쟁이 공정한 입찰의 바탕이 되었습니다. 우리나라 공공 공사는 국가가 공표하는 표준품셈으로 단위 작업의 투입량을 정하고, 원가계산 방식으로 예정 가격을 만드는 체계를 써 왔습니다.</p>
+        <p>공사비가 정해져도 관리는 시작일 뿐입니다. 시공자는 계약 금액보다 작은 실행 예산으로 공사를 끝내야 하고, 매달 기성을 청구해 받은 돈으로 다음 달 인건비와 자재비를 냅니다. 기성이 늦게 들어오면 이익이 나는 공사에서도 부도가 납니다. 발주자는 공사비만이 아니라 30년 넘게 드는 운영·유지 비용과 돈의 시간 가치를 함께 보아야 합니다.</p>
+        <div class="o-chain"><span>도면 · 시방 · 공정표</span><i>→</i><span class="tool">수량 × 일위대가 · 원가 구성 · 정확도 · 현금 흐름 · NPV · LCC</span><i>→</i><span>예정 가격 · 입찰가 · 실행 예산 · 투자 판단</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="basics">
+    <h2>적산과 견적</h2>
+    <div class="problem"><strong>같은 도면, 다른 금액</strong>
+      <p>세 시공사가 B-10 입찰에 참여해 각각 238억, 244억, 251억 원을 적어 냈습니다. 도면과 시방서는 같습니다. 물량이 다를까요, 단가가 다를까요, 아니면 관리비와 이윤이 다를까요?</p></div>
+    <p><span class="term">적산</span><span class="en">(quantity surveying, quantity take-off)</span>은 도면과 시방서에서 공종별 수량을 계산하는 일입니다. 같은 도면이면 누가 하든 같은 값이 나와야 하는, 기술적·객관적인 작업입니다. <span class="term">견적</span><span class="en">(estimating)</span>은 그 수량에 단가를 곱하고 관리비·이윤과 위험을 더해 금액을 정하는 일로, 회사의 생산성·구매력·전략·위험 판단이 들어갑니다. 위 세 금액의 차이는 대부분 견적에서 납니다. 다만 수량 누락은 견적에서 가장 비싼 실수이므로, 적산은 정해진 순서와 규칙으로 빠짐없이 합니다.</p>
+    <figure class="diagram" id="fig-es-flow">
+      <svg viewBox="0 0 860 260" role="img" aria-label="적산에서 견적까지의 흐름: 도면, 수량 산출, 일위대가, 원가계산서, 예정 가격과 입찰가, 실행 예산">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g text-anchor="middle">
+          <g transform="translate(30,46)">
+            <rect x="0" y="0" width="140" height="64" rx="8" class="f-elev"/><text x="70" y="26" class="t" style="font-weight:700">도면 · 시방서</text><text x="70" y="46" class="t-mono">설계 도서</text>
+            <rect x="170" y="0" width="150" height="64" rx="8" class="f-acc2-soft"/><text x="245" y="26" class="t" style="font-weight:700">① 수량 산출</text><text x="245" y="46" class="t-mono">m³ · m² · t</text>
+            <rect x="350" y="0" width="150" height="64" rx="8" class="f-acc2-soft"/><text x="425" y="26" class="t" style="font-weight:700">② 일위대가</text><text x="425" y="46" class="t-mono">원/단위</text>
+            <rect x="530" y="0" width="140" height="64" rx="8" class="f-acc-soft"/><text x="600" y="26" class="t" style="font-weight:700">③ 원가 구성</text><text x="600" y="46" class="t-mono">관리비 · 이윤</text>
+            <rect x="690" y="0" width="110" height="64" rx="8" class="f-acc-soft"/><text x="745" y="26" class="t" style="font-weight:700">공사비</text><text x="745" y="46" class="t-mono">244억</text>
+          </g>
+          <g style="stroke:var(--text-dim);stroke-width:2" marker-end="url(#es-ah-dim)"><line x1="172" y1="78" x2="198" y2="78"/><line x1="352" y1="78" x2="378" y2="78"/><line x1="532" y1="78" x2="558" y2="78"/><line x1="702" y1="78" x2="718" y2="78"/></g>
+          <path d="M275 112V150" style="stroke:var(--accent-2);stroke-width:1.6;fill:none"/><text x="275" y="168" class="t-mono" style="fill:var(--accent-2)">적산(객관): 같은 도면 → 같은 수량</text>
+          <path d="M630 112V150" style="stroke:var(--accent);stroke-width:1.6;fill:none"/><text x="630" y="168" class="t-mono" style="fill:var(--accent)">견적(판단): 단가 · 위험 · 전략</text>
+          <text x="430" y="206" class="t-dim">발주자: 예정 가격(원가계산 형태) · 입찰자: 입찰가 · 낙찰 후 시공자: 실행 예산(목표 원가)</text>
+          <text x="430" y="228" class="t-dim">수량 × 단가 = 직접비, 여기에 간접비 · 일반관리비 · 이윤 · 부가가치세</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-1.</b> 적산에서 견적까지. 수량 산출(①)은 도면에 대한 객관적 계산이고, 일위대가(②)와 원가 구성(③)에는 생산성과 판단이 들어간다. 발주자의 예정 가격, 입찰자의 입찰가, 시공자의 실행 예산은 같은 틀에서 목적만 다르다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="takeoff">
+    <h2>수량 산출: B-10 기준층</h2>
+    <div class="problem"><strong>한 층에 레미콘 몇 대, 거푸집 몇 장</strong>
+      <p>B-10 기준층(2–10층)은 32 × 24 m 평면, 8 m 격자, 기둥 20개, 큰보 400 × 700, 슬래브 210 mm, 코어 벽 400 mm, 층고 4.0 m입니다. 레미콘 주문, 거푸집 반입, 철근 가공 계획은 모두 이 층의 수량에서 시작합니다.</p></div>
+    <p>수량 산출은 부재별로, 정해진 순서와 공제 규칙으로 합니다. 콘크리트는 체적(m³), 거푸집은 콘크리트와 닿는 면적(m²), 철근은 질량(t)입니다. 부재가 겹치는 곳(보와 기둥의 접합부, 보 위의 슬래브)을 두 번 세지 않도록 우선순위를 정하는 것이 관행입니다. 이 책은 교육용으로 다음처럼 단순화합니다: 슬래브는 평면 전체 × 두께, 보는 슬래브 아래 웨브만(중심선 길이), 기둥과 벽은 슬래브 아래 높이만. 철근은 부재별 배근 대신 <span class="term">원단위</span><span class="en">(unit quantity rate)</span>(콘크리트 1 m³당 철근 t)를 쓰고, 상세 산출은 <a href="../../materials/chapters/rebar.html#takeoff">MaterialsBook 11장의 물량 산출</a>을 따릅니다.</p>
+    <div class="callout def"><strong>정의 12.1 (기준층 수량, 교육용 단순화)</strong> 평면 \(A = 32\times24 = 768\) m², 슬래브 두께 \(t\), 보 \(b \times h\), 보 중심선 길이 \(L_b = 4\times32 + 5\times24 = 248\) m(순길이 \(L_n = 31\times(8 - c)\)), 기둥 \(n_c = 20\)개 \(c \times c\), 코어 벽 길이 \(L_w\)·두께 \(t_w\), 층고 \(H\):
+      <div class="formula">$$V = \underbrace{A\,t}_{\text{슬래브}} + \underbrace{L_b\,b\,(h - t)}_{\text{보}} + \underbrace{n_c c^2 (H - t)}_{\text{기둥}} + \underbrace{L_w t_w (H - t)}_{\text{벽}}, \qquad W_s = \rho_s V$$
+        $$A_f = (A - b L_b - n_c c^2) + \bigl(2(h - t) + b\bigr)L_n + 4c\,(H - h)\,n_c + 2 L_w (H - t) + 112\,t$$<div class="where">\(A_f\): 거푸집 면적(슬래브 밑면, 보 옆·밑, 기둥 네 면(보 밑까지), 벽 양면, 슬래브 가장자리 둘레 112 m). \(\rho_s\): 철근 원단위(교육용 0.12 t/m³). 실제 적산은 개구부·계단·헌치·이음과 할증(철근 약 3 % 등, 표준품셈 확인)을 넣는다.</div></div></div>
+    <figure class="diagram" id="fig-es-plan">
+      <svg viewBox="0 0 860 320" role="img" aria-label="B-10 기준층 평면: 8 m 격자, 기둥 20개, 큰보, 코어, 부재별 콘크리트 수량">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(50,40)">
+          <rect x="0" y="0" width="384" height="240" style="fill:var(--accent);opacity:.08;stroke:var(--text-dim)"/>
+          <g style="stroke:var(--accent-2);stroke-width:5;opacity:.7">
+            <line x1="0" y1="0" x2="384" y2="0"/><line x1="0" y1="80" x2="384" y2="80"/><line x1="0" y1="160" x2="384" y2="160"/><line x1="0" y1="240" x2="384" y2="240"/>
+            <line x1="0" y1="0" x2="0" y2="240"/><line x1="96" y1="0" x2="96" y2="240"/><line x1="192" y1="0" x2="192" y2="240"/><line x1="288" y1="0" x2="288" y2="240"/><line x1="384" y1="0" x2="384" y2="240"/>
+          </g>
+          <g style="fill:var(--text-dim)">
+            <rect x="-5" y="-5" width="10" height="10"/><rect x="91" y="-5" width="10" height="10"/><rect x="187" y="-5" width="10" height="10"/><rect x="283" y="-5" width="10" height="10"/><rect x="379" y="-5" width="10" height="10"/>
+            <rect x="-5" y="75" width="10" height="10"/><rect x="91" y="75" width="10" height="10"/><rect x="187" y="75" width="10" height="10"/><rect x="283" y="75" width="10" height="10"/><rect x="379" y="75" width="10" height="10"/>
+            <rect x="-5" y="155" width="10" height="10"/><rect x="91" y="155" width="10" height="10"/><rect x="187" y="155" width="10" height="10"/><rect x="283" y="155" width="10" height="10"/><rect x="379" y="155" width="10" height="10"/>
+            <rect x="-5" y="235" width="10" height="10"/><rect x="91" y="235" width="10" height="10"/><rect x="187" y="235" width="10" height="10"/><rect x="283" y="235" width="10" height="10"/><rect x="379" y="235" width="10" height="10"/>
+          </g>
+          <rect x="120" y="96" width="144" height="48" style="fill:none;stroke:var(--accent);stroke-width:5"/>
+          <text x="192" y="125" text-anchor="middle" class="t-mono" style="fill:var(--accent)">코어 벽</text>
+          <text x="192" y="268" text-anchor="middle" class="t-dim">32 m (8 m × 4경간)</text>
+          <text x="-22" y="120" text-anchor="middle" class="t-dim" transform="rotate(-90 -22 120)">24 m (8 m × 3)</text>
+        </g>
+        <g transform="translate(480,46)" class="t-mono">
+          <text x="0" y="0" class="t" style="font-weight:700">기준층 콘크리트 (교육용)</text>
+          <rect x="0" y="16" width="161" height="18" style="fill:var(--accent);opacity:.35"/><text x="168" y="30">슬래브 768 × 0.21 = 161.3</text>
+          <rect x="0" y="44" width="49" height="18" style="fill:var(--accent-2);opacity:.7"/><text x="168" y="58">보 248 × 0.4 × 0.49 = 48.6</text>
+          <rect x="0" y="72" width="49" height="18" style="fill:var(--text-dim);opacity:.7"/><text x="168" y="86">기둥 20 × 0.8² × 3.79 = 48.5</text>
+          <rect x="0" y="100" width="30" height="18" style="fill:var(--accent);opacity:.8"/><text x="168" y="114">코어 벽 20 × 0.4 × 3.79 = 30.3</text>
+          <line x1="0" y1="132" x2="340" y2="132" class="s-axis"/>
+          <text x="0" y="154" class="t" style="font-weight:700">합계 ≈ 289 m³ (약 290)</text>
+          <text x="0" y="178">철근 0.12 t/m³ × 289 ≈ 35 t</text>
+          <text x="0" y="200">거푸집 ≈ 1,350 m² (4.7 m²/m³)</text>
+          <text x="0" y="222" class="t-dim">레미콘 6 m³ 차 약 49대분</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-2.</b> B-10 기준층 평면(개략)과 부재별 콘크리트 수량. 슬래브가 절반 이상이다. 코어 벽은 개구부를 뺀 순길이 약 20 m로 단순화했다(코어 외곽 16 × 8 m). 기둥 800 × 800은 앞 권의 값이며 위층 기둥이 작아지면(ConcreteBook: 5–10층 600) 층 수량이 줄어든다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-es-qto">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>수량 산출기: 부재 치수 → 콘크리트 · 거푸집 · 철근</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-qto" aria-label="부재별 콘크리트 체적, 거푸집 면적, 철근 질량 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>슬래브 두께 t <output id="es-qt-t-out"></output></span><input type="range" id="es-qt-t" min="150" max="300" step="10" value="210"></label>
+          <label class="ctrl"><span>큰보 춤 h <output id="es-qt-h-out"></output></span><input type="range" id="es-qt-h" min="500" max="900" step="50" value="700"></label>
+          <label class="ctrl"><span>큰보 폭 b <output id="es-qt-b-out"></output></span><input type="range" id="es-qt-b" min="300" max="600" step="50" value="400"></label>
+          <label class="ctrl"><span>기둥 c × c <output id="es-qt-c-out"></output></span><input type="range" id="es-qt-c" min="500" max="1000" step="50" value="800"></label>
+          <label class="ctrl"><span>철근 원단위 <output id="es-qt-r-out"></output></span><input type="range" id="es-qt-r" min="0.08" max="0.18" step="0.005" value="0.12"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">콘크리트</span><span class="v" id="es-qt-o-v">—</span></div>
+        <div class="stat"><span class="k">거푸집</span><span class="v" id="es-qt-o-f">—</span></div>
+        <div class="stat"><span class="k">철근</span><span class="v" id="es-qt-o-s">—</span></div>
+        <div class="stat"><span class="k">지상 10개 층 합계</span><span class="v" id="es-qt-o-10">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 콘크리트 약 289 m³, 거푸집 약 1,350 m², 철근 약 35 t을 확인하세요 · 기둥을 600으로 줄이면(ConcreteBook의 5–10층) 콘크리트가 약 21 m³ 줄고 거푸집도 줄어듭니다 · 슬래브를 250으로 두껍게 하면 슬래브 콘크리트는 늘지만 보 웨브(h − t)는 줄어듭니다 · 거푸집/콘크리트 비(m²/m³)는 얇은 부재가 많을수록 커집니다 — 거푸집 비용이 골조비의 큰 몫인 이유 · 모델: 정의 12.1, 층고 4.0 m, 코어 벽 순길이 20 m·두께 0.4 m 고정, 지상 합계는 기준층 × 10(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 12.1 (기준층 수량)</strong> \(t = 0.21\), \(b \times h = 0.4 \times 0.7\), \(c = 0.8\), \(H = 4.0\) m.
+      <p><b>① 콘크리트</b> 슬래브 \(768 \times 0.21 = 161.3\), 보 \(248 \times 0.4 \times 0.49 = 48.6\), 기둥 \(20 \times 0.64 \times 3.79 = 48.5\), 벽 \(20 \times 0.4 \times 3.79 = 30.3\) → \(V = 288.7 \approx 290\) m³.</p>
+      <p><b>② 거푸집</b> 슬래브 밑 \(768 - 0.4\times248 - 20\times0.64 = 656.0\), 보 \((0.98 + 0.4)\times31\times7.2 = 308.0\), 기둥 \(3.2 \times 3.3 \times 20 = 211.2\), 벽 \(2\times20\times3.79 = 151.6\), 가장자리 \(112\times0.21 = 23.5\) → \(A_f \approx 1{,}350\) m²(4.7 m²/m³).</p>
+      <p><b>③ 철근</b> \(0.12 \times 288.7 = 34.6 \approx 35\) t(MaterialsBook 11장의 기준층 값과 같다).</p>
+      <p><b>④ 판단</b> 6 m³ 레미콘 차 약 49대, 거푸집은 유로폼 한 장(600 × 1,200 mm, 0.72 m²) 기준 약 1,900장분이다. 3주 층 사이클(6장)이면 거푸집을 전용하는 횟수가 거푸집 단가를 좌우한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="unit-price">
+    <h2>표준품셈과 일위대가</h2>
+    <div class="problem"><strong>콘크리트 1 m³ 타설에 얼마</strong>
+      <p>레미콘 값만 알면 될까요? 타설에는 펌프카, 콘크리트공과 보통인부, 진동기가 들고, 레미콘은 펌프 배관과 손실로 주문량보다 조금 더 필요합니다. 1 m³당 재료·사람·장비를 모두 더한 값을 어떻게 만들까요?</p></div>
+    <p><span class="term">표준품셈</span><span class="en">(standard estimating manual)</span>은 단위 작업에 드는 재료·인력·장비의 표준 투입량을 정한 기준입니다. 우리나라 공공 공사에서는 국토교통부가 공표하는 건설공사 표준품셈을 쓰고, 일부 공종은 실제 시공 실적 단가를 모은 <span class="term">표준시장단가</span><span class="en">(standard market unit price)</span>를 씁니다(대상 공종과 적용은 현행 기준 확인). 투입량에 재료 단가, 노임(대한건설협회 공표 시중노임단가 형태), 장비 손료·운전 경비를 곱해 더한 단위 단가를 <span class="term">일위대가</span><span class="en">(unit price breakdown)</span>라 합니다. 이 장의 투입량·단가는 실제 품셈 값이 아니라, 작업 조(crew)의 하루 산출량으로 만든 교육용 숫자입니다.</p>
+    <div class="callout def"><strong>정의 12.2 (일위대가, 작업 조 방식)</strong> 단위 수량 1당
+      <div class="formula">$$u = \underbrace{q_m\,p_m\,(1 + \beta)}_{\text{재료비}} + \underbrace{\frac{\sum_k n_k w_k}{Q_d}}_{\text{노무비}} + \underbrace{\frac{\sum_j e_j}{Q_d}}_{\text{경비(장비)}}$$<div class="where">\(q_m\): 단위당 재료 수량, \(p_m\): 재료 단가, \(\beta\): 할증률(손실), \(n_k\)·\(w_k\): 직종별 인원과 일당, \(Q_d\): 작업 조의 하루 산출량, \(e_j\): 장비의 하루 비용. 품셈 방식은 같은 값을 단위당 인원(인/m³)으로 적은 것이다: \(n_k/Q_d\). 생산성 \(Q_d\)가 노무비와 장비비를 함께 정한다.</div></div></div>
+    <figure class="diagram" id="fig-es-unit">
+      <svg viewBox="0 0 860 260" role="img" aria-label="일위대가 구조: 콘크리트 타설 1 m³의 재료비, 노무비, 경비 구성">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g text-anchor="middle">
+          <rect x="330" y="26" width="200" height="50" rx="8" class="f-acc-soft"/><text x="430" y="48" class="t" style="font-weight:700">콘크리트 타설 1 m³</text><text x="430" y="66" class="t-mono">약 119,000원</text>
+          <g style="stroke:var(--text-dim);stroke-width:1.6;fill:none"><path d="M430 76V96H150V116"/><path d="M430 96V116"/><path d="M430 96H710V116"/></g>
+          <rect x="40" y="116" width="220" height="110" rx="8" class="f-elev"/><text x="150" y="138" class="t" style="font-weight:700">재료비 96,000</text>
+          <text x="150" y="162" class="t-mono">레미콘 1.01 m³</text><text x="150" y="182" class="t-mono">× 95,000원/m³</text><text x="150" y="206" class="t-dim">할증 1 % (교육용)</text>
+          <rect x="320" y="116" width="220" height="110" rx="8" class="f-elev"/><text x="430" y="138" class="t" style="font-weight:700">노무비 12,700</text>
+          <text x="430" y="162" class="t-mono">콘크리트공 3 + 보통인부 4</text><text x="430" y="182" class="t-mono">1,520,000원/일</text><text x="430" y="206" class="t-dim">÷ 120 m³/일</text>
+          <rect x="600" y="116" width="220" height="110" rx="8" class="f-elev"/><text x="710" y="138" class="t" style="font-weight:700">경비 10,800</text>
+          <text x="710" y="162" class="t-mono">펌프카 1대</text><text x="710" y="182" class="t-mono">1,300,000원/일</text><text x="710" y="206" class="t-dim">÷ 120 m³/일</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-3.</b> 일위대가의 구조(교육용 숫자). 재료비는 수량에 비례하고, 노무비와 장비비는 하루 비용을 하루 산출량으로 나눈 값이다. 그래서 같은 레미콘이라도 타설 속도가 빠른 현장의 m³당 단가가 싸다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-es-unit">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>일위대가 구성: 재료 · 노무 · 장비 → 단위 단가 · 층 공사비</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-unit" aria-label="선택한 공종의 단위 단가를 재료비, 노무비, 경비로 나눈 막대와 기준층 금액"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>공종</span><div class="seg" id="es-un-item"><button data-value="con" class="on">콘크리트</button><button data-value="form">거푸집</button><button data-value="bar">철근</button></div></div>
+          <label class="ctrl"><span>재료 단가 배율 <output id="es-un-m-out"></output></span><input type="range" id="es-un-m" min="0.7" max="1.5" step="0.05" value="1"></label>
+          <label class="ctrl"><span>노임 배율 <output id="es-un-w-out"></output></span><input type="range" id="es-un-w" min="0.7" max="1.5" step="0.05" value="1"></label>
+          <label class="ctrl"><span>하루 산출량 배율 <output id="es-un-q-out"></output></span><input type="range" id="es-un-q" min="0.5" max="1.5" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">단위 단가</span><span class="v" id="es-un-o-u">—</span></div>
+        <div class="stat"><span class="k">재료 · 노무 · 경비</span><span class="v" id="es-un-o-s">—</span></div>
+        <div class="stat"><span class="k">기준층 수량 × 단가</span><span class="v" id="es-un-o-f">—</span></div>
+        <div class="stat"><span class="k">3공종 기준층 합계</span><span class="v" id="es-un-o-t">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 콘크리트 기본값 약 119,000원/m³(재료 80 %), 거푸집 약 40,600원/m²(노무 75 %), 철근 약 1,417,000원/t(재료 65 %)를 비교하세요 · 거푸집에서 하루 산출량을 0.7배로 낮추면 단가가 크게 오릅니다 — 노무 중심 공종은 생산성이 원가를 정합니다 · 콘크리트에서 재료 단가를 1.2배로 올리면(레미콘 가격 변동) 단가가 거의 그만큼 오릅니다 · 3공종 기준층 합계 약 1.38억 원은 골조 공사비(G1 + G2 = 58억 원, 층당 5.8억 원)의 일부일 뿐입니다 — 동바리, 양중, 가설, 관리 인력 등이 더해집니다 · 모델: 정의 12.2, 기준층 수량은 예제 12.1, 모든 단가·인원·산출량은 교육용(실제 품셈·노임·자재 가격 아님).</div>
+    </div>
+    <div class="table-wrap"><table class="es-tbl">
+      <thead><tr><th>공종 (단위)</th><th>재료</th><th>작업 조 (일당, 원)</th><th>하루 산출</th><th>장비 (원/일)</th><th>일위대가 (원)</th></tr></thead>
+      <tbody>
+        <tr><td>콘크리트 타설 (m³)</td><td>레미콘 1.01 m³ × 95,000</td><td>콘크리트공 3 × 280,000 + 보통인부 4 × 170,000</td><td>120 m³</td><td>펌프카 1,300,000</td><td>≈ 119,450</td></tr>
+        <tr><td>거푸집 유로폼 (m²)</td><td>손료·소모 자재 9,000</td><td>형틀목공 6 × 300,000 + 보통인부 2 × 170,000</td><td>70 m²</td><td>소도구 70,000</td><td>≈ 40,570</td></tr>
+        <tr><td>철근 가공·조립 (t)</td><td>철근 1.03 t × 900,000</td><td>철근공 5 × 300,000 + 보통인부 2 × 170,000</td><td>4 t</td><td>가공기 등 120,000</td><td>≈ 1,417,000</td></tr>
+      </tbody>
+    </table></div>
+    <p class="table-note"><b>표 12-1.</b> 교육용 일위대가. 실제 견적은 현행 표준품셈의 투입량, 공표 노임, 조달청·물가 정보지의 자재 가격(형태)과 현장 조건으로 다시 만든다.</p>
+    <div class="callout"><strong>예제 12.2 (기준층 골조 3공종의 직접비)</strong> 표 12-1과 예제 12.1의 수량.
+      <p><b>① 콘크리트</b> \(288.7 \times 119{,}450 = 34.5\)백만 원. <b>② 거푸집</b> \(1{,}350 \times 40{,}570 = 54.8\)백만 원. <b>③ 철근</b> \(34.6 \times 1{,}417{,}000 = 49.1\)백만 원.</p>
+      <p><b>④ 합계</b> 약 138백만 원 = 1.38억 원/층. 거푸집이 가장 크다 — 면적이 콘크리트 체적의 4.7배이고 노무 비중이 크기 때문이다.</p>
+      <p><b>⑤ 판단</b> P-B10의 지상 골조 활동 비용은 층당 약 5.8억 원(G1 + G2 = 58억 원 ÷ 10)이다. 차이는 동바리, 타워크레인·호이스트, 먹매김·검측, 가설, 현장 관리비와 일반관리비·이윤 배분이다. 견적에서 3대 공종만 세면 골조비를 절반 넘게 놓친다.</p></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="cost-structure">
+    <h2>원가 구성: 직접비에서 공사비까지</h2>
+    <div class="problem"><strong>244억 원은 어떻게 쌓였나</strong>
+      <p>예제 12.2의 직접비를 모든 공종에 대해 더하면 재료비·노무비·장비비가 나옵니다. 그 위에 현장을 운영하는 비용, 본사를 운영하는 비용, 이윤과 세금이 얹힙니다. 각각 무엇에 몇 %를 곱할까요?</p></div>
+    <p>공공 공사의 예정 가격은 국가를 당사자로 하는 계약에 관한 법률과 관련 예규(예정가격 작성기준 형태)의 원가계산 방식으로 만듭니다. 큰 틀은 다음과 같습니다(항목·요율 상한은 현행 법령·예규 확인). <span class="term">재료비</span><span class="en">(material cost)</span>와 <span class="term">노무비</span><span class="en">(labor cost)</span>(직접노무비 + 직접노무비에 요율을 곱한 간접노무비), <span class="term">경비</span><span class="en">(expenses)</span>(기계경비, 산재·고용보험료, 산업안전보건관리비, 기타 경비 등)를 더하면 <span class="term">순공사원가</span><span class="en">(net construction cost)</span>입니다. 여기에 본사 운영비인 <span class="term">일반관리비</span><span class="en">(general administrative expenses)</span>(순공사원가 × 요율)와 <span class="term">이윤</span><span class="en">(profit)</span>(노무비 + 경비 + 일반관리비에 요율)을 더해 총원가가 되고, 부가가치세(10 %)를 더하면 공사비입니다. 요율에는 상한이 있고 산업안전보건관리비는 별도 고시의 계상 기준(대상액 × 요율 형태)을 따릅니다.</p>
+    <figure class="diagram" id="fig-es-comp">
+      <svg viewBox="0 0 860 300" role="img" aria-label="원가계산서 형태의 공사비 구성: 재료비, 노무비, 경비, 순공사원가, 일반관리비, 이윤, 부가가치세">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g class="t-mono">
+          <g transform="translate(40,40)">
+            <rect x="0" y="0" width="190" height="34" rx="6" class="f-elev"/><text x="12" y="22">재료비 (직접·간접)</text>
+            <rect x="0" y="44" width="190" height="56" rx="6" class="f-elev"/><text x="12" y="66">노무비</text><text x="12" y="88" class="t-dim">직접 + 간접(직접 × 요율)</text>
+            <rect x="0" y="110" width="190" height="96" rx="6" class="f-elev"/><text x="12" y="132">경비</text><text x="12" y="152" class="t-dim">기계경비 · 보험료</text><text x="12" y="172" class="t-dim">안전보건관리비</text><text x="12" y="192" class="t-dim">기타 경비(요율)</text>
+          </g>
+          <path d="M236 40V246" style="stroke:var(--accent-2);stroke-width:2;fill:none"/>
+          <g style="stroke:var(--text-dim);stroke-width:2" marker-end="url(#es-ah-dim)"><line x1="240" y1="143" x2="282" y2="143"/></g>
+          <rect x="290" y="118" width="150" height="50" rx="6" class="f-acc2-soft"/><text x="365" y="140" text-anchor="middle" class="t" style="font-weight:700">순공사원가</text><text x="365" y="158" text-anchor="middle">220.1억</text>
+          <g style="stroke:var(--text-dim);stroke-width:2" marker-end="url(#es-ah-dim)"><line x1="442" y1="143" x2="474" y2="143"/></g>
+          <rect x="480" y="40" width="160" height="50" rx="6" class="f-elev"/><text x="560" y="62" text-anchor="middle">+ 일반관리비</text><text x="560" y="80" text-anchor="middle" class="t-dim">순공사원가 × 요율</text>
+          <rect x="480" y="118" width="160" height="50" rx="6" class="f-elev"/><text x="560" y="140" text-anchor="middle">+ 이윤</text><text x="560" y="158" text-anchor="middle" class="t-dim">(노무 + 경비 + 일관) × 요율</text>
+          <rect x="480" y="196" width="160" height="50" rx="6" class="f-acc-soft"/><text x="560" y="218" text-anchor="middle" class="t" style="font-weight:700">총원가 244.1억</text><text x="560" y="236" text-anchor="middle">= P-B10 BAC</text>
+          <g style="stroke:var(--text-dim);stroke-width:2" marker-end="url(#es-ah-dim)"><line x1="642" y1="221" x2="676" y2="221"/></g>
+          <rect x="682" y="196" width="140" height="50" rx="6" class="f-acc-soft"/><text x="752" y="218" text-anchor="middle">+ 부가세 10 %</text><text x="752" y="236" text-anchor="middle" class="t" style="font-weight:700">268.5억</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-4.</b> 원가계산서 형태의 공사비 구성(P-B10 교육용 값). 기준이 되는 금액(대상액)이 항목마다 다르다는 점이 중요하다: 간접노무비는 직접노무비, 기타 경비는 재료비 + 노무비, 일반관리비는 순공사원가, 이윤은 재료비를 뺀 노무비 + 경비 + 일반관리비에 요율을 곱한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-es-comp">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>원가 구성 막대: 직접비 → 간접노무비 · 경비 → 일반관리비 · 이윤 → 부가세</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-comp" aria-label="공사비 구성 폭포 막대: 재료비, 노무비, 경비 항목, 일반관리비, 이윤, 부가가치세가 차례로 쌓인다"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>재료비 (억) <output id="es-cp-m-out"></output></span><input type="range" id="es-cp-m" min="60" max="160" step="1" value="113"></label>
+          <label class="ctrl"><span>직접노무비 (억) <output id="es-cp-l-out"></output></span><input type="range" id="es-cp-l" min="30" max="110" step="1" value="68"></label>
+          <label class="ctrl"><span>간접노무비율 <output id="es-cp-il-out"></output></span><input type="range" id="es-cp-il" min="0" max="0.2" step="0.005" value="0.09"></label>
+          <label class="ctrl"><span>일반관리비율 <output id="es-cp-ga-out"></output></span><input type="range" id="es-cp-ga" min="0" max="0.1" step="0.005" value="0.055"></label>
+          <label class="ctrl"><span>이윤율 <output id="es-cp-p-out"></output></span><input type="range" id="es-cp-p" min="0" max="0.2" step="0.005" value="0.1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">순공사원가</span><span class="v" id="es-cp-o-n">—</span></div>
+        <div class="stat"><span class="k">일반관리비 · 이윤</span><span class="v" id="es-cp-o-g">—</span></div>
+        <div class="stat"><span class="k">총원가</span><span class="v" id="es-cp-o-t">—</span></div>
+        <div class="stat"><span class="k">부가세 포함</span><span class="v" id="es-cp-o-v">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 총원가 약 244.1억 원(P-B10 BAC), 부가세 포함 약 268.5억 원을 확인하세요 · 직접노무비를 10억 원 올리면 간접노무비, 보험료, 안전관리비, 기타 경비, 이윤이 줄줄이 따라 늘어 총원가가 약 14억 원 늘어납니다 — 노무비가 많은 기준이 되기 때문입니다 · 이윤율을 0으로 하면 총원가가 약 11.9억 원 줄어듭니다 · 모델: 기계경비 16.5억 원 고정, 산재·고용보험 노무비 × 4.7 %, 산업안전보건관리비 (재료비 + 직접노무비) × 2.0 %, 기타 경비 (재료비 + 노무비) × 5 % — 모든 요율은 교육용 기본값이며 법정 요율이 아니다(현행 법령·고시 확인).</div>
+    </div>
+    <div class="callout"><strong>예제 12.3 (P-B10 공사비 구성)</strong> 재료비 113, 직접노무비 68, 기계경비 16.5억 원(교육용).
+      <p><b>① 노무비</b> 간접노무비 \(68 \times 0.09 = 6.12\) → 노무비 74.12.</p>
+      <p><b>② 경비</b> 보험료 \(74.12 \times 0.047 = 3.48\), 안전보건관리비 \((113 + 68)\times0.02 = 3.62\), 기타 경비 \((113 + 74.12)\times0.05 = 9.36\) → 경비 \(16.5 + 3.48 + 3.62 + 9.36 = 32.96\).</p>
+      <p><b>③ 순공사원가</b> \(113 + 74.12 + 32.96 = 220.08\).</p>
+      <p><b>④ 일반관리비·이윤</b> \(220.08 \times 0.055 = 12.10\), \((74.12 + 32.96 + 12.10)\times0.10 = 11.92\) → <b>총원가 244.10억 원</b>, 부가세 24.41 → 268.51억 원.</p>
+      <p><b>⑤ 판단</b> 이윤은 총원가의 약 4.9 %다. 11장의 간접비 0.30억 원/주(93주 27.9억 원)는 간접노무비·보험료·기타 경비·일반관리비 일부처럼 기간에 따라 늘어나는 몫을 따로 떼어 정한 교육용 값이다.</p></div>
+    <div class="callout site"><strong>P-B10 공사비 244억 원</strong> 이 책의 BAC 244억 원은 예제 12.3의 총원가(부가세 별도)로 본다: 재료비 113, 노무비 74.1, 경비 33.0, 일반관리비 12.1, 이윤 11.9억 원. 9장 공정표의 활동별 비용 배분(A 3 … M 2)은 이 총원가를 활동에 나눈 것이다. 기준층 수량은 콘크리트 약 290 m³, 거푸집 약 1,350 m², 철근 약 35 t이고, 3대 골조 공종의 직접비는 약 1.38억 원/층(교육용 단가)이다. 모든 단가·요율은 교육용이며 실제 공사 판단에 쓰지 않는다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="accuracy">
+    <h2>견적 단계와 정확도</h2>
+    <div class="problem"><strong>기획 단계에 "244억 원"이라고 말해도 되나</strong>
+      <p>B-10의 기획 단계에서 발주자가 공사비를 묻습니다. 아직 평면 개략과 연면적(약 9,200 m²)뿐입니다. 비슷한 건물의 m²당 공사비를 곱해 한 숫자를 말하면, 그 숫자는 얼마나 믿을 만할까요?</p></div>
+    <p>견적의 정확도는 설계가 얼마나 진행되었는지(설계 성숙도)에 따라 달라집니다. 기획 단계에는 m²당 단가나 비슷한 사례의 비율로 하는 <b>개략 견적</b>, 기본 설계 단계에는 주요 공종 수량에 복합 단가를 곱하는 견적, 실시 설계가 끝나면 모든 수량에 일위대가를 곱하는 <b>상세 견적</b>을 합니다. 국제적으로 많이 쓰는 분류인 AACE International의 견적 등급(18R-97 형태)은 등급 5(가장 개략)부터 1(가장 상세)까지 다섯 등급을 두고 등급마다 예상 정확도 범위를 제시합니다.</p>
+    <div class="table-wrap"><table class="es-tbl">
+      <thead><tr><th>등급(AACE 형태)</th><th>설계 성숙도</th><th>주 용도</th><th>방법 예</th><th>정확도 범위(하한 / 상한)</th></tr></thead>
+      <tbody>
+        <tr><td>5</td><td>0–2 %</td><td>구상·타당성 선별</td><td>m²당 단가, 사례 비율</td><td>−20 ~ −50 % / +30 ~ +100 %</td></tr>
+        <tr><td>4</td><td>1–15 %</td><td>타당성 연구</td><td>주요 공종 비율, 매개 변수</td><td>−15 ~ −30 % / +20 ~ +50 %</td></tr>
+        <tr><td>3</td><td>10–40 %</td><td>예산 승인</td><td>주요 수량 × 복합 단가</td><td>−10 ~ −20 % / +10 ~ +30 %</td></tr>
+        <tr><td>2</td><td>30–75 %</td><td>입찰·통제</td><td>상세 수량 × 단가</td><td>−5 ~ −15 % / +5 ~ +20 %</td></tr>
+        <tr><td>1</td><td>65–100 %</td><td>입찰 검토·확인</td><td>상세 수량 × 단가(전부)</td><td>−3 ~ −10 % / +3 ~ +15 %</td></tr>
+      </tbody>
+    </table></div>
+    <p class="table-note"><b>표 12-2.</b> 견적 등급과 정확도 범위(AACE International 권장 실무 18R-97 형태, 현행 문서 확인). 범위는 사업의 복잡도·기술 성숙도·위험에 따라 넓은 쪽과 좁은 쪽 사이에서 정한다. 상한이 하한보다 넓은 것은 견적이 실제보다 낮게 나오는 경향(누락, 낙관)을 반영한다.</p>
+    <figure class="diagram" id="fig-es-funnel">
+      <svg viewBox="0 0 860 280" role="img" aria-label="견적 정확도 깔때기: 설계가 진행될수록 범위가 좁아지고 상한이 하한보다 넓다">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(80,30)">
+          <line x1="0" y1="110" x2="700" y2="110" style="stroke:var(--text-dim);stroke-dasharray:5 4"/>
+          <path d="M0 0C200 40 400 80 700 98L700 122C400 128 200 150 0 170Z" style="fill:var(--accent);opacity:.18;stroke:var(--accent)"/>
+          <g class="t-mono" text-anchor="middle"><text x="40" y="200">등급 5</text><text x="200" y="200">4</text><text x="360" y="200">3</text><text x="520" y="200">2</text><text x="670" y="200">1</text></g>
+          <text x="350" y="226" text-anchor="middle" class="t-dim">설계 성숙도 →</text>
+          <text x="20" y="20" class="t-mono" style="fill:var(--accent)">+100 %</text><text x="20" y="160" class="t-mono" style="fill:var(--accent)">−50 %</text>
+          <text x="600" y="90" class="t-mono" style="fill:var(--accent)">+3 ~ +15 %</text>
+          <text x="706" y="114" class="t-mono">점 견적</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-5.</b> 견적 정확도 깔때기(개략). 설계가 진행될수록 범위가 좁아지지만 0이 되지는 않는다. 상한 쪽이 더 넓다. 예비비(contingency)는 이 범위 안의 "알려진 미지"에 대비한 금액이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-es-funnel">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>견적 정확도 깔때기: 설계 성숙도 → 등급 · 범위</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-funnel" aria-label="설계 성숙도에 따른 P-B10 견적의 넓은 범위와 좁은 범위 깔때기, 현재 위치"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>설계 성숙도 <output id="es-fn-m-out"></output></span><input type="range" id="es-fn-m" min="0" max="100" step="1" value="1"></label>
+          <label class="ctrl"><span>사업 복잡도·위험 (좁음 0 → 넓음 1) <output id="es-fn-k-out"></output></span><input type="range" id="es-fn-k" min="0" max="1" step="0.05" value="0.5"></label>
+          <label class="ctrl"><span>점 견적 (억) <output id="es-fn-e-out"></output></span><input type="range" id="es-fn-e" min="150" max="350" step="1" value="244"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">등급</span><span class="v" id="es-fn-o-c">—</span></div>
+        <div class="stat"><span class="k">범위 (%)</span><span class="v" id="es-fn-o-r">—</span></div>
+        <div class="stat"><span class="k">금액 범위</span><span class="v" id="es-fn-o-a">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 성숙도 1 %(기획 단계, 등급 5)에서 244억 원의 범위가 대략 159억–403억 원임을 보세요 — "244억"은 한 점이 아니라 넓은 범위의 대표값입니다 · 성숙도 80 %(실시 설계)로 옮기면 범위가 약 228억–266억 원(등급 1)으로 좁아집니다 · 복잡도를 1로 하면 같은 등급에서도 범위가 넓은 쪽 끝으로 갑니다 · 모델: 표 12-2의 등급과 하한·상한 범위를 복잡도로 선형 보간(교육용), 성숙도 경계 2·15·40·75 %.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="cash-flow">
+    <h2>원가 계획과 현금 흐름</h2>
+    <div class="problem"><strong>이익이 나는 공사인데 돈이 모자라다</strong>
+      <p>P-B10을 수주한 시공사는 계약 금액보다 5 % 싼 실행 예산으로 공사를 끝낼 자신이 있습니다. 그런데 인건비와 자재비는 매주 나가고, 기성은 4주마다 청구해 몇 주 뒤에 들어오며 일부는 준공 뒤까지 묶입니다. 공사 중 현금이 가장 많이 모자라는 때는 언제이고 얼마일까요?</p></div>
+    <p>낙찰 뒤 시공자는 계약 금액과 별도로 실제로 쓸 목표 원가인 <span class="term">실행 예산</span><span class="en">(execution budget)</span>을 짭니다. 원가는 관리 목적에 따라 직접비·간접비, 고정비·변동비, 공종(작업 분류 체계)별로 나누어 계획하고, 공정표에 실어 시간 분포를 만듭니다. 11장의 자원 부하도와 같은 방법(<code>CB.pm.spread(acts, r, "cost", "ES")</code>)으로 주별 비용을 쌓으면 누적 곡선이 S 모양이 되는데, 이것이 비용 <span class="term">S 곡선</span><span class="en">(S-curve)</span>입니다. 발주자는 공사가 진행된 만큼 <span class="term">기성</span><span class="en">(progress payment)</span>을 지급합니다. 지급에는 청구 주기와 심사·지급 기간만큼 <b>지연</b>이 있고, 계약에 따라 기성의 일부를 하자 담보로 남겨 두었다가 준공 뒤 돌려주는 <span class="term">유보금</span><span class="en">(retention)</span>(해외·민간 계약 형태)이나, 착공 때 미리 주고 기성에서 나누어 회수하는 <span class="term">선급금</span><span class="en">(advance payment)</span>이 있습니다(국내 공공 계약의 지급 기한·선급금 비율은 현행 법령·예규 확인).</p>
+    <div class="sim" id="sim-es-scurve">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>P-B10 비용 S 곡선: ES · LS 기준과 사이 띠</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-scurve" aria-label="P-B10 누적 비용 S 곡선의 ES·LS 기준과 주별 비용 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>기준 주 <output id="es-sc-w-out"></output></span><input type="range" id="es-sc-w" min="1" max="93" step="1" value="40"></label>
+          <div class="ctrl"><span>주별 막대</span><div class="seg" id="es-sc-b"><button data-value="ES" class="on">ES</button><button data-value="LS">LS</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">ES 누적</span><span class="v" id="es-sc-o-e">—</span></div>
+        <div class="stat"><span class="k">LS 누적</span><span class="v" id="es-sc-o-l">—</span></div>
+        <div class="stat"><span class="k">띠 폭</span><span class="v" id="es-sc-o-d">—</span></div>
+        <div class="stat"><span class="k">ES 진도율</span><span class="v" id="es-sc-o-p">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 40주에서 ES 누적 약 75.7억 원, 60주에서 약 155.4억 원을 확인하세요(LS는 각각 73.0, 125.5억 원) · 띠가 가장 넓은 곳은 설비 I(여유 21주, 40억 원)의 영향입니다 · 13장은 이 곡선을 기준선(PV)으로 쓰고 실적을 겹칩니다 · 모델: <code>CB.pm.spread(CB.pm.B10, r, "cost", "ES" | "LS")</code>, 활동 안에서 비용 균등(교육용).</div>
+    </div>
+    <div class="callout def"><strong>정의 12.3 (시공자의 현금 수지)</strong> 주 \(t\)의 지출 \(O_t = (1 - m)\,v_t\)(\(v_t\): 계약 가치 기준의 주별 기성 가치, \(m\): 계약 대비 이익률), 기성은 \(p\)주마다 그 기간의 가치를 청구하고 \(L\)주 뒤에 받는다. 받는 금액은
+      <div class="formula">$$I_{k + L} = (1 - \rho - \alpha)\sum_{t \in \text{기간 }k} v_t, \qquad I_0 \mathrel{+}= \alpha \cdot BAC, \qquad I_{T + L + \text{보증}} \mathrel{+}= \rho\cdot BAC, \qquad CP_t = \sum_{\tau \le t}(I_\tau - O_\tau)$$<div class="where">\(\rho\): 유보율, \(\alpha\): 선급금 비율(기성에서 같은 비율로 회수). 누적 현금 수지 \(CP_t\)의 최솟값이 <b>최대 자금 소요</b>이고, 음수 면적(억 원·주)에 차입 이자율을 곱하면 금융 비용이다. 최종값은 이익 \(m \cdot BAC\)다.</div></div></div>
+    <figure class="diagram" id="fig-es-cash">
+      <svg viewBox="0 0 860 300" role="img" aria-label="시공자 현금 흐름: 누적 지출 곡선, 계단 모양 누적 수입, 그 차이인 현금 수지와 최대 자금 소요">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(80,30)">
+          <line x1="0" y1="160" x2="700" y2="160" class="s-axis"/><line x1="0" y1="230" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 160C150 150 250 110 350 70S560 18 640 14" style="fill:none;stroke:var(--bad);stroke-width:2.6"/>
+          <path d="M0 160H100V150H180V128H260V100H340V74H420V52H500V34H580V22H660V8H690V2" style="fill:none;stroke:var(--ok);stroke-width:2.6"/>
+          <path d="M0 160Q120 190 240 205T480 196T690 150" style="fill:none;stroke:var(--accent);stroke-width:2.4;stroke-dasharray:6 4"/>
+          <line x1="290" y1="160" x2="290" y2="210" style="stroke:var(--accent);stroke-width:1.5"/><text x="296" y="222" class="t-mono" style="fill:var(--accent)">최대 자금 소요</text>
+          <text x="400" y="66" class="t-mono" style="fill:var(--bad)">누적 지출(원가)</text>
+          <text x="470" y="30" class="t-mono" style="fill:var(--ok)">누적 수입(기성, 지연)</text>
+          <text x="520" y="190" class="t-mono" style="fill:var(--accent)">현금 수지 = 수입 − 지출</text>
+          <text x="690" y="176" text-anchor="end" class="t-dim">유보금 반환 →</text>
+          <text x="350" y="250" text-anchor="middle" class="t-dim">시간 (주) →</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-6.</b> 시공자 현금 흐름(개략). 지출은 매주 나가는 매끈한 S 곡선이고, 수입은 청구 주기와 지급 지연 때문에 오른쪽으로 밀린 계단이다. 둘의 차이(주황 점선)가 음수인 동안 시공자는 자기 자금이나 차입으로 공사를 끌고 간다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-es-cash">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>P-B10 현금 흐름: 기성 지급 지연 · 유보율 · 선급금 → 현금 수지</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-cash" aria-label="P-B10 시공자의 누적 지출, 누적 수입 계단, 누적 현금 수지 곡선과 최대 자금 소요 표시"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>지급 지연 L <output id="es-cs-l-out"></output></span><input type="range" id="es-cs-l" min="0" max="12" step="1" value="4"></label>
+          <label class="ctrl"><span>유보율 ρ <output id="es-cs-r-out"></output></span><input type="range" id="es-cs-r" min="0" max="0.1" step="0.01" value="0.05"></label>
+          <label class="ctrl"><span>선급금 α <output id="es-cs-a-out"></output></span><input type="range" id="es-cs-a" min="0" max="0.3" step="0.01" value="0"></label>
+          <label class="ctrl"><span>이익률 m <output id="es-cs-m-out"></output></span><input type="range" id="es-cs-m" min="-0.05" max="0.15" step="0.005" value="0.05"></label>
+          <label class="ctrl"><span>차입 이자율 (연) <output id="es-cs-i-out"></output></span><input type="range" id="es-cs-i" min="0" max="0.12" step="0.005" value="0.06"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 자금 소요</span><span class="v" id="es-cs-o-min">—</span></div>
+        <div class="stat"><span class="k">그때</span><span class="v" id="es-cs-o-wk">—</span></div>
+        <div class="stat"><span class="k">금융 비용</span><span class="v" id="es-cs-o-f">—</span></div>
+        <div class="stat"><span class="k">최종 이익 − 금융 비용</span><span class="v" id="es-cs-o-e">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(지연 4주, 유보 5 %, 선급금 없음, 이익률 5 %)에서 최대 자금 소요 약 34.6억 원(67주 무렵), 금융 비용 약 1.5억 원 — 이익 12.2억 원의 1/8이 이자로 나갑니다 · 지연을 8주로 늘리면 최대 소요가 약 54억 원으로 커집니다 · 선급금 10 %를 받으면 약 25.7억 원으로 줄어듭니다 · 이익률을 0 아래로 내리면 공사 끝까지 현금이 회복되지 않습니다 · 모델: 정의 12.3, 비용은 ES 기준 <code>CB.pm.spread</code>, 청구 4주, 유보금은 준공 + L + 8주에 반환, 이자는 음수 잔액 × 연 이자율/52(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 12.4 (P-B10 시공자의 자금 계획)</strong> \(m = 5\,\%\), \(L = 4\)주, \(\rho = 5\,\%\), \(\alpha = 0\).
+      <p><b>① 지출</b> 93주 동안 \(0.95 \times 244 = 231.8\)억 원, 53–68주에 주당 약 3억 원 이상으로 가장 빠르다(G2·H·I 동시 진행).</p>
+      <p><b>② 수입</b> 4주마다 기성의 95 %를 4주 뒤에 받는다. 지출보다 평균 약 6주 늦고, 매번 5 %가 유보된다.</p>
+      <p><b>③ 최대 자금 소요</b> 계산하면 약 −34.6억 원(67주 무렵) — 계약 금액의 14 %. 음수 면적 약 1,276억 원·주 × 6 %/52 ≈ <b>1.5억 원</b>의 금융 비용.</p>
+      <p><b>④ 판단</b> 이익 12.2억 원 가운데 1.5억 원이 이자다. 지급 지연을 줄이는 계약 조건, 선급금, 협력 업체 대금 지급 조건(지출을 늦추는 쪽)이 현금 흐름을 바꾼다. 다만 하도급 대금 지급 기한은 법령(하도급법 등, 현행 확인)이 정하므로 지출을 마음대로 늦출 수 없다.</p></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="economics">
+    <h2>시간 가치와 경제성: NPV · IRR</h2>
+    <div class="problem"><strong>244억 원을 들여 지으면 남는가</strong>
+      <p>발주자는 2년 동안 244억 원을 쓰고, 이후 8년 동안 임대 순수입을 받은 뒤 10년째에 건물을 팔 계획입니다. 지금 쓰는 1억 원과 10년 뒤 받는 1억 원은 같은 값이 아닙니다. 어떻게 비교할까요?</p></div>
+    <p>돈에는 시간 가치가 있습니다. 연 이율 \(i\)로 굴릴 수 있다면 \(t\)년 뒤의 금액 \(F\)는 지금 \(F/(1+i)^t\)과 같습니다. 이 \(i\)를 할인율이라 하고, 사업의 모든 현금 흐름을 현재 가치로 바꿔 더한 것이 <span class="term">순현재가치</span><span class="en">(net present value, NPV)</span>, NPV를 0으로 만드는 할인율이 <span class="term">내부 수익률</span><span class="en">(internal rate of return, IRR)</span>입니다.</p>
+    <div class="callout def"><strong>정의 12.4 (NPV와 IRR)</strong>
+      <div class="formula">$$NPV(i) = \sum_{t=0}^{n}\frac{CF_t}{(1 + i)^t}, \qquad NPV(IRR) = 0, \qquad PV_{\text{연금}} = A\,\frac{1 - (1 + i)^{-n}}{i}$$<div class="where">\(CF_t\): \(t\)년 말의 순현금 흐름(지출 −, 수입 +). \(NPV \gt 0\)이면 할인율(요구 수익률, 자본 비용)보다 많이 번다. IRR \(\gt\) 요구 수익률이면 채택. 부호가 여러 번 바뀌는 흐름은 IRR이 여러 개이거나 없을 수 있어 NPV로 판단한다. <code>CB.pm.npv(cfs, i)</code>, <code>CB.pm.irr(cfs)</code>(이분법).</div></div></div>
+    <figure class="diagram" id="fig-es-tv">
+      <svg viewBox="0 0 860 240" role="img" aria-label="현금 흐름 도표: 0년과 1년의 지출 화살표, 2년부터 10년의 수입 화살표, 현재 가치로 할인">
+        <rect x="10" y="10" width="840" height="220" rx="10" class="f-surface"/>
+        <g transform="translate(70,30)">
+          <line x1="0" y1="100" x2="720" y2="100" class="s-axis"/>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="190">0</text><text x="72" y="190">1</text><text x="144" y="190">2</text><text x="288" y="190">4</text><text x="432" y="190">6</text><text x="576" y="190">8</text><text x="720" y="190">10년</text></g>
+          <g style="stroke:var(--bad);stroke-width:4" marker-end="url(#es-ah-bad)"><line x1="0" y1="100" x2="0" y2="160"/><line x1="72" y1="100" x2="72" y2="172"/></g>
+          <g style="stroke:var(--ok);stroke-width:3" marker-end="url(#es-ah-ok)"><line x1="144" y1="100" x2="144" y2="84"/><line x1="216" y1="100" x2="216" y2="84"/><line x1="288" y1="100" x2="288" y2="84"/><line x1="360" y1="100" x2="360" y2="84"/><line x1="432" y1="100" x2="432" y2="84"/><line x1="504" y1="100" x2="504" y2="84"/><line x1="576" y1="100" x2="576" y2="84"/><line x1="648" y1="100" x2="648" y2="84"/><line x1="720" y1="100" x2="720" y2="6"/></g>
+          <text x="10" y="150" class="t-mono" style="fill:var(--bad)">−110</text><text x="80" y="164" class="t-mono" style="fill:var(--bad)">−134</text>
+          <text x="300" y="74" class="t-mono" style="fill:var(--ok)">임대 순수입 +20 / 년</text>
+          <text x="640" y="20" class="t-mono" style="fill:var(--ok)">+20 + 매각 230</text>
+          <path d="M700 40Q400 -10 30 60" style="fill:none;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 4" marker-end="url(#es-ah-acc)"/>
+          <text x="380" y="30" class="t-mono" style="fill:var(--accent)">÷ (1 + i)^t 로 현재로 가져온다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-7.</b> B-10 개발 사업의 현금 흐름 도표(교육용, 억 원). 아래 화살표는 지출, 위는 수입. 모든 화살표를 0년으로 할인해 더한 것이 NPV다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-es-npv">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>NPV · IRR 계산기: 현금 흐름 막대 끌기 → NPV 곡선과 IRR</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-npv" class="es-drag" aria-label="연도별 현금 흐름 막대(위아래로 끌 수 있음)와 할인율에 따른 NPV 곡선, IRR 교점"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>할인율 i <output id="es-np-i-out"></output></span><input type="range" id="es-np-i" min="0" max="0.15" step="0.0025" value="0.06"></label>
+          <div class="btn-row"><button class="btn" id="es-np-reset">B-10 개발 사업으로</button><button class="btn" id="es-np-flat">임대만(매각 없음)</button></div>
+          <p class="sim-note" style="margin:0;padding:0;border:0">막대를 위아래로 끌어 연도별 현금 흐름을 바꾸세요(5억 원 단위).</p>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">NPV(i)</span><span class="v" id="es-np-o-n">—</span></div>
+        <div class="stat"><span class="k">IRR</span><span class="v" id="es-np-o-r">—</span></div>
+        <div class="stat"><span class="k">단순 합계</span><span class="v" id="es-np-o-s">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="es-np-o-d">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(−110, −134, +20 × 8, +250)에서 6 % NPV 약 +20.4억 원, IRR 약 7.2 %를 확인하세요 · 할인율을 8 %로 올리면 NPV가 음수가 됩니다 — IRR이 곧 손익 분기 할인율입니다 · 10년째 매각 금액을 끌어 내리면 IRR이 급하게 떨어집니다 — 개발 사업의 수익이 출구 가치에 크게 기댄다는 뜻입니다 · "임대만"은 매각 없이 20억 원/년을 계속 받는 경우(10년까지)로, 단순 합계도 음수입니다 · 모델: 정의 12.4, <code>CB.pm.npv</code>·<code>CB.pm.irr</code>(−99 %–100 % 사이 이분법, 해가 없으면 "없음"), 교육용 숫자.</div>
+    </div>
+    <div class="callout"><strong>예제 12.5 (B-10 개발 사업)</strong> \(CF = (-110, -134, +20 \times 8, +250)\)억 원, 요구 수익률 6 %.
+      <p><b>① 지출</b> \(-110 - 134/1.06 = -236.4\).</p>
+      <p><b>② 임대</b> 2–9년 20억 원: \(20 \times [a_{9|} - a_{1|}] = 20 \times (6.802 - 0.943) = 117.2\).</p>
+      <p><b>③ 10년째</b> \(250/1.06^{10} = 139.6\). <b>NPV</b> \(= -236.4 + 117.2 + 139.6 \approx +20.4\)억 원 \(\gt 0\) → 채택.</p>
+      <p><b>④ IRR</b> 8 %에서 NPV \(\approx -11.9\), 6 %에서 +20.4 → 그 사이, 계산하면 약 7.2 %. 요구 수익률 6 %보다 1.2 %p 높을 뿐이므로 공사비 증가나 공기 지연(임대 개시 지연)에 민감하다. 11장의 "조기 준공 이익"이 바로 이 흐름에서 나온다.</p></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="lcc">
+    <h2>생애 주기 비용</h2>
+    <div class="problem"><strong>비싼 유리가 싸다?</strong>
+      <p>커튼월(H, 32억 원)에 고성능 삼중 유리를 쓰면 공사비가 4억 원 늘지만 냉난방 에너지 비용이 해마다 0.35억 원 줄어든다고 합니다. 30년을 쓰는 건물이라면 어느 쪽이 쌀까요?</p></div>
+    <p>건물의 비용은 짓는 데서 끝나지 않습니다. <span class="term">생애 주기 비용</span><span class="en">(life-cycle cost, LCC)</span>은 기획·설계·시공의 초기 비용과 운영(에너지)·유지 관리·교체·해체 비용을 분석 기간 동안 모두 현재 가치로 더한 값입니다. 사무 건물의 운영·유지 비용 누계가 초기 공사비보다 큰 경우가 많아, 물에 잠긴 부분이 더 큰 빙산에 비유됩니다. 대안 비교에서는 초기 비용 차이를 연간 절감액의 현재 가치가 언제 따라잡는지(할인 회수 기간)를 봅니다.</p>
+    <div class="callout def"><strong>정의 12.5 (생애 주기 비용, 단순 형태)</strong>
+      <div class="formula">$$LCC = C_0 + \sum_{t=1}^{n}\frac{E\,(1+g)^{t-1} + M}{(1 + i)^t} + \sum_{k}\frac{R_k}{(1 + i)^{t_k}}$$<div class="where">\(C_0\): 초기 비용, \(E\): 첫해 에너지 비용, \(g\): 에너지 가격 상승률, \(M\): 연간 유지 비용, \(R_k\): \(t_k\)년의 교체 비용, \(n\): 분석 기간. 할인율이 높을수록 미래 절감의 가치가 작아져 초기 비용이 싼 대안이 유리해진다.</div></div></div>
+    <figure class="diagram" id="fig-es-lcc">
+      <svg viewBox="0 0 860 260" role="img" aria-label="생애 주기 비용 빙산: 물 위의 초기 공사비, 물 아래의 운영·유지·교체 비용, 두 대안의 누적 현재 가치 곡선 교차">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <line x1="0" y1="70" x2="300" y2="70" style="stroke:var(--accent-2);stroke-width:2"/>
+          <path d="M120 70L150 20L180 70Z" style="fill:var(--accent);opacity:.7"/><text x="150" y="58" text-anchor="middle" class="t-mono" style="fill:#fff">초기</text>
+          <path d="M80 70H220L260 200H40Z" style="fill:var(--accent-2);opacity:.25;stroke:var(--accent-2)"/>
+          <text x="150" y="110" text-anchor="middle" class="t-mono">에너지 · 운영</text><text x="150" y="140" text-anchor="middle" class="t-mono">유지 관리 · 보수</text><text x="150" y="170" text-anchor="middle" class="t-mono">설비 교체 · 해체</text>
+          <text x="300" y="64" text-anchor="end" class="t-dim">수면</text>
+        </g>
+        <g transform="translate(420,30)">
+          <line x1="0" y1="190" x2="380" y2="190" class="s-axis"/><line x1="0" y1="190" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 120L380 20" style="fill:none;stroke:var(--bad);stroke-width:2.6"/>
+          <path d="M0 100L380 40" style="fill:none;stroke:var(--ok);stroke-width:2.6"/>
+          <circle cx="252" cy="54" r="5" style="fill:var(--accent)"/><text x="252" y="80" text-anchor="middle" class="t-mono" style="fill:var(--accent)">할인 회수 시점</text>
+          <text x="20" y="140" class="t-mono" style="fill:var(--bad)">A 일반 유리 (싸게 짓고 비싸게 씀)</text>
+          <text x="20" y="92" class="t-mono" style="fill:var(--ok)">B 고성능 유리</text>
+          <text x="190" y="210" text-anchor="middle" class="t-dim">연수 → (누적 현재 가치)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-8.</b> 생애 주기 비용. 왼쪽: 초기 공사비는 빙산의 물 위 부분이다. 오른쪽: 초기 비용이 큰 대안 B의 누적 현재 가치 곡선이 기울기가 작아 언젠가 A와 만난다. 분석 기간이 그 시점보다 길면 B가 싸다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-es-lcc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>생애 주기 비용 비교: 초기비 vs 운영비, 할인율 · 기간</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="es-cv-lcc" aria-label="두 커튼월 대안의 누적 현재 가치 곡선과 할인 회수 시점, 분석 기간의 LCC 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>B의 추가 초기비 (억) <output id="es-lc-c-out"></output></span><input type="range" id="es-lc-c" min="0" max="12" step="0.5" value="4"></label>
+          <label class="ctrl"><span>B의 연간 에너지 절감 (억) <output id="es-lc-s-out"></output></span><input type="range" id="es-lc-s" min="0" max="1" step="0.05" value="0.35"></label>
+          <label class="ctrl"><span>할인율 i <output id="es-lc-i-out"></output></span><input type="range" id="es-lc-i" min="0" max="0.12" step="0.005" value="0.04"></label>
+          <label class="ctrl"><span>에너지 가격 상승률 g <output id="es-lc-g-out"></output></span><input type="range" id="es-lc-g" min="0" max="0.06" step="0.005" value="0"></label>
+          <label class="ctrl"><span>분석 기간 n <output id="es-lc-n-out"></output></span><input type="range" id="es-lc-n" min="5" max="50" step="1" value="30"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">LCC A (일반)</span><span class="v" id="es-lc-o-a">—</span></div>
+        <div class="stat"><span class="k">LCC B (고성능)</span><span class="v" id="es-lc-o-b">—</span></div>
+        <div class="stat"><span class="k">할인 회수 기간</span><span class="v" id="es-lc-o-p">—</span></div>
+        <div class="stat"><span class="k">유리한 대안</span><span class="v" id="es-lc-o-w">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(A 32억 + 에너지 1.2 + 유지 0.1억 원/년, B는 +4억 원에 에너지 0.35억 원/년 절감, 4 %, 30년)에서 LCC A 약 54.5억, B 약 52.4억 원, 할인 회수 약 16년을 확인하세요 · 할인율을 9 %로 올리면 회수 기간이 분석 기간을 넘어 A가 유리해집니다 · 에너지 가격 상승률 3 %를 넣으면 B가 훨씬 유리해집니다 · 분석 기간을 12년으로 줄이면(짧게 보유하고 파는 발주자) A가 유리합니다 — 누가 운영비를 내는지가 선택을 바꿉니다 · 모델: 정의 12.5(교체·해체 생략, 유지비 두 대안 같음), 교육용 숫자.</div>
+    </div>
+    <div class="callout"><strong>예제 12.6 (커튼월 유리 선택)</strong> \(i = 4\,\%\), \(n = 30\), \(g = 0\). 연금 현가 계수 \(a = (1 - 1.04^{-30})/0.04 = 17.29\).
+      <p><b>① A</b> \(32 + (1.20 + 0.10)\times17.29 = 54.5\)억 원. <b>② B</b> \(36 + (0.85 + 0.10)\times17.29 = 52.4\)억 원.</p>
+      <p><b>③ 회수</b> \(0.35\,a_{n|} = 4\) → \(a_{n|} = 11.43\) → \(n \approx 16\)년(단순 회수는 \(4/0.35 = 11.4\)년).</p>
+      <p><b>④ 판단</b> 30년을 운영하는 발주자에게는 B가 약 2.1억 원 싸다. 그러나 10년 안에 매각하는 개발 사업(예제 12.5)이라면 절감의 대부분을 다음 소유자가 누리므로 매각 가격에 반영되지 않는 한 A를 고르기 쉽다. LCC는 "누가, 얼마나 오래"를 정한 뒤에 의미가 있다.</p></div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="contracts.html"><small>CH.02 · 발주 방식과 계약</small>예정 가격과 입찰가<br><span>원가 구성과 정확도가 입찰 가격 결정의 바탕이다.</span></a>
+      <a href="resources.html"><small>CH.11 · 자원 관리와 공기 단축</small>직접비 · 간접비<br><span>단축 비용과 간접비 0.30억 원/주가 최적 공기를 정한다.</span></a>
+      <a href="evm.html"><small>CH.13 · 진도 관리와 EVM</small>기준선 S 곡선<br><span>비용 S 곡선이 PV가 되고, 실행 예산이 원가 관리의 기준이다.</span></a>
+      <a href="concrete-work.html"><small>CH.06 · 철근·거푸집·콘크리트 공사</small>기준층 290 m³ · 35 t<br><span>수량이 레미콘 배차·거푸집 전용·철근 가공 계획이 된다.</span></a>
+      <a href="../../materials/chapters/rebar.html#takeoff"><small>MaterialsBook · 철근</small>철근 물량 산출<br><span>가공 길이·단위 질량·할증으로 하는 상세 철근 적산.</span></a>
+      <a href="productivity.html"><small>CH.16 · 생산성과 스마트 건설</small>BIM 5D와 생산성<br><span>모델에서 수량을 뽑고, 생산성이 일위대가를 바꾼다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>적산은 도면에서 수량을 세는 객관적 계산, 견적은 수량 × 단가에 관리비·이윤·위험을 더하는 판단이다. 수량 누락이 가장 비싼 실수다.</li>
+      <li>B-10 기준층(교육용): 콘크리트 ≈ 290 m³(슬래브 161, 보 49, 기둥 49, 벽 30), 거푸집 ≈ 1,350 m²(4.7 m²/m³), 철근 ≈ 0.12 t/m³ × 290 ≈ 35 t.</li>
+      <li>일위대가 = 재료(수량 × 단가 × (1 + 할증)) + 노무(작업 조 일당 ÷ 하루 산출) + 장비(일 비용 ÷ 하루 산출). 노무 중심 공종(거푸집)은 생산성이 단가를 정한다. 기준층 3대 공종 ≈ 1.38억 원(교육용).</li>
+      <li>원가계산서 형태: 재료비 + 노무비(직접 + 간접) + 경비 = 순공사원가 → + 일반관리비(순공사원가 × 요율) → + 이윤((노무 + 경비 + 일관) × 요율) → 총원가 → + 부가세 10 %. P-B10: 220.1 → 244.1억 원(교육용 요율, 법정 요율은 현행 확인).</li>
+      <li>견적 정확도는 설계 성숙도에 따른다(AACE 등급 5–1 형태: 기획 단계 −50 %/+100 %까지, 상세 단계 −3 %/+3 % 수준까지). 상한이 더 넓다.</li>
+      <li>비용 S 곡선(P-B10 ES: 40주 75.7억, 60주 155.4억 원)과 기성 지연·유보금이 시공자의 현금 수지를 만든다. 기본 조건에서 최대 자금 소요 약 34.6억 원, 금융 비용 약 1.5억 원.</li>
+      <li>NPV = Σ CF<sub>t</sub>/(1 + i)<sup>t</sup>, IRR은 NPV = 0인 할인율. B-10 개발 사업: 6 %에서 NPV ≈ +20억 원, IRR ≈ 7.2 %.</li>
+      <li>LCC는 초기비 + 운영·유지·교체비의 현재 가치. 고성능 유리(+4억, −0.35억 원/년)는 30년·4 %에서 약 2.1억 원 싸지만 기간이 짧거나 할인율이 높으면 뒤집힌다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 적산과 견적에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">적산은 회사 전략에 따라 달라지고 견적은 누가 해도 같다</button><button class="opt" data-correct>적산은 도면의 수량을 세는 일이고, 견적은 단가·관리비·이윤·위험을 더해 금액을 정하는 일이다</button><button class="opt">둘은 같은 말이다</button><button class="opt">견적은 수량만 다룬다</button>
+      </div><div class="quiz-exp">같은 도면이면 수량은 같아야 한다. 입찰가 차이는 주로 단가, 관리비·이윤, 위험 판단에서 난다.</div></div>
+      <div class="quiz-q"><p>2. 32 × 24 m 평면, 슬래브 두께 0.25 m의 슬래브 콘크리트는?</p><div class="opts">
+        <button class="opt">161 m³</button><button class="opt" data-correct>192 m³</button><button class="opt">768 m³</button><button class="opt">240 m³</button>
+      </div><div class="quiz-exp">768 × 0.25 = 192 m³. 210 mm일 때 161.3 m³보다 약 31 m³ 많다.</div></div>
+      <div class="quiz-q"><p>3. 작업 조의 일당 합계가 2,100,000원, 하루 산출 70 m², 재료비 9,000원/m², 장비 70,000원/일이다. 일위대가는?</p><div class="opts">
+        <button class="opt">약 30,000원/m²</button><button class="opt" data-correct>약 40,000원/m²</button><button class="opt">약 2,179,000원/m²</button><button class="opt">약 31,000원/m²</button>
+      </div><div class="quiz-exp">노무 2,100,000/70 = 30,000, 장비 70,000/70 = 1,000, 재료 9,000 → 40,000원/m². 하루 비용을 산출량으로 나눈다.</div></div>
+      <div class="quiz-q"><p>4. 원가계산서 형태에서 이윤을 계산할 때 기준(대상액)에 들어가지 않는 것은?</p><div class="opts">
+        <button class="opt">노무비</button><button class="opt">경비</button><button class="opt">일반관리비</button><button class="opt" data-correct>재료비</button>
+      </div><div class="quiz-exp">이 장의 형태에서 이윤은 (노무비 + 경비 + 일반관리비) × 요율이다. 재료비는 대상액에서 빠진다(현행 예규 확인).</div></div>
+      <div class="quiz-q"><p>5. 기획 단계(설계 성숙도 2 % 미만)의 견적 정확도에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">±3 % 수준이다</button><button class="opt">하한과 상한이 같다</button><button class="opt" data-correct>범위가 매우 넓고(AACE 형태 등급 5) 상한이 하한보다 넓다</button><button class="opt">설계 성숙도와 무관하다</button>
+      </div><div class="quiz-exp">등급 5는 −20 ~ −50 % / +30 ~ +100 % 형태다. 누락·낙관 때문에 실제가 견적보다 클 가능성이 더 크다.</div></div>
+      <div class="quiz-q"><p>6. 다른 조건이 같을 때 시공자의 최대 자금 소요를 줄이는 것은?</p><div class="opts">
+        <button class="opt">기성 지급 지연을 늘린다</button><button class="opt">유보율을 높인다</button><button class="opt" data-correct>선급금을 받는다</button><button class="opt">비용을 더 일찍 지출한다</button>
+      </div><div class="quiz-exp">선급금은 착공 때 현금을 넣어 주므로 음수 구간을 줄인다(기성에서 나누어 회수). 지연과 유보는 수입을 늦춰 소요를 키운다.</div></div>
+      <div class="quiz-q"><p>7. CF = (−100, +60, +60)의 할인율 10 % NPV는?</p><div class="opts">
+        <button class="opt">+20.0</button><button class="opt" data-correct>약 +4.1</button><button class="opt">약 −4.1</button><button class="opt">약 +9.1</button>
+      </div><div class="quiz-exp">60/1.1 + 60/1.21 = 54.55 + 49.59 = 104.13 → NPV = +4.13. 단순 합계 +20보다 작다. IRR은 약 13.1 %.</div></div>
+      <div class="quiz-q"><p>8. 초기비가 4억 원 더 들고 해마다 0.35억 원을 아끼는 대안의 할인 회수 기간에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">할인율과 무관하게 11.4년이다</button><button class="opt" data-correct>할인율이 높을수록 길어지고, 너무 높으면 회수되지 않는다</button><button class="opt">할인율이 높을수록 짧아진다</button><button class="opt">분석 기간이 길수록 길어진다</button>
+      </div><div class="quiz-exp">절감의 현재 가치가 할인율이 높을수록 작아져 회수 기간이 길어진다. 연금 현가가 1/i에 수렴하므로 0.35/i ≤ 4, 곧 i ≥ 8.75 %이면 영원히 회수되지 않는다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 (교육용 모델: 수량 산출 · 일위대가 · 원가 구성 · 현금 흐름 · LCC) ---------- */
+const ESU = {
+  font(o) { return `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`; },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = ESU.font(o);
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  won: (v) => CB.sig(Math.round(v)) + "원",
+  /** 정의 12.1: 기준층 수량(m, m³, m², t) */
+  qto(t, b, h, c, rho, H = 4.0, Lw = 20, tw = 0.4) {
+    const A = 768, Lb = 248, Ln = 31 * (8 - c), nc = 20;
+    const v = { slab: A * t, beam: Lb * b * Math.max(0, h - t), col: nc * c * c * (H - t), wall: Lw * tw * (H - t) };
+    const f = { slab: A - b * Lb - nc * c * c, beam: (2 * Math.max(0, h - t) + b) * Ln, col: 4 * c * (H - h) * nc, wall: 2 * Lw * (H - t), edge: 112 * t };
+    const V = v.slab + v.beam + v.col + v.wall, F = f.slab + f.beam + f.col + f.wall + f.edge;
+    return { v, f, V, F, S: rho * V };
+  },
+  /** 표 12-1: 일위대가 기본 데이터(교육용) */
+  ITEMS: {
+    con: { name: "콘크리트", unit: "m³", mat: 95000 * 1.01, crew: 3 * 280000 + 4 * 170000, eq: 1300000, Qd: 120 },
+    form: { name: "거푸집", unit: "m²", mat: 9000, crew: 6 * 300000 + 2 * 170000, eq: 70000, Qd: 70 },
+    bar: { name: "철근", unit: "t", mat: 900000 * 1.03, crew: 5 * 300000 + 2 * 170000, eq: 120000, Qd: 4 },
+  },
+  unit(it, km, kw, kq) { const q = it.Qd * kq; const m = it.mat * km, l = (it.crew * kw) / q, e = it.eq / q; return { m, l, e, u: m + l + e }; },
+  /** 예제 12.3: 원가 구성 */
+  comp(o) {
+    const il = o.dl * o.rIL, lab = o.dl + il, ins = lab * 0.047, safe = (o.mat + o.dl) * 0.02, oth = (o.mat + lab) * 0.05, exp = o.eq + ins + safe + oth;
+    const net = o.mat + lab + exp, ga = net * o.rGA, pr = (lab + exp + ga) * o.rP, tot = net + ga + pr;
+    return { il, lab, ins, safe, oth, exp, net, ga, pr, tot, vat: tot * 0.1 };
+  },
+};
+
+/* ---------- 1. 수량 산출기 ---------- */
+(function () {
+  const gt = CB.range("es-qt-t", (v) => v + " mm", draw), gh = CB.range("es-qt-h", (v) => v + " mm", draw), gb = CB.range("es-qt-b", (v) => v + " mm", draw);
+  const gc = CB.range("es-qt-c", (v) => v + " mm", draw), gr = CB.range("es-qt-r", (v) => v.toFixed(3) + " t/m³", draw);
+  const calc = () => ESU.qto(gt() / 1000, gb() / 1000, gh() / 1000, gc() / 1000, gr());
+  const cv = CB.canvas("#es-cv-qto", (ctx, W, H) => {
+    const P = CB.palette(), q = calc(), narrow = W < 520, cols = [P.accent, P.accent2, P.dim, P.warn, P.ok];
+    const groups = [
+      { t: "콘크리트 (m³)", max: 400, parts: [["슬래브", q.v.slab], ["보", q.v.beam], ["기둥", q.v.col], ["벽", q.v.wall]], tot: q.V },
+      { t: "거푸집 (m² ÷ 5)", max: 400, parts: [["슬래브 밑", q.f.slab / 5], ["보", q.f.beam / 5], ["기둥", q.f.col / 5], ["벽", q.f.wall / 5], ["가장자리", q.f.edge / 5]], tot: q.F / 5, lab: CB.sig(q.F) + " m²" },
+      { t: "철근 (t × 10)", max: 400, parts: [["철근", q.S * 10]], tot: q.S * 10, lab: CB.num(q.S, 1) + " t" },
+    ];
+    const x0 = narrow ? 92 : 130, w = W - x0 - 70, rowH = (H - 40) / 3, X = (v) => x0 + (v / 400) * w;
+    groups.forEach((g, i) => {
+      const y = 18 + i * rowH, bh = Math.min(34, rowH * 0.42);
+      ESU.text(ctx, g.t, x0 - 8, y + bh / 2, P.text, { size: narrow ? 10.5 : 12, align: "right" });
+      let acc = 0;
+      g.parts.forEach(([nm, v], k) => {
+        ctx.fillStyle = ESU.alpha(cols[k % cols.length], 0.75); ctx.fillRect(X(acc), y, X(acc + v) - X(acc), bh);
+        if (X(acc + v) - X(acc) > 34) ESU.text(ctx, nm, (X(acc) + X(acc + v)) / 2, y + bh + 10, P.dim, { size: 9.5, bold: false });
+        acc += v;
+      });
+      ESU.text(ctx, g.lab || CB.num(g.tot, 1) + " m³", Math.min(W - 30, X(acc) + 32), y + bh / 2, P.text, { size: 11 });
+    });
+    ESU.text(ctx, "막대 길이는 비교를 위해 거푸집 ÷ 5, 철근 × 10", W / 2, H - 10, P.dim, { size: 10, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 280, maxHeight: 400 });
+  function draw() {
+    cv.redraw(); const q = calc();
+    CB.stat("es-qt-o-v", CB.num(q.V, 1) + " m³"); CB.stat("es-qt-o-f", CB.sig(q.F) + " m² (" + (q.F / q.V).toFixed(1) + " m²/m³)");
+    CB.stat("es-qt-o-s", CB.num(q.S, 1) + " t"); CB.stat("es-qt-o-10", CB.sig(q.V * 10) + " m³ · " + CB.sig(q.S * 10) + " t");
+  }
+  draw();
+})();
+
+/* ---------- 2. 일위대가 ---------- */
+(function () {
+  const gi = CB.seg("es-un-item", draw), gm = CB.range("es-un-m", (v) => v.toFixed(2) + "배", draw), gw = CB.range("es-un-w", (v) => v.toFixed(2) + "배", draw), gq = CB.range("es-un-q", (v) => v.toFixed(2) + "배", draw);
+  const Q = ESU.qto(0.21, 0.4, 0.7, 0.8, 0.12), qty = { con: Q.V, form: Q.F, bar: Q.S };
+  const cv = CB.canvas("#es-cv-unit", (ctx, W, H) => {
+    const P = CB.palette(), ids = ["con", "form", "bar"], sel = gi();
+    const x0 = W < 520 ? 70 : 96, w = W - x0 - 20, rowH = (H - 50) / 3;
+    ids.forEach((id, i) => {
+      const it = ESU.ITEMS[id], r = id === sel ? ESU.unit(it, gm(), gw(), gq()) : ESU.unit(it, 1, 1, 1), y = 16 + i * rowH, bh = Math.min(30, rowH * 0.45);
+      const parts = [["재료", r.m, P.accent2], ["노무", r.l, P.accent], ["경비", r.e, P.warn]];
+      ESU.text(ctx, it.name, x0 - 8, y + bh / 2, id === sel ? P.text : P.dim, { size: 12, align: "right" });
+      let acc = 0;
+      parts.forEach(([nm, v, col]) => { const xa = x0 + (acc / r.u) * w, xb = x0 + ((acc + v) / r.u) * w; ctx.fillStyle = ESU.alpha(col, id === sel ? 0.85 : 0.35); ctx.fillRect(xa, y, xb - xa, bh); if (xb - xa > 46) ESU.text(ctx, `${nm} ${Math.round((v / r.u) * 100)}%`, (xa + xb) / 2, y + bh / 2, P.text, { size: 10 }); acc += v; });
+      ESU.text(ctx, `${ESU.won(r.u)}/${it.unit}`, x0 + w / 2, y + bh + 12, id === sel ? P.text : P.dim, { size: 11 });
+    });
+    ESU.text(ctx, "막대는 각 단가를 100 %로 본 구성비", W / 2, H - 10, P.dim, { size: 10, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.48), minHeight: 260, maxHeight: 380 });
+  function draw() {
+    cv.redraw();
+    const id = gi(), it = ESU.ITEMS[id], r = ESU.unit(it, gm(), gw(), gq());
+    CB.stat("es-un-o-u", ESU.won(r.u) + "/" + it.unit);
+    CB.stat("es-un-o-s", [r.m, r.l, r.e].map((v) => CB.sig(Math.round(v))).join(" · "));
+    CB.stat("es-un-o-f", CB.num((qty[id] * r.u) / 1e6, 1) + " 백만 원");
+    const tot = ["con", "form", "bar"].reduce((s, k) => s + qty[k] * (k === id ? r.u : ESU.unit(ESU.ITEMS[k], 1, 1, 1).u), 0);
+    CB.stat("es-un-o-t", CB.num(tot / 1e8, 2) + " 억 원");
+  }
+  draw();
+})();
+
+/* ---------- 3. 원가 구성 ---------- */
+(function () {
+  const g = { m: CB.range("es-cp-m", (v) => v, draw), l: CB.range("es-cp-l", (v) => v, draw), il: CB.range("es-cp-il", (v) => (v * 100).toFixed(1) + " %", draw), ga: CB.range("es-cp-ga", (v) => (v * 100).toFixed(1) + " %", draw), p: CB.range("es-cp-p", (v) => (v * 100).toFixed(1) + " %", draw) };
+  const calc = () => ESU.comp({ mat: g.m(), dl: g.l(), eq: 16.5, rIL: g.il(), rGA: g.ga(), rP: g.p() });
+  const cv = CB.canvas("#es-cv-comp", (ctx, W, H) => {
+    const P = CB.palette(), c = calc();
+    const steps = [["재료비", g.m(), P.accent2], ["직접노무비", g.l(), P.accent], ["간접노무비", c.il, P.accent], ["기계경비", 16.5, P.warn], ["보험료", c.ins, P.warn], ["안전관리비", c.safe, P.warn], ["기타 경비", c.oth, P.warn], ["일반관리비", c.ga, P.dim], ["이윤", c.pr, P.ok], ["부가세", c.vat, P.faint]];
+    const ymax = Math.ceil((c.tot + c.vat) / 50) * 50 + 10, n = steps.length + 2;
+    const ch = CB.chart(ctx, { x: 56, y: 14, w: W - 70, h: H - 14 - 70 }, { x: [0, n], y: [0, ymax], xTicks: [], yLabel: "억 원", hlines: [{ y: c.net, color: P.accent2, label: `순공사원가 ${c.net.toFixed(1)}` }, { y: c.tot, color: P.ok, label: `총원가 ${c.tot.toFixed(1)}`, dash: [] }] });
+    const bw = (W - 70) / n; let acc = 0;
+    const lab = (s, i) => { ctx.save(); ctx.translate(ch.X(i + 0.5), ch.Y(0) + 8); ctx.rotate(-Math.PI / 4); ctx.font = ESU.font({ size: W < 520 ? 9 : 10.5, bold: false }); ctx.fillStyle = P.dim; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(s, 0, 0); ctx.restore(); };
+    steps.forEach(([nm, v, col], i) => {
+      const k = i < 7 ? i : i + 1;
+      ctx.fillStyle = ESU.alpha(col, 0.75); ctx.fillRect(ch.X(k) + bw * 0.12, ch.Y(acc + v), bw * 0.76, ch.Y(acc) - ch.Y(acc + v));
+      if (bw > 34) ESU.text(ctx, v.toFixed(1), ch.X(k + 0.5), ch.Y(acc + v) - 8, P.text, { size: 9.5 });
+      lab(nm, k); acc += v;
+      if (i === 6) { ctx.fillStyle = ESU.alpha(P.accent2, 0.5); ctx.fillRect(ch.X(7) + bw * 0.12, ch.Y(acc), bw * 0.76, ch.Y(0) - ch.Y(acc)); lab("순공사원가", 7); }
+    });
+    ctx.fillStyle = ESU.alpha(P.ok, 0.5); ctx.fillRect(ch.X(n - 1) + bw * 0.12, ch.Y(acc), bw * 0.76, ch.Y(0) - ch.Y(acc)); lab("공사비(부가세 포함)", n - 1);
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.56), minHeight: 320, maxHeight: 460 });
+  function draw() {
+    cv.redraw(); const c = calc();
+    CB.stat("es-cp-o-n", c.net.toFixed(2) + "억"); CB.stat("es-cp-o-g", c.ga.toFixed(2) + " · " + c.pr.toFixed(2) + "억");
+    CB.stat("es-cp-o-t", c.tot.toFixed(2) + "억"); CB.stat("es-cp-o-v", (c.tot + c.vat).toFixed(2) + "억");
+  }
+  draw();
+})();
+
+/* ---------- 4. 견적 정확도 깔때기 ---------- */
+(function () {
+  const CL = [[2, 5, [-20, -50], [30, 100]], [15, 4, [-15, -30], [20, 50]], [40, 3, [-10, -20], [10, 30]], [75, 2, [-5, -15], [5, 20]], [101, 1, [-3, -10], [3, 15]]];
+  const cls = (m) => CL.find((c) => m < c[0]);
+  const range = (m, k) => { const c = cls(m); return { c: c[1], lo: c[2][0] + (c[2][1] - c[2][0]) * k, hi: c[3][0] + (c[3][1] - c[3][0]) * k }; };
+  const gm = CB.range("es-fn-m", (v) => v + " %", draw), gk = CB.range("es-fn-k", (v) => v.toFixed(2), draw), ge = CB.range("es-fn-e", (v) => v + "억", draw);
+  const cv = CB.canvas("#es-cv-funnel", (ctx, W, H) => {
+    const P = CB.palette(), m = gm(), k = gk(), r = range(m, k);
+    const wide = [], narrow = [], wl = [], nl = [], cur = [], curl = [];
+    for (let x = 0; x <= 100; x += 0.5) { const a = range(x, 1), b = range(x, 0), c2 = range(x, k); wide.push([x, a.hi]); wl.push([x, a.lo]); narrow.push([x, b.hi]); nl.push([x, b.lo]); cur.push([x, c2.hi]); curl.push([x, c2.lo]); }
+    const ch = CB.chart(ctx, null, { x: [0, 100], y: [-60, 110], xLabel: "설계 성숙도 (%)", yLabel: "점 견적 대비 (%)", hlines: [{ y: 0, color: P.text, dash: [] }], vlines: [{ x: m, color: P.text, label: "등급 " + r.c }],
+      series: [{ data: wide, color: P.faint, width: 1.2, dash: [4, 3] }, { data: wl, color: P.faint, width: 1.2, dash: [4, 3] }, { data: narrow, color: P.dim, width: 1.2, dash: [2, 3] }, { data: nl, color: P.dim, width: 1.2, dash: [2, 3] }, { data: cur, color: P.bad, width: 2.6 }, { data: curl, color: P.accent2, width: 2.6 }],
+      points: [{ x: m, y: r.hi, color: P.bad, r: 5 }, { x: m, y: r.lo, color: P.accent2, r: 5 }] });
+    [2, 15, 40, 75].forEach((b) => { ctx.save(); ctx.strokeStyle = P.grid; ctx.setLineDash([2, 4]); ctx.beginPath(); ctx.moveTo(ch.X(b), ch.Y(-60)); ctx.lineTo(ch.X(b), ch.Y(110)); ctx.stroke(); ctx.restore(); });
+    ESU.text(ctx, "점선: 복잡도 0(좁음)·1(넓음)의 경계", ch.X(70), ch.Y(95), P.dim, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 280, maxHeight: 400 });
+  function draw() {
+    cv.redraw(); const r = range(gm(), gk()), e = ge();
+    CB.stat("es-fn-o-c", "등급 " + r.c); CB.stat("es-fn-o-r", CB.num(r.lo, 1) + " / +" + CB.num(r.hi, 1));
+    CB.stat("es-fn-o-a", CB.sig(e * (1 + r.lo / 100)) + "–" + CB.sig(e * (1 + r.hi / 100)) + "억");
+  }
+  draw();
+})();
+
+/* ---------- 5. 비용 S 곡선 ---------- */
+const ES_R = CB.pm.cpm(CB.pm.B10), ES_E = CB.pm.spread(CB.pm.B10, ES_R, "cost", "ES"), ES_L = CB.pm.spread(CB.pm.B10, ES_R, "cost", "LS");
+(function () {
+  const gw = CB.range("es-sc-w", (v) => v + "주", draw), gb = CB.seg("es-sc-b", draw), T = 93;
+  const cv = CB.canvas("#es-cv-scurve", (ctx, W, H) => {
+    const P = CB.palette(), w = gw(), top = { x: 58, y: 14, w: W - 72, h: H * 0.56 };
+    const ce = [[0, 0]].concat(ES_E.cum.map((v, t) => [t + 1, v])), cl = [[0, 0]].concat(ES_L.cum.map((v, t) => [t + 1, v]));
+    const ch = CB.chart(ctx, top, { x: [0, T], y: [0, 250], yLabel: "누적 억 원", xLabel: "", series: [{ data: ce, color: P.accent, width: 2.8 }, { data: cl, color: P.accent2, width: 2.4, dash: [6, 4] }], vlines: [{ x: w, color: P.text }], points: [{ x: w, y: ES_E.cum[w - 1], color: P.accent, r: 5 }, { x: w, y: ES_L.cum[w - 1], color: P.accent2, r: 5 }] });
+    ctx.save(); ctx.beginPath(); ce.forEach(([x, y], i) => (i ? ctx.lineTo(ch.X(x), ch.Y(y)) : ctx.moveTo(ch.X(x), ch.Y(y)))); for (let i = cl.length - 1; i >= 0; i--) ctx.lineTo(ch.X(cl[i][0]), ch.Y(cl[i][1])); ctx.closePath(); ctx.fillStyle = ESU.alpha(P.accent, 0.1); ctx.fill(); ctx.restore();
+    ESU.text(ctx, "ES", ch.X(70), ch.Y(ES_E.cum[69]) - 12, P.accent, { size: 11 }); ESU.text(ctx, "LS", ch.X(74), ch.Y(ES_L.cum[73]) + 14, P.accent2, { size: 11 });
+    const per = gb() === "ES" ? ES_E.per : ES_L.per, hb = { x: 58, y: top.y + top.h + 18, w: W - 72, h: H - (top.y + top.h + 18) - 40 };
+    const c2 = CB.chart(ctx, hb, { x: [0, T], y: [0, 5], xLabel: "주", yLabel: "억 원/주", vlines: [{ x: w - 0.5, color: P.text }] });
+    per.forEach((v, t) => { ctx.fillStyle = ESU.alpha(P.accent, 0.7); ctx.fillRect(c2.X(t) + 0.3, c2.Y(v), Math.max(0.6, c2.X(1) - c2.X(0) - 0.6), c2.Y(0) - c2.Y(v)); });
+  }, { aspect: (W) => (W < 520 ? 1.05 : 0.6), minHeight: 340, maxHeight: 500 });
+  function draw() {
+    cv.redraw(); const w = gw(), e = ES_E.cum[w - 1], l = ES_L.cum[w - 1];
+    CB.stat("es-sc-o-e", e.toFixed(1) + "억"); CB.stat("es-sc-o-l", l.toFixed(1) + "억"); CB.stat("es-sc-o-d", (e - l).toFixed(1) + "억"); CB.stat("es-sc-o-p", ((e / 244) * 100).toFixed(1) + " %");
+  }
+  draw();
+})();
+
+/* ---------- 6. 현금 흐름 ---------- */
+(function () {
+  const g = { l: CB.range("es-cs-l", (v) => v + "주", draw), r: CB.range("es-cs-r", (v) => Math.round(v * 100) + " %", draw), a: CB.range("es-cs-a", (v) => Math.round(v * 100) + " %", draw), m: CB.range("es-cs-m", (v) => (v * 100).toFixed(1) + " %", draw), i: CB.range("es-cs-i", (v) => (v * 100).toFixed(1) + " %", draw) };
+  const T = 93, BAC = 244;
+  const calc = () => {
+    const lag = g.l(), ret = g.r(), adv = g.a(), m = g.m(), W = T + lag + 20;
+    const out = new Array(W).fill(0), inn = new Array(W).fill(0);
+    ES_E.per.forEach((v, t) => (out[t] = v * (1 - m)));
+    inn[0] += BAC * adv; let billed = 0;
+    for (let k = 4; k <= Math.ceil(T / 4) * 4; k += 4) { const ev = ES_E.cum[Math.min(k, T) - 1] - billed; billed += ev; inn[k - 1 + lag] += ev * (1 - ret - adv); }
+    inn[T - 1 + lag + 8] += BAC * ret;
+    let c = 0, ci = 0, co = 0, min = 0, wk = 0, neg = 0; const cp = [[0, 0]], cin = [[0, 0]], cout = [[0, 0]];
+    for (let t = 0; t < W; t++) { ci += inn[t]; co += out[t]; c = ci - co; cp.push([t + 1, c]); cin.push([t + 1, ci]); cout.push([t + 1, co]); if (c < min) { min = c; wk = t + 1; } if (c < 0) neg -= c; }
+    return { W, cp, cin, cout, min, wk, fin: (neg * g.i()) / 52, end: c };
+  };
+  const cv = CB.canvas("#es-cv-cash", (ctx, W, H) => {
+    const P = CB.palette(), c = calc();
+    const lo = Math.min(-20, Math.floor(c.min / 20) * 20 - 10);
+    const step = []; c.cin.forEach(([x, y], i) => { if (i) step.push([x - 1, c.cin[i - 1][1]]); step.push([x, y]); });
+    CB.chart(ctx, null, { x: [0, c.W], y: [lo, 260], xLabel: "주", yLabel: "누적 억 원", hlines: [{ y: 0, color: P.text, dash: [] }],
+      series: [{ data: c.cout, color: P.bad, width: 2.4 }, { data: step, color: P.ok, width: 2.4 }, { data: c.cp, color: P.accent, width: 3 }],
+      vlines: [{ x: c.wk, color: P.accent, label: `최대 소요 ${c.min.toFixed(1)}억` }, { x: 93, color: P.dim, label: "준공" }], points: [{ x: c.wk, y: c.min, color: P.accent, r: 5 }] });
+    const lx = 70, ly = 26;
+    [["누적 지출", P.bad], ["누적 수입(기성)", P.ok], ["현금 수지", P.accent]].forEach(([s, col], i) => { ctx.fillStyle = col; ctx.fillRect(lx, ly + i * 16 - 2, 14, 3); ESU.text(ctx, s, lx + 20, ly + i * 16, col, { size: 10.5, align: "left" }); });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.56), minHeight: 300, maxHeight: 440 });
+  function draw() {
+    cv.redraw(); const c = calc();
+    CB.stat("es-cs-o-min", c.min.toFixed(1) + "억"); CB.stat("es-cs-o-wk", c.wk ? c.wk + "주" : "—");
+    CB.stat("es-cs-o-f", c.fin.toFixed(2) + "억"); CB.stat("es-cs-o-e", (c.end - c.fin).toFixed(2) + "억");
+  }
+  draw();
+})();
+
+/* ---------- 7. NPV · IRR ---------- */
+(function () {
+  const BASE = [-110, -134, 20, 20, 20, 20, 20, 20, 20, 20, 250], FLAT = [-110, -134, 20, 20, 20, 20, 20, 20, 20, 20, 20];
+  let cf = BASE.slice(), drag = -1, geo = null;
+  const gi = CB.range("es-np-i", (v) => (v * 100).toFixed(2) + " %", draw);
+  document.getElementById("es-np-reset").addEventListener("click", () => { cf = BASE.slice(); draw(); });
+  document.getElementById("es-np-flat").addEventListener("click", () => { cf = FLAT.slice(); draw(); });
+  const cv = CB.canvas("#es-cv-npv", (ctx, W, H) => {
+    const P = CB.palette(), narrow = W < 520, i = gi();
+    const top = { x: 56, y: 14, w: W - 70, h: narrow ? H * 0.5 : H * 0.52 };
+    const c = CB.chart(ctx, top, { x: [-0.5, cf.length - 0.5], y: [-300, 300], xTicks: cf.map((_, t) => t), xFmt: (v) => v + "년", yLabel: "CF (억 원)", hlines: [{ y: 0, color: P.text, dash: [] }] });
+    geo = { c, top };
+    cf.forEach((v, t) => {
+      const bw = (top.w / cf.length) * 0.6, x = c.X(t) - bw / 2;
+      ctx.fillStyle = ESU.alpha(v < 0 ? P.bad : P.ok, 0.75); ctx.fillRect(x, Math.min(c.Y(v), c.Y(0)), bw, Math.abs(c.Y(v) - c.Y(0)));
+      ctx.fillStyle = ESU.alpha(P.accent, 0.35); const pv = v / Math.pow(1 + i, t); ctx.fillRect(x + bw * 0.3, Math.min(c.Y(pv), c.Y(0)), bw * 0.4, Math.abs(c.Y(pv) - c.Y(0)));
+      if (!narrow || t % 2 === 0 || t === cf.length - 1) ESU.text(ctx, String(v), c.X(t), v >= 0 ? c.Y(v) - 9 : c.Y(v) + 9, P.text, { size: 10 });
+    });
+    ESU.text(ctx, "가는 주황 막대 = 현재 가치", top.x + 6, top.y + top.h - 10, P.accent, { size: 10, bold: false, align: "left" });
+    const by = top.y + top.h + 30, S = [];
+    for (let r = 0; r <= 0.2001; r += 0.0025) S.push([r * 100, CB.pm.npv(cf, r)]);
+    const ys = S.map((p) => p[1]), irr = CB.pm.irr(cf);
+    CB.chart(ctx, { x: 56, y: by, w: W - 70, h: H - by - 44 }, { x: [0, 20], y: [Math.min(-60, Math.floor(Math.min(...ys) / 20) * 20), Math.max(60, Math.ceil(Math.max(...ys) / 20) * 20)], xLabel: "할인율 i (%)", yLabel: "NPV",
+      series: [{ data: S, color: P.accent, width: 2.6 }], hlines: [{ y: 0, color: P.text, dash: [] }], vlines: [{ x: i * 100, color: P.dim }].concat(isFinite(irr) && irr >= 0 && irr <= 0.2 ? [{ x: irr * 100, color: P.ok, label: "IRR" }] : []),
+      points: [{ x: i * 100, y: CB.pm.npv(cf, i), color: P.accent, r: 5 }] });
+  }, { aspect: (W) => (W < 520 ? 1.15 : 0.7), minHeight: 380, maxHeight: 560 });
+  const el = document.getElementById("es-cv-npv");
+  const idx = (e) => { if (!geo) return -1; const b = el.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top, { c, top } = geo; if (y < top.y || y > top.y + top.h) return -1; const t = Math.round((x - top.x) / (top.w / cf.length) - 0.5); return t >= 0 && t < cf.length ? t : -1; };
+  el.addEventListener("pointerdown", (e) => { drag = idx(e); if (drag >= 0) { el.setPointerCapture(e.pointerId); move(e); e.preventDefault(); } });
+  const move = (e) => { if (drag < 0) return; const b = el.getBoundingClientRect(), { top } = geo; const v = 300 - ((e.clientY - b.top - top.y) / top.h) * 600; const nv = Math.round(CB.clamp(v, -300, 300) / 5) * 5; if (nv !== cf[drag]) { cf[drag] = nv; draw(); } };
+  el.addEventListener("pointermove", move);
+  const up = () => (drag = -1); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+  function draw() {
+    cv.redraw(); const i = gi(), n = CB.pm.npv(cf, i), irr = CB.pm.irr(cf), s = cf.reduce((a, b) => a + b, 0);
+    CB.stat("es-np-o-n", (n >= 0 ? "+" : "") + n.toFixed(2) + "억"); CB.stat("es-np-o-r", isFinite(irr) ? (irr * 100).toFixed(2) + " %" : "없음");
+    CB.stat("es-np-o-s", (s >= 0 ? "+" : "") + s + "억"); CB.stat("es-np-o-d", n >= 0 ? "채택(NPV ≥ 0)" : "기각");
+  }
+  draw();
+})();
+
+/* ---------- 8. 생애 주기 비용 ---------- */
+(function () {
+  const g = { c: CB.range("es-lc-c", (v) => v.toFixed(1), draw), s: CB.range("es-lc-s", (v) => v.toFixed(2), draw), i: CB.range("es-lc-i", (v) => (v * 100).toFixed(1) + " %", draw), gg: CB.range("es-lc-g", (v) => (v * 100).toFixed(1) + " %", draw), n: CB.range("es-lc-n", (v) => v + "년", draw) };
+  const A0 = 32, EA = 1.2, M = 0.1;
+  const curve = (c0, e, n) => { const i = g.i(), gr = g.gg(), out = [[0, c0]]; let s = c0; for (let t = 1; t <= n; t++) { s += (e * Math.pow(1 + gr, t - 1) + M) / Math.pow(1 + i, t); out.push([t, s]); } return out; };
+  const calc = () => { const n = g.n(), N = 50, a = curve(A0, EA, N), b = curve(A0 + g.c(), EA - g.s(), N); let pb = null; for (let t = 0; t <= N; t++) if (b[t][1] <= a[t][1] + 1e-9 && g.c() > 0) { pb = t; break; } if (g.c() === 0) pb = 0; return { n, a, b, la: a[n][1], lb: b[n][1], pb }; };
+  const cv = CB.canvas("#es-cv-lcc", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), ymax = Math.ceil(Math.max(c.a[50][1], c.b[50][1]) / 10) * 10 + 5;
+    CB.chart(ctx, null, { x: [0, 50], y: [20, ymax], xLabel: "연수", yLabel: "누적 현재 가치 (억 원)", series: [{ data: c.a, color: P.bad, width: 2.6 }, { data: c.b, color: P.ok, width: 2.6 }],
+      vlines: [{ x: c.n, color: P.text, label: "분석 기간" }].concat(c.pb != null && c.pb > 0 ? [{ x: c.pb, color: P.accent, label: "회수" }] : []), points: [{ x: c.n, y: c.la, color: P.bad, r: 5 }, { x: c.n, y: c.lb, color: P.ok, r: 5 }] });
+    ESU.text(ctx, "A 일반 유리", 120, 30, P.bad, { size: 11, align: "left" }); ESU.text(ctx, "B 고성능 유리", 120, 46, P.ok, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.52), minHeight: 280, maxHeight: 420 });
+  function draw() {
+    cv.redraw(); const c = calc();
+    CB.stat("es-lc-o-a", c.la.toFixed(1) + "억"); CB.stat("es-lc-o-b", c.lb.toFixed(1) + "억");
+    CB.stat("es-lc-o-p", c.pb == null ? "50년 안에 없음" : c.pb + "년"); CB.stat("es-lc-o-w", c.lb < c.la - 1e-9 ? "B (−" + (c.la - c.lb).toFixed(1) + "억)" : "A (−" + (c.lb - c.la).toFixed(1) + "억)");
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

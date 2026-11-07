@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>PERT와 공기 위험 · SiteBook</title>
+<meta name="description" content="공기는 확률이다. 3점 추정과 베타·삼각 분포, 주공정의 평균·분산과 완료 확률, 합류 편향, P-B10 몬테카를로(P50·P80, 주공정 지수), 토네이도 차트, 일정 버퍼, 날씨 위험을 직접 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .pt-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .pt-msg b { color: var(--text); }
+  .pt-tbl td, .pt-tbl th { font-variant-numeric: tabular-nums; text-align: center; }
+  .pt-tbl td.pt-crit { color: var(--bad); font-weight: 700; }
+  .pt-busy { opacity: .55; transition: opacity .15s; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="site"></script>
+</head>
+<body data-chapter="pert">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="pt-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="pt-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="pt-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 10</div>
+    <h1 data-no-glossary>PERT와 공기 위험</h1>
+    <p class="lead">9장의 P-B10 공정표는 93주에 끝난다고 말합니다. 그러나 흙막이가 정확히 10주, 커튼월이 정확히 16주 걸린다고 믿는 현장 기술자는 없습니다. 지반은 예상과 다르고, 비는 예고 없이 오고, 커튼월 유닛은 늦게 도착합니다. 이 장은 기간을 하나의 숫자가 아니라 <b>분포</b>로 다룹니다. 3점 추정과 PERT로 주공정의 평균과 표준편차를 구해 완료 확률을 계산하고, 병렬 경로가 만나는 곳의 <b>합류 편향</b> 때문에 PERT가 낙관적인 까닭을 실험하고, 몬테카를로 시뮬레이션으로 P-B10의 공기 분포·P80·주공정 지수를 구합니다. 마지막으로 그 결과로 일정 버퍼를 정하고, 날씨처럼 달력에 묶인 위험을 다룹니다.</p>
+    <ul class="objectives">
+      <li>3점 추정 \((a, m, b)\)로 PERT 기대 기간 \(t_e = (a + 4m + b)/6\)과 표준편차 \((b - a)/6\)을 구하고 삼각 분포와 비교한다.</li>
+      <li>주공정의 평균·분산을 더해 정규 근사로 목표 공기 안의 완료 확률 \(P = \Phi\big((T_s - \mu)/\sigma\big)\)를 계산한다.</li>
+      <li>병렬 경로가 합류할 때 공기 분포가 오른쪽으로 밀리는 합류 편향을 설명하고 크기를 추정한다.</li>
+      <li>몬테카를로 공정 위험 분석으로 P-B10의 공기 분포, P50·P80, 주공정 지수를 구하고 PERT와 다른 까닭을 분해한다.</li>
+      <li>토네이도 차트로 공기 위험에 크게 기여하는 활동을 찾고, 목표 신뢰도에 맞는 일정 버퍼를 정한다.</li>
+      <li>날씨처럼 착공 시기에 따라 달라지는 위험을 달력과 함께 모델링한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 관리가 없었다면</small><b>"93주"라는 약속은 열 번 중 아홉 번 깨진다</b></div>
+      <div class="o-body"><p>1950년대 후반 미 해군 특수 사업국은 폴라리스 잠수함 발사 미사일 개발이라는, 누구도 해 본 적 없는 수천 개 작업의 일정을 관리해야 했습니다. 경험 자료가 없으니 각 작업의 기간을 하나로 정할 수 없었습니다. 그래서 담당자에게 "가장 빠르면, 보통이면, 가장 늦으면"의 세 값을 묻고 그것으로 기간의 평균과 흩어짐을 계산하는 방법을 컨설팅 회사(부즈 앨런 해밀턴)·록히드와 함께 만들었는데, 이것이 PERT(Program Evaluation and Review Technique)로 알려져 있습니다(1958년 무렵). 같은 시기 산업계의 CPM(9장)이 기간을 확정값으로 보고 비용과 공기의 맞바꿈에 집중했다면, PERT는 불확실성에 집중했습니다.</p>
+        <p>확정 공정표는 모든 활동이 "보통"으로 끝날 때의 공기를 줍니다. 그런데 늦어질 일은 많아도 크게 빨라질 일은 드물어서, 그 공기에 끝날 확률은 생각보다 낮습니다. P-B10의 93주는 이 장의 계산으로 열 번 중 한 번 남짓만 지켜지는 약속입니다. 확률로 공기를 말해야 계약 공기와 버퍼를 근거 있게 정할 수 있습니다.</p>
+        <div class="o-chain"><span>3점 추정(a, m, b)</span><i>→</i><span class="tool">PERT t<sub>e</sub>·σ · Φ · 합류 편향 · 몬테카를로 P80 · 주공정 지수</span><i>→</i><span>완료 확률 · 버퍼 · 위험 대응 우선순위</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="uncertainty">
+    <h2>기간의 불확실성</h2>
+    <div class="problem"><strong>"굴착은 12주"라고 말할 때 숨은 것</strong>
+      <p>굴착·버팀보 C의 담당자는 12주라고 했습니다. 다시 물으니 "지반이 시추 결과대로면 10주, 암반이 더 높게 나오거나 민원으로 반출 시간이 줄면 18주"라고 합니다. 12주는 무엇이고, 공정표에는 무엇을 적어야 할까요?</p></div>
+    <p>활동 기간이 흩어지는 원인은 크게 넷입니다. ① <b>생산성의 변동</b>: 작업조의 숙련도, 장비 고장, 자재 공급의 들쭉날쭉. ② <b>조건의 불확실성</b>: 지반, 지하 매설물, 기존 구조물처럼 파 보기 전에는 모르는 것. ③ <b>외부 사건</b>: 날씨, 인허가, 민원, 설계 변경. ④ <b>추정 자체의 오차</b>: 비슷한 공사의 자료가 적거나 낙관적으로 말하는 습관. 이 가운데 ①은 작은 변동이 자주, ②·③은 드물지만 큰 지연으로 나타납니다.</p>
+    <p>그래서 건설 활동의 기간 분포는 대개 <b>오른쪽으로 꼬리가 긴</b> 모양입니다. 일이 잘 풀려도 계획보다 크게 빨라지기는 어렵지만(작업 순서와 양생 같은 물리적 하한), 잘못되면 몇 배로 늘어날 수 있습니다. 이 비대칭 때문에 "가장 그럴듯한 값"(최빈값)은 평균보다 작고, 최빈값들을 더한 확정 공정표는 체계적으로 낙관적입니다.</p>
+    <figure class="diagram" id="fig-pt-skew">
+      <svg viewBox="0 0 860 290" role="img" aria-label="오른쪽 꼬리가 긴 활동 기간 분포와 낙관값 a, 최빈값 m, 평균, 비관값 b">
+        <rect x="10" y="10" width="840" height="270" rx="10" class="f-surface"/>
+        <line x1="80" y1="230" x2="800" y2="230" class="s-axis"/>
+        <path d="M140 230C190 200 230 70 290 62C360 54 420 120 500 170C580 212 680 226 760 230Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.6"/>
+        <line x1="140" y1="230" x2="140" y2="240" style="stroke:var(--text-dim);stroke-width:2"/><line x1="760" y1="230" x2="760" y2="240" style="stroke:var(--text-dim);stroke-width:2"/>
+        <line x1="290" y1="62" x2="290" y2="230" style="stroke:var(--accent-2);stroke-width:1.8;stroke-dasharray:5 4"/>
+        <line x1="355" y1="70" x2="355" y2="230" style="stroke:var(--bad);stroke-width:1.8;stroke-dasharray:5 4"/>
+        <g class="t-mono" text-anchor="middle"><text x="140" y="256">a 낙관 10주</text><text x="290" y="256" style="fill:var(--accent-2)">m 최빈 12주</text><text x="380" y="256" style="fill:var(--bad)">평균 ≈ 12.7주</text><text x="760" y="256">b 비관 18주</text></g>
+        <text x="560" y="120" class="t-dim">긴 꼬리: 암반 출현, 민원으로 반출 제한,</text>
+        <text x="560" y="140" class="t-dim">장마철 배수 문제, 계측 경보로 작업 중지</text>
+        <text x="110" y="100" class="t-dim">물리적 하한: 버팀보 4단 설치,</text>
+        <text x="110" y="120" class="t-dim">반출 장비 대수</text>
+        <path d="M520 130L470 150" style="stroke:var(--text-faint);fill:none" marker-end="url(#pt-ah)"/>
+      </svg>
+      <figcaption><b>그림 10-1.</b> P-B10 굴착 C(a 10, m 12, b 18주)의 기간 분포 개략. 최빈값 12주는 가장 자주 나오는 값일 뿐, 평균(PERT 약 12.7주)은 긴 꼬리 쪽으로 끌려간다. 확정 공정표에 12주를 쓰면 평균보다 0.7주 낙관적인 셈이다.</figcaption>
+    </figure>
+    <div class="callout tip"><strong>3점을 묻는 법</strong> "보통 몇 주?"만 묻지 말고 "모든 것이 잘 풀리면?", "무엇이 잘못될 수 있고, 그러면?"을 차례로 묻습니다. 비관값은 "100번 중 1–5번 정도 일어날 나쁜 경우"로, 천재지변 같은 극단은 따로 위험 등록부(2장)에 둡니다. 담당자는 대개 범위를 좁게 말하는 경향(과신)이 있어, 과거 공사의 계획 대비 실적 비율로 보정하는 것이 좋습니다.</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="three-point">
+    <h2>3점 추정과 베타·삼각 분포</h2>
+    <div class="problem"><strong>세 숫자로 분포를 그리려면</strong>
+      <p>내부 마감 J에 대해 낙관 17주, 최빈 20주, 비관 28주를 받았습니다. 평균과 표준편차를 어떻게 정하고, 어떤 분포 모양을 가정해야 할까요?</p></div>
+    <div class="callout def"><strong>정의 10.1 (3점 추정)</strong> 활동 기간을 <span class="term">낙관 기간</span><span class="en">(optimistic duration)</span> \(a\), <span class="term">최빈 기간</span><span class="en">(most likely duration)</span> \(m\), <span class="term">비관 기간</span><span class="en">(pessimistic duration)</span> \(b\)의 세 값(\(a \le m \le b\))으로 나타내는 것을 <span class="term">3점 추정</span><span class="en">(three-point estimate)</span>이라 한다. \(a\)와 \(b\)는 분포의 끝(또는 끝 근처), \(m\)은 가장 자주 나오는 값(최빈값)이다.</div>
+    <div class="callout def"><strong>원리 10.2 (PERT 근사)</strong> <span class="term">PERT</span><span class="en">(program evaluation and review technique)</span>는 기간이 \([a, b]\) 위의 <span class="term">베타 분포</span><span class="en">(beta distribution)</span>를 따른다고 보고, 평균과 표준편차를 다음으로 근사한다.
+      <div class="formula">$$t_e = \frac{a + 4m + b}{6}, \qquad \sigma = \frac{b - a}{6}, \qquad \sigma^2 = \left(\frac{b - a}{6}\right)^2$$<div class="where">\(t_e\): <span class="term">기대 기간</span><span class="en">(expected duration)</span>. 최빈값에 4배 가중치를 준 가중 평균이다. "범위의 1/6이 표준편차"는 정규 분포의 ±3σ가 거의 모든 값을 덮는다는 데서 빌린 근사다. 이 평균을 정확히 주는 베타 분포의 모양 계수는 \(\alpha = 1 + 4\frac{m - a}{b - a}\), \(\beta = 1 + 4\frac{b - m}{b - a}\)(이른바 PERT-베타)이며, 그 정확한 표준편차는 \((b-a)/6\)과 조금 다르다(아래 시뮬레이터).</div></div></div>
+    <div class="callout def"><strong>정의 10.3 (삼각 분포)</strong> \(a\)에서 0, \(m\)에서 최대, \(b\)에서 다시 0이 되는 꺾은선 확률 밀도를 <span class="term">삼각 분포</span><span class="en">(triangular distribution)</span>라 한다.
+      <div class="formula">$$\mu_{tri} = \frac{a + m + b}{3}, \qquad \sigma_{tri}^2 = \frac{a^2 + m^2 + b^2 - ab - am - bm}{18}$$<div class="where">세 값을 똑같이 가중하므로 꼬리가 긴 추정에서 PERT보다 평균이 크고 흩어짐도 크다. 모양이 단순해 몬테카를로 표본을 뽑기 쉬워(<code>CB.pm.tri</code>) 공정 위험 분석 소프트웨어가 흔히 쓴다. 어느 분포가 "옳은지"는 자료로만 판단할 수 있으며, 같은 \((a, m, b)\)라도 분포 선택이 결과를 바꾼다는 점을 기억해야 한다(예제 10.4).</div></div></div>
+    <figure class="diagram" id="fig-pt-shapes">
+      <svg viewBox="0 0 860 260" role="img" aria-label="같은 a, m, b에 대한 PERT 베타 분포와 삼각 분포의 모양 비교, 왼쪽 치우침, 대칭, 오른쪽 치우침">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <line x1="0" y1="150" x2="230" y2="150" class="s-axis"/>
+          <path d="M0 150L46 20L230 150" style="fill:none;stroke:var(--accent-2);stroke-width:2;stroke-dasharray:5 3"/>
+          <path d="M0 150C10 90 30 18 56 22C90 28 140 120 230 150" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <text x="115" y="178" text-anchor="middle" class="t-mono">m 가까이 a: 오른쪽 꼬리</text>
+        </g>
+        <g transform="translate(315,40)">
+          <line x1="0" y1="150" x2="230" y2="150" class="s-axis"/>
+          <path d="M0 150L115 20L230 150" style="fill:none;stroke:var(--accent-2);stroke-width:2;stroke-dasharray:5 3"/>
+          <path d="M0 150C40 140 70 20 115 18C160 20 190 140 230 150" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <text x="115" y="178" text-anchor="middle" class="t-mono">대칭: 두 분포 평균 같음</text>
+        </g>
+        <g transform="translate(590,40)">
+          <line x1="0" y1="150" x2="230" y2="150" class="s-axis"/>
+          <path d="M0 150L184 20L230 150" style="fill:none;stroke:var(--accent-2);stroke-width:2;stroke-dasharray:5 3"/>
+          <path d="M0 150C90 120 140 28 174 22C200 18 220 90 230 150" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <text x="115" y="178" text-anchor="middle" class="t-mono">m 가까이 b: 왼쪽 꼬리(드묾)</text>
+        </g>
+        <g class="t-mono"><rect x="330" y="226" width="22" height="3" style="fill:var(--accent)"/><text x="358" y="231">PERT-베타</text><line x1="460" y1="228" x2="482" y2="228" style="stroke:var(--accent-2);stroke-width:2;stroke-dasharray:5 3"/><text x="488" y="231">삼각</text></g>
+      </svg>
+      <figcaption><b>그림 10-2.</b> 같은 \((a, m, b)\)에 대한 PERT-베타(실선)와 삼각(점선) 분포. 베타는 최빈값 근처에 더 몰리고 양 끝이 얇다. 건설 활동은 대부분 왼쪽 그림처럼 오른쪽 꼬리가 길고, 이때 삼각 분포의 평균이 PERT 평균보다 크다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-pt-dist">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>3점 추정 분포: a · m · b를 움직여 베타와 삼각 비교</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pt-cv-dist" aria-label="PERT 베타 분포와 삼각 분포의 확률 밀도, 평균과 표준편차 표시"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>P-B10 활동 불러오기</span><select id="pt-ds-act" aria-label="활동 선택"></select></div>
+          <label class="ctrl"><span>낙관 a <output id="pt-ds-a-out"></output></span><input type="range" id="pt-ds-a" min="1" max="40" step="0.5" value="17"></label>
+          <label class="ctrl"><span>최빈 m <output id="pt-ds-m-out"></output></span><input type="range" id="pt-ds-m" min="1" max="40" step="0.5" value="20"></label>
+          <label class="ctrl"><span>비관 b <output id="pt-ds-b-out"></output></span><input type="range" id="pt-ds-b" min="1" max="40" step="0.5" value="28"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">PERT t<sub>e</sub> · σ</span><span class="v" id="pt-ds-o-p">—</span></div>
+        <div class="stat"><span class="k">베타 정확 σ</span><span class="v" id="pt-ds-o-bs">—</span></div>
+        <div class="stat"><span class="k">삼각 평균 · σ</span><span class="v" id="pt-ds-o-t">—</span></div>
+        <div class="stat"><span class="k">P(≤ m) 베타 · 삼각</span><span class="v" id="pt-ds-o-m">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(J: 17, 20, 28)에서 PERT 평균 20.83주, 삼각 평균 21.67주를 확인하세요 · 최빈값 20주 안에 끝날 확률은 베타 약 0.38, 삼각 약 0.27로 둘 다 절반이 안 됩니다 · m을 a와 b의 한가운데로 옮기면 두 평균이 같아집니다 · b만 늘리면(비관이 깊어지면) 삼각 평균이 PERT보다 빠르게 커집니다 · 모델: 원리 10.2(PERT-베타, α = 1 + 4(m − a)/(b − a), β = 1 + 4(b − m)/(b − a)), 정의 10.3. a ≤ m ≤ b가 되도록 슬라이더가 서로 밀어낸다.</div>
+    </div>
+    <div class="callout"><strong>예제 10.1 (내부 마감 J의 3점 추정)</strong> \(a = 17\), \(m = 20\), \(b = 28\)주.
+      <p><b>① PERT</b> \(t_e = (17 + 80 + 28)/6 = 125/6 = 20.83\) 주, \(\sigma = (28 - 17)/6 = 1.83\) 주, \(\sigma^2 = 3.36\).</p>
+      <p><b>② 삼각</b> \(\mu = (17 + 20 + 28)/3 = 21.67\) 주. \(\sigma^2 = (289 + 400 + 784 - 476 - 340 - 560)/18 = 97/18 = 5.39\) → \(\sigma = 2.32\) 주.</p>
+      <p><b>③ 판단</b> 확정 공정표의 20주는 두 분포 모두에서 평균보다 작다(0.8–1.7주 낙관적). 분산은 삼각이 PERT의 1.6배다. 주공정 활동이 아홉 개라면 이런 차이가 쌓여 공기 전체에서 몇 주가 된다. 어떤 분포를 쓸지보다 더 중요한 것은 \(b\)를 정직하게 받는 일이다.</p></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="completion-probability">
+    <h2>주공정의 평균·분산과 완료 확률</h2>
+    <div class="problem"><strong>계약 공기 100주, 지킬 확률은</strong>
+      <p>발주자가 계약 공기를 100주로 제안합니다. 확정 공정표로는 93주이니 7주나 남는 것 같습니다. 그런데 각 활동의 기간이 흩어진다면 100주 안에 끝날 확률은 몇 %일까요?</p></div>
+    <div class="callout def"><strong>원리 10.4 (경로 공기의 정규 근사와 완료 확률)</strong> 주공정 위 활동 기간이 서로 독립이면 경로 공기의 평균과 분산은 각각 더해지고, 활동이 여러 개이면 <span class="term">중심 극한 정리</span><span class="en">(central limit theorem)</span>에 따라 경로 공기는 정규 분포에 가까워진다.
+      <div class="formula">$$\mu_T = \sum_{i \in CP} t_{e,i}, \qquad \sigma_T^2 = \sum_{i \in CP} \sigma_i^2, \qquad P(T \le T_s) = \Phi\!\left(\frac{T_s - \mu_T}{\sigma_T}\right)$$<div class="where">\(T_s\): 목표(계약) 공기, \(\Phi\): 표준 정규 누적 분포(<code>CB.pm.prob</code>). <span class="term">완료 확률</span><span class="en">(probability of completion)</span>이다. 거꾸로 신뢰도 \(p\)를 주면 필요한 공기는 \(T_p = \mu_T + z_p\sigma_T\)(\(z_{0.8} = 0.84\), \(z_{0.9} = 1.28\), \(z_{0.95} = 1.645\)). 표준편차는 더하지 않고 <b>분산을 더한 뒤 제곱근</b>한다는 점에 주의 — 9개 활동의 σ 합은 10.2주지만 경로의 σ는 3.3주다. 독립 가정이 깨지면(같은 장마가 여러 옥외 활동을 함께 늦춤) 실제 σ는 이보다 크다.</div></div></div>
+    <div class="table-wrap"><table class="pt-tbl">
+      <caption>표 10-1. P-B10의 3점 추정과 PERT 값(주, <code>CB.pm.B10</code>). 빨강은 확정 주공정.</caption>
+      <thead><tr><th>활동</th><th>a</th><th>m</th><th>b</th><th>t<sub>e</sub></th><th>σ</th><th>σ²</th><th>삼각 평균</th></tr></thead>
+      <tbody>
+        <tr><td class="pt-crit">A 착공·가설</td><td>3</td><td>4</td><td>6</td><td>4.17</td><td>0.50</td><td>0.25</td><td>4.33</td></tr>
+        <tr><td class="pt-crit">B 흙막이</td><td>8</td><td>10</td><td>15</td><td>10.50</td><td>1.17</td><td>1.36</td><td>11.00</td></tr>
+        <tr><td>D PHC 말뚝</td><td>5</td><td>6</td><td>9</td><td>6.33</td><td>0.67</td><td>0.44</td><td>6.67</td></tr>
+        <tr><td class="pt-crit">C 굴착·버팀보</td><td>10</td><td>12</td><td>18</td><td>12.67</td><td>1.33</td><td>1.78</td><td>13.33</td></tr>
+        <tr><td class="pt-crit">E 기초 매트</td><td>3</td><td>4</td><td>6</td><td>4.17</td><td>0.50</td><td>0.25</td><td>4.33</td></tr>
+        <tr><td class="pt-crit">F 지하 골조</td><td>7</td><td>8</td><td>11</td><td>8.33</td><td>0.67</td><td>0.44</td><td>8.67</td></tr>
+        <tr><td class="pt-crit">G1 골조 1–5층</td><td>13</td><td>15</td><td>20</td><td>15.50</td><td>1.17</td><td>1.36</td><td>16.00</td></tr>
+        <tr><td>G2 골조 6–10층</td><td>12</td><td>15</td><td>19</td><td>15.17</td><td>1.17</td><td>1.36</td><td>15.33</td></tr>
+        <tr><td class="pt-crit">H 커튼월</td><td>14</td><td>16</td><td>22</td><td>16.67</td><td>1.33</td><td>1.78</td><td>17.33</td></tr>
+        <tr><td>I 설비</td><td>26</td><td>30</td><td>38</td><td>30.67</td><td>2.00</td><td>4.00</td><td>31.33</td></tr>
+        <tr><td>K 옥상 방수</td><td>3</td><td>4</td><td>6</td><td>4.17</td><td>0.50</td><td>0.25</td><td>4.33</td></tr>
+        <tr><td class="pt-crit">J 내부 마감</td><td>17</td><td>20</td><td>28</td><td>20.83</td><td>1.83</td><td>3.36</td><td>21.67</td></tr>
+        <tr><td>L 조경·포장</td><td>5</td><td>6</td><td>9</td><td>6.33</td><td>0.67</td><td>0.44</td><td>6.67</td></tr>
+        <tr><td class="pt-crit">M 시운전·준공</td><td>3</td><td>4</td><td>6</td><td>4.17</td><td>0.50</td><td>0.25</td><td>4.33</td></tr>
+        <tr><td><b>주공정 합</b></td><td>78</td><td>93</td><td>132</td><td><b>97.00</b></td><td>—</td><td><b>10.83</b></td><td><b>101.0</b></td></tr>
+      </tbody>
+    </table></div>
+    <figure class="diagram" id="fig-pt-clt">
+      <svg viewBox="0 0 860 280" role="img" aria-label="주공정 아홉 활동의 분포를 더하면 정규 분포에 가까운 경로 공기 분포가 되고, 목표 공기 왼쪽 면적이 완료 확률">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <g style="fill:none;stroke:var(--accent);stroke-width:1.6">
+            <path d="M0 60C8 30 14 10 22 12C32 16 40 50 56 60"/><path d="M66 60C74 30 80 10 88 12C98 16 106 50 122 60"/><path d="M132 60C140 30 146 10 154 12C164 16 172 50 188 60"/>
+            <path d="M0 140C8 110 14 90 22 92C32 96 40 130 56 140"/><path d="M66 140C74 110 80 90 88 92C98 96 106 130 122 140"/><path d="M132 140C140 110 146 90 154 92C164 96 172 130 188 140"/>
+            <path d="M0 220C8 190 14 170 22 172C32 176 40 210 56 220"/><path d="M66 220C74 190 80 170 88 172C98 176 106 210 122 220"/><path d="M132 220C140 190 146 170 154 172C164 176 172 210 188 220"/>
+          </g>
+          <g class="t-mono" text-anchor="middle"><text x="28" y="76">A</text><text x="94" y="76">B</text><text x="160" y="76">C</text><text x="28" y="156">E</text><text x="94" y="156">F</text><text x="160" y="156">G1</text><text x="28" y="236">H</text><text x="94" y="236">J</text><text x="160" y="236">M</text></g>
+        </g>
+        <text x="270" y="140" class="t" style="font-size:22px">Σ</text>
+        <path d="M300 136H350" style="stroke:var(--text-dim);stroke-width:2;fill:none" marker-end="url(#pt-ah)"/>
+        <g transform="translate(380,30)">
+          <line x1="0" y1="200" x2="440" y2="200" class="s-axis"/>
+          <path d="M0 200C80 199 130 190 170 150C200 112 210 30 230 30C250 30 260 112 290 150C330 190 380 199 440 200" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <path d="M0 200C80 199 130 190 170 150C200 112 210 30 230 30C250 30 260 112 290 150C305 168 310 172 316 176V200Z" style="fill:var(--accent-soft)"/>
+          <line x1="230" y1="30" x2="230" y2="200" style="stroke:var(--accent-2);stroke-dasharray:5 4;stroke-width:1.6"/>
+          <line x1="316" y1="60" x2="316" y2="200" style="stroke:var(--bad);stroke-width:2"/>
+          <line x1="150" y1="60" x2="150" y2="200" style="stroke:var(--text-dim);stroke-width:1.6;stroke-dasharray:3 3"/>
+          <g class="t-mono" text-anchor="middle"><text x="230" y="218" style="fill:var(--accent-2)">μ 97</text><text x="316" y="218" style="fill:var(--bad)">T<tspan dy="3" font-size="9">s</tspan><tspan dy="-3"> 100</tspan></text><text x="150" y="218">93</text></g>
+          <text x="316" y="52" text-anchor="middle" class="t-mono" style="fill:var(--bad)">P = Φ(0.91) ≈ 0.82</text>
+          <text x="80" y="120" class="t-mono">σ = √10.83 = 3.29</text>
+          <text x="150" y="240" text-anchor="middle" class="t-mono">P(≤ 93) ≈ 0.11</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-3.</b> 주공정 아홉 활동의 분포(왼쪽, 오른쪽 꼬리)를 더하면 경로 공기는 정규 분포에 가까워진다(원리 10.4). 목표 공기 왼쪽 면적이 완료 확률이다. 확정 공기 93주는 이 분포의 왼쪽 꼬리에 있다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-pt-prob">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>완료 확률 계산기: 목표 공기 → 정규 곡선 아래 면적</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pt-cv-prob" aria-label="경로 공기의 정규 분포와 목표 공기까지 칠한 면적"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>목표 공기 T<sub>s</sub></span> <output id="pt-pr-t-out"></output></span><input type="range" id="pt-pr-t" min="85" max="112" step="0.5" value="100"></label>
+          <div class="ctrl"><span>경로</span><div class="seg" id="pt-pr-src"><button data-value="h" class="on">H 경로(주공정)</button><button data-value="g2">G2 경로</button><button data-value="u">직접</button></div></div>
+          <label class="ctrl"><span>평균 μ <output id="pt-pr-m-out"></output></span><input type="range" id="pt-pr-m" min="80" max="110" step="0.5" value="97"></label>
+          <label class="ctrl"><span>표준편차 σ <output id="pt-pr-s-out"></output></span><input type="range" id="pt-pr-s" min="0.5" max="10" step="0.01" value="3.29"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">z = (T<sub>s</sub> − μ)/σ</span><span class="v" id="pt-pr-o-z">—</span></div>
+        <div class="stat"><span class="k">완료 확률</span><span class="v" id="pt-pr-o-p">—</span></div>
+        <div class="stat"><span class="k">P(≤ 93주)</span><span class="v" id="pt-pr-o-93">—</span></div>
+        <div class="stat"><span class="k">P80 · P90 공기</span><span class="v" id="pt-pr-o-q">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: H 경로(μ 97, σ 3.29)에서 100주의 완료 확률 약 82 %, 93주는 약 11 %를 확인하세요 · G2 경로(μ 95.5, σ 3.23)는 100주에서 약 92 %로, 따로 보면 H 경로보다 안전해 보입니다 — 그러나 둘 다 지켜져야 하므로 실제 확률은 두 값보다 낮습니다(다음 절) · σ를 두 배로 하면 P80 공기가 얼마나 늘어나는지 보세요 · 모델: 원리 10.4, <code>CB.pm.pert</code>, <code>CB.pm.prob</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 10.2 (P-B10의 PERT 완료 확률)</strong> 표 10-1의 주공정 A–B–C–E–F–G1–H–J–M.
+      <p><b>① 평균</b> \(\mu_T = 4.17 + 10.50 + 12.67 + 4.17 + 8.33 + 15.50 + 16.67 + 20.83 + 4.17 = 97.0\) 주.</p>
+      <p><b>② 분산</b> \(\sigma_T^2 = 0.25 + 1.36 + 1.78 + 0.25 + 0.44 + 1.36 + 1.78 + 3.36 + 0.25 = 10.83\) → \(\sigma_T = 3.29\) 주.</p>
+      <p><b>③ 확률</b> 100주: \(z = (100 - 97)/3.29 = 0.91\) → \(P = \Phi(0.91) = 0.82\). 93주: \(z = -1.22\) → \(P = 0.11\). 80 % 신뢰 공기: \(97 + 0.84\times3.29 = 99.8\) 주.</p>
+      <p><b>④ 판단</b> 확정 공정표의 93주는 PERT로 보아도 11 % 확률의 약속이다. 계약 공기 100주는 PERT로 82 %다. 다만 이 값은 G2 경로(평균 95.5주)를 무시했고 베타 분포를 가정했으므로 낙관적이다 — 다음 두 절에서 고친다.</p></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="merge-bias">
+    <h2>PERT의 한계: 합류 편향</h2>
+    <div class="problem"><strong>두 경로 모두 평균 50주, 50주 안에 끝날 확률은</strong>
+      <p>평균 50주, 표준편차 4주인 두 독립 경로가 마지막 활동 앞에서 만납니다. 각 경로가 50주 안에 끝날 확률은 50 %입니다. 프로젝트가 50주 안에 끝날 확률도 50 %일까요?</p></div>
+    <p>PERT는 확정 주공정 하나만 보고 확률을 계산합니다. 그러나 합류점의 착수는 <b>들어오는 경로들의 최대값</b>이 정합니다(원리 9.4). 여러 확률 변수의 최대값은 각 평균의 최대값보다 크거나 같습니다. 두 경로가 모두 50주 안에 끝나야 하므로 확률은 \(0.5\times0.5 = 0.25\)이고, 공기 분포 전체가 오른쪽으로 밀립니다. 이것이 <span class="term">합류 편향</span><span class="en">(merge bias)</span>입니다.</p>
+    <div class="callout def"><strong>원리 10.5 (합류 편향)</strong> 합류점에 들어오는 독립 경로 공기 \(T_1, \dots, T_n\)에 대해
+      <div class="formula">$$P\big(\max_k T_k \le t\big) = \prod_{k=1}^{n} P(T_k \le t), \qquad E\big[\max_k T_k\big] \ge \max_k E[T_k]$$<div class="where">같은 정규 분포 \(N(\mu, \sigma^2)\)인 경로 두 개면 \(E[\max] = \mu + \sigma/\sqrt{\pi} \approx \mu + 0.56\sigma\). 편향은 병렬 경로가 많을수록, 경로들의 평균이 비슷할수록(여유가 작을수록), 흩어짐이 클수록 커진다. 여유가 σ의 몇 배 이상인 경로는 거의 기여하지 않는다. PERT의 확정 주공정 확률은 그래서 늘 낙관적이며, 이를 바로잡는 가장 일반적인 방법이 몬테카를로 시뮬레이션이다.</div></div></div>
+    <figure class="diagram" id="fig-pt-merge">
+      <svg viewBox="0 0 860 270" role="img" aria-label="두 경로가 합류하는 네트워크와, 각 경로 분포보다 오른쪽으로 밀린 최대값 분포">
+        <rect x="10" y="10" width="840" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(30,60)">
+          <rect x="0" y="50" width="60" height="36" rx="6" class="f-elev"/><text x="30" y="73" text-anchor="middle" class="t-mono" style="fill:var(--text)">G1</text>
+          <rect x="110" y="0" width="70" height="36" rx="6" style="fill:var(--bg-elev);stroke:var(--accent-2)"/><text x="145" y="23" text-anchor="middle" class="t-mono" style="fill:var(--text)">G2 15.2</text>
+          <rect x="110" y="100" width="70" height="36" rx="6" style="fill:var(--bg-elev);stroke:var(--bad)"/><text x="145" y="123" text-anchor="middle" class="t-mono" style="fill:var(--text)">H 16.7</text>
+          <rect x="230" y="50" width="60" height="36" rx="6" class="f-elev"/><text x="260" y="73" text-anchor="middle" class="t-mono" style="fill:var(--text)">J</text>
+          <g style="stroke:var(--text-dim);stroke-width:1.5;fill:none" marker-end="url(#pt-ah)"><path d="M60 62L108 22"/><path d="M60 76L108 116"/><path d="M180 22L228 62"/><path d="M180 116L228 76"/></g>
+          <text x="145" y="170" text-anchor="middle" class="t-dim">J 착수 = max(G2 끝, H 끝)</text>
+        </g>
+        <g transform="translate(380,30)">
+          <line x1="0" y1="190" x2="440" y2="190" class="s-axis"/>
+          <path d="M20 190C90 188 120 120 160 50C180 20 200 20 220 50C260 120 290 188 360 190" style="fill:none;stroke:var(--text-dim);stroke-width:2;stroke-dasharray:5 3"/>
+          <path d="M60 190C130 188 170 110 210 40C228 14 250 14 270 50C310 120 340 186 420 190" style="fill:none;stroke:var(--accent);stroke-width:2.8"/>
+          <line x1="190" y1="20" x2="190" y2="190" style="stroke:var(--text-dim);stroke-dasharray:3 3"/>
+          <line x1="244" y1="20" x2="244" y2="190" style="stroke:var(--accent);stroke-dasharray:3 3"/>
+          <g class="t-mono" text-anchor="middle"><text x="190" y="208">μ (각 경로)</text><text x="262" y="226" style="fill:var(--accent)">E[max] = μ + 0.56σ</text></g>
+          <text x="330" y="80" class="t-mono" style="fill:var(--accent)">max 분포</text>
+          <text x="30" y="80" class="t-mono">각 경로</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-4.</b> 합류 편향. P-B10에서 J는 G2 경로와 H 경로가 만나는 곳이다. 두 경로의 평균 차이가 PERT로 1.2주(97.0 vs 95.5)에 불과하고 σ는 각각 약 3.3주라, G2 경로가 더 늦게 끝나는 경우가 적지 않다. 같은 평균의 두 경로라면 최대값의 평균은 0.56σ만큼 오른쪽으로 간다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-pt-merge">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>합류 편향 실험: 병렬 경로 수 → 최대값 분포</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pt-cv-merge" aria-label="한 경로의 정규 분포와 여러 병렬 경로의 최대값 분포 비교"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>병렬 경로 수 n <output id="pt-mg-n-out"></output></span><input type="range" id="pt-mg-n" min="1" max="10" step="1" value="2"></label>
+          <label class="ctrl"><span>경로 σ <output id="pt-mg-s-out"></output></span><input type="range" id="pt-mg-s" min="1" max="8" step="0.1" value="4"></label>
+          <label class="ctrl"><span>다른 경로의 여유 Δ <output id="pt-mg-d-out"></output></span><input type="range" id="pt-mg-d" min="0" max="15" step="0.5" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">P(T ≤ μ)</span><span class="v" id="pt-mg-o-p">—</span></div>
+        <div class="stat"><span class="k">E[max] − μ</span><span class="v" id="pt-mg-o-e">—</span></div>
+        <div class="stat"><span class="k">P80: 한 경로 → max</span><span class="v" id="pt-mg-o-q">—</span></div>
+        <div class="stat"><span class="k">주경로가 마지막일 확률</span><span class="v" id="pt-mg-o-c">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: n = 2, Δ = 0에서 P(T ≤ μ) = 0.25, E[max] − μ = 0.56σ = 2.26주를 확인하세요 · n을 10까지 늘리면 P(T ≤ μ)는 0.1 %, 평균은 1.5σ 이상 밀립니다 · Δ를 σ의 2배(8주)로 두면 다른 경로가 거의 기여하지 않습니다 — 여유가 큰 경로는 걱정할 필요가 없고, 여유가 작은 경로가 위험합니다 · 모델: 원리 10.5, 주경로 N(μ = 50, σ²)과 평균이 Δ만큼 작은 n − 1개의 독립 정규 경로, 최대값 분포는 해석해(누적 분포의 곱)로 수치 적분.</div>
+    </div>
+    <div class="callout"><strong>예제 10.3 (두 경로의 합류)</strong> 독립 경로 \(T_1, T_2 \sim N(50, 4^2)\).
+      <p><b>① 50주 완료 확률</b> \(0.5\times0.5 = 0.25\). PERT는 0.5라고 말한다.</p>
+      <p><b>② 평균</b> \(E[\max] = 50 + 4/\sqrt{\pi} = 52.26\) 주.</p>
+      <p><b>③ 80 % 공기</b> 한 경로: \(50 + 0.84\times4 = 53.4\). 두 경로: \(\Phi(z)^2 = 0.8\) → \(\Phi(z) = 0.894\) → \(z = 1.25\) → 55.0주. <b>판단</b>: 같은 신뢰도에 1.6주가 더 필요하다. 여유가 작은 병렬 경로(P-B10의 G2)는 "여유 1주"가 아니라 "주공정과 거의 같은 위험"으로 관리해야 한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="monte-carlo">
+    <h2>몬테카를로 공정 위험 분석</h2>
+    <div class="problem"><strong>합류점이 여럿, 분포도 제각각이면</strong>
+      <p>P-B10에는 E·J·M 세 합류점이 있고, 활동마다 꼬리 모양이 다릅니다. 원리 10.5를 손으로 적용하기는 어렵습니다. 공정표를 수천 번 "실제로 지어 보면" 어떨까요?</p></div>
+    <p><span class="term">몬테카를로 시뮬레이션</span><span class="en">(Monte Carlo simulation)</span>은 1940년대 로스앨러모스에서 핵무기 개발 중 확률 계산에 쓰기 시작한, 난수로 표본을 뽑아 반복 계산하는 방법으로 알려져 있습니다. 공정 위험 분석에서는 아래 순서를 수천 번 되풀이합니다.</p>
+    <figure class="diagram" id="fig-pt-mcflow">
+      <svg viewBox="0 0 860 220" role="img" aria-label="몬테카를로 공정 위험 분석의 순서: 기간 표본 뽑기, CPM 계산, 공기와 주공정 기록, 반복, 분포 집계">
+        <rect x="10" y="10" width="840" height="200" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="50" width="160" height="70" rx="10" class="f-elev"/><text x="110" y="78" style="fill:var(--text);font-weight:700">① 표본 뽑기</text><text x="110" y="100">활동마다 d ~ (a, m, b)</text>
+          <rect x="230" y="50" width="160" height="70" rx="10" class="f-elev"/><text x="310" y="78" style="fill:var(--text);font-weight:700">② CPM 계산</text><text x="310" y="100">전진·후진(9장)</text>
+          <rect x="430" y="50" width="160" height="70" rx="10" class="f-elev"/><text x="510" y="78" style="fill:var(--text);font-weight:700">③ 기록</text><text x="510" y="100">공기 T, 주공정 활동</text>
+          <rect x="630" y="50" width="200" height="70" rx="10" class="f-acc-soft"/><text x="730" y="78" style="fill:var(--text);font-weight:700">④ 집계(N회 뒤)</text><text x="730" y="100">히스토그램·P50·P80·지수</text>
+        </g>
+        <g style="stroke:var(--accent);stroke-width:2;fill:none" marker-end="url(#pt-ah-acc)"><path d="M190 85H226"/><path d="M390 85H426"/><path d="M590 85H626"/></g>
+        <path d="M510 120V160H110V124" style="stroke:var(--text-dim);stroke-width:1.6;fill:none;stroke-dasharray:5 4" marker-end="url(#pt-ah)"/>
+        <text x="310" y="178" text-anchor="middle" class="t-dim">N번 반복(예: 2,000회) — 매번 주공정이 다를 수 있다</text>
+      </svg>
+      <figcaption><b>그림 10-5.</b> 몬테카를로 공정 위험 분석(<code>CB.pm.monteCarlo</code>). 매 반복이 "있을 법한 한 번의 공사"이며, 합류점의 최대값과 주공정의 이동이 자동으로 반영된다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 10.6 (백분위 공기와 주공정 지수)</strong> \(N\)번 반복한 공기 \(T^{(1)}, \dots, T^{(N)}\)의 경험 누적 분포에서
+      <div class="formula">$$P_p = \text{공기 } T \text{의 } p\text{ 백분위}, \qquad CI_i = \frac{\#\{k : i \in CP^{(k)}\}}{N}$$<div class="where"><span class="term">백분위 공기</span><span class="en">(percentile duration)</span> \(P_{80}\)은 80 % 확률로 그 안에 끝나는 공기다(P50은 중앙값). 실무에서 계약·목표 공기를 정할 때 P80 정도를 흔히 쓴다(조직의 위험 성향에 따름). <span class="term">주공정 지수</span><span class="en">(criticality index)</span> \(CI_i\)는 반복 중 활동 \(i\)가 주공정에 든 비율이다. 확정 CPM은 활동을 주공정(1)과 비주공정(0)으로 가르지만, 몬테카를로는 그 사이의 값을 준다. 반복 수 \(N\)이 작으면 꼬리의 백분위가 흔들리므로 P80·P90에는 보통 1,000–5,000회를 쓴다.</div></div></div>
+    <div class="sim" id="sim-pt-mc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>P-B10 몬테카를로: 공기 분포 · 누적 곡선 · 주공정 지수</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pt-cv-mc" aria-label="P-B10 몬테카를로 공기 히스토그램, 누적 곡선, P50과 P80, PERT 정규 곡선"></canvas><canvas id="pt-cv-mcci" aria-label="P-B10 활동별 주공정 지수 막대"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>반복 수 N</span><div class="seg" id="pt-mc-n"><button data-value="500">500</button><button data-value="2000" class="on">2,000</button><button data-value="5000">5,000</button></div></div>
+          <label class="ctrl"><span>난수 시드 <output id="pt-mc-seed-out"></output></span><input type="range" id="pt-mc-seed" min="1" max="50" step="1" value="7"></label>
+          <div class="ctrl"><span>기간 분포</span><div class="seg" id="pt-mc-dist"><button data-value="tri" class="on">삼각</button><button data-value="beta">PERT-베타</button></div></div>
+          <label class="ctrl"><span>비관 꼬리 배율 k <output id="pt-mc-k-out"></output></span><input type="range" id="pt-mc-k" min="0.5" max="2" step="0.1" value="1"></label>
+          <label class="ctrl"><span>H 커튼월 최빈 m <output id="pt-mc-h-out"></output></span><input type="range" id="pt-mc-h" min="14" max="20" step="0.5" value="16"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평균 · σ</span><span class="v" id="pt-mc-o-m">—</span></div>
+        <div class="stat"><span class="k">P50 · P80</span><span class="v" id="pt-mc-o-q">—</span></div>
+        <div class="stat"><span class="k">P(≤ 93) · P(≤ 100)</span><span class="v" id="pt-mc-o-p">—</span></div>
+        <div class="stat"><span class="k">주공정 지수 G2 · H</span><span class="v" id="pt-mc-o-c">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(삼각, 2,000회, 시드 7)에서 평균 약 101주, P80 약 105주, G2의 주공정 지수 약 0.2, H 약 0.8을 확인하세요 · 분포를 PERT-베타로 바꾸면 평균이 약 97주로 내려옵니다 — 97주와 101주의 차이 대부분은 분포 선택이고, 합류 편향은 약 0.3주입니다(예제 10.4) · 시드를 바꾸면 P80이 몇 십분의 1주씩 흔들리고, N = 500에서는 더 크게 흔들립니다 · H의 최빈값을 14주로 내려도 G2의 지수는 약 0.3에 그칩니다 — H의 비관 꼬리(b = 22주)가 그대로이기 때문입니다 · k = 1.5(비관값을 50 % 깊게)면 P80이 약 113주로 뜁니다 · 모델: <code>CB.pm.monteCarlo</code>(삼각, <code>CB.pm.tri</code>), PERT-베타는 감마 표본으로 만든 페이지 계산(교육용). 비관 꼬리 배율은 b′ = m + k(b − m). 입력이 바뀔 때만 다시 계산한다.</div>
+    </div>
+    <figure class="diagram" id="fig-pt-scurve">
+      <svg viewBox="0 0 860 260" role="img" aria-label="공기 누적 확률 곡선에서 P50과 P80 읽기">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <line x1="90" y1="210" x2="800" y2="210" class="s-axis"/><line x1="90" y1="210" x2="90" y2="30" class="s-axis"/>
+        <path d="M110 208C220 206 300 190 380 140C440 100 480 70 540 52C600 38 680 33 790 32" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+        <line x1="90" y1="121" x2="398" y2="121" style="stroke:var(--accent-2);stroke-dasharray:5 4;stroke-width:1.6"/><line x1="398" y1="121" x2="398" y2="210" style="stroke:var(--accent-2);stroke-dasharray:5 4;stroke-width:1.6"/>
+        <line x1="90" y1="66" x2="502" y2="66" style="stroke:var(--bad);stroke-dasharray:5 4;stroke-width:1.6"/><line x1="502" y1="66" x2="502" y2="210" style="stroke:var(--bad);stroke-dasharray:5 4;stroke-width:1.6"/>
+        <line x1="190" y1="190" x2="190" y2="210" style="stroke:var(--text-dim);stroke-width:2"/>
+        <g class="t-mono" text-anchor="end"><text x="84" y="214">0</text><text x="84" y="125">0.5</text><text x="84" y="70">0.8</text><text x="84" y="36">1</text></g>
+        <g class="t-mono" text-anchor="middle"><text x="190" y="228">93 (확정, 약 2 %)</text><text x="398" y="228" style="fill:var(--accent-2)">P50 ≈ 101</text><text x="502" y="244" style="fill:var(--bad)">P80 ≈ 105</text></g>
+        <text x="560" y="130" class="t-dim">세로축: 그 공기 안에 끝날 확률</text>
+        <text x="560" y="150" class="t-dim">가로축: 공기(주)</text>
+      </svg>
+      <figcaption><b>그림 10-6.</b> P-B10 몬테카를로(삼각) 공기의 누적 확률 곡선(개략). 원하는 확률(세로)에서 수평으로 가 곡선과 만나는 공기(가로)를 읽는다. 위험 분석에서는 이 곡선을 흔히 S 곡선이라 부르지만, 13장의 비용 S 곡선과는 다른 것이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 10.4 (PERT 97주와 몬테카를로 101주의 차이 분해)</strong> 같은 3점 추정으로 PERT는 97주, 몬테카를로(삼각, 2,000회)는 101.3주를 준다. 무엇이 4주를 만들었나?
+      <p><b>① 분포의 차이</b> 확정 주공정 아홉 활동의 삼각 평균을 더하면 \(4.33 + 11.00 + 13.33 + 4.33 + 8.67 + 16.00 + 17.33 + 21.67 + 4.33 = 101.0\) 주. 꼬리가 긴 추정에서 \((a + m + b)/3\)이 \((a + 4m + b)/6\)보다 크기 때문에 생긴 약 4.0주가 차이의 대부분이다.</p>
+      <p><b>② 합류 편향</b> 몬테카를로 평균 101.3주 − 주공정 하나의 평균 101.0주 ≈ 0.3주. PERT-베타로 표본을 뽑아도 평균은 약 97.2주로, PERT 97.0주보다 약 0.2주 크다. G2 경로가 약 20 %의 경우에 주공정이 되며 생긴 몫이다.</p>
+      <p><b>③ 흩어짐</b> 몬테카를로의 σ는 약 4.1주(삼각), PERT의 3.3주보다 크다. P80은 약 104.6주, 100주 완료 확률은 약 39 %(PERT는 82 %), 93주는 약 2 %.</p>
+      <p><b>④ 판단</b> "몬테카를로가 길게 나오는 것은 합류 편향 때문"이라는 설명은 P-B10에서는 절반의 진실도 못 된다. 이 공정표에서는 병렬 경로의 여유가 작은 곳이 G2 하나뿐이라 합류 편향은 작고, <b>꼬리를 어떤 분포로 표현하느냐</b>가 결과를 좌우한다. 분포 가정은 위험 분석 보고서에 반드시 밝히고, 가능하면 과거 공사의 계획 대비 실적 자료로 고른다. 병렬 경로가 여럿이고 여유가 비슷한 공정표(예: 여러 동을 동시에 짓는 단지 공사)에서는 합류 편향이 훨씬 커진다.</p></div>
+    <div class="callout site"><strong>P-B10 공기 위험 요약</strong> 확정 CPM 93주(9장). PERT(주공정 하나, 베타 근사): 평균 97.0주, σ 3.3주, 100주 완료 확률 82 %. 몬테카를로(삼각, 2,000회, 시드 7): 평균 약 101주, σ 약 4.1주, P50 약 101주, P80 약 105주, 93주 완료 확률 약 2 %. 주공정 지수: A·B·C·E·F·G1·J·M은 1, H 약 0.8, G2 약 0.2, 나머지(D·I·K·L) 0. 결론: 계약 공기 협의는 P80 약 105주를 기준으로, 확정 93주는 내부 목표(도전 일정)로 쓰고 그 차이를 버퍼로 관리한다(아래 절). 모든 값은 교육용 3점 추정에서 나온 것이다.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="sensitivity">
+    <h2>어느 활동이 위험을 만드나: 토네이도 차트</h2>
+    <div class="problem"><strong>위험 관리 예산은 어디에</strong>
+      <p>공기 위험을 줄이는 데 쓸 예산이 있습니다. 내부 마감 J의 작업조를 예비로 확보할까요, 커튼월 H의 유닛을 미리 제작할까요, 설비 I의 범위를 좁힐까요? 공기 분포에 가장 크게 기여하는 활동부터 다뤄야 합니다.</p></div>
+    <div class="callout def"><strong>정의 10.7 (민감도와 토네이도 차트)</strong> <span class="term">민감도 분석</span><span class="en">(sensitivity analysis)</span>은 입력 하나를 바꿀 때 출력(공기)이 얼마나 변하는지 본다. ① <b>범위 스윙</b>: 활동 \(i\)만 \(a_i\)와 \(b_i\)로 바꾸고 나머지는 최빈값에 둔 공기의 폭 \(T(b_i) - T(a_i)\). ② <b>상관 계수</b>: 몬테카를로 반복에서 활동 기간 \(d_i\)와 공기 \(T\)의 상관 계수. 활동별 막대를 큰 것부터 위에서 아래로 늘어놓은 그림이 회오리 모양이라 <span class="term">토네이도 차트</span><span class="en">(tornado chart)</span>라 한다.</div>
+    <div class="sim" id="sim-pt-tornado">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>토네이도 차트: 활동별 공기 위험 기여</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pt-cv-tor" aria-label="P-B10 활동별 공기 스윙 또는 상관 계수를 큰 순서로 늘어놓은 토네이도 차트"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>방법</span><div class="seg" id="pt-tr-m"><button data-value="swing" class="on">범위 스윙(a ↔ b)</button><button data-value="corr">몬테카를로 상관</button></div></div>
+          <label class="ctrl"><span>J 내부 마감의 비관 b <output id="pt-tr-j-out"></output></span><input type="range" id="pt-tr-j" min="20" max="36" step="1" value="28"></label>
+          <label class="ctrl"><span>H 커튼월의 비관 b <output id="pt-tr-h-out"></output></span><input type="range" id="pt-tr-h" min="16" max="30" step="1" value="22"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">1위 활동</span><span class="v" id="pt-tr-o-1">—</span></div>
+        <div class="stat"><span class="k">2위 활동</span><span class="v" id="pt-tr-o-2">—</span></div>
+        <div class="stat"><span class="k">영향 없는 활동</span><span class="v" id="pt-tr-o-0">—</span></div>
+        <div class="stat"><span class="k">기준 공기</span><span class="v" id="pt-tr-o-t">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 범위 스윙에서 J(−3/+8주)가 1위, C·H(+6주)가 뒤따르는 것을 보세요 · H의 막대는 왼쪽이 −1주뿐입니다 — H가 빨라지면 G2 경로가 주공정이 되어 이득이 막힙니다(비대칭) · D·I·K·L은 범위 끝까지 가도 공기를 바꾸지 못합니다 · J의 비관값을 24주로 줄이면(예비 작업조 확보) 순위가 바뀝니다 · 상관 방법으로 바꾸면 G2처럼 가끔만 주공정이 되는 활동이 작은 양의 값을 갖습니다 · 모델: 정의 10.7, 스윙은 <code>CB.pm.cpm</code> 28회, 상관은 삼각 분포 2,000회(시드 7) 페이지 계산.</div>
+    </div>
+    <div class="callout tip"><strong>위험 대응의 네 가지</strong> 토네이도 차트 위쪽 활동부터 대응을 정합니다(2장 위험 관리와 같은 틀). <b>회피</b>: 위험이 큰 공법을 바꿈(역타 공법으로 C와 G1을 겹침). <b>전가</b>: 계약·보험으로 넘김(커튼월 지연 손해 배상 조항). <b>완화</b>: 확률이나 영향을 줄임(커튼월 유닛 선제작, 마감 예비 작업조, 지반 추가 조사). <b>수용</b>: 버퍼로 감당(아래 절). 대응에는 비용이 들므로 "줄어드는 P80 1주의 가치"(지체상금, 간접비, 임대 수익)와 비교합니다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="buffer">
+    <h2>일정 버퍼와 위험 대응</h2>
+    <div class="problem"><strong>93주로 계획하고 몇 주를 더 약속하나</strong>
+      <p>현장 소장은 작업자들에게 93주 공정표를 목표로 주고 싶어 합니다. 그러나 발주자와는 지킬 수 있는 날짜를 약속해야 합니다. 둘 사이의 간격, 즉 버퍼를 몇 주로 해야 할까요?</p></div>
+    <p><span class="term">일정 버퍼</span><span class="en">(schedule buffer)</span>는 불확실성에 대비해 공정표에 명시적으로 넣는 시간입니다. 활동마다 몰래 여유를 넣으면(관리자들이 "넉넉히" 말한 기간) 그 시간은 거의 다 쓰입니다. 일이 일찍 끝나도 다음 일을 일찍 시작하지 않거나(<span class="term">파킨슨 법칙</span><span class="en">(Parkinson's law)</span>: 일은 주어진 시간을 채울 때까지 늘어난다), 여유가 있으니 마감 직전에 시작하기(<span class="term">학생 증후군</span><span class="en">(student syndrome)</span>) 때문입니다. 골드랫(E. M. Goldratt)이 1997년 『Critical Chain』에서 제안한 <span class="term">핵심 연쇄 프로젝트 관리</span><span class="en">(critical chain project management, CCPM)</span>는 활동 기간을 공격적인 값(대략 중앙값)으로 줄이고, 줄인 안전 시간을 모아 프로젝트 끝에 <span class="term">프로젝트 버퍼</span><span class="en">(project buffer)</span>로, 비주공정 경로가 주공정에 합류하는 곳에 <span class="term">합류 버퍼</span><span class="en">(feeding buffer)</span>로 둡니다. 모은 버퍼는 활동별 여유의 합보다 작아도 됩니다 — 모든 활동이 동시에 비관값으로 가지는 않기 때문입니다(분산의 합, 원리 10.4).</p>
+    <figure class="diagram" id="fig-pt-ccpm">
+      <svg viewBox="0 0 860 240" role="img" aria-label="활동마다 숨긴 안전 시간과, 공격적 기간 뒤에 모은 프로젝트 버퍼와 합류 버퍼 비교">
+        <rect x="10" y="10" width="840" height="220" rx="10" class="f-surface"/>
+        <text x="30" y="44" class="t" style="font-weight:700">숨긴 안전 시간</text>
+        <g transform="translate(30,56)">
+          <rect x="0" y="0" width="90" height="22" style="fill:var(--accent)"/><rect x="90" y="0" width="40" height="22" style="fill:var(--accent);opacity:.35"/>
+          <rect x="130" y="0" width="140" height="22" style="fill:var(--accent)"/><rect x="270" y="0" width="60" height="22" style="fill:var(--accent);opacity:.35"/>
+          <rect x="330" y="0" width="110" height="22" style="fill:var(--accent)"/><rect x="440" y="0" width="50" height="22" style="fill:var(--accent);opacity:.35"/>
+          <text x="510" y="16" class="t-mono">각 활동이 자기 안전 시간을 다 씀 → 길다</text>
+        </g>
+        <text x="30" y="124" class="t" style="font-weight:700">CCPM</text>
+        <g transform="translate(30,136)">
+          <rect x="0" y="0" width="90" height="22" style="fill:var(--bad)"/><rect x="90" y="0" width="140" height="22" style="fill:var(--bad)"/><rect x="230" y="0" width="110" height="22" style="fill:var(--bad)"/>
+          <rect x="340" y="0" width="100" height="22" style="fill:none;stroke:var(--ok);stroke-width:2;stroke-dasharray:5 3"/><text x="390" y="15" text-anchor="middle" class="t-mono" style="fill:var(--ok)">프로젝트 버퍼</text>
+          <rect x="120" y="40" width="70" height="20" style="fill:var(--accent-2)"/><rect x="190" y="40" width="40" height="20" style="fill:none;stroke:var(--ok);stroke-width:2;stroke-dasharray:4 3"/>
+          <path d="M230 50H238V26" style="stroke:var(--text-dim);fill:none" marker-end="url(#pt-ah)"/>
+          <text x="250" y="56" class="t-mono" style="fill:var(--ok)">합류 버퍼</text>
+          <text x="510" y="16" class="t-mono">공격적 기간 + 모은 버퍼 → 짧고 관리 가능</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-7.</b> 활동마다 숨긴 안전 시간(위)과 CCPM의 모은 버퍼(아래, 개략). 버퍼를 얼마나 썼는지(버퍼 소비율)를 진척률과 함께 보며 관리한다 — 진척 50 %에 버퍼 70 %를 썼다면 경고.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 10.8 (버퍼 크기 정하기)</strong> 확정(또는 공격적) 공기 \(T_0\)에 목표 신뢰도 \(p\)의 공기를 맞추는 버퍼는
+      <div class="formula">$$B_p = T_p - T_0, \qquad T_p^{PERT} = \mu_T + z_p\,\sigma_T, \qquad T_p^{MC} = P_p, \qquad B_{SSQ} = \sqrt{\textstyle\sum_{i\in CP}\,(b_i - m_i)^2}$$<div class="where">PERT 방법은 정규 근사(합류 편향 무시), 몬테카를로 방법은 시뮬레이션 백분위, SSQ(제곱합 제곱근) 방법은 주공정 활동별 안전 시간(여기서는 \(b - m\)으로 두는 교육용 형태)을 분산처럼 합친 CCPM 계열의 경험식이다. 여러 방법의 값을 비교하고, 계약상 지체상금·간접비와 견주어 정한다.</div></div></div>
+    <div class="sim" id="sim-pt-buffer">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>버퍼 크기 정하기: 목표 신뢰도 → 버퍼 주수</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pt-cv-buf" aria-label="PERT 정규 누적 곡선과 몬테카를로 누적 곡선, 목표 신뢰도에서 읽은 공기와 버퍼"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>목표 신뢰도 p <output id="pt-bf-p-out"></output></span><input type="range" id="pt-bf-p" min="50" max="97" step="1" value="80"></label>
+          <div class="ctrl"><span>몬테카를로 분포</span><div class="seg" id="pt-bf-d"><button data-value="tri" class="on">삼각</button><button data-value="beta">PERT-베타</button></div></div>
+          <label class="ctrl"><span><span>기준 공기 T<sub>0</sub></span> <output id="pt-bf-t-out"></output></span><input type="range" id="pt-bf-t" min="88" max="100" step="1" value="93"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">PERT 버퍼</span><span class="v" id="pt-bf-o-pe">—</span></div>
+        <div class="stat"><span class="k">몬테카를로 버퍼</span><span class="v" id="pt-bf-o-mc">—</span></div>
+        <div class="stat"><span class="k">SSQ 버퍼(형태)</span><span class="v" id="pt-bf-o-ss">—</span></div>
+        <div class="stat"><span class="k">약속 공기(MC)</span><span class="v" id="pt-bf-o-c">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: p = 80 %에서 PERT 버퍼 약 6.8주, 몬테카를로(삼각) 약 11.6주를 비교하세요 · p를 95 %로 올리면 버퍼가 급격히 커집니다(꼬리) · 분포를 PERT-베타로 바꾸면 몬테카를로 버퍼가 PERT와 가까워집니다(합류 편향 몫만 남음) · SSQ는 신뢰도를 묻지 않는 경험식이라 초록 세로선이 움직이지 않습니다 · 모델: 정의 10.8, 몬테카를로는 2,000회(시드 7) 결과를 한 번 계산해 둔다.</div>
+    </div>
+    <div class="callout"><strong>예제 10.5 (P-B10의 80 % 버퍼)</strong> 기준 공기 93주, 목표 신뢰도 80 %.
+      <p><b>① PERT</b> \(T_{80} = 97.0 + 0.84\times3.29 = 99.8\) → 버퍼 6.8주.</p>
+      <p><b>② 몬테카를로(삼각)</b> \(P_{80} \approx 104.6\) → 버퍼 약 11.6주.</p>
+      <p><b>③ SSQ</b> 주공정의 \(b - m\): 2, 5, 6, 2, 3, 5, 6, 8, 2 → 제곱합 207 → \(\sqrt{207} = 14.4\) 주(이 형태는 보수적).</p>
+      <p><b>④ 판단</b> 세 값의 폭(7–14주)이 곧 "모델 위험"이다. 분포 가정이 불확실하므로 몬테카를로 값(약 12주)을 기준으로 약속 공기 약 105주를 제안하고, 현장에는 93주를 목표로 주며 버퍼 소비율을 월간 보고에 넣는다. 약속 공기를 줄이라는 요구가 오면 버퍼를 깎지 말고 토네이도 상위 활동(J, C, H)의 위험을 줄이는 대책과 그 비용을 함께 제시한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="weather">
+    <h2>날씨 위험: 달력에 묶인 불확실성</h2>
+    <div class="problem"><strong>3월 착공과 9월 착공, 같은 공정표인가</strong>
+      <p>P-B10을 3월에 착공하면 굴착·지하 골조가 장마철에 걸리고, 9월에 착공하면 지하 공사가 가을·겨울에, 지상 골조가 이듬해 봄에 걸립니다. 활동별 3점 추정에는 이 차이가 들어 있지 않습니다. 어떻게 반영할까요?</p></div>
+    <p>날씨는 활동마다 독립적인 불확실성이 아닙니다. 같은 장마가 그 시기의 <b>모든 옥외 활동을 함께</b> 늦추고(상관), 그 영향은 활동이 언제 진행되느냐에 달려 있습니다. 그래서 날씨는 활동 기간 분포에 섞어 넣기보다 <b>달력</b>으로 모델링하는 편이 낫습니다. 주마다 그 달의 <span class="term">기상 작업 불능일</span><span class="en">(weather non-working days)</span> 확률을 적용하고, 옥외 활동만 그만큼 진척을 잃게 합니다. 실무에서는 기상청 평년값(강수일수, 일 강수량 기준별 일수, 최저 기온, 풍속)과 공종별 작업 중지 기준(콘크리트 타설, 크레인 풍속 제한 등, 현행 시방·안전 기준 확인)을 결합합니다.</p>
+    <div class="sim" id="sim-pt-weather">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>날씨 위험: 착공 월과 장마 → 옥외 공종 지연(교육용)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="pt-cv-wx" aria-label="공사 기간 동안 주별 작업 불능 확률 막대, 옥외 활동 구간, 공기 분포 히스토그램"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>착공 월 <output id="pt-wx-s-out"></output></span><input type="range" id="pt-wx-s" min="1" max="12" step="1" value="3"></label>
+          <label class="ctrl"><span>강우일 중 작업 불능 비율 <output id="pt-wx-l-out"></output></span><input type="range" id="pt-wx-l" min="0" max="1" step="0.05" value="0.4"></label>
+          <label class="ctrl"><span>장마 강도(6–8월 배율) <output id="pt-wx-m-out"></output></span><input type="range" id="pt-wx-m" min="0.5" max="2" step="0.1" value="1"></label>
+          <label class="check"><input type="checkbox" id="pt-wx-c" checked> 동절기(12–2월) 콘크리트 공종 생산성 85 %</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평균 공기</span><span class="v" id="pt-wx-o-m">—</span></div>
+        <div class="stat"><span class="k">P80</span><span class="v" id="pt-wx-o-q">—</span></div>
+        <div class="stat"><span class="k">날씨 지연(평균)</span><span class="v" id="pt-wx-o-d">—</span></div>
+        <div class="stat"><span class="k">가장 나쁜 착공 월</span><span class="v" id="pt-wx-o-w">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 3월 착공(기본값)과 9월 착공의 평균 공기를 비교하세요(약 102주 vs 약 99주) · 3월 착공에서는 굴착 C·기초 E·지하 골조 F가 장마와 겹칩니다 · 장마 강도를 1.5로 올리면 3월 착공의 평균이 104주 근처로 늘어납니다 · 동절기 체크를 끄면 겨울에 골조가 걸리는 착공 월의 이점이 사라집니다 · 모델(교육용): 월별 강우일수 1–12월 3, 3, 5, 6, 6, 8, 14, 12, 7, 4, 5, 3일(교육용 가정값, 실제는 기상청 평년값 확인)을 30일로 나누고 작업 불능 비율을 곱한 값을 하루 작업 불능 확률로, 옥외 활동(A–H, K, L)만 주 5일 중 잃은 날만큼 진척을 잃는다. 기간의 3점 불확실성은 넣지 않았다(최빈값 기간). 400회 반복, 입력이 바뀔 때만 계산.</div>
+    </div>
+    <div class="callout"><strong>예제 10.6 (착공 월의 선택)</strong> 위 교육용 모형(작업 불능 비율 0.4, 장마 배율 1, 동절기 85 %).
+      <p><b>① 3월 착공</b> 평균 약 102주. 굴착(14–26주 = 6–9월)과 기초·지하 골조가 장마철에 걸린다.</p>
+      <p><b>② 9월 착공</b> 평균 약 99주. 지하 공사가 가을·겨울(강우 적음)에, 장마는 지상 골조 G1에 일부 걸린다. 동절기 생산성 저하가 지하 골조에 걸리지만 장마보다 작다.</p>
+      <p><b>③ 판단</b> 같은 공정표라도 착공 월에 따라 평균 공기가 약 3주 다르다. 착공 월을 바꿀 수 없다면 장마 전 흙막이·굴착을 최대한 진행하도록 공정을 앞당기거나(장비 추가), 우기 대비(가설 지붕, 배수 계획, 4장)를 준비한다. 날씨 지연은 계약상 불가항력 공기 연장 사유가 될 수 있으나 "평년 수준의 날씨"는 대개 시공자 위험이므로, 평년값만큼은 공정표에 반영해 두어야 한다(계약 조건 확인).</p></div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="cpm.html"><small>CH.09 · 공정 계획과 CPM</small>확정 공정표 93주<br><span>몬테카를로의 매 반복이 9장의 전진·후진 계산이다.</span></a>
+      <a href="contracts.html"><small>CH.02 · 발주 방식과 계약</small>계약 공기와 위험 분담<br><span>P80 공기와 지체상금, 불가항력 날씨의 공기 연장.</span></a>
+      <a href="resources.html"><small>CH.11 · 자원 관리와 공기 단축</small>버퍼를 지키는 단축<br><span>토네이도 상위 활동을 단축하면 P80이 줄어든다.</span></a>
+      <a href="evm.html"><small>CH.13 · 진도 관리와 EVM</small>버퍼 소비율과 SPI<br><span>진척률 대비 버퍼 소비를 진도 지표와 함께 본다.</span></a>
+      <a href="earthworks.html"><small>CH.04 · 토공과 흙막이 시공</small>굴착 C의 꼬리<br><span>지반·장마·반출 제한이 비관값을 만든다.</span></a>
+      <a href="quality.html"><small>CH.14 · 품질 관리</small>정규 분포와 확률<br><span>같은 Φ가 관리도와 공정 능력에서 다시 나온다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>건설 활동 기간은 오른쪽 꼬리가 긴 분포를 따르므로, 최빈값을 더한 확정 공정표는 체계적으로 낙관적이다. P-B10의 93주는 PERT로 약 11 %, 몬테카를로로 약 2 % 확률이다.</li>
+      <li>3점 추정 (a, m, b): PERT t<sub>e</sub> = (a + 4m + b)/6, σ = (b − a)/6. 삼각 분포 평균 (a + m + b)/3은 꼬리가 길면 PERT보다 크다(J: 20.83 vs 21.67주).</li>
+      <li>경로 공기는 평균과 <b>분산</b>을 더하고 정규 근사한다: P = Φ((T<sub>s</sub> − μ)/σ). P-B10 주공정 μ 97.0, σ 3.29주 → 100주 82 %, P80 99.8주.</li>
+      <li>합류점의 착수는 들어오는 경로의 최대값이므로 공기 분포가 오른쪽으로 밀린다(합류 편향). 같은 두 경로면 P(≤ μ) = 0.25, E[max] = μ + 0.56σ. 여유가 작은 병렬 경로일수록 크다.</li>
+      <li>몬테카를로(표본 → CPM → 기록 → 반복)는 합류와 주공정 이동을 자동으로 반영한다. P-B10(삼각, 2,000회): 평균 약 101주, P80 약 105주, 주공정 지수 H 약 0.8·G2 약 0.2.</li>
+      <li>97주와 101주의 차이 약 4주는 대부분 분포 선택(삼각 vs 베타)이고 합류 편향은 약 0.3주다. 분포 가정은 결과를 좌우하므로 반드시 밝힌다.</li>
+      <li>토네이도 차트(범위 스윙·상관)로 위험 기여 순위를 정한다. P-B10은 J, C, H 순. 병렬 경로 때문에 스윙은 비대칭일 수 있다(H: −1/+6주).</li>
+      <li>버퍼는 활동에 숨기지 말고 모은다(CCPM). B<sub>p</sub> = T<sub>p</sub> − T<sub>0</sub>: P-B10 80 %는 PERT 6.8주, 몬테카를로 약 12주. 날씨처럼 달력에 묶이고 서로 상관된 위험은 착공 월을 넣은 달력 모형으로 따로 본다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 3점 추정 a = 8, m = 10, b = 18주인 활동의 PERT 기대 기간과 표준편차는?</p><div class="opts">
+        <button class="opt">12주, 1.67주</button><button class="opt" data-correct>11주, 1.67주</button><button class="opt">10주, 10주</button><button class="opt">12주, 3.33주</button>
+      </div><div class="quiz-exp">\(t_e = (8 + 40 + 18)/6 = 11\), \(\sigma = (18 - 8)/6 = 1.67\). 12주는 삼각 분포 평균 (8 + 10 + 18)/3이다.</div></div>
+      <div class="quiz-q"><p>2. 주공정 위 세 활동의 σ가 3, 4, 0주(독립)일 때 경로 공기의 σ는?</p><div class="opts">
+        <button class="opt">7주</button><button class="opt" data-correct>5주</button><button class="opt">3.5주</button><button class="opt">25주</button>
+      </div><div class="quiz-exp">분산을 더한다: 9 + 16 + 0 = 25 → σ = 5주. 표준편차를 그대로 더한 7주는 과대하다(모든 활동이 동시에 나쁘게 가는 경우).</div></div>
+      <div class="quiz-q"><p>3. 경로 공기 μ = 97주, σ = 3.29주일 때 목표 공기 97주의 완료 확률은(PERT)?</p><div class="opts">
+        <button class="opt">약 11 %</button><button class="opt" data-correct>50 %</button><button class="opt">약 82 %</button><button class="opt">100 %</button>
+      </div><div class="quiz-exp">\(z = 0\) → \(\Phi(0) = 0.5\). 평균 공기를 목표로 하면 절반은 늦는다.</div></div>
+      <div class="quiz-q"><p>4. 독립이고 분포가 같은 세 경로가 합류한다. 각 경로가 평균 안에 끝날 확률이 0.5라면 합류점까지 평균 안에 끝날 확률은?</p><div class="opts">
+        <button class="opt">0.5</button><button class="opt">0.33</button><button class="opt" data-correct>0.125</button><button class="opt">0.875</button>
+      </div><div class="quiz-exp">최대값이 평균 이하이려면 세 경로 모두 평균 이하여야 한다: \(0.5^3 = 0.125\). 합류 편향이다.</div></div>
+      <div class="quiz-q"><p>5. 몬테카를로 2,000회 중 활동 G2가 주공정에 든 횟수가 400회였다. 옳은 해석은?</p><div class="opts">
+        <button class="opt">G2는 전체 여유가 0.2주다</button><button class="opt" data-correct>G2의 주공정 지수는 0.2로, 다섯 번에 한 번꼴로 공기를 정한다</button><button class="opt">G2는 20 % 늦어진다</button><button class="opt">G2는 비주공정이므로 관리하지 않아도 된다</button>
+      </div><div class="quiz-exp">주공정 지수 = 400/2,000 = 0.2. 확정 CPM에서 여유 1주인 G2는 불확실성을 넣으면 준주공정으로 관리해야 한다.</div></div>
+      <div class="quiz-q"><p>6. 같은 3점 추정으로 PERT 평균 97주, 몬테카를로(삼각) 평균 101주가 나왔다. P-B10에서 이 차이의 주된 원인은?</p><div class="opts">
+        <button class="opt">반복 수가 부족해서</button><button class="opt">합류 편향</button><button class="opt" data-correct>꼬리가 긴 추정에서 삼각 분포 평균이 PERT 평균보다 크기 때문</button><button class="opt">난수 시드 때문</button>
+      </div><div class="quiz-exp">주공정 삼각 평균의 합이 이미 101.0주다. 합류 편향 몫은 약 0.3주에 그친다(예제 10.4).</div></div>
+      <div class="quiz-q"><p>7. 범위 스윙 토네이도에서 커튼월 H의 막대가 −1/+6주로 비대칭인 까닭은?</p><div class="opts">
+        <button class="opt">H의 3점 추정이 대칭이라서</button><button class="opt" data-correct>H가 빨라지면 여유 1주의 G2 경로가 주공정이 되어 단축 이득이 막히기 때문</button><button class="opt">H가 비주공정이라서</button><button class="opt">삼각 분포를 썼기 때문</button>
+      </div><div class="quiz-exp">H를 a = 14주로 줄여도 J의 착수는 G2(68주 끝)가 정해 공기는 92주(−1)에 머문다. 늘리면 그대로 공기가 는다(+6).</div></div>
+      <div class="quiz-q"><p>8. CCPM에서 활동별 안전 시간을 모아 프로젝트 버퍼로 두면 합보다 작게 잡아도 되는 이유는?</p><div class="opts">
+        <button class="opt">작업자가 더 빨리 일하므로</button><button class="opt">버퍼는 쓰지 않으므로</button><button class="opt" data-correct>모든 활동이 동시에 비관값으로 가지는 않아, 독립인 흩어짐은 분산처럼 더해지기 때문</button><button class="opt">파킨슨 법칙 때문에</button>
+      </div><div class="quiz-exp">독립 변동은 제곱합 제곱근으로 커진다(√(Σσ²) &lt; Σσ). 파킨슨 법칙·학생 증후군은 오히려 숨긴 안전 시간이 낭비되는 이유다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const PTX = {
+  font(o) { return `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`; },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = PTX.font(o);
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    if (o.halo !== false) { ctx.lineWidth = 3; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); }
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  /** PERT-베타의 모양 계수 */
+  ab(a, m, b) { const w = Math.max(1e-9, b - a); return [1 + (4 * (m - a)) / w, 1 + (4 * (b - m)) / w]; },
+  betaPdf(x, a, m, b) {
+    if (x <= a || x >= b) return 0; const [al, be] = PTX.ab(a, m, b), u = (x - a) / (b - a);
+    return Math.exp((al - 1) * Math.log(u) + (be - 1) * Math.log(1 - u) - (CB.lgamma(al) + CB.lgamma(be) - CB.lgamma(al + be))) / (b - a);
+  },
+  triPdf(x, a, m, b) { if (x < a || x > b || b - a < 1e-9) return 0; return x < m ? (2 * (x - a)) / ((b - a) * Math.max(1e-9, m - a)) : (2 * (b - x)) / ((b - a) * Math.max(1e-9, b - m)); },
+  /** 감마 표본(마르사글리아–창) — PERT-베타 표본용, 교육용 */
+  gamma(k, r) {
+    if (k < 1) return PTX.gamma(k + 1, r) * Math.pow(Math.max(r(), 1e-12), 1 / k);
+    const d = k - 1 / 3, c = 1 / Math.sqrt(9 * d);
+    for (;;) {
+      let x, v; do { const u1 = Math.max(r(), 1e-12), u2 = r(); x = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2); v = 1 + c * x; } while (v <= 0);
+      v = v * v * v; const u = r();
+      if (u < 1 - 0.0331 * x ** 4 || Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+    }
+  },
+  beta(a, m, b, r) { if (b - a < 1e-9) return a; const [al, be] = PTX.ab(a, m, b), x = PTX.gamma(al, r), y = PTX.gamma(be, r); return a + ((b - a) * x) / (x + y); },
+  /** 몬테카를로: dist "tri"는 CB.pm.monteCarlo, "beta"는 같은 구조의 페이지 계산 */
+  mc(acts, n, seed, dist) {
+    if (dist === "tri") return CB.pm.monteCarlo(acts, n, seed);
+    const r = CB.rng(seed), T = [], crit = {}; acts.forEach((a) => (crit[a.id] = 0));
+    for (let k = 0; k < n; k++) { const s = acts.map((a) => ({ ...a, d: PTX.beta(a.a, a.m, a.b, r) })); const res = CB.pm.cpm(s); T.push(res.T); res.critical.forEach((id) => crit[id]++); }
+    Object.keys(crit).forEach((k) => (crit[k] /= n));
+    return { T, crit };
+  },
+  q(sorted, p) { const i = p * (sorted.length - 1), lo = Math.floor(i), hi = Math.ceil(i); return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo); },
+  zinv(p) { let lo = -8, hi = 8; for (let k = 0; k < 80; k++) { const m = (lo + hi) / 2; if (CB.normCdf(m) < p) lo = m; else hi = m; } return (lo + hi) / 2; },
+  /** PERT 경로 값: te로 CPM을 돌려 주공정의 평균·분산 */
+  pertPath(acts) {
+    const R = CB.pm.cpm(acts.map((a) => ({ ...a, d: CB.pm.pert(a.a, a.m, a.b).te })));
+    const v = R.critical.reduce((s, id) => { const a = acts.find((x) => x.id === id); return s + CB.pm.pert(a.a, a.m, a.b).v; }, 0);
+    return { mu: R.T, sd: Math.sqrt(v), crit: R.critical };
+  },
+  debounce(fn, ms = 140) { let t = 0; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; },
+};
+const PT_B10 = CB.pm.B10.map((a) => ({ ...a, pred: [...a.pred] }));
+
+/* ---------- 1. 3점 추정 분포 ---------- */
+(function () {
+  const sel = document.getElementById("pt-ds-act");
+  sel.innerHTML = `<option value="">직접 입력</option>` + PT_B10.map((a) => `<option value="${a.id}"${a.id === "J" ? " selected" : ""}>${a.id} ${a.name} (${a.a}, ${a.m}, ${a.b})</option>`).join("");
+  const fmt = (v) => CB.num(v, 1) + " 주";
+  const ga = CB.range("pt-ds-a", fmt, () => push("a")), gm = CB.range("pt-ds-m", fmt, () => push("m")), gb = CB.range("pt-ds-b", fmt, () => push("b"));
+  function push(which) {
+    let a = ga(), m = gm(), b = gb();
+    if (which === "a") { if (m < a) m = a; if (b < m + 0.5) b = Math.min(40, m + 0.5); if (b - a < 0.5) a = b - 0.5; }
+    if (which === "m") { if (a > m) a = m; if (b < m) b = m; if (b - a < 0.5) { if (b < 40) b = Math.min(40, a + 0.5); else a = b - 0.5; } }
+    if (which === "b") { if (m > b) m = b; if (a > m) a = m; if (b - a < 0.5) a = Math.max(1, b - 0.5); if (m < a) m = a; }
+    ga.set(a, false); gm.set(m, false); gb.set(b, false); sel.value = ""; draw();
+  }
+  sel.addEventListener("change", () => { const a = PT_B10.find((x) => x.id === sel.value); if (!a) return; ga.set(a.a, false); gm.set(a.m, false); gb.set(a.b, false); draw(); });
+  function calc() {
+    const a = ga(), m = gm(), b = gb(), p = CB.pm.pert(a, m, b), [al, be] = PTX.ab(a, m, b);
+    const bsd = (b - a) * Math.sqrt((al * be) / ((al + be) ** 2 * (al + be + 1)));
+    const tm = (a + m + b) / 3, tsd = Math.sqrt(Math.max(0, (a * a + m * m + b * b - a * b - a * m - b * m) / 18));
+    let pb = 0; const N = 400, h = (m - a) / N; for (let i = 0; i < N; i++) pb += PTX.betaPdf(a + (i + 0.5) * h, a, m, b) * h;
+    return { a, m, b, p, bsd, tm, tsd, pb: m - a < 1e-9 ? 0 : pb, pt: (m - a) / Math.max(1e-9, b - a) };
+  }
+  const cv = CB.canvas("#pt-cv-dist", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), pad = Math.max(1, (c.b - c.a) * 0.12), x0 = Math.max(0, c.a - pad), x1 = c.b + pad;
+    const B = [], T = []; let ymax = 0;
+    for (let i = 0; i <= 300; i++) { const x = x0 + ((x1 - x0) * i) / 300, yb = PTX.betaPdf(x, c.a, c.m, c.b), yt = PTX.triPdf(x, c.a, c.m, c.b); B.push([x, yb]); T.push([x, yt]); ymax = Math.max(ymax, yb, yt); }
+    const res = CB.chart(ctx, { x: 52, y: 26, w: W - 52 - 16, h: H - 26 - 50 }, { x: [x0, x1], y: [0, ymax * 1.18], xLabel: "기간 (주)", yLabel: "확률 밀도",
+      series: [{ data: T, color: P.accent2, width: 2, dash: [6, 4] }, { data: B, color: P.accent, width: 2.8, fill: PTX.alpha(P.accent, 0.12) }],
+      vlines: [{ x: c.m, color: P.dim, dash: [2, 3] }, { x: c.p.te, color: P.accent, dash: [] }, { x: c.tm, color: P.accent2, dash: [] }] });
+    const yb = res.Y(ymax * 1.08);
+    ctx.save(); ctx.strokeStyle = P.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(res.X(c.p.te - c.p.sd), yb); ctx.lineTo(res.X(c.p.te + c.p.sd), yb); ctx.stroke(); ctx.restore();
+    PTX.text(ctx, `±σ ${CB.num(c.p.sd, 2)}`, res.X(c.p.te + c.p.sd) + 4, yb, P.accent, { size: 10.5, align: "left" });
+    PTX.text(ctx, `PERT ${CB.num(c.p.te, 2)}`, res.X(c.p.te), res.Y(0) - 12, P.accent, { size: 10.5, align: c.tm > c.p.te ? "right" : "left" });
+    PTX.text(ctx, `삼각 ${CB.num(c.tm, 2)}`, res.X(c.tm) + (c.tm > c.p.te ? 4 : -4), res.Y(0) - 28, P.accent2, { size: 10.5, align: c.tm > c.p.te ? "left" : "right" });
+    PTX.text(ctx, "실선 PERT-베타 · 점선 삼각", W - 18, 14, P.dim, { size: 10.5, bold: false, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.56), minHeight: 260, maxHeight: 400 });
+  function draw() {
+    cv.redraw(); const c = calc();
+    CB.stat("pt-ds-o-p", CB.num(c.p.te, 2) + " · " + CB.num(c.p.sd, 2)); CB.stat("pt-ds-o-bs", CB.num(c.bsd, 2) + " 주");
+    CB.stat("pt-ds-o-t", CB.num(c.tm, 2) + " · " + CB.num(c.tsd, 2)); CB.stat("pt-ds-o-m", CB.num(c.pb, 2) + " · " + CB.num(c.pt, 2));
+  }
+  draw();
+})();
+
+/* ---------- 2. 완료 확률 ---------- */
+(function () {
+  const pathStats = (ids) => { let mu = 0, v = 0; ids.forEach((id) => { const a = PT_B10.find((x) => x.id === id), p = CB.pm.pert(a.a, a.m, a.b); mu += p.te; v += p.v; }); return { mu, sd: Math.sqrt(v) }; };
+  const SRC = { h: pathStats(["A", "B", "C", "E", "F", "G1", "H", "J", "M"]), g2: pathStats(["A", "B", "C", "E", "F", "G1", "G2", "J", "M"]) };
+  const gt = CB.range("pt-pr-t", (v) => CB.num(v, 1) + " 주", draw);
+  const gm = CB.range("pt-pr-m", (v) => CB.num(v, 1) + " 주", () => { gs2.set("u", false); draw(); });
+  const gs = CB.range("pt-pr-s", (v) => CB.num(v, 2) + " 주", () => { gs2.set("u", false); draw(); });
+  const gs2 = CB.seg("pt-pr-src", (v) => { const s = SRC[v]; if (s) { gm.set(Math.round(s.mu * 2) / 2, false); gs.set(Math.round(s.sd * 100) / 100, false); } draw(); });
+  const cv = CB.canvas("#pt-cv-prob", (ctx, W, H) => {
+    const P = CB.palette(), mu = gm(), sd = gs(), Ts = gt(), x0 = Math.min(mu - 4 * sd, 90, Ts - 2), x1 = Math.max(mu + 4 * sd, Ts + 2), pk = CB.normPdf(mu, mu, sd);
+    const curve = [], fill = [];
+    for (let i = 0; i <= 300; i++) { const x = x0 + ((x1 - x0) * i) / 300, y = CB.normPdf(x, mu, sd); curve.push([x, y]); if (x <= Ts) fill.push([x, y]); }
+    fill.push([Ts, CB.normPdf(Ts, mu, sd)]);
+    const res = CB.chart(ctx, { x: 52, y: 26, w: W - 52 - 16, h: H - 26 - 50 }, { x: [x0, x1], y: [0, pk * 1.25], xLabel: "공기 (주)", yLabel: "확률 밀도", yFmt: (v) => v.toFixed(2),
+      series: [{ data: fill, color: "transparent", width: 0, fill: PTX.alpha(P.accent, 0.3) }, { data: curve, color: P.accent, width: 2.6 }],
+      vlines: [{ x: 93, color: P.dim, dash: [3, 3] }, { x: mu, color: P.accent2, dash: [5, 4] }, { x: Ts, color: P.bad, dash: [], width: 2 }] });
+    const pr = CB.pm.prob(Ts, mu, sd);
+    PTX.text(ctx, `P = ${CB.num(pr * 100, 1)} %`, res.X(Math.max(x0 + 1, Math.min(Ts, mu) - sd * 0.6)), res.Y(pk * 0.35), P.text, { size: 13 });
+    PTX.text(ctx, "93", res.X(93), 14, P.dim, { size: 10.5 }); PTX.text(ctx, "μ " + CB.num(mu, 1), res.X(mu), 14, P.accent2, { size: 10.5 });
+    PTX.text(ctx, "T_s " + CB.num(Ts, 1), Math.min(res.X(Ts) + 4, W - 70), 30, P.bad, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.52), minHeight: 260, maxHeight: 380 });
+  function draw() {
+    cv.redraw(); const mu = gm(), sd = gs(), Ts = gt();
+    CB.stat("pt-pr-o-z", CB.num((Ts - mu) / sd, 2)); CB.stat("pt-pr-o-p", CB.num(CB.pm.prob(Ts, mu, sd) * 100, 1) + " %");
+    CB.stat("pt-pr-o-93", CB.num(CB.pm.prob(93, mu, sd) * 100, 1) + " %"); CB.stat("pt-pr-o-q", CB.num(mu + 0.8416 * sd, 1) + " · " + CB.num(mu + 1.2816 * sd, 1));
+  }
+  draw();
+})();
+
+/* ---------- 3. 합류 편향 ---------- */
+(function () {
+  const gn = CB.range("pt-mg-n", (v) => v + "개", draw), gs = CB.range("pt-mg-s", (v) => CB.num(v, 1) + " 주", draw), gd = CB.range("pt-mg-d", (v) => CB.num(v, 1) + " 주", draw);
+  const MU = 50;
+  function calc() {
+    const n = gn(), s = gs(), D = gd(), t0 = MU - 5 * s - D, t1 = MU + 6 * s, N = 1200, h = (t1 - t0) / N;
+    const F = (t) => CB.normCdf(t, MU, s) * Math.pow(CB.normCdf(t, MU - D, s), n - 1);
+    const pts = []; let E = 0, last = 0, cMain = 0, p80 = NaN;
+    for (let i = 0; i <= N; i++) {
+      const t = t0 + i * h, Fi = F(t), f = i ? (Fi - last) / h : 0; last = Fi; pts.push([t - h / 2, f]); E += (t - h / 2) * f * h;
+      cMain += CB.normPdf(t, MU, s) * Math.pow(CB.normCdf(t, MU - D, s), n - 1) * h;
+      if (isNaN(p80) && Fi >= 0.8) p80 = t;
+    }
+    return { n, s, D, pts, E, p0: F(MU), p80, cMain: n === 1 ? 1 : cMain, t0, t1 };
+  }
+  const cv = CB.canvas("#pt-cv-merge", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), one = [];
+    for (let i = 0; i <= 300; i++) { const t = c.t0 + ((c.t1 - c.t0) * i) / 300; one.push([t, CB.normPdf(t, MU, c.s)]); }
+    const ymax = Math.max(...c.pts.map((p) => p[1]), CB.normPdf(MU, MU, c.s)) * 1.18;
+    const res = CB.chart(ctx, { x: 52, y: 26, w: W - 52 - 16, h: H - 26 - 50 }, { x: [c.t0, c.t1], y: [0, ymax], xLabel: "합류점 도달 시각 (주)", yLabel: "확률 밀도", yFmt: (v) => v.toFixed(2),
+      series: [{ data: one, color: P.dim, width: 2, dash: [6, 4] }, { data: c.pts, color: P.accent, width: 2.8, fill: PTX.alpha(P.accent, 0.12) }],
+      vlines: [{ x: MU, color: P.dim, dash: [3, 3] }, { x: c.E, color: P.accent, dash: [] }] });
+    PTX.text(ctx, "μ = 50", res.X(MU) - 4, 14, P.dim, { size: 10.5, align: "right" });
+    PTX.text(ctx, "E[max] " + CB.num(c.E, 2), res.X(c.E) + 4, 14, P.accent, { size: 10.5, align: "left" });
+    PTX.text(ctx, "점선: 한 경로 · 실선: n개 경로의 최대값", W - 18, 32, P.dim, { size: 10.5, bold: false, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.52), minHeight: 260, maxHeight: 380 });
+  function draw() {
+    cv.redraw(); const c = calc();
+    CB.stat("pt-mg-o-p", CB.num(c.p0 * 100, c.p0 < 0.01 ? 2 : 1) + " %"); CB.stat("pt-mg-o-e", "+" + CB.num(c.E - MU, 2) + " 주 (" + CB.num((c.E - MU) / c.s, 2) + "σ)");
+    CB.stat("pt-mg-o-q", CB.num(MU + 0.8416 * c.s, 1) + " → " + CB.num(c.p80, 1)); CB.stat("pt-mg-o-c", CB.num(c.cMain * 100, 0) + " %");
+  }
+  draw();
+})();
+
+/* ---------- 4. P-B10 몬테카를로 ---------- */
+(function () {
+  const gn = CB.seg("pt-mc-n", run), gseed = CB.range("pt-mc-seed", (v) => String(v), sched), gd = CB.seg("pt-mc-dist", run);
+  const gk = CB.range("pt-mc-k", (v) => "× " + v.toFixed(1), sched), gh = CB.range("pt-mc-h", (v) => CB.num(v, 1) + " 주", sched);
+  const view = document.getElementById("pt-cv-mc").parentElement;
+  let R = null;
+  function acts() { const k = gk(); return PT_B10.map((a) => { const m = a.id === "H" ? gh() : a.m; return { ...a, m, d: m, b: m + k * (a.b - a.m) }; }); }
+  function run() {
+    const A = acts(), out = PTX.mc(A, Number(gn()), gseed(), gd()), s = [...out.T].sort((x, y) => x - y);
+    R = { s, crit: out.crit, mean: CB.mean(out.T), sd: CB.std(out.T), pert: PTX.pertPath(A), A, n: s.length };
+    view.classList.remove("pt-busy"); cv.redraw(); cv2.redraw(); stats();
+  }
+  const deb = PTX.debounce(run, 160);
+  function sched() { view.classList.add("pt-busy"); deb(); }
+  const cdf = (x) => { let lo = 0, hi = R.s.length; while (lo < hi) { const m = (lo + hi) >> 1; if (R.s[m] <= x) lo = m + 1; else hi = m; } return lo / R.s.length; };
+  const cv = CB.canvas("#pt-cv-mc", (ctx, W, H) => {
+    if (!R) return; const P = CB.palette();
+    const lo = Math.floor(Math.min(R.s[0], 90)), hi = Math.ceil(Math.max(R.s[R.n - 1], 105)), bins = CB.clamp(Math.round(hi - lo), 15, 50), hist = CB.histogram(R.s, bins, [lo, hi]);
+    const cmax = Math.max(...hist.counts), ny = (x) => R.n * hist.width * CB.normPdf(x, R.pert.mu, R.pert.sd);
+    const ymax = Math.max(cmax, ny(R.pert.mu)) * 1.15, box = { x: 50, y: 30, w: W - 50 - 44, h: H - 30 - 50 };
+    const norm = []; for (let i = 0; i <= 200; i++) { const x = lo + ((hi - lo) * i) / 200; norm.push([x, ny(x)]); }
+    const res = CB.chart(ctx, box, { x: [lo, hi], y: [0, ymax], xLabel: "공기 (주)", yLabel: "빈도", series: [{ data: norm, color: P.accent2, width: 1.8, dash: [5, 4] }] });
+    ctx.save(); ctx.fillStyle = PTX.alpha(P.accent, 0.55);
+    hist.counts.forEach((c, i) => { const x0 = res.X(hist.edges[i]), x1 = res.X(hist.edges[i + 1]); ctx.fillRect(x0 + 0.5, res.Y(c), Math.max(1, x1 - x0 - 1), res.Y(0) - res.Y(c)); });
+    // 누적 곡선(오른쪽 축 0–1)
+    const YC = (p) => box.y + box.h - p * box.h; ctx.strokeStyle = P.text; ctx.lineWidth = 2; ctx.beginPath();
+    for (let i = 0; i < R.n; i += Math.max(1, Math.floor(R.n / 400))) { const x = res.X(R.s[i]), y = YC((i + 1) / R.n); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.lineTo(res.X(R.s[R.n - 1]), YC(1)); ctx.stroke();
+    ctx.fillStyle = P.dim; ctx.font = "11px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    [0, 0.5, 0.8, 1].forEach((p) => ctx.fillText(p.toFixed(1), box.x + box.w + 6, YC(p)));
+    ctx.restore();
+    const p50 = PTX.q(R.s, 0.5), p80 = PTX.q(R.s, 0.8);
+    [[93, P.dim, "93", 0], [R.pert.mu, P.accent2, "PERT " + CB.num(R.pert.mu, 1), 1], [p50, P.text, "P50 " + CB.num(p50, 1), 2], [p80, P.bad, "P80 " + CB.num(p80, 1), 3]].forEach(([x, col, lab, k]) => {
+      ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.setLineDash(k === 0 ? [3, 3] : k === 1 ? [5, 4] : []); ctx.beginPath(); ctx.moveTo(res.X(x), box.y); ctx.lineTo(res.X(x), box.y + box.h); ctx.stroke(); ctx.restore();
+      PTX.text(ctx, lab, res.X(x) + (k % 2 ? -3 : 3), 10 + (k % 2) * 12, col, { size: 10.5, align: k % 2 ? "right" : "left" });
+    });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.56), minHeight: 270, maxHeight: 400 });
+  const cv2 = CB.canvas("#pt-cv-mcci", (ctx, W, H) => {
+    if (!R) return; const P = CB.palette(), lw = W < 480 ? 34 : 120, x0 = lw + 6, w = W - x0 - 54, rh = (H - 30) / R.A.length;
+    PTX.text(ctx, "주공정 지수(반복 중 주공정에 든 비율)", 8, 12, P.dim, { size: 11, bold: false, align: "left", mono: false });
+    R.A.forEach((a, i) => {
+      const y = 26 + i * rh, ci = R.crit[a.id] || 0, col = ci >= 0.5 ? P.bad : ci > 0.005 ? P.accent2 : P.faint;
+      PTX.text(ctx, lw < 50 ? a.id : a.id + " " + a.name, 6, y + rh / 2, P.text, { size: 10.5, align: "left", mono: lw < 50, bold: false, halo: false });
+      ctx.fillStyle = PTX.alpha(P.text, 0.06); ctx.fillRect(x0, y + 3, w, rh - 6);
+      ctx.fillStyle = col; ctx.fillRect(x0, y + 3, Math.max(ci > 0 ? 2 : 0, w * ci), rh - 6);
+      PTX.text(ctx, ci.toFixed(2), x0 + w + 6, y + rh / 2, col === P.faint ? P.dim : col, { size: 10.5, align: "left", halo: false });
+    });
+  }, { aspect: (W) => 300 / W, minHeight: 300, maxHeight: 300 });
+  function stats() {
+    const c = R;
+    CB.stat("pt-mc-o-m", CB.num(c.mean, 1) + " · " + CB.num(c.sd, 1)); CB.stat("pt-mc-o-q", CB.num(PTX.q(c.s, 0.5), 1) + " · " + CB.num(PTX.q(c.s, 0.8), 1));
+    CB.stat("pt-mc-o-p", CB.num(cdf(93) * 100, 1) + " % · " + CB.num(cdf(100) * 100, 0) + " %"); CB.stat("pt-mc-o-c", (c.crit.G2 || 0).toFixed(2) + " · " + (c.crit.H || 0).toFixed(2));
+  }
+  run();
+})();
+
+/* ---------- 5. 토네이도 차트 ---------- */
+(function () {
+  const gm = CB.seg("pt-tr-m", draw), gj = CB.range("pt-tr-j", (v) => v + " 주", sched), gh = CB.range("pt-tr-h", (v) => v + " 주", sched);
+  let corrCache = {};
+  const acts = () => PT_B10.map((a) => ({ ...a, d: a.m, b: a.id === "J" ? gj() : a.id === "H" ? gh() : a.b }));
+  function swing() {
+    const A = acts(), T0 = CB.pm.cpm(A).T;
+    return { T0, rows: A.map((a) => { const lo = CB.pm.cpm(A.map((x) => (x.id === a.id ? { ...x, d: x.a } : x))).T - T0, hi = CB.pm.cpm(A.map((x) => (x.id === a.id ? { ...x, d: x.b } : x))).T - T0; return { a, lo, hi, v: hi - lo }; }) };
+  }
+  function corr() {
+    const key = gj() + "|" + gh(); if (corrCache[key]) return corrCache[key];
+    const A = acts(), r = CB.rng(7), n = 2000, D = A.map(() => []), T = [];
+    for (let k = 0; k < n; k++) { const s = A.map((a) => ({ ...a, d: CB.pm.tri(a.a, a.m, a.b, r()) })); s.forEach((a, i) => D[i].push(a.d)); T.push(CB.pm.cpm(s).T); }
+    const mT = CB.mean(T), sT = T.reduce((s, x) => s + (x - mT) ** 2, 0);
+    const rows = A.map((a, i) => { const x = D[i], mx = CB.mean(x); let sxy = 0, sx = 0; for (let k = 0; k < n; k++) { sxy += (x[k] - mx) * (T[k] - mT); sx += (x[k] - mx) ** 2; } const c = sxy / Math.sqrt(sx * sT || 1); return { a, lo: 0, hi: c, v: Math.abs(c) }; });
+    corrCache = { [key]: { T0: mT, rows } }; return corrCache[key];
+  }
+  const deb = PTX.debounce(draw, 120), view = document.getElementById("pt-cv-tor").parentElement;
+  function sched() { if (gm() === "corr") { view.classList.add("pt-busy"); deb(); } else draw(); }
+  const data = () => { const d = gm() === "swing" ? swing() : corr(); return { ...d, rows: [...d.rows].sort((x, y) => y.v - x.v) }; };
+  const cv = CB.canvas("#pt-cv-tor", (ctx, W, H) => {
+    const P = CB.palette(), d = data(), sw = gm() === "swing", lw = W < 480 ? 34 : 120;
+    const lo = sw ? Math.min(-4, ...d.rows.map((r) => r.lo)) : -0.1, hi = sw ? Math.max(9, ...d.rows.map((r) => r.hi)) + 1 : 1;
+    const box = { x: lw + 8, y: 14, w: W - lw - 8 - 16, h: H - 14 - 50 }, rh = box.h / d.rows.length;
+    const res = CB.chart(ctx, box, { x: [lo, hi], y: [0, 1], yTicks: [], xTicks: sw ? [-4, -2, 0, 2, 4, 6, 8, 10, 12, 14].filter((v) => v >= lo && v <= hi) : undefined, xLabel: sw ? "공기 변화 (주, a ↔ b)" : "활동 기간과 공기의 상관 계수", xFmt: (v) => (sw ? (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) : v.toFixed(1)), vlines: [{ x: 0, color: P.axis, dash: [] }] });
+    d.rows.forEach((r, i) => {
+      const y = box.y + i * rh + rh * 0.18, h = rh * 0.64;
+      PTX.text(ctx, lw < 50 ? r.a.id : r.a.id + " " + r.a.name, 6, y + h / 2, r.v > 1e-6 ? P.text : P.faint, { size: 10.5, align: "left", mono: lw < 50, bold: false, halo: false });
+      if (sw) {
+        ctx.fillStyle = P.accent2; ctx.fillRect(res.X(r.lo), y, res.X(0) - res.X(r.lo), h);
+        ctx.fillStyle = P.bad; ctx.fillRect(res.X(0), y, res.X(r.hi) - res.X(0), h);
+        if (r.v > 0) PTX.text(ctx, (r.lo ? "−" + Math.abs(r.lo) : "0") + " / +" + r.hi, res.X(r.hi) + 4, y + h / 2, P.dim, { size: 10, align: "left" });
+      } else {
+        ctx.fillStyle = r.hi > 0.3 ? P.bad : P.accent2; ctx.fillRect(Math.min(res.X(0), res.X(r.hi)), y, Math.abs(res.X(r.hi) - res.X(0)), h);
+        PTX.text(ctx, r.hi.toFixed(2), Math.max(res.X(r.hi), res.X(0)) + 4, y + h / 2, P.dim, { size: 10, align: "left" });
+      }
+    });
+  }, { aspect: (W) => 400 / W, minHeight: 380, maxHeight: 400 });
+  function draw() {
+    view.classList.remove("pt-busy"); cv.redraw(); const d = data(), sw = gm() === "swing";
+    const f = (r) => r.a.id + (sw ? ` (${r.lo ? "−" + Math.abs(r.lo) : "0"}/+${r.hi})` : ` (${r.hi.toFixed(2)})`);
+    CB.stat("pt-tr-o-1", f(d.rows[0])); CB.stat("pt-tr-o-2", f(d.rows[1]));
+    CB.stat("pt-tr-o-0", d.rows.filter((r) => r.v < (sw ? 1e-6 : 0.02)).map((r) => r.a.id).join(", ") || "없음");
+    CB.stat("pt-tr-o-t", sw ? d.T0 + " 주(모두 m)" : CB.num(d.T0, 1) + " 주(MC 평균)");
+  }
+  draw();
+})();
+
+/* ---------- 6. 버퍼 크기 ---------- */
+(function () {
+  const gp = CB.range("pt-bf-p", (v) => v + " %", draw), gd = CB.seg("pt-bf-d", draw), gt = CB.range("pt-bf-t", (v) => v + " 주", draw);
+  const cache = {}, sample = (d) => cache[d] || (cache[d] = PTX.mc(PT_B10, 2000, 7, d).T.sort((x, y) => x - y));
+  const pp = PTX.pertPath(PT_B10);
+  const ssq = Math.sqrt(CB.pm.cpm(PT_B10).critical.reduce((s, id) => { const a = PT_B10.find((x) => x.id === id); return s + (a.b - a.m) ** 2; }, 0));
+  function calc() {
+    const p = gp() / 100, T0 = gt(), s = sample(gd()), Tpe = pp.mu + PTX.zinv(p) * pp.sd, Tmc = PTX.q(s, p);
+    return { p, T0, s, Tpe, Tmc, Tss: T0 + ssq };
+  }
+  const cv = CB.canvas("#pt-cv-buf", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), x0 = 86, x1 = Math.max(118, Math.ceil(c.Tss + 2)), pe = [], mc = [];
+    for (let i = 0; i <= 200; i++) { const x = x0 + ((x1 - x0) * i) / 200; pe.push([x, CB.normCdf(x, pp.mu, pp.sd)]); }
+    for (let i = 0; i < c.s.length; i += 5) mc.push([c.s[i], (i + 1) / c.s.length]);
+    mc.push([c.s[c.s.length - 1], 1]);
+    const res = CB.chart(ctx, { x: 50, y: 26, w: W - 50 - 16, h: H - 26 - 50 }, { x: [x0, x1], y: [0, 1], xLabel: "공기 (주)", yLabel: "완료 확률",
+      series: [{ data: pe, color: P.accent2, width: 2, dash: [6, 4] }, { data: mc, color: P.accent, width: 2.6 }],
+      hlines: [{ y: c.p, color: P.text, dash: [2, 3] }],
+      vlines: [{ x: c.T0, color: P.dim, dash: [3, 3] }, { x: c.Tpe, color: P.accent2, dash: [] }, { x: c.Tmc, color: P.bad, dash: [] }, { x: c.Tss, color: P.ok, dash: [6, 3] }] });
+    const yA = res.Y(c.p) + 14;
+    [[c.Tpe, P.accent2, "PERT"], [c.Tmc, P.bad, "MC"]].forEach(([x, col, lab], k) => {
+      const yy = yA + k * 16; ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(res.X(c.T0), yy); ctx.lineTo(res.X(x), yy); ctx.stroke(); ctx.restore();
+      PTX.text(ctx, `${lab} 버퍼 ${CB.num(x - c.T0, 1)}`, res.X(x) + 4, yy, col, { size: 10.5, align: "left" });
+    });
+    PTX.text(ctx, "SSQ", res.X(c.Tss) + 3, res.Y(0.12), P.ok, { size: 10.5, align: "left" });
+    PTX.text(ctx, "T₀ " + c.T0, res.X(c.T0) - 3, res.Y(0.95), P.dim, { size: 10.5, align: "right" });
+    PTX.text(ctx, "점선: PERT 정규 · 실선: 몬테카를로", W - 18, 12, P.dim, { size: 10.5, bold: false, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.56), minHeight: 270, maxHeight: 400 });
+  function draw() {
+    cv.redraw(); const c = calc(), f = (v) => (v < 0 ? "필요 없음" : CB.num(v, 1) + " 주");
+    CB.stat("pt-bf-o-pe", f(c.Tpe - c.T0)); CB.stat("pt-bf-o-mc", f(c.Tmc - c.T0)); CB.stat("pt-bf-o-ss", CB.num(ssq, 1) + " 주");
+    CB.stat("pt-bf-o-c", Math.ceil(Math.max(c.T0, c.Tmc)) + " 주");
+  }
+  draw();
+})();
+
+/* ---------- 7. 날씨 위험(교육용 달력 모형) ---------- */
+(function () {
+  const RAIN = [3, 3, 5, 6, 6, 8, 14, 12, 7, 4, 5, 3];   // 교육용 가정 월별 강우일수(1–12월)
+  const OUT = new Set(["A", "B", "C", "D", "E", "F", "G1", "G2", "H", "K", "L"]), CONC = new Set(["E", "F", "G1", "G2"]);
+  const gs = CB.range("pt-wx-s", (v) => v + "월", sched), gl = CB.range("pt-wx-l", (v) => v.toFixed(2), sched), gm = CB.range("pt-wx-m", (v) => "× " + v.toFixed(1), sched);
+  const ck = document.getElementById("pt-wx-c"); ck.addEventListener("change", sched);
+  const view = document.getElementById("pt-cv-wx").parentElement, R0 = CB.pm.cpm(PT_B10);
+  const month = (start, w) => (start - 1 + Math.floor((w * 7) / 30.44)) % 12;
+  const pDay = (m, loss, mons) => Math.min(0.95, (RAIN[m] / 30) * loss * (m >= 5 && m <= 7 ? mons : 1));
+  function sim(start, loss, mons, cold, n, seed) {
+    const r = CB.rng(seed), T = [];
+    for (let k = 0; k < n; k++) {
+      const EF = {};
+      R0.order.forEach((id) => {
+        const a = PT_B10.find((x) => x.id === id); let t = Math.max(0, ...a.pred.map((p) => EF[p])), work = 0, guard = 0;
+        while (work < a.d - 1e-9 && guard++ < 2000) {
+          const w = Math.floor(t + 1e-9); let rate = 1;
+          if (OUT.has(id)) { const m = month(start, w), p = pDay(m, loss, mons); let lost = 0; for (let d = 0; d < 5; d++) if (r() < p) lost++; rate = (5 - lost) / 5; if (cold && CONC.has(id) && (m === 11 || m <= 1)) rate *= 0.85; }
+          if (rate <= 1e-6) { t = w + 1; continue; }
+          const step = Math.min(w + 1 - t, (a.d - work) / rate); work += step * rate; t += step;
+        }
+        EF[id] = t;
+      });
+      T.push(Math.max(...Object.values(EF)));
+    }
+    return T;
+  }
+  let R = null;
+  function run() {
+    const s = gs(), l = gl(), m = gm(), c = ck.checked, T = sim(s, l, m, c, 400, 11).sort((x, y) => x - y);
+    let worst = { s: 0, v: -1 };
+    for (let st = 1; st <= 12; st++) { const v = CB.mean(sim(st, l, m, c, 120, 5)); if (v > worst.v) worst = { s: st, v }; }
+    R = { s, l, m, c, T, mean: CB.mean(T), worst };
+    view.classList.remove("pt-busy"); cv.redraw(); stats();
+  }
+  const deb = PTX.debounce(run, 160);
+  function sched() { view.classList.add("pt-busy"); deb(); }
+  const cv = CB.canvas("#pt-cv-wx", (ctx, W, H) => {
+    if (!R) return; const P = CB.palette(), Tm = 120, h1 = Math.round((H - 40) * 0.42);
+    const top = { x: 50, y: 22, w: W - 50 - 16, h: h1 - 30 };
+    const res = CB.chart(ctx, top, { x: [0, Tm], y: [0, 0.5], yTicks: [0, 0.25, 0.5], xTicks: [0, 20, 40, 60, 80, 100, 120], yFmt: (v) => v.toFixed(2), yLabel: "" });
+    // 옥외 활동 구간(최빈값 일정)
+    ctx.save(); ctx.fillStyle = PTX.alpha(P.ok, 0.1);
+    PT_B10.forEach((a) => { if (OUT.has(a.id)) { const x = R0.acts[a.id]; ctx.fillRect(res.X(x.ES), top.y, res.X(x.EF) - res.X(x.ES), top.h); } });
+    for (let w = 0; w < Tm; w++) { const m = month(R.s, w), p = pDay(m, R.l, R.m); ctx.fillStyle = m >= 5 && m <= 7 ? P.accent2 : m === 11 || m <= 1 ? P.dim : P.accent; ctx.fillRect(res.X(w) + 0.5, res.Y(p), Math.max(1, res.X(w + 1) - res.X(w) - 1), res.Y(0) - res.Y(p)); }
+    for (let w = 0; w < Tm; w++) { const m = month(R.s, w); if (w === 0 || m !== month(R.s, w - 1)) { if (m % 3 === 0) PTX.text(ctx, (m + 1) + "월", res.X(w) + 2, top.y - 8, P.dim, { size: 10, align: "left", bold: false }); } }
+    ctx.restore();
+    PTX.text(ctx, "주별 작업 불능 확률 · 초록 띠 = 옥외 활동 기간", W - 18, top.y + top.h + 30, P.dim, { size: 10.5, bold: false, align: "right" });
+    const bot = { x: 50, y: h1 + 40, w: W - 50 - 16, h: H - h1 - 40 - 46 }, lo = 90, hi = Math.max(115, Math.ceil(R.T[R.T.length - 1] + 1)), hist = CB.histogram(R.T, CB.clamp(hi - lo, 10, 40), [lo, hi]);
+    const r2 = CB.chart(ctx, bot, { x: [lo, hi], y: [0, Math.max(...hist.counts) * 1.2], xLabel: "공기 (주)", yLabel: "빈도",
+      vlines: [{ x: 93, color: P.dim, dash: [3, 3] }, { x: R.mean, color: P.accent, dash: [] }, { x: PTX.q(R.T, 0.8), color: P.bad, dash: [] }] });
+    ctx.fillStyle = PTX.alpha(P.accent2, 0.6);
+    hist.counts.forEach((c, i) => { const x0 = r2.X(hist.edges[i]), x1 = r2.X(hist.edges[i + 1]); ctx.fillRect(x0 + 0.5, r2.Y(c), Math.max(1, x1 - x0 - 1), r2.Y(0) - r2.Y(c)); });
+    PTX.text(ctx, "93", r2.X(93) - 3, bot.y + 8, P.dim, { size: 10.5, align: "right" });
+    PTX.text(ctx, "평균 " + CB.num(R.mean, 1), r2.X(R.mean) - 3, bot.y + 8, P.accent, { size: 10.5, align: "right" });
+    PTX.text(ctx, "P80 " + CB.num(PTX.q(R.T, 0.8), 1), r2.X(PTX.q(R.T, 0.8)) + 3, bot.y + 22, P.bad, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 1.15 : 0.72), minHeight: 380, maxHeight: 520 });
+  function stats() {
+    CB.stat("pt-wx-o-m", CB.num(R.mean, 1) + " 주"); CB.stat("pt-wx-o-q", CB.num(PTX.q(R.T, 0.8), 1) + " 주");
+    CB.stat("pt-wx-o-d", "+" + CB.num(R.mean - 93, 1) + " 주"); CB.stat("pt-wx-o-w", R.worst.s + "월 (" + CB.num(R.worst.v, 1) + ")");
+  }
+  run();
+})();
+</script>
+</body>
+</html>

@@ -166,28 +166,31 @@ window.CONSTRUCTION_BOOKS = [
   },
   {
     "id": "sitebook",
-    "code": "SIT",
     "title": "SiteBook",
     "subtitle": "시공과 건설관리 교과서",
     "headline": "도면이 건물이 되기까지",
-    "description": "토공과 기초, 거푸집과 콘크리트 타설, 철골 세우기, 공정표와 주공정, 물량과 원가, 품질과 안전까지 공정을 직접 짜고 비용을 계산해 보는 시공·건설관리 교과서.",
+    "description": "발주와 계약, 공사 계획과 가설, 토공·기초·골조·철골·마감 시공, CPM 공정표와 PERT 공기 위험, 자원과 공기 단축, 적산과 원가, EVM, 품질·안전·생산성까지 — 공정을 짜고 원가를 따라가 보며 기준 공사 P-B10의 숫자로 익히는 시공·건설관리 교과서.",
     "stage": "delivery",
-    "status": "planned",
+    "status": "published",
     "color": "#e8590c",
     "colorDark": "#ffa94d",
     "topics": [
-      "공종과 순서",
-      "CPM 공정표",
-      "물량·원가",
+      "계약·가설",
+      "공종별 시공",
+      "CPM·PERT",
+      "자원·공기 단축",
+      "적산·원가",
       "EVM",
-      "품질·안전"
+      "품질·안전",
+      "생산성"
     ],
     "motif": "crane",
-    "slug": "site",
-    "url": "#",
+    "code": "SIT",
     "legacyUrl": null,
-    "chapters": 0,
-    "simulators": 0
+    "slug": "site",
+    "url": "site/",
+    "chapters": 17,
+    "simulators": 128
   },
   {
     "id": "bimbook",

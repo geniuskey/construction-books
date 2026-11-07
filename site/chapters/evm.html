@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>진도 관리와 EVM · SiteBook</title>
+<meta name="description" content="계획대로 가고 있나. 진도 측정 규칙과 가중 진도, S 곡선 기준선과 ES·LS 띠, 계획 가치·획득 가치·실제 원가와 SPI·CPI, 획득 일정, EAC 예측과 TCPI, 회복 대책과 대시보드를 P-B10 50주 시나리오로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .ev-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .ev-msg b { color: var(--text); }
+  .ev-msg.ok { color: var(--ok); } .ev-msg.bad { color: var(--bad); } .ev-msg.warn { color: var(--warn); }
+  .ev-tbl td, .ev-tbl th { font-variant-numeric: tabular-nums; }
+  .ev-tbl td.ok { color: var(--ok); font-weight: 600; } .ev-tbl td.bad { color: var(--bad); font-weight: 600; } .ev-tbl td.warn { color: var(--warn); font-weight: 600; }
+  .ev-ok { color: var(--ok) !important; } .ev-bad { color: var(--bad) !important; } .ev-warn { color: var(--warn) !important; }
+  .ev-dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 14px; background: var(--canvas-bg); }
+  .ev-tile { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elev); padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+  .ev-tile h4 { margin: 0; font-size: 13.5px; color: var(--text); overflow-wrap: anywhere; }
+  .ev-tile .ev-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); font-family: var(--mono); }
+  .ev-light { width: 14px; height: 14px; border-radius: 50%; flex: none; background: var(--text-faint); box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-faint) 30%, transparent); }
+  .ev-light.g { background: var(--ok); } .ev-light.y { background: var(--warn); } .ev-light.r { background: var(--bad); }
+  .ev-tile.all { border-color: var(--accent); }
+  .ev-tile .ev-tag { font-size: 12px; color: var(--text-faint); }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="site"></script>
+</head>
+<body data-chapter="evm">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="ev-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="ev-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="ev-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+      <marker id="ev-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <marker id="ev-ah-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 13</div>
+    <h1 data-no-glossary>진도 관리와 EVM</h1>
+    <p class="lead">공정표(9장)와 실행 예산(12장)은 "이렇게 하겠다"는 약속입니다. 착공하는 순간부터 현실은 약속에서 벗어나기 시작합니다. 굴착 중에 암반이 나오고, 레미콘이 늦고, 비가 옵니다. 공사 관리자가 매주 답해야 하는 질문은 단순합니다. <b>지금 계획보다 앞서 있나, 늦었나? 돈은 계획보다 더 썼나, 덜 썼나? 이대로 가면 언제, 얼마에 끝나나?</b> 그런데 "지금까지 120억을 썼다"는 숫자만으로는 어느 질문에도 답할 수 없습니다. 120억어치 일을 했는지, 100억어치 일에 120억을 썼는지 모르기 때문입니다. 이 장은 진도를 재는 규칙에서 시작해, 계획 가치·획득 가치·실제 원가 세 곡선으로 공정과 원가를 한 장의 그림에 놓는 획득 가치 관리(EVM)를 세우고, P-B10의 50주 시점 교육용 시나리오(굴착 중 암반·용수로 4주 지연과 원가 초과)를 진단하고 회복 대책을 고릅니다.</p>
+    <ul class="objectives">
+      <li>진도 측정 방법(물량 비례, 가중 마일스톤, 0/100·50/50·20/80 규칙, 주관적 완료율)의 장단점과 적용 범위를 설명하고, 공종 진도를 비용·공수 가중치로 묶어 전체 진도를 계산한다.</li>
+      <li>CPM 결과와 비용 배분으로 ES·LS 기준 S 곡선과 그 사이 띠를 그리고, 성과 측정 기준선(PMB)의 의미를 설명한다.</li>
+      <li>PV·EV·AC에서 \(SV, CV, SPI, CPI\)를 계산하고 사분면으로 공정·원가 상태를 판정한다.</li>
+      <li>획득 일정 \(ES\)와 \(SPI(t)\)로 공정 지연을 주 단위로 표현하고, 준공 무렵 \(SPI \to 1\)이 되는 한계를 설명한다.</li>
+      <li>EAC를 세 가지 방법으로 예측하고 \(TCPI\)로 남은 일의 원가 효율 요구치를 판단한다.</li>
+      <li>지연 원인을 분석해 회복 대책(공기 단축·자원 재배치)의 비용과 효과를 비교하고, 신호등 대시보드로 보고한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 관리가 없었다면</small><b>"예산의 60 %를 썼다"가 좋은 소식인지 나쁜 소식인지 아무도 몰랐다</b></div>
+      <div class="o-body"><p>1960년대 미국 국방부와 항공우주국은 거대한 개발 사업의 원가 보고를 받으면서 같은 문제에 부딪혔습니다. 계약자는 "예산 대비 집행률"을 보고했지만, 집행률이 계획과 같다는 것은 일이 계획만큼 되었다는 뜻이 아니었습니다. 일은 늦고 돈은 그대로 나가면, 마지막 몇 달에 거대한 초과가 한꺼번에 드러났습니다. 1962년 무렵 PERT/COST가 공정 네트워크에 원가를 붙이려 했고, 1967년 미국 국방부는 계약자의 관리 체계가 갖춰야 할 기준(Cost/Schedule Control Systems Criteria, C/SCSC)을 정했습니다. 핵심 생각은 하나였습니다. <b>한 일의 양을 그 일의 예산 단가로 값을 매긴다</b>(획득 가치). 그러면 계획(무엇을 했어야 하나), 성과(무엇을 했나), 원가(얼마를 썼나)를 같은 화폐 단위로 비교할 수 있습니다.</p>
+        <p>이 기준은 1998년 산업계 표준 ANSI/EIA-748(획득 가치 관리 체계)로 넘어가 민간에도 퍼졌고, 미국 PMI의 PMBOK 가이드와 여러 나라의 공공 사업 관리 지침에 들어갔습니다. 2003년 월터 립키(Walt Lipke)는 획득 가치를 "시간"으로 다시 읽는 획득 일정(earned schedule)을 제안해, 사업 후반에 공정 지표가 무뎌지는 약점을 보완했습니다. 오늘날 건설 현장의 월간 공정·원가 보고서와 기성 검토의 상당 부분이 이 세 곡선의 언어로 쓰입니다(국내 공공 공사의 적용 지침은 현행 확인).</p>
+        <div class="o-chain"><span>공정표 · 실행 예산</span><i>→</i><span class="tool">진도 측정 · PV/EV/AC · SPI·CPI · EAC</span><i>→</i><span>회복 대책 · 보고 · 조기 경보</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="progress">
+    <h2>진도 측정: 무엇을 "한 일"로 셀까</h2>
+    <div class="problem"><strong>지하 골조는 몇 % 됐나</strong>
+      <p>P-B10의 지하 골조 F(8주, 16억 원)를 시작한 지 4주가 지났습니다. 먹매김과 철근 조립은 끝났고 거푸집이 절반쯤 섰습니다. 콘크리트는 한 차도 치지 않았습니다. 공무 담당자는 "기간의 절반이 지났으니 50 %", 공사 팀장은 "타설 전이니 아직 0 %", 철근 업체는 "철근은 다 했으니 60 %"라고 합니다. 누구의 숫자로 기성과 공정 보고를 해야 할까요?</p></div>
+    <p>모든 진도 관리는 "활동 하나가 지금 몇 % 끝났나"에서 출발합니다. 이 숫자에 활동 예산을 곱한 것이 곧 그 활동의 획득 가치이므로, 측정 규칙이 흔들리면 그 위에 쌓는 지표가 모두 흔들립니다. 그래서 측정 방법은 <b>착공 전에, 활동마다</b> 정해 두고 바꾸지 않는 것이 원칙입니다. 대표적인 방법은 다음과 같습니다.</p>
+    <div class="callout def"><strong>정의 13.1 (진도 측정 방법)</strong> 활동의 <span class="term">진도율</span><span class="en">(percent complete)</span> \(p \in [0, 1]\)을 정하는 규칙.
+      <ul>
+        <li><b>물량 비례</b>(units completed): \(p = \)완료 물량/전체 물량. 굴착 m³, 철근 t, 말뚝 본수, 커튼월 유닛 수처럼 같은 단위가 반복되는 활동에 가장 객관적이다.</li>
+        <li><span class="term">가중 마일스톤</span><span class="en">(weighted milestone)</span>: 활동을 검측 가능한 단계로 나누고 단계마다 가중치를 미리 정해, 끝난 단계의 가중치 합을 \(p\)로 한다. 예: 골조 한 층 = 먹매김·철근 20 % → 거푸집 30 % → 타설 35 % → 양생·탈형 15 %.</li>
+        <li><b>고정 공식</b>(fixed formula): 시작하면 \(x\) %, 끝나면 나머지. <span class="term">0/100 규칙</span><span class="en">(0/100 rule)</span>, 50/50, 20/80 규칙. 한두 보고 주기 안에 끝나는 짧은 활동에만 쓴다.</li>
+        <li><b>주관적 완료율</b>(percent complete estimate): 담당자의 판단. 간편하지만 낙관 편향이 있어 "90 %에서 오래 머무는" 현상이 생긴다. 근거(체크리스트·사진)를 붙인다.</li>
+        <li><span class="term">투입 비례</span><span class="en">(level of effort, LOE)</span>: 현장 관리처럼 산출물이 없는 지원 활동은 시간이 지나면 계획만큼 진도를 준다(\(EV = PV\)). 성과를 재는 것이 아니므로 비중이 크면 지표를 흐린다.</li>
+      </ul></div>
+    <figure class="diagram" id="fig-ev-rules">
+      <svg viewBox="0 0 860 330" role="img" aria-label="한 활동의 실제 진행과 0/100, 50/50, 20/80, 가중 마일스톤 규칙이 인정하는 진도 비교">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(80,36)">
+          <line x1="0" y1="240" x2="420" y2="240" class="s-axis"/><line x1="0" y1="240" x2="0" y2="0" class="s-axis"/>
+          <g class="t-mono" text-anchor="end"><text x="-8" y="244">0</text><text x="-8" y="124">50</text><text x="-8" y="76">80</text><text x="-8" y="4">100 %</text></g>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="258">시작</text><text x="210" y="258">중간</text><text x="420" y="258">완료</text></g>
+          <text x="210" y="282" text-anchor="middle" class="t-dim">활동 안의 경과 시간</text>
+          <path d="M0 240C70 236 120 214 180 172C240 128 300 60 420 0" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <path d="M0 240H418V0" style="fill:none;stroke:var(--text-dim);stroke-width:2;stroke-dasharray:6 4"/>
+          <path d="M2 240V120H420V0" style="fill:none;stroke:var(--accent-2);stroke-width:2.2"/>
+          <path d="M4 240V192H422V2" style="fill:none;stroke:var(--warn);stroke-width:2.2"/>
+          <path d="M0 240H96V192H200V120H300V36H400V0H420" style="fill:none;stroke:var(--ok);stroke-width:2.2"/>
+          <line x1="210" y1="0" x2="210" y2="240" style="stroke:var(--text-faint);stroke-dasharray:3 4"/>
+        </g>
+        <g transform="translate(540,52)" class="t">
+          <line x1="0" y1="0" x2="30" y2="0" style="stroke:var(--accent);stroke-width:3"/><text x="40" y="4">실제 물량 진도(느린 시작)</text>
+          <line x1="0" y1="32" x2="30" y2="32" style="stroke:var(--text-dim);stroke-width:2;stroke-dasharray:6 4"/><text x="40" y="36">0/100: 끝나야 인정</text>
+          <line x1="0" y1="64" x2="30" y2="64" style="stroke:var(--accent-2);stroke-width:2.2"/><text x="40" y="68">50/50: 시작 50 %, 끝 50 %</text>
+          <line x1="0" y1="96" x2="30" y2="96" style="stroke:var(--warn);stroke-width:2.2"/><text x="40" y="100">20/80: 시작 20 %, 끝 80 %</text>
+          <line x1="0" y1="128" x2="30" y2="128" style="stroke:var(--ok);stroke-width:2.2"/><text x="40" y="132">가중 마일스톤(단계 완료)</text>
+          <text x="0" y="176" class="t-dim">중간 시점에서 실제는 약 30 %인데</text>
+          <text x="0" y="196" class="t-dim">0/100은 0, 50/50은 50 %를 인정한다.</text>
+          <text x="0" y="216" class="t-dim">짧은 활동이 많으면 오차가 서로 상쇄된다.</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-1.</b> 진도 측정 규칙이 인정하는 진도(개략). 고정 공식은 측정이 쉽지만 활동이 길면 중간 시점의 오차가 크다. 가중 마일스톤은 검측 단계와 묶여 있어 객관적이고, 물량 비례는 실제 진도에 가장 가깝다.</figcaption>
+    </figure>
+    <p>고정 공식의 오차는 활동 길이에 비례합니다. 16억 원짜리 8주 활동을 0/100으로 재면 8주 동안 획득 가치가 0이었다가 마지막 주에 16억이 한꺼번에 생깁니다. 같은 일을 1주짜리 활동 8개로 쪼개 0/100을 적용하면 오차는 많아야 2억(활동 하나)입니다. 그래서 실무 지침은 고정 공식을 "한두 보고 주기 이내의 짧은 활동"에만 허용하고, 긴 활동은 물량이나 가중 마일스톤으로 재라고 권합니다. 아래 시뮬레이터에서 활동을 쪼개 보며 확인하세요.</p>
+    <div class="sim" id="sim-ev-method">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>진도 측정 규칙 비교: 지하 골조 F(8주, 16억)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ev-cv-method" aria-label="활동 F의 실제 진도와 측정 규칙별 인정 획득 가치 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경과 시간 <output id="ev-me-t-out"></output></span><input type="range" id="ev-me-t" min="0" max="8" step="0.1" value="4"></label>
+          <label class="ctrl"><span>나눈 활동 수 <output id="ev-me-n-out"></output></span><input type="range" id="ev-me-n" min="1" max="16" step="1" value="1"></label>
+          <div class="ctrl"><span>실제 진행 모양</span><div class="seg" id="ev-me-shape"><button data-value="slow" class="on">느린 시작</button><button data-value="lin">균등</button><button data-value="fast">빠른 시작</button></div></div>
+          <div class="ctrl"><span>강조할 규칙</span><div class="seg" id="ev-me-rule"><button data-value="z">0/100</button><button data-value="h" class="on">50/50</button><button data-value="t">20/80</button><button data-value="m">마일스톤</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">실제 진도(물량)</span><span class="v" id="ev-me-o-true">—</span></div>
+        <div class="stat"><span class="k">선택 규칙 EV</span><span class="v" id="ev-me-o-rule">—</span></div>
+        <div class="stat"><span class="k">오차</span><span class="v" id="ev-me-o-err">—</span></div>
+        <div class="stat"><span class="k">최대 오차(전 기간)</span><span class="v" id="ev-me-o-max">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 활동 1개, 4주 시점에서 0/100은 0억, 50/50은 8억을 인정합니다 · 나눈 활동 수를 8, 16으로 늘리면 모든 규칙의 곡선이 실제 진도에 달라붙고 최대 오차가 줄어듭니다 · "빠른 시작"이면 50/50이 오히려 과소 평가가 됩니다 · 모델: 활동 F를 같은 크기의 하위 활동 n개로 나누어 차례로 진행(교육용). 실제 진행 모양은 하위 활동마다 같은 S자/균등/오목 곡선, 마일스톤 가중치는 20·30·35·15 %(실제 진도 20·50·85·100 %에 도달할 때 인정).</div>
+    </div>
+    <div class="callout"><strong>예제 13.1 (지하 골조 F의 진도, 4주 시점)</strong> F: 8주, 예산 16억 원. 4주 시점에 먹매김·철근 조립 완료, 거푸집 절반, 타설 전. 물량으로 환산한 실제 진도는 약 40 %라고 하자.
+      <p><b>① 0/100</b> 끝나지 않았으므로 \(EV = 0\). <b>② 50/50</b> 시작했으므로 \(EV = 0.5\times16 = 8.0\)억. <b>③ 20/80</b> \(EV = 0.2\times16 = 3.2\)억.</p>
+      <p><b>④ 가중 마일스톤</b>(20·30·35·15 %) 끝난 단계는 먹매김·철근(20 %)뿐 → \(EV = 3.2\)억. 거푸집 절반은 단계가 끝나지 않았으므로 인정하지 않는다(보수적).</p>
+      <p><b>⑤ 물량 비례</b> \(EV = 0.40\times16 = 6.4\)억.</p>
+      <p><b>판정</b> 같은 현장 상태가 0에서 8억까지 다르게 보고된다. 8주짜리 활동에 고정 공식을 쓰는 것이 문제다. F처럼 층·구획 단위로 반복되는 골조는 <b>구획별 가중 마일스톤</b>(검측과 연결)이 알맞고, 굴착·말뚝처럼 물량이 분명한 활동은 물량 비례로 잰다. 측정 규칙은 계약 기성 규칙(2장)과 맞춰 미리 정한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="weighted">
+    <h2>가중 진도: 공종을 하나의 숫자로 묶기</h2>
+    <div class="problem"><strong>"전체 공정률 42 %"는 무엇을 평균한 것인가</strong>
+      <p>주간 공정 회의에서 공종별 진도는 토공 100 %, 골조 28 %, 설비 27 %, 마감 0 %입니다. 단순히 평균하면 그럴듯한 숫자가 나오지만, 마감은 골조보다 공사비가 작고 인력은 훨씬 많이 듭니다. 어떤 가중치로 묶어야 할까요?</p></div>
+    <p>전체 진도는 활동(또는 공종) 진도의 <b>가중 평균</b>입니다. 가중치로는 보통 예산(비용)을 쓰고, 노무 중심 공종의 생산성을 볼 때는 공수(인·주, 인·일)를 씁니다. 비용 가중 진도는 정의상 \(EV/BAC\)와 같으므로, 공정률 보고와 획득 가치가 한 숫자로 일치합니다. 단순 평균은 작은 공종과 큰 공종을 같은 무게로 세므로 쓰지 않습니다.</p>
+    <div class="callout def"><strong>정의 13.2 (가중 진도)</strong> 활동 \(i\)의 진도율 \(p_i\), 가중치 \(w_i\)(예산 \(BAC_i\) 또는 공수 \(H_i\))에 대해
+      <div class="formula">$$P = \frac{\sum_i w_i\,p_i}{\sum_i w_i}, \qquad w_i = BAC_i \;\Rightarrow\; P = \frac{\sum_i BAC_i\,p_i}{BAC} = \frac{EV}{BAC}$$<div class="where">계획 진도는 같은 가중치로 계획 진도율을 묶은 \(PV/BAC\)이다. 가중치는 기준선과 함께 고정한다. 가중치를 바꾸면 과거 보고와 비교할 수 없다.</div></div></div>
+    <div class="sim" id="sim-ev-weighted">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>가중 진도 계산기: P-B10 공종 진도 → 전체 진도</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ev-cv-weighted" aria-label="공종별 진도 막대와 비용·공수·단순 평균 가중 전체 진도"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>가설·흙막이·토공 <output id="ev-wt-0-out"></output></span><input type="range" id="ev-wt-0" min="0" max="100" step="1" value="100"></label>
+          <label class="ctrl"><span>기초·지하 골조 <output id="ev-wt-1-out"></output></span><input type="range" id="ev-wt-1" min="0" max="100" step="1" value="100"></label>
+          <label class="ctrl"><span>지상 골조 <output id="ev-wt-2-out"></output></span><input type="range" id="ev-wt-2" min="0" max="100" step="1" value="28"></label>
+          <label class="ctrl"><span>외장·방수·조경 <output id="ev-wt-3-out"></output></span><input type="range" id="ev-wt-3" min="0" max="100" step="1" value="0"></label>
+          <label class="ctrl"><span>설비 <output id="ev-wt-4-out"></output></span><input type="range" id="ev-wt-4" min="0" max="100" step="1" value="27"></label>
+          <label class="ctrl"><span>마감·준공 <output id="ev-wt-5-out"></output></span><input type="range" id="ev-wt-5" min="0" max="100" step="1" value="0"></label>
+          <div class="btn-row"><button class="btn" id="ev-wt-plan">50주 계획 진도</button><button class="btn" id="ev-wt-act">50주 시나리오 실적</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">비용 가중(= EV/BAC)</span><span class="v" id="ev-wt-o-c">—</span></div>
+        <div class="stat"><span class="k">공수 가중</span><span class="v" id="ev-wt-o-h">—</span></div>
+        <div class="stat"><span class="k">단순 평균</span><span class="v" id="ev-wt-o-s">—</span></div>
+        <div class="stat"><span class="k">획득 가치 EV</span><span class="v" id="ev-wt-o-ev">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(50주 시나리오 실적에 가까운 값)에서 비용 가중 39.4 %, 공수 가중 34.6 %, 단순 평균 42.5 %를 확인하세요 · "50주 계획 진도"를 누르면 비용 가중 44.7 %(= 109.0/244)가 됩니다 · 마감을 30 %로 올리면 공수 가중이 비용 가중보다 크게 오릅니다(마감은 인력 비중이 크다) · 모델: 공종 예산과 공수는 <code>CB.pm.B10</code>의 cost와 res × d(인·주)를 공종별로 합한 값(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 13.2 (P-B10 50주 시점의 전체 진도)</strong> 공종 예산(억 원)과 공수(인·주): 가설·흙막이·토공(A·B·C·D) 43, 742 / 기초·지하 골조(E·F) 26, 520 / 지상 골조(G1·G2) 58, 1,575 / 외장·방수·조경(H·K·L) 40, 592 / 설비(I) 40, 1,050 / 마감·준공(J·M) 37, 1,260. 진도율 100, 100, 28, 0, 27, 0 %.
+      <p><b>① 비용 가중</b> \(43 + 26 + 0.28\times58 + 0.27\times40 = 69 + 16.24 + 10.80 = 96.0\)억 → \(96.0/244 = 39.4\,\%\).</p>
+      <p><b>② 공수 가중</b> \(742 + 520 + 0.28\times1{,}575 + 0.27\times1{,}050 = 1{,}986\) → \(1{,}986/5{,}739 = 34.6\,\%\).</p>
+      <p><b>③ 단순 평균</b> \((100 + 100 + 28 + 0 + 27 + 0)/6 = 42.5\,\%\).</p>
+      <p><b>판정</b> 계획 진도(비용 가중)는 \(109.0/244 = 44.7\,\%\)이므로 약 5 %p 뒤져 있다. 단순 평균 42.5 %는 실제보다 좋아 보이게 만든다. 공수 가중이 더 낮은 것은 앞으로 남은 일(마감·설비·골조)이 인력이 많이 드는 일이라는 뜻이며, 남은 기간의 인력 부하(11장)가 계획보다 높아질 것을 예고한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="baseline">
+    <h2>S 곡선과 기준선</h2>
+    <div class="problem"><strong>40주에 얼마를 써 있어야 정상인가</strong>
+      <p>P-B10 공사비 244억 원을 93주에 나누면 주당 2.6억 원이지만, 실제 투입은 착공 직후 느리고, 골조·커튼월·설비가 겹치는 중반에 빠르며, 마감이 끝나 가면 다시 느려집니다. 게다가 여유가 있는 활동(말뚝, 설비, 옥상 방수)을 언제 시작하느냐에 따라 같은 공정표에서도 누적 곡선이 달라집니다. "정상 범위"를 어떻게 그릴까요?</p></div>
+    <p>활동별 예산을 공정표의 시간 위에 펼치고(12장의 원가 계획) 누적하면 <span class="term">S 곡선</span><span class="en">(S-curve)</span>이 됩니다. 모든 활동을 가장 이른 시작(ES)에 두면 위쪽 곡선, 가장 늦은 시작(LS)에 두면 아래쪽 곡선이 나오고, 둘 사이의 띠는 "여유를 쓰는 범위 안에서 가능한 모든 계획"을 담습니다. 처음과 끝, 그리고 주공정이 모든 것을 정하는 구간에서는 띠가 좁고, 여유가 큰 활동이 많은 구간에서는 넓습니다.</p>
+    <div class="callout def"><strong>정의 13.3 (성과 측정 기준선)</strong> 승인된 공정표에 따라 활동 예산을 시간에 배분한 누적 곡선을 <span class="term">성과 측정 기준선</span><span class="en">(performance measurement baseline, PMB)</span>이라 하고, 그 값 \(PV(t)\)를 시점 \(t\)의 <span class="term">계획 가치</span><span class="en">(planned value, PV)</span>라 한다. 활동 안에서 균등 배분하면
+      <div class="formula">$$PV(t) = \sum_i BAC_i \cdot \min\!\left(1,\ \max\!\left(0,\ \frac{t - S_i}{d_i}\right)\right), \qquad PV(T) = BAC$$<div class="where">\(S_i\): 기준선이 정한 활동 \(i\)의 시작(ES 또는 승인된 시작), \(d_i\): 기간, \(BAC\): <span class="term">완료 시 예산</span><span class="en">(budget at completion, BAC)</span>. 예비비(관리 예비비)는 PMB에 넣지 않는다. 기준선은 승인된 설계 변경으로만 바꾼다(<span class="term">재기준선</span><span class="en">(re-baselining)</span>). 지연을 감추려고 기준선을 고치는 것은 측정 자체를 무너뜨린다.</div></div></div>
+    <figure class="diagram" id="fig-ev-band">
+      <svg viewBox="0 0 860 330" role="img" aria-label="ES 기준과 LS 기준 누적 비용 곡선과 그 사이의 띠, 기준선 선택">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(80,30)">
+          <path d="M0 250C80 236 140 200 220 140C300 80 380 22 520 10L520 10C440 18 360 60 300 110C220 176 120 236 0 250Z" style="fill:var(--accent-soft);stroke:none"/>
+          <line x1="0" y1="250" x2="540" y2="250" class="s-axis"/><line x1="0" y1="250" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 250C80 236 140 200 220 140C300 80 380 22 520 10" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <path d="M0 250C120 236 220 176 300 110C360 60 440 18 520 10" style="fill:none;stroke:var(--accent-2);stroke-width:2.6"/>
+          <path d="M0 250C100 238 180 190 260 126C330 72 410 20 520 10" style="fill:none;stroke:var(--text-dim);stroke-width:2;stroke-dasharray:7 5"/>
+          <line x1="0" y1="10" x2="540" y2="10" style="stroke:var(--text-faint);stroke-dasharray:3 4"/>
+          <text x="-8" y="14" text-anchor="end" class="t-mono">BAC</text>
+          <text x="260" y="270" text-anchor="middle" class="t-dim">시간(주)</text>
+          <text x="-40" y="130" text-anchor="middle" class="t-dim" transform="rotate(-90 -40 130)">누적 비용</text>
+          <text x="140" y="168" class="t-mono" style="fill:var(--accent)">ES 기준(위)</text>
+          <text x="330" y="152" class="t-mono" style="fill:var(--accent-2)">LS 기준(아래)</text>
+          <text x="250" y="96" class="t-mono">채택한 기준선 PMB</text>
+          <line x1="244" y1="100" x2="262" y2="122" style="stroke:var(--text-dim)" marker-end="url(#ev-ah-dim)"/>
+          <text x="520" y="268" text-anchor="middle" class="t-mono">T = 93</text>
+        </g>
+        <g transform="translate(640,64)" class="t-dim">
+          <text x="0" y="0">띠의 폭 = 여유를 어떻게</text>
+          <text x="0" y="20">쓰느냐에 따른 자금 흐름 차이</text>
+          <text x="0" y="56">ES에 가까울수록</text>
+          <text x="0" y="76">일찍 쓰고 공기 위험 작음</text>
+          <text x="0" y="112">LS에 가까울수록</text>
+          <text x="0" y="132">늦게 쓰지만 여유가 없음</text>
+          <text x="0" y="168">실적 곡선이 띠 아래로</text>
+          <text x="0" y="188">벗어나면 경보</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-2.</b> S 곡선의 띠(개략). 같은 공정표라도 여유 활동의 시작 시점에 따라 누적 곡선은 ES 곡선과 LS 곡선 사이 어디에나 놓일 수 있다. 실무에서는 자원 평준화(11장)와 현금 흐름(12장)을 고려해 그 사이의 한 곡선을 기준선으로 승인한다. 이 책의 P-B10 기준선은 ES 기준이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ev-scurve">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>P-B10 S 곡선 기준선: ES·LS 띠와 여유 활동의 위치</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ev-cv-scurve" aria-label="P-B10의 ES 기준·LS 기준 누적 비용 곡선과 그 사이의 띠, 주간 비용 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>읽을 시점 t <output id="ev-sc-t-out"></output></span><input type="range" id="ev-sc-t" min="0" max="93" step="1" value="40"></label>
+          <label class="ctrl"><span>설비 I 시작 늦춤 <output id="ev-sc-i-out"></output></span><input type="range" id="ev-sc-i" min="0" max="21" step="1" value="0"></label>
+          <label class="ctrl"><span>말뚝 D 시작 늦춤 <output id="ev-sc-d-out"></output></span><input type="range" id="ev-sc-d" min="0" max="16" step="1" value="0"></label>
+          <div class="ctrl"><span>아래 막대</span><div class="seg" id="ev-sc-bar"><button data-value="cost" class="on">주간 비용</button><button data-value="res">주간 인원</button><button data-value="none">없음</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">PV<sub>ES</sub>(t)</span><span class="v" id="ev-sc-o-es">—</span></div>
+        <div class="stat"><span class="k">PV<sub>LS</sub>(t)</span><span class="v" id="ev-sc-o-ls">—</span></div>
+        <div class="stat"><span class="k">조정 계획(t)</span><span class="v" id="ev-sc-o-adj">—</span></div>
+        <div class="stat"><span class="k">띠 폭 · 계획 진도</span><span class="v" id="ev-sc-o-w">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: t = 40에서 ES 75.7억, LS 73.0억, t = 60에서 ES 155.4억, LS 125.5억을 확인하세요(띠가 가장 넓은 구간은 여유가 큰 설비 I가 걸친 50–70주) · 설비 I를 21주(전체 여유)까지 늦추면 조정 계획 곡선이 LS 곡선에 붙고 공기는 그대로 93주입니다 · 늦춤은 각 활동의 전체 여유 안으로 제한됩니다 · 모델: <code>CB.pm.cpm</code>과 <code>CB.pm.spread</code>(활동 안 균등 배분), 조정 계획은 I·D의 시작만 옮긴 ES 계획(후행 활동은 여유 안이므로 영향 없음).</div>
+    </div>
+    <div class="callout"><strong>예제 13.3 (P-B10의 40주·60주 계획 가치)</strong> CPM 결과(9장): A 0–4, B 4–14, D 4–10, C 14–26, E 26–30, F 30–38, G1 38–53, I 38–68(ES 기준).
+      <p><b>① 40주, ES 기준</b> 끝난 활동 A·B·D·C·E·F: \(3 + 18 + 8 + 14 + 10 + 16 = 69\)억. 진행 중 G1: \(30\times2/15 = 4.0\), I: \(40\times2/30 = 2.67\). 합계 \(PV_{ES}(40) = 75.7\)억.</p>
+      <p><b>② 40주, LS 기준</b> D의 LS는 20주, I의 LS는 59주이므로 D는 끝났고 I는 시작 전 → \(69 + 4.0 = 73.0\)억. 띠 폭 2.7억(작다).</p>
+      <p><b>③ 60주, ES 기준</b> \(69 + 30 + 28\times7/15 + 32\times7/16 + 40\times22/30 = 69 + 30 + 13.07 + 14.0 + 29.33 = 155.4\)억. LS 기준은 125.5억(I가 59주에야 시작, G2의 LS가 54주) → 띠 폭 약 30억.</p>
+      <p><b>판정</b> 60주 무렵에는 같은 공정표 안에서도 누적 투입이 약 30억 원(BAC의 12 %) 다를 수 있다. 그래서 "계획 대비 실적"을 말하려면 어떤 기준선(ES·LS·평준화 계획)과 비교하는지 먼저 정해야 한다. 이 책은 ES 기준선을 P-B10의 PMB로 쓴다.</p></div>
+    <div class="callout site"><strong>P-B10 성과 측정 기준선</strong> BAC 244억 원, 계획 공기 93주, ES 기준 누적 계획 가치: 10주 21.8, 20주 36.0, 30주 53.0, 40주 75.7, 50주 <b>109.0</b>, 60주 155.4, 70주 202.2, 80주 226.2, 93주 244.0억 원. LS 기준 50주 93.0억, 60주 125.5억. 계획 진도(비용 가중) 50주 44.7 %. 금액은 직접·간접·일반 관리비를 활동에 배분한 교육용 값이다(12장).</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="earned-value">
+    <h2>획득 가치: 세 곡선과 네 지표</h2>
+    <div class="problem"><strong>50주 보고서: 102억을 썼다. 좋은가 나쁜가?</strong>
+      <p>50주 시점 P-B10의 누적 실제 지출은 102.3억 원, 계획 가치는 109.0억 원입니다. "계획보다 6.7억 덜 썼으니 절감"이라고 보고해도 될까요? 굴착이 4주 늦어진 것은 모두 압니다.</p></div>
+    <p>계획 대비 지출만 비교하면 공정 지연과 원가 절감이 구분되지 않습니다. 일이 늦으면 돈도 늦게 나가므로 지출이 계획보다 적게 보입니다. 획득 가치 관리는 세 번째 숫자를 더해 이 혼동을 풉니다. <b>지금까지 한 일을 예산 단가로 값을 매긴 것</b>, 곧 획득 가치입니다.</p>
+    <div class="callout def"><strong>정의 13.4 (세 가지 기본 값)</strong> <span class="term">상태 기준일</span><span class="en">(status date, data date)</span> \(t\)에서
+      <ul>
+        <li><b>계획 가치</b> \(PV\): 기준선상 \(t\)까지 했어야 할 일의 예산(정의 13.3).</li>
+        <li><span class="term">획득 가치</span><span class="en">(earned value, EV)</span> \(EV = \sum_i BAC_i\,p_i\): 실제로 한 일의 예산. 진도율 \(p_i\)는 정의 13.1의 규칙으로 잰다.</li>
+        <li><span class="term">실제 원가</span><span class="en">(actual cost, AC)</span>: 실제로 한 일에 실제로 든 원가. EV와 같은 범위(같은 작업, 같은 원가 항목)로 집계해야 한다. 발생주의(투입·검수 기준)로 잡고 대금 지급 시점과 섞지 않는다.</li>
+      </ul></div>
+    <div class="callout def"><strong>정의 13.5 (차이와 지수)</strong>
+      <div class="formula">$$SV = EV - PV,\quad CV = EV - AC,\qquad SPI = \frac{EV}{PV},\quad CPI = \frac{EV}{AC}$$<div class="where"><span class="term">일정 차이</span><span class="en">(schedule variance, SV)</span>와 <span class="term">원가 차이</span><span class="en">(cost variance, CV)</span>는 음수면 불리(지연·초과)하다. <span class="term">공정 성과 지수</span><span class="en">(schedule performance index, SPI)</span> 0.9는 "계획한 일의 90 %만 했다", <span class="term">원가 성과 지수</span><span class="en">(cost performance index, CPI)</span> 0.9는 "1원을 써서 0.9원어치 일을 했다"는 뜻이다. SV는 시간이 아니라 금액 단위라는 점에 주의한다(시간 단위는 정의 13.6).</div></div></div>
+    <figure class="diagram" id="fig-ev-curves">
+      <svg viewBox="0 0 860 340" role="img" aria-label="상태 기준일에서 계획 가치, 획득 가치, 실제 원가 곡선과 일정 차이·원가 차이, 완료 시 예상 원가">
+        <rect x="10" y="10" width="840" height="320" rx="10" class="f-surface"/>
+        <g transform="translate(80,26)">
+          <line x1="0" y1="260" x2="600" y2="260" class="s-axis"/><line x1="0" y1="260" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 260C90 248 160 214 240 160C320 104 420 40 540 30" style="fill:none;stroke:var(--text-dim);stroke-width:2.4;stroke-dasharray:7 5"/>
+          <path d="M0 260C90 250 160 224 270 182" style="fill:none;stroke:var(--ok);stroke-width:3"/>
+          <path d="M0 260C90 248 160 216 270 168" style="fill:none;stroke:var(--bad);stroke-width:3"/>
+          <path d="M270 168C360 120 450 50 580 14" style="fill:none;stroke:var(--bad);stroke-width:1.6;stroke-dasharray:3 4"/>
+          <line x1="270" y1="0" x2="270" y2="260" style="stroke:var(--text-faint);stroke-dasharray:3 4"/>
+          <text x="270" y="278" text-anchor="middle" class="t-mono">상태 기준일 t</text>
+          <line x1="0" y1="30" x2="600" y2="30" style="stroke:var(--text-faint);stroke-dasharray:2 4"/><text x="-6" y="34" text-anchor="end" class="t-mono">BAC</text>
+          <line x1="0" y1="14" x2="600" y2="14" style="stroke:var(--bad);stroke-dasharray:2 4;opacity:.6"/><text x="-6" y="16" text-anchor="end" class="t-mono" style="fill:var(--bad)">EAC</text>
+          <line x1="292" y1="138" x2="292" y2="180" style="stroke:var(--accent-2);stroke-width:2" marker-start="url(#ev-ah-a2)" marker-end="url(#ev-ah-a2)"/>
+          <text x="300" y="158" class="t-mono" style="fill:var(--accent-2)">SV = EV − PV</text>
+          <line x1="252" y1="168" x2="252" y2="182" style="stroke:var(--accent);stroke-width:2"/>
+          <text x="140" y="196" class="t-mono" style="fill:var(--accent)">CV = EV − AC</text>
+          <line x1="200" y1="192" x2="246" y2="178" style="stroke:var(--accent)" marker-end="url(#ev-ah-acc)"/>
+          <line x1="232" y1="182" x2="270" y2="182" style="stroke:var(--accent-2);stroke-dasharray:2 3"/>
+          <text x="300" y="214" class="t-mono">ES(획득 일정): EV가 PV 곡선과 같아지는 시점</text>
+          <text x="560" y="276" text-anchor="middle" class="t-mono">T(계획 공기)</text>
+          <text x="-40" y="130" text-anchor="middle" class="t-dim" transform="rotate(-90 -40 130)">누적 금액(억 원)</text>
+        </g>
+        <g transform="translate(700,60)" class="t">
+          <line x1="0" y1="0" x2="28" y2="0" style="stroke:var(--text-dim);stroke-width:2.4;stroke-dasharray:7 5"/><text x="36" y="4">PV</text>
+          <line x1="0" y1="28" x2="28" y2="28" style="stroke:var(--ok);stroke-width:3"/><text x="36" y="32">EV</text>
+          <line x1="0" y1="56" x2="28" y2="56" style="stroke:var(--bad);stroke-width:3"/><text x="36" y="60">AC</text>
+          <text x="0" y="100" class="t-dim">EV 아래 PV</text><text x="0" y="118" class="t-dim">→ 늦다</text>
+          <text x="0" y="148" class="t-dim">AC 위 EV</text><text x="0" y="166" class="t-dim">→ 비싸다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-3.</b> 획득 가치 관리의 세 곡선(개략). PV(회색 점선)는 기준선, EV(초록)는 한 일의 예산 가치, AC(빨강)는 실제 원가다. 상태 기준일에서 EV와 PV의 세로 차이가 일정 차이, EV와 AC의 세로 차이가 원가 차이이며, 현재 효율이 계속되면 AC 곡선은 BAC보다 높은 EAC에서 끝난다.</figcaption>
+    </figure>
+    <p>두 지수를 좌표로 놓으면 상태를 한눈에 분류할 수 있습니다(그림 13-4). 오른쪽 위(\(SPI \ge 1, CPI \ge 1\))는 앞서고 절감, 왼쪽 아래는 늦고 초과입니다. 왼쪽 위(늦지만 싸다)는 흔히 "인력을 덜 넣어서 일이 늦다"는 신호이고, 오른쪽 아래(빠르지만 비싸다)는 초과 근무나 추가 장비로 공기를 산 경우에 자주 나타납니다. 지수가 1에서 조금 벗어나는 것은 측정 잡음이므로, 보통 ±5 %나 ±10 % 같은 허용 범위를 정해 그 밖으로 나갈 때 원인 분석을 합니다(허용 범위는 사업마다 정한다).</p>
+    <figure class="diagram" id="fig-ev-quad">
+      <svg viewBox="0 0 860 320" role="img" aria-label="SPI와 CPI 좌표 평면의 네 사분면과 허용 범위">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(90,30)">
+          <rect x="0" y="0" width="200" height="120" style="fill:color-mix(in srgb, var(--warn) 14%, transparent)"/>
+          <rect x="200" y="0" width="200" height="120" style="fill:color-mix(in srgb, var(--ok) 16%, transparent)"/>
+          <rect x="0" y="120" width="200" height="120" style="fill:color-mix(in srgb, var(--bad) 16%, transparent)"/>
+          <rect x="200" y="120" width="200" height="120" style="fill:color-mix(in srgb, var(--warn) 14%, transparent)"/>
+          <rect x="180" y="100" width="40" height="40" style="fill:none;stroke:var(--text-dim);stroke-dasharray:4 3"/>
+          <line x1="0" y1="240" x2="400" y2="240" class="s-axis"/><line x1="0" y1="240" x2="0" y2="0" class="s-axis"/>
+          <line x1="200" y1="0" x2="200" y2="240" style="stroke:var(--axis)"/><line x1="0" y1="120" x2="400" y2="120" style="stroke:var(--axis)"/>
+          <g class="t" text-anchor="middle"><text x="100" y="56">늦지만 절감</text><text x="300" y="56">앞서고 절감</text><text x="100" y="186">늦고 초과</text><text x="300" y="186">앞서지만 초과</text></g>
+          <g class="t-mono" text-anchor="middle"><text x="100" y="76">투입 부족?</text><text x="300" y="76">기준선 보수적?</text><text x="100" y="206">가장 위험</text><text x="300" y="206">공기를 돈으로 삼</text></g>
+          <g class="t-mono"><text x="200" y="258" text-anchor="middle">SPI = 1</text><text x="-8" y="124" text-anchor="end">1</text><text x="400" y="258" text-anchor="end">SPI →</text><text x="-8" y="10" text-anchor="end">CPI</text></g>
+          <circle cx="152" cy="146" r="7" style="fill:var(--accent)"/>
+          <text x="40" y="160" class="t-mono" style="fill:var(--accent)">P-B10 50주</text>
+          <text x="150" y="96" class="t-mono" style="fill:var(--text-dim)">허용 범위</text>
+        </g>
+        <g transform="translate(530,50)" class="t-dim">
+          <text x="0" y="0">P-B10 50주(교육용 시나리오)</text>
+          <text x="0" y="24" class="t-mono">SPI = 95.7/109.0 = 0.878</text>
+          <text x="0" y="44" class="t-mono">CPI = 95.7/102.3 = 0.935</text>
+          <text x="0" y="78">→ 늦고 초과(왼쪽 아래)</text>
+          <text x="0" y="112">지수만으로는 원인을 모른다.</text>
+          <text x="0" y="132">어느 활동이 지수를 끌어내렸는지</text>
+          <text x="0" y="152">활동·공종별로 내려가 본다</text>
+          <text x="0" y="172">(13.8절 대시보드).</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-4.</b> SPI–CPI 사분면. 가운데 점선 상자는 허용 범위(예: ±5 %)다. 사분면은 원인에 대한 가설을 주지만 원인 자체는 아니다. 같은 "늦고 초과"라도 설계 변경, 지반 조건, 생산성 저하에 따라 대책이 다르다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ev-calc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>EVM 계산기: PV · EV · AC → 모든 지표와 판정</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ev-cv-calc" aria-label="PV, EV, AC 막대와 SV, CV, 그리고 SPI–CPI 사분면 위의 점"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>BAC <output id="ev-ca-bac-out"></output></span><input type="range" id="ev-ca-bac" min="50" max="400" step="1" value="244"></label>
+          <label class="ctrl"><span>계획 가치 PV <output id="ev-ca-pv-out"></output></span><input type="range" id="ev-ca-pv" min="0" max="400" step="0.01" value="109"></label>
+          <label class="ctrl"><span>획득 가치 EV <output id="ev-ca-ev-out"></output></span><input type="range" id="ev-ca-ev" min="0" max="400" step="0.01" value="95.67"></label>
+          <label class="ctrl"><span>실제 원가 AC <output id="ev-ca-ac-out"></output></span><input type="range" id="ev-ca-ac" min="0" max="450" step="0.01" value="102.29"></label>
+          <label class="ctrl"><span>허용 범위 ± <output id="ev-ca-tol-out"></output></span><input type="range" id="ev-ca-tol" min="1" max="15" step="1" value="5"></label>
+          <div class="btn-row"><button class="btn" id="ev-ca-p1">P-B10 50주</button><button class="btn" id="ev-ca-p2">앞서고 초과</button><button class="btn" id="ev-ca-p3">늦지만 절감</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">SV · SPI</span><span class="v" id="ev-ca-o-s">—</span></div>
+        <div class="stat"><span class="k">CV · CPI</span><span class="v" id="ev-ca-o-c">—</span></div>
+        <div class="stat"><span class="k">EAC = BAC/CPI</span><span class="v" id="ev-ca-o-eac">—</span></div>
+        <div class="stat"><span class="k">ETC · VAC</span><span class="v" id="ev-ca-o-etc">—</span></div>
+        <div class="stat"><span class="k">TCPI(BAC)</span><span class="v" id="ev-ca-o-tc">—</span></div>
+      </div>
+      <div class="ev-msg" id="ev-ca-msg">—</div>
+      <div class="sim-note">해볼 것: 기본값(P-B10 50주)에서 SPI 0.878, CPI 0.935, EAC 260.9억, TCPI 1.047을 확인하세요 · AC를 BAC 이상으로 올리면 TCPI(BAC)는 계산할 수 없습니다(이미 예산을 다 씀) · EV를 PV와 같게 하면 공정은 정상이고 원가만 보입니다 · 모델: <code>CB.pm.evm</code>(EAC = BAC/CPI, ETC = EAC − AC, VAC = BAC − EAC, TCPI = (BAC − EV)/(BAC − AC)), 판정 색은 허용 범위 기준(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 13.4 (P-B10 50주 진단)</strong> 상태 기준일 50주, BAC 244억 원. 기준선(ES) \(PV = 109.0\)억, 시나리오의 \(EV = 95.7\)억, \(AC = 102.3\)억(아래 기준 공사 노트).
+      <p><b>① 차이</b> \(SV = 95.7 - 109.0 = -13.3\)억(지연), \(CV = 95.7 - 102.3 = -6.6\)억(초과).</p>
+      <p><b>② 지수</b> \(SPI = 95.7/109.0 = 0.878\), \(CPI = 95.7/102.3 = 0.935\). 계획한 일의 88 %만 했고, 1원으로 0.935원어치 일을 했다.</p>
+      <p><b>③ 예측</b> 현재 원가 효율이 계속되면 \(EAC = 244/0.935 = 260.9\)억, \(ETC = 260.9 - 102.3 = 158.6\)억, \(VAC = 244 - 260.9 = -16.9\)억(약 6.9 % 초과).</p>
+      <p><b>④ 요구 효율</b> 예산 안에서 끝내려면 남은 일 \(244 - 95.7 = 148.3\)억어치를 남은 예산 \(244 - 102.3 = 141.7\)억으로 해야 한다. \(TCPI = 148.3/141.7 = 1.047\).</p>
+      <p><b>판정</b> 왼쪽 아래 사분면(늦고 초과). SPI 0.878은 허용 범위(±5 %)를 크게 벗어나므로 원인 분석과 회복 대책이 필요하다. TCPI 1.047은 지금까지의 CPI 0.935보다 12 % 높은 효율을 남은 기간 내내 내야 한다는 뜻으로, 실무에서는 TCPI가 CPI보다 0.05–0.10 이상 크면 "예산 달성은 비현실적"으로 보고 EAC를 공식화하는 것이 보통이다(경험칙, 사업마다 다름).</p></div>
+    <div class="callout site"><strong>P-B10 진도 시나리오(교육용, 13장 정의)</strong> 기준선은 ES 기준(93주, BAC 244억). 실적 시나리오: A·B·D는 계획대로(B 원가 +3 %). 굴착 C는 14주에 시작해 20주까지 계획대로 50 %를 마쳤으나, <b>20주부터 암반과 지하수 유입</b>으로 나머지 50 %에 6주 대신 10주가 걸려 30주에 끝났다(4주 지연, 그 구간 원가 1.5배: 암 파쇄·추가 배수). 이후 활동은 4주씩 밀려 E 30–34, F 34–42, G1 42–57, I 42–72, G2·H 57부터, J 73–93, M 93–97주(실적 원가 계수 E·F 1.05, G1 1.06, G2 1.04, H·I·J 1.02–1.03, 나머지 1.00). <b>50주 시점: PV 109.0, EV 95.7, AC 102.3억 원 → SV −13.3, CV −6.6억, SPI 0.878, CPI 0.935, EAC(BAC/CPI) 260.9억, ETC 158.6억, VAC −16.9억, TCPI 1.047, 획득 일정 ES 46.0주, SPI(t) 0.920.</b> 대책 없이 가면 준공 97주, 최종 원가 약 254.8억(시간 비례 간접비 연장분 제외).</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="tracking">
+    <h2>시간에 따른 추적과 획득 일정</h2>
+    <div class="problem"><strong>지연은 몇 주인가</strong>
+      <p>SV = −13.3억 원이라는 숫자를 들은 발주자가 묻습니다. "그래서 몇 주 늦었습니까?" 금액으로 표시한 일정 차이는 곧바로 주 단위로 바뀌지 않습니다. 게다가 공사가 끝나 갈수록 SV는 0으로, SPI는 1로 돌아갑니다. 준공이 4주 늦은 공사도 마지막 날에는 EV = PV = BAC가 되기 때문입니다.</p></div>
+    <p>획득 가치를 매주 기록하면 세 곡선이 자라는 모습과 지수의 시계열을 얻습니다. 지수 하나보다 <b>추세</b>가 중요합니다. CPI가 몇 주째 계속 내려가면 원인이 계속 작동하고 있다는 뜻이고, 한 번 떨어진 뒤 평평하면 일회성 사건(이번 시나리오의 암반)이었다는 뜻입니다. 시간 단위 지연은 <b>획득 일정</b>으로 읽습니다. 지금까지의 EV를 계획 곡선 위에 수평으로 옮겨 "이만큼의 일은 계획상 언제 끝났어야 했나"를 찾는 것입니다(그림 13-5).</p>
+    <div class="callout def"><strong>정의 13.6 (획득 일정)</strong> 상태 기준일 \(AT\)(actual time)에서 \(PV(ES) = EV(AT)\)를 만족하는 시점 \(ES\)를 <span class="term">획득 일정</span><span class="en">(earned schedule, ES)</span>이라 한다.
+      <div class="formula">$$SV(t) = ES - AT, \qquad SPI(t) = \frac{ES}{AT}, \qquad IEAC(t) = \frac{T}{SPI(t)}$$<div class="where">\(SV(t)\)는 주 단위 일정 차이(음수면 지연), \(IEAC(t)\)는 현재 속도가 계속될 때의 예상 공기(\(T\): 계획 공기). 금액 기준 SPI와 달리 \(SPI(t)\)는 준공이 늦으면 마지막까지 1보다 작게 남는다. 획득 일정의 "ES"는 CPM의 가장 이른 시작(ES)과 다른 뜻이므로, 이 장에서는 문맥을 밝혀 쓴다.</div></div></div>
+    <figure class="diagram" id="fig-ev-es">
+      <svg viewBox="0 0 860 300" role="img" aria-label="획득 가치를 계획 곡선에 수평으로 옮겨 획득 일정을 찾는 그림">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(80,24)">
+          <line x1="0" y1="230" x2="560" y2="230" class="s-axis"/><line x1="0" y1="230" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 230C90 220 170 190 250 140C330 90 420 30 540 14" style="fill:none;stroke:var(--text-dim);stroke-width:2.4;stroke-dasharray:7 5"/>
+          <path d="M0 230C90 222 170 200 290 158" style="fill:none;stroke:var(--ok);stroke-width:3"/>
+          <circle cx="290" cy="158" r="5" style="fill:var(--ok)"/>
+          <line x1="290" y1="158" x2="236" y2="158" style="stroke:var(--accent);stroke-width:2" marker-end="url(#ev-ah-acc)"/>
+          <circle cx="232" cy="158" r="4" style="fill:var(--accent)"/>
+          <line x1="232" y1="158" x2="232" y2="230" style="stroke:var(--accent);stroke-dasharray:3 3"/>
+          <line x1="290" y1="158" x2="290" y2="230" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="232" y="248" text-anchor="middle" class="t-mono" style="fill:var(--accent)">ES = 46</text>
+          <text x="296" y="248" text-anchor="start" class="t-mono">AT = 50</text>
+          <line x1="232" y1="214" x2="290" y2="214" style="stroke:var(--bad);stroke-width:1.6" marker-start="url(#ev-ah-bad)" marker-end="url(#ev-ah-bad)"/>
+          <text x="262" y="206" text-anchor="middle" class="t-mono" style="fill:var(--bad)">SV(t) = −4주</text>
+          <text x="300" y="150" class="t-mono" style="fill:var(--ok)">EV(50) = 95.7억</text>
+          <text x="120" y="150" class="t-mono">PV(46) = 95.7억</text>
+          <text x="440" y="56" class="t-mono">PV(ES 기준선)</text>
+        </g>
+        <g transform="translate(680,60)" class="t-dim">
+          <text x="0" y="0">SPI(t) = 46/50</text>
+          <text x="0" y="20">= 0.920</text>
+          <text x="0" y="56">IEAC(t) = 93/0.92</text>
+          <text x="0" y="76">≈ 101주</text>
+          <text x="0" y="112">금액 SPI 0.878로</text>
+          <text x="0" y="132">93/0.878 ≈ 106주는</text>
+          <text x="0" y="152">과대 추정</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-5.</b> 획득 일정. 50주까지 한 일(95.7억)은 기준선상 46주에 끝났어야 할 양이므로 4주 늦었다. 이 4주가 시나리오의 굴착 지연 4주와 정확히 같은 것은 지연 뒤 다른 활동이 계획 속도로 진행되었기 때문이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ev-track">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>P-B10 EVM 추적: 주 슬라이더로 세 곡선과 지수 시계열</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ev-cv-track" aria-label="P-B10 시나리오의 PV, EV, AC 누적 곡선과 SPI, CPI, SPI(t) 시계열"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>상태 기준일 AT <output id="ev-tr-t-out"></output></span><input type="range" id="ev-tr-t" min="0" max="97" step="1" value="50"></label>
+          <div class="btn-row"><button class="btn" id="ev-tr-play">▶ 재생</button></div>
+          <div class="ctrl"><span>시나리오</span><div class="seg" id="ev-tr-sc"><button data-value="base" class="on">암반·용수</button><button data-value="sys">전반적 저효율</button></div></div>
+          <div class="ctrl"><span>아래 그래프</span><div class="seg" id="ev-tr-low"><button data-value="idx" class="on">지수</button><button data-value="var">차이(억)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">PV · EV · AC</span><span class="v" id="ev-tr-o-v">—</span></div>
+        <div class="stat"><span class="k">SPI · CPI</span><span class="v" id="ev-tr-o-i">—</span></div>
+        <div class="stat"><span class="k">획득 일정 ES · SV(t)</span><span class="v" id="ev-tr-o-es">—</span></div>
+        <div class="stat"><span class="k">SPI(t) · IEAC(t)</span><span class="v" id="ev-tr-o-t">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 20주까지는 세 곡선이 겹치다가 20–30주에 EV가 PV 아래로, AC가 EV 위로 갈라지는 것을 보세요 · 50주에서 PV 109.0, EV 95.7, AC 102.3 · 재생해서 80주 이후 SPI가 1로 돌아가는데 SPI(t)는 약 0.96에 머무는 것을 확인하세요 · "전반적 저효율"은 지연·초과가 공사 내내 퍼진 대조 시나리오입니다(CPI가 계속 낮게 유지) · 모델: 실적은 활동별 실제 시작·기간·원가 계수(기준 공사 노트)로 계산한 교육용 값, PV는 <code>CB.pm.spread</code>의 ES 기준 누적, 지수는 <code>CB.pm.evm</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 13.5 (획득 일정)</strong> 50주의 \(EV = 95.7\)억. ES 기준 누적 계획은 45주 92.3억, 46주 95.7억(I·G1이 진행 중인 구간, 주당 약 3.3억).
+      <p><b>① 획득 일정</b> \(PV(46) = 95.7 = EV\) → \(ES = 46.0\)주.</p>
+      <p><b>② 시간 지표</b> \(SV(t) = 46.0 - 50 = -4.0\)주, \(SPI(t) = 46/50 = 0.920\).</p>
+      <p><b>③ 공기 예측</b> 현재 속도가 계속되면 \(IEAC(t) = 93/0.920 = 101\)주. 금액 SPI로 나누면 \(93/0.878 = 106\)주가 되어 지나치게 비관적이다(금액 SPI는 지출 속도가 큰 중반에 과장된다).</p>
+      <p><b>판정</b> 지연이 일회성 사건(암반)이고 이후 속도가 계획대로라면 "지연 일수 그대로" 97주에 끝난다. 속도 자체가 떨어진 것이라면 약 101주다. 어느 쪽인지는 지수의 추세(시뮬레이터)로 판단한다. 이 시나리오는 30주 이후 \(SV(t)\)가 −4주에 머물러 있으므로 앞의 경우에 가깝다.</p></div>
+    <div class="callout deep"><strong>심화: 왜 금액 SPI는 끝에 1이 되나</strong> \(SPI = EV/PV\)에서 계획 공기 \(T\) 이후에는 \(PV = BAC\)로 고정되고 EV는 언젠가 BAC에 이르므로, 늦은 공사도 결국 \(SPI = 1\)이 된다. 대략 공사의 2/3가 지나면 금액 SPI는 지연을 과소 표시하기 시작한다는 것이 획득 일정 연구의 관찰이다. 또한 SPI는 주공정을 구분하지 못한다. 여유가 많은 설비 I가 앞서 가고 주공정 커튼월이 늦으면 SPI는 1에 가깝게 나오지만 준공은 늦는다. 그래서 EVM 지표는 반드시 CPM 공정표(주공정의 여유)와 함께 본다(9장).</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="forecast">
+    <h2>완료 시 예상 원가와 남은 일의 효율</h2>
+    <div class="problem"><strong>최종 공사비를 얼마로 보고할까</strong>
+      <p>본사는 50주 보고서에서 "준공 시 원가"를 요구합니다. CPI로 나누면 260.9억, 지연까지 반영하면 283억, "나머지는 계획대로"라고 하면 250.6억입니다. 같은 자료에서 30억 원 넘게 차이 나는 세 답 가운데 무엇을 내야 할까요?</p></div>
+    <p><span class="term">완료 시 예상 원가</span><span class="en">(estimate at completion, EAC)</span>는 "지금까지 쓴 돈 + 남은 일에 들 돈"입니다. 앞부분 AC는 사실이고, 차이는 뒷부분 <span class="term">잔여 공사 예상 원가</span><span class="en">(estimate to complete, ETC)</span>를 어떻게 가정하느냐에서 나옵니다. 각 공식은 "과거의 효율이 미래에도 이어질 것인가"에 대한 서로 다른 가정입니다.</p>
+    <div class="callout def"><strong>정의 13.7 (EAC 예측 방법과 TCPI)</strong>
+      <div class="formula">$$\begin{aligned}
+      \text{(1) 원가 효율 지속:}&\quad EAC_1 = \frac{BAC}{CPI} = AC + \frac{BAC - EV}{CPI}\\
+      \text{(2) 원가와 공정 효율 지속:}&\quad EAC_2 = AC + \frac{BAC - EV}{CPI\cdot SPI}\\
+      \text{(3) 잔여 계획대로:}&\quad EAC_3 = AC + (BAC - EV)\\
+      \text{(4) 재견적:}&\quad EAC_4 = AC + ETC_{\text{bottom-up}}
+      \end{aligned}$$
+      $$TCPI_{BAC} = \frac{BAC - EV}{BAC - AC}, \qquad TCPI_{EAC} = \frac{BAC - EV}{EAC - AC}, \qquad VAC = BAC - EAC$$
+      <div class="where">(1)은 초과 원인이 계속 작동한다고 볼 때, (2)는 지연을 만회하려고 돈을 더 쓸 것(가속 비용)까지 반영할 때, (3)은 원인이 일회성이라 다시 일어나지 않는다고 볼 때 쓴다. (4)는 남은 일을 다시 적산하는 것으로 가장 정확하지만 비용이 든다. <span class="term">완료 성과 지수</span><span class="en">(to-complete performance index, TCPI)</span>는 목표(BAC 또는 승인된 EAC) 안에서 끝내기 위해 남은 일에서 내야 할 원가 효율이다. \(BAC \le AC\)이면 \(TCPI_{BAC}\)는 정의되지 않는다(이미 불가능). \(VAC\)는 <span class="term">완료 시 원가 차이</span><span class="en">(variance at completion, VAC)</span>로, 음수면 예산 초과가 예상된다.</div></div></div>
+    <figure class="diagram" id="fig-ev-fan">
+      <svg viewBox="0 0 860 300" role="img" aria-label="상태 기준일 이후 EAC 예측 방법별 원가 곡선 부채꼴">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(80,24)">
+          <line x1="0" y1="230" x2="560" y2="230" class="s-axis"/><line x1="0" y1="230" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 230C90 220 170 196 260 148" style="fill:none;stroke:var(--bad);stroke-width:3"/>
+          <line x1="260" y1="0" x2="260" y2="230" style="stroke:var(--text-faint);stroke-dasharray:3 4"/>
+          <path d="M260 148C340 100 420 60 540 52" style="fill:none;stroke:var(--text-dim);stroke-width:2;stroke-dasharray:3 4"/>
+          <path d="M260 148C350 90 440 46 560 34" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <path d="M260 148C360 70 460 20 580 10" style="fill:none;stroke:var(--accent-2);stroke-width:2"/>
+          <line x1="0" y1="56" x2="600" y2="56" style="stroke:var(--text-faint);stroke-dasharray:2 4"/>
+          <text x="-6" y="60" text-anchor="end" class="t-mono">BAC</text>
+          <text x="544" y="66" class="t-mono">(3) 250.6</text>
+          <text x="564" y="38" class="t-mono" style="fill:var(--accent)">(1) 260.9</text>
+          <text x="500" y="14" class="t-mono" style="fill:var(--accent-2)">(2) 283.0</text>
+          <text x="260" y="248" text-anchor="middle" class="t-mono">50주</text>
+          <text x="150" y="190" class="t-mono" style="fill:var(--bad)">AC 102.3</text>
+        </g>
+        <g transform="translate(690,80)" class="t-dim">
+          <text x="0" y="0">같은 자료,</text>
+          <text x="0" y="20">다른 가정</text>
+          <text x="0" y="56">원인이 일회성 → (3)</text>
+          <text x="0" y="80">원인이 지속 → (1)</text>
+          <text x="0" y="104">만회 가속 → (2)</text>
+          <text x="0" y="140">최종 보고는 (4)</text>
+          <text x="0" y="160">재견적으로 확인</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-6.</b> EAC 예측의 부채꼴(P-B10 50주, 억 원). 세 공식의 차이는 32억 원이다. 숫자 자체보다 "어떤 가정을 했는가"를 함께 보고한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ev-eac">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>EAC 예측 방법 비교: 시점에 따라 어느 공식이 맞나</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ev-cv-eac" aria-label="상태 기준일별로 계산한 세 가지 EAC 예측값의 시계열과 실제 최종 원가"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>상태 기준일 <output id="ev-ea-t-out"></output></span><input type="range" id="ev-ea-t" min="10" max="96" step="1" value="50"></label>
+          <div class="ctrl"><span>시나리오</span><div class="seg" id="ev-ea-sc"><button data-value="base" class="on">암반·용수(일회성)</button><button data-value="sys">전반적 저효율</button></div></div>
+          <div class="ctrl"><span>예측 대상</span><div class="seg" id="ev-ea-what"><button data-value="cost" class="on">원가</button><button data-value="time">공기</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">(1) BAC/CPI</span><span class="v" id="ev-ea-o-1">—</span></div>
+        <div class="stat"><span class="k">(2) CPI·SPI</span><span class="v" id="ev-ea-o-2">—</span></div>
+        <div class="stat"><span class="k">(3) 잔여 계획대로</span><span class="v" id="ev-ea-o-3">—</span></div>
+        <div class="stat"><span class="k">실제 최종</span><span class="v" id="ev-ea-o-f">—</span></div>
+      </div>
+      <div class="ev-msg" id="ev-ea-msg">—</div>
+      <div class="sim-note">해볼 것: 암반 시나리오에서 30–60주 사이 공식 (3)이 실제 최종(254.8억)에 가장 가깝고 (2)가 가장 멀다는 것을 보세요 · "전반적 저효율"로 바꾸면 공식 (1)이 일찍부터 최종값 근처에 머뭅니다(CPI가 안정) · "공기"로 바꾸면 T/SPI와 T/SPI(t)를 비교합니다 · 모델: 매 상태 기준일의 PV·EV·AC로 각 공식을 계산(교육용 시나리오), 실제 최종은 시나리오를 끝까지 진행한 값.</div>
+    </div>
+    <div class="callout"><strong>예제 13.6 (세 가지 EAC와 TCPI, 50주)</strong> \(BAC = 244\), \(EV = 95.7\), \(AC = 102.3\), \(CPI = 0.935\), \(SPI = 0.878\).
+      <p><b>(1)</b> \(EAC_1 = 244/0.935 = 260.9\)억. <b>(2)</b> \(CPI\cdot SPI = 0.821\), \(EAC_2 = 102.3 + 148.3/0.821 = 102.3 + 180.7 = 283.0\)억. <b>(3)</b> \(EAC_3 = 102.3 + 148.3 = 250.6\)억.</p>
+      <p><b>원인과 연결</b> 초과의 대부분은 굴착 C의 암반 구간(7억의 1.5배 → 3.5억 초과)이고, 이후 활동의 원가 계수는 1.02–1.06이다. 그러므로 "일회성 + 작은 지속 초과"로 보아 (3)과 (1) 사이, 남은 일을 재견적하면 약 252억이 합리적이다. 시나리오의 실제 최종 원가는 254.8억(공기 연장 간접비 제외)이다.</p>
+      <p><b>TCPI</b> 승인 목표를 \(EAC = 255\)억으로 올리면 \(TCPI_{EAC} = 148.3/(255 - 102.3) = 0.971\). 남은 일에서 CPI 0.971을 내야 하는데, 이는 지금까지의 0.935보다 높다. 목표를 올려도 현재 효율 그대로는 모자라므로 원가 대책(남은 공종의 재작업·대기 줄이기)이 함께 필요하다.</p>
+      <p><b>판정</b> (2)는 "지연을 돈으로 만회한다"는 가정이라 공기 회복 대책을 실제로 쓸 때만 의미가 있다. 공식을 고른 이유(원인 분석)를 보고서에 함께 적는다.</p></div>
+    <div class="callout warn"><strong>CPI의 안정성</strong> 미국 국방 사업 자료를 분석한 연구(1990년대, Christensen 등)는 사업이 약 20 % 진행된 뒤에는 누적 CPI가 크게 좋아지지 않는 경향을 보고했습니다. "앞으로 만회하겠다"는 예측은 대부분 실현되지 않는다는 뜻입니다. 건설 공사는 공종이 바뀌며 원가 구조가 달라지므로 그대로 옮길 수는 없지만, \(TCPI\)가 누적 \(CPI\)보다 크게 높은 계획은 근거(구체적 대책)가 없으면 믿지 않는 것이 좋습니다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="recovery">
+    <h2>원인 분석과 회복 대책</h2>
+    <div class="problem"><strong>4주를 되찾을 수 있나, 그럴 가치가 있나</strong>
+      <p>50주 시점 예상 준공은 97주, 계약 공기는 93주입니다. 늦어지면 현장 관리비 같은 시간 비례 간접비가 주마다 들고, 계약 조건에 따라 지체상금이 붙습니다. 남은 주공정에서 어디를 얼마나 줄여야 가장 싸게 93주로 돌아갈까요?</p></div>
+    <p>지표가 허용 범위를 벗어나면 다음 순서로 대응합니다. ① <b>내려가 보기</b>: 공종·활동별 SPI·CPI로 차이가 어디서 왔는지 찾는다. ② <b>원인 분류</b>: 설계 변경(발주자 책임, 기준선 변경 대상), 예측 못 한 현장 조건(지반·지장물, 계약 조건에 따라 공기 연장 청구 가능), 시공자 생산성(자원 부족, 재작업, 조정 실패), 외부 요인(기상·자재 수급). ③ <b>대책</b>: 남은 주공정의 공기 단축(11장의 비용 경사), <span class="term">공정 중첩</span><span class="en">(fast-tracking)</span>(FS를 SS로 바꿔 겹치기, 재작업 위험 증가), 자원 재배치(여유가 큰 활동에서 주공정으로), 작업 방법 변경(프리패브·시스템 거푸집), 범위·설계 변경 협의. ④ <b>효과 확인</b>: 대책을 반영한 새 공정표로 CPM과 EAC를 다시 계산한다.</p>
+    <figure class="diagram" id="fig-ev-loop">
+      <svg viewBox="0 0 860 300" role="img" aria-label="측정에서 차이 분석, 원인 분류, 대책 선택, 재계산으로 이어지는 관리 순환">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g class="t" text-anchor="middle">
+          <rect x="40" y="40" width="150" height="62" rx="10" class="f-acc2-soft"/><text x="115" y="66">측정</text><text x="115" y="86" class="t-mono">진도·AC·PV</text>
+          <rect x="250" y="40" width="150" height="62" rx="10" class="f-acc2-soft"/><text x="325" y="66">차이 분석</text><text x="325" y="86" class="t-mono">SPI·CPI·SV(t)</text>
+          <rect x="460" y="40" width="150" height="62" rx="10" class="f-acc-soft"/><text x="535" y="66">허용 범위?</text><text x="535" y="86" class="t-mono">±5 % 형태</text>
+          <rect x="670" y="40" width="150" height="62" rx="10" class="f-elev"/><text x="745" y="66">원인 분류</text><text x="745" y="86" class="t-mono">설계·현장·생산성</text>
+          <rect x="670" y="180" width="150" height="72" rx="10" class="f-elev"/><text x="745" y="206">대책</text><text x="745" y="226" class="t-mono">단축·중첩·재배치</text><text x="745" y="242" class="t-mono">방법·범위 협의</text>
+          <rect x="400" y="180" width="200" height="72" rx="10" class="f-elev"/><text x="500" y="206">재계산</text><text x="500" y="226" class="t-mono">CPM(9장) · 비용 경사(11장)</text><text x="500" y="242" class="t-mono">새 EAC·준공일</text>
+          <rect x="120" y="180" width="200" height="72" rx="10" class="f-elev"/><text x="220" y="206">승인·보고</text><text x="220" y="226" class="t-mono">재기준선은 변경만</text><text x="220" y="242" class="t-mono">대시보드</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.6;fill:none">
+          <line x1="190" y1="71" x2="246" y2="71" marker-end="url(#ev-ah-dim)"/><line x1="400" y1="71" x2="456" y2="71" marker-end="url(#ev-ah-dim)"/>
+          <line x1="610" y1="71" x2="666" y2="71" marker-end="url(#ev-ah-dim)"/><line x1="745" y1="102" x2="745" y2="176" marker-end="url(#ev-ah-dim)"/>
+          <line x1="670" y1="216" x2="604" y2="216" marker-end="url(#ev-ah-dim)"/><line x1="400" y1="216" x2="324" y2="216" marker-end="url(#ev-ah-dim)"/>
+          <path d="M120 216H70V106" marker-end="url(#ev-ah-dim)"/>
+          <path d="M535 102V140H130V106" style="stroke-dasharray:4 4" marker-end="url(#ev-ah-dim)"/>
+        </g>
+        <text x="330" y="134" class="t-mono" text-anchor="middle">범위 안: 기록만 하고 다음 주기</text>
+        <text x="70" y="270" class="t-mono">계획 → 실행 → 측정 → 조정</text>
+      </svg>
+      <figcaption><b>그림 13-7.</b> 진도 관리의 순환. 지표는 경보일 뿐이고, 대책은 원인에 맞춰 고른다. 대책의 효과는 반드시 CPM과 EAC를 다시 계산해 확인한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ev-recover">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>회복 대책 효과: 50주 시점 남은 공정 단축 → 준공 주·비용</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ev-cv-recover" aria-label="50주 이후 남은 활동의 간트 차트와 주공정, 단축 반영 후 예상 준공 주"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>G1 지상 골조(남은 7주) 단축 <output id="ev-rc-g1-out"></output></span><input type="range" id="ev-rc-g1" min="0" max="2" step="1" value="0"></label>
+          <label class="ctrl"><span>G2 6–10층 골조 단축 <output id="ev-rc-g2-out"></output></span><input type="range" id="ev-rc-g2" min="0" max="2" step="1" value="0"></label>
+          <label class="ctrl"><span>H 커튼월 단축 <output id="ev-rc-h-out"></output></span><input type="range" id="ev-rc-h" min="0" max="3" step="1" value="0"></label>
+          <label class="ctrl"><span>J 내부 마감 단축 <output id="ev-rc-j-out"></output></span><input type="range" id="ev-rc-j" min="0" max="4" step="1" value="0"></label>
+          <label class="ctrl"><span>M 시운전·준공 단축 <output id="ev-rc-m-out"></output></span><input type="range" id="ev-rc-m" min="0" max="1" step="1" value="0"></label>
+          <div class="btn-row"><button class="btn" id="ev-rc-best">가장 싼 4주 회복</button><button class="btn" id="ev-rc-reset">대책 없음</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">예상 준공</span><span class="v" id="ev-rc-o-t">—</span></div>
+        <div class="stat"><span class="k">단축 비용</span><span class="v" id="ev-rc-o-c">—</span></div>
+        <div class="stat"><span class="k">간접비·지체상금 회피</span><span class="v" id="ev-rc-o-s">—</span></div>
+        <div class="stat"><span class="k">순효과</span><span class="v" id="ev-rc-o-n">—</span></div>
+      </div>
+      <div class="ev-msg" id="ev-rc-msg">—</div>
+      <div class="sim-note">해볼 것: H만 3주 줄이면 준공은 1주만 당겨집니다(G2 경로가 새 주공정이 됨) · J는 두 경로에 모두 있고 경사가 가장 작아(0.20억/주) "가장 싼 4주 회복"은 J 4주, 0.8억입니다 · J를 0으로 두고 G1 2, H 2, G2 1주로도 93주(1.45억)를 만들어 보세요 · 모델: 50주 시점 남은 기간(G1 7, G2 15, H 16, I 22, K 4, J 20, L 6, M 4주)으로 <code>CB.pm.cpm</code>, 비용 경사(억/주, 11장의 P-B10 단축 자료) G1 0.25, G2 0.25, H 0.35, J 0.20, M 0.80, 최대 단축 G1 2(남은 기간 기준), G2 2, H 3, J 4, M 1주, 시간 비례 간접비 0.30억/주, 지체상금 계약 금액 × 0.5/1,000 × 7일 ≈ 0.85억/주(공사 지체상금률 형태, 현행 국가계약법령 확인, 93주 초과분).</div>
+    </div>
+    <div class="callout"><strong>예제 13.7 (가장 싼 회복, 50주 시점)</strong> 남은 경로(50주부터의 길이): H 경로 G1(7) → H(16) → J(20) → M(4) = 47주(준공 97), G2 경로 G1 → G2(15) → J → M = 46주, 설비 I(22) → M = 26주, K·L 경로 7 + 15 + 4 + 6 + 4 = 36주.
+      <p><b>① 비용 경사</b>(11장의 P-B10 단축 자료) J 0.20, G1·G2 0.25, H 0.35, M 0.80억/주. 50주에 J는 아직 시작 전이므로 최대 4주(20 → 16주)를 줄일 수 있고, G1은 남은 7주 가운데 2주까지로 본다(교육용).</p>
+      <p><b>② 가장 싼 단축</b> J는 H 경로와 G2 경로에 모두 들어 있고 경사도 가장 작다. J 4주 → H 경로 43, G2 경로 42 → 43주(준공 93). 단축 비용 \(4\times0.20 = 0.8\)억.</p>
+      <p><b>③ J를 줄일 수 없다면</b>(마감 인력이 이미 60명/주로 최대 부하, 11장) G1 2주(0.5억, 두 경로 공통) → H 경로 45, G2 경로 44. H 1주(0.35억) → 44, 44로 두 경로가 함께 주공정이 된다. 이제 한쪽만 줄이면 소용없으므로 H + G2 각 1주(0.6억/주)와 M 1주(0.8억/주) 중 싼 H + G2 → 43주. 합계 \(0.5 + 0.35 + 0.6 = 1.45\)억.</p>
+      <p><b>④ 효과</b> 회피: 시간 비례 간접비 \(4\times0.30 = 1.2\)억 + 지체상금 \(4\times0.85 = 3.4\)억 = 4.6억. 순효과 J안 +3.8억, 대안 +3.2억.</p>
+      <p><b>판정</b> 회복할 가치가 있다. 다만 J 단축(내부 마감 20 → 16주)은 작업 구역을 나누고 인력을 늘리는 일이어서 밀집에 따른 생산성 저하, 공종 간 간섭(8장), 마감 품질 저하(14장)의 위험이 있다. 비용 경사만으로 고르지 말고 실행 가능성을 함께 본다. 또한 암반 지연이 계약상 "예측할 수 없는 현장 조건"으로 인정되면 공기 연장을 청구할 수 있어(2장, 계약 조건 확인) 지체상금 항목이 빠지고 결론이 달라질 수 있다.</p></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="dashboard">
+    <h2>보고서와 대시보드</h2>
+    <div class="problem"><strong>현장 소장은 5분 안에 무엇을 봐야 하나</strong>
+      <p>공정·원가 보고서는 수십 쪽이지만, 매주 회의에서 소장과 발주자가 보는 것은 한 화면입니다. 어떤 숫자를, 어떤 단위로 쪼개, 어떤 기준으로 색을 칠해야 문제를 놓치지 않을까요?</p></div>
+    <p>대시보드는 지표를 <b>작업 분류 체계(WBS)를 따라 내려가며</b> 보여 줍니다. 전체 SPI·CPI가 정상이어도 한 공종이 크게 나쁠 수 있고, 거꾸로 전체가 나빠도 원인은 한 공종일 수 있습니다. 색은 미리 정한 기준으로만 칠합니다. 예를 들어 지수 0.95 이상 초록, 0.90–0.95 노랑, 0.90 미만 빨강(기준은 사업마다 정한다)처럼 정하고, 색 옆에 숫자와 추세를 함께 적습니다. 색만 있으면 색각 이상이 있는 사람과 흑백 인쇄에서 정보가 사라집니다.</p>
+    <div class="table-wrap"><table class="ev-tbl">
+      <thead><tr><th>보고 항목</th><th>내용</th><th>주기(예)</th></tr></thead>
+      <tbody>
+        <tr><td>요약</td><td>전체 진도(계획·실적), SPI·CPI·SPI(t), EAC·예상 준공일, 주요 위험 3개</td><td>주간·월간</td></tr>
+        <tr><td>공종별 지표</td><td>공종·활동별 PV·EV·AC, 신호등, 지난 4주 추세</td><td>주간</td></tr>
+        <tr><td>주공정과 여유</td><td>갱신 공정표의 주공정, 주공정에 가까운 경로의 남은 여유</td><td>주간</td></tr>
+        <tr><td>차이 분석</td><td>허용 범위를 벗어난 항목의 원인·책임·대책·담당·기한</td><td>월간</td></tr>
+        <tr><td>예측</td><td>EAC 방법과 가정, TCPI, 현금 흐름 전망(12장)</td><td>월간</td></tr>
+        <tr><td>변경 기록</td><td>승인된 설계 변경과 기준선 변경 이력</td><td>발생 시</td></tr>
+      </tbody></table></div>
+    <div class="sim" id="sim-ev-dash">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>대시보드 신호등: 공종별 SPI·CPI와 판정 기준</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><div class="ev-dash" id="ev-db-tiles" aria-live="polite"></div></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>상태 기준일 <output id="ev-db-t-out"></output></span><input type="range" id="ev-db-t" min="1" max="97" step="1" value="50"></label>
+          <label class="ctrl"><span>초록 기준(≥) <output id="ev-db-g-out"></output></span><input type="range" id="ev-db-g" min="0.9" max="1" step="0.01" value="0.95"></label>
+          <label class="ctrl"><span>빨강 기준(미만) <output id="ev-db-r-out"></output></span><input type="range" id="ev-db-r" min="0.8" max="0.95" step="0.01" value="0.9"></label>
+          <div class="ctrl"><span>시나리오</span><div class="seg" id="ev-db-sc"><button data-value="base" class="on">암반·용수</button><button data-value="sys">전반적 저효율</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">빨강 공종 수</span><span class="v" id="ev-db-o-r">—</span></div>
+        <div class="stat"><span class="k">전체 SPI · CPI</span><span class="v" id="ev-db-o-a">—</span></div>
+        <div class="stat"><span class="k">가장 나쁜 공종</span><span class="v" id="ev-db-o-w">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 50주에서 "가설·흙막이·토공"은 공정은 끝났는데(SPI 1.00) CPI가 0.91로 노랑입니다. 끝난 공종의 원가 초과는 회복되지 않으므로 이 색은 준공까지 그대로 남습니다 · 지상 골조와 설비는 공정이 빨강입니다(4주 밀림) · 25주로 옮기면 굴착 문제가 막 드러나는 모습을 볼 수 있습니다 · 시작 전 공종은 회색(—) · 추세 화살표는 4주 전 대비 · 모델: 공종 = <code>CB.pm.B10</code> 활동 묶음, 시나리오는 기준 공사 노트(교육용).</div>
+    </div>
+    <div class="callout tip"><strong>좋은 대시보드의 조건</strong> ① 같은 기준선·같은 측정 규칙으로 계산한 숫자만 한 화면에 둔다. ② 누적 지수와 함께 최근 기간(주·월) 지수나 추세를 보여 준다. 누적 지수는 오래된 공사일수록 둔해진다. ③ 금액 SPI 옆에 주 단위 지연(SV(t))과 주공정 여유를 둔다. ④ 신호등은 판단을 대신하지 않는다. 빨강마다 원인·대책·담당·기한이 붙어야 한다. ⑤ 기준선이 바뀌었으면 이전 보고와 비교할 수 없다는 표시를 한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="cpm.html"><small>CH.09 · 공정 계획과 CPM</small>기준선의 출발점<br><span>ES·LS와 여유가 S 곡선의 띠와 회복 대책의 주공정을 정한다.</span></a>
+      <a href="pert.html"><small>CH.10 · PERT와 공기 위험</small>예측의 불확실성<br><span>IEAC(t) 97–101주는 PERT·몬테카를로의 공기 분포와 함께 본다.</span></a>
+      <a href="resources.html"><small>CH.11 · 자원 관리와 공기 단축</small>비용 경사로 회복<br><span>예제 13.7의 단축 순서는 11장의 "가장 싼 주공정부터" 규칙이다.</span></a>
+      <a href="estimating.html"><small>CH.12 · 적산과 원가 관리</small>예산과 현금 흐름<br><span>BAC와 활동 배분, 기성 지급과 현금 수지가 PV와 AC의 바탕이다.</span></a>
+      <a href="contracts.html"><small>CH.02 · 발주 방식과 계약</small>기성·지체상금·공기 연장<br><span>진도 측정 규칙은 기성 규칙과, 지연 원인은 계약 책임과 맞물린다.</span></a>
+      <a href="productivity.html"><small>CH.16 · 생산성과 스마트 건설</small>PPC와 4D 진도<br><span>라스트 플래너의 약속 이행률과 드론·BIM 물량이 진도 측정을 객관화한다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>진도 측정 규칙(물량 비례, 가중 마일스톤, 0/100·50/50·20/80, 주관적 완료율, 투입 비례)은 착공 전에 활동마다 정한다. 고정 공식은 한두 보고 주기 안의 짧은 활동에만 쓴다.</li>
+      <li>전체 진도는 가중 평균이며 비용 가중 진도 = EV/BAC. P-B10 50주: 비용 가중 39.4 %, 공수 가중 34.6 %, 계획 44.7 %.</li>
+      <li>ES·LS 기준 S 곡선 사이의 띠는 여유 사용에 따른 계획의 범위다. P-B10 ES 기준선: 40주 75.7, 50주 109.0, 60주 155.4억(LS 60주 125.5억).</li>
+      <li>SV = EV − PV, CV = EV − AC, SPI = EV/PV, CPI = EV/AC. P-B10 50주: PV 109.0, EV 95.7, AC 102.3억 → SPI 0.878, CPI 0.935(늦고 초과).</li>
+      <li>획득 일정 ES는 PV(ES) = EV인 시점이다. SV(t) = ES − AT, SPI(t) = ES/AT. P-B10: ES 46주, SV(t) −4주, SPI(t) 0.920. 금액 SPI는 준공 무렵 1로 돌아가므로 시간 지표와 주공정을 함께 본다.</li>
+      <li>EAC = BAC/CPI(효율 지속), AC + (BAC − EV)/(CPI·SPI)(가속 포함), AC + (BAC − EV)(일회성). 50주: 260.9, 283.0, 250.6억. TCPI = (BAC − EV)/(BAC − AC) = 1.047.</li>
+      <li>회복 대책은 원인 분석 → 남은 주공정의 가장 싼 단축부터(여러 경로가 주공정이면 함께) → CPM·EAC 재계산. P-B10: 내부 마감 J 4주, 0.8억으로 93주 회복(간접비·지체상금 회피 4.6억). J가 불가능하면 G1 2 + H 2 + G2 1주, 1.45억.</li>
+      <li>대시보드는 WBS를 따라 내려가며 같은 기준선의 숫자, 추세, 주공정 여유를 함께 보이고, 신호등 기준을 미리 정하며 색 옆에 숫자를 적는다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 10주 동안 계속되는 20억 원짜리 활동의 진도를 50/50 규칙으로 잴 때의 문제는?</p><div class="opts">
+        <button class="opt">진도가 항상 과소 평가된다</button><button class="opt" data-correct>시작 직후 10억을 인정해 긴 기간 동안 실제와 크게 어긋날 수 있다</button><button class="opt">완료 시점에 EV가 BAC보다 커진다</button><button class="opt">문제없다. 50/50은 긴 활동용 규칙이다</button>
+      </div><div class="quiz-exp">고정 공식은 한두 보고 주기 안의 짧은 활동용이다. 긴 활동은 물량 비례나 가중 마일스톤으로 잰다. 활동을 쪼개면 오차가 줄어든다.</div></div>
+      <div class="quiz-q"><p>2. PV = 80억, EV = 72억, AC = 90억일 때 SPI와 CPI는?</p><div class="opts">
+        <button class="opt">SPI 1.11, CPI 1.25</button><button class="opt">SPI 0.80, CPI 0.90</button><button class="opt" data-correct>SPI 0.90, CPI 0.80</button><button class="opt">SPI 0.89, CPI 0.80</button>
+      </div><div class="quiz-exp">\(SPI = 72/80 = 0.90\), \(CPI = 72/90 = 0.80\). 늦고 초과이며, 원가 쪽이 더 나쁘다.</div></div>
+      <div class="quiz-q"><p>3. 지출(AC)이 계획(PV)보다 적다는 사실만으로 "원가 절감"이라고 할 수 없는 이유는?</p><div class="opts">
+        <button class="opt">AC는 항상 과소 집계되기 때문</button><button class="opt" data-correct>일이 늦으면 지출도 늦어지므로, 한 일의 가치(EV)와 비교해야 하기 때문</button><button class="opt">PV에 예비비가 들어 있기 때문</button><button class="opt">AC는 기성 지급액이기 때문</button>
+      </div><div class="quiz-exp">원가 효율은 같은 일에 대해 비교해야 한다. CV = EV − AC. P-B10 50주는 AC 102.3 &lt; PV 109.0이지만 EV 95.7 &lt; AC이므로 초과다.</div></div>
+      <div class="quiz-q"><p>4. BAC 244억, CPI 0.935일 때 BAC/CPI 방식의 EAC와 VAC는?</p><div class="opts">
+        <button class="opt">EAC 228.1억, VAC +15.9억</button><button class="opt" data-correct>EAC 260.9억, VAC −16.9억</button><button class="opt">EAC 283.0억, VAC −39.0억</button><button class="opt">EAC 250.6억, VAC −6.6억</button>
+      </div><div class="quiz-exp">\(EAC = 244/0.935 = 260.9\), \(VAC = 244 - 260.9 = -16.9\)억. 283.0은 CPI·SPI 방식, 250.6은 잔여 계획대로 방식이다.</div></div>
+      <div class="quiz-q"><p>5. TCPI(BAC)가 1.15이고 누적 CPI가 0.92이다. 가장 알맞은 해석은?</p><div class="opts">
+        <button class="opt">예산 안에서 끝날 가능성이 높다</button><button class="opt">남은 일은 지금보다 15 % 덜 효율적이어도 된다</button><button class="opt" data-correct>남은 일에서 지금보다 훨씬 높은 효율이 필요해 예산 달성은 비현실적일 가능성이 크다</button><button class="opt">TCPI는 공정 지표이므로 원가와 무관하다</button>
+      </div><div class="quiz-exp">TCPI는 목표 안에서 끝내기 위해 남은 일에서 내야 할 원가 효율이다. 1.15는 0.92보다 25 % 높아, 구체적 대책 없이는 EAC를 올려 승인받는 것이 현실적이다.</div></div>
+      <div class="quiz-q"><p>6. 계획 공기 93주 공사가 97주에 끝났다. 준공 시점의 금액 SPI와 SPI(t)는?</p><div class="opts">
+        <button class="opt">SPI 0.96, SPI(t) 1.00</button><button class="opt" data-correct>SPI 1.00, SPI(t) ≈ 0.96</button><button class="opt">둘 다 1.00</button><button class="opt">둘 다 0.96</button>
+      </div><div class="quiz-exp">준공하면 EV = PV = BAC이므로 금액 SPI = 1이다. 획득 일정은 ES = 93, AT = 97 → SPI(t) = 93/97 = 0.96으로 지연을 끝까지 보여 준다.</div></div>
+      <div class="quiz-q"><p>7. 지연을 만회하려고 주공정이 아닌 활동(전체 여유 21주)에 인력을 더 넣었다. 결과로 옳은 것은?</p><div class="opts">
+        <button class="opt">준공일이 당겨진다</button><button class="opt" data-correct>금액 SPI는 좋아질 수 있지만 준공일은 당겨지지 않는다</button><button class="opt">SPI와 준공일 모두 변하지 않는다</button><button class="opt">주공정이 그 활동으로 바뀐다</button>
+      </div><div class="quiz-exp">EV는 어느 활동에서 벌든 같은 돈이라 SPI는 오를 수 있다. 그러나 준공은 주공정이 정한다. 그래서 EVM은 CPM과 함께 본다.</div></div>
+      <div class="quiz-q"><p>8. 남은 공정에서 두 경로가 모두 주공정이다. 1주 단축 비용 경사는 경로 1에만 있는 활동 0.7억, 경로 2에만 있는 활동 0.8억, 두 경로에 공통인 활동 1.2억이다. 공기를 1주 줄이는 가장 싼 방법은?</p><div class="opts">
+        <button class="opt">경로 1의 활동만 1주(0.7억)</button><button class="opt">경로 1과 경로 2의 활동을 각 1주(1.5억)</button><button class="opt" data-correct>공통 활동 1주(1.2억)</button><button class="opt">두 경로가 모두 주공정이면 줄일 수 없다</button>
+      </div><div class="quiz-exp">두 경로가 모두 주공정이면 둘 다 1주씩 줄어야 공기가 준다. 경로 1만 줄이면 경로 2가 그대로 공기를 정한다(0.7억 낭비). 공통 활동 1.2억 &lt; 0.7 + 0.8 = 1.5억이므로 공통 활동이 가장 싸다(11장 비용 경사 규칙).</div></div>
+    </div>
+  </section>
+</main>
+<script>
+/* ---------- 이 장의 도우미(교육용 시나리오 포함) ---------- */
+const EVX = (() => {
+  const B = CB.pm.B10, R = CB.pm.cpm(B), T = R.T, BAC = B.reduce((s, a) => s + a.cost, 0);
+  const byId = {}; B.forEach((a) => (byId[a.id] = a));
+  const c01 = (x) => Math.max(0, Math.min(1, x));
+  /** 실적 시나리오: 활동 → [[실제 시작, 기간, 물량 비율, 원가 계수], ...] (교육용) */
+  const SC = {
+    base: { A: [[0, 4, 1, 1]], B: [[4, 10, 1, 1.03]], D: [[4, 6, 1, 1]], C: [[14, 6, 0.5, 1], [20, 10, 0.5, 1.5]], E: [[30, 4, 1, 1.05]], F: [[34, 8, 1, 1.05]],
+      G1: [[42, 15, 1, 1.06]], G2: [[57, 15, 1, 1.04]], H: [[57, 16, 1, 1.02]], I: [[42, 30, 1, 1.03]], K: [[72, 4, 1, 1]], J: [[73, 20, 1, 1.02]], L: [[76, 6, 1, 1]], M: [[93, 4, 1, 1]] },
+    // 대조: 지연·초과가 공사 전반에 퍼짐(모든 활동 기간 약 4 % 증가가 누적, 원가 계수 1.07)
+    sys: (() => {
+      const o = {}, f = 1.043, cf = 1.07, ES = {};
+      R.order.forEach((id) => { const a = byId[id]; let s = 0; (a.pred || []).forEach((p) => { s = Math.max(s, ES[p] + byId[p].d * f); }); ES[id] = s; o[id] = [[s, a.d * f, 1, cf]]; });
+      return o;
+    })(),
+  };
+  const finish = (sc) => Math.max(...B.map((a) => { const g = SC[sc][a.id]; const l = g[g.length - 1]; return l[0] + l[1]; }));
+  const pvAct = (a, t) => a.cost * c01((t - R.acts[a.id].ES) / a.d);
+  const evAct = (a, t, sc) => SC[sc][a.id].reduce((s, [st, d, f]) => s + a.cost * f * c01((t - st) / d), 0);
+  const acAct = (a, t, sc) => SC[sc][a.id].reduce((s, [st, d, f, cf]) => s + a.cost * f * cf * c01((t - st) / d), 0);
+  function at(t, sc = "base", ids) {
+    let PV = 0, EV = 0, AC = 0;
+    (ids ? ids.map((i) => byId[i]) : B).forEach((a) => { PV += pvAct(a, t); EV += evAct(a, t, sc); AC += acAct(a, t, sc); });
+    return { PV, EV, AC };
+  }
+  const pv = (t) => B.reduce((s, a) => s + pvAct(a, t), 0);
+  /** 획득 일정: PV(ES) = EV 인 시점(이분법, PV는 단조 증가) */
+  function earned(EV) {
+    if (EV <= 0) return 0; if (EV >= BAC - 1e-9) return T;
+    let lo = 0, hi = T; for (let k = 0; k < 50; k++) { const m = (lo + hi) / 2; if (pv(m) < EV) lo = m; else hi = m; } return (lo + hi) / 2;
+  }
+  const GROUPS = [["가설·흙막이·토공", ["A", "B", "C", "D"]], ["기초·지하 골조", ["E", "F"]], ["지상 골조", ["G1", "G2"]], ["외장·방수·조경", ["H", "K", "L"]], ["설비", ["I"]], ["마감·준공", ["J", "M"]]];
+  const font = (o = {}) => `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+  function text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = font(o); ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  }
+  const alpha = (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`;
+  const idxCls = (v, tol = 0.05) => (!isFinite(v) ? "" : v >= 1 - tol ? "ev-ok" : v >= 1 - 2 * tol ? "ev-warn" : "ev-bad");
+  const f1 = (v) => CB.num(v, 1), f3 = (v) => (isFinite(v) ? v.toFixed(3) : "—");
+  return { B, R, T, BAC, byId, SC, finish, at, pv, earned, GROUPS, text, alpha, idxCls, f1, f3, c01 };
+})();
+
+/* ---------- 1. 진도 측정 규칙 ---------- */
+(function () {
+  const gt = CB.range("ev-me-t", (v) => v.toFixed(1) + " 주", draw), gn = CB.range("ev-me-n", (v) => v + "개", draw);
+  const gs = CB.seg("ev-me-shape", draw), gr = CB.seg("ev-me-rule", draw);
+  const D = 8, C = 16;
+  const shape = (u) => { u = EVX.c01(u); const s = gs(); return s === "lin" ? u : s === "slow" ? u * u * (3 - 2 * u) * 0.35 + u * u * 0.65 : 1 - (1 - u) * (1 - u); };
+  function credit(rule, t) {
+    const n = gn(), d = D / n, c = C / n; let s = 0;
+    for (let k = 0; k < n; k++) {
+      const u = (t - k * d) / d; if (u <= 0) continue;
+      const p = shape(Math.min(1, u)), done = u >= 1 - 1e-9;
+      if (rule === "true") s += c * p;
+      else if (rule === "z") s += done ? c : 0;
+      else if (rule === "h") s += done ? c : 0.5 * c;
+      else if (rule === "t") s += done ? c : 0.2 * c;
+      else if (rule === "m") { const ms = [[0.2, 0.2], [0.5, 0.5], [0.85, 0.85], [1, 1]]; let w = 0; ms.forEach(([q, cum]) => { if (p >= q - 1e-9) w = cum; }); s += c * w; }
+    }
+    return s;
+  }
+  const RULES = [["z", "0/100"], ["h", "50/50"], ["t", "20/80"], ["m", "마일스톤"]];
+  const cv = CB.canvas("#ev-cv-method", (ctx, W, H) => {
+    const P = CB.palette(), col = { z: P.dim, h: P.accent2, t: P.warn, m: P.ok }, sel = gr();
+    const N = 320, ser = [];
+    const mk = (rule) => { const d = []; for (let i = 0; i <= N; i++) { const t = (D * i) / N; d.push([t, credit(rule, t)]); } return d; };
+    RULES.forEach(([r]) => ser.push({ data: mk(r), color: col[r], width: r === sel ? 3 : 1.3, dash: r === sel ? [] : [4, 4] }));
+    ser.push({ data: mk("true"), color: P.accent, width: 3 });
+    const t = gt();
+    const res = CB.chart(ctx, { x: 56, y: 16, w: W - 56 - 16, h: H - 16 - 48 }, { x: [0, D], y: [0, 17], xLabel: "경과 시간 (주)", yLabel: "인정 EV (억 원)", series: ser, vlines: [{ x: t, color: P.text, label: "t" }], points: [{ x: t, y: credit("true", t), color: P.accent, r: 5 }, { x: t, y: credit(sel, t), color: col[sel], r: 5 }] });
+    const lx = res.box.x + 8; let ly = res.box.y + 12;
+    [["실제(물량)", P.accent]].concat(RULES.map(([r, n]) => [n, col[r]])).forEach(([n, c]) => { EVX.text(ctx, n, lx, ly, c, { align: "left", size: 11 }); ly += 15; });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.58), minHeight: 260, maxHeight: 420 });
+  function draw() {
+    cv.redraw();
+    const t = gt(), tr = credit("true", t), sel = gr(), rv = credit(sel, t);
+    let mx = 0; for (let i = 0; i <= 400; i++) { const tt = (D * i) / 400; mx = Math.max(mx, Math.abs(credit(sel, tt) - credit("true", tt))); }
+    CB.stat("ev-me-o-true", EVX.f1(tr) + " 억 <small>(" + Math.round((100 * tr) / C) + " %)</small>");
+    CB.stat("ev-me-o-rule", EVX.f1(rv) + " 억");
+    const e = rv - tr; CB.stat("ev-me-o-err", `<span class="${Math.abs(e) > 2 ? "ev-bad" : Math.abs(e) > 1 ? "ev-warn" : "ev-ok"}">${CB.signed(e, 1)} 억</span>`);
+    CB.stat("ev-me-o-max", EVX.f1(mx) + " 억");
+  }
+  draw();
+})();
+
+/* ---------- 2. 가중 진도 ---------- */
+(function () {
+  const G = EVX.GROUPS.map(([n, ids]) => ({ n, ids, c: ids.reduce((s, i) => s + EVX.byId[i].cost, 0), h: ids.reduce((s, i) => s + EVX.byId[i].res * EVX.byId[i].d, 0) }));
+  const gs = G.map((_, k) => CB.range("ev-wt-" + k, (v) => v + " %", draw));
+  const calc = () => {
+    const p = gs.map((g) => g() / 100), C = G.reduce((s, g) => s + g.c, 0), Hs = G.reduce((s, g) => s + g.h, 0);
+    const ev = G.reduce((s, g, k) => s + g.c * p[k], 0), hw = G.reduce((s, g, k) => s + g.h * p[k], 0) / Hs;
+    return { p, C, ev, pc: ev / C, ph: hw, ps: p.reduce((s, x) => s + x, 0) / p.length };
+  };
+  const cv = CB.canvas("#ev-cv-weighted", (ctx, W, H) => {
+    const P = CB.palette(), r = calc(), narrow = W < 520;
+    const x0 = narrow ? 92 : 128, y0 = 14, w = W - x0 - (narrow ? 84 : 96), rowH = (H - y0 - 96) / G.length;
+    const maxC = Math.max(...G.map((g) => g.c));
+    G.forEach((g, k) => {
+      const y = y0 + k * rowH, bh = Math.min(22, rowH * 0.6);
+      EVX.text(ctx, g.n, x0 - 8, y + bh / 2, P.text, { align: "right", size: narrow ? 10 : 11.5, mono: false });
+      const full = (w * g.c) / maxC;
+      ctx.fillStyle = EVX.alpha(P.faint, 0.35); ctx.fillRect(x0, y, full, bh);
+      ctx.fillStyle = EVX.alpha(P.ok, 0.85); ctx.fillRect(x0, y, full * r.p[k], bh);
+      ctx.strokeStyle = P.border; ctx.strokeRect(x0, y, full, bh);
+      EVX.text(ctx, Math.round(r.p[k] * 100) + "% · " + g.c + "억", x0 + full + 4, y + bh / 2, P.dim, { align: "left", size: 10.5 });
+      const hh = 4, hwid = (w * g.h) / Math.max(...G.map((q) => q.h)) * 0.999;
+      ctx.fillStyle = EVX.alpha(P.accent2, 0.6); ctx.fillRect(x0, y + bh + 2, hwid, hh);
+    });
+    // 전체 진도 막대 3개
+    const yb = H - 86, bw = w;
+    [["비용 가중", r.pc, P.ok], ["공수 가중", r.ph, P.accent2], ["단순 평균", r.ps, P.faint]].forEach(([n, v, c], k) => {
+      const y = yb + k * 22;
+      EVX.text(ctx, n, x0 - 8, y + 8, P.dim, { align: "right", size: 11, mono: false });
+      ctx.fillStyle = EVX.alpha(P.faint, 0.25); ctx.fillRect(x0, y, bw, 16); ctx.fillStyle = EVX.alpha(c, 0.85); ctx.fillRect(x0, y, bw * v, 16);
+      EVX.text(ctx, (v * 100).toFixed(1) + " %", x0 + bw + 6, y + 8, P.text, { align: "left", size: 11 });
+    });
+    const xp = x0 + bw * (109.0 / 244);
+    ctx.save(); ctx.strokeStyle = P.dim; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(xp, yb - 2); ctx.lineTo(xp, yb + 66); ctx.stroke(); ctx.restore();
+    EVX.text(ctx, "50주 계획 44.7 %", xp, yb + 76, P.dim, { size: 10.5 });
+    EVX.text(ctx, "막대 길이 = 예산, 파란 띠 = 공수", x0, y0 + G.length * rowH + 2, P.faint, { align: "left", size: 10, mono: false });
+  }, { aspect: (W) => (W < 520 ? 1.05 : 0.62), minHeight: 320, maxHeight: 460 });
+  function draw() {
+    cv.redraw(); const r = calc();
+    CB.stat("ev-wt-o-c", (r.pc * 100).toFixed(1) + " %"); CB.stat("ev-wt-o-h", (r.ph * 100).toFixed(1) + " %");
+    CB.stat("ev-wt-o-s", (r.ps * 100).toFixed(1) + " %"); CB.stat("ev-wt-o-ev", EVX.f1(r.ev) + " 억");
+  }
+  const setFrom = (fn) => { G.forEach((g, k) => { const v = g.ids.reduce((s, i) => s + fn(i), 0) / g.c; gs[k].set(Math.round(100 * v), false); }); draw(); };
+  document.getElementById("ev-wt-plan").addEventListener("click", () => setFrom((i) => EVX.at(50, "base", [i]).PV));
+  document.getElementById("ev-wt-act").addEventListener("click", () => setFrom((i) => EVX.at(50, "base", [i]).EV));
+  draw();
+})();
+
+/* ---------- 3. S 곡선 기준선 ---------- */
+(function () {
+  const gt = CB.range("ev-sc-t", (v) => v + " 주", draw), gi = CB.range("ev-sc-i", (v) => v + " 주", draw), gd = CB.range("ev-sc-d", (v) => v + " 주", draw), gb = CB.seg("ev-sc-bar", draw);
+  const B = EVX.B, R = EVX.R, T = EVX.T;
+  const es = CB.pm.spread(B, R, "cost", "ES", T), ls = CB.pm.spread(B, R, "cost", "LS", T);
+  const adj = () => {
+    const acts = {}; Object.keys(R.acts).forEach((k) => (acts[k] = { ...R.acts[k] }));
+    acts.I.ES += Math.min(gi(), R.acts.I.TF); acts.D.ES += Math.min(gd(), R.acts.D.TF);
+    const rr = { ...R, acts };
+    return { cost: CB.pm.spread(B, rr, "cost", "ES", T), res: CB.pm.spread(B, rr, "res", "ES", T) };
+  };
+  const cumAt = (cum, t) => (t <= 0 ? 0 : cum[Math.min(T, t) - 1]);
+  const cv = CB.canvas("#ev-cv-scurve", (ctx, W, H) => {
+    const P = CB.palette(), t = gt(), a = adj(), bar = gb();
+    const pts = (cum) => [[0, 0]].concat(cum.map((v, i) => [i + 1, v]));
+    const box = { x: 58, y: 16, w: W - 58 - 18, h: H - 16 - 48 };
+    const res = CB.chart(ctx, box, { x: [0, T], y: [0, 260], xLabel: "주", yLabel: "누적 비용 (억 원)", series: [] });
+    // 띠
+    ctx.save(); ctx.beginPath();
+    pts(es.cum).forEach(([x, y], i) => (i ? ctx.lineTo(res.X(x), res.Y(y)) : ctx.moveTo(res.X(x), res.Y(y))));
+    pts(ls.cum).reverse().forEach(([x, y]) => ctx.lineTo(res.X(x), res.Y(y)));
+    ctx.closePath(); ctx.fillStyle = EVX.alpha(P.accent, 0.14); ctx.fill(); ctx.restore();
+    // 주간 막대
+    if (bar !== "none") {
+      const per = bar === "cost" ? a.cost.per : a.res.per, mx = bar === "cost" ? 8 : 140;
+      per.forEach((v, i) => { const hh = (v / mx) * box.h * 0.32; ctx.fillStyle = EVX.alpha(bar === "cost" ? P.accent : P.accent2, 0.35); ctx.fillRect(res.X(i) + 0.5, box.y + box.h - hh, Math.max(1, res.X(i + 1) - res.X(i) - 1), hh); });
+      EVX.text(ctx, W < 520 ? (bar === "cost" ? "막대: 주간 비용(억/주)" : "막대: 주간 인원(명)") : bar === "cost" ? "막대: 주간 비용(억/주, 최대 8), 조정 계획" : "막대: 주간 인원(명, 최대 140), 조정 계획", box.x + 8, box.y + 28, P.dim, { align: "left", size: 10.5, mono: false });
+    }
+    CB.chart(ctx, box, { x: [0, T], y: [0, 260], xTicks: [], yTicks: [], series: [
+      { data: pts(es.cum), color: P.accent, width: 2.2 }, { data: pts(ls.cum), color: P.accent2, width: 2.2 },
+      { data: pts(a.cost.cum), color: P.dim, width: 2, dash: [7, 5] }],
+      hlines: [{ y: 244, color: P.faint, label: "BAC 244" }], vlines: [{ x: t, color: P.text }],
+      points: [{ x: t, y: cumAt(es.cum, t), color: P.accent, r: 4.5 }, { x: t, y: cumAt(ls.cum, t), color: P.accent2, r: 4.5 }] });
+    EVX.text(ctx, "ES", res.X(30), res.Y(cumAt(es.cum, 30)) - 12, P.accent, { size: 11 });
+    EVX.text(ctx, "LS", res.X(64), res.Y(cumAt(ls.cum, 64)) + 14, P.accent2, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.56), minHeight: 260, maxHeight: 440 });
+  function draw() {
+    cv.redraw(); const t = gt(), a = adj(), e = cumAt(es.cum, t), l = cumAt(ls.cum, t), m = cumAt(a.cost.cum, t);
+    CB.stat("ev-sc-o-es", EVX.f1(e) + " 억"); CB.stat("ev-sc-o-ls", EVX.f1(l) + " 억"); CB.stat("ev-sc-o-adj", EVX.f1(m) + " 억");
+    CB.stat("ev-sc-o-w", EVX.f1(e - l) + " 억 · " + ((100 * e) / 244).toFixed(1) + " %");
+  }
+  draw();
+})();
+
+/* ---------- 4. EVM 계산기 ---------- */
+(function () {
+  const gb = CB.range("ev-ca-bac", (v) => v + " 억", draw), gp = CB.range("ev-ca-pv", (v) => v.toFixed(1) + " 억", draw), ge = CB.range("ev-ca-ev", (v) => v.toFixed(1) + " 억", draw), ga = CB.range("ev-ca-ac", (v) => v.toFixed(1) + " 억", draw), gtl = CB.range("ev-ca-tol", (v) => v + " %", draw);
+  const calc = () => { const o = { BAC: gb(), PV: gp(), EV: ge(), AC: ga() }; return Object.assign(o, CB.pm.evm(o)); };
+  const cv = CB.canvas("#ev-cv-calc", (ctx, W, H) => {
+    const P = CB.palette(), r = calc(), tol = gtl() / 100, narrow = W < 560;
+    const b1 = narrow ? { x: 52, y: 16, w: W - 70, h: H * 0.5 - 50 } : { x: 52, y: 16, w: W * 0.5 - 76, h: H - 16 - 44 };
+    const b2 = narrow ? { x: 52, y: H * 0.5 + 16, w: W - 70, h: H * 0.5 - 56 } : { x: W * 0.5 + 34, y: 16, w: W * 0.5 - 52, h: H - 16 - 44 };
+    const ymax = Math.max(r.BAC, r.PV, r.EV, r.AC, isFinite(r.EAC) ? Math.min(r.EAC, 600) : 0) * 1.1;
+    const res = CB.chart(ctx, b1, { x: [0, 3], y: [0, ymax], xTicks: [], yLabel: "억 원", hlines: [{ y: r.BAC, color: P.faint, label: "BAC" }] });
+    const bars = [["PV", r.PV, P.dim], ["EV", r.EV, P.ok], ["AC", r.AC, P.bad]];
+    const bw = b1.w / 3;
+    bars.forEach(([n, v, c], k) => {
+      const x = b1.x + bw * k + bw * 0.2, y = res.Y(v);
+      ctx.fillStyle = EVX.alpha(c, k === 0 ? 0.25 : 0.7); ctx.fillRect(x, y, bw * 0.6, res.Y(0) - y);
+      if (k === 0) { ctx.save(); ctx.strokeStyle = c; ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.strokeRect(x, y, bw * 0.6, res.Y(0) - y); ctx.restore(); }
+      EVX.text(ctx, n, x + bw * 0.3, res.Y(0) + 14, c, { size: 12 });
+      EVX.text(ctx, CB.num(v, 1), x + bw * 0.3, y - 10, P.text, { size: 11 });
+    });
+    // SV, CV 화살표
+    const arrow = (x, ya, yb, c, label) => { ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, ya); ctx.lineTo(x, yb); ctx.stroke(); ctx.restore(); EVX.text(ctx, label, x, Math.min(res.Y(0) - 12, Math.max(ya, yb) + 16), c, { size: 10.5 }); };
+    arrow(b1.x + bw * 1.0, res.Y(r.PV), res.Y(r.EV), r.SV < 0 ? P.bad : P.ok, "SV " + CB.signed(r.SV, 1));
+    arrow(b1.x + bw * 2.0, res.Y(r.AC), res.Y(r.EV), r.CV < 0 ? P.bad : P.ok, "CV " + CB.signed(r.CV, 1));
+    // 사분면
+    const lo = 0.6, hi = 1.4;
+    const q = CB.chart(ctx, b2, { x: [lo, hi], y: [lo, hi], xLabel: "SPI", yLabel: "", xTicks: [0.6, 0.8, 1, 1.2, 1.4], yTicks: [0.6, 0.8, 1, 1.2, 1.4], series: [] });
+    const fillQ = (x0, x1, y0, y1, c) => { ctx.fillStyle = c; ctx.fillRect(q.X(x0), q.Y(y1), q.X(x1) - q.X(x0), q.Y(y0) - q.Y(y1)); };
+    fillQ(lo, 1, 1, hi, EVX.alpha(P.warn, 0.12)); fillQ(1, hi, 1, hi, EVX.alpha(P.ok, 0.14)); fillQ(lo, 1, lo, 1, EVX.alpha(P.bad, 0.14)); fillQ(1, hi, lo, 1, EVX.alpha(P.warn, 0.12));
+    ctx.save(); ctx.strokeStyle = P.dim; ctx.setLineDash([4, 3]); ctx.strokeRect(q.X(1 - tol), q.Y(1 + tol), q.X(1 + tol) - q.X(1 - tol), q.Y(1 - tol) - q.Y(1 + tol)); ctx.restore();
+    ctx.save(); ctx.strokeStyle = P.axis; ctx.beginPath(); ctx.moveTo(q.X(1), q.Y(lo)); ctx.lineTo(q.X(1), q.Y(hi)); ctx.moveTo(q.X(lo), q.Y(1)); ctx.lineTo(q.X(hi), q.Y(1)); ctx.stroke(); ctx.restore();
+    EVX.text(ctx, "CPI", b2.x + 4, b2.y + 8, P.dim, { align: "left", size: 11 });
+    const sz = narrow ? 9.5 : 10.5;
+    EVX.text(ctx, "늦지만 절감", q.X(0.8), q.Y(1.3), P.dim, { size: sz, mono: false }); EVX.text(ctx, "앞서고 절감", q.X(1.2), q.Y(1.3), P.dim, { size: sz, mono: false });
+    EVX.text(ctx, "늦고 초과", q.X(0.8), q.Y(0.7), P.dim, { size: sz, mono: false }); EVX.text(ctx, "앞서지만 초과", q.X(1.2), q.Y(0.7), P.dim, { size: sz, mono: false });
+    if (isFinite(r.SPI) && isFinite(r.CPI)) {
+      const px = q.X(CB.clamp(r.SPI, lo, hi)), py = q.Y(CB.clamp(r.CPI, lo, hi));
+      ctx.fillStyle = P.accent; ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill();
+    }
+  }, { aspect: (W) => (W < 560 ? 1.35 : 0.5), minHeight: 300, maxHeight: 620 });
+  const msg = document.getElementById("ev-ca-msg");
+  function draw() {
+    cv.redraw(); const r = calc(), tol = gtl() / 100;
+    CB.stat("ev-ca-o-s", `${CB.signed(r.SV, 1)} · <span class="${EVX.idxCls(r.SPI, tol)}">${EVX.f3(r.SPI)}</span>`);
+    CB.stat("ev-ca-o-c", `${CB.signed(r.CV, 1)} · <span class="${EVX.idxCls(r.CPI, tol)}">${EVX.f3(r.CPI)}</span>`);
+    CB.stat("ev-ca-o-eac", isFinite(r.EAC) ? EVX.f1(r.EAC) + " 억" : "—");
+    CB.stat("ev-ca-o-etc", isFinite(r.EAC) ? EVX.f1(r.ETC) + " · " + CB.signed(r.VAC, 1) : "—");
+    const tcOk = r.BAC - r.AC > 1e-6;
+    CB.stat("ev-ca-o-tc", tcOk ? `<span class="${r.TCPI > 1.1 ? "ev-bad" : r.TCPI > 1 ? "ev-warn" : "ev-ok"}">${EVX.f3(r.TCPI)}</span>` : '<span class="ev-bad">불가</span>');
+    let s = "";
+    if (!(r.PV > 0) || !(r.AC > 0)) { s = "PV와 AC가 0보다 커야 지수를 계산할 수 있습니다."; msg.className = "ev-msg"; }
+    else {
+      const sp = r.SPI >= 1 - tol ? (r.SPI > 1 + tol ? "앞섬" : "정상") : "지연", cp = r.CPI >= 1 - tol ? (r.CPI > 1 + tol ? "절감" : "정상") : "초과";
+      s = `<b>공정 ${sp}, 원가 ${cp}.</b> `;
+      if (r.EV > r.BAC) s += "EV가 BAC를 넘을 수 없습니다(진도 100 % 초과) — 측정을 확인하세요. ";
+      if (!tcOk) s += "AC가 이미 BAC 이상이라 예산 안 완료는 불가능합니다. EAC를 새 목표로 승인받아야 합니다.";
+      else if (r.TCPI > r.CPI + 0.1) s += `TCPI ${EVX.f3(r.TCPI)}가 현재 CPI보다 0.1 넘게 높아 예산 달성은 비현실적입니다.`;
+      else if (r.TCPI > 1) s += `남은 일에서 CPI ${EVX.f3(r.TCPI)} 이상이 필요합니다.`;
+      else s += "남은 일은 지금 효율로도 예산 안에서 가능합니다.";
+      msg.className = "ev-msg " + (sp === "지연" || cp === "초과" ? "bad" : "ok");
+    }
+    msg.innerHTML = s;
+  }
+  const preset = (pv, ev, ac) => { gb.set(244, false); gp.set(pv, false); ge.set(ev, false); ga.set(ac, false); draw(); };
+  document.getElementById("ev-ca-p1").addEventListener("click", () => preset(109, 95.67, 102.29));
+  document.getElementById("ev-ca-p2").addEventListener("click", () => preset(109, 118, 131));
+  document.getElementById("ev-ca-p3").addEventListener("click", () => preset(109, 94, 88));
+  draw();
+})();
+
+/* ---------- 5. 시간 추적 ---------- */
+(function () {
+  const sc = CB.seg("ev-tr-sc", draw), low = CB.seg("ev-tr-low", draw);
+  const gt = CB.range("ev-tr-t", (v) => v + " 주", draw);
+  const TMAX = 100;
+  const series = () => {
+    const s = sc(), out = { PV: [], EV: [], AC: [], SPI: [], CPI: [], SPIt: [], SV: [], CV: [] };
+    for (let t = 0; t <= TMAX; t++) {
+      const o = EVX.at(t, s), e = CB.pm.evm({ BAC: EVX.BAC, ...o });
+      out.PV.push([t, o.PV]); out.EV.push([t, o.EV]); out.AC.push([t, o.AC]);
+      if (t >= 4) { out.SPI.push([t, e.SPI]); out.CPI.push([t, e.CPI]); out.SPIt.push([t, EVX.earned(o.EV) / t]); }
+      out.SV.push([t, e.SV]); out.CV.push([t, e.CV]);
+    }
+    return out;
+  };
+  let S = series(), lastSc = sc();
+  const cv = CB.canvas("#ev-cv-track", (ctx, W, H) => {
+    const P = CB.palette(), t = gt(), cut = (d) => d.filter(([x]) => x <= t);
+    const h1 = H * 0.6;
+    const b1 = { x: 56, y: 14, w: W - 56 - 16, h: h1 - 14 - 30 }, b2 = { x: 56, y: h1 + 8, w: W - 56 - 16, h: H - h1 - 8 - 40 };
+    CB.chart(ctx, b1, { x: [0, TMAX], y: [0, 290], yLabel: "억 원", xFmt: () => "", series: [
+      { data: S.PV, color: P.dim, width: 2, dash: [7, 5] }, { data: cut(S.EV), color: P.ok, width: 2.6 }, { data: cut(S.AC), color: P.bad, width: 2.6 }],
+      hlines: [{ y: 244, color: P.faint, label: "BAC" }], vlines: [{ x: t, color: P.text }, { x: 93, color: P.faint, label: "T 93" }] });
+    let lx = b1.x + 8, ly = b1.y + 10;
+    [["PV", P.dim], ["EV", P.ok], ["AC", P.bad]].forEach(([n, c]) => { EVX.text(ctx, n, lx, ly, c, { align: "left", size: 11 }); lx += 34; });
+    if (low() === "idx") {
+      CB.chart(ctx, b2, { x: [0, TMAX], y: [0.7, 1.1], xLabel: "주", yTicks: [0.7, 0.8, 0.9, 1, 1.1], series: [
+        { data: cut(S.SPI), color: P.accent2, width: 2.2 }, { data: cut(S.CPI), color: P.accent, width: 2.2 }, { data: cut(S.SPIt), color: P.accent2, width: 1.6, dash: [3, 3] }],
+        hlines: [{ y: 1, color: P.faint }, { y: 0.95, color: P.warn, dash: [2, 4] }], vlines: [{ x: t, color: P.text }] });
+      let x2 = b2.x + 8; [["SPI", P.accent2], ["CPI", P.accent], ["SPI(t) 점선", P.accent2]].forEach(([n, c]) => { EVX.text(ctx, n, x2, b2.y + 10, c, { align: "left", size: 10.5 }); x2 += n.length * 7 + 22; });
+    } else {
+      CB.chart(ctx, b2, { x: [0, TMAX], y: [-30, 5], xLabel: "주", series: [{ data: cut(S.SV), color: P.accent2, width: 2.2 }, { data: cut(S.CV), color: P.accent, width: 2.2 }],
+        hlines: [{ y: 0, color: P.faint }], vlines: [{ x: t, color: P.text }] });
+      let x2 = b2.x + 8; [["SV", P.accent2], ["CV", P.accent]].forEach(([n, c]) => { EVX.text(ctx, n, x2, b2.y + 10, c, { align: "left", size: 10.5 }); x2 += 34; });
+    }
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.66), minHeight: 320, maxHeight: 520 });
+  function draw() {
+    if (sc() !== lastSc) { lastSc = sc(); S = series(); }
+    cv.redraw();
+    const t = gt(), o = EVX.at(t, sc()), e = CB.pm.evm({ BAC: EVX.BAC, ...o }), es = EVX.earned(o.EV);
+    CB.stat("ev-tr-o-v", `${EVX.f1(o.PV)} · <span class="ev-ok">${EVX.f1(o.EV)}</span> · <span class="ev-bad">${EVX.f1(o.AC)}</span>`);
+    CB.stat("ev-tr-o-i", t > 0 ? `<span class="${EVX.idxCls(e.SPI)}">${EVX.f3(e.SPI)}</span> · <span class="${EVX.idxCls(e.CPI)}">${EVX.f3(e.CPI)}</span>` : "—");
+    CB.stat("ev-tr-o-es", t > 0 ? `${CB.num(es, 1)} 주 · ${CB.signed(es - t, 1)} 주` : "—");
+    const spit = t > 0 ? es / t : NaN;
+    CB.stat("ev-tr-o-t", t > 0 && spit > 0 ? `${EVX.f3(spit)} · ${CB.num(EVX.T / spit, 0)} 주` : "—");
+  }
+  let timer = null;
+  CB.playButton("ev-tr-play", () => { if (gt() >= 97) gt.set(0, false); timer = setInterval(() => { const v = gt() + 1; gt.set(Math.min(97, v)); if (v >= 97) { clearInterval(timer); document.getElementById("ev-tr-play").click(); } }, 90); }, () => clearInterval(timer));
+  draw();
+})();
+
+/* ---------- 6. EAC 비교 ---------- */
+(function () {
+  const gt = CB.range("ev-ea-t", (v) => v + " 주", draw), sc = CB.seg("ev-ea-sc", draw), what = CB.seg("ev-ea-what", draw);
+  const build = (s) => {
+    const fin = EVX.finish(s), finAC = EVX.at(fin + 1, s).AC, out = { e1: [], e2: [], e3: [], t1: [], t2: [], fin, finAC };
+    for (let t = 6; t <= 96; t++) {
+      const o = EVX.at(t, s), e = CB.pm.evm({ BAC: EVX.BAC, ...o }), rem = EVX.BAC - o.EV;
+      out.e1.push([t, e.EAC]); out.e2.push([t, o.AC + rem / Math.max(1e-6, e.CPI * e.SPI)]); out.e3.push([t, o.AC + rem]);
+      out.t1.push([t, EVX.T / e.SPI]); out.t2.push([t, EVX.T / (EVX.earned(o.EV) / t)]);
+    }
+    return out;
+  };
+  const cache = {}; const get = () => cache[sc()] || (cache[sc()] = build(sc()));
+  const val = (arr, t) => (arr.find(([x]) => x === t) || [0, NaN])[1];
+  const cv = CB.canvas("#ev-cv-eac", (ctx, W, H) => {
+    const P = CB.palette(), d = get(), t = gt();
+    const box = { x: 58, y: 16, w: W - 58 - 16, h: H - 16 - 48 };
+    if (what() === "cost") {
+      CB.chart(ctx, box, { x: [0, 100], y: [230, 340], xLabel: "상태 기준일 (주)", yLabel: "EAC (억 원)", series: [
+        { data: d.e1, color: P.accent, width: 2.2 }, { data: d.e2, color: P.accent2, width: 2.2 }, { data: d.e3, color: P.dim, width: 2.2, dash: [4, 3] }],
+        hlines: [{ y: 244, color: P.faint, label: "BAC 244" }, { y: d.finAC, color: P.bad, label: "실제 최종 " + CB.num(d.finAC, 1), dash: [] }], vlines: [{ x: t, color: P.text }] });
+      let lx = box.x + 8; [["(1) BAC/CPI", P.accent], ["(2) CPI·SPI", P.accent2], ["(3) 잔여 계획", P.dim]].forEach(([n, c]) => { EVX.text(ctx, n, lx, box.y + 10, c, { align: "left", size: 10.5 }); lx += W < 480 ? 86 : 100; });
+    } else {
+      CB.chart(ctx, box, { x: [0, 100], y: [85, 115], xLabel: "상태 기준일 (주)", yLabel: "예상 공기 (주)", series: [
+        { data: d.t1, color: P.accent2, width: 2.2 }, { data: d.t2, color: P.accent, width: 2.2 }],
+        hlines: [{ y: 93, color: P.faint, label: "계획 93" }, { y: d.fin, color: P.bad, label: "실제 " + CB.num(d.fin, 0) + "주", dash: [] }], vlines: [{ x: t, color: P.text }] });
+      let lx = box.x + 8; [["T/SPI", P.accent2], ["T/SPI(t)", P.accent]].forEach(([n, c]) => { EVX.text(ctx, n, lx, box.y + 10, c, { align: "left", size: 10.5 }); lx += 80; });
+    }
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.52), minHeight: 260, maxHeight: 420 });
+  const msg = document.getElementById("ev-ea-msg");
+  function draw() {
+    cv.redraw(); const d = get(), t = gt();
+    const v = [val(d.e1, t), val(d.e2, t), val(d.e3, t)], err = v.map((x) => Math.abs(x - d.finAC)), best = err.indexOf(Math.min(...err));
+    ["1", "2", "3"].forEach((k, i) => CB.stat("ev-ea-o-" + k, `<span class="${i === best ? "ev-ok" : ""}">${EVX.f1(v[i])}</span>`));
+    CB.stat("ev-ea-o-f", EVX.f1(d.finAC) + " 억 · " + CB.num(d.fin, 0) + "주");
+    const nm = ["(1) BAC/CPI", "(2) CPI·SPI", "(3) 잔여 계획대로"][best];
+    if (what() === "cost") msg.innerHTML = `${t}주 시점에서 실제 최종 원가에 가장 가까운 공식은 <b>${nm}</b>(오차 ${CB.num(err[best], 1)}억)입니다. ` + (sc() === "base" ? "초과 원인(암반)이 일회성이어서 잔여 계획 방식이 잘 맞고, CPI·SPI 방식은 지연이 원가로 번진다고 가정해 과대 추정합니다." : "원가 초과가 공사 내내 일정한 비율로 일어나므로 CPI 방식이 일찍부터 안정적으로 맞습니다.");
+    else { const a = val(d.t1, t), b = val(d.t2, t); msg.innerHTML = `${t}주 시점 예상 공기: T/SPI = <b>${CB.num(a, 1)}주</b>, T/SPI(t) = <b>${CB.num(b, 1)}주</b>, 실제 ${CB.num(d.fin, 0)}주. 금액 SPI 기반 예측은 중반에 과장되고 후반에는 93주로 되돌아가는 반면, 획득 일정 기반 예측은 더 안정적입니다.`; }
+    msg.className = "ev-msg";
+  }
+  draw();
+})();
+
+/* ---------- 7. 회복 대책 ---------- */
+(function () {
+  const K = [["g1", "G1", 0.25], ["g2", "G2", 0.25], ["h", "H", 0.35], ["j", "J", 0.2], ["m", "M", 0.8]];
+  const g = {}; K.forEach(([k]) => (g[k] = CB.range("ev-rc-" + k, (v) => v + " 주", draw)));
+  const REM = { G1: 7, G2: 15, H: 16, I: 22, K: 4, J: 20, L: 6, M: 4 };
+  const IND = 0.3, LD = 244 * 0.0005 * 7, T0 = 50, TC = 93;
+  const NAMES = { G1: "G1 골조 1–5층", G2: "G2 골조 6–10층", H: "H 커튼월", I: "I 설비", K: "K 옥상 방수", J: "J 내부 마감", L: "L 조경·포장", M: "M 시운전·준공" };
+  const calc = () => {
+    const cut = {}; let cost = 0; K.forEach(([k, id, s]) => { cut[id] = g[k](); cost += g[k]() * s; });
+    const acts = Object.keys(REM).map((id) => ({ id, d: Math.max(0.5, REM[id] - (cut[id] || 0)), pred: EVX.byId[id].pred.filter((p) => REM[p] != null) }));
+    const r = CB.pm.cpm(acts), fin = T0 + r.T, base = 97;
+    const saved = base - fin, avoid = saved * IND + (Math.max(0, base - TC) - Math.max(0, fin - TC)) * LD;
+    return { acts, r, fin, cost, avoid, net: avoid - cost };
+  };
+  const cv = CB.canvas("#ev-cv-recover", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), narrow = W < 520;
+    const x0 = narrow ? 92 : 118, y0 = 40, w = W - x0 - 16, rows = c.acts.length, rh = (H - y0 - 36) / rows, tmax = 50;
+    const X = (t) => x0 + (t / tmax) * w;
+    ctx.save(); ctx.font = "11px " + getComputedStyle(document.body).getPropertyValue("--mono"); ctx.fillStyle = P.dim; ctx.textAlign = "center";
+    for (let t = 0; t <= tmax; t += 5) { ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(X(t), y0 - 4); ctx.lineTo(X(t), H - 30); ctx.stroke(); if (!narrow || t % 10 === 0) ctx.fillText(String(T0 + t), X(t), H - 16); }
+    ctx.restore();
+    const xc = X(TC - T0); ctx.save(); ctx.strokeStyle = P.ok; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(xc, y0 - 34); ctx.lineTo(xc, H - 30); ctx.stroke(); ctx.restore();
+    const same = Math.abs(c.fin - TC) < 0.5;
+    if (!same) EVX.text(ctx, "계약 93", xc - 4, y0 - 28, P.ok, { size: 10.5, align: "right" });
+    const xf = X(c.r.T); ctx.save(); ctx.strokeStyle = c.fin > TC ? P.bad : P.ok; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(xf, y0 - 6); ctx.lineTo(xf, H - 30); ctx.stroke(); ctx.restore();
+    EVX.text(ctx, same ? "준공 93 = 계약" : "준공 " + CB.num(c.fin, 0), same ? xf - 4 : Math.min(xf + 4, W - 4), y0 - 14, c.fin > TC ? P.bad : P.ok, { size: 10.5, align: same || xf > W - 60 ? "right" : "left" });
+    c.acts.forEach((a, k) => {
+      const A = c.r.acts[a.id], y = y0 + k * rh + rh * 0.2, bh = rh * 0.6, base = REM[a.id];
+      EVX.text(ctx, narrow ? a.id : NAMES[a.id], x0 - 6, y + bh / 2, P.text, { align: "right", size: narrow ? 10.5 : 11, mono: false });
+      ctx.strokeStyle = P.faint; ctx.strokeRect(X(A.ES), y, X(A.ES + base) - X(A.ES), bh);
+      ctx.fillStyle = EVX.alpha(A.critical ? P.bad : P.accent2, 0.75); ctx.fillRect(X(A.ES), y, X(A.EF) - X(A.ES), bh);
+      if (A.TF > 0.01) { ctx.save(); ctx.strokeStyle = P.accent2; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(A.EF), y + bh / 2); ctx.lineTo(X(A.LF), y + bh / 2); ctx.stroke(); ctx.restore(); }
+    });
+    EVX.text(ctx, "주(실제 시점) · 빨강 = 주공정, 윤곽 = 단축 전 기간", x0, H - 4, P.faint, { align: "left", size: 10, mono: false, baseline: "bottom" });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.56), minHeight: 300, maxHeight: 440 });
+  const msg = document.getElementById("ev-rc-msg");
+  function draw() {
+    cv.redraw(); const c = calc();
+    CB.stat("ev-rc-o-t", `<span class="${c.fin > TC ? "ev-bad" : "ev-ok"}">${CB.num(c.fin, 0)} 주</span>`);
+    CB.stat("ev-rc-o-c", CB.num(c.cost, 2) + " 억"); CB.stat("ev-rc-o-s", CB.num(c.avoid, 2) + " 억");
+    CB.stat("ev-rc-o-n", `<span class="${c.net >= 0 ? "ev-ok" : "ev-bad"}">${CB.signed(c.net, 2)} 억</span>`);
+    const crit = c.r.critical.join("–");
+    const wasted = K.filter(([k, id]) => g[k]() > 0 && !c.r.acts[id].critical && c.r.acts[id].TF > 0.01).map(([, id]) => id);
+    msg.innerHTML = `주공정: <b>${crit}</b>. ` + (wasted.length ? `<span class="ev-bad">${wasted.join(", ")}의 단축은 주공정이 아니어서 준공을 당기지 못합니다(돈만 씀).</span>` : c.fin <= TC ? "계약 공기 안으로 회복했습니다." : `아직 ${CB.num(c.fin - TC, 0)}주 늦습니다.`);
+    msg.className = "ev-msg";
+  }
+  document.getElementById("ev-rc-best").addEventListener("click", () => { g.g1.set(0, false); g.g2.set(0, false); g.h.set(0, false); g.j.set(4, false); g.m.set(0, false); draw(); });
+  document.getElementById("ev-rc-reset").addEventListener("click", () => { K.forEach(([k]) => g[k].set(0, false)); draw(); });
+  draw();
+})();
+
+/* ---------- 8. 대시보드 ---------- */
+(function () {
+  const gt = CB.range("ev-db-t", (v) => v + " 주", draw), gg = CB.range("ev-db-g", (v) => v.toFixed(2), draw), gr = CB.range("ev-db-r", (v) => v.toFixed(2), draw), sc = CB.seg("ev-db-sc", draw);
+  const box = document.getElementById("ev-db-tiles");
+  const light = (v) => { if (!isFinite(v)) return ["", "—"]; const G = gg(), Rr = Math.min(gr(), G); return v >= G ? ["g", "초록"] : v >= Rr ? ["y", "노랑"] : ["r", "빨강"]; };
+  const trend = (now, prev) => (!isFinite(now) || !isFinite(prev) ? "" : now - prev > 0.005 ? "↗" : now - prev < -0.005 ? "↘" : "→");
+  function tile(name, ids, t, s, all) {
+    const o = EVX.at(t, s, ids), p = EVX.at(Math.max(1, t - 4), s, ids);
+    const spi = o.PV > 1e-6 ? o.EV / o.PV : NaN, cpi = o.AC > 1e-6 ? o.EV / o.AC : NaN;
+    const spiP = p.PV > 1e-6 ? p.EV / p.PV : NaN, cpiP = p.AC > 1e-6 ? p.EV / p.AC : NaN;
+    const [ls, lsT] = light(spi), [lc, lcT] = light(cpi);
+    const html = `<div class="ev-tile${all ? " all" : ""}"><h4>${name}</h4>
+      <div class="ev-row"><span class="ev-light ${ls}" aria-hidden="true"></span>SPI ${isFinite(spi) ? spi.toFixed(2) : "—"} ${trend(spi, spiP)}<span class="ev-tag">${lsT}</span></div>
+      <div class="ev-row"><span class="ev-light ${lc}" aria-hidden="true"></span>CPI ${isFinite(cpi) ? cpi.toFixed(2) : "—"} ${trend(cpi, cpiP)}<span class="ev-tag">${lcT}</span></div>
+      <div class="ev-tag">EV ${CB.num(o.EV, 1)} / 예산 ${CB.num(ids ? ids.reduce((q, i) => q + EVX.byId[i].cost, 0) : EVX.BAC, 0)}억</div></div>`;
+    return { html, spi, cpi, red: (ls === "r") + (lc === "r") > 0 };
+  }
+  function draw() {
+    const t = gt(), s = sc();
+    const all = tile("전체 공사", null, t, s, true);
+    const ts = EVX.GROUPS.map(([n, ids]) => Object.assign(tile(n, ids, t, s, false), { n }));
+    box.innerHTML = all.html + ts.map((x) => x.html).join("");
+    CB.stat("ev-db-o-r", String(ts.filter((x) => x.red).length) + " / " + ts.length);
+    CB.stat("ev-db-o-a", `${isFinite(all.spi) ? all.spi.toFixed(2) : "—"} · ${isFinite(all.cpi) ? all.cpi.toFixed(2) : "—"}`);
+    let worst = null, wv = Infinity; ts.forEach((x) => { const v = Math.min(isFinite(x.spi) ? x.spi : 9, isFinite(x.cpi) ? x.cpi : 9); if (v < wv) { wv = v; worst = x.n; } });
+    CB.stat("ev-db-o-w", wv < 9 ? `${worst} (${wv.toFixed(2)})` : "—");
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

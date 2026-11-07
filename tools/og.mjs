@@ -1,5 +1,5 @@
 // Copyright (c) 2026 geniuskey and ConstructionBooks contributors. MIT. Based on the MathBooks og renderer.
-// Render the 1200×630 share images: og.png (shelf home), mechanics/, materials/, geotech/, structure/, concrete/ and civil/og.png.
+// Render the 1200×630 share images: og.png (shelf home), mechanics/, materials/, geotech/, structure/, concrete/, civil/ and site/og.png.
 // Usage: node tools/og.mjs   (rerun after books, chapters or simulators change). Needs Playwright.
 // Covers use the same shelf.css and covers.js as the home page; stats are counted like shared/js/shelf.js.
 import { chromium } from 'playwright';
@@ -51,6 +51,11 @@ sandbox5.window = sandbox5;
 vm.createContext(sandbox5);
 vm.runInContext(read('civil/js/common.js'), sandbox5);
 CB.civ = sandbox5.CB.civ;
+const sandbox6 = { ...sandbox, document: { ...sandbox.document, currentScript: { src: 'http://x/site/js/common.js' } } };
+sandbox6.window = sandbox6;
+vm.createContext(sandbox6);
+vm.runInContext(read('site/js/common.js'), sandbox6);
+CB.pm = sandbox6.CB.pm;
 
 const base = `
   html, body { margin:0; width:1200px; height:630px; overflow:hidden; }
@@ -325,9 +330,41 @@ const civPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><sty
   <div class="art">${civArt}</div>
 </body></html>`;
 
+// SiteBook: the P-B10 Gantt chart from CPM (critical red, float tails) above the cost S-curve.
+const siteArt = (() => {
+  let s = '';
+  const acts = CB.pm.B10, r = CB.pm.cpm(acts), T = r.T, X = (w) => 150 + (w / T) * 400, rowH = 19, y0 = 70;
+  acts.forEach((a, i) => {
+    const R = r.acts[a.id], y = y0 + i * rowH;
+    s += `<text x="140" y="${y + 13}" text-anchor="end" fill="#aeb8cc" font-size="12.5">${a.name}</text>`;
+    s += `<rect x="${X(R.ES)}" y="${y + 3}" width="${X(R.EF) - X(R.ES)}" height="${rowH - 6}" rx="3" fill="${R.critical ? '#ff5f57' : '#74b0f0'}"/>`;
+    if (R.TF > 0) s += `<line x1="${X(R.EF)}" y1="${y + rowH / 2}" x2="${X(R.LF)}" y2="${y + rowH / 2}" stroke="#74b0f0" stroke-width="2" stroke-dasharray="3 3"/>`;
+  });
+  s += `<text x="350" y="50" text-anchor="middle" fill="#cfd6e4" font-size="17" font-weight="700">P-B10 공정표 · ${T}주 · 주공정 빨강</text>`;
+  const sp = CB.pm.spread(acts, r, 'cost', 'ES'), BAC = sp.cum[sp.cum.length - 1], gy = 560, gh = 170;
+  let d = ''; sp.cum.forEach((c, i) => { d += (i ? 'L' : 'M') + X(i + 1).toFixed(1) + ' ' + (gy - (c / BAC) * gh).toFixed(1); });
+  s += `<line x1="${X(0)}" y1="${gy}" x2="${X(T)}" y2="${gy}" stroke="#4a5670" stroke-width="2"/><path d="${d}" fill="none" stroke="#ffa94d" stroke-width="4"/>`;
+  s += `<text x="${X(T) - 4}" y="${gy - gh - 6}" text-anchor="end" fill="#ffa94d" font-family="monospace" font-size="15">누적 원가 S 곡선 · BAC ${Math.round(BAC)}억</text>`;
+  return `<svg viewBox="0 0 600 600" width="600" height="600"><defs><clipPath id="c7"><rect x="20" y="20" width="560" height="560" rx="28"/></clipPath></defs><rect x="20" y="20" width="560" height="560" rx="28" fill="#0f1625" stroke="#26324a"/><g clip-path="url(#c7)">${s}</g></svg>`;
+})();
+const site = books.find((b) => b.id === 'sitebook');
+const sitePage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>${read('shelf.css')}</style><style>${base}
+  .art { position:absolute; right:40px; top:15px; }
+</style></head><body>
+  <div class="left">
+    <div class="brand">${read('site/favicon.svg')}<span>SiteBook</span></div>
+    <div class="eyebrow">INTERACTIVE CONSTRUCTION MANAGEMENT</div>
+    <h1>도면이<br><span class="soft">건물이</span><br><span class="warm">되기까지</span></h1>
+    <p class="lead">공종별 시공과 장비, CPM·PERT 공정표,<br>원가와 EVM, 품질·안전을 직접 계산하는 건설관리.</p>
+    <div class="stats"><span><b>4</b>부</span><span><b>16</b>개 장</span><span><b>${Math.floor(site.simulators / 10) * 10}+</b>시뮬레이터</span></div>
+  </div>
+  <div class="url">construction.euiyun.com/site/</div>
+  <div class="art">${siteArt}</div>
+</body></html>`;
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
-for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png'], [strPage, 'structure/og.png'], [rcPage, 'concrete/og.png'], [civPage, 'civil/og.png']]) {
+for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png'], [strPage, 'structure/og.png'], [rcPage, 'concrete/og.png'], [civPage, 'civil/og.png'], [sitePage, 'site/og.png']]) {
   await page.setContent(html, { waitUntil: 'networkidle' });
   await page.addScriptTag({ content: read('shared/js/covers.js') });
   await page.evaluate(async () => {
@@ -337,4 +374,4 @@ for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [m
   await page.screenshot({ path: join(root, out) });
 }
 await browser.close();
-console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators}, structure/og.png: ${structure.simulators}, concrete/og.png: ${concrete.simulators}, civil/og.png: ${civil.simulators} simulators`);
+console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators}, structure/og.png: ${structure.simulators}, concrete/og.png: ${concrete.simulators}, civil/og.png: ${civil.simulators}, site/og.png: ${site.simulators} simulators`);

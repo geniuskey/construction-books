@@ -1,0 +1,1202 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>공정 계획과 CPM · SiteBook</title>
+<meta name="description" content="무엇이 공기를 정하나. 작업 분류 체계와 기간 산정, 간트·AOA·AON·사선식 공정표, FS·SS·FF·SF 관계와 지연, 전진·후진 계산, 전체·자유 여유, 주공정, 공정 갱신을 P-B10 93주 공정표로 직접 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .cp-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .cp-msg b { color: var(--text); }
+  .cp-msg.ok { color: var(--ok); }
+  .cp-msg.bad { color: var(--bad); font-weight: 600; }
+  .cp-msg.warn { color: var(--warn); font-weight: 600; }
+  .cp-tbl td, .cp-tbl th { font-variant-numeric: tabular-nums; text-align: center; }
+  .cp-tbl td.cp-crit { color: var(--bad); font-weight: 700; }
+  .cp-ed { display: grid; gap: 6px; padding: 14px 18px; border-top: 1px solid var(--border); background: var(--surface); }
+  .cp-ed-row { display: grid; grid-template-columns: 30px minmax(0, 1.2fr) 64px minmax(0, 1.3fr) 34px; gap: 6px; align-items: center; }
+  .cp-ed-row input { font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); min-width: 0; width: 100%; box-sizing: border-box; }
+  .cp-ed-row input:focus { outline: none; border-color: var(--accent); }
+  .cp-ed-row input.cp-bad { border-color: var(--bad); }
+  .cp-ed-row input.cp-ed-d { font-family: var(--mono); text-align: right; }
+  .cp-ed-row input.cp-ed-p { font-family: var(--mono); }
+  .cp-ed-id { font: 700 14px var(--mono); text-align: center; color: var(--text); }
+  .cp-ed-id.cp-crit { color: var(--bad); }
+  .cp-ed-del { font: inherit; font-size: 15px; line-height: 1; padding: 6px 0; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); cursor: pointer; }
+  .cp-ed-del:hover { border-color: var(--bad); color: var(--bad); }
+  .cp-ed-head { font-size: 12px; color: var(--text-dim); }
+  .cp-ed-head span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cp-ed-bar { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg-elev); }
+  @media (max-width: 560px) {
+    .cp-ed-row { grid-template-columns: 30px minmax(0, 1fr) 60px 34px; }
+    .cp-ed-row > :nth-child(1) { grid-column: 1; grid-row: 1; }
+    .cp-ed-row > :nth-child(2) { grid-column: 2; grid-row: 1; }
+    .cp-ed-row > :nth-child(3) { grid-column: 3; grid-row: 1; }
+    .cp-ed-row > :nth-child(4) { grid-column: 2 / 5; grid-row: 2; }
+    .cp-ed-row > :nth-child(5) { grid-column: 4; grid-row: 1; }
+    .cp-ed-row { padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
+    .cp-ed-head { display: none; }
+  }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="site"></script>
+</head>
+<body data-chapter="cpm">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="cp-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="cp-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+      <marker id="cp-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="cp-ah-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 09</div>
+    <h1 data-no-glossary>공정 계획과 CPM</h1>
+    <p class="lead">B-10 신축 공사에는 흙막이, 말뚝, 굴착, 골조, 커튼월, 설비, 마감까지 수십 개의 공종이 얽혀 있습니다. 이 가운데 어느 하나가 한 주 늦어지면 준공이 한 주 늦어지는 공종이 있고, 몇 주가 늦어져도 아무 일 없는 공종이 있습니다. 그 차이를 계산하는 도구가 <b>주공정법(CPM)</b>입니다. 이 장은 일을 쪼개고(WBS), 기간을 정하고(물량 ÷ 생산성), 순서를 잇고(FS·SS·FF와 지연), 전진·후진 두 번의 계산으로 각 활동의 가장 이른·늦은 시각과 여유를 구해, P-B10의 공기 93주와 주공정 A–B–C–E–F–G1–H–J–M을 손과 시뮬레이터로 확인합니다. 마지막으로 실적이 들어왔을 때 공정표를 갱신하는 법을 익힙니다.</p>
+    <ul class="objectives">
+      <li>작업 분류 체계(WBS)로 공사를 작업 패키지와 활동으로 나누고, 기간을 \(D = Q/(P\cdot n)\)으로 산정한다.</li>
+      <li>바 차트(간트), 화살표형(AOA)·노드형(AON) 네트워크, 사선식 공정표의 쓰임과 한계를 비교한다.</li>
+      <li>FS·SS·FF·SF 관계와 지연(lag)을 공정표에 표현하고 그 의미를 현장 작업으로 설명한다.</li>
+      <li>전진 계산(ES·EF)과 후진 계산(LS·LF)으로 공기와 전체 여유·자유 여유, 주공정을 구한다.</li>
+      <li>여유를 소비하면 언제 후속 활동이, 언제 준공이 늦어지는지 판정한다.</li>
+      <li>데이터 날짜 기준으로 실적과 남은 기간을 넣어 공정표를 갱신하고 예상 준공을 다시 계산한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 관리가 없었다면</small><b>모두가 바빴지만 아무도 무엇이 급한지 몰랐다</b></div>
+      <div class="o-body"><p>20세기 초 헨리 갠트(Henry L. Gantt)가 작업을 시간축 위의 막대로 그린 바 차트는 지금도 가장 많이 쓰이는 공정표입니다. 그러나 막대만으로는 "이 막대가 늦으면 어느 막대가 밀리는가"가 보이지 않습니다. 1950년대 후반 미국 화학 회사 듀폰(DuPont)과 레밍턴 랜드(Remington Rand)의 켈리(J. E. Kelley)와 워커(M. R. Walker)가 공장 건설·정비 공사의 일정을 컴퓨터로 계산하려고 활동의 선후행 관계를 네트워크로 표현하고 가장 긴 경로를 찾는 방법을 만든 것이 주공정법(CPM)의 시작으로 알려져 있습니다(1957년 무렵). 거의 같은 시기 미 해군의 폴라리스 미사일 개발 사업에서 기간의 불확실성을 다루는 PERT가 나왔습니다(10장).</p>
+        <p>네트워크 공정표가 없던 현장에서는 모든 공종이 "우리 일이 제일 급하다"고 말했고, 공사가 늦어지면 어느 공종을 서둘러야 준공이 당겨지는지 알 수 없어 엉뚱한 곳에 돈을 썼습니다. CPM은 공기를 정하는 소수의 활동(주공정)과 여유가 있는 다수의 활동을 갈라, 관리의 눈과 돈을 어디에 써야 할지 알려 줍니다.</p>
+        <div class="o-chain"><span>공사 범위·도면·물량</span><i>→</i><span class="tool">WBS · D = Q/(P·n) · 네트워크 · 전진·후진 계산 · 여유</span><i>→</i><span>공기 · 주공정 · 관리 우선순위 · 갱신</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="purpose">
+    <h2>공정 관리의 목적</h2>
+    <div class="problem"><strong>"언제 끝나요?"에 답하려면</strong>
+      <p>발주자가 B-10의 준공일을 묻습니다. 공무 담당 신입은 공종별 소요 기간을 모두 더해 "196주"라고 답하려다 멈췄습니다. 흙막이와 말뚝은 동시에 할 수 있고, 설비는 골조를 따라 올라가며 진행됩니다. 무엇을 더하고 무엇을 겹쳐야 할까요?</p></div>
+    <p><span class="term">공정 관리</span><span class="en">(schedule management)</span>는 공사를 정해진 기간 안에 끝내도록 활동의 순서와 시기를 계획하고, 실행을 측정해 차이를 조정하는 일입니다. 이 책의 원칙(계획 → 실행 → 측정 → 조정)이 가장 또렷하게 드러나는 영역입니다. 공정표는 세 가지 질문에 답해야 합니다.</p>
+    <ol>
+      <li><b>언제 끝나는가</b> — 활동들의 선후행 관계를 따라가 가장 긴 경로의 길이가 공기입니다. 14개 활동 기간을 모두 더한 196주가 아니라, 동시에 진행할 수 있는 것은 겹쳐서 93주입니다.</li>
+      <li><b>무엇이 늦으면 안 되는가</b> — 그 가장 긴 경로 위의 활동(주공정)은 하루가 늦어지면 준공이 하루 늦어집니다. 나머지는 여유만큼 늦어져도 됩니다.</li>
+      <li><b>언제 무엇이 필요한가</b> — 활동의 시작·종료 시각이 정해지면 인력·장비·자재 반입 시기(11장), 기성과 현금 흐름(12장), 진도의 기준선(13장)이 정해집니다.</li>
+    </ol>
+    <figure class="diagram" id="fig-cp-loop">
+      <svg viewBox="0 0 860 300" role="img" aria-label="공정 관리의 순환: 계획, 실행, 측정, 조정과 가운데의 공정표">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <rect x="330" y="112" width="200" height="76" rx="12" class="f-acc-soft"/>
+        <text x="430" y="144" text-anchor="middle" class="t" style="font-weight:700">공정표</text>
+        <text x="430" y="166" text-anchor="middle" class="t-mono">기준선 · 주공정 · 여유</text>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="60" y="40" width="190" height="64" rx="10" class="f-elev"/><text x="155" y="66" style="font-weight:700;fill:var(--text)">① 계획</text><text x="155" y="88">WBS · 기간 · 순서 · CPM</text>
+          <rect x="610" y="40" width="190" height="64" rx="10" class="f-elev"/><text x="705" y="66" style="font-weight:700;fill:var(--text)">② 실행</text><text x="705" y="88">공종별 시공 · 자원 투입</text>
+          <rect x="610" y="196" width="190" height="64" rx="10" class="f-elev"/><text x="705" y="222" style="font-weight:700;fill:var(--text)">③ 측정</text><text x="705" y="244">실적 · 진척률 · 남은 기간</text>
+          <rect x="60" y="196" width="190" height="64" rx="10" class="f-elev"/><text x="155" y="222" style="font-weight:700;fill:var(--text)">④ 조정</text><text x="155" y="244">갱신 · 만회 · 공기 단축</text>
+        </g>
+        <g style="stroke:var(--accent);stroke-width:2.2;fill:none" marker-end="url(#cp-ah-acc)">
+          <path d="M252 72H606"/><path d="M705 106V192"/><path d="M606 228H254"/><path d="M155 194V108"/>
+        </g>
+        <g style="stroke:var(--text-faint);stroke-width:1.4;stroke-dasharray:4 4;fill:none">
+          <path d="M250 104L330 130"/><path d="M610 104L530 130"/><path d="M610 196L530 170"/><path d="M250 196L330 170"/>
+        </g>
+        <text x="430" y="62" text-anchor="middle" class="t-dim">기준선 확정 → 착공</text>
+        <text x="430" y="248" text-anchor="middle" class="t-dim">데이터 날짜마다 비교 → 새 예상 준공</text>
+      </svg>
+      <figcaption><b>그림 9-1.</b> 공정 관리의 순환. 계획 단계의 공정표가 <b>기준선</b>(baseline)으로 확정되고, 실행 중 실적을 측정해 기준선과 비교하며, 차이가 나면 갱신·만회 대책·공기 단축(11장)으로 조정한다. 공정표는 한 번 그리고 끝나는 그림이 아니라 공사 내내 다시 계산되는 모델이다.</figcaption>
+    </figure>
+    <p>계약서에는 <span class="term">계약 공기</span><span class="en">(contract duration)</span>와 중간 <span class="term">마일스톤</span><span class="en">(milestone)</span>이 적힙니다. 마일스톤은 기간이 0인 사건으로, "지하 골조 완료", "골조 상량", "수전(受電)", "사용 승인"처럼 발주자·감리·인허가와 맞물린 시점입니다. 계약 공기를 넘기면 지체상금이 붙고(2장, 요율은 계약·현행 법령 확인), 마일스톤을 놓치면 뒤따르는 설비 반입이나 임차인 입주 계획이 흔들립니다. 그래서 공정표는 계약 공기에 맞는 계획인지, 그 계획이 얼마나 확실한지(10장)를 함께 보여 주어야 합니다.</p>
+    <div class="callout tip"><strong>공정표의 상세 수준</strong> 공정표는 쓰는 사람에 따라 상세 수준이 다릅니다. 발주자·경영진에게는 수십 개 활동의 <b>요약 공정표</b>(이 책의 P-B10 14개 활동이 이 수준), 현장 소장에게는 수백–수천 개 활동의 <b>상세 공정표</b>, 작업 반장에게는 2–6주 앞을 보는 <b>단기(주간·월간) 공정표</b>가 필요합니다. 셋은 같은 네트워크를 다른 배율로 본 것이어야 하며, 상세 공정표를 요약하면 요약 공정표의 기간과 순서가 나와야 합니다.</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="wbs">
+    <h2>작업 분류 체계와 기간 산정</h2>
+    <div class="problem"><strong>"골조 공사"는 몇 주짜리 활동인가</strong>
+      <p>"골조 공사 30주"라는 막대 하나로는 철근공이 언제 들어오고 레미콘을 언제부터 주문해야 하는지 알 수 없습니다. 반대로 철근 한 다발마다 활동을 만들면 아무도 공정표를 읽지 못합니다. 일을 어디까지 쪼개야 할까요?</p></div>
+    <p>공사 범위를 위에서 아래로 나눈 나무 구조가 <span class="term">작업 분류 체계</span><span class="en">(work breakdown structure, WBS)</span>입니다. 맨 아래 칸은 책임자·예산·기간을 붙여 관리할 수 있는 <span class="term">작업 패키지</span><span class="en">(work package)</span>이고, 공정표의 <span class="term">활동</span><span class="en">(activity)</span>은 작업 패키지를 시간 순서로 다시 나눈 것입니다. WBS는 원가 분류(12장)와 진도 측정(13장)의 뼈대이기도 해서, 공정·원가·진도가 같은 코드로 묶여야 나중에 "어느 작업이 늦고 어느 작업이 돈을 넘겼나"를 함께 볼 수 있습니다.</p>
+    <figure class="diagram" id="fig-cp-wbs">
+      <svg viewBox="0 0 880 330" role="img" aria-label="P-B10의 작업 분류 체계: 프로젝트, 공종 묶음, 작업 패키지와 활동">
+        <rect x="10" y="10" width="860" height="310" rx="10" class="f-surface"/>
+        <rect x="350" y="26" width="180" height="40" rx="8" class="f-acc-soft"/><text x="440" y="51" text-anchor="middle" class="t" style="font-weight:700">P-B10 신축 공사</text>
+        <g style="stroke:var(--text-faint);stroke-width:1.4;fill:none"><path d="M440 66V84M98 84H782M98 84V100M269 84V100M440 84V100M611 84V100M782 84V100"/></g>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="28" y="100" width="140" height="38" rx="7" class="f-elev"/><text x="98" y="124" style="fill:var(--text);font-weight:600">1 가설·토공</text>
+          <rect x="199" y="100" width="140" height="38" rx="7" class="f-elev"/><text x="269" y="124" style="fill:var(--text);font-weight:600">2 기초·골조</text>
+          <rect x="370" y="100" width="140" height="38" rx="7" class="f-elev"/><text x="440" y="124" style="fill:var(--text);font-weight:600">3 외장</text>
+          <rect x="541" y="100" width="140" height="38" rx="7" class="f-elev"/><text x="611" y="124" style="fill:var(--text);font-weight:600">4 설비·마감</text>
+          <rect x="712" y="100" width="140" height="38" rx="7" class="f-elev"/><text x="782" y="124" style="fill:var(--text);font-weight:600">5 외부·준공</text>
+        </g>
+        <g style="stroke:var(--text-faint);stroke-width:1.2;fill:none"><path d="M98 138V292M269 138V292M440 138V232M611 138V232M782 138V232"/></g>
+        <g class="t-mono">
+          <text x="106" y="164">A 착공·가설 4</text><text x="106" y="190">B 흙막이 10</text><text x="106" y="216">D PHC 말뚝 6</text><text x="106" y="242">C 굴착·버팀보 12</text>
+          <text x="277" y="164">E 기초 매트 4</text><text x="277" y="190">F 지하 골조 8</text><text x="277" y="216">G1 골조 1–5층 15</text><text x="277" y="242">G2 골조 6–10층 15</text>
+          <text x="448" y="164">H 커튼월 16</text><text x="448" y="190">K 옥상 방수 4</text>
+          <text x="619" y="164">I 설비 30</text><text x="619" y="190">J 내부 마감 20</text>
+          <text x="790" y="164">L 조경·포장 6</text><text x="790" y="190">M 시운전·준공 4</text>
+        </g>
+        <rect x="270" y="256" width="270" height="56" rx="7" style="fill:none;stroke:var(--accent-2);stroke-dasharray:4 3"/>
+        <text x="282" y="276" class="t-mono" style="fill:var(--accent-2)">G1을 더 쪼개면(6장): 층마다</text>
+        <text x="282" y="296" class="t-mono" style="fill:var(--accent-2)">먹매김→철근→거푸집→타설→양생, 3주/층</text>
+        <path d="M269 248L300 256" style="stroke:var(--accent-2);fill:none"/>
+      </svg>
+      <figcaption><b>그림 9-2.</b> P-B10의 작업 분류 체계(요약 수준, 교육용). 숫자는 활동 기간(주). 상세 공정표에서는 G1이 층별·작업별로 나뉘어 수십 개의 활동이 되지만, 요약 공정표에서는 하나의 작업 패키지로 다룬다.</figcaption>
+    </figure>
+    <p>활동을 나누는 실용 기준은 이렇습니다. ① 한 활동은 한 책임자(한 협력 업체·한 작업조)가 맡는다. ② 시작과 끝을 눈으로 확인할 수 있다("지하 2층 슬래브 타설 완료"). ③ 기간이 갱신 주기에 비해 너무 길지 않다(월간 갱신이면 대체로 몇 주 이내). ④ 선후행 관계가 바뀌는 곳에서 끊는다 — 커튼월은 지상 골조 1–5층이 끝나야 시작하므로 지상 골조를 G1·G2로 나누었습니다.</p>
+    <div class="callout def"><strong>정의 9.1 (기간 산정)</strong> 활동의 기간은 일의 양을 투입 자원의 생산 속도로 나눈 값이다.
+      <div class="formula">$$D = \frac{Q}{P\cdot n\cdot \eta}\ \ (\text{일}), \qquad D_{\text{주}} = \frac{D}{w}$$<div class="where">\(Q\): 물량(m³, t, m², 개), \(P\): 작업조(또는 장비) 1개의 <span class="term">생산성</span><span class="en">(productivity)</span>(물량/조·일), \(n\): 투입 조 수, \(\eta\): 작업 가능률(날씨·간섭·대기·준비를 뺀 실작업 비율, 1 이하), \(w\): 주당 작업일 수(5 또는 6). 투입을 늘리면 기간이 \(1/n\)으로 줄어드는 것은 작업 공간이 충분할 때뿐이다. 좁은 층에 조를 몰아넣으면 서로 방해해 1조당 생산성이 떨어진다(11장). 생산성은 회사의 실적 자료나 표준품셈(형태, 현행 확인)에서 가져오고, 어느 쪽이든 현장 조건으로 보정한다.</div></div></div>
+    <div class="sim" id="sim-cp-dur">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>기간 산정기: 물량 ÷ (생산성 × 조 수 × 작업 가능률)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-dur" aria-label="투입 조 수에 따른 활동 기간 곡선과 현재 선택점"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>작업</span><div class="seg" id="cp-du-pre"><button data-value="exc" class="on">굴착(C)</button><button data-value="reb">철근 조립(기준층)</button><button data-value="usr">직접 입력</button></div></div>
+          <label class="ctrl"><span>물량 Q <output id="cp-du-q-out"></output></span><input type="range" id="cp-du-q" min="500" max="20000" step="50" value="8450"></label>
+          <label class="ctrl"><span>생산성 P <output id="cp-du-p-out"></output></span><input type="range" id="cp-du-p" min="100" max="1500" step="2" value="608"></label>
+          <label class="ctrl"><span>투입 조(대) 수 n <output id="cp-du-n-out"></output></span><input type="range" id="cp-du-n" min="1" max="8" step="1" value="1"></label>
+          <label class="ctrl"><span>작업 가능률 η <output id="cp-du-e-out"></output></span><input type="range" id="cp-du-e" min="0.2" max="1" step="0.01" value="1"></label>
+          <label class="ctrl"><span>혼잡 손실 c <output id="cp-du-c-out"></output></span><input type="range" id="cp-du-c" min="0" max="0.3" step="0.01" value="0"></label>
+          <div class="ctrl"><span>주당 작업일</span><div class="seg" id="cp-du-w"><button data-value="5" class="on">5일</button><button data-value="6">6일</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기간 D</span><span class="v" id="cp-du-o-d">—</span></div>
+        <div class="stat"><span class="k">주 단위</span><span class="v" id="cp-du-o-w">—</span></div>
+        <div class="stat"><span class="k">실효 조 수</span><span class="v" id="cp-du-o-n">—</span></div>
+        <div class="stat"><span class="k">총 투입(조·일)</span><span class="v" id="cp-du-o-cd">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 굴착 기본값(굴삭기 1대, 76 m³/h × 8 h = 608 m³/일)에서 순수 굴착 약 13.9일을 확인하세요 · 굴삭기를 2대로 늘리면 약 7일, 그러나 혼잡 손실 c를 0.2로 두면 2대가 1.67대 몫만 합니다 · 작업 가능률을 0.35로 낮추면(버팀보 설치 대기·반출 시간 제한) 약 8주가 됩니다 · 철근 조립은 기준층 35 t를 4조가 하루 1.5 t씩 하면 약 5.8일입니다 · 모델: 정의 9.1, 실효 조 수 n/(1 + c(n − 1))(교육용 혼잡 모형), 생산성은 교육용 값.</div>
+    </div>
+    <div class="callout"><strong>예제 9.1 (굴착 기간과 활동 C의 12주)</strong> P-B10 지하 굴착 8,450 m³를 0.8 m³ 굴삭기(4장: 약 76 m³/h)로 판다. 하루 8시간, 주 5일.
+      <p><b>① 순수 굴착 기간</b> \(P = 76\times 8 = 608\) m³/대·일 → \(D = 8{,}450/608 = 13.9\) 일 ≈ 2.8주(1대).</p>
+      <p><b>② 활동 C가 12주인 까닭</b> 굴착은 버팀보 단마다 멈춘다. 지하 11 m를 4단 버팀보로 받치면 굴착 → 띠장·버팀보 설치 → 프리로딩 → 계측 확인을 네 번 되풀이하고, 도심지 반출 시간 제한과 덤프트럭 대기가 겹친다. 작업 가능률을 \(\eta \approx 0.25\)로 보면 \(13.9/0.25 = 56\) 일 ≈ 11주, 마지막 단 정리와 바닥 버림 콘크리트를 더해 12주가 된다.</p>
+      <p><b>③ 판단</b> 굴삭기를 더 투입해도 버팀보 설치가 병목이면 기간은 거의 줄지 않는다. 기간 산정은 "물량 ÷ 장비 능력"이 아니라 <b>가장 느린 공정 단계</b>를 찾는 일이다. C를 줄이려면 버팀보 대신 어스앵커(작업 공간 확보), 역타 공법 등 공법을 바꾸는 검토가 필요하다(4장, 11장).</p></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="schedule-types">
+    <h2>공정표의 종류</h2>
+    <div class="problem"><strong>같은 네 활동, 세 가지 그림</strong>
+      <p>터파기 3일, 기초 4일, 배관 매설 2일, 골조 5일. 기초와 배관은 터파기 뒤에, 골조는 둘 다 끝난 뒤에 합니다. 이 관계를 막대로, 화살표로, 상자로 그려 보면 각각 무엇이 잘 보이고 무엇이 안 보일까요?</p></div>
+    <p><span class="term">간트 차트</span><span class="en">(Gantt chart, bar chart)</span>는 활동을 행, 시간을 열로 두고 기간을 막대로 그립니다. 누구나 읽을 수 있고 "지금 무엇을 하고 있어야 하나"가 한눈에 보이지만, 막대 사이의 논리(어느 막대가 밀리면 어느 막대가 밀리나)는 드러나지 않습니다. 네트워크 공정표는 그 논리를 그립니다. <span class="term">화살표형 네트워크</span><span class="en">(activity-on-arrow, AOA)</span>는 활동을 화살표, 사건(시작·종료 시점)을 동그라미로 그립니다. 두 활동이 같은 두 사건 사이에 나란히 놓이거나 일부만 공유하는 선행 관계를 표현하려면 기간 0인 <span class="term">더미 활동</span><span class="en">(dummy activity)</span>을 점선 화살표로 넣어야 합니다. <span class="term">노드형 네트워크</span><span class="en">(activity-on-node, AON)</span>는 활동을 상자, 관계를 화살표로 그리며 더미가 필요 없고 SS·FF 같은 관계도 그릴 수 있어 오늘날 공정 관리 소프트웨어의 표준입니다. 이 책은 AON을 씁니다(PDM, precedence diagramming method라고도 합니다).</p>
+    <figure class="diagram" id="fig-cp-types">
+      <svg viewBox="0 0 880 300" role="img" aria-label="같은 네 활동을 간트 차트, 화살표형 네트워크, 노드형 네트워크로 그린 비교">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <text x="150" y="38" text-anchor="middle" class="t" style="font-weight:700">간트 차트</text>
+        <g transform="translate(30,54)">
+          <g class="t-mono"><text x="0" y="22">A 터파기</text><text x="0" y="62">B 기초</text><text x="0" y="102">C 배관</text><text x="0" y="142">D 골조</text></g>
+          <line x1="70" y1="164" x2="250" y2="164" class="s-axis"/>
+          <g class="t-mono" text-anchor="middle"><text x="70" y="182">0</text><text x="130" y="182">4</text><text x="190" y="182">8</text><text x="250" y="182">12일</text></g>
+          <rect x="70" y="10" width="45" height="18" style="fill:var(--bad)"/>
+          <rect x="115" y="50" width="60" height="18" style="fill:var(--bad)"/>
+          <rect x="115" y="90" width="30" height="18" style="fill:var(--accent-2)"/><line x1="145" y1="99" x2="175" y2="99" style="stroke:var(--accent-2);stroke-dasharray:4 3;stroke-width:1.6"/>
+          <rect x="175" y="130" width="75" height="18" style="fill:var(--bad)"/>
+          <text x="150" y="214" text-anchor="middle" class="t-dim">언제 하나 ○ · 왜 그때인가 ×</text>
+        </g>
+        <line x1="300" y1="30" x2="300" y2="270" style="stroke:var(--border)"/>
+        <text x="440" y="38" text-anchor="middle" class="t" style="font-weight:700">화살표형(AOA)</text>
+        <g transform="translate(320,70)">
+          <g style="fill:var(--bg-elev);stroke:var(--text-dim);stroke-width:1.4"><circle cx="20" cy="70" r="15"/><circle cx="100" cy="70" r="15"/><circle cx="190" cy="20" r="15"/><circle cx="190" cy="120" r="15"/><circle cx="260" cy="20" r="15"/></g>
+          <g class="t-mono" text-anchor="middle" style="fill:var(--text)"><text x="20" y="74">1</text><text x="100" y="74">2</text><text x="190" y="24">3</text><text x="190" y="124">4</text><text x="260" y="24">5</text></g>
+          <g style="stroke:var(--text-dim);stroke-width:1.8;fill:none" marker-end="url(#cp-ah)"><path d="M35 70H82"/><path d="M113 62L174 28"/><path d="M113 78L174 112"/><path d="M205 20H242"/></g>
+          <path d="M190 105V38" style="stroke:var(--text-dim);stroke-width:1.6;stroke-dasharray:4 3;fill:none" marker-end="url(#cp-ah)"/>
+          <g class="t-mono"><text x="48" y="62">A 3</text><text x="124" y="36">B 4</text><text x="124" y="114">C 2</text><text x="212" y="12">D 5</text><text x="196" y="76">더미</text></g>
+          <text x="140" y="164" text-anchor="middle" class="t-dim">활동 = 화살표, 사건 = 원</text>
+          <text x="140" y="184" text-anchor="middle" class="t-dim">C→D 관계에 더미 필요</text>
+        </g>
+        <line x1="590" y1="30" x2="590" y2="270" style="stroke:var(--border)"/>
+        <text x="730" y="38" text-anchor="middle" class="t" style="font-weight:700">노드형(AON)</text>
+        <g transform="translate(605,70)">
+          <g style="fill:var(--bg-elev);stroke-width:1.6"><rect x="0" y="50" width="54" height="40" rx="6" style="stroke:var(--bad)"/><rect x="92" y="0" width="54" height="40" rx="6" style="stroke:var(--bad)"/><rect x="92" y="100" width="54" height="40" rx="6" style="stroke:var(--accent-2)"/><rect x="190" y="50" width="54" height="40" rx="6" style="stroke:var(--bad)"/></g>
+          <g class="t-mono" text-anchor="middle" style="fill:var(--text)"><text x="27" y="74">A 3</text><text x="119" y="24">B 4</text><text x="119" y="124">C 2</text><text x="217" y="74">D 5</text></g>
+          <g style="stroke:var(--bad);stroke-width:2;fill:none" marker-end="url(#cp-ah-bad)"><path d="M54 62L90 28"/><path d="M146 28L188 62"/></g>
+          <g style="stroke:var(--text-dim);stroke-width:1.6;fill:none" marker-end="url(#cp-ah)"><path d="M54 78L90 112"/><path d="M146 112L188 80"/></g>
+          <text x="122" y="164" text-anchor="middle" class="t-dim">활동 = 상자, 관계 = 화살표</text>
+          <text x="122" y="184" text-anchor="middle" class="t-dim">더미 없음 · SS·FF도 표현</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-3.</b> 같은 네 활동(A 3일 → B 4일·C 2일 → D 5일)을 세 가지로 그렸다. 공기는 12일, 주공정은 A–B–D(빨강), C는 2일의 여유가 있다(점선 꼬리). AOA에서는 C의 끝(사건 4)이 D의 시작(사건 3)보다 먼저여야 한다는 관계를 점선 더미로 나타낸다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 9.2 (AON 노드 표기)</strong> 이 책의 노드형 네트워크는 활동 상자의 네 귀에 네 시각을 적는다. 윗줄 왼쪽 <span class="term">가장 이른 시작 시각</span><span class="en">(early start, ES)</span>, 가운데 기간 \(d\), 오른쪽 <span class="term">가장 이른 종료 시각</span><span class="en">(early finish, EF)</span>. 아랫줄 왼쪽 <span class="term">가장 늦은 시작 시각</span><span class="en">(late start, LS)</span>, 가운데 전체 여유 \(TF\), 오른쪽 <span class="term">가장 늦은 종료 시각</span><span class="en">(late finish, LF)</span>. 시각은 "공사 시작 후 경과한 주(또는 일)의 끝"으로 센다. 즉 ES = 0은 첫 주의 시작, EF = 4는 4주째의 끝이다. 주공정 활동은 테두리와 화살표를 빨강으로 그린다.</div>
+    <figure class="diagram" id="fig-cp-node">
+      <svg viewBox="0 0 860 250" role="img" aria-label="AON 노드의 아홉 칸 표기: ES, 기간, EF, 활동 이름, LS, 전체 여유, LF">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g transform="translate(70,40)">
+          <rect x="0" y="0" width="300" height="170" rx="10" style="fill:var(--bg-elev);stroke:var(--text-dim);stroke-width:1.6"/>
+          <line x1="0" y1="46" x2="300" y2="46" style="stroke:var(--border)"/><line x1="0" y1="124" x2="300" y2="124" style="stroke:var(--border)"/>
+          <line x1="100" y1="0" x2="100" y2="46" style="stroke:var(--border)"/><line x1="200" y1="0" x2="200" y2="46" style="stroke:var(--border)"/>
+          <line x1="100" y1="124" x2="100" y2="170" style="stroke:var(--border)"/><line x1="200" y1="124" x2="200" y2="170" style="stroke:var(--border)"/>
+          <g class="t-mono" text-anchor="middle" style="font-size:14px"><text x="50" y="29" style="fill:var(--accent-2);font-size:14px">ES</text><text x="150" y="29" style="font-size:14px">d</text><text x="250" y="29" style="fill:var(--accent-2);font-size:14px">EF</text>
+            <text x="50" y="153" style="fill:var(--accent);font-size:14px">LS</text><text x="150" y="153" style="font-size:14px">TF</text><text x="250" y="153" style="fill:var(--accent);font-size:14px">LF</text></g>
+          <text x="150" y="82" text-anchor="middle" class="t" style="font-weight:700;font-size:16px">ID</text>
+          <text x="150" y="106" text-anchor="middle" class="t-dim">활동 이름</text>
+        </g>
+        <g transform="translate(480,40)">
+          <rect x="0" y="0" width="300" height="170" rx="10" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.4"/>
+          <line x1="0" y1="46" x2="300" y2="46" style="stroke:var(--border)"/><line x1="0" y1="124" x2="300" y2="124" style="stroke:var(--border)"/>
+          <line x1="100" y1="0" x2="100" y2="46" style="stroke:var(--border)"/><line x1="200" y1="0" x2="200" y2="46" style="stroke:var(--border)"/>
+          <line x1="100" y1="124" x2="100" y2="170" style="stroke:var(--border)"/><line x1="200" y1="124" x2="200" y2="170" style="stroke:var(--border)"/>
+          <g class="t-mono" text-anchor="middle"><text x="50" y="30" style="font-size:16px;fill:var(--text)">38</text><text x="150" y="30" style="font-size:16px;fill:var(--text)">15</text><text x="250" y="30" style="font-size:16px;fill:var(--text)">53</text>
+            <text x="50" y="154" style="font-size:16px;fill:var(--text)">38</text><text x="150" y="154" style="font-size:16px;fill:var(--bad)">0</text><text x="250" y="154" style="font-size:16px;fill:var(--text)">53</text></g>
+          <text x="150" y="82" text-anchor="middle" class="t" style="font-weight:700;font-size:16px;fill:var(--bad)">G1</text>
+          <text x="150" y="106" text-anchor="middle" class="t-dim">지상 골조 1–5층</text>
+        </g>
+        <text x="220" y="232" text-anchor="middle" class="t-dim">윗줄: 전진 계산 · 아랫줄: 후진 계산</text>
+        <text x="630" y="232" text-anchor="middle" class="t-dim">P-B10의 G1(주공정, TF = 0)</text>
+      </svg>
+      <figcaption><b>그림 9-4.</b> AON 노드 표기(정의 9.2). 윗줄은 전진 계산, 아랫줄은 후진 계산으로 채운다. 오른쪽은 P-B10의 G1: 38주 끝에 시작해 53주 끝에 끝나고, LS = ES이므로 여유가 없다.</figcaption>
+    </figure>
+    <p>네 번째 종류인 <span class="term">사선식 공정표</span><span class="en">(linear scheduling method, LSM)</span>는 가로축을 시간, 세로축을 위치(층, 거리 km)로 두고 각 작업을 기울어진 선으로 그립니다. 선의 기울기가 작업 속도(층/주)입니다. 같은 작업이 층마다·구간마다 반복되는 고층 건물, 도로, 터널, 관로 공사에서 작업 간 간섭(선이 교차하거나 너무 가까워지는 곳)을 바로 보여 줍니다. 네트워크로 그리면 층 × 공종 수만큼 활동이 늘어나는 반복 공사를 몇 개의 선으로 압축하는 셈입니다. 반복 공정의 LOB(line of balance)와 버퍼 설계는 11장에서 더 다룹니다.</p>
+    <figure class="diagram" id="fig-cp-linear">
+      <svg viewBox="0 0 860 280" role="img" aria-label="사선식 공정표: 층과 시간 축에 골조, 커튼월, 내부 마감 세 작업의 선">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <line x1="90" y1="230" x2="810" y2="230" class="s-axis"/><line x1="90" y1="230" x2="90" y2="30" class="s-axis"/>
+        <g class="t-mono" text-anchor="end"><text x="82" y="214">1층</text><text x="82" y="134">5층</text><text x="82" y="44">10층</text></g>
+        <g class="t-mono" text-anchor="middle"><text x="90" y="248">0</text><text x="290" y="248">10</text><text x="490" y="248">20</text><text x="690" y="248">30주</text></g>
+        <path d="M90 230L690 30" style="stroke:var(--accent);stroke-width:3;fill:none"/>
+        <path d="M270 230L590 30" style="stroke:var(--accent-2);stroke-width:3;fill:none"/>
+        <path d="M390 230L810 30" style="stroke:var(--ok);stroke-width:3;fill:none"/>
+        <g class="t-mono"><rect x="104" y="40" width="22" height="4" style="fill:var(--accent)"/><text x="132" y="46" style="fill:var(--accent)">골조 3주/층</text>
+          <rect x="104" y="60" width="22" height="4" style="fill:var(--accent-2)"/><text x="132" y="66" style="fill:var(--accent-2)">커튼월 1.6주/층(더 빠름)</text>
+          <rect x="104" y="80" width="22" height="4" style="fill:var(--ok)"/><text x="132" y="86" style="fill:var(--ok)">내부 마감 2.1주/층</text></g>
+        <circle cx="476" cy="101" r="9" style="fill:none;stroke:var(--bad);stroke-width:2"/>
+        <path d="M469 93L440 62" style="stroke:var(--bad);fill:none"/>
+        <text x="318" y="56" class="t-mono" style="fill:var(--bad)">간섭: 커튼월이 골조를 따라잡음</text>
+      </svg>
+      <figcaption><b>그림 9-5.</b> 사선식 공정표(개략, 교육용 속도). 기울기는 속도다. 뒤따르는 작업이 앞 작업보다 빠르면 선이 만나 작업이 멈추거나 같은 층에서 부딪힌다. 이때는 늦게 시작하거나 속도를 맞춰 선을 나란히(같은 기울기로) 만든다.</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="cp-tbl">
+      <caption>표 9-1. 공정표 종류의 비교</caption>
+      <thead><tr><th>종류</th><th>잘 보이는 것</th><th>약점</th><th>주 용도</th></tr></thead>
+      <tbody>
+        <tr><td>간트(바 차트)</td><td>시기·기간·진행 상황</td><td>논리·주공정이 안 보임</td><td>보고, 현장 게시, 단기 공정</td></tr>
+        <tr><td>AOA(화살표형)</td><td>사건(마일스톤)과 경로</td><td>더미 필요, FS만 자연스러움</td><td>교육, 과거 CPM·PERT 문헌</td></tr>
+        <tr><td>AON(노드형, PDM)</td><td>논리, 여유, 주공정, SS·FF·지연</td><td>시간축이 없음(시간축 위에 그리면 보완)</td><td>공정 관리 소프트웨어 표준</td></tr>
+        <tr><td>사선식(LSM)</td><td>반복 작업의 속도와 간섭</td><td>반복이 아닌 작업 표현이 어려움</td><td>고층 골조·마감, 도로·터널·관로</td></tr>
+      </tbody>
+    </table></div>
+    <div class="sim" id="sim-cp-lob">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>사선식 공정표: 층별 작업 속도와 간섭</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-lob" aria-label="10개 층에 대한 골조, 커튼월, 내부 마감의 사선식 공정표"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>골조 <output id="cp-lb-a-out"></output></span><input type="range" id="cp-lb-a" min="2" max="4" step="0.1" value="3"></label>
+          <label class="ctrl"><span>커튼월 <output id="cp-lb-b-out"></output></span><input type="range" id="cp-lb-b" min="0.8" max="3" step="0.1" value="1.6"></label>
+          <label class="ctrl"><span>내부 마감 <output id="cp-lb-c-out"></output></span><input type="range" id="cp-lb-c" min="1" max="3.5" step="0.1" value="2"></label>
+          <label class="ctrl"><span>작업 간 최소 간격(버퍼) <output id="cp-lb-g-out"></output></span><input type="range" id="cp-lb-g" min="0" max="4" step="0.5" value="1"></label>
+          <div class="ctrl"><span>착수 방식</span><div class="seg" id="cp-lb-m"><button data-value="asap" class="on">층마다 즉시</button><button data-value="cont">연속 작업(유휴 없음)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">골조 완료</span><span class="v" id="cp-lb-o-a">—</span></div>
+        <div class="stat"><span class="k">커튼월 완료</span><span class="v" id="cp-lb-o-b">—</span></div>
+        <div class="stat"><span class="k">마감 완료</span><span class="v" id="cp-lb-o-c">—</span></div>
+        <div class="stat"><span class="k">작업조 유휴(주)</span><span class="v" id="cp-lb-o-i">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 커튼월(1.6주/층)은 골조(3주/층)보다 빨라 층마다 즉시 착수하면 매 층 기다립니다 — 유휴 시간을 보세요 · "연속 작업"으로 바꾸면 착수를 늦춰 유휴가 0이 되지만 완료 시각은 같습니다 · 마감을 1주/층으로 빠르게 해도 골조가 느리면 완료가 거의 당겨지지 않습니다 · 모델: 지상 10개 층, 작업 j의 k층 착수 = max(앞 작업의 k층 완료 + 버퍼, 같은 작업의 k − 1층 완료), "연속 작업"은 유휴가 없도록 첫 층 착수를 늦춘다(교육용 LOB 맛보기, 11장).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="relations">
+    <h2>선후행 관계와 지연</h2>
+    <div class="problem"><strong>커튼월은 골조가 다 끝나야 시작하나</strong>
+      <p>P-B10 공정표에서 커튼월 H는 지상 골조 1–5층(G1)이 끝난 뒤 시작합니다. 그런데 현장 소장은 "3층까지 골조가 올라가면 1층 커튼월을 달 수 있다"고 말합니다. 공정표에 이 겹침을 어떻게 적을까요? 그리고 겹치면 공기는 정말 줄어들까요?</p></div>
+    <p>두 활동 사이의 순서 제약이 <span class="term">선후행 관계</span><span class="en">(precedence relationship)</span>입니다. 기본은 앞 활동이 끝나야 뒤 활동이 시작하는 관계지만, 실제 공사는 앞 작업이 일부 진행되면 뒤 작업이 따라붙는 겹침이 흔합니다. AON은 네 가지 관계와 시간 간격으로 이를 표현합니다.</p>
+    <div class="callout def"><strong>정의 9.3 (선후행 관계와 지연)</strong> 선행 활동 \(i\)와 후행 활동 \(j\) 사이에 <span class="term">지연 시간</span><span class="en">(lag)</span> \(\ell\)을 두고
+      <div class="formula">$$\begin{aligned} \text{FS}&: ES_j \ge EF_i + \ell \qquad & \text{SS}&: ES_j \ge ES_i + \ell \\ \text{FF}&: EF_j \ge EF_i + \ell \qquad & \text{SF}&: EF_j \ge ES_i + \ell \end{aligned}$$<div class="where"><span class="term">종료–시작 관계</span><span class="en">(finish-to-start, FS)</span>: 기초 타설이 끝나야 골조를 시작(가장 흔함, 지연 생략 시 0). <span class="term">시작–시작 관계</span><span class="en">(start-to-start, SS)</span>: 골조가 시작되고 \(\ell\) 뒤에 커튼월 시작. <span class="term">종료–종료 관계</span><span class="en">(finish-to-finish, FF)</span>: 골조가 끝나고 \(\ell\) 뒤에야 커튼월이 끝날 수 있음. <span class="term">시작–종료 관계</span><span class="en">(start-to-finish, SF)</span>: 새 가설 전력이 들어와야 임시 발전기 사용을 끝냄처럼 드물다. FS의 지연은 콘크리트 양생처럼 자원이 들지 않는 기다림이다. 음의 지연을 <span class="term">리드</span><span class="en">(lead)</span>라 하는데, 논리를 숨기므로 SS + 지연으로 바꿔 쓰는 편이 좋다. 활동이 여럿의 후행이면 모든 조건을 만족하는 가장 이른 시각을 고른다.</div></div></div>
+    <figure class="diagram" id="fig-cp-rel">
+      <svg viewBox="0 0 880 260" role="img" aria-label="네 가지 선후행 관계 FS, SS, FF, SF의 막대 그림">
+        <rect x="10" y="10" width="860" height="240" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle" style="font-weight:700"><text x="115" y="40" style="fill:var(--text)">FS + ℓ</text><text x="325" y="40" style="fill:var(--text)">SS + ℓ</text><text x="545" y="40" style="fill:var(--text)">FF + ℓ</text><text x="765" y="40" style="fill:var(--text)">SF + ℓ</text></g>
+        <g transform="translate(30,60)">
+          <rect x="0" y="10" width="80" height="22" style="fill:var(--accent)"/><rect x="100" y="80" width="70" height="22" style="fill:var(--accent-2)"/>
+          <path d="M80 32V91H96" style="fill:none;stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#cp-ah)"/>
+          <text x="40" y="26" text-anchor="middle" class="t-mono" style="fill:#fff">i</text><text x="135" y="96" text-anchor="middle" class="t-mono" style="fill:#fff">j</text>
+          <text x="88" y="72" class="t-mono">ℓ</text>
+          <text x="85" y="140" text-anchor="middle" class="t-dim">타설 → 양생 ℓ → 다음 작업</text>
+        </g>
+        <line x1="225" y1="30" x2="225" y2="230" style="stroke:var(--border)"/>
+        <g transform="translate(250,60)">
+          <rect x="0" y="10" width="130" height="22" style="fill:var(--accent)"/><rect x="40" y="80" width="110" height="22" style="fill:var(--accent-2)"/>
+          <path d="M0 32V91H36" style="fill:none;stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#cp-ah)"/>
+          <line x1="0" y1="118" x2="40" y2="118" style="stroke:var(--accent);stroke-width:1.4"/><text x="20" y="132" text-anchor="middle" class="t-mono">ℓ</text>
+          <text x="65" y="26" text-anchor="middle" class="t-mono" style="fill:#fff">골조 i</text><text x="95" y="96" text-anchor="middle" class="t-mono" style="fill:#fff">커튼월 j</text>
+          <text x="75" y="156" text-anchor="middle" class="t-dim">앞 작업이 ℓ만큼 진행되면 착수</text>
+        </g>
+        <line x1="445" y1="30" x2="445" y2="230" style="stroke:var(--border)"/>
+        <g transform="translate(470,60)">
+          <rect x="0" y="10" width="110" height="22" style="fill:var(--accent)"/><rect x="60" y="80" width="90" height="22" style="fill:var(--accent-2)"/>
+          <path d="M110 32V60H150V76" style="fill:none;stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#cp-ah)"/>
+          <line x1="110" y1="118" x2="150" y2="118" style="stroke:var(--accent);stroke-width:1.4"/><text x="130" y="132" text-anchor="middle" class="t-mono">ℓ</text>
+          <text x="55" y="26" text-anchor="middle" class="t-mono" style="fill:#fff">i</text><text x="105" y="96" text-anchor="middle" class="t-mono" style="fill:#fff">j</text>
+          <text x="75" y="156" text-anchor="middle" class="t-dim">앞 작업이 끝나야 마무리 가능</text>
+        </g>
+        <line x1="665" y1="30" x2="665" y2="230" style="stroke:var(--border)"/>
+        <g transform="translate(690,60)">
+          <rect x="60" y="10" width="90" height="22" style="fill:var(--accent)"/><rect x="0" y="80" width="80" height="22" style="fill:var(--accent-2)"/>
+          <path d="M60 32V60H80V76" style="fill:none;stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#cp-ah)"/>
+          <text x="105" y="26" text-anchor="middle" class="t-mono" style="fill:#fff">새 전력 i</text><text x="40" y="96" text-anchor="middle" class="t-mono" style="fill:#fff">발전기 j</text>
+          <text x="75" y="156" text-anchor="middle" class="t-dim">i가 시작해야 j가 끝남(드묾)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-6.</b> 네 가지 선후행 관계. 주황은 선행 활동 i, 파랑은 후행 활동 j, 화살표는 관계가 묶는 두 끝점이다. 지연 ℓ은 끝점 사이의 최소 간격이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-cp-rel">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>선후행 관계의 종류: FS · SS · FF · SF와 지연</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-rel" aria-label="선행 활동과 후행 활동의 막대, 관계 화살표, 시간축"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>관계</span><div class="seg" id="cp-rl-t"><button data-value="FS" class="on">FS</button><button data-value="SS">SS</button><button data-value="FF">FF</button><button data-value="SF">SF</button></div></div>
+          <label class="ctrl"><span>지연 ℓ (음수 = 리드) <output id="cp-rl-l-out"></output></span><input type="range" id="cp-rl-l" min="-4" max="10" step="1" value="0"></label>
+          <label class="ctrl"><span>선행 i 기간 <output id="cp-rl-a-out"></output></span><input type="range" id="cp-rl-a" min="1" max="15" step="1" value="10"></label>
+          <label class="ctrl"><span>후행 j 기간 <output id="cp-rl-b-out"></output></span><input type="range" id="cp-rl-b" min="1" max="15" step="1" value="6"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">j의 ES / EF</span><span class="v" id="cp-rl-o-j">—</span></div>
+        <div class="stat"><span class="k">두 활동의 공기</span><span class="v" id="cp-rl-o-t">—</span></div>
+        <div class="stat"><span class="k">겹친 기간</span><span class="v" id="cp-rl-o-o">—</span></div>
+        <div class="stat"><span class="k">구속하는 끝점</span><span class="v" id="cp-rl-o-k">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: FS 지연 0에서 공기 16주(10 + 6)를 확인하고 SS로 바꾸면 6주 겹쳐 10주가 됩니다 · SS 지연 2(i 10주, j 6주)에서 j는 2–8주에 놓이고 2주의 여유가 생깁니다 · FF 지연 2면 j는 i보다 2주 늦게 끝나야 해 6–12주입니다 · j가 i보다 길 때 FF는 j의 착수를 i의 착수보다 앞당기려 하지만 공사 시작(0) 앞으로는 갈 수 없습니다 · 모델: 정의 9.3, ES ≥ 0. FS·SS·FF는 <code>CB.pm.cpm</code>, SF는 같은 규칙의 페이지 계산.</div>
+    </div>
+    <div class="callout"><strong>예제 9.2 (커튼월을 골조와 겹치면)</strong> P-B10의 커튼월 H(16주)를 G1 종료 후(FS)가 아니라 "G1 시작 9주 뒤"(1–3층 골조 완료, SS 9)에 착수한다고 하자.
+      <p><b>① 전진 계산</b> G1의 ES = 38이므로 H의 ES = 38 + 9 = 47, EF = 63. 내부 마감 J ← G2·H: G2의 EF = 68 &gt; 63이므로 J의 ES = 68, EF = 88, M은 88–92. <b>공기 92주</b>로 1주 줄었다.</p>
+      <p><b>② 주공정의 이동</b> H에는 5주 여유가 생기고, 주공정은 A–B–C–E–F–G1–<b>G2</b>–J–M으로 옮겨 간다. 원래 H와 G2의 차이(여유 1주)만큼만 줄어든 것이다. 7주를 당겼는데 1주만 얻었다.</p>
+      <p><b>③ 현실적인 FF 조건을 더하면</b> 커튼월은 최상층 골조가 끝나야 마무리할 수 있으므로 "G2 종료 2주 뒤 H 종료"(FF 2)를 더하면 H의 EF ≥ 70 → J 70–90, M 90–94, <b>공기 94주</b>로 오히려 1주 늘어난다. 이제 주공정은 G2를 지나 H로 넘어간다(A–…–G1–G2–H–J–M).</p>
+      <p><b>④ 판단</b> 겹침(SS)은 공기를 줄이는 대표 수단이지만, 겹친 작업의 마무리 조건(FF)과 병렬 경로의 여유가 이득을 정한다. 겹침 계획은 반드시 네트워크 전체로 다시 계산해야 한다. 아래 편집기에서 직접 확인할 수 있다.</p></div>
+    <div class="callout warn"><strong>공정표를 망치는 습관</strong> ① 선행·후행이 없는 열린 끝(open end): 어떤 활동이 늦어도 아무것도 밀리지 않는 것처럼 보인다. 첫 활동과 마지막 활동 말고는 모두 앞뒤가 있어야 한다. ② 날짜 고정 제약의 남용: "이 날 시작" 제약을 걸면 논리가 끊기고 여유가 왜곡된다. ③ 긴 리드·큰 지연: 이유를 적지 않은 지연은 숨은 여유다. 공정표 검토(감리·발주자)는 이 세 가지부터 본다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="cpm-calc">
+    <h2>CPM 계산: 전진과 후진</h2>
+    <div class="problem"><strong>여덟 개 활동, 몇 일 걸리나</strong>
+      <p>B-10 부지 한쪽에 지을 부속동(경비실) 공사입니다. 터파기 3일 → 기초 4일·배관 매설 2일 → 골조 6일 → 지붕 3일·설비 5일(배관과 골조 뒤) → 마감 4일(지붕·설비 뒤), 외부 포장 2일(지붕 뒤). 공기는? 그리고 배관 매설은 며칠까지 늦어도 될까요?</p></div>
+    <p><span class="term">주공정법</span><span class="en">(critical path method, CPM)</span>은 두 번의 훑기로 끝납니다. 처음부터 끝으로 가며 "가장 일찍 언제 시작·종료할 수 있나"를 구하는 <span class="term">전진 계산</span><span class="en">(forward pass)</span>, 끝에서 처음으로 돌아오며 "공기를 지키려면 가장 늦게 언제 시작·종료해야 하나"를 구하는 <span class="term">후진 계산</span><span class="en">(backward pass)</span>입니다. 계산 순서는 모든 선행 활동이 먼저 오도록 늘어놓은 위상 순서입니다.</p>
+    <div class="callout def"><strong>원리 9.4 (전진 계산)</strong> 선행이 없는 활동은 \(ES = 0\). 나머지는 모든 선행 관계(정의 9.3)를 만족하는 가장 이른 시각을 고른다. FS만 있으면
+      <div class="formula">$$ES_j = \max_{i \in \text{pred}(j)} \left(EF_i + \ell_{ij}\right), \qquad EF_j = ES_j + d_j, \qquad T = \max_j EF_j$$<div class="where">합류점(선행이 여럿인 활동)에서는 <b>최대값</b>을 고른다 — 모든 선행이 끝나야 하므로 가장 늦게 끝나는 선행이 착수를 정한다. \(T\)는 계산 공기다.</div></div></div>
+    <div class="callout def"><strong>원리 9.5 (후진 계산)</strong> 후행이 없는 활동은 \(LF = T\)(또는 계약 공기 \(T_s\)). 나머지는 위상 순서의 역순으로
+      <div class="formula">$$LF_i = \min_{j \in \text{succ}(i)} \left(LS_j - \ell_{ij}\right), \qquad LS_i = LF_i - d_i$$<div class="where">분기점(후행이 여럿인 활동)에서는 <b>최소값</b>을 고른다 — 가장 급한 후행에 맞춰야 한다. SS 관계는 \(LF_i \le LS_j - \ell + d_i\), FF 관계는 \(LF_i \le LF_j - \ell\)로 바뀐다.</div></div></div>
+    <div class="callout def"><strong>정의 9.6 (전체 여유·자유 여유·주공정)</strong>
+      <div class="formula">$$TF_i = LS_i - ES_i = LF_i - EF_i, \qquad FF_i = \min_{j \in \text{succ}(i)}\left(ES_j - \ell_{ij}\right) - EF_i$$<div class="where"><span class="term">전체 여유</span><span class="en">(total float, TF)</span>: 공기를 늦추지 않고 활동이 늦어질 수 있는 시간. <span class="term">자유 여유</span><span class="en">(free float, FF)</span>: 어느 후행 활동의 가장 이른 착수도 늦추지 않고 늦어질 수 있는 시간(항상 \(FF \le TF\)). TF = 0인 활동을 시작부터 끝까지 이은 경로가 <span class="term">주공정</span><span class="en">(critical path)</span>이고, 그 길이가 공기다. 네트워크에서 가장 긴 경로이며 둘 이상일 수 있다. 계약 공기 \(T_s \lt T\)로 후진 계산을 하면 TF가 음수가 되는데, <span class="term">음의 여유</span><span class="en">(negative float)</span>는 그만큼 단축해야 한다는 뜻이다.</div></div></div>
+    <figure class="diagram" id="fig-cp-example">
+      <svg viewBox="0 0 880 290" role="img" aria-label="부속동 예제 네트워크: 여덟 활동의 ES, 기간, EF, LS, 전체 여유, LF와 주공정">
+        <rect x="10" y="10" width="860" height="270" rx="10" class="f-surface"/>
+        <path d="M140 146C166 146 166 76 190 76" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M140 146C166 146 166 226 190 226" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M310 76C336 76 336 76 360 76" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M310 226C421 226 421 226 530 226" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M480 76C506 76 506 76 530 76" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M480 76C506 76 506 226 530 226" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M650 76C676 76 676 226 700 226" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M650 76C676 76 676 76 700 76" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M650 226C676 226 676 226 700 226" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <g transform="translate(22,110)"><rect width="118" height="72" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 20.2H118M0 51.8H118M39.3 0V20.2M78.7 0V20.2M39.3 51.8V72M78.7 51.8V72" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:12px"><text x="19.7" y="15.2" style="fill:var(--text);font-size:12px">0</text><text x="59.0" y="15.2" style="font-size:12px">3</text><text x="98.3" y="15.2" style="fill:var(--text);font-size:12px">3</text><text x="19.7" y="67.0" style="fill:var(--text);font-size:12px">0</text><text x="59.0" y="67.0" style="fill:var(--bad);font-size:12px">0</text><text x="98.3" y="67.0" style="fill:var(--text);font-size:12px">3</text></g><text x="59.0" y="35.0" text-anchor="middle" class="t" style="font-weight:700;font-size:14px;fill:var(--bad)">a</text><text x="59.0" y="47.0" text-anchor="middle" class="t-mono" style="font-size:10.5px">터파기</text></g>
+        <g transform="translate(192,40)"><rect width="118" height="72" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 20.2H118M0 51.8H118M39.3 0V20.2M78.7 0V20.2M39.3 51.8V72M78.7 51.8V72" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:12px"><text x="19.7" y="15.2" style="fill:var(--text);font-size:12px">3</text><text x="59.0" y="15.2" style="font-size:12px">4</text><text x="98.3" y="15.2" style="fill:var(--text);font-size:12px">7</text><text x="19.7" y="67.0" style="fill:var(--text);font-size:12px">3</text><text x="59.0" y="67.0" style="fill:var(--bad);font-size:12px">0</text><text x="98.3" y="67.0" style="fill:var(--text);font-size:12px">7</text></g><text x="59.0" y="35.0" text-anchor="middle" class="t" style="font-weight:700;font-size:14px;fill:var(--bad)">b</text><text x="59.0" y="47.0" text-anchor="middle" class="t-mono" style="font-size:10.5px">기초</text></g>
+        <g transform="translate(192,190)"><rect width="118" height="72" rx="6" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:1.5"/><path d="M0 20.2H118M0 51.8H118M39.3 0V20.2M78.7 0V20.2M39.3 51.8V72M78.7 51.8V72" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:12px"><text x="19.7" y="15.2" style="fill:var(--text);font-size:12px">3</text><text x="59.0" y="15.2" style="font-size:12px">2</text><text x="98.3" y="15.2" style="fill:var(--text);font-size:12px">5</text><text x="19.7" y="67.0" style="fill:var(--text);font-size:12px">11</text><text x="59.0" y="67.0" style="fill:var(--accent-2);font-size:12px">8</text><text x="98.3" y="67.0" style="fill:var(--text);font-size:12px">13</text></g><text x="59.0" y="35.0" text-anchor="middle" class="t" style="font-weight:700;font-size:14px;fill:var(--text)">c</text><text x="59.0" y="47.0" text-anchor="middle" class="t-mono" style="font-size:10.5px">배관 매설</text></g>
+        <g transform="translate(362,40)"><rect width="118" height="72" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 20.2H118M0 51.8H118M39.3 0V20.2M78.7 0V20.2M39.3 51.8V72M78.7 51.8V72" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:12px"><text x="19.7" y="15.2" style="fill:var(--text);font-size:12px">7</text><text x="59.0" y="15.2" style="font-size:12px">6</text><text x="98.3" y="15.2" style="fill:var(--text);font-size:12px">13</text><text x="19.7" y="67.0" style="fill:var(--text);font-size:12px">7</text><text x="59.0" y="67.0" style="fill:var(--bad);font-size:12px">0</text><text x="98.3" y="67.0" style="fill:var(--text);font-size:12px">13</text></g><text x="59.0" y="35.0" text-anchor="middle" class="t" style="font-weight:700;font-size:14px;fill:var(--bad)">d</text><text x="59.0" y="47.0" text-anchor="middle" class="t-mono" style="font-size:10.5px">골조</text></g>
+        <g transform="translate(532,40)"><rect width="118" height="72" rx="6" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:1.5"/><path d="M0 20.2H118M0 51.8H118M39.3 0V20.2M78.7 0V20.2M39.3 51.8V72M78.7 51.8V72" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:12px"><text x="19.7" y="15.2" style="fill:var(--text);font-size:12px">13</text><text x="59.0" y="15.2" style="font-size:12px">3</text><text x="98.3" y="15.2" style="fill:var(--text);font-size:12px">16</text><text x="19.7" y="67.0" style="fill:var(--text);font-size:12px">15</text><text x="59.0" y="67.0" style="fill:var(--accent-2);font-size:12px">2</text><text x="98.3" y="67.0" style="fill:var(--text);font-size:12px">18</text></g><text x="59.0" y="35.0" text-anchor="middle" class="t" style="font-weight:700;font-size:14px;fill:var(--text)">e</text><text x="59.0" y="47.0" text-anchor="middle" class="t-mono" style="font-size:10.5px">지붕</text></g>
+        <g transform="translate(532,190)"><rect width="118" height="72" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 20.2H118M0 51.8H118M39.3 0V20.2M78.7 0V20.2M39.3 51.8V72M78.7 51.8V72" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:12px"><text x="19.7" y="15.2" style="fill:var(--text);font-size:12px">13</text><text x="59.0" y="15.2" style="font-size:12px">5</text><text x="98.3" y="15.2" style="fill:var(--text);font-size:12px">18</text><text x="19.7" y="67.0" style="fill:var(--text);font-size:12px">13</text><text x="59.0" y="67.0" style="fill:var(--bad);font-size:12px">0</text><text x="98.3" y="67.0" style="fill:var(--text);font-size:12px">18</text></g><text x="59.0" y="35.0" text-anchor="middle" class="t" style="font-weight:700;font-size:14px;fill:var(--bad)">f</text><text x="59.0" y="47.0" text-anchor="middle" class="t-mono" style="font-size:10.5px">설비</text></g>
+        <g transform="translate(702,40)"><rect width="118" height="72" rx="6" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:1.5"/><path d="M0 20.2H118M0 51.8H118M39.3 0V20.2M78.7 0V20.2M39.3 51.8V72M78.7 51.8V72" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:12px"><text x="19.7" y="15.2" style="fill:var(--text);font-size:12px">16</text><text x="59.0" y="15.2" style="font-size:12px">2</text><text x="98.3" y="15.2" style="fill:var(--text);font-size:12px">18</text><text x="19.7" y="67.0" style="fill:var(--text);font-size:12px">20</text><text x="59.0" y="67.0" style="fill:var(--accent-2);font-size:12px">4</text><text x="98.3" y="67.0" style="fill:var(--text);font-size:12px">22</text></g><text x="59.0" y="35.0" text-anchor="middle" class="t" style="font-weight:700;font-size:14px;fill:var(--text)">h</text><text x="59.0" y="47.0" text-anchor="middle" class="t-mono" style="font-size:10.5px">외부 포장</text></g>
+        <g transform="translate(702,190)"><rect width="118" height="72" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 20.2H118M0 51.8H118M39.3 0V20.2M78.7 0V20.2M39.3 51.8V72M78.7 51.8V72" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:12px"><text x="19.7" y="15.2" style="fill:var(--text);font-size:12px">18</text><text x="59.0" y="15.2" style="font-size:12px">4</text><text x="98.3" y="15.2" style="fill:var(--text);font-size:12px">22</text><text x="19.7" y="67.0" style="fill:var(--text);font-size:12px">18</text><text x="59.0" y="67.0" style="fill:var(--bad);font-size:12px">0</text><text x="98.3" y="67.0" style="fill:var(--text);font-size:12px">22</text></g><text x="59.0" y="35.0" text-anchor="middle" class="t" style="font-weight:700;font-size:14px;fill:var(--bad)">g</text><text x="59.0" y="47.0" text-anchor="middle" class="t-mono" style="font-size:10.5px">마감</text></g>
+      </svg>
+      <figcaption><b>그림 9-7.</b> 부속동 예제의 완성된 AON(단위: 일). 주공정 a–b–d–f–g(빨강), 공기 22일. e(지붕)는 TF 2이지만 FF 0 — 하루만 늦어도 후행 h(외부 포장)의 착수가 밀린다. c(배관 매설)는 8일, h는 4일의 여유가 있다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-cp-pass">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>전진·후진 계산 단계별 애니메이션</h3></div>
+      <div class="sim-body">
+        <div class="sim-view"><canvas id="cp-cv-pass" aria-label="네트워크 공정표에 전진·후진 계산 값이 한 단계씩 채워지는 애니메이션"></canvas></div>
+      </div>
+      <div class="cp-msg" id="cp-ps-msg">—</div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>네트워크</span><div class="seg" id="cp-ps-net"><button data-value="ex" class="on">부속동 예제(일)</button><button data-value="b10">P-B10(주)</button></div></div>
+        <div class="ctrl"><span>단계</span><div class="btn-row"><button class="btn" id="cp-ps-first">처음</button><button class="btn" id="cp-ps-prev">◀ 이전</button><button class="btn primary" id="cp-ps-next">다음 ▶</button><button class="btn" id="cp-ps-play">▶ 재생</button><button class="btn" id="cp-ps-last">끝</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">단계</span><span class="v" id="cp-ps-o-s">—</span></div>
+        <div class="stat"><span class="k">계산 중</span><span class="v" id="cp-ps-o-p">—</span></div>
+        <div class="stat"><span class="k">공기 T</span><span class="v" id="cp-ps-o-t">—</span></div>
+        <div class="stat"><span class="k">주공정</span><span class="v" id="cp-ps-o-c">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: "다음"을 눌러 합류점 f에서 max(c의 EF 5, d의 EF 13) = 13을 고르는 것을 보세요 · 후진 계산에서 분기점 e는 min(g의 LS 18, h의 LS 20) = 18을 고릅니다 · 마지막 단계에서 여유와 주공정(빨강)이 나타납니다 · P-B10으로 바꾸면 E에서 max(C 26, D 10)이, J에서 max(G2 68, H 69)가 공기를 정하는 것을 확인하세요 · 모델: 원리 9.4·9.5, 정의 9.6(<code>CB.pm.cpm</code>과 같은 결과).</div>
+    </div>
+    <div class="callout"><strong>예제 9.3 (부속동 손계산)</strong> 위 문제의 여덟 활동(일).
+      <p><b>① 전진</b> a: 0–3. b: 3–7. c: 3–5. d: 7–13. e: 13–16. f: ES = max(c 5, d 13) = 13 → 13–18. g: ES = max(e 16, f 18) = 18 → 18–22. h: 16–18. <b>T = max(EF) = 22일</b>.</p>
+      <p><b>② 후진</b> 끝 활동 g·h의 LF = 22. g: 18–22, h: 20–22. f: LF = 18 → 13–18. e: LF = min(g 18, h 20) = 18 → 15–18. d: LF = min(e 15, f 13) = 13 → 7–13. c: LF = f 13 → 11–13. b: 3–7. a: LF = min(b 3, c 11) = 3 → 0–3.</p>
+      <div class="table-wrap"><table class="cp-tbl"><thead><tr><th>활동</th><th>d</th><th>ES</th><th>EF</th><th>LS</th><th>LF</th><th>TF</th><th>FF</th></tr></thead><tbody>
+        <tr><td class="cp-crit">a 터파기</td><td>3</td><td>0</td><td>3</td><td>0</td><td>3</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td class="cp-crit">b 기초</td><td>4</td><td>3</td><td>7</td><td>3</td><td>7</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td>c 배관 매설</td><td>2</td><td>3</td><td>5</td><td>11</td><td>13</td><td>8</td><td>8</td></tr>
+        <tr><td class="cp-crit">d 골조</td><td>6</td><td>7</td><td>13</td><td>7</td><td>13</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td>e 지붕</td><td>3</td><td>13</td><td>16</td><td>15</td><td>18</td><td>2</td><td>0</td></tr>
+        <tr><td class="cp-crit">f 설비</td><td>5</td><td>13</td><td>18</td><td>13</td><td>18</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td class="cp-crit">g 마감</td><td>4</td><td>18</td><td>22</td><td>18</td><td>22</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td>h 외부 포장</td><td>2</td><td>16</td><td>18</td><td>20</td><td>22</td><td>4</td><td>4</td></tr>
+      </tbody></table></div>
+      <p><b>③ 여유</b> e의 FF = min(g의 ES 18, h의 ES 16) − 16 = 0, TF = 2. c의 FF = 13 − 5 = 8. <b>판정</b>: 공기 22일, 주공정 a–b–d–f–g. 배관 매설은 8일까지 늦어져도 아무 활동도 밀지 않는다. 지붕은 2일까지 늦어도 준공은 그대로지만 하루라도 늦으면 외부 포장 착수가 밀린다 — 포장 업체에 미리 알려야 한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="float">
+    <h2>여유 시간: 언제 주공정이 되나</h2>
+    <div class="problem"><strong>말뚝 공사가 3주 늦어졌다</strong>
+      <p>PHC 말뚝 D의 장비 반입이 늦어 3주 지연이 예상됩니다. 소장은 "D는 여유가 16주라 괜찮다"고 합니다. 옥상 방수 K가 5주 늦어지는 경우는 어떨까요? K의 여유는 11주라는데, 외부 조경 L 업체는 왜 항의할까요?</p></div>
+    <p>여유는 늦어져도 되는 시간이지만, 두 종류의 여유는 영향을 받는 대상이 다릅니다. 자유 여유 안에서 늦어지면 아무도 모릅니다. 자유 여유를 넘고 전체 여유 안이면 후속 활동 몇 개가 밀리지만 준공은 그대로입니다(후속 활동의 여유를 대신 쓴 것입니다). 전체 여유를 넘으면 그 활동은 주공정이 되고 넘은 만큼 준공이 늦어집니다. 같은 경로 위의 활동들은 전체 여유를 <b>함께 쓴다</b>는 점이 중요합니다. K가 11주를 다 쓰면 L은 여유가 0이 됩니다.</p>
+    <figure class="diagram" id="fig-cp-floats">
+      <svg viewBox="0 0 860 250" role="img" aria-label="P-B10의 K와 L에서 자유 여유와 전체 여유를 막대와 점선 꼬리로 비교">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <line x1="120" y1="196" x2="830" y2="196" class="s-axis"/>
+        <g class="t-mono" text-anchor="middle"><text x="120" y="214">68</text><text x="252" y="214">72</text><text x="450" y="214">78</text><text x="615" y="214">83</text><text x="813" y="214">89주</text></g>
+        <g class="t-mono"><text x="24" y="63">K 옥상 방수</text><text x="24" y="123">L 조경·포장</text><text x="24" y="176">M 준공</text></g>
+        <rect x="120" y="48" width="132" height="22" style="fill:var(--accent-2)"/>
+        <line x1="252" y1="59" x2="615" y2="59" style="stroke:var(--accent-2);stroke-dasharray:5 4;stroke-width:1.8"/><line x1="615" y1="51" x2="615" y2="67" style="stroke:var(--accent-2);stroke-width:1.8"/>
+        <text x="440" y="44" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">K: TF 11 · FF 0 (L과 함께 쓰는 여유)</text>
+        <rect x="252" y="108" width="198" height="22" style="fill:var(--accent-2)"/>
+        <line x1="450" y1="119" x2="813" y2="119" style="stroke:var(--accent-2);stroke-dasharray:5 4;stroke-width:1.8"/><line x1="813" y1="111" x2="813" y2="127" style="stroke:var(--accent-2);stroke-width:1.8"/>
+        <text x="632" y="104" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">L: TF 11 · FF 11</text>
+        <line x1="813" y1="150" x2="813" y2="190" style="stroke:var(--bad);stroke-width:3"/><text x="804" y="176" text-anchor="end" class="t-mono" style="fill:var(--bad)">J 종료 = M 착수 89</text>
+        <path d="M252 72V104" style="stroke:var(--text-dim);fill:none;stroke-width:1.4" marker-end="url(#cp-ah)"/>
+      </svg>
+      <figcaption><b>그림 9-8.</b> 여유의 공유(P-B10). K(68–72주)는 전체 여유 11주가 있지만 자유 여유는 0이다. K가 늦으면 곧바로 L이 밀린다. L(72–78주)의 여유 11주는 K와 같은 경로의 여유로, 둘이 합쳐 11주를 넘게 늦으면 M의 착수(89주)를 넘겨 준공이 늦어진다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-cp-float">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>여유 시간 이해: 비주공정 활동을 늦춰 보기(P-B10)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-float" aria-label="P-B10 간트 차트에서 선택한 활동을 늦췄을 때 기준선 대비 밀린 활동과 공기"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>늦출 활동</span><div class="seg" id="cp-fl-a"><button data-value="D">D 말뚝</button><button data-value="G2">G2 골조</button><button data-value="I">I 설비</button><button data-value="K" class="on">K 방수</button><button data-value="L">L 조경</button></div></div>
+          <label class="ctrl"><span>착수 지연 <output id="cp-fl-s-out"></output></span><input type="range" id="cp-fl-s" min="0" max="30" step="1" value="5"></label>
+          <label class="ctrl"><span>기간 증가 <output id="cp-fl-x-out"></output></span><input type="range" id="cp-fl-x" min="0" max="20" step="1" value="0"></label>
+        </div>
+      </div>
+      <div class="cp-msg" id="cp-fl-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">원래 TF / FF</span><span class="v" id="cp-fl-o-f">—</span></div>
+        <div class="stat"><span class="k">쓴 여유</span><span class="v" id="cp-fl-o-u">—</span></div>
+        <div class="stat"><span class="k">공기 T</span><span class="v" id="cp-fl-o-t">—</span></div>
+        <div class="stat"><span class="k">밀린 후속 활동</span><span class="v" id="cp-fl-o-p">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: K를 5주 늦추면 공기는 93주 그대로지만 L이 5주 밀립니다(FF 0) · L을 5주 늦추면 아무것도 밀리지 않습니다(FF 11) · D를 3주 늦춰도 영향이 없고, 17주 늦추면 공기가 94주가 되며 D가 주공정에 들어갑니다 · G2는 여유가 1주뿐이라 2주만 늦어도 공기가 늘고 주공정이 G2로 옮겨 갑니다 · 모델: 선택 활동의 선행 관계에 지연을 더하고 기간을 늘려 <code>CB.pm.cpm</code>으로 다시 계산. 점선 윤곽 = 원래 일정, 점선 꼬리 = 전체 여유.</div>
+    </div>
+    <div class="callout"><strong>예제 9.4 (여유 소비 판정)</strong> P-B10에서 ① D(말뚝)가 3주, ② K(옥상 방수)가 5주, ③ G2(골조 6–10층)가 2주 늦어진다. 각각 판정하라.
+      <p><b>①</b> D: TF = FF = 16. 3주 ≤ 16(자유 여유 안) → 후속 E의 착수(26주)에 영향 없음. 단, 남은 여유는 13주.</p>
+      <p><b>②</b> K: TF 11, FF 0. 5주는 자유 여유를 넘고 전체 여유 안 → L이 72–78에서 77–83주로 밀리지만 M 착수(89주) 전에 끝나므로 준공은 93주 그대로. 조경 업체의 투입 일정을 다시 맞춰야 한다.</p>
+      <p><b>③</b> G2: TF 1. 2주는 전체 여유를 1주 넘는다 → G2 EF = 70, J 70–90, M 90–94, <b>공기 94주(+1)</b>. 주공정이 H에서 G2로 옮겨 간다. 판단: G2는 "여유가 있는 활동"이라기보다 <b>준주공정</b>(near-critical) 활동으로 관리해야 한다. 10장에서 보듯 기간의 불확실성까지 넣으면 G2가 주공정이 될 확률이 약 20 %다.</p></div>
+    <div class="callout warn"><strong>여유는 누구의 것인가</strong> 시공자가 여유 활동을 일부러 늦게 계획하거나, 발주자의 설계 변경이 여유를 먹으면 나중에 공기 지연의 책임을 따질 때 다툼이 생깁니다. 계약은 여유를 "프로젝트 공유", "시공자 소유" 가운데 하나로 정하거나 공기 연장 청구의 분석 방법(지연 분석)을 정해 둡니다(2장, 계약 조건 확인). 실무에서는 기준선 공정표를 승인받아 두고, 지연이 생길 때마다 그 원인과 소비한 여유를 기록하는 것이 가장 강한 방어입니다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="network-editor">
+    <h2>네트워크 편집기: 직접 짜고 계산하기</h2>
+    <div class="problem"><strong>논리를 바꾸면 무엇이 바뀌나</strong>
+      <p>공정표 검토 회의에서 "흙막이와 말뚝을 동시에 하지 말고 말뚝을 먼저 하자", "설비를 골조 시작과 함께 따라 올리자" 같은 제안이 오갑니다. 제안마다 손으로 다시 계산하기는 번거롭습니다. 활동과 관계를 바꾸는 즉시 공기와 주공정이 다시 나오면 어떨까요?</p></div>
+    <p>아래 편집기는 이 장의 계산 전체(정의 9.3, 원리 9.4·9.5, 정의 9.6)를 <code>CB.pm.cpm</code>으로 수행합니다. 활동마다 이름, 기간, 선행 활동을 적습니다. 선행 활동은 쉼표로 나누고, 관계와 지연을 붙일 수 있습니다: <code>A</code>(A 종료 후, FS), <code>A+2</code>(FS 지연 2), <code>B SS+3</code>(B 시작 3 뒤), <code>C FF+1</code>(C 종료 1 뒤에 종료), <code>D SS-1</code>(리드). 순환(A가 B를 기다리고 B가 A를 기다림)을 만들면 계산이 멈추고 어느 활동이 순환에 걸렸는지 알려 줍니다. 실제 공정 관리 소프트웨어도 같은 검사를 합니다.</p>
+    <div class="sim" id="sim-cp-net">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>네트워크 편집기: 활동·관계·기간을 바꾸면 즉시 CPM</h3></div>
+      <div class="sim-body">
+        <div class="sim-view"><canvas id="cp-cv-net" aria-label="편집한 활동들의 노드형 네트워크와 ES, EF, LS, LF, 전체 여유, 주공정"></canvas></div>
+      </div>
+      <div class="cp-msg" id="cp-ed-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">공기 T</span><span class="v" id="cp-ed-o-t">—</span></div>
+        <div class="stat"><span class="k">주공정</span><span class="v" id="cp-ed-o-c">—</span></div>
+        <div class="stat"><span class="k">활동 수 / 관계 수</span><span class="v" id="cp-ed-o-n">—</span></div>
+        <div class="stat"><span class="k">여유 가장 큰 활동</span><span class="v" id="cp-ed-o-f">—</span></div>
+      </div>
+      <div class="cp-ed" id="cp-ed-rows" aria-label="활동 목록 편집"></div>
+      <div class="cp-ed-bar">
+        <button class="btn primary" id="cp-ed-add">+ 활동 추가</button>
+        <button class="btn" id="cp-ed-ex">부속동 예제</button>
+        <button class="btn" id="cp-ed-b10">P-B10</button>
+        <button class="btn" id="cp-ed-ss">겹침 예(예제 9.2)</button>
+        <button class="btn" id="cp-ed-cyc">순환 만들기</button>
+        <button class="btn" id="cp-ed-clr">비우기</button>
+      </div>
+      <div class="sim-note">해볼 것: P-B10을 불러와 H의 선행을 <code>G1 SS+9</code>로 바꾸면 공기 92주, 주공정이 G2로 옮겨 갑니다(예제 9.2) · 거기에 <code>G2 FF+2</code>를 더하면 94주가 됩니다 · D의 기간을 30으로 늘리면 D가 주공정이 됩니다 · "순환 만들기"는 A의 선행에 M을 넣어 순환을 만듭니다 · 모델: <code>CB.pm.cpm</code>(FS·SS·FF와 지연, 위상 정렬로 순환 검출). SF는 지원하지 않는다. 노드 표기는 정의 9.2, 단위는 입력한 기간 단위.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="p-b10">
+    <h2>P-B10 공정표: 93주와 주공정</h2>
+    <div class="problem"><strong>14개 활동, 196주의 일을 93주에</strong>
+      <p>P-B10의 14개 활동 기간을 모두 더하면 196주입니다. 선후행 관계(<code>CB.pm.B10</code>)에 따라 겹칠 것을 겹치면 공기는 몇 주이고, 어느 활동을 관리해야 할까요?</p></div>
+    <div class="table-wrap"><table class="cp-tbl">
+      <caption>표 9-2. P-B10 CPM 결과(주, 모두 FS 관계). 빨강은 주공정.</caption>
+      <thead><tr><th>활동</th><th>d</th><th>선행</th><th>ES</th><th>EF</th><th>LS</th><th>LF</th><th>TF</th><th>FF</th></tr></thead>
+      <tbody>
+        <tr><td class="cp-crit">A 착공·가설 준비</td><td>4</td><td>—</td><td>0</td><td>4</td><td>0</td><td>4</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td class="cp-crit">B 흙막이(지하연속벽)</td><td>10</td><td>A</td><td>4</td><td>14</td><td>4</td><td>14</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td>D PHC 말뚝</td><td>6</td><td>A</td><td>4</td><td>10</td><td>20</td><td>26</td><td>16</td><td>16</td></tr>
+        <tr><td class="cp-crit">C 굴착·버팀보</td><td>12</td><td>B</td><td>14</td><td>26</td><td>14</td><td>26</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td class="cp-crit">E 기초 매트</td><td>4</td><td>C, D</td><td>26</td><td>30</td><td>26</td><td>30</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td class="cp-crit">F 지하 골조</td><td>8</td><td>E</td><td>30</td><td>38</td><td>30</td><td>38</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td class="cp-crit">G1 지상 골조 1–5층</td><td>15</td><td>F</td><td>38</td><td>53</td><td>38</td><td>53</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td>G2 지상 골조 6–10층</td><td>15</td><td>G1</td><td>53</td><td>68</td><td>54</td><td>69</td><td>1</td><td>0</td></tr>
+        <tr><td class="cp-crit">H 커튼월</td><td>16</td><td>G1</td><td>53</td><td>69</td><td>53</td><td>69</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td>I 기계·전기 설비</td><td>30</td><td>F</td><td>38</td><td>68</td><td>59</td><td>89</td><td>21</td><td>21</td></tr>
+        <tr><td>K 옥상 방수</td><td>4</td><td>G2</td><td>68</td><td>72</td><td>79</td><td>83</td><td>11</td><td>0</td></tr>
+        <tr><td class="cp-crit">J 내부 마감</td><td>20</td><td>G2, H</td><td>69</td><td>89</td><td>69</td><td>89</td><td class="cp-crit">0</td><td>0</td></tr>
+        <tr><td>L 외부 조경·포장</td><td>6</td><td>K</td><td>72</td><td>78</td><td>83</td><td>89</td><td>11</td><td>11</td></tr>
+        <tr><td class="cp-crit">M 시운전·준공</td><td>4</td><td>I, J, L</td><td>89</td><td>93</td><td>89</td><td>93</td><td class="cp-crit">0</td><td>0</td></tr>
+      </tbody>
+    </table></div>
+    <figure class="diagram" id="fig-cp-b10">
+      <svg viewBox="0 0 900 300" role="img" aria-label="P-B10 14개 활동의 노드형 네트워크와 각 노드의 ES, 기간, EF, LS, 전체 여유, LF">
+        <rect x="4" y="10" width="892" height="282" rx="10" class="f-surface"/>
+        <path d="M82 148C92 148 92 148 100 148" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M82 148C92 148 92 238 100 238" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M170 148C180 148 180 148 188 148" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M258 148C268 148 268 148 276 148" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M170 238H300C312 238 312 228 312 183" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M346 148C356 148 356 148 364 148" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M434 148C444 148 444 148 452 148" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M434 148C444 148 444 238 452 238" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M522 148C532 148 532 58 540 58" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M522 148C532 148 532 148 540 148" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M610 58C620 58 620 58 628 58" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M610 58C620 58 620 148 628 148" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M610 148C620 148 620 148 628 148" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M698 58C708 58 708 58 716 58" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M522 238H828C840 238 840 228 840 183" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <path d="M698 148C752 148 752 148 804 148" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#cp-ah-bad)"/>
+        <path d="M786 58C796 58 796 148 804 148" style="fill:none;stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#cp-ah)"/>
+        <g transform="translate(14,116)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">0</text><text x="34.0" y="12.9" style="font-size:10.5px">4</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">4</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">0</text><text x="34.0" y="59.0" style="fill:var(--bad);font-size:10.5px">0</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">4</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--bad)">A</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">착공·가설</text></g>
+        <g transform="translate(102,116)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">4</text><text x="34.0" y="12.9" style="font-size:10.5px">10</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">14</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">4</text><text x="34.0" y="59.0" style="fill:var(--bad);font-size:10.5px">0</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">14</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--bad)">B</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">흙막이</text></g>
+        <g transform="translate(102,206)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:1.5"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">4</text><text x="34.0" y="12.9" style="font-size:10.5px">6</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">10</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">20</text><text x="34.0" y="59.0" style="fill:var(--accent-2);font-size:10.5px">16</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">26</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--text)">D</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">PHC 말뚝</text></g>
+        <g transform="translate(190,116)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">14</text><text x="34.0" y="12.9" style="font-size:10.5px">12</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">26</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">14</text><text x="34.0" y="59.0" style="fill:var(--bad);font-size:10.5px">0</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">26</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--bad)">C</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">굴착·버팀보</text></g>
+        <g transform="translate(278,116)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">26</text><text x="34.0" y="12.9" style="font-size:10.5px">4</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">30</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">26</text><text x="34.0" y="59.0" style="fill:var(--bad);font-size:10.5px">0</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">30</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--bad)">E</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">기초 매트</text></g>
+        <g transform="translate(366,116)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">30</text><text x="34.0" y="12.9" style="font-size:10.5px">8</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">38</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">30</text><text x="34.0" y="59.0" style="fill:var(--bad);font-size:10.5px">0</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">38</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--bad)">F</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">지하 골조</text></g>
+        <g transform="translate(454,116)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">38</text><text x="34.0" y="12.9" style="font-size:10.5px">15</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">53</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">38</text><text x="34.0" y="59.0" style="fill:var(--bad);font-size:10.5px">0</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">53</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--bad)">G1</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">골조 1–5층</text></g>
+        <g transform="translate(454,206)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:1.5"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">38</text><text x="34.0" y="12.9" style="font-size:10.5px">30</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">68</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">59</text><text x="34.0" y="59.0" style="fill:var(--accent-2);font-size:10.5px">21</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">89</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--text)">I</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">설비</text></g>
+        <g transform="translate(542,26)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:1.5"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">53</text><text x="34.0" y="12.9" style="font-size:10.5px">15</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">68</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">54</text><text x="34.0" y="59.0" style="fill:var(--accent-2);font-size:10.5px">1</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">69</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--text)">G2</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">골조 6–10층</text></g>
+        <g transform="translate(542,116)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">53</text><text x="34.0" y="12.9" style="font-size:10.5px">16</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">69</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">53</text><text x="34.0" y="59.0" style="fill:var(--bad);font-size:10.5px">0</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">69</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--bad)">H</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">커튼월</text></g>
+        <g transform="translate(630,26)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:1.5"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">68</text><text x="34.0" y="12.9" style="font-size:10.5px">4</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">72</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">79</text><text x="34.0" y="59.0" style="fill:var(--accent-2);font-size:10.5px">11</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">83</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--text)">K</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">옥상 방수</text></g>
+        <g transform="translate(630,116)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">69</text><text x="34.0" y="12.9" style="font-size:10.5px">20</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">89</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">69</text><text x="34.0" y="59.0" style="fill:var(--bad);font-size:10.5px">0</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">89</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--bad)">J</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">내부 마감</text></g>
+        <g transform="translate(718,26)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:1.5"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">72</text><text x="34.0" y="12.9" style="font-size:10.5px">6</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">78</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">83</text><text x="34.0" y="59.0" style="fill:var(--accent-2);font-size:10.5px">11</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">89</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--text)">L</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">조경·포장</text></g>
+        <g transform="translate(806,116)"><rect width="68" height="64" rx="6" style="fill:var(--bg-elev);stroke:var(--bad);stroke-width:2.2"/><path d="M0 17.9H68M0 46.1H68M22.7 0V17.9M45.3 0V17.9M22.7 46.1V64M45.3 46.1V64" style="stroke:var(--border);fill:none"/><g class="t-mono" text-anchor="middle" style="font-size:10.5px"><text x="11.3" y="12.9" style="fill:var(--text);font-size:10.5px">89</text><text x="34.0" y="12.9" style="font-size:10.5px">4</text><text x="56.7" y="12.9" style="fill:var(--text);font-size:10.5px">93</text><text x="11.3" y="59.0" style="fill:var(--text);font-size:10.5px">89</text><text x="34.0" y="59.0" style="fill:var(--bad);font-size:10.5px">0</text><text x="56.7" y="59.0" style="fill:var(--text);font-size:10.5px">93</text></g><text x="34.0" y="31.0" text-anchor="middle" class="t" style="font-weight:700;font-size:12.5px;fill:var(--bad)">M</text><text x="34.0" y="43.0" text-anchor="middle" class="t-mono" style="font-size:9.0px">시운전·준공</text></g>
+      </svg>
+      <figcaption><b>그림 9-9.</b> P-B10 네트워크(AON, 주 단위, 정의 9.2 표기). 주공정 A–B–C–E–F–G1–H–J–M(빨강)의 길이가 4 + 10 + 12 + 4 + 8 + 15 + 16 + 20 + 4 = 93주다. G2는 H와 나란한 경로에서 1주 짧아 TF = 1, I는 F에서 M까지 30주로 51주짜리 경로(G1–H–J)와 경쟁하지 않아 TF = 21이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-cp-gantt">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>P-B10 간트 차트: 기간을 바꾸면 주공정이 움직인다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-gantt" aria-label="P-B10 14개 활동의 간트 차트, 주공정 빨강, 여유 점선 꼬리"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>G2 골조 6–10층 <output id="cp-gt-g2-out"></output></span><input type="range" id="cp-gt-g2" min="10" max="22" step="1" value="15"></label>
+          <label class="ctrl"><span>H 커튼월 <output id="cp-gt-h-out"></output></span><input type="range" id="cp-gt-h" min="10" max="22" step="1" value="16"></label>
+          <label class="ctrl"><span>I 기계·전기 설비 <output id="cp-gt-i-out"></output></span><input type="range" id="cp-gt-i" min="20" max="56" step="1" value="30"></label>
+          <label class="ctrl"><span>C 굴착·버팀보 <output id="cp-gt-c-out"></output></span><input type="range" id="cp-gt-c" min="6" max="20" step="1" value="12"></label>
+          <label class="ctrl"><span>D PHC 말뚝 <output id="cp-gt-d-out"></output></span><input type="range" id="cp-gt-d" min="3" max="30" step="1" value="6"></label>
+          <div class="ctrl"><span>막대 위치</span><div class="seg" id="cp-gt-b"><button data-value="ES" class="on">가장 이른(ES)</button><button data-value="LS">가장 늦은(LS)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">공기 T</span><span class="v" id="cp-gt-o-t">—</span></div>
+        <div class="stat"><span class="k">주공정</span><span class="v" id="cp-gt-o-c">—</span></div>
+        <div class="stat"><span class="k">TF: G2 · H</span><span class="v" id="cp-gt-o-gh">—</span></div>
+        <div class="stat"><span class="k">TF: I · D</span><span class="v" id="cp-gt-o-id">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: H를 14주로 줄이면 공기가 92주로 1주만 줄고 주공정이 G2로 넘어갑니다(줄인 2주 중 1주는 G2의 여유가 막음) · G2를 17주로 늘리면 94주, H와 G2를 모두 16주로 두면 두 경로가 동시에 주공정입니다 · I를 52주 이상으로 늘리면 설비가 주공정이 됩니다 · C를 줄이면 D의 여유가 줄어 C를 6주로 하면 D의 여유는 10주입니다 · LS 보기로 바꾸면 여유가 있는 활동이 꼬리 끝으로 밀린 늦은 일정이 보입니다(11장 자원, 13장 S 곡선의 LS 기준) · 모델: <code>CB.pm.cpm</code>, 주공정 빨강·여유 활동 파랑·점선 꼬리 = 전체 여유(공정표 그리기 규약).</div>
+    </div>
+    <div class="callout"><strong>예제 9.5 (P-B10의 합류점과 분기점)</strong> 표 9-2를 손으로 확인한다.
+      <p><b>① 전진 — 합류점</b> E ← C·D: ES = max(C 26, D 10) = 26. J ← G2·H: ES = max(68, 69) = 69. M ← I·J·L: ES = max(68, 89, 78) = 89 → <b>T = 93주</b>.</p>
+      <p><b>② 후진 — 분기점</b> G1 → G2·H: G2의 LS = min(K의 LS 79, J의 LS 69) − 15 = 54, H의 LS = 69 − 16 = 53 → G1의 LF = min(54, 53) = 53. F → G1·I: I의 LS = 89 − 30 = 59 → F의 LF = min(G1 38, I 59) = 38. A → B·D: D의 LS = 26 − 6 = 20 → A의 LF = min(B 4, D 20) = 4.</p>
+      <p><b>③ 판정</b> 주공정 A–B–C–E–F–G1–H–J–M(93주). 관리 우선순위는 주공정 9개 → 여유 1주인 G2(준주공정) → 여유 11주의 K·L → 16주의 D → 21주의 I 순이다. 설비 I는 여유가 커 보이지만 30주짜리 긴 활동이라 생산성이 30 % 떨어지면 9주 늦어진다. 여유는 절대값보다 <b>기간 대비 비율</b>로도 보아야 한다.</p></div>
+    <div class="callout site"><strong>P-B10 공정표의 해석</strong> 공기 93주(약 21.5개월)는 지하 공사 38주(A–F, 41 %), 지상 골조 30주, 외장·마감 36주로 나뉜다. 지하 공사 38주가 모두 주공정이므로 착공 초기의 흙막이·굴착 지연은 그대로 준공 지연이 된다. 지상에서는 커튼월 H와 골조 G2가 1주 차이로 경쟁하므로 "커튼월 유닛 제작·반입"이 공정의 급소다. 여유가 큰 설비 I(21주)와 말뚝 D(16주)는 자원 평준화(11장)의 조정 대상이다. 이 공정표의 ES 기준 누적 공사비는 40주 약 75.7억 원, 60주 약 155.4억 원(12·13장), 최대 인력 부하는 약 115명(53주 무렵, 11장)이다. 기간의 불확실성을 넣은 분석은 10장에서 이어진다.</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="update">
+    <h2>공정표 읽기와 갱신</h2>
+    <div class="problem"><strong>착공 20주, 흙막이가 2주 늦게 끝났다</strong>
+      <p>흙막이 B가 12주 걸려 16주 끝에 끝났고, 굴착 C는 16주에 시작해 4주가 지났는데 계획 속도의 80 %로 진행 중입니다. 준공은 언제로 예상해야 할까요? "C를 계획 속도로 따라잡는다"고 가정할 때와 "지금 속도가 계속된다"고 가정할 때는 얼마나 다를까요?</p></div>
+    <p>공정표는 정해진 주기(보통 주간·월간)마다 <b>갱신</b>합니다. 기준선은 그대로 두고, 그 위에 실적과 새 예측을 겹쳐 그립니다. 갱신의 기준 시점을 <span class="term">데이터 날짜</span><span class="en">(data date)</span>라 하며, 그 앞은 실적(사실), 그 뒤는 예측입니다.</p>
+    <div class="callout def"><strong>원리 9.7 (공정 갱신)</strong> 데이터 날짜 \(t_d\)에서 활동을 세 가지로 나눈다.
+      <div class="formula">$$\text{완료: } AF \le t_d, \qquad \text{진행 중: } EF^{\text{new}} = t_d + RD, \qquad \text{미착수: } ES^{\text{new}} = \max\left(t_d,\ \max_{i}EF_i^{\text{new}}\right)$$<div class="where">완료 활동은 실적 착수·종료일로 고정하고, 진행 중 활동은 <span class="term">남은 기간</span><span class="en">(remaining duration, RD)</span>을 새로 추정하며, 미착수 활동은 데이터 날짜 이전에 시작할 수 없다. 이 상태로 전진·후진 계산을 다시 해 새 예상 준공과 새 주공정을 얻는다. 남은 기간은 "남은 물량 ÷ 앞으로의 생산 속도"이며, 앞으로의 속도를 계획값으로 볼지 실적값으로 볼지가 예측을 크게 바꾼다. 데이터 날짜에서 기준선과 실적을 비교하는 진도 지표(SPI 등)는 13장에서 다룬다.</div></div></div>
+    <div class="sim" id="sim-cp-update">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>공정 갱신: 실적을 넣고 남은 공정 재계산(P-B10)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-upd" aria-label="기준선 윤곽, 실적 막대, 데이터 날짜 이후 예측 막대가 겹친 P-B10 간트 차트"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>데이터 날짜 <output id="cp-up-t-out"></output></span><input type="range" id="cp-up-t" min="4" max="90" step="1" value="20"></label>
+          <label class="ctrl"><span>B 흙막이 실제 기간 <output id="cp-up-b-out"></output></span><input type="range" id="cp-up-b" min="8" max="18" step="1" value="12"></label>
+          <label class="ctrl"><span>D 말뚝 실제 기간 <output id="cp-up-d-out"></output></span><input type="range" id="cp-up-d" min="4" max="26" step="1" value="6"></label>
+          <label class="ctrl"><span>C 굴착 실적 속도(계획 대비) <output id="cp-up-c-out"></output></span><input type="range" id="cp-up-c" min="0.6" max="1.3" step="0.05" value="0.8"></label>
+          <div class="ctrl"><span>진행 중 활동의 남은 기간</span><div class="seg" id="cp-up-m"><button data-value="plan" class="on">계획 속도로 회복</button><button data-value="act">실적 속도 유지</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">예상 준공</span><span class="v" id="cp-up-o-t">—</span></div>
+        <div class="stat"><span class="k">기준선(93주) 대비</span><span class="v" id="cp-up-o-v">—</span></div>
+        <div class="stat"><span class="k">진척률 계획 / 실적</span><span class="v" id="cp-up-o-p">—</span></div>
+        <div class="stat"><span class="k">남은 주공정</span><span class="v" id="cp-up-o-c">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(20주, B 12주, C 속도 0.8)에서 "계획 속도로 회복"은 95.8주, "실적 속도 유지"는 98주를 예측합니다 · 데이터 날짜를 30주로 옮기면 C가 거의 끝나 두 예측이 98주 근처로 모입니다 — 진척이 쌓일수록 예측의 불확실성이 줄어듭니다 · D를 26주로 늘리고 「실적 속도 유지」를 고르면 E가 D를 기다려 주공정이 D로 넘어갑니다 · 진척률은 공사비 가중(BAC 244억 원 중 완료 몫, 13장의 EV/BAC) · 모델: 원리 9.7. 실적 세계는 B·D·C만 바뀌고 나머지는 계획대로라고 가정한 교육용 시나리오, 갱신 계산은 데이터 날짜를 기간으로 갖는 가상 활동을 미착수 활동의 선행으로 넣어 <code>CB.pm.cpm</code>으로 한다.</div>
+    </div>
+    <div class="callout"><strong>예제 9.6 (20주 갱신)</strong> 데이터 날짜 20주. A 0–4(완료), B 4–16(완료, 계획보다 2주 늦음), D 4–10(완료), C 16주 착수, 계획 속도의 80 %로 4주 진행.
+      <p><b>① C의 진척률</b> 4주 × 0.8 = 3.2주 몫 → 3.2/12 = 26.7 %. 남은 물량 = 12 × 0.733 = 8.8주 몫.</p>
+      <p><b>② 남은 기간 두 가지</b> 계획 속도로 회복: \(RD = 8.8\) 주 → C 종료 28.8주. 실적 속도 유지: \(RD = 8.8/0.8 = 11\) 주 → C 종료 31주.</p>
+      <p><b>③ 새 예상 준공</b> C 뒤는 모두 주공정(E–F–G1–H–J–M = 67주)이므로 28.8 + 67 − 0 = <b>95.8주</b> 또는 31 + 67 = <b>98주</b>. 기준선 대비 2.8–5주 지연.</p>
+      <p><b>④ 판단</b> 늦은 활동이 "따라잡는다"는 가정은 근거(추가 장비, 반출 시간 연장 허가)가 있을 때만 쓴다. 근거가 없으면 실적 속도로 예측하고 만회 대책(11장의 공기 단축: 골조 사이클 단축, H의 겹침)을 세운다. 공사비 가중 진척률은 계획 36.0억 원(14.8 %) 대비 실적 32.7억 원(13.4 %)이다.</p></div>
+    <div class="callout tip"><strong>갱신을 잘하는 습관</strong> ① 기준선은 덮어쓰지 않는다(승인받은 변경이 있을 때만 새 기준선). ② 실적 착수·종료일과 진척률은 현장 기록(작업 일보, 검측 기록)에서 가져온다. ③ 남은 기간은 담당 공종 책임자에게 직접 묻고 근거를 적는다. ④ 갱신마다 주공정과 준주공정(여유 몇 주 이하) 목록이 바뀌었는지 확인한다. ⑤ 지연이 생기면 원인(발주자·시공자·불가항력)을 함께 기록해 둔다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="pert.html"><small>CH.10 · PERT와 공기 위험</small>93주는 몇 % 확률인가<br><span>기간을 3점 추정으로 바꾸면 주공정 지수와 P80 공기가 나온다.</span></a>
+      <a href="resources.html"><small>CH.11 · 자원 관리와 공기 단축</small>여유 안에서 옮기기<br><span>TF가 자원 평준화의 이동 폭이고, 주공정이 공기 단축의 대상이다.</span></a>
+      <a href="estimating.html"><small>CH.12 · 적산과 원가 관리</small>ES·LS 기준 현금 흐름<br><span>활동 시각에 비용을 나누면 기성과 S 곡선이 된다.</span></a>
+      <a href="evm.html"><small>CH.13 · 진도 관리와 EVM</small>기준선 = 계획 가치(PV)<br><span>갱신의 실적이 획득 가치(EV)가 된다.</span></a>
+      <a href="contracts.html"><small>CH.02 · 발주 방식과 계약</small>계약 공기와 지체상금<br><span>여유의 소유와 공기 연장 청구는 계약이 정한다.</span></a>
+      <a href="concrete-work.html"><small>CH.06 · 철근·거푸집·콘크리트 공사</small>G1·G2의 3주/층<br><span>골조 활동을 층 사이클로 쪼개면 상세 공정표가 된다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>공정 관리는 계획(공정표·기준선) → 실행 → 측정(실적) → 조정(갱신·만회)의 순환이다. 공정표는 언제 끝나나, 무엇이 늦으면 안 되나, 언제 무엇이 필요한가에 답한다.</li>
+      <li>WBS로 공사를 작업 패키지·활동으로 나누고, 기간은 D = Q/(P·n·η)로 산정한다. 투입을 늘려도 병목 단계와 작업 공간이 기간의 하한을 정한다(굴착 순수 14일 vs 활동 C 12주).</li>
+      <li>간트는 시기, AON은 논리·여유·주공정, AOA는 사건(더미 필요), 사선식은 반복 작업의 속도와 간섭을 잘 보여 준다. 이 책은 AON 노드의 네 귀에 ES·EF·LS·LF를 적는다.</li>
+      <li>FS·SS·FF·SF와 지연 ℓ: FS ES<sub>j</sub> ≥ EF<sub>i</sub> + ℓ, SS ES<sub>j</sub> ≥ ES<sub>i</sub> + ℓ, FF EF<sub>j</sub> ≥ EF<sub>i</sub> + ℓ. 겹침(SS)의 이득은 병렬 경로의 여유와 마무리 조건(FF)이 정한다(예제 9.2: 92주 또는 94주).</li>
+      <li>전진 계산은 합류점에서 max, 후진 계산은 분기점에서 min. TF = LS − ES, FF = min(후행 ES) − EF, FF ≤ TF. TF = 0의 경로가 주공정이며 가장 긴 경로다.</li>
+      <li>자유 여유 안의 지연은 아무것도 밀지 않고, 전체 여유 안이면 후속 활동만 밀며, 전체 여유를 넘으면 준공이 늦어진다. 같은 경로의 활동은 여유를 함께 쓴다(K·L의 11주).</li>
+      <li>P-B10: 공기 93주, 주공정 A–B–C–E–F–G1–H–J–M, 여유 D 16 · G2 1 · I 21 · K·L 11주. G2는 준주공정이다.</li>
+      <li>갱신은 데이터 날짜에서 완료(실적 고정)·진행 중(남은 기간)·미착수(데이터 날짜 이후)로 나눠 다시 계산한다. 남은 기간을 계획 속도로 볼지 실적 속도로 볼지가 예측을 바꾼다(예제 9.6: 95.8 vs 98주).</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 굴착 물량 6,000 m³를 하루 500 m³ 파는 굴삭기 2대로, 작업 가능률 0.6에서 판다. 기간은?</p><div class="opts">
+        <button class="opt">6일</button><button class="opt">3.6일</button><button class="opt" data-correct>10일</button><button class="opt">20일</button>
+      </div><div class="quiz-exp">\(D = 6{,}000/(500\times2\times0.6) = 10\) 일. 6일은 작업 가능률을 빠뜨린 값, 20일은 1대 기준이다.</div></div>
+      <div class="quiz-q"><p>2. AOA 네트워크에서 더미 활동이 필요한 이유는?</p><div class="opts">
+        <button class="opt">기간이 0인 마일스톤을 표시하려고</button><button class="opt" data-correct>활동을 화살표로 그릴 때 일부만 겹치는 선행 관계나 같은 두 사건 사이의 병렬 활동을 표현하려고</button><button class="opt">SS 관계를 그리려고</button><button class="opt">주공정을 표시하려고</button>
+      </div><div class="quiz-exp">AOA는 사건(원)이 관계를 대신하므로, 그림 9-3처럼 C의 종료가 D의 착수 조건이 되는 관계를 사건 하나로 합칠 수 없을 때는 기간 0의 점선 화살표(더미)로 잇는다. AON은 더미가 필요 없다.</div></div>
+      <div class="quiz-q"><p>3. 선행 i(10주)와 후행 j(6주)가 SS 관계, 지연 2주다. 둘만 있을 때 j의 일정과 공기는?</p><div class="opts">
+        <button class="opt">j 10–16주, 공기 16주</button><button class="opt" data-correct>j 2–8주, 공기 10주</button><button class="opt">j 12–18주, 공기 18주</button><button class="opt">j 4–10주, 공기 10주</button>
+      </div><div class="quiz-exp">SS: \(ES_j = ES_i + 2 = 2\), \(EF_j = 8\). i가 10주에 끝나므로 공기 10주, j는 \(LF = 10\)까지 늦어질 수 있어 여유 2주.</div></div>
+      <div class="quiz-q"><p>4. 활동 f의 선행이 c(EF 5)와 d(EF 13)이고 모두 FS다. f의 ES는?</p><div class="opts">
+        <button class="opt">5</button><button class="opt">9</button><button class="opt" data-correct>13</button><button class="opt">18</button>
+      </div><div class="quiz-exp">합류점에서는 모든 선행이 끝나야 하므로 최대값: max(5, 13) = 13.</div></div>
+      <div class="quiz-q"><p>5. 활동 e: ES 13, EF 16, LS 15, LF 18. 후행 g의 ES 18, h의 ES 16(모두 FS). e의 TF와 FF는?</p><div class="opts">
+        <button class="opt">TF 2, FF 2</button><button class="opt" data-correct>TF 2, FF 0</button><button class="opt">TF 0, FF 2</button><button class="opt">TF 5, FF 0</button>
+      </div><div class="quiz-exp">TF = LS − ES = 2. FF = min(18, 16) − 16 = 0. 하루만 늦어도 h가 밀리지만, 2일까지는 준공에 영향이 없다.</div></div>
+      <div class="quiz-q"><p>6. P-B10에서 옥상 방수 K(TF 11, FF 0)가 6주 늦어지면?</p><div class="opts">
+        <button class="opt">아무 활동도 영향을 받지 않는다</button><button class="opt" data-correct>후속 L이 6주 밀리지만 공기는 93주 그대로다</button><button class="opt">공기가 6주 늘어난다</button><button class="opt">K가 주공정이 되고 공기가 99주가 된다</button>
+      </div><div class="quiz-exp">자유 여유(0)는 넘었지만 전체 여유(11) 안이다. L은 78–84주로 밀리고 L의 남은 여유는 5주가 된다.</div></div>
+      <div class="quiz-q"><p>7. P-B10에서 커튼월 H를 16주에서 13주로 줄이면 공기는?</p><div class="opts">
+        <button class="opt">90주</button><button class="opt" data-correct>92주</button><button class="opt">93주</button><button class="opt">91주</button>
+      </div><div class="quiz-exp">H가 줄면 J의 착수는 G2(EF 68)가 정한다. 공기는 1주만 줄어 92주, 주공정은 G2 경로로 옮겨 간다. 주공정 단축은 병렬 경로의 여유만큼만 효과가 있다.</div></div>
+      <div class="quiz-q"><p>8. 데이터 날짜 20주에 진척률 25 %(12주짜리 활동, 실적 속도는 계획의 75 %)인 진행 중 활동의 남은 기간을 실적 속도로 추정하면?</p><div class="opts">
+        <button class="opt">9주</button><button class="opt" data-correct>12주</button><button class="opt">3주</button><button class="opt">16주</button>
+      </div><div class="quiz-exp">남은 물량 = 12 × 0.75 = 9주 몫. 실적 속도 0.75로 하면 9/0.75 = 12주. 계획 속도로 회복한다고 보면 9주다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미: 글자, 간트 차트, AON 노드 그리기(교육용 그리기 모델, 계산은 CB.pm.cpm) ---------- */
+const CPX = {
+  font(o) { return `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`; },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = CPX.font(o);
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    if (o.halo !== false) { ctx.lineWidth = 3; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); }
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, x0, y0, x1, y1, color, width = 1.4, dash) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.restore(); },
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  pid: (p) => (typeof p === "string" ? p : p.id),
+  rel: (p) => (typeof p === "string" ? { id: p, type: "FS", lag: 0 } : { id: p.id, type: p.type || "FS", lag: p.lag || 0 }),
+  n: (v) => (Math.abs(v - Math.round(v)) < 1e-6 ? String(Math.round(v)) : CB.num(v, 1)),
+  clone: (acts) => acts.map((a) => ({ ...a, pred: (a.pred || []).map((p) => (typeof p === "string" ? p : { ...p })) })),
+  arrow(ctx, x, y, ang, color, s = 7) {
+    ctx.save(); ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x - s * Math.cos(ang - 0.42), y - s * Math.sin(ang - 0.42)); ctx.lineTo(x - s * Math.cos(ang + 0.42), y - s * Math.sin(ang + 0.42)); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  /** 위상 순서의 깊이로 열(또는 행)을 정하는 배치. 폭이 좁으면 위→아래 배치 */
+  layout(acts, order, W) {
+    const byId = {}, lv = {}; acts.forEach((a) => (byId[a.id] = a));
+    order.forEach((id) => { let L = 0; (byId[id].pred || []).forEach((p) => { const q = CPX.pid(p); if (lv[q] != null) L = Math.max(L, lv[q] + 1); }); lv[id] = L; });
+    const maxL = order.length ? Math.max(...order.map((id) => lv[id])) : -1;
+    acts.forEach((a) => { if (lv[a.id] == null) lv[a.id] = maxL + 1; });
+    const nL = acts.length ? Math.max(...acts.map((a) => lv[a.id])) + 1 : 1;
+    const cols = Array.from({ length: nL }, () => []);
+    acts.forEach((a) => cols[lv[a.id]].push(a.id));
+    const maxK = Math.max(1, ...cols.map((c) => c.length)), pad = 8, pos = {};
+    const colW = (W - 2 * pad) / nL;
+    if (colW >= 68) {
+      const w = Math.min(128, colW - 14), h = 60, rowH = 76;
+      cols.forEach((c, L) => c.forEach((id, k) => (pos[id] = { x: pad + L * colW + (colW - w) / 2, y: 12 + k * rowH + ((maxK - c.length) * rowH) / 2, w, h })));
+      return { pos, H: 12 + maxK * rowH + 4, vertical: false };
+    }
+    const h = 60, rowH = 86, cw = (W - 2 * pad) / maxK, w = Math.max(48, Math.min(140, cw - 10));
+    cols.forEach((c, L) => c.forEach((id, k) => { const off = (W - c.length * cw) / 2; pos[id] = { x: off + k * cw + (cw - w) / 2, y: 12 + L * rowH, w, h }; }));
+    return { pos, H: 12 + nL * rowH, vertical: true };
+  },
+  /**
+   * AON 그리기. o.vals(id) → { ES, EF, LS, LF, TF } 중 보일 값(없으면 "·"), o.color(id) → 테두리 색, o.hl 강조 id,
+   * o.edgeColor(predId, succId, rel) → 색, o.names 표시 여부
+   */
+  aon(ctx, Lay, acts, o) {
+    const P = CB.palette(), pos = Lay.pos;
+    // 관계 화살표
+    acts.forEach((a) => (a.pred || []).forEach((pp) => {
+      const r = CPX.rel(pp), A = pos[r.id], B = pos[a.id]; if (!A || !B) return;
+      const col = (o.edgeColor && o.edgeColor(r.id, a.id, r)) || P.faint, wd = col === P.bad ? 2.2 : 1.4;
+      let x1, y1, x2, y2, c1x, c1y, c2x, c2y;
+      if (!Lay.vertical) {
+        x1 = A.x + A.w; y1 = A.y + A.h / 2; x2 = B.x; y2 = B.y + B.h / 2;
+        if (x2 > x1 + 4) { const m = (x2 - x1) / 2; c1x = x1 + m; c1y = y1; c2x = x2 - m; c2y = y2; }
+        else { x1 = A.x + A.w / 2; y1 = A.y; x2 = B.x + B.w / 2; y2 = B.y; c1x = x1; c1y = y1 - 40; c2x = x2; c2y = y2 - 40; }
+      } else {
+        x1 = A.x + A.w / 2; y1 = A.y + A.h; x2 = B.x + B.w / 2; y2 = B.y;
+        if (y2 > y1 + 4) { const m = (y2 - y1) / 2; c1x = x1; c1y = y1 + m; c2x = x2; c2y = y2 - m; }
+        else { x1 = A.x + A.w; y1 = A.y + A.h / 2; x2 = B.x + B.w; y2 = B.y + B.h / 2; c1x = x1 + 40; c1y = y1; c2x = x2 + 40; c2y = y2; }
+      }
+      ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y2); ctx.stroke(); ctx.restore();
+      CPX.arrow(ctx, x2, y2, Math.atan2(y2 - c2y, x2 - c2x), col);
+      if (r.type !== "FS" || r.lag) {
+        const t = 0.5, mx = (1 - t) ** 3 * x1 + 3 * (1 - t) ** 2 * t * c1x + 3 * (1 - t) * t * t * c2x + t ** 3 * x2, my = (1 - t) ** 3 * y1 + 3 * (1 - t) ** 2 * t * c1y + 3 * (1 - t) * t * t * c2y + t ** 3 * y2;
+        CPX.text(ctx, r.type + (r.lag ? (r.lag > 0 ? "+" : "−") + CPX.n(Math.abs(r.lag)) : ""), mx, my, P.accent, { size: 10 });
+      }
+    }));
+    // 노드
+    acts.forEach((a) => {
+      const p = pos[a.id]; if (!p) return;
+      const v = o.vals ? o.vals(a.id) : {}, col = (o.color && o.color(a.id)) || P.dim, hl = o.hl === a.id;
+      const t = 17, cw = p.w / 3, fs = p.w < 70 ? 9.5 : 11;
+      ctx.save();
+      ctx.fillStyle = hl ? CPX.alpha(P.accent, 0.14) : P.elev; ctx.strokeStyle = hl ? P.accent : col; ctx.lineWidth = hl ? 3 : col === P.bad ? 2.2 : 1.4;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x, p.y, p.w, p.h, 6) : ctx.rect(p.x, p.y, p.w, p.h); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = P.border; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.moveTo(p.x, p.y + t); ctx.lineTo(p.x + p.w, p.y + t); ctx.moveTo(p.x, p.y + p.h - t); ctx.lineTo(p.x + p.w, p.y + p.h - t);
+      [1, 2].forEach((k) => { ctx.moveTo(p.x + k * cw, p.y); ctx.lineTo(p.x + k * cw, p.y + t); ctx.moveTo(p.x + k * cw, p.y + p.h - t); ctx.lineTo(p.x + k * cw, p.y + p.h); });
+      ctx.stroke(); ctx.restore();
+      const S = (x) => (x == null ? "·" : CPX.n(x)), o2 = { size: fs, halo: false };
+      CPX.text(ctx, S(v.ES), p.x + cw / 2, p.y + t / 2 + 1, P.text, o2); CPX.text(ctx, CPX.n(a.d), p.x + 1.5 * cw, p.y + t / 2 + 1, P.dim, o2); CPX.text(ctx, S(v.EF), p.x + 2.5 * cw, p.y + t / 2 + 1, P.text, o2);
+      CPX.text(ctx, S(v.LS), p.x + cw / 2, p.y + p.h - t / 2, P.text, o2); CPX.text(ctx, S(v.TF), p.x + 1.5 * cw, p.y + p.h - t / 2, col === P.bad ? P.bad : P.dim, o2); CPX.text(ctx, S(v.LF), p.x + 2.5 * cw, p.y + p.h - t / 2, P.text, o2);
+      const showName = o.names !== false && a.name && p.w >= 96;
+      CPX.text(ctx, a.id, p.x + p.w / 2, p.y + p.h / 2 + (showName ? -6 : 0), col === P.bad ? P.bad : P.text, { size: 12.5, halo: false });
+      if (showName) {
+        let nm = a.name; ctx.save(); ctx.font = CPX.font({ size: 9.5, bold: false, mono: false });
+        while (nm.length > 1 && ctx.measureText(nm).width > p.w - 8) nm = nm.slice(0, -1);
+        ctx.restore(); if (nm !== a.name) nm = nm.slice(0, -1) + "…";
+        CPX.text(ctx, nm, p.x + p.w / 2, p.y + p.h / 2 + 8, P.dim, { size: 9.5, bold: false, mono: false, halo: false });
+      }
+    });
+  },
+  /** 간트 차트. rows: [{ id, label, s, f, crit, tf, tfLeft, base:[s,f], done:[s,f], fc:[s,f], dim, hl }] */
+  gantt(ctx, box, rows, Tmax, o = {}) {
+    const P = CB.palette(), lw = o.lw, x0 = box.x + lw, w = box.w - lw - 6, X = (t) => x0 + (t / Tmax) * w;
+    const rh = box.h / rows.length, step = Tmax > 70 ? 10 : Tmax > 30 ? 5 : Tmax > 12 ? 2 : 1;
+    ctx.save(); ctx.strokeStyle = P.grid; ctx.lineWidth = 1;
+    for (let t = 0; t <= Tmax + 1e-9; t += step) { ctx.beginPath(); ctx.moveTo(X(t), box.y); ctx.lineTo(X(t), box.y + box.h); ctx.stroke(); CPX.text(ctx, String(t), X(t), box.y + box.h + 10, P.dim, { size: 10.5, bold: false }); }
+    ctx.restore();
+    CPX.text(ctx, o.unit || "주", X(Tmax), box.y + box.h + 24, P.dim, { size: 10.5, bold: false, align: "right" });
+    rows.forEach((r, i) => {
+      const yc = box.y + (i + 0.5) * rh, bh = Math.min(15, rh * 0.62), col = r.crit ? P.bad : P.accent2;
+      if (i % 2 === 0) { ctx.fillStyle = CPX.alpha(P.text, 0.03); ctx.fillRect(box.x, yc - rh / 2, box.w, rh); }
+      CPX.text(ctx, r.label, box.x + 2, yc, r.hl ? P.warn : r.crit ? P.bad : P.text, { size: lw < 50 ? 10.5 : 11, align: "left", mono: lw < 50, bold: !!(r.crit || r.hl), halo: false });
+      if (r.base) { ctx.save(); ctx.strokeStyle = P.faint; ctx.lineWidth = 1.3; ctx.setLineDash([3, 2]); ctx.strokeRect(X(r.base[0]), yc - bh / 2 - 2, Math.max(1, X(r.base[1]) - X(r.base[0])), bh + 4); ctx.restore(); }
+      if (r.done) { ctx.fillStyle = P.dim; ctx.fillRect(X(r.done[0]), yc - bh / 2, Math.max(1, X(r.done[1]) - X(r.done[0])), bh); }
+      if (r.fc) { ctx.fillStyle = CPX.alpha(col, r.dim ? 0.45 : 0.9); ctx.fillRect(X(r.fc[0]), yc - bh / 2, Math.max(1, X(r.fc[1]) - X(r.fc[0])), bh); }
+      if (r.tf > 1e-6) {
+        const a = r.tfLeft ? r.fc[0] - r.tf : r.fc[1], b = r.tfLeft ? r.fc[0] : r.fc[1] + r.tf;
+        CPX.line(ctx, X(a), yc, X(b), yc, P.accent2, 1.6, [4, 3]); CPX.line(ctx, X(r.tfLeft ? a : b), yc - 5, X(r.tfLeft ? a : b), yc + 5, P.accent2, 1.6);
+      }
+    });
+    (o.vlines || []).forEach((v) => { CPX.line(ctx, X(v.x), box.y - 4, X(v.x), box.y + box.h, v.color, v.width || 2, v.dash); if (v.label) CPX.text(ctx, v.label, Math.min(X(v.x) + 4, box.x + box.w - 4), box.y - 8, v.color, { size: 10.5, align: X(v.x) + 80 > box.x + box.w ? "right" : "left" }); });
+    return { X };
+  },
+};
+
+/* ---------- 1. 기간 산정기 ---------- */
+(function () {
+  const PRE = {
+    exc: { q: [500, 20000, 50, 8450], p: [100, 1500, 2, 608], n: 1, e: 1, c: 0, qu: "m³", pu: "m³/대·일", nu: "대" },
+    reb: { q: [5, 100, 0.5, 35], p: [0.3, 4, 0.1, 1.5], n: 4, e: 1, c: 0, qu: "t", pu: "t/조·일", nu: "조" },
+    usr: { q: [10, 1000, 10, 400], p: [1, 100, 1, 20], n: 3, e: 0.8, c: 0.1, qu: "단위", pu: "단위/조·일", nu: "조" },
+  };
+  let cur = PRE.exc;
+  const gq = CB.range("cp-du-q", (v) => CB.sig(v) + " " + cur.qu, draw), gp = CB.range("cp-du-p", (v) => CB.sig(v) + " " + cur.pu, draw);
+  const gn = CB.range("cp-du-n", (v) => v + " " + cur.nu, draw), ge = CB.range("cp-du-e", (v) => v.toFixed(2), draw), gc = CB.range("cp-du-c", (v) => v.toFixed(2), draw);
+  const gw = CB.seg("cp-du-w", draw);
+  CB.seg("cp-du-pre", (v) => {
+    cur = PRE[v];
+    [[gq, cur.q], [gp, cur.p]].forEach(([g, r]) => { g.el.min = r[0]; g.el.max = r[1]; g.el.step = r[2]; g.set(r[3], false); });
+    gn.set(cur.n, false); ge.set(cur.e, false); gc.set(cur.c, false); draw();
+  });
+  const neff = (n, c) => n / (1 + c * (n - 1));
+  const days = (n) => gq() / (gp() * neff(n, gc()) * ge());
+  const cv = CB.canvas("#cp-cv-dur", (ctx, W, H) => {
+    const P = CB.palette(), n = gn(), d1 = days(1), data = [];
+    for (let k = 1; k <= 8; k += 0.05) data.push([k, days(k)]);
+    const res = CB.chart(ctx, { x: 60, y: 18, w: W - 60 - 18, h: H - 18 - 50 }, { x: [1, 8], y: [0, d1 * 1.1], xTicks: [1, 2, 3, 4, 5, 6, 7, 8], xLabel: "투입 조(대) 수 n", yLabel: "기간 D (일)",
+      series: [{ data: data.map(([k]) => [k, d1 / k]), color: P.faint, width: 1.4, dash: [5, 4] }, { data, color: P.accent, width: 2.6 }],
+      points: [{ x: n, y: days(n), color: P.accent2, r: 6 }] });
+    CPX.text(ctx, `D = ${CB.num(days(n), 1)}일`, Math.min(res.X(n) + 8, W - 60), res.Y(days(n)) - 14, P.accent2, { size: 12, align: "left" });
+    if (gc() > 0) CPX.text(ctx, "점선: 혼잡 손실 없을 때(1/n)", W - 22, 30, P.dim, { size: 10.5, bold: false, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.6), minHeight: 260, maxHeight: 400 });
+  function draw() {
+    cv.redraw();
+    const n = gn(), d = days(n), w = Number(gw());
+    CB.stat("cp-du-o-d", CB.num(d, 1) + " 일"); CB.stat("cp-du-o-w", CB.num(d / w, 1) + " 주");
+    CB.stat("cp-du-o-n", CB.num(neff(n, gc()), 2) + " " + cur.nu); CB.stat("cp-du-o-cd", CB.sig(n * d));
+  }
+  draw();
+})();
+
+/* ---------- 2. 사선식 공정표 ---------- */
+(function () {
+  const ga = CB.range("cp-lb-a", (v) => v.toFixed(1) + " 주/층", draw), gb = CB.range("cp-lb-b", (v) => v.toFixed(1) + " 주/층", draw), gcc = CB.range("cp-lb-c", (v) => v.toFixed(1) + " 주/층", draw);
+  const gg = CB.range("cp-lb-g", (v) => v.toFixed(1) + " 주", draw), gm = CB.seg("cp-lb-m", draw);
+  const NF = 10;
+  function calc() {
+    const t = [ga(), gb(), gcc()], buf = gg(), S = [], F = [], idle = [0, 0, 0];
+    for (let j = 0; j < 3; j++) {
+      S[j] = []; F[j] = [];
+      if (j === 0) { for (let k = 0; k < NF; k++) { S[0][k] = k * t[0]; F[0][k] = S[0][k] + t[0]; } continue; }
+      if (gm() === "cont") {
+        let s0 = 0; for (let k = 0; k < NF; k++) s0 = Math.max(s0, F[j - 1][k] + buf - k * t[j]);
+        for (let k = 0; k < NF; k++) { S[j][k] = s0 + k * t[j]; F[j][k] = S[j][k] + t[j]; }
+      } else {
+        for (let k = 0; k < NF; k++) { S[j][k] = Math.max(F[j - 1][k] + buf, k ? F[j][k - 1] : 0); F[j][k] = S[j][k] + t[j]; if (k) idle[j] += S[j][k] - F[j][k - 1]; }
+      }
+    }
+    return { S, F, idle };
+  }
+  const cv = CB.canvas("#cp-cv-lob", (ctx, W, H) => {
+    const P = CB.palette(), r = calc(), Tm = Math.ceil((r.F[2][NF - 1] + 2) / 5) * 5, cols = [P.accent, P.accent2, P.ok], names = ["골조", "커튼월", "내부 마감"];
+    const res = CB.chart(ctx, { x: 50, y: 30, w: W - 50 - 16, h: H - 30 - 50 }, { x: [0, Tm], y: [0, NF], yTicks: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], yFmt: (v) => v + "F", xLabel: "시간 (주)", yLabel: "" });
+    for (let j = 0; j < 3; j++) {
+      ctx.save(); ctx.fillStyle = CPX.alpha(cols[j], 0.75);
+      for (let k = 0; k < NF; k++) { const y0 = res.Y(k + 1) + 3, y1 = res.Y(k) - 3; ctx.fillRect(res.X(r.S[j][k]), y0, Math.max(1, res.X(r.F[j][k]) - res.X(r.S[j][k])), y1 - y0); }
+      ctx.strokeStyle = cols[j]; ctx.lineWidth = 2; ctx.beginPath();
+      for (let k = 0; k < NF; k++) { const x = res.X(r.S[j][k]), y = res.Y(k + 0.5); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke(); ctx.restore();
+      CPX.text(ctx, names[j], 56 + j * Math.min(110, (W - 70) / 3), 14, cols[j], { size: 11.5, align: "left" });
+    }
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.6), minHeight: 300, maxHeight: 440 });
+  function draw() {
+    cv.redraw(); const r = calc();
+    CB.stat("cp-lb-o-a", CB.num(r.F[0][NF - 1], 1) + " 주"); CB.stat("cp-lb-o-b", CB.num(r.F[1][NF - 1], 1) + " 주");
+    CB.stat("cp-lb-o-c", CB.num(r.F[2][NF - 1], 1) + " 주"); CB.stat("cp-lb-o-i", CB.num(r.idle[1], 1) + " · " + CB.num(r.idle[2], 1));
+  }
+  draw();
+})();
+
+/* ---------- 3. 선후행 관계 ---------- */
+(function () {
+  const gt = CB.seg("cp-rl-t", draw), gl = CB.range("cp-rl-l", (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) + " 주", draw);
+  const ga = CB.range("cp-rl-a", (v) => v + " 주", draw), gb = CB.range("cp-rl-b", (v) => v + " 주", draw);
+  function calc() {
+    const type = gt(), l = gl(), dA = ga(), dB = gb();
+    let raw = type === "FS" ? dA + l : type === "SS" ? l : type === "FF" ? dA + l - dB : l - dB, ES;
+    if (type === "SF") ES = Math.max(0, raw);
+    else ES = CB.pm.cpm([{ id: "i", d: dA }, { id: "j", d: dB, pred: [{ id: "i", type, lag: l }] }]).acts.j.ES;
+    const EF = ES + dB, T = Math.max(dA, EF), ov = Math.max(0, Math.min(dA, EF) - Math.max(0, ES));
+    return { type, l, dA, dB, ES, EF, T, ov, start0: raw < 0 };
+  }
+  const cv = CB.canvas("#cp-cv-rel", (ctx, W, H) => {
+    const P = CB.palette(), r = calc(), Tm = Math.max(16, Math.ceil((r.T + 2) / 4) * 4), x0 = 40, w = W - x0 - 18, X = (t) => x0 + (t / Tm) * w;
+    const yi = 50, yj = 150, bh = 30;
+    ctx.save(); ctx.strokeStyle = P.grid;
+    const st = Tm > 24 ? 4 : 2;
+    for (let t = 0; t <= Tm; t += st) { ctx.beginPath(); ctx.moveTo(X(t), 30); ctx.lineTo(X(t), H - 40); ctx.stroke(); CPX.text(ctx, String(t), X(t), H - 28, P.dim, { size: 10.5, bold: false }); }
+    ctx.restore(); CPX.text(ctx, "주", X(Tm), H - 12, P.dim, { size: 10.5, bold: false, align: "right" });
+    ctx.fillStyle = P.accent; ctx.fillRect(X(0), yi, X(r.dA) - X(0), bh); CPX.text(ctx, `i  ${r.dA}주`, (X(0) + X(r.dA)) / 2, yi + bh / 2, "#fff", { size: 12, halo: false });
+    ctx.fillStyle = P.accent2; ctx.fillRect(X(r.ES), yj, X(r.EF) - X(r.ES), bh); CPX.text(ctx, `j  ${r.dB}주`, (X(r.ES) + X(r.EF)) / 2, yj + bh / 2, "#fff", { size: 12, halo: false });
+    const ta = r.type[0] === "F" ? r.dA : 0, tb = r.type[1] === "S" ? r.ES : r.EF;
+    const xa = X(ta), xb = X(tb), ym = (yi + bh + yj) / 2;
+    ctx.save(); ctx.strokeStyle = P.text; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(xa, yi + bh); ctx.lineTo(xa, ym); ctx.lineTo(xb, ym); ctx.lineTo(xb, yj - 2); ctx.stroke(); ctx.restore();
+    CPX.arrow(ctx, xb, yj - 1, Math.PI / 2, P.text);
+    [xa, xb].forEach((x) => { ctx.fillStyle = P.text; ctx.beginPath(); ctx.arc(x, x === xa ? yi + bh : yj, 3, 0, Math.PI * 2); ctx.fill(); });
+    CPX.text(ctx, `${r.type} ${r.l >= 0 ? "+" : "−"}${Math.abs(r.l)}` + (r.start0 ? "  (공사 시작 0에서 멈춤)" : ""), Math.max(80, Math.min(W - 80, (xa + xb) / 2)), ym - 11, P.accent, { size: 11.5 });
+    CPX.text(ctx, `ES ${r.ES} · EF ${r.EF}`, Math.min(X(r.EF) + 6, W - 90), yj + bh + 16, P.accent2, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 240, maxHeight: 320 });
+  function draw() {
+    cv.redraw(); const r = calc();
+    CB.stat("cp-rl-o-j", r.ES + " / " + r.EF + " 주"); CB.stat("cp-rl-o-t", r.T + " 주"); CB.stat("cp-rl-o-o", r.ov + " 주");
+    CB.stat("cp-rl-o-k", r.start0 ? "공사 시작(0)" : { FS: "i 종료 → j 착수", SS: "i 착수 → j 착수", FF: "i 종료 → j 종료", SF: "i 착수 → j 종료" }[r.type]);
+  }
+  draw();
+})();
+
+/* ---------- 예제 네트워크 ---------- */
+const CP_EX = [
+  { id: "a", name: "터파기", d: 3, pred: [] }, { id: "b", name: "기초", d: 4, pred: ["a"] }, { id: "c", name: "배관 매설", d: 2, pred: ["a"] },
+  { id: "d", name: "골조", d: 6, pred: ["b"] }, { id: "e", name: "지붕", d: 3, pred: ["d"] }, { id: "f", name: "설비", d: 5, pred: ["c", "d"] },
+  { id: "g", name: "마감", d: 4, pred: ["e", "f"] }, { id: "h", name: "외부 포장", d: 2, pred: ["e"] },
+];
+/** 주공정을 실제로 구속하는 관계인지(빨강 화살표) */
+function cpDriving(R, acts, pid, sid, rel) {
+  const A = R.acts[pid], B = R.acts[sid]; if (!A || !B || !A.critical || !B.critical) return false;
+  if (rel.type === "SS") return Math.abs(B.ES - (A.ES + rel.lag)) < 1e-9;
+  if (rel.type === "FF") return Math.abs(B.EF - (A.EF + rel.lag)) < 1e-9;
+  return Math.abs(B.ES - (A.EF + rel.lag)) < 1e-9;
+}
+
+/* ---------- 4. 전진·후진 계산 애니메이션 ---------- */
+(function () {
+  let acts, R, steps, k = 0, unit = "일", acc = 0, playing = false;
+  function build(net) {
+    acts = net === "b10" ? CPX.clone(CB.pm.B10) : CPX.clone(CP_EX); unit = net === "b10" ? "주" : "일";
+    R = CB.pm.cpm(acts); steps = [{ k: "init" }];
+    R.order.forEach((id) => steps.push({ k: "f", id })); steps.push({ k: "T" });
+    [...R.order].reverse().forEach((id) => steps.push({ k: "b", id })); steps.push({ k: "tf" });
+    k = 0;
+  }
+  build("ex");
+  const byId = (id) => acts.find((a) => a.id === id);
+  const succ = (id) => acts.filter((a) => (a.pred || []).some((p) => CPX.pid(p) === id));
+  function state() {
+    const f = new Set(), b = new Set(); let tf = false, T = false;
+    for (let i = 1; i <= k; i++) { const s = steps[i]; if (s.k === "f") f.add(s.id); if (s.k === "b") b.add(s.id); if (s.k === "T") T = true; if (s.k === "tf") tf = true; }
+    return { f, b, tf, T };
+  }
+  function message() {
+    const s = steps[k], A = R.acts;
+    if (s.k === "init") return "<b>시작</b> — 위상 순서(" + R.order.join(" → ") + ")대로 전진 계산을 합니다. 「다음」을 누르세요.";
+    if (s.k === "T") return `<b>공기</b> T = max(EF) = <b>${CPX.n(R.T)} ${unit}</b>. 이제 끝에서부터 후진 계산을 합니다(끝 활동의 LF = T).`;
+    if (s.k === "tf") return `<b>여유</b> TF = LS − ES. TF = 0인 활동: <b style="color:var(--bad)">${R.critical.join("–")}</b> → 주공정. ` + acts.filter((a) => !A[a.id].critical).map((a) => `${a.id} TF ${CPX.n(A[a.id].TF)}·FF ${CPX.n(A[a.id].FF)}`).join(", ");
+    const a = byId(s.id), x = A[s.id];
+    if (s.k === "f") {
+      const ps = (a.pred || []).map(CPX.pid);
+      const es = ps.length === 0 ? "선행 없음 → ES = 0" : ps.length === 1 ? `ES = ${ps[0]}의 EF = ${CPX.n(x.ES)}` : `합류점: ES = max(${ps.map((p) => `${p} ${CPX.n(A[p].EF)}`).join(", ")}) = <b>${CPX.n(x.ES)}</b>`;
+      return `<b>전진 ${s.id}</b> (${a.name}) — ${es}, EF = ${CPX.n(x.ES)} + ${CPX.n(a.d)} = <b>${CPX.n(x.EF)}</b>`;
+    }
+    const ss = succ(s.id).map((b) => b.id);
+    const lf = ss.length === 0 ? `후행 없음 → LF = T = ${CPX.n(R.T)}` : ss.length === 1 ? `LF = ${ss[0]}의 LS = ${CPX.n(x.LF)}` : `분기점: LF = min(${ss.map((q) => `${q} ${CPX.n(A[q].LS)}`).join(", ")}) = <b>${CPX.n(x.LF)}</b>`;
+    return `<b>후진 ${s.id}</b> (${a.name}) — ${lf}, LS = ${CPX.n(x.LF)} − ${CPX.n(a.d)} = <b>${CPX.n(x.LS)}</b>`;
+  }
+  const cv = CB.canvas("#cp-cv-pass", (ctx, W) => {
+    const P = CB.palette(), L = CPX.layout(acts, R.order, W), st = state(), cur = steps[k].id;
+    CPX.aon(ctx, L, acts, {
+      hl: cur,
+      vals: (id) => { const x = R.acts[id]; return { ES: st.f.has(id) ? x.ES : null, EF: st.f.has(id) ? x.EF : null, LS: st.b.has(id) ? x.LS : null, LF: st.b.has(id) ? x.LF : null, TF: st.tf ? x.TF : null }; },
+      color: (id) => (st.tf ? (R.acts[id].critical ? P.bad : P.accent2) : P.dim),
+      edgeColor: (p, s, rel) => (st.tf && cpDriving(R, acts, p, s, rel) ? P.bad : cur && (p === cur || s === cur) ? P.accent : P.faint),
+    });
+  }, { aspect: (W) => CPX.layout(acts, R.order, W).H / W });
+  function show() {
+    cv.redraw();
+    const el = document.getElementById("cp-ps-msg"); el.innerHTML = message();
+    const s = steps[k];
+    CB.stat("cp-ps-o-s", `${k} / ${steps.length - 1}`);
+    CB.stat("cp-ps-o-p", s.k === "f" ? "전진(ES·EF)" : s.k === "b" ? "후진(LS·LF)" : s.k === "T" ? "공기" : s.k === "tf" ? "여유·주공정" : "—");
+    CB.stat("cp-ps-o-t", k >= steps.findIndex((q) => q.k === "T") ? CPX.n(R.T) + " " + unit : "—");
+    CB.stat("cp-ps-o-c", s.k === "tf" ? R.critical.join("–") : "—");
+  }
+  const go = (n) => { k = CB.clamp(n, 0, steps.length - 1); show(); };
+  CB.seg("cp-ps-net", (v) => { build(v); cv.resize(); show(); });
+  document.getElementById("cp-ps-first").addEventListener("click", () => go(0));
+  document.getElementById("cp-ps-prev").addEventListener("click", () => go(k - 1));
+  document.getElementById("cp-ps-next").addEventListener("click", () => go(k + 1));
+  document.getElementById("cp-ps-last").addEventListener("click", () => go(steps.length - 1));
+  const pb = CB.playButton("cp-ps-play", () => { playing = true; if (k >= steps.length - 1) go(0); }, () => (playing = false));
+  CB.loop(document.getElementById("cp-cv-pass"), (dt) => {
+    if (!playing) return; acc += dt; if (acc < 0.9) return; acc = 0;
+    if (k >= steps.length - 1) { playing = false; pb.set(false); return; }
+    go(k + 1);
+  });
+  show();
+})();
+
+/* ---------- 5. 여유 시간 이해 ---------- */
+(function () {
+  const ga = CB.seg("cp-fl-a", draw), gs = CB.range("cp-fl-s", (v) => v + " 주", draw), gx = CB.range("cp-fl-x", (v) => v + " 주", draw);
+  const R0 = CB.pm.cpm(CB.pm.B10);
+  function calc() {
+    const id = ga(), s = gs(), x = gx();
+    const acts = CPX.clone(CB.pm.B10).map((a) => a.id !== id ? a : { ...a, d: a.d + x, pred: a.pred.map((p) => ({ id: CPX.pid(p), type: "FS", lag: s })) });
+    const R = CB.pm.cpm(acts), moved = acts.filter((a) => a.id !== id && R.acts[a.id].ES > R0.acts[a.id].ES + 1e-9).map((a) => a.id);
+    return { id, s, x, acts, R, moved };
+  }
+  const cv = CB.canvas("#cp-cv-float", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), lw = W < 480 ? 30 : 118, Tm = Math.max(100, Math.ceil((c.R.T + 4) / 10) * 10);
+    const rows = c.acts.map((a) => {
+      const x = c.R.acts[a.id], x0 = R0.acts[a.id], ch = a.id === c.id || c.moved.includes(a.id);
+      return { label: lw < 50 ? a.id : a.id + " " + a.name, crit: x.critical, tf: x.TF, fc: [x.ES, x.EF], base: ch ? [x0.ES, x0.EF] : null, hl: ch };
+    });
+    CPX.gantt(ctx, { x: 6, y: 22, w: W - 12, h: H - 22 - 34 }, rows, Tm, { lw, vlines: [{ x: 93, color: P.faint, dash: [4, 4], width: 1.2, label: "기준 93" }, { x: c.R.T, color: c.R.T > 93 ? P.bad : P.ok, width: 1.6, label: c.R.T > 93 ? `공기 ${c.R.T}` : "" }] });
+  }, { aspect: (W) => 400 / W, minHeight: 380, maxHeight: 420 });
+  function draw() {
+    cv.redraw(); const c = calc(), x0 = R0.acts[c.id], u = c.s + c.x, dT = c.R.T - 93, el = document.getElementById("cp-fl-msg");
+    CB.stat("cp-fl-o-f", CPX.n(x0.TF) + " / " + CPX.n(x0.FF) + " 주"); CB.stat("cp-fl-o-u", u + " 주");
+    CB.stat("cp-fl-o-t", c.R.T + " 주" + (dT > 0 ? ` (+${dT})` : "")); CB.stat("cp-fl-o-p", c.moved.length ? c.moved.join(", ") : "없음");
+    if (u === 0) { el.className = "cp-msg"; el.innerHTML = `${c.id}의 여유: 전체 ${CPX.n(x0.TF)}주, 자유 ${CPX.n(x0.FF)}주. 슬라이더로 늦춰 보세요.`; }
+    else if (u <= x0.FF + 1e-9) { el.className = "cp-msg ok"; el.innerHTML = `<b>자유 여유 안</b> — ${u}주 ≤ FF ${CPX.n(x0.FF)}주: 어느 후속 활동도 밀리지 않습니다. 남은 자유 여유 ${CPX.n(x0.FF - u)}주.`; }
+    else if (u <= x0.TF + 1e-9) { el.className = "cp-msg warn"; el.innerHTML = `자유 여유 초과, 전체 여유 안 — 후속 ${c.moved.join(", ")}이(가) 밀리지만 공기는 93주 그대로. 남은 전체 여유 ${CPX.n(x0.TF - u)}주(같은 경로가 함께 씀).`; }
+    else { el.className = "cp-msg bad"; el.innerHTML = `전체 여유 초과 — ${u}주 &gt; TF ${CPX.n(x0.TF)}주: 공기 ${c.R.T}주(+${dT}). 주공정: ${c.R.critical.join("–")}`; }
+  }
+  draw();
+})();
+
+/* ---------- 6. 네트워크 편집기 ---------- */
+(function () {
+  const box = document.getElementById("cp-ed-rows"), msg = document.getElementById("cp-ed-msg");
+  let rows = [], R = null, acts = [], bad = new Set(), warns = [];
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const fromActs = (list) => list.map((a) => ({ id: a.id, name: a.name, d: a.d, p: (a.pred || []).map((p) => { const r = CPX.rel(p); return r.id + (r.type !== "FS" ? " " + r.type : "") + (r.lag ? (r.lag > 0 ? "+" : "-") + Math.abs(r.lag) : ""); }).join(", ") }));
+  function nextId() {
+    const used = new Set(rows.map((r) => r.id));
+    for (let i = 0; i < 26; i++) { const c = String.fromCharCode(65 + i); if (!used.has(c)) return c; }
+    for (let i = 1; ; i++) if (!used.has("N" + i)) return "N" + i;
+  }
+  function parse(str, self, ids) {
+    const out = [], errs = [];
+    String(str).split(/[,，;]/).map((t) => t.trim()).filter(Boolean).forEach((tok) => {
+      const m = tok.match(/^([A-Za-z0-9가-힣]+)\s*(FS|SS|FF|SF)?\s*([+-]\s*\d+(?:\.\d+)?)?$/i);
+      if (!m) { errs.push(`"${tok}" 형식 오류`); return; }
+      const id = ids.find((x) => x.toLowerCase() === m[1].toLowerCase()), type = (m[2] || "FS").toUpperCase(), lag = m[3] ? Number(m[3].replace(/\s/g, "")) : 0;
+      if (!id) { errs.push(`${self}: 없는 활동 "${m[1]}"`); return; }
+      if (type === "SF") { errs.push(`${self}: SF는 지원하지 않음`); return; }
+      out.push(type === "FS" && !lag ? id : { id, type, lag });
+    });
+    return { out, errs };
+  }
+  function compute() {
+    const ids = rows.map((r) => r.id); warns = [];
+    acts = rows.map((r) => {
+      let d = Number(r.d); if (!isFinite(d) || d < 0) d = 0; d = Math.min(d, 999);
+      const p = parse(r.p, r.id, ids); warns.push(...p.errs); r.err = p.errs.length > 0;
+      return { id: r.id, name: r.name, d, pred: p.out };
+    });
+    R = acts.length ? CB.pm.cpm(acts) : null; bad = new Set();
+    if (R && !R.ok) {
+      const un = acts.filter((a) => !R.order.includes(a.id)).map((a) => a.id), set = new Set(un);
+      let changed = true; // 순환 밖의 하류 활동을 벗겨 낸다
+      while (changed) { changed = false; [...set].forEach((id) => { const hasSucc = acts.some((b) => set.has(b.id) && b.pred.some((p) => CPX.pid(p) === id)); if (!hasSucc) { set.delete(id); changed = true; } }); }
+      bad = set;
+    }
+  }
+  function renderRows() {
+    box.innerHTML = `<div class="cp-ed-row cp-ed-head"><span>ID</span><span>활동 이름</span><span>기간</span><span class="h-p">선행 (예: A, B SS+2)</span><span></span></div>` +
+      rows.map((r, i) => `<div class="cp-ed-row"><span class="cp-ed-id" data-id="${esc(r.id)}">${esc(r.id)}</span><input class="cp-ed-n" data-i="${i}" data-f="name" value="${esc(r.name)}" aria-label="${esc(r.id)} 이름"><input class="cp-ed-d" type="number" min="0" max="999" step="1" data-i="${i}" data-f="d" value="${esc(r.d)}" aria-label="${esc(r.id)} 기간"><input class="cp-ed-p" data-i="${i}" data-f="p" value="${esc(r.p)}" placeholder="선행 없음" aria-label="${esc(r.id)} 선행 활동"><button class="cp-ed-del" data-i="${i}" aria-label="${esc(r.id)} 삭제">×</button></div>`).join("");
+    document.getElementById("cp-ed-add").disabled = rows.length >= 30;
+  }
+  const cv = CB.canvas("#cp-cv-net", (ctx, W, H) => {
+    const P = CB.palette();
+    if (!acts.length) { CPX.text(ctx, "활동이 없습니다. 「+ 활동 추가」를 누르세요.", W / 2, H / 2, P.dim, { size: 13, mono: false }); return; }
+    const L = CPX.layout(acts, R.order, W);
+    CPX.aon(ctx, L, acts, {
+      vals: (id) => (R.ok ? R.acts[id] : {}),
+      color: (id) => (bad.has(id) ? P.warn : R.ok ? (R.acts[id].critical ? P.bad : P.accent2) : P.faint),
+      edgeColor: (p, s, rel) => (!R.ok ? (bad.has(p) && bad.has(s) ? P.warn : P.faint) : cpDriving(R, acts, p, s, rel) ? P.bad : P.faint),
+    });
+  }, { aspect: (W) => Math.max(180, acts.length ? CPX.layout(acts, R ? R.order : [], W).H : 180) / W });
+  function refresh(resize = true) {
+    compute();
+    box.querySelectorAll(".cp-ed-p").forEach((el) => el.classList.toggle("cp-bad", !!(rows[+el.dataset.i] && rows[+el.dataset.i].err)));
+    box.querySelectorAll(".cp-ed-id").forEach((el) => el.classList.toggle("cp-crit", !!(R && R.ok && R.acts[el.dataset.id] && R.acts[el.dataset.id].critical)));
+    if (resize) cv.resize(); else cv.redraw();
+    if (!R) { msg.className = "cp-msg"; msg.textContent = "활동을 추가하세요."; ["t", "c", "n", "f"].forEach((k) => CB.stat("cp-ed-o-" + k, "—")); return; }
+    const nRel = acts.reduce((s, a) => s + a.pred.length, 0);
+    CB.stat("cp-ed-o-n", acts.length + " / " + nRel);
+    if (!R.ok) {
+      const down = acts.filter((a) => !R.order.includes(a.id) && !bad.has(a.id)).map((a) => a.id);
+      msg.className = "cp-msg bad";
+      msg.innerHTML = `순환이 있어 계산할 수 없습니다: <b>${[...bad].join(" → ")}</b>가 서로를 기다립니다(노랑).` + (down.length ? ` 그 뒤에 묶인 활동: ${down.join(", ")}.` : "") + " 선행 관계 하나를 지우세요." + (warns.length ? "<br>" + warns.join(" · ") : "");
+      ["t", "c", "f"].forEach((k) => CB.stat("cp-ed-o-" + k, "—")); return;
+    }
+    const big = acts.filter((a) => !R.acts[a.id].critical).sort((a, b) => R.acts[b.id].TF - R.acts[a.id].TF)[0];
+    CB.stat("cp-ed-o-t", CPX.n(R.T)); CB.stat("cp-ed-o-c", R.critical.join("–") || "—");
+    CB.stat("cp-ed-o-f", big ? `${big.id} (TF ${CPX.n(R.acts[big.id].TF)})` : "모두 주공정");
+    msg.className = warns.length ? "cp-msg warn" : "cp-msg ok";
+    msg.innerHTML = warns.length ? "무시한 입력: " + warns.join(" · ") : `계산 완료: 공기 ${CPX.n(R.T)}, 주공정 ${R.critical.join("–")}. 빨강 화살표는 주공정을 구속하는 관계입니다.`;
+  }
+  box.addEventListener("input", (e) => { const t = e.target, i = +t.dataset.i; if (!t.dataset.f || !rows[i]) return; rows[i][t.dataset.f] = t.value; refresh(); });
+  box.addEventListener("click", (e) => { const t = e.target.closest(".cp-ed-del"); if (!t) return; rows.splice(+t.dataset.i, 1); renderRows(); refresh(); });
+  const load = (list) => { rows = list; renderRows(); refresh(); };
+  document.getElementById("cp-ed-add").addEventListener("click", () => { if (rows.length >= 30) return; const last = rows[rows.length - 1]; rows.push({ id: nextId(), name: "새 활동", d: 5, p: last ? last.id : "" }); renderRows(); refresh(); });
+  document.getElementById("cp-ed-ex").addEventListener("click", () => load(fromActs(CP_EX)));
+  document.getElementById("cp-ed-b10").addEventListener("click", () => load(fromActs(CB.pm.B10)));
+  document.getElementById("cp-ed-ss").addEventListener("click", () => { const l = fromActs(CB.pm.B10); l.find((r) => r.id === "H").p = "G1 SS+9, G2 FF+2"; load(l); });
+  document.getElementById("cp-ed-cyc").addEventListener("click", () => {
+    if (rows.length < 2) rows = fromActs(CB.pm.B10);
+    const first = rows[0], last = rows[rows.length - 1]; if (!first.p.split(",").map((s) => s.trim()).includes(last.id)) first.p = first.p ? first.p + ", " + last.id : last.id;
+    renderRows(); refresh();
+  });
+  document.getElementById("cp-ed-clr").addEventListener("click", () => load([{ id: "A", name: "새 활동", d: 5, p: "" }]));
+  load(fromActs(CP_EX));
+})();
+
+/* ---------- 7. P-B10 간트 ---------- */
+(function () {
+  const g = {}; ["g2", "h", "i", "c", "d"].forEach((k) => (g[k] = CB.range("cp-gt-" + k, (v) => v + " 주", draw)));
+  const gb = CB.seg("cp-gt-b", draw);
+  function calc() {
+    const map = { G2: g.g2(), H: g.h(), I: g.i(), C: g.c(), D: g.d() };
+    const acts = CPX.clone(CB.pm.B10).map((a) => (map[a.id] != null ? { ...a, d: map[a.id] } : a));
+    return { acts, R: CB.pm.cpm(acts) };
+  }
+  const cv = CB.canvas("#cp-cv-gantt", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), lw = W < 480 ? 30 : 118, Tm = Math.max(100, Math.ceil((c.R.T + 4) / 10) * 10), ls = gb() === "LS";
+    const rows = c.acts.map((a) => { const x = c.R.acts[a.id]; return { label: lw < 50 ? a.id : a.id + " " + a.name, crit: x.critical, tf: x.TF, tfLeft: ls, fc: ls ? [x.LS, x.LF] : [x.ES, x.EF] }; });
+    CPX.gantt(ctx, { x: 6, y: 22, w: W - 12, h: H - 22 - 34 }, rows, Tm, { lw, vlines: [{ x: c.R.T, color: P.bad, width: 1.6, label: `T = ${c.R.T}주` }] });
+  }, { aspect: (W) => 400 / W, minHeight: 380, maxHeight: 420 });
+  function draw() {
+    cv.redraw(); const c = calc(), A = c.R.acts;
+    CB.stat("cp-gt-o-t", c.R.T + " 주"); CB.stat("cp-gt-o-c", c.R.critical.join("–"));
+    CB.stat("cp-gt-o-gh", CPX.n(A.G2.TF) + " · " + CPX.n(A.H.TF)); CB.stat("cp-gt-o-id", CPX.n(A.I.TF) + " · " + CPX.n(A.D.TF));
+  }
+  draw();
+})();
+
+/* ---------- 8. 공정 갱신 ---------- */
+(function () {
+  const gt = CB.range("cp-up-t", (v) => v + " 주", draw), gB = CB.range("cp-up-b", (v) => v + " 주", draw), gD = CB.range("cp-up-d", (v) => v + " 주", draw);
+  const gC = CB.range("cp-up-c", (v) => Math.round(v * 100) + " %", draw), gm = CB.seg("cp-up-m", draw);
+  const base = CB.pm.B10, R0 = CB.pm.cpm(base), PV = CB.pm.spread(base, R0, "cost", "ES"), BAC = base.reduce((s, a) => s + a.cost, 0);
+  function calc() {
+    const t = gt(), method = gm();
+    const actual = CPX.clone(base).map((a) => ({ ...a, d: a.id === "B" ? gB() : a.id === "D" ? gD() : a.id === "C" ? a.d / gC() : a.d }));
+    const ra = CB.pm.cpm(actual), st = {};
+    base.forEach((a) => {
+      const AS = ra.acts[a.id].ES, AF = ra.acts[a.id].EF;
+      if (AF <= t + 1e-9) st[a.id] = { s: "done", AS, AF, pc: 1 };
+      else if (AS < t - 1e-9) { const pc = (t - AS) / (AF - AS); st[a.id] = { s: "prog", AS, pc, RD: method === "plan" ? a.d * (1 - pc) : AF - t }; }
+      else st[a.id] = { s: "ns", pc: 0 };
+    });
+    const acts2 = [{ id: "DD", d: t, pred: [] }].concat(base.map((a) => { const s = st[a.id];
+      if (s.s === "done") return { id: a.id, d: s.AF, pred: [] };
+      if (s.s === "prog") return { id: a.id, d: t + s.RD, pred: [] };
+      return { id: a.id, d: a.d, pred: [...a.pred, "DD"] }; }));
+    const rf = CB.pm.cpm(acts2), ev = base.reduce((s, a) => s + a.cost * st[a.id].pc, 0);
+    return { t, st, rf, ev, pv: PV.cum[Math.min(PV.cum.length - 1, t - 1)] };
+  }
+  const cv = CB.canvas("#cp-cv-upd", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), lw = W < 480 ? 30 : 118, Tm = Math.max(100, Math.ceil((c.rf.T + 4) / 10) * 10);
+    const rows = base.map((a) => {
+      const s = c.st[a.id], x = c.rf.acts[a.id], x0 = R0.acts[a.id], crit = s.s !== "done" && x.critical;
+      const r = { label: lw < 50 ? a.id : a.id + " " + a.name, crit, base: [x0.ES, x0.EF] };
+      if (s.s === "done") r.done = [s.AS, s.AF];
+      else if (s.s === "prog") { r.done = [s.AS, c.t]; r.fc = [c.t, x.EF]; r.tf = x.TF; }
+      else { r.fc = [x.ES, x.EF]; r.tf = x.TF; }
+      return r;
+    });
+    CPX.gantt(ctx, { x: 6, y: 22, w: W - 12, h: H - 22 - 34 }, rows, Tm, { lw, vlines: [{ x: c.t, color: P.accent, width: 2.2, label: `데이터 날짜 ${c.t}` }, { x: c.rf.T, color: c.rf.T > 93 + 1e-9 ? P.bad : P.ok, width: 1.4, dash: [4, 3] }] });
+  }, { aspect: (W) => 400 / W, minHeight: 380, maxHeight: 420 });
+  function draw() {
+    cv.redraw(); const c = calc(), dv = c.rf.T - 93;
+    CB.stat("cp-up-o-t", CB.num(c.rf.T, 1) + " 주"); CB.stat("cp-up-o-v", (dv > 0.05 ? "+" : dv < -0.05 ? "−" : "±") + CB.num(Math.abs(dv), 1) + " 주");
+    CB.stat("cp-up-o-p", CB.num((c.pv / BAC) * 100, 1) + " % / " + CB.num((c.ev / BAC) * 100, 1) + " %");
+    const crit = c.rf.critical.filter((id) => id !== "DD" && c.st[id].s !== "done");
+    CB.stat("cp-up-o-c", crit.join("–") || "—");
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

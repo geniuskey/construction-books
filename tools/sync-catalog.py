@@ -52,6 +52,14 @@ LOCAL_BOOKS = [{
     'status': 'published', 'level': '토목 3학년', 'stage': 'civil', 'slug': 'civil', 'legacyUrl': None,
     'color': '#2b8a3e', 'colorDark': '#8ce99a', 'motif': 'bridge',
     'topics': ['교량 하중', '거더·아치·케이블', '하부 구조', '터널·지보', 'TBM', '교통·선형', '포장·배수', '철도·하천'],
+}, {
+    'id': 'sitebook', 'code': 'SIT', 'title': 'SiteBook', 'subtitle': '시공과 건설관리 교과서',
+    'headline': '도면이 건물이 되기까지',
+    'description': '발주와 계약, 공사 계획과 가설, 토공·기초·골조·철골·마감 시공, CPM 공정표와 PERT 공기 위험, 자원과 공기 단축, 적산과 원가, EVM, 품질·안전·생산성까지 — 공정을 짜고 원가를 따라가 보며 기준 공사 P-B10의 숫자로 익히는 시공·건설관리 교과서.',
+    'url': 'https://construction.euiyun.com/site/', 'repo': 'https://github.com/geniuskey/construction-books', 'field': 'construction',
+    'status': 'published', 'level': '건축·토목 4학년·현장 신입', 'stage': 'delivery', 'slug': 'site', 'legacyUrl': None,
+    'color': '#e8590c', 'colorDark': '#ffa94d', 'motif': 'crane',
+    'topics': ['계약·가설', '공종별 시공', 'CPM·PERT', '자원·공기 단축', '적산·원가', 'EVM', '품질·안전', '생산성'],
 }]
 books = LOCAL_BOOKS
 catalog = []
