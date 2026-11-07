@@ -111,28 +111,30 @@ window.CONSTRUCTION_BOOKS = [
   },
   {
     "id": "concretebook",
-    "code": "RCS",
     "title": "ConcreteBook",
     "subtitle": "철근콘크리트 구조 교과서",
     "headline": "인장은 철근이, 압축은 콘크리트가",
-    "description": "등가 응력 블록과 휨 설계, 철근비와 연성 파괴, 전단과 비틀림, 균열과 처짐, 기둥의 P-M 상관도, 슬래브와 기초까지 단면을 직접 설계해 보는 철근콘크리트 교과서.",
+    "description": "강도 설계와 등가 응력 블록, 단철근·복철근·T형 보의 휨, 전단과 비틀림, 정착과 이음, 처짐과 균열, 슬래브, 기둥 P–M 상관도와 장주, 내진 상세, 기초, 스트럿–타이 모델, 프리스트레스트 콘크리트까지 — 단면을 그리고 철근을 놓아 보며 기준 부재 G1·C1을 직접 설계하는 철근콘크리트 교과서.",
     "stage": "design",
-    "status": "planned",
+    "status": "published",
     "color": "#5c677d",
     "colorDark": "#a9b4c8",
     "topics": [
-      "휨 설계",
-      "철근비·연성",
-      "전단",
-      "균열·처짐",
-      "P-M 상관도"
+      "응력 블록·휨",
+      "전단·비틀림",
+      "정착·처짐·균열",
+      "슬래브",
+      "P–M 상관도",
+      "내진 상세",
+      "기초·STM·PSC"
     ],
     "motif": "rebar",
-    "slug": "concrete",
-    "url": "#",
+    "code": "RCS",
     "legacyUrl": null,
-    "chapters": 0,
-    "simulators": 0
+    "slug": "concrete",
+    "url": "concrete/",
+    "chapters": 17,
+    "simulators": 128
   },
   {
     "id": "civilbook",

@@ -1,0 +1,1272 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>정착과 이음 · ConcreteBook</title>
+<meta name="description" content="철근이 뽑히지 않게. 부착 응력, 기본 정착 길이와 보정 계수, 표준 갈고리, 압축 정착과 다발 철근, G1 모멘트 포락선 위의 절단점, 겹침 이음 A·B급과 기계식 이음을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .dv-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .dv-msg b { color: var(--text); }
+  .dv-msg.ok { color: var(--ok); font-weight: 600; }
+  .dv-msg.bad { color: var(--bad); font-weight: 600; }
+  .dv-msg.warn { color: var(--warn); font-weight: 600; }
+  .dv-tbl td, .dv-tbl th { font-variant-numeric: tabular-nums; }
+  .dv-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .dv-steps { margin: 6px 0 0; }
+  .dv-steps li { margin: 4px 0; }
+  .dv-checks { list-style: none; margin: 0; padding: 10px 18px; border-top: 1px solid var(--border); display: grid; gap: 4px; font-size: 13.5px; }
+  .dv-checks li { padding-left: 22px; position: relative; color: var(--text-dim); overflow-wrap: anywhere; }
+  .dv-checks li::before { content: "•"; position: absolute; left: 6px; font-weight: 700; }
+  .dv-checks li.ok::before { content: "✓"; color: var(--ok); }
+  .dv-checks li.bad::before { content: "✗"; color: var(--bad); }
+  .dv-checks li.na::before { content: "–"; color: var(--text-faint); }
+  .dv-checks li b { color: var(--text); }
+  .dv-sched td, .dv-sched th { font-variant-numeric: tabular-nums; font-size: 13.5px; }
+  #dv-cv-cut, #dv-cv-spl { touch-action: pan-y; cursor: ew-resize; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="concrete"></script>
+</head>
+<body data-chapter="development">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="dv-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="dv-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="dv-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--tension)"/></marker>
+      <marker id="dv-ah-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--compression)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 07</div>
+    <h1 data-no-glossary>정착과 이음</h1>
+    <p class="lead">3장과 4장에서 G1의 하단 4-D25와 상단 6-D25를 골랐습니다. 그 계산은 모두 "철근이 그 단면에서 항복강도까지 낼 수 있다"는 가정 위에 서 있습니다. 철근 한 가닥이 500 MPa를 내려면 253 kN의 힘이 철근 표면을 따라 콘크리트로 넘어가야 하고, 그러려면 철근이 그 단면 앞뒤로 충분히 <b>묻혀</b> 있어야 합니다. 이 장은 그 길이, 곧 <b>정착 길이</b>를 부착 응력의 평형에서 유도하고, 기준의 기본 정착 길이와 보정 계수, 표준 갈고리, 압축 철근과 다발 철근의 정착을 계산한 다음, G1의 모멘트 포락선 위에서 철근을 어디서 자르고 어디서 이을지를 결정합니다. 마지막에는 G1 한 경간의 절단·이음 계획과 철근 물량까지 정리합니다.</p>
+    <ul class="objectives">
+      <li>부착 응력 \(u = (d_b/4)\,df_s/dx\)를 유도하고, 정착 부착·휨 부착·균열 사이 부착에서 철근 응력과 부착 응력의 분포를 설명한다.</li>
+      <li>기본 정착 길이 \(l_{db} = 0.6\,d_b f_y/(\lambda\sqrt{f_{ck}})\)에 위치·도막·크기·배근 조건 보정 계수를 적용해 인장 정착 길이 \(l_d\)를 구하고, 정밀식과 비교한다.</li>
+      <li>표준 갈고리의 모양과 정착 길이 \(l_{dh}\)를 계산해 기둥 안에서 직선 정착과 갈고리 정착 가운데 하나를 고른다.</li>
+      <li>압축 철근의 정착, 다발 철근의 정착 길이 증가와 등가 지름을 계산한다.</li>
+      <li>모멘트 포락선 위에서 이론 절단점, 연장 길이, 정착 길이, 인장 구역 절단 조건을 검토해 실제 절단점을 정하고, 정모멘트 철근의 지점 연장과 부모멘트 철근의 변곡점 연장을 확인한다.</li>
+      <li>겹침 이음의 A급·B급을 판정하고 이음 위치를 고르며, 압축 이음·기계식 이음·용접 이음의 쓰임을 구분한다. G1의 절단·이음 계획과 철근 물량을 정리한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>모멘트도대로 자른 철근, 이음에서 풀린 기둥</b></div>
+      <div class="o-body"><p>휨 설계만 보면 철근은 모멘트가 필요한 만큼만 있으면 됩니다. G1 하단 철근 네 가닥 가운데 두 가닥은 경간 중앙에서만 필요하니, 모멘트도에서 필요 없어지는 점에서 딱 잘라 버리면 철근이 절약됩니다. 그런데 그렇게 자른 철근은 잘린 끝 근처에서 아무 힘도 내지 못합니다. 철근의 힘은 끝에서 0이고, 부착으로 조금씩 쌓여 정착 길이만큼 들어가서야 항복강도에 이르기 때문입니다. 게다가 철근이 갑자기 끊긴 곳에서는 남은 철근의 응력이 튀고 휨–전단 균열이 일찍 생깁니다. 그래서 기준은 절단점을 이론 위치보다 더 뻗게 하고, 인장 구역에서 철근을 자를 때는 전단 여유를 확인하게 합니다.</p>
+        <p>이음도 같습니다. 철근은 보통 12 m 안팎으로 공급되므로 길게 이어지는 보와 층마다 올라가는 기둥 주근은 어딘가에서 이어야 합니다. 지진 피해 조사에서는 기둥 밑동처럼 휨이 가장 큰 곳에 주근 겹침 이음을 몰아 두고 띠철근이 성긴 기둥이, 피복이 떨어진 뒤 이음이 미끄러져 휨강도를 잃은 사례가 거듭 보고되었습니다. 미국 캘리포니아에서 1971년 샌페르난도 지진 뒤 시작된 교각 보강도 기둥의 구속과 밑동 겹침 이음을 주요 대상으로 삼았습니다. 정착과 이음은 "계산된 강도가 실제로 나오게 하는" 상세이고, 그래서 이 장의 길이 계산은 휨 설계만큼 중요합니다.</p>
+        <div class="o-chain"><span>철근 힘 A<sub>b</sub>f<sub>y</sub> · 부착 · 피복·간격</span><i>→</i><span class="tool">l<sub>d</sub> · l<sub>dh</sub> · 절단점 · 이음 등급</span><i>→</i><span>배근도 · 이음 위치 · 철근 물량</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="bond">
+    <h2>부착 응력: 철근 응력이 변하는 곳</h2>
+    <div class="problem"><strong>철근의 힘은 어디서 콘크리트로 넘어가나</strong>
+      <p>G1 경간 중앙에서 하단 철근 한 가닥은 휨 강도 상태에서 약 253 kN(506.7 mm² × 500 MPa)을 받습니다. 지점 쪽으로 가면 모멘트가 줄어 철근 힘도 줄어듭니다. 그 차이는 어디로 갔을까요? 철근 표면을 따라 콘크리트로 넘어갔습니다. 넘어가는 힘의 세기가 부착 응력이고, 그 크기는 철근 응력이 얼마나 빨리 변하는지로 정해집니다.</p></div>
+    <p>철근과 콘크리트 사이의 힘 전달, 곧 <span class="term">부착</span><span class="en">(bond)</span>의 메커니즘(화학적 접착, 마찰, 마디의 기계적 맞물림)과 뽑힘 시험은 <a href="../../materials/chapters/rebar.html#bond">MaterialsBook 11장</a>에서 다루었습니다. 여기서는 설계에 필요한 한 가지, 철근 토막의 평형에서 출발합니다.</p>
+    <div class="callout def"><strong>정의 7.1 (부착 응력)</strong> 지름 \(d_b\), 단면적 \(A_b = \pi d_b^2/4\)인 철근의 길이 \(dx\) 토막에서 철근 응력이 \(df_s\)만큼 변하면, 그 차이는 둘레 \(\pi d_b\)에 작용하는 <span class="term">부착 응력</span><span class="en">(bond stress)</span> \(u\)가 받는다.
+      <div class="formula">$$u\,\pi d_b\,dx = A_b\,df_s \quad\Longrightarrow\quad u = \frac{d_b}{4}\,\frac{df_s}{dx}$$<div class="where">부착 응력은 철근 응력이 변하는 곳에서만 생긴다. 철근 응력이 일정한 구간(순수 휨 구간의 균열 단면 사이 평균)에는 평균 부착 응력이 없고, 응력이 빨리 변할수록(굵은 철근일수록 같은 \(df_s/dx\)에 대해) 부착 응력이 커진다.</div></div></div>
+    <p>보에서 철근 응력이 변하는 이유는 세 가지이고, 각각 부착 응력의 모양이 다릅니다(그림 7-1).</p>
+    <ul>
+      <li><b>정착 부착(anchorage bond).</b> 철근 끝에서 응력은 0이다. 위험 단면에서 \(f_s\)를 내려면 끝까지의 묻힘 길이 동안 부착으로 힘을 쌓아야 한다. 정착 길이와 이음 길이는 이 부착의 문제다.</li>
+      <li><b><span class="term">휨 부착</span><span class="en">(flexural bond)</span>.</b> 모멘트가 변하면 철근 힘 \(T = M/jd\)도 변한다. \(dT/dx = V/jd\)이므로 평균 부착 응력은 \(u = V/(\Sigma_0\,jd)\)(\(\Sigma_0\): 철근 둘레의 합)다. 옛 허용 응력 설계는 이 값을 직접 검토했지만, 균열 뒤 실제 부착 응력은 균열 위치에 따라 크게 달라 지금 기준은 정착 길이로 바꾸어 검토한다.</li>
+      <li><b>균열 사이 부착.</b> 균열 단면에서는 철근이 인장을 혼자 받고, 균열 사이에서는 부착으로 콘크리트가 일부를 나눠 받아 철근 응력이 줄어든다(인장 강성 효과). 부착 응력은 균열 양쪽에서 방향이 바뀐다. 균열 간격과 폭(8장)이 이 부착으로 정해진다.</li>
+    </ul>
+    <figure class="diagram" id="fig-dv-bond">
+      <svg viewBox="0 0 860 330" role="img" aria-label="정착 구간과 균열 사이에서 철근 응력과 부착 응력의 분포">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <text x="30" y="36" class="t" style="font-weight:700">(a) 정착 부착: 끝에서 0 → 위험 단면에서 f<tspan baseline-shift="sub" font-size="9">s</tspan></text>
+        <g transform="translate(40,52)">
+          <rect x="0" y="0" width="350" height="44" rx="3" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <rect x="0" y="17" width="330" height="10" rx="5" style="fill:var(--tension);opacity:.85"/>
+          <line x1="350" y1="22" x2="395" y2="22" style="stroke:var(--tension);stroke-width:10"/>
+          <line x1="396" y1="22" x2="380" y2="22" style="stroke:var(--accent-2);stroke-width:2.5" marker-end="url(#dv-ah-ld)"/>
+          <text x="398" y="18" class="t-mono" style="fill:var(--accent-2)">T</text>
+          <line x1="350" y1="-6" x2="350" y2="54" style="stroke:var(--warn);stroke-dasharray:4 3"/>
+          <text x="352" y="66" class="t-mono" style="fill:var(--warn)">위험 단면</text>
+          <line x1="0" y1="62" x2="350" y2="62" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/>
+          <text x="175" y="76" text-anchor="middle" class="t-mono">묻힘 길이 l</text>
+          <g transform="translate(0,96)">
+            <line x1="0" y1="70" x2="350" y2="70" class="s-axis"/><line x1="0" y1="0" x2="0" y2="70" class="s-axis"/>
+            <path d="M0 70 C 120 66, 240 40, 350 6" style="fill:none;stroke:var(--tension);stroke-width:2.5"/>
+            <line x1="0" y1="70" x2="350" y2="6" style="fill:none;stroke:var(--tension);stroke-width:1.5;stroke-dasharray:5 4"/>
+            <text x="8" y="12" class="t-mono" style="fill:var(--tension)">철근 응력 f<tspan baseline-shift="sub" font-size="8">s</tspan>(x)</text>
+            <text x="200" y="58" class="t-mono">점선: u가 고르다고 본 설계 가정</text>
+          </g>
+          <g transform="translate(0,180)">
+            <line x1="0" y1="56" x2="350" y2="56" class="s-axis"/><line x1="0" y1="0" x2="0" y2="56" class="s-axis"/>
+            <path d="M0 52 C 140 50, 260 36, 350 4" style="fill:none;stroke:var(--accent);stroke-width:2.5"/>
+            <line x1="0" y1="30" x2="350" y2="30" style="stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 4"/>
+            <text x="8" y="12" class="t-mono" style="fill:var(--accent)">부착 응력 u = (d<tspan baseline-shift="sub" font-size="8">b</tspan>/4) df<tspan baseline-shift="sub" font-size="8">s</tspan>/dx</text>
+            <text x="250" y="72" class="t-mono">하중 쪽 끝에 몰린다</text>
+          </g>
+        </g>
+        <line x1="440" y1="30" x2="440" y2="300" style="stroke:var(--border)"/>
+        <text x="460" y="36" class="t" style="font-weight:700">(b) 균열 사이: 균열에서 최대, 사이에서 감소</text>
+        <g transform="translate(470,52)">
+          <rect x="0" y="0" width="350" height="44" rx="3" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <g style="stroke:var(--text-dim);stroke-width:1.6"><line x1="10" y1="0" x2="10" y2="34"/><line x1="125" y1="0" x2="125" y2="34"/><line x1="240" y1="0" x2="240" y2="34"/><line x1="340" y1="0" x2="340" y2="34"/></g>
+          <rect x="0" y="28" width="350" height="9" rx="4" style="fill:var(--tension);opacity:.85"/>
+          <text x="125" y="-6" text-anchor="middle" class="t-mono">균열</text>
+          <line x1="10" y1="62" x2="125" y2="62" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/>
+          <text x="68" y="76" text-anchor="middle" class="t-mono">균열 간격 s<tspan baseline-shift="sub" font-size="8">cr</tspan></text>
+          <g transform="translate(0,96)">
+            <line x1="0" y1="70" x2="350" y2="70" class="s-axis"/><line x1="0" y1="0" x2="0" y2="70" class="s-axis"/>
+            <path d="M10 8 Q 67 50 125 8 Q 182 50 240 8 Q 290 46 340 8" style="fill:none;stroke:var(--tension);stroke-width:2.5"/>
+            <line x1="0" y1="20" x2="350" y2="20" style="stroke:var(--tension);stroke-width:1.2;stroke-dasharray:3 3"/>
+            <text x="200" y="64" class="t-mono" style="fill:var(--tension)">f<tspan baseline-shift="sub" font-size="8">s</tspan>(x): 균열에서 M/(A<tspan baseline-shift="sub" font-size="8">s</tspan>jd)</text>
+            <text x="250" y="16" class="t-mono">평균값</text>
+          </g>
+          <g transform="translate(0,180)">
+            <line x1="0" y1="28" x2="350" y2="28" class="s-axis"/><line x1="0" y1="0" x2="0" y2="56" class="s-axis"/>
+            <path d="M10 2 L 67 28 L 125 54 L 125 2 L 182 28 L 240 54 L 240 2 L 290 28 L 340 54" style="fill:none;stroke:var(--accent);stroke-width:2.2"/>
+            <text x="150" y="70" class="t-mono" style="fill:var(--accent)">u: 균열 양쪽에서 방향이 바뀐다(평균 0)</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-1.</b> 부착 응력의 두 모습. (a) 정착: 철근 끝에서 응력 0, 위험 단면에서 \(f_s\). 실제 부착 응력은 하중 쪽 끝에 몰리지만, 설계는 평균 부착 응력이 고르다고 보고(점선) 정착 길이를 정한다. (b) 균열 사이: 균열 단면에서 철근 응력이 가장 크고 사이에서는 콘크리트가 인장을 나눠 받아 줄어든다. 부착 응력은 균열 양쪽에서 부호가 바뀐다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 7.2 (정착의 평형)</strong> 위험 단면에서 철근 응력 \(f_s\)를 내야 하는 철근이 끝까지 길이 \(l\)만큼 묻혀 있고, 그 구간의 평균 부착 응력이 \(\bar u\)라면
+      <div class="formula">$$\bar u\,\pi d_b\,l = \frac{\pi d_b^2}{4} f_s \quad\Longrightarrow\quad l = \frac{d_b f_s}{4\bar u}.$$<div class="where">\(f_s = f_y\)를 내는 데 필요한 길이가 <span class="term">정착 길이</span><span class="en">(development length)</span> \(l_d\)다. 평균 부착 강도는 대략 \(\sqrt{f_{ck}}\)에 비례하므로 \(l_d \propto d_b f_y/\sqrt{f_{ck}}\). 철근 지름이 두 배면 힘은 네 배, 둘레는 두 배라서 길이가 두 배 필요하다.</div></div></div>
+    <p>부착이 무너지는 방식은 두 가지입니다. 철근 둘레를 구속하는 콘크리트가 충분하면 마디 사이 콘크리트가 깎여 철근이 미끄러지는 <span class="term">뽑힘 파괴</span><span class="en">(pull-out failure)</span>가, 피복이나 철근 사이 간격이 얇으면 마디가 비스듬히 누르는 힘의 반지름 성분이 콘크리트를 링처럼 벌려 <span class="term">쪼갬 파괴</span><span class="en">(splitting failure)</span>가 먼저 옵니다. 실제 보에서는 대부분 쪼갬이 지배하므로, 정착 길이는 피복·간격과 이를 가로지르는 횡철근(스터럽)에 민감합니다(다음 절).</p>
+    <div class="sim" id="sim-dv-bond">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>부착 응력 분포: 정착 · 휨 부착 · 균열 사이</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dv-cv-bond" aria-label="철근 응력과 부착 응력의 분포 그래프"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>경우</span><div class="seg" id="dv-bd-mode"><button data-value="anc" class="on">정착</button><button data-value="flex">휨 부착</button><button data-value="crack">균열 사이</button></div></div>
+          <div class="ctrl"><span>호칭</span><div class="seg" id="dv-bd-bar"><button data-value="D16">D16</button><button data-value="D22">D22</button><button data-value="D25" class="on">D25</button><button data-value="D32">D32</button></div></div>
+          <label class="ctrl"><span>묻힘 길이 l <output id="dv-bd-l-out"></output></span><input type="range" id="dv-bd-l" min="100" max="2000" step="10" value="700"></label>
+          <label class="ctrl"><span><i style="font-style:normal">위험 단면 응력 f<sub>s</sub>/f<sub>y</sub></i> <output id="dv-bd-fs-out"></output></span><input type="range" id="dv-bd-fs" min="0.1" max="1" step="0.01" value="1"></label>
+          <label class="ctrl"><span><i style="font-style:normal">순피복 c/d<sub>b</sub></i> <output id="dv-bd-c-out"></output></span><input type="range" id="dv-bd-c" min="0.6" max="4" step="0.1" value="1.6"></label>
+          <label class="ctrl"><span><i style="font-style:normal">균열 간격 s<sub>cr</sub></i> <output id="dv-bd-s-out"></output></span><input type="range" id="dv-bd-s" min="80" max="400" step="10" value="200"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평균 부착 응력 ū</span><span class="v" id="dv-bd-u">—</span></div>
+        <div class="stat"><span class="k">최대 부착 응력</span><span class="v" id="dv-bd-umax">—</span></div>
+        <div class="stat"><span class="k">부착 강도(교육용)</span><span class="v" id="dv-bd-cap">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="dv-bd-ok">—</span></div>
+      </div>
+      <div class="dv-msg" id="dv-bd-msg">—</div>
+      <div class="sim-note">해볼 것: "정착"에서 묻힘 길이를 줄여 평균 부착 응력이 부착 강도를 넘는 길이를 찾으세요 — 그 길이가 이 모델의 정착 길이입니다 · 순피복을 줄이면 쪼갬 강도가 떨어져 필요한 길이가 길어집니다 · "휨 부착"은 G1(V<sub>u</sub> 400 kN, 4-D25)의 u = V/(Σ<sub>0</sub>jd)를 보여 줍니다 · "균열 사이"에서 간격을 넓히면 균열 사이 철근 응력이 더 많이 줄어듭니다(인장 강성) · 모델(교육용, MaterialsBook 11장과 같은 꼴): 뽑힘 강도 2.5√f<sub>ck</sub>, 쪼갬 강도 0.6√f<sub>ck</sub>(c/d<sub>b</sub> + 0.5), 부착 응력 분포는 탄성 해(cosh 형)와 균등 분포를 하중 비율로 섞은 근사. f<sub>ck</sub> 30, SD500.</div>
+    </div>
+    <div class="callout"><strong>예제 7.1 (G1 지점 부근의 휨 부착)</strong> G1 지점에서 \(V_u = 400\) kN, 하단 4-D25, \(d = 634\) mm.
+      <ol class="dv-steps">
+        <li><b>둘레의 합.</b> \(\Sigma_0 = 4\pi \times 25.4 = 319\) mm, \(jd \approx 0.9d = 571\) mm.</li>
+        <li><b>평균 휨 부착 응력.</b> \(u = V/(\Sigma_0\,jd) = 400{,}000/(319 \times 571) = 2.2\) MPa \(= 0.40\sqrt{f_{ck}}\).</li>
+        <li><b>비교.</b> 다음 절의 기본 정착 길이가 함축한 평균 부착 응력은 \(\bar u = d_b f_y/(4 l_{db}) = 0.42\sqrt{f_{ck}} = 2.28\) MPa다. 크기는 비슷하지만 두 검토는 다르다. 휨 부착은 철근이 이어져 있는 곳의 "변하는 힘"이고, 정착은 철근 끝에서 "쌓아야 하는 힘"이다. 균열 단면 근처에서는 국부 부착 응력이 평균보다 훨씬 커지므로, 기준은 평균 휨 부착 대신 모든 점에서 정착 길이를 확보하도록 요구한다(절단점 절).</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="tension-ld">
+    <h2>인장 정착 길이: 기본식과 보정 계수</h2>
+    <div class="problem"><strong>D25 하나를 정착하는 데 몇 mm가 필요한가</strong>
+      <p>원리 7.2에 평균 부착 강도만 넣으면 길이가 나옵니다. 문제는 그 "평균 부착 강도"가 철근 위치(위쪽인가 아래쪽인가), 표면(도막), 지름, 피복과 간격, 감싸는 스터럽에 따라 두세 배까지 달라진다는 것입니다. 기준은 기본 길이 하나에 이 효과들을 보정 계수로 곱합니다.</p></div>
+    <div class="callout def"><strong>원리 7.3 (인장 이형철근의 기본 정착 길이, KDS 14 20 52 형태)</strong> 보통 콘크리트, 이형철근에 대해
+      <div class="formula">$$l_{db} = \frac{0.6\,d_b\,f_y}{\lambda\sqrt{f_{ck}}}, \qquad l_d = l_{db} \times (\text{보정 계수}) \ge 300\ \text{mm}$$<div class="where">\(\lambda\): <span class="term">경량 콘크리트 계수</span><span class="en">(lightweight concrete factor)</span>(보통 1.0, 경량 0.75–0.85 형태). \(\sqrt{f_{ck}}\)는 8.4 MPa 이하로 제한하는 형태다. 원리 7.2와 비교하면 \(0.6 = 1/(4 \times 0.417)\), 곧 평균 부착 강도를 \(\bar u \approx 0.42\sqrt{f_{ck}}\)로 본 것이다. <code>CB.rc.ldb</code>가 이 식이다.</div></div></div>
+    <p><span class="term">기본 정착 길이</span><span class="en">(basic development length)</span>에 곱하는 <span class="term">정착 길이 보정 계수</span><span class="en">(modification factor)</span> 가운데 널리 확인된 것은 다음과 같습니다(값과 적용 조건은 현행 KDS 14 20 52 확인).</p>
+    <div class="table-wrap"><table class="dv-tbl">
+      <thead><tr><th>계수</th><th>조건</th><th>값</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>α (철근 위치)</td><td><span class="term">상부 철근</span><span class="en">(top bar)</span>: 정착 길이 구간 아래에 콘크리트를 300 mm 넘게 한 번에 친 수평 철근</td><td class="hl">1.3</td><td>블리딩 물·공기가 철근 밑에 고여 부착이 약하다</td></tr>
+        <tr><td></td><td>그 밖의 철근</td><td>1.0</td><td></td></tr>
+        <tr><td>β (도막)</td><td>에폭시 도막, 피복 3d<sub>b</sub> 미만 또는 순간격 6d<sub>b</sub> 미만</td><td>1.5</td><td>표면이 미끄러워 맞물림·마찰이 준다</td></tr>
+        <tr><td></td><td>그 밖의 에폭시 도막 철근</td><td>1.2</td><td></td></tr>
+        <tr><td></td><td>도막 없음(아연 도금 포함 형태)</td><td>1.0</td><td>αβ ≤ 1.7</td></tr>
+        <tr><td>γ (크기)</td><td>D19 이하</td><td>0.8</td><td>가는 철근은 둘레/단면적 비가 커서 쪼갬이 덜하다</td></tr>
+        <tr><td></td><td>D22 이상</td><td>1.0</td><td></td></tr>
+        <tr><td>배근 조건(간이식)</td><td>순간격 d<sub>b</sub> 이상·피복 d<sub>b</sub> 이상이고 최소 스터럽, 또는 순간격 2d<sub>b</sub> 이상·피복 d<sub>b</sub> 이상</td><td>1.0</td><td>쪼갬에 대한 여유</td></tr>
+        <tr><td></td><td>그 밖의 경우</td><td>1.5</td><td></td></tr>
+        <tr><td>과다 철근</td><td>소요 A<sub>s</sub> / 배근 A<sub>s</sub>(내진 상세, 지점 정착 등 적용 제외 있음)</td><td>≤ 1.0</td><td>철근 응력이 f<sub>y</sub>보다 작다</td></tr>
+      </tbody></table></div>
+    <p>간이식은 표의 계수를 곱해 \(l_d = l_{db}\,\alpha\beta\gamma \times (1.0\ \text{또는}\ 1.5)\)로 쓰는 형태입니다. 피복·간격·횡철근의 효과를 연속적으로 반영하고 싶으면 정밀식을 씁니다.</p>
+    <div class="callout def"><strong>원리 7.4 (정밀식, KDS 14 20 52 / ACI 318 형태)</strong>
+      <div class="formula">$$l_d = \frac{0.90\,d_b f_y}{\lambda\sqrt{f_{ck}}}\;\frac{\alpha\beta\gamma}{\left(\dfrac{c + K_{tr}}{d_b}\right)}, \qquad \frac{c + K_{tr}}{d_b} \le 2.5, \qquad K_{tr} = \frac{40\,A_{tr}}{s\,n}$$<div class="where">\(K_{tr}\)는 쪼갬면을 가로지르는 스터럽의 효과를 길이로 나타낸 <span class="term">횡보강 지수</span><span class="en">(transverse reinforcement index)</span>다. \(c\): 철근 중심에서 가장 가까운 콘크리트 표면까지 거리와 철근 중심 간격의 1/2 가운데 작은 값. \(A_{tr}\): 간격 \(s\) 안에서 쪼갬면을 가로지르는 횡철근 단면적, \(n\): 그 면을 따라 정착·이음되는 철근 수. \((c + K_{tr})/d_b = 1.5\)를 넣으면 \(0.90/1.5 = 0.6\)으로 기본식과 같아진다. 상한 2.5는 쪼갬 대신 뽑힘이 지배해 더 줄일 수 없는 한계다.</div></div></div>
+    <figure class="diagram" id="fig-dv-split">
+      <svg viewBox="0 0 860 300" role="img" aria-label="보 단면의 피복, 철근 간격, 스터럽과 쪼갬 균열의 세 가지 모양">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="-6" class="t" style="font-weight:700">G1 하단 4-D25의 c와 K<tspan baseline-shift="sub" font-size="9">tr</tspan></text>
+          <rect x="0" y="10" width="260" height="200" rx="2" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <rect x="26" y="36" width="208" height="160" rx="10" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <g style="fill:var(--tension)"><circle cx="45" cy="177" r="8.3"/><circle cx="101" cy="177" r="8.3"/><circle cx="159" cy="177" r="8.3"/><circle cx="215" cy="177" r="8.3"/></g>
+          <line x1="45" y1="177" x2="45" y2="210" style="stroke:var(--warn);stroke-width:1.4"/><text x="50" y="203" class="t-mono" style="fill:var(--warn)">c<tspan baseline-shift="sub" font-size="8">b</tspan>=66</text>
+          <line x1="101" y1="160" x2="159" y2="160" style="stroke:var(--warn);stroke-width:1.4" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/><text x="130" y="154" text-anchor="middle" class="t-mono" style="fill:var(--warn)">중심 간격 89.7</text>
+          <text x="130" y="240" text-anchor="middle" class="t-mono">c = min(66, 89.7/2) = 44.9 mm</text>
+          <text x="130" y="256" text-anchor="middle" class="t-mono">스터럽 2-D13@150 → K<tspan baseline-shift="sub" font-size="8">tr</tspan> = 40·253/(150·4) = 16.9</text>
+        </g>
+        <g transform="translate(370,40)">
+          <text x="0" y="-6" class="t" style="font-weight:700">쪼갬 균열의 모양</text>
+          <g transform="translate(0,10)">
+            <rect x="0" y="0" width="140" height="110" rx="2" style="fill:var(--surface-2);stroke:var(--border)"/>
+            <g style="fill:var(--tension)"><circle cx="30" cy="84" r="8"/><circle cx="70" cy="84" r="8"/><circle cx="110" cy="84" r="8"/></g>
+            <path d="M0 84 L22 84 M38 84 L62 84 M78 84 L102 84 M118 84 L140 84" style="stroke:var(--bad);stroke-width:2"/>
+            <text x="70" y="130" text-anchor="middle" class="t-mono">옆면 쪼갬</text><text x="70" y="145" text-anchor="middle" class="t-dim">간격이 좁을 때</text>
+          </g>
+          <g transform="translate(160,10)">
+            <rect x="0" y="0" width="140" height="110" rx="2" style="fill:var(--surface-2);stroke:var(--border)"/>
+            <g style="fill:var(--tension)"><circle cx="35" cy="88" r="8"/><circle cx="105" cy="88" r="8"/></g>
+            <path d="M35 96 L35 110 M105 96 L105 110" style="stroke:var(--bad);stroke-width:2"/>
+            <text x="70" y="130" text-anchor="middle" class="t-mono">바닥면 쪼갬</text><text x="70" y="145" text-anchor="middle" class="t-dim">하부 피복이 얇을 때</text>
+          </g>
+          <g transform="translate(320,10)">
+            <rect x="0" y="0" width="140" height="110" rx="2" style="fill:var(--surface-2);stroke:var(--border)"/>
+            <g style="fill:var(--tension)"><circle cx="22" cy="90" r="8"/><circle cx="118" cy="90" r="8"/></g>
+            <path d="M14 98 L0 110 M28 82 L36 110 M126 98 L140 110 M112 82 L104 110" style="stroke:var(--bad);stroke-width:2"/>
+            <text x="70" y="130" text-anchor="middle" class="t-mono">V형 쪼갬</text><text x="70" y="145" text-anchor="middle" class="t-dim">모서리 철근</text>
+          </g>
+          <text x="0" y="190" class="t-dim">쪼갬면을 가로지르는 스터럽(K<tspan baseline-shift="sub" font-size="8">tr</tspan>)이 균열을 붙잡아</text>
+          <text x="0" y="208" class="t-dim">부착 강도를 올린다. 피복·간격이 지름보다 충분히 크면</text>
+          <text x="0" y="226" class="t-dim">쪼갬 대신 뽑힘이 지배한다((c + K<tspan baseline-shift="sub" font-size="8">tr</tspan>)/d<tspan baseline-shift="sub" font-size="8">b</tspan> ≤ 2.5).</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-2.</b> 정밀식의 \(c\)와 \(K_{tr}\). G1 하단 4-D25(피복 40, 스터럽 D13)에서 바닥까지 거리는 \(40 + 12.7 + 12.7 = 65.4\) mm, 철근 중심 간격의 반은 44.9 mm로 간격이 지배한다. 오른쪽은 쪼갬 균열의 세 전형이다. 어느 면이 먼저 쪼개지는지가 \(c\)의 정의(작은 값)에 들어 있다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 7.2 (G1 하단·상단 D25의 인장 정착 길이)</strong> D25(\(d_b = 25.4\) mm), SD500, \(f_{ck} = 30\) MPa, 보통 콘크리트, 도막 없음.
+      <ol class="dv-steps">
+        <li><b>기본 정착 길이.</b> \(l_{db} = 0.6 \times 25.4 \times 500/(1.0 \times \sqrt{30}) = 7{,}620/5.477 = 1{,}391\) mm(약 \(55d_b\)).</li>
+        <li><b>하단 철근(간이식).</b> α = 1.0, β = 1.0, γ = 1.0(D22 이상). 순간격 \(89.7 - 25.4 = 64\) mm ≥ \(2d_b = 51\) mm, 피복(스터럽 밖) 52.7 mm ≥ \(d_b\) → 배근 조건 1.0. \(l_d = 1{,}391\) mm.</li>
+        <li><b>상단 철근.</b> 보 춤 700 mm를 한 번에 치므로 상단 철근 밑 콘크리트가 300 mm를 넘는다 → α = 1.3. \(l_d = 1.3 \times 1{,}391 = 1{,}809\) mm(약 \(71d_b\)).</li>
+        <li><b>하단 철근(정밀식).</b> \(c = 44.9\) mm, \(K_{tr} = 40 \times 253.4/(150 \times 4) = 16.9\) mm → \((c + K_{tr})/d_b = 61.8/25.4 = 2.43 \le 2.5\). \(l_d = 0.90 \times 25.4 \times 500/5.477 \times 1.0/2.43 = 2{,}087/2.43 = 859\) mm. 간이식의 62 %다.</li>
+        <li><b>판정.</b> 정밀식은 피복·간격·스터럽의 이득을 모두 반영해 훨씬 짧다. 이 장의 G1 계획은 보수적인 간이식 값(하단 1,391 mm, 상단 1,809 mm)을 쓰고, 공간이 빠듯한 곳에서만 정밀식을 쓴다. 두 값 모두 최소 300 mm를 넘는다.</li>
+      </ol></div>
+    <div class="sim" id="sim-dv-ld">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>정착 길이 계산기: 간이식 · 정밀식 · 압축</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dv-cv-ld" aria-label="정착 길이 막대 비교"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>호칭 <output id="dv-ld-bar-out"></output></span><input type="range" id="dv-ld-bar"></label>
+          <div class="ctrl"><span><i style="font-style:normal">강종 f<sub>y</sub></i></span><div class="seg" id="dv-ld-fy"><button data-value="400">SD400</button><button data-value="500" class="on">SD500</button><button data-value="600">SD600</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">f<sub>ck</sub></i> <output id="dv-ld-fck-out"></output></span><input type="range" id="dv-ld-fck" min="21" max="70" step="1" value="30"></label>
+          <div class="ctrl"><span>위치 α</span><div class="seg" id="dv-ld-pos"><button data-value="1" class="on">하부·기타</button><button data-value="1.3">상부 철근</button></div></div>
+          <div class="ctrl"><span>도막 β</span><div class="seg" id="dv-ld-coat"><button data-value="1" class="on">없음</button><button data-value="1.2">에폭시</button><button data-value="1.5">에폭시·피복 얇음</button></div></div>
+          <div class="ctrl"><span>콘크리트 λ</span><div class="seg" id="dv-ld-lam"><button data-value="1" class="on">보통</button><button data-value="0.85">모래경량</button><button data-value="0.75">경량</button></div></div>
+          <div class="ctrl"><span>배근 조건(간이식)</span><div class="seg" id="dv-ld-cond"><button data-value="1" class="on">양호</button><button data-value="1.5">그 밖</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">(c + K<sub>tr</sub>)/d<sub>b</sub> (정밀식)</i> <output id="dv-ld-ck-out"></output></span><input type="range" id="dv-ld-ck" min="1" max="3" step="0.01" value="2.43"></label>
+          <label class="ctrl"><span><i style="font-style:normal">소요/배근 A<sub>s</sub></i> <output id="dv-ld-ex-out"></output></span><input type="range" id="dv-ld-ex" min="0.4" max="1" step="0.01" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기본 l<sub>db</sub></span><span class="v" id="dv-ld-ldb">—</span></div>
+        <div class="stat"><span class="k">간이식 l<sub>d</sub></span><span class="v" id="dv-ld-s">—</span></div>
+        <div class="stat"><span class="k">정밀식 l<sub>d</sub></span><span class="v" id="dv-ld-p">—</span></div>
+        <div class="stat"><span class="k">압축 l<sub>d</sub></span><span class="v" id="dv-ld-c">—</span></div>
+      </div>
+      <div class="dv-msg" id="dv-ld-msg">—</div>
+      <div class="sim-note">해볼 것: 기본값(G1 하단 D25)에서 간이식 1,391 mm와 정밀식 859 mm를 확인하고, "상부 철근"으로 바꿔 1,809 mm가 되는지 보세요 · (c + K<sub>tr</sub>)/d<sub>b</sub>를 1.5로 내리면 정밀식이 기본식과 같아집니다 · 에폭시·피복 얇음과 상부 철근을 함께 고르면 αβ = 1.95가 아니라 상한 1.7이 적용됩니다 · f<sub>ck</sub>를 70까지 올려도 √f<sub>ck</sub> 상한 8.4 MPa 때문에 더 줄지 않습니다 · 모델: 원리 7.3·7.4, 7.6(압축), <code>CB.rc.ldb</code>. 계수와 조건은 KDS 14 20 52 형태(현행 기준 확인), 교육용.</div>
+    </div>
+    <div class="callout tip"><strong>정착 길이는 "응력이 f<sub>y</sub>인 단면"에서 잰다</strong> 정착 길이는 철근 끝에서부터가 아니라 철근이 최대 응력을 내야 하는 <span class="term">위험 단면</span><span class="en">(critical section for development)</span>에서 철근 끝 쪽으로 잰다. 보에서는 최대 모멘트 단면, 철근이 잘리거나 굽혀지는 점, 지점 면이 위험 단면이다. 한 철근에 위험 단면이 여러 개 있으면 각 단면에서 양쪽으로 필요한 길이를 모두 확인한다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="hooks">
+    <h2>표준 갈고리: 짧은 곳에서 정착하기</h2>
+    <div class="problem"><strong>1,809 mm를 800 mm 기둥 안에 넣을 수 있나</strong>
+      <p>G1 상단 철근이 바깥 기둥에서 끝난다고 합시다. 지점 면에서 1,809 mm를 곧게 묻어야 하는데 기둥 폭은 800 mm뿐입니다. 철근 끝을 정해진 모양으로 구부린 <span class="term">표준 갈고리</span><span class="en">(standard hook)</span>로 만들면, 굽은 안쪽의 콘크리트가 철근을 지압으로 붙잡아 훨씬 짧은 길이로 정착됩니다.</p></div>
+    <figure class="diagram" id="fig-dv-hook">
+      <svg viewBox="0 0 860 300" role="img" aria-label="90도 표준 갈고리, 180도 표준 갈고리, 스터럽 135도 갈고리의 치수">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">90° 표준 갈고리</text>
+          <line x1="0" y1="40" x2="190" y2="40" style="stroke:var(--warn);stroke-dasharray:4 3"/>
+          <line x1="190" y1="20" x2="190" y2="230" style="stroke:var(--warn);stroke-dasharray:4 3"/>
+          <path d="M0 60 L150 60 A 36 36 0 0 1 186 96 L186 226" style="fill:none;stroke:var(--tension);stroke-width:10;stroke-linecap:round"/>
+          <line x1="0" y1="20" x2="191" y2="20" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/>
+          <text x="80" y="14" text-anchor="middle" class="t-mono">l<tspan baseline-shift="sub" font-size="8">dh</tspan>: 위험 단면 → 갈고리 바깥면</text>
+          <line x1="210" y1="96" x2="210" y2="226" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/>
+          <text x="216" y="166" class="t-mono">12d<tspan baseline-shift="sub" font-size="8">b</tspan></text>
+          <text x="96" y="110" class="t-mono">안지름 6d<tspan baseline-shift="sub" font-size="8">b</tspan></text>
+          <text x="96" y="124" class="t-mono">(D25 이하)</text>
+          <text x="0" y="258" class="t-dim">위험 단면: 지점 면(보 철근)</text>
+        </g>
+        <g transform="translate(330,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">180° 표준 갈고리</text>
+          <path d="M0 60 L140 60 A 40 40 0 0 1 140 140 L100 140" style="fill:none;stroke:var(--tension);stroke-width:10;stroke-linecap:round"/>
+          <line x1="0" y1="20" x2="190" y2="20" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/>
+          <text x="90" y="14" text-anchor="middle" class="t-mono">l<tspan baseline-shift="sub" font-size="8">dh</tspan></text>
+          <line x1="185" y1="20" x2="185" y2="160" style="stroke:var(--warn);stroke-dasharray:4 3"/>
+          <line x1="100" y1="160" x2="140" y2="160" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/>
+          <text x="60" y="176" class="t-mono">4d<tspan baseline-shift="sub" font-size="8">b</tspan> 이상, 60 mm 이상</text>
+          <text x="0" y="230" class="t-dim">굽힘 안지름: D10–D25 6d<tspan baseline-shift="sub" font-size="8">b</tspan>,</text>
+          <text x="0" y="246" class="t-dim">D29–D35 8d<tspan baseline-shift="sub" font-size="8">b</tspan>, 그 이상 10d<tspan baseline-shift="sub" font-size="8">b</tspan>(형태)</text>
+        </g>
+        <g transform="translate(600,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">스터럽·띠철근 갈고리</text>
+          <rect x="20" y="40" width="160" height="150" rx="10" style="fill:none;stroke:var(--accent);stroke-width:6"/>
+          <path d="M40 40 L74 74" style="stroke:var(--accent);stroke-width:6;stroke-linecap:round"/>
+          <path d="M20 60 L54 94" style="stroke:var(--accent);stroke-width:6;stroke-linecap:round"/>
+          <g style="fill:var(--tension)"><circle cx="36" cy="56" r="9"/><circle cx="164" cy="56" r="9"/><circle cx="36" cy="174" r="9"/><circle cx="164" cy="174" r="9"/></g>
+          <text x="80" y="100" class="t-mono">135° 갈고리</text>
+          <text x="80" y="114" class="t-mono">연장 6d<tspan baseline-shift="sub" font-size="8">b</tspan>(형태)</text>
+          <text x="0" y="230" class="t-dim">90° 갈고리는 연장 6d<tspan baseline-shift="sub" font-size="8">b</tspan>(D16 이하)</text>
+          <text x="0" y="246" class="t-dim">내진 후프는 135°(12장)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-3.</b> 표준 갈고리의 모양(KDS 14 20 50·14 20 52 형태, 치수는 현행 기준 확인). 갈고리 정착 길이 \(l_{dh}\)는 위험 단면에서 갈고리 바깥면까지 잰다. 90° 갈고리는 굽힘 뒤 \(12d_b\), 180° 갈고리는 \(4d_b\)(60 mm 이상)를 더 뻗는다. 갈고리 안쪽의 지압 응력이 커서 굽힘 지름이 너무 작으면 콘크리트가 부서진다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 7.5 (표준 갈고리의 정착 길이, KDS 14 20 52 형태)</strong>
+      <div class="formula">$$l_{hb} = \frac{0.24\,\beta\,d_b\,f_y}{\lambda\sqrt{f_{ck}}}, \qquad l_{dh} = l_{hb} \times (\text{보정 계수}) \ge \max(8d_b,\ 150\ \text{mm})$$<div class="where">β: 도막 계수(에폭시 1.2, 그 밖 1.0). 보정 계수(형태): 갈고리 평면에 수직인 측면 피복 70 mm 이상이고 90° 갈고리 연장부 피복 50 mm 이상(D35 이하) → 0.7, 갈고리를 \(3d_b\) 이하 간격의 띠철근·스터럽이 감싸면(D35 이하) → 0.8, 과다 철근 → 소요/배근 \(A_s\). <code>CB.rc.ldh</code>가 \(l_{hb}\)다. 갈고리는 압축 철근의 정착에는 효과가 없다고 본다.</div></div></div>
+    <p>계수 0.24는 직선 정착의 0.6에 비해 40 %입니다. 갈고리 안쪽 콘크리트에 기대는 지압이 부착보다 훨씬 효율적이기 때문입니다. 대신 갈고리는 정착부 둘레 콘크리트를 벌리는 힘이 커서, 기둥–보 접합부에서는 갈고리를 기둥 코어 안쪽까지 넣고 띠철근으로 감싸야 제 성능이 나옵니다. 갈고리를 접합부 바깥쪽으로 향하게 두면 갈고리가 피복을 밀어내 쪼갤 수 있으므로, 보 철근의 갈고리는 접합부 중심 쪽(위 철근은 아래로, 아래 철근은 위로)으로 구부립니다.</p>
+    <div class="callout"><strong>예제 7.3 (바깥 기둥에 정착하는 G1 상단 D25)</strong> 바깥 기둥 800 × 800 mm(교육용으로 C1과 같은 크기), 피복 40 mm, 띠철근 D13, D25 SD500, \(f_{ck} = 30\) MPa.
+      <ol class="dv-steps">
+        <li><b>직선 정착.</b> 상단 철근 \(l_d = 1{,}809\) mm. 기둥 안 쓸 수 있는 길이는 \(800 - 40 - 12.7 - 25.4 \approx 720\) mm(기둥 주근 안쪽까지, 교육용). 1,809 > 720 → 불가.</li>
+        <li><b>갈고리 기본 길이.</b> \(l_{hb} = 0.24 \times 1.0 \times 25.4 \times 500/5.477 = 556\) mm.</li>
+        <li><b>보정.</b> 측면 피복이 70 mm 이상(기둥 폭 800, 보 폭 400이라 측면 여유가 큼)이고 연장부 피복 50 mm 이상이면 × 0.7 → 389 mm. 하한 \(\max(8 \times 25.4, 150) = 203\) mm보다 크다.</li>
+        <li><b>판정.</b> \(l_{dh} = 389\)(보정) 또는 556 mm(보정 없음) ≤ 720 mm → 90° 표준 갈고리로 정착 가능. 굽힘 안지름 \(6d_b = 152\) mm, 연장 \(12d_b = 305\) mm를 기둥 안에서 아래로 내린다.</li>
+      </ol></div>
+    <div class="sim" id="sim-dv-hook">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>직선 정착 vs 갈고리: 기둥 안에 들어가나</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dv-cv-hook" aria-label="보–기둥 접합부 입면과 정착 길이"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">기둥 폭 h<sub>c</sub></i> <output id="dv-hk-hc-out"></output></span><input type="range" id="dv-hk-hc" min="300" max="1200" step="10" value="800"></label>
+          <div class="ctrl"><span>호칭</span><div class="seg" id="dv-hk-bar"><button data-value="D16">D16</button><button data-value="D19">D19</button><button data-value="D22">D22</button><button data-value="D25" class="on">D25</button><button data-value="D32">D32</button></div></div>
+          <div class="ctrl"><span>강종</span><div class="seg" id="dv-hk-fy"><button data-value="400">SD400</button><button data-value="500" class="on">SD500</button><button data-value="600">SD600</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">f<sub>ck</sub></i> <output id="dv-hk-fck-out"></output></span><input type="range" id="dv-hk-fck" min="21" max="60" step="1" value="30"></label>
+          <div class="ctrl"><span>철근 위치</span><div class="seg" id="dv-hk-pos"><button data-value="top" class="on">상단</button><button data-value="bot">하단</button></div></div>
+          <div class="ctrl"><span>갈고리</span><div class="seg" id="dv-hk-type"><button data-value="90" class="on">90°</button><button data-value="180">180°</button></div></div>
+          <label class="check"><input type="checkbox" id="dv-hk-cov" checked> 측면 피복 70 mm 이상(× 0.7)</label>
+          <label class="check"><input type="checkbox" id="dv-hk-tie"> <i style="font-style:normal">3d<sub>b</sub> 이하 띠철근으로 감쌈(× 0.8)</i></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">직선 l<sub>d</sub></span><span class="v" id="dv-hk-ld">—</span></div>
+        <div class="stat"><span class="k">갈고리 l<sub>dh</sub></span><span class="v" id="dv-hk-ldh">—</span></div>
+        <div class="stat"><span class="k">쓸 수 있는 길이</span><span class="v" id="dv-hk-av">—</span></div>
+        <div class="stat"><span class="k">선택</span><span class="v" id="dv-hk-ok">—</span></div>
+      </div>
+      <div class="dv-msg" id="dv-hk-msg">—</div>
+      <div class="sim-note">해볼 것: 기본값(G1 상단 D25, 800 mm 기둥)에서 직선은 안 되고 갈고리는 되는 것을 확인하세요 · 기둥 폭을 줄여 갈고리마저 들어가지 않는 폭을 찾고, D22로 바꾸면 다시 들어가는지 보세요 · 하단 철근은 α = 1.0이라 직선 정착이 조금 짧습니다 · 1,200 mm 기둥에서 하단 D16은 직선으로도 됩니다 · 모델: 원리 7.3(간이식, 배근 조건 양호), 7.5, 쓸 수 있는 길이 = h<sub>c</sub> − 피복 40 − 띠철근 D13 − 기둥 주근 D25(교육용). 계수는 KDS 14 20 52 형태.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="compression-bundled">
+    <h2>압축 철근의 정착과 다발 철근</h2>
+    <div class="problem"><strong>누르는 철근은 왜 짧게 묻어도 되나</strong>
+      <p>기둥 주근은 대부분 압축을 받고, 기초에 꽂는 장부 철근(다월)도 압축을 기초로 넘깁니다. 압축 철근은 끝이 콘크리트를 직접 눌러(끝 지압) 힘의 일부를 넘기고, 둘레에 휨 인장 균열도 없어 부착이 좋습니다. 그래서 같은 철근이라도 압축 정착 길이는 인장의 절반 이하입니다.</p></div>
+    <div class="callout def"><strong>원리 7.6 (압축 이형철근의 정착, KDS 14 20 52 형태)</strong>
+      <div class="formula">$$l_{db} = \max\!\left(\frac{0.25\,d_b f_y}{\lambda\sqrt{f_{ck}}},\ 0.043\,d_b f_y\right), \qquad l_d = l_{db} \times (\text{보정 계수}) \ge 200\ \text{mm}$$<div class="where">보정 계수(형태): 지름 6 mm 이상·피치 100 mm 이하 나선 철근 또는 중심 간격 100 mm 이하 D13 띠철근으로 감싸면 0.75, 과다 철근 소요/배근 \(A_s\). 갈고리는 압축 정착에 고려하지 않는다. 두 번째 항 0.043은 고강도 콘크리트에서 길이가 지나치게 짧아지지 않게 하는 하한이다.</div></div></div>
+    <p>D25, SD500, \(f_{ck} = 30\) MPa이면 \(0.25 \times 25.4 \times 500/5.477 = 580\) mm와 \(0.043 \times 25.4 \times 500 = 546\) mm 가운데 큰 580 mm입니다. 인장 1,391 mm의 42 %입니다.</p>
+    <p>철근이 많아 한 단에 다 놓을 수 없을 때는 2–4가닥을 붙여 한 다발로 배근합니다. <span class="term">다발 철근</span><span class="en">(bundled bars)</span>은 스터럽이나 띠철근 안에 두어야 하고, 다발 하나는 4가닥 이하, 보에서는 D35를 넘는 철근을 다발로 쓰지 않는 형태로 제한합니다. 다발은 서로 맞닿은 면만큼 둘레가 콘크리트에 닿지 않아 부착이 불리하므로 정착 길이를 늘립니다.</p>
+    <div class="callout def"><strong>원리 7.7 (다발 철근, KDS 14 20 52 형태)</strong> 다발 안 철근 각각의 정착 길이는 단일 철근의 정착 길이에 3가닥 다발이면 20 %, 4가닥 다발이면 33 %를 더한다(2가닥은 그대로). 간격·피복 제한과 보정 계수의 \(d_b\)에는 다발과 단면적이 같은 원의 <span class="term">등가 지름</span><span class="en">(equivalent diameter)</span> \(d_{b,eq} = d_b\sqrt{n}\)을 쓴다. 다발의 철근은 한곳에서 함께 자르지 않고 \(40d_b\) 이상 엇갈려 끝낸다.</div>
+    <figure class="diagram" id="fig-dv-bundle">
+      <svg viewBox="0 0 860 250" role="img" aria-label="2, 3, 4가닥 다발 철근의 모양과 등가 지름, 엇갈린 절단">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <g transform="translate(40,60)"><circle cx="0" cy="0" r="38" style="fill:none;stroke:var(--warn);stroke-dasharray:4 3"/><g style="fill:var(--tension)"><circle cx="-13.5" cy="0" r="13.5"/><circle cx="13.5" cy="0" r="13.5"/></g><text x="0" y="66" text-anchor="middle" class="t-mono">2가닥 · d<tspan baseline-shift="sub" font-size="8">eq</tspan> = 1.41d<tspan baseline-shift="sub" font-size="8">b</tspan></text><text x="0" y="82" text-anchor="middle" class="t-mono">l<tspan baseline-shift="sub" font-size="8">d</tspan> × 1.00</text></g>
+          <g transform="translate(190,60)"><circle cx="0" cy="0" r="38" style="fill:none;stroke:var(--warn);stroke-dasharray:4 3"/><g style="fill:var(--tension)"><circle cx="-13.5" cy="7.8" r="13.5"/><circle cx="13.5" cy="7.8" r="13.5"/><circle cx="0" cy="-15.6" r="13.5"/></g><text x="0" y="66" text-anchor="middle" class="t-mono">3가닥 · 1.73d<tspan baseline-shift="sub" font-size="8">b</tspan></text><text x="0" y="82" text-anchor="middle" class="t-mono">× 1.20</text></g>
+          <g transform="translate(340,60)"><circle cx="0" cy="0" r="44" style="fill:none;stroke:var(--warn);stroke-dasharray:4 3"/><g style="fill:var(--tension)"><circle cx="-13.5" cy="-13.5" r="13.5"/><circle cx="13.5" cy="-13.5" r="13.5"/><circle cx="-13.5" cy="13.5" r="13.5"/><circle cx="13.5" cy="13.5" r="13.5"/></g><text x="0" y="66" text-anchor="middle" class="t-mono">4가닥 · 2.00d<tspan baseline-shift="sub" font-size="8">b</tspan></text><text x="0" y="82" text-anchor="middle" class="t-mono">× 1.33</text></g>
+          <g transform="translate(450,10)">
+            <text x="0" y="0" class="t" style="font-weight:700">다발 철근의 엇갈린 절단</text>
+            <line x1="0" y1="40" x2="340" y2="40" style="stroke:var(--tension);stroke-width:7"/>
+            <line x1="0" y1="50" x2="230" y2="50" style="stroke:var(--tension);stroke-width:7"/>
+            <line x1="0" y1="60" x2="120" y2="60" style="stroke:var(--tension);stroke-width:7"/>
+            <line x1="120" y1="80" x2="230" y2="80" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/>
+            <text x="175" y="96" text-anchor="middle" class="t-mono">≥ 40d<tspan baseline-shift="sub" font-size="8">b</tspan></text>
+            <line x1="230" y1="80" x2="340" y2="80" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/>
+            <text x="285" y="96" text-anchor="middle" class="t-mono">≥ 40d<tspan baseline-shift="sub" font-size="8">b</tspan></text>
+            <text x="0" y="130" class="t-dim">한곳에서 다발 전체를 끊으면 남은 단면의</text>
+            <text x="0" y="148" class="t-dim">응력이 갑자기 튀고 균열이 집중된다.</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-4.</b> 다발 철근. 점선 원은 단면적이 같은 등가 지름 \(d_b\sqrt n\)이다. 3·4가닥 다발은 콘크리트에 닿는 둘레가 단일 철근 합보다 크게 줄어 정착 길이를 20 %·33 % 늘린다(KDS 14 20 52 형태). 다발의 절단은 \(40d_b\) 이상 엇갈린다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-dv-bundle">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>다발 철근: 둘레와 정착 길이</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dv-cv-bun" aria-label="다발 철근 단면과 노출 둘레"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>다발 가닥 수 n</span><div class="seg" id="dv-bn-n"><button data-value="1">1</button><button data-value="2">2</button><button data-value="3" class="on">3</button><button data-value="4">4</button></div></div>
+          <div class="ctrl"><span>호칭</span><div class="seg" id="dv-bn-bar"><button data-value="D19">D19</button><button data-value="D22">D22</button><button data-value="D25" class="on">D25</button><button data-value="D29">D29</button><button data-value="D32">D32</button></div></div>
+          <div class="ctrl"><span>응력 종류</span><div class="seg" id="dv-bn-mode"><button data-value="t" class="on">인장</button><button data-value="c">압축</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">다발 A<sub>s</sub></span><span class="v" id="dv-bn-as">—</span></div>
+        <div class="stat"><span class="k">등가 지름</span><span class="v" id="dv-bn-deq">—</span></div>
+        <div class="stat"><span class="k">노출 둘레 / 개별 합</span><span class="v" id="dv-bn-per">—</span></div>
+        <div class="stat"><span class="k">정착 길이(가닥마다)</span><span class="v" id="dv-bn-ld">—</span></div>
+      </div>
+      <div class="dv-msg" id="dv-bn-msg">—</div>
+      <div class="sim-note">해볼 것: 가닥 수를 1 → 4로 늘리며 콘크리트에 닿는 둘레 비율(노출 둘레/개별 둘레 합)이 얼마나 주는지 보세요 · 기준의 증가율(1.00·1.00·1.20·1.33)과 둘레 감소의 역수를 비교해 보세요 — 2가닥은 둘레가 줄어도 증가가 없습니다(시험 결과에 근거한 판단) · 모델: 노출 둘레는 다발을 실로 감싼 볼록 껍질의 둘레(교육용), 정착 길이는 원리 7.3(간이식, 하부, 양호)·7.6·7.7. D35 초과 다발 제한은 보 기준 형태.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="cutoff">
+    <h2>철근 절단점: 모멘트 포락선 위에서</h2>
+    <div class="problem"><strong>G1 하단 4-D25는 경간 끝까지 다 필요한가</strong>
+      <p>정모멘트 철근 4-D25는 경간 중앙의 \(M_u^+ = 460\) kN·m를 위해 고른 것입니다. 지점 쪽으로 가면 정모멘트가 줄어 0이 되고 부모멘트로 바뀝니다. 2-D25만으로도 버틸 수 있는 곳부터는 두 가닥을 잘라도 될 것 같습니다. 어디서 자를까요? 상단 6-D25도 지점에서 멀어지면 줄일 수 있습니다.</p></div>
+    <p>절단점은 <span class="term">모멘트 포락선</span><span class="en">(moment envelope)</span> 위에서 정합니다. 연속보의 각 단면은 활하중 배치(<span class="term">패턴 재하</span><span class="en">(pattern loading)</span>)에 따라 서로 다른 하중 경우에서 최대 정·부모멘트를 받으므로, 여러 경우의 모멘트도를 겹친 바깥 선이 그 단면의 설계 모멘트입니다(<a href="t-beam.html">4장</a>, <a href="../../mechanics/chapters/influence.html">MechanicsBook 영향선</a>). 이 장에서는 G1 내부 경간 포락선을 다음 세 하중 경우로 만듭니다(교육용, <code>CB.beam</code>: 경간 8 m 단순 지지 + 양 끝 부모멘트).</p>
+    <div class="table-wrap"><table class="dv-tbl">
+      <thead><tr><th>경우</th><th>경간 하중 w<sub>u</sub></th><th>양 끝 모멘트</th><th>만드는 값</th></tr></thead>
+      <tbody>
+        <tr><td>A 정모멘트 최대(이 경간 재하, 이웃 경간 일부 비재하)</td><td>100 kN/m</td><td>−340 kN·m</td><td class="hl">중앙 M<sub>u</sub><sup>+</sup> = 460 kN·m</td></tr>
+        <tr><td>B 부모멘트 최대(이 경간과 이웃 경간 재하)</td><td>100 kN/m</td><td>−640 kN·m</td><td class="hl">지점 M<sub>u</sub><sup>−</sup> = 640 kN·m</td></tr>
+        <tr><td>C 이 경간 비재하(1.2D만), 이웃 경간 재하</td><td>68 kN/m</td><td>−480 kN·m</td><td>부모멘트 구간이 가장 멀리(변곡점 2.63 m)</td></tr>
+      </tbody></table></div>
+    <p>CONTRIBUTING의 G1 계수 모멘트(\(M_u^+ = 460\), \(M_u^- = 640\) kN·m)를 그대로 재현하게 A·B의 끝 모멘트를 골랐고, C의 끝 모멘트 480 kN·m(640의 75 %)는 교육용 가정입니다. 실제 설계에서는 골조 해석과 패턴 재하로 포락선을 구합니다(<a href="case-study.html">16장</a>).</p>
+    <figure class="diagram" id="fig-dv-cut">
+      <svg viewBox="0 0 860 340" role="img" aria-label="모멘트 포락선 위의 설계 휨강도 계단, 이론 절단점, 연장 길이와 정착 길이">
+        <rect x="10" y="10" width="840" height="320" rx="10" class="f-surface"/>
+        <g transform="translate(70,40)">
+          <line x1="0" y1="150" x2="720" y2="150" class="s-axis"/>
+          <line x1="0" y1="0" x2="0" y2="270" class="s-axis"/>
+          <text x="6" y="10" class="t-mono">정모멘트 M<tspan baseline-shift="sub" font-size="8">u</tspan><tspan baseline-shift="super" font-size="8">+</tspan></text>
+          <path d="M0 150 C 80 150, 120 120, 180 96 C 260 60, 300 30, 360 26 C 420 30, 460 60, 540 96 C 600 120, 640 150, 720 150" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.5"/>
+          <line x1="0" y1="26" x2="720" y2="26" style="stroke:var(--faint, var(--text-faint));stroke-dasharray:2 3"/>
+          <path d="M0 150 L0 150 L120 150 L120 82 L600 82 L600 150 Z" style="fill:none;stroke:var(--ok);stroke-width:0"/>
+          <path d="M40 92 L 680 92" style="stroke:var(--tension);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="690" y="96" class="t-mono" style="fill:var(--tension)">φM<tspan baseline-shift="sub" font-size="8">n</tspan>(2-D25)</text>
+          <path d="M160 18 L560 18" style="stroke:var(--tension);stroke-width:2.5"/>
+          <text x="560" y="12" class="t-mono" style="fill:var(--tension)">φM<tspan baseline-shift="sub" font-size="8">n</tspan>(4-D25)</text>
+          <line x1="184" y1="92" x2="184" y2="200" style="stroke:var(--warn);stroke-dasharray:4 3"/>
+          <text x="188" y="212" class="t-mono" style="fill:var(--warn)">이론 절단점</text>
+          <line x1="122" y1="18" x2="122" y2="236" style="stroke:var(--bad);stroke-width:2"/>
+          <text x="116" y="232" text-anchor="end" class="t-mono" style="fill:var(--bad)">실제 절단점</text>
+          <line x1="122" y1="180" x2="184" y2="180" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/>
+          <text x="40" y="176" class="t-mono">max(d, 12d<tspan baseline-shift="sub" font-size="8">b</tspan>)</text>
+          <line x1="122" y1="226" x2="360" y2="226" style="stroke:var(--accent-2);stroke-width:1.5" marker-start="url(#dv-ah-ld)" marker-end="url(#dv-ah-ld)"/>
+          <text x="240" y="240" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">≥ l<tspan baseline-shift="sub" font-size="8">d</tspan>(최대 모멘트 단면에서)</text>
+          <line x1="360" y1="26" x2="360" y2="236" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="364" y="262" class="t-mono">최대 M</text>
+          <g transform="translate(0,140)"><rect x="0" y="120" width="720" height="16" rx="2" style="fill:var(--surface-2);stroke:var(--border)"/>
+            <line x1="4" y1="132" x2="716" y2="132" style="stroke:var(--tension);stroke-width:3"/>
+            <line x1="122" y1="126" x2="598" y2="126" style="stroke:var(--tension);stroke-width:3"/></g>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-5.</b> 절단점 결정의 원리(정모멘트, 개념도). 남는 철근의 설계 휨강도(파랑 점선)가 포락선과 만나는 점이 <span class="term">이론 절단점</span><span class="en">(theoretical cutoff point)</span>이다. 실제로는 ① 이론 절단점에서 \(d\)와 \(12d_b\) 가운데 큰 값만큼 더 뻗고, ② 최대 모멘트 단면에서 \(l_d\) 이상이어야 하며, ③ 계속되는 철근은 이론 절단점에서 \(l_d\) 이상 묻혀 있어야 한다. 아래 띠는 보 입면의 하단 철근 길이다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 7.8 (휨철근의 절단, KDS 14 20 52 형태)</strong>
+      <ol class="dv-steps">
+        <li><b><span class="term">연장 길이</span><span class="en">(extension length)</span>.</b> 휨철근은 휨을 받는 데 더 이상 필요하지 않은 점(이론 절단점)을 지나 \(d\)와 \(12d_b\) 가운데 큰 길이 이상 연장한다(단순보 지점과 캔틸레버 끝은 제외). 모멘트도의 불확실성과 사인장 균열로 철근 힘이 옮겨 가는 효과(5장 트러스 모형에서 철근 힘이 모멘트도보다 \(d\) 정도 앞서 간다)를 덮는다.</li>
+        <li><b>정착.</b> 절단되는 철근은 그 철근의 최대 응력 단면(최대 모멘트 단면)에서 \(l_d\) 이상 묻혀 있어야 한다.</li>
+        <li><b>계속되는 철근.</b> 절단점에서 끝나는 철근이 휨에 필요 없어지는 점 너머로, 계속되는 철근은 \(l_d\) 이상 묻혀 있어야 한다.</li>
+        <li><b>인장 구역 절단.</b> 인장 구역에서 철근을 자르면 그 끝에서 균열이 일찍 생기고 전단강도가 준다. 다음 가운데 하나를 만족할 때만 자른다: 절단점의 \(V_u \le (2/3)\phi V_n\), 또는 절단점에서 \(3d/4\) 구간에 추가 스터럽, 또는 (D35 이하) 계속되는 철근이 절단점 소요의 두 배 이상이고 \(V_u \le (3/4)\phi V_n\).</li>
+      </ol></div>
+    <div class="sim" id="sim-dv-cutoff">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>G1 절단점 결정기: 포락선 · φM<sub>n</sub> 계단 · 정착 검토</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dv-cv-cut" aria-label="G1 모멘트 포락선과 설계 휨강도 계단, 철근 입면"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>편집할 철근 무리</span><div class="seg" id="dv-ct-grp"><button data-value="B" class="on">하단 2가닥</button><button data-value="T1">상단 2단 2가닥</button><button data-value="T2">상단 1단 가운데 2가닥</button></div></div>
+          <label class="ctrl"><span>하단 절단 위치(지점에서) <output id="dv-ct-xb-out"></output></span><input type="range" id="dv-ct-xb" min="0" max="3.5" step="0.05" value="0.6"></label>
+          <label class="ctrl"><span>상단 2단 절단 위치 <output id="dv-ct-x1-out"></output></span><input type="range" id="dv-ct-x1" min="0.4" max="4" step="0.05" value="1.2"></label>
+          <label class="ctrl"><span>상단 1단 절단 위치 <output id="dv-ct-x2-out"></output></span><input type="range" id="dv-ct-x2" min="0.4" max="4" step="0.05" value="1.8"></label>
+          <div class="ctrl"><span>포락선</span><div class="seg" id="dv-ct-env"><button data-value="env" class="on">포락선</button><button data-value="all">하중 경우 A·B·C</button></div></div>
+          <div class="btn-row"><button class="btn" id="dv-ct-auto">기준대로 자동 결정</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">이론 절단점</span><span class="v" id="dv-ct-xt">—</span></div>
+        <div class="stat"><span class="k">필요 최소/최대 위치</span><span class="v" id="dv-ct-need">—</span></div>
+        <div class="stat"><span class="k">절단점 V<sub>u</sub> / (2/3)φV<sub>n</sub></span><span class="v" id="dv-ct-v">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="dv-ct-ok">—</span></div>
+      </div>
+      <ul class="dv-checks" id="dv-ct-list"><li>—</li></ul>
+      <div class="sim-note">해볼 것: 그래프를 좌우로 끌면 고른 무리의 절단 위치가 옮겨집니다 · 하단 2가닥을 이론 절단점(2.01 m)까지 당겨 보면 연장 길이 검토가 불합격입니다 · 상단 2단 철근은 이론 절단점이 0.35 m로 지점에 아주 가깝지만, 상부 철근 정착 길이 1,809 mm 때문에 2.2 m 넘게 뻗어야 합니다 — "정착이 지배한다" · "자동 결정"은 원리 7.8의 네 조건을 모두 만족하는 가장 짧은 위치(0.05 m 단위)를 고릅니다 · 모델: 포락선은 하중 경우 A·B·C(<code>CB.beam</code>, 교육용), φM<sub>n</sub>은 <code>CB.rc.flexure</code>(하단 d 634, 상단 1단 d 634·2단 d 584), l<sub>d</sub>는 간이식(하단 1,391, 상단 1,809 mm), 상단 정착의 위험 단면은 기둥 면(지점 중심에서 0.4 m), φV<sub>n</sub> = 0.75(V<sub>c</sub> 223 + V<sub>s</sub> 412) = 476 kN. 위치는 지점 중심에서 잰 값이며 양쪽 대칭입니다.</div>
+    </div>
+    <div class="callout"><strong>예제 7.4 (G1 하단·상단 철근의 절단점)</strong> 포락선은 위 표의 A·B·C, \(\phi M_n\)은 4-D25(d 634) 503, 2-D25 262, 상단 6-D25(2단) 701, 4-D25 503 kN·m. 거리는 지점 중심에서 잰다.
+      <ol class="dv-steps">
+        <li><b>하단 2가닥.</b> 경우 A에서 \(M = -340 + 50x(8 - x) = 262\) → \(x = 2.01\) m가 이론 절단점. 연장 \(\max(d, 12d_b) = \max(634, 305) = 634\) mm → \(x \le 2.01 - 0.63 = 1.38\) m. 최대 모멘트 단면(중앙 4.0 m)에서 \(4.0 - 1.38 = 2.62\) m ≥ \(l_d\) 1.39 m. 계속되는 2가닥은 2.01 m에서 지점 쪽으로 2.01 m + 지점 안 길이 ≥ 1.39 m. 인장 구역(경우 A에서 1.38 m의 \(M = +117\) kN·m)에서 자르므로 \(V_u = 100(4 - 1.38) = 262\) kN ≤ \((2/3) \times 476 = 317\) kN 확인. → <b>지점 중심에서 1.35 m에서 절단</b>(양쪽), 길이 \(8.0 - 2 \times 1.35 = 5.3\) m.</li>
+        <li><b>상단 2단 2가닥(6 → 4).</b> 경우 B에서 \(-640 + 50x(8 - x) = -503\) → 이론 절단점 0.35 m. 연장 \(d = 610\) mm → 0.96 m. 그러나 정착: 기둥 면(0.4 m)에서 \(l_d = 1.81\) m → 2.21 m. <b>정착이 지배</b>해 2.25 m.</li>
+        <li><b>상단 1단 가운데 2가닥(4 → 2).</b> 이론 절단점은 \(-640 + 50x(8 - x) = -262\) → 1.03 m, 연장 → 1.64 m. 기둥 면에서 \(l_d\) → 2.21 m. 계속되는 철근 조건: 2단 철근이 필요 없어지는 0.35 m에서 \(l_d\) → 2.16 m. 가장 큰 값 2.21 m → <b>2.25 m</b>. 결국 상단 4가닥을 같은 점에서 자르게 된다.</li>
+        <li><b>인장 구역 확인.</b> 2.25 m는 경우 C의 부모멘트 구간(변곡점 2.63 m) 안이므로 인장 구역이다. \(V_u = 100(4 - 2.25) = 175\) kN ≤ 317 kN 합격.</li>
+        <li><b>남는 2가닥.</b> 모서리 2-D25(1/3)는 경간 전체를 지나 스터럽을 걸고, 변곡점 너머 연장 조건(다음 절)을 자동으로 만족한다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="supports">
+    <h2>정모멘트 철근의 지점 정착과 부모멘트 철근의 연장</h2>
+    <div class="problem"><strong>지점에서는 정모멘트가 0인데 하단 철근을 왜 넣나</strong>
+      <p>포락선만 보면 G1 하단 철근은 지점 근처(0.97 m 안쪽)에서 필요 없습니다. 그래도 기준은 하단 철근의 일부를 반드시 지점 안까지 넣으라고 합니다. 모멘트 재분배, 예상하지 못한 하중(지점 침하, 기둥 손상 뒤의 연쇄 붕괴 저항), 사인장 균열이 지점 근처 하단 철근에 만드는 인장(5장 트러스 모형) 때문입니다.</p></div>
+    <figure class="diagram" id="fig-dv-sup">
+      <svg viewBox="0 0 860 300" role="img" aria-label="연속보 지점부의 정모멘트 철근 연장, 부모멘트 철근의 변곡점 너머 연장, 단순 지점의 정착 검토">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,36)">
+          <rect x="330" y="0" width="80" height="230" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <text x="370" y="246" text-anchor="middle" class="t-mono">기둥</text>
+          <rect x="0" y="40" width="740" height="90" style="fill:var(--surface-2);stroke:var(--border);opacity:.7"/>
+          <line x1="80" y1="52" x2="660" y2="52" style="stroke:var(--tension);stroke-width:4"/>
+          <line x1="0" y1="58" x2="760" y2="58" style="stroke:var(--tension);stroke-width:4;opacity:.6"/>
+          <line x1="0" y1="118" x2="350" y2="118" style="stroke:var(--tension);stroke-width:4"/>
+          <line x1="390" y1="118" x2="740" y2="118" style="stroke:var(--tension);stroke-width:4"/>
+          <line x1="300" y1="112" x2="350" y2="112" style="stroke:var(--accent-2);stroke-width:2"/>
+          <text x="232" y="148" class="t-mono" style="fill:var(--tension)">하단 철근의 1/4 이상(연속보)</text>
+          <text x="232" y="162" class="t-mono" style="fill:var(--tension)">지점 안으로 150 mm 이상</text>
+          <line x1="80" y1="20" x2="80" y2="140" style="stroke:var(--warn);stroke-dasharray:4 3"/>
+          <text x="84" y="22" class="t-mono" style="fill:var(--warn)">변곡점</text>
+          <text x="50" y="38" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">연장</text>
+          <text x="440" y="22" class="t-mono">부모멘트 철근 1/3 이상: 변곡점 너머 max(d, 12d<tspan baseline-shift="sub" font-size="8">b</tspan>, l<tspan baseline-shift="sub" font-size="8">n</tspan>/16)</text>
+          <line x1="20" y1="44" x2="80" y2="44" style="stroke:var(--accent-2);stroke-width:1.5" marker-start="url(#dv-ah-ld)" marker-end="url(#dv-ah-ld)"/>
+          <text x="440" y="190" class="t" style="font-weight:700">단순 지점·변곡점의 정착 검토</text>
+          <text x="440" y="210" class="t-mono">l<tspan baseline-shift="sub" font-size="8">d</tspan> ≤ 1.3·M<tspan baseline-shift="sub" font-size="8">n</tspan>/V<tspan baseline-shift="sub" font-size="8">u</tspan> + l<tspan baseline-shift="sub" font-size="8">a</tspan>(지점 반력이 끝을 누를 때)</text>
+          <text x="440" y="228" class="t-mono">l<tspan baseline-shift="sub" font-size="8">d</tspan> ≤ M<tspan baseline-shift="sub" font-size="8">n</tspan>/V<tspan baseline-shift="sub" font-size="8">u</tspan> + l<tspan baseline-shift="sub" font-size="8">a</tspan>(변곡점, l<tspan baseline-shift="sub" font-size="8">a</tspan> ≤ max(d, 12d<tspan baseline-shift="sub" font-size="8">b</tspan>))</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-6.</b> 지점부 배근 규칙(KDS 14 20 52 형태, 현행 기준 확인). 정모멘트 철근은 단순보에서 1/3, 연속보에서 1/4 이상을 지점 안으로 150 mm 이상 넣는다. 부모멘트 철근은 1/3 이상을 변곡점 너머 \(d\), \(12d_b\), 순경간의 1/16 가운데 큰 값 이상 연장한다. 정모멘트 철근이 끝나는 단순 지점과 변곡점에서는 지름을 제한하는 검토가 따로 있다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 7.9 (단순 지점과 변곡점의 정모멘트 철근, KDS 14 20 52 형태)</strong> 정모멘트 철근이 끝나는 단순 지점과 <span class="term">변곡점</span><span class="en">(point of inflection)</span>에서는 그 철근의 \(l_d\)가
+      <div class="formula">$$l_d \le \frac{M_n}{V_u} + l_a$$<div class="where">\(M_n\): 그 단면에 계속되는 철근이 모두 \(f_y\)라고 본 공칭 휨강도, \(V_u\): 그 단면의 계수 전단력, \(l_a\): 지점 중심 너머 묻힌 길이(변곡점에서는 \(d\)와 \(12d_b\) 가운데 큰 값 이하). 철근 끝이 지점 반력으로 눌리면 \(M_n/V_u\)에 1.3을 곱한다. 지점 근처에서 모멘트가 \(V_u\)의 기울기로 빠르게 커지므로, 철근이 짧은 거리 안에 \(f_y\)에 이를 수 있을 만큼 가늘어야 한다는 조건이다. 만족하지 않으면 철근을 가늘게 하거나 갈고리를 둔다.</div></div></div>
+    <p>G1에서 확인해 봅시다. 하단에 계속되는 2-D25의 \(M_n = 262/0.85 \approx 309\) kN·m(\(\phi = 0.85\)), 경우 A의 정모멘트 변곡점(지점에서 0.97 m)에서 \(V_u = 100 \times (4 - 0.97) = 303\) kN이므로 \(M_n/V_u = 1.02\) m, \(l_a = \max(634, 305) = 634\) mm → \(1.02 + 0.63 = 1.65\) m ≥ \(l_d = 1.39\) m. 합격입니다. 상단 모서리 2-D25는 부모멘트 철근의 1/3(6가닥 중 2가닥)으로 경간 전체를 지나므로 변곡점(경우 C, 2.63 m) 너머 연장 \(\max(610, 305, 7{,}200/16 = 450) = 610\) mm 조건을 자동으로 만족합니다.</p>
+    <div class="callout warn"><strong>구조 일체성 철근</strong> 기준은 둘레 보와 보의 하단 철근 일부를 연속시키거나 기계식·용접 이음, 갈고리로 지점에 정착해(<span class="term">구조 일체성</span><span class="en">(structural integrity)</span>), 기둥 하나가 손상되어도 보가 현수 작용으로 하중을 잡을 수 있게 하라고 요구한다(구조 일체성 요구, KDS 14 20 50 / 41 20 형태, 이음 위치·비율은 현행 기준 확인). 하단 철근을 지점 근처에서 모두 자르는 계획은 강도 검토를 통과해도 이 요구를 어길 수 있다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="lap-splices">
+    <h2>겹침 이음: A급과 B급</h2>
+    <div class="problem"><strong>이음은 어디에 두고, 얼마나 겹쳐야 하나</strong>
+      <p>B-10의 X 방향 골조는 4경간 32 m라서 G1의 철근은 어디선가 이어야 합니다. 겹침 이음에서는 한 철근의 힘이 부착으로 콘크리트에 넘어갔다가 옆 철근으로 다시 들어갑니다. 두 철근 모두 정착 길이만큼 겹치면 될 것 같지만, 이음 끝에서는 쪼갬 균열이 몰리고 이음 구간의 응력 상태가 단순 정착보다 나쁩니다. 그래서 이음이 있는 곳의 철근 여유와 한곳에서 잇는 비율에 따라 길이를 늘립니다.</p></div>
+    <div class="callout def"><strong>원리 7.10 (인장 이형철근의 겹침 이음, KDS 14 20 52 형태)</strong> <span class="term">겹침 이음</span><span class="en">(lap splice)</span>의 길이는
+      <div class="formula">$$\text{A급: } l_s = 1.0\,l_d, \qquad \text{B급: } l_s = 1.3\,l_d, \qquad l_s \ge 300\ \text{mm}$$<div class="where">\(l_d\)는 과다 철근 보정을 하지 않은 인장 정착 길이(위치·도막 등 보정은 적용). <b><span class="term">A급 이음</span><span class="en">(class A splice)</span></b>: 이음 구간 전체에서 배근 \(A_s\)가 소요 \(A_s\)의 2배 이상이고, 이음 길이 안에서 잇는 철근이 전체의 1/2 이하. <b><span class="term">B급 이음</span><span class="en">(class B splice)</span></b>: 그 밖의 경우. 두 철근을 띄워 두는 <span class="term">비접촉 겹침 이음</span><span class="en">(non-contact lap splice)</span>은 철근 간격을 이음 길이의 1/5과 150 mm 가운데 작은 값 이하로 한다(형태). 철근 응력이 큰 곳에서는 이음을 피하고, 엇갈려 잇는다. D35를 넘는 철근은 겹침 이음하지 않는다(형태).</div></div></div>
+    <figure class="diagram" id="fig-dv-lap">
+      <svg viewBox="0 0 860 300" role="img" aria-label="겹침 이음 구간의 힘 전달, 압축 스트럿과 쪼갬 균열, 엇갈린 이음">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">겹침 구간의 힘 흐름</text>
+          <rect x="0" y="16" width="440" height="100" rx="3" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <line x1="0" y1="56" x2="320" y2="56" style="stroke:var(--tension);stroke-width:9;stroke-linecap:round"/>
+          <line x1="120" y1="78" x2="440" y2="78" style="stroke:var(--tension);stroke-width:9;stroke-linecap:round"/>
+          <g style="stroke:var(--compression);stroke-width:2">
+            <line x1="135" y1="60" x2="155" y2="74"/><line x1="165" y1="60" x2="185" y2="74"/><line x1="195" y1="60" x2="215" y2="74"/><line x1="225" y1="60" x2="245" y2="74"/><line x1="255" y1="60" x2="275" y2="74"/><line x1="285" y1="60" x2="305" y2="74"/>
+          </g>
+          <g style="stroke:var(--bad);stroke-width:1.6"><path d="M120 16 L126 50"/><path d="M320 116 L314 84"/></g>
+          <g style="stroke:var(--accent);stroke-width:3"><line x1="150" y1="18" x2="150" y2="114"/><line x1="230" y1="18" x2="230" y2="114"/><line x1="310" y1="18" x2="310" y2="114"/></g>
+          <line x1="120" y1="132" x2="320" y2="132" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/>
+          <text x="220" y="148" text-anchor="middle" class="t-mono">이음 길이 l<tspan baseline-shift="sub" font-size="8">s</tspan></text>
+          <text x="0" y="172" class="t-mono" style="fill:var(--compression)">빨강: 철근 사이 비스듬한 압축(스트럿)</text>
+          <text x="0" y="188" class="t-mono" style="fill:var(--bad)">이음 끝: 쪼갬 균열이 시작되는 곳</text>
+          <text x="0" y="204" class="t-mono" style="fill:var(--accent)">스터럽: 쪼갬을 가로질러 붙잡는다</text>
+          <g transform="translate(0,220)">
+            <text x="0" y="12" class="t-dim">비접촉 이음: 두 철근 간격 ≤ min(l<tspan baseline-shift="sub" font-size="8">s</tspan>/5, 150 mm)(형태)</text>
+          </g>
+        </g>
+        <g transform="translate(520,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">이음 위치</text>
+          <text x="0" y="28" class="t-mono">한곳에서 전부(100 %)</text>
+          <g transform="translate(0,36)"><line x1="0" y1="8" x2="140" y2="8" style="stroke:var(--tension);stroke-width:5"/><line x1="0" y1="18" x2="140" y2="18" style="stroke:var(--tension);stroke-width:5"/><line x1="100" y1="13" x2="280" y2="13" style="stroke:var(--tension);stroke-width:5;opacity:.55"/><line x1="100" y1="23" x2="280" y2="23" style="stroke:var(--tension);stroke-width:5;opacity:.55"/><rect x="100" y="0" width="40" height="30" style="fill:none;stroke:var(--bad);stroke-dasharray:3 2"/></g>
+          <text x="0" y="96" class="t-mono">엇갈림(50 %씩)</text>
+          <g transform="translate(0,104)"><line x1="0" y1="8" x2="90" y2="8" style="stroke:var(--tension);stroke-width:5"/><line x1="50" y1="12" x2="280" y2="12" style="stroke:var(--tension);stroke-width:5;opacity:.55"/><line x1="0" y1="24" x2="200" y2="24" style="stroke:var(--tension);stroke-width:5"/><line x1="160" y1="28" x2="280" y2="28" style="stroke:var(--tension);stroke-width:5;opacity:.55"/></g>
+          <text x="0" y="170" class="t-dim">이음 사이 중심 간격은 1.3l<tspan baseline-shift="sub" font-size="8">s</tspan> 이상 띄우는</text>
+          <text x="0" y="186" class="t-dim">형태가 흔하다(한 이음 구간 안에 들지 않게).</text>
+          <text x="0" y="214" class="t-dim">모멘트가 작은 곳 + 엇갈림 → A급 가능</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-7.</b> 겹침 이음. 한 철근의 힘은 두 철근 사이의 비스듬한 콘크리트 압축으로 옆 철근에 넘어가고, 그 반지름 성분이 이음 끝에서 쪼갬 균열을 만든다. 이음을 감싸는 스터럽·띠철근이 쪼갬을 붙잡는다. 오른쪽: 한곳에 모든 철근을 이으면 그 단면이 가장 약해지므로 이음을 엇갈린다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 7.11 (압축 이형철근의 겹침 이음, KDS 14 20 52 형태)</strong>
+      <div class="formula">$$l_s = \begin{cases} 0.072\,f_y\,d_b & f_y \le 400\ \text{MPa} \\[3pt] (0.13\,f_y - 24)\,d_b & f_y \gt 400\ \text{MPa} \end{cases} \qquad \ge 300\ \text{mm}$$<div class="where">압축 철근끼리의 <span class="term">압축 이음</span><span class="en">(compression splice)</span>은 끝 지압이 일부를 전달하므로 인장 이음보다 짧다. \(f_{ck} \lt 21\) MPa이면 1/3을 더한다. 띠철근·나선 철근 기둥은 조건에 따라 0.83·0.75배까지 줄이는 형태가 있다. 서로 다른 지름의 압축 철근을 이을 때는 굵은 철근의 정착 길이와 가는 철근의 이음 길이 가운데 큰 값으로 한다. 기둥 주근처럼 하중 조합에 따라 인장이 생길 수 있는 철근은 인장 이음 조건도 확인한다.</div></div></div>
+    <div class="callout"><strong>예제 7.5 (G1 이음 길이)</strong> D25 SD500, \(f_{ck} = 30\) MPa.
+      <ol class="dv-steps">
+        <li><b>하단 철근 B급.</b> \(l_s = 1.3 \times 1{,}391 = 1{,}808\) mm. A급 조건(소요의 2배 이상 · 1/2 이하 이음)을 만족하는 곳이면 1,391 mm.</li>
+        <li><b>상단 철근 B급.</b> 상부 철근 α = 1.3 → \(l_d = 1{,}809\) mm, \(l_s = 1.3 \times 1{,}809 = 2{,}351\) mm. 굵은 상부 철근의 인장 이음은 2.4 m에 이른다. 이음 위치를 잘 고르는 것만으로 0.5 m 넘게 줄일 수 있다.</li>
+        <li><b>압축 이음(기둥 C1 주근).</b> \(f_y = 500 \gt 400\) → \((0.13 \times 500 - 24) \times 25.4 = 41 \times 25.4 = 1{,}041\) mm. 인장 이음(1,808 mm)의 58 %다.</li>
+        <li><b>판정 기준.</b> 이음 위치의 소요 \(A_s\)는 그 점의 포락선 \(M_u\)로 <code>CB.rc.asReq</code>를 써서 구하고, 배근 \(A_s\)와 비교해 A/B급을 정한다(시뮬레이터).</li>
+      </ol></div>
+    <div class="sim" id="sim-dv-splice">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>겹침 이음 위치 고르기: 포락선 위의 A급·B급</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dv-cv-spl" aria-label="모멘트 포락선 위의 이음 구간과 판정"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>이을 철근</span><div class="seg" id="dv-sp-bars"><button data-value="bot" class="on">하단 계속 철근 2-D25</button><button data-value="top">상단 모서리 2-D25</button></div></div>
+          <label class="ctrl"><span>이음 중심 위치 x <output id="dv-sp-x-out"></output></span><input type="range" id="dv-sp-x" min="0" max="8" step="0.05" value="4"></label>
+          <div class="ctrl"><span>한 구간에서 잇는 비율</span><div class="seg" id="dv-sp-pct"><button data-value="100" class="on">전부</button><button data-value="50">절반(엇갈림)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">구간 최대 M<sub>u</sub>(인장측)</span><span class="v" id="dv-sp-mu">—</span></div>
+        <div class="stat"><span class="k">배근/소요 A<sub>s</sub></span><span class="v" id="dv-sp-r">—</span></div>
+        <div class="stat"><span class="k">등급</span><span class="v" id="dv-sp-cls">—</span></div>
+        <div class="stat"><span class="k">이음 길이 l<sub>s</sub></span><span class="v" id="dv-sp-ls">—</span></div>
+      </div>
+      <div class="dv-msg" id="dv-sp-msg">—</div>
+      <div class="sim-note">해볼 것: 하단 철근을 경간 중앙(4 m)에서 이으면 왜 나쁜지, 지점 근처(0.5 m)로 옮기면 어떻게 되는지 보세요 · 상단 모서리 철근은 반대로 경간 중앙이 좋은 자리입니다(포락선에 상단 인장이 없음) · "절반(엇갈림)"이 A급의 두 번째 조건입니다 · 이음 구간이 인장 철근 응력이 거의 f<sub>y</sub>인 곳(배근/소요 &lt; 1.2)에 걸치면 경고가 나옵니다 · 모델: 포락선 A·B·C(교육용), 이음 구간 안 최대 M<sub>u</sub>로 소요 A<sub>s</sub> = <code>CB.rc.asReq</code>(하단 d 634, 상단 d 610), 배근 A<sub>s</sub>는 예제 7.4의 절단 계획(하단 1.35 m, 상단 2.25 m), 원리 7.10. 교육용.</div>
+    </div>
+    <div class="sim" id="sim-dv-lap">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>이음 구간의 응력 전달 애니메이션</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dv-cv-lap" aria-label="겹침 이음 두 철근의 응력 분포와 쪼갬 균열"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">이음 길이 l<sub>s</sub>/d<sub>b</sub></i> <output id="dv-lp-ls-out"></output></span><input type="range" id="dv-lp-ls" min="10" max="90" step="1" value="40"></label>
+          <label class="ctrl"><span><i style="font-style:normal">순피복 c/d<sub>b</sub></i> <output id="dv-lp-c-out"></output></span><input type="range" id="dv-lp-c" min="0.8" max="3" step="0.1" value="1.6"></label>
+          <div class="ctrl"><span>횡보강</span><div class="seg" id="dv-lp-tr"><button data-value="0">없음</button><button data-value="1" class="on">스터럽 @150</button><button data-value="2">스터럽 @75</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">하중 단계 T/(A<sub>b</sub>f<sub>y</sub>)</i> <output id="dv-lp-p-out"></output></span><input type="range" id="dv-lp-p" min="0" max="1.25" step="0.01" value="0.6"></label>
+          <div class="btn-row"><button class="btn" id="dv-lp-play">▶ 당기기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">전달 가능 힘 / A<sub>b</sub>f<sub>y</sub></span><span class="v" id="dv-lp-cap">—</span></div>
+        <div class="stat"><span class="k">필요 이음 길이(이 모델)</span><span class="v" id="dv-lp-need">—</span></div>
+        <div class="stat"><span class="k">기준 B급 l<sub>s</sub>(D25)</span><span class="v" id="dv-lp-code">—</span></div>
+        <div class="stat"><span class="k">상태</span><span class="v" id="dv-lp-st">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: ▶ 당기기로 하중을 올리며 왼쪽 철근의 힘이 이음 구간에서 오른쪽 철근으로 넘어가는 모습을 보세요 · 이음 길이를 줄이면 철근이 항복하기 전에 이음 끝에서 쪼갬 균열이 퍼져 이음이 미끄러집니다 · 같은 길이에서 스터럽 간격을 줄이면 전달 가능 힘이 커집니다 — 기둥 밑동 이음이 띠철근에 민감한 이유입니다 · 모델(교육용): 이음 부착 강도 u = 0.6√f<sub>ck</sub>((c + K<sub>tr</sub>)/d<sub>b</sub> + 0.5) ≤ 2.5√f<sub>ck</sub>, K<sub>tr</sub> = 40A<sub>tr</sub>/(sn)(2-D13, n = 4), 이음 구간 안 응력은 직선 전달, f<sub>ck</sub> 30, D25 SD500. 기준 길이는 원리 7.10.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="mechanical">
+    <h2>기계식 이음과 용접 이음</h2>
+    <div class="problem"><strong>2.4 m를 겹칠 수 없을 때</strong>
+      <p>굵은 철근(D29 이상)의 인장 겹침 이음은 2–3 m에 이르고, 기둥 밑동처럼 철근이 붐비는 곳에서는 겹친 철근 때문에 콘크리트가 잘 채워지지 않습니다. D35를 넘는 철근은 아예 겹침 이음을 하지 않습니다. 이때는 철근을 직접 잇는 이음 장치를 씁니다.</p></div>
+    <p><span class="term">기계식 이음</span><span class="en">(mechanical splice)</span>은 <span class="term">커플러</span><span class="en">(coupler)</span>(이음 장치)로 두 철근을 잇는 방법입니다. 철근 끝에 나사를 깎거나 굴려 만들고 나사 슬리브로 잇는 나사식, 슬리브를 철근에 눌러 붙이는 압착식, 슬리브 안에 무수축 그라우트나 용융 금속을 채우는 충전식 등이 있습니다. 기준은 기계식 이음이 철근 설계기준항복강도의 125 % 이상을 발휘하도록 요구하는 형태이고(현행 KDS 14 20 52와 내진 상세 등급 확인), 지진 하중을 받는 소성 힌지 구간에는 철근 인장강도 수준까지 발휘하는 등급을 요구하거나 이음 위치를 제한합니다. <span class="term">용접 이음</span><span class="en">(welded splice)</span>도 125 % 이상을 발휘하는 완전 용입 맞대기 용접이어야 하고, 용접할 수 있는 강종(용접용 W 표시 등, MaterialsBook 11장)이어야 합니다.</p>
+    <div class="table-wrap"><table class="dv-tbl">
+      <thead><tr><th>방법</th><th>장점</th><th>주의할 점</th><th>쓰는 곳</th></tr></thead>
+      <tbody>
+        <tr><td>인장 겹침 이음</td><td>장치가 필요 없고 싸다, 시공 단순</td><td>길다(굵은 철근 2–3 m), 철근 혼잡, 쪼갬, D35 초과 불가(형태)</td><td>슬래브·보의 일반 이음</td></tr>
+        <tr><td>압축 겹침 이음</td><td>인장보다 짧다</td><td>인장이 생기는 조합 확인</td><td>기둥 주근</td></tr>
+        <tr><td>기계식 이음(나사·압착·충전)</td><td>짧고 붐비지 않음, 굵은 철근 가능</td><td>장치 성능 인증·시험, 나사 가공 품질, 피복 확보(커플러 지름이 크다)</td><td>기둥·벽·교각 주근, 프리캐스트 접합</td></tr>
+        <tr><td>용접 이음</td><td>장치가 없다</td><td>용접성 강종, 현장 품질 관리, 열 영향</td><td>제한적</td></tr>
+      </tbody></table></div>
+    <div class="callout site"><strong>C1 기둥 주근의 이음</strong> C1(800 × 800 mm, 16-D25)의 주근은 층마다 잇는다. 압축 겹침 이음이면 원리 7.11로 \(1{,}041\) mm, 인장이 생길 수 있는 조합이면 B급 인장 이음 1,808 mm다. 층고 4 m 기둥의 아래쪽 1/4–1/3에 1.8 m짜리 이음 16개가 모이면 띠철근 간격이 촘촘한 소성 힌지 구간(12장)과 겹쳐 콘크리트 채움이 어려워진다. 그래서 고층 RC 건물의 기둥 주근은 기계식 이음으로 층 중간에서 엇갈려 잇는 경우가 많다. 이 책은 C1을 압축 이음 1,041 mm, 층 바닥 위 기둥 중간 높이 쪽 배치로 가정하고(교육용), 내진 상세의 이음 위치 제한은 12장에서 다룬다.</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="g1-plan">
+    <h2>G1 절단·이음 계획과 철근 물량</h2>
+    <div class="problem"><strong>계산을 도면으로</strong>
+      <p>예제 7.4와 7.5의 결과를 한 장의 배근도로 모읍시다. 어느 철근이 어디서 끝나고, 어디서 이어지며, 한 경간에 철근이 몇 kg 들어가는지를 정리하면 절단의 이득과 대가가 보입니다.</p></div>
+    <figure class="diagram" id="fig-dv-plan">
+      <svg viewBox="0 0 860 330" role="img" aria-label="G1 내부 경간의 상하단 철근 절단과 이음 계획 입면도">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(50,40)">
+          <rect x="-30" y="0" width="60" height="230" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <rect x="730" y="0" width="60" height="230" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <rect x="0" y="70" width="760" height="100" style="fill:var(--surface-2);stroke:var(--border);opacity:.6"/>
+          <text x="0" y="250" class="t-mono">지점 중심</text><text x="760" y="250" text-anchor="end" class="t-mono">지점 중심</text>
+          <line x1="0" y1="260" x2="760" y2="260" class="s-line" marker-start="url(#dv-ah)" marker-end="url(#dv-ah)"/><text x="380" y="276" text-anchor="middle" class="t-mono">8,000</text>
+          <g style="stroke:var(--tension);stroke-width:4">
+            <line x1="-30" y1="80" x2="790" y2="80"/>
+          </g>
+          <line x1="-30" y1="88" x2="214" y2="88" style="stroke:var(--compression);stroke-width:4"/>
+          <line x1="546" y1="88" x2="790" y2="88" style="stroke:var(--compression);stroke-width:4"/>
+          <text x="40" y="62" class="t-mono">상단 6-D25 중 4가닥: 지점에서 2,250</text>
+          <text x="400" y="62" class="t-mono">모서리 2-D25: 연속(중앙부 이음)</text>
+          <line x1="214" y1="96" x2="214" y2="108" style="stroke:var(--compression)"/><text x="218" y="108" class="t-mono" style="fill:var(--compression)">2,250</text>
+          <rect x="268" y="72" width="224" height="16" style="fill:none;stroke:var(--accent-2);stroke-dasharray:4 3"/>
+          <text x="380" y="104" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">상단 이음 구간 2,351(B급, 압축 구역)</text>
+          <g style="stroke:var(--tension);stroke-width:4"><line x1="-30" y1="160" x2="790" y2="160"/></g>
+          <line x1="128" y1="152" x2="632" y2="152" style="stroke:var(--warn);stroke-width:4"/>
+          <text x="128" y="144" class="t-mono" style="fill:var(--warn)">하단 2가닥: 지점에서 1,350 → 길이 5,300</text>
+          <text x="40" y="190" class="t-mono" style="fill:var(--tension)">하단 모서리 2-D25: 연속, 지점 부근 이음</text>
+          <rect x="-26" y="154" width="70" height="14" style="fill:none;stroke:var(--accent-2);stroke-dasharray:4 3"/>
+          <text x="40" y="206" class="t-mono" style="fill:var(--accent-2)">하단 이음: 지점 ±0.7 m 안, A급 1,391(엇갈림)</text>
+          <g style="stroke:var(--accent);stroke-width:1.4;opacity:.8">
+            <line x1="40" y1="74" x2="40" y2="166"/><line x1="70" y1="74" x2="70" y2="166"/><line x1="100" y1="74" x2="100" y2="166"/><line x1="660" y1="74" x2="660" y2="166"/><line x1="690" y1="74" x2="690" y2="166"/><line x1="720" y1="74" x2="720" y2="166"/>
+          </g>
+          <text x="560" y="206" class="t-mono" style="fill:var(--accent)">스터럽 2-D13@150</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-8.</b> G1 내부 경간의 절단·이음 계획(교육용, 대칭). 상단 6-D25 가운데 4가닥(2단 2가닥 + 1단 가운데 2가닥)은 지점 중심에서 2.25 m에서 자르고, 모서리 2가닥은 연속시켜 상단 인장이 없는 경간 중앙부에서 잇는다. 하단 4-D25 가운데 2가닥은 지점 중심에서 1.35 m에서 자르고(길이 5.3 m), 모서리 2가닥은 연속시켜 정모멘트가 없는 지점 부근에서 엇갈려 잇는다. 이음 등급은 시뮬레이터 "겹침 이음 위치 고르기"로 확인한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-dv-plan">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>G1 배근 계획과 철근 물량</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dv-cv-plan" aria-label="G1 한 경간 배근 입면과 철근 길이"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>계획</span><div class="seg" id="dv-pl-plan"><button data-value="full">모두 통으로</button><button data-value="cut" class="on">절단 계획(예제 7.4)</button><button data-value="simple">단순보 근사 7-D25</button></div></div>
+          <div class="ctrl"><span>이음 길이 포함</span><div class="seg" id="dv-pl-lap"><button data-value="0">빼기</button><button data-value="1" class="on">넣기</button></div></div>
+          <label class="ctrl"><span>경간 수(X 방향 골조) <output id="dv-pl-n-out"></output></span><input type="range" id="dv-pl-n" min="1" max="4" step="1" value="4"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">주근 길이(한 경간)</span><span class="v" id="dv-pl-len">—</span></div>
+        <div class="stat"><span class="k">주근 질량(한 경간)</span><span class="v" id="dv-pl-kg">—</span></div>
+        <div class="stat"><span class="k">골조 한 줄 합계</span><span class="v" id="dv-pl-tot">—</span></div>
+        <div class="stat"><span class="k">"모두 통으로" 대비</span><span class="v" id="dv-pl-sav">—</span></div>
+      </div>
+      <div class="table-wrap" style="margin:0;border-top:1px solid var(--border)"><table class="dv-sched" id="dv-pl-tbl"><thead><tr><th>철근</th><th>개수</th><th>길이(m)</th><th>소계(m)</th><th>질량(kg)</th></tr></thead><tbody><tr><td>—</td></tr></tbody></table></div>
+      <div class="sim-note">해볼 것: "모두 통으로"와 "절단 계획"의 질량 차이를 보세요 — 철근은 약 25–30 %(이음 포함) 줄지만 철근 종류(길이)가 늘어 가공·조립이 복잡해집니다 · "단순보 근사 7-D25"는 MaterialsBook 11장의 물량 산출 가정(하단 7-D25)입니다. 연속보 설계로 하단 철근이 얼마나 줄었는지 비교하세요 · 모델: 길이는 지점 중심 사이 8 m 기준(기둥 안 정착 길이·갈고리 제외), 이음은 경간마다 상·하단 모서리 2가닥씩 하나(하단 A급 1.39 m, 상단 B급 2.35 m), D25 3.98 kg/m(<code>CB.steel.BARS</code>), 스터럽 제외. 교육용.</div>
+    </div>
+    <div class="callout site"><strong>G1 정착·절단·이음 요약(교육용)</strong> D25 SD500, \(f_{ck}\) 30 MPa: 기본 정착 길이 \(l_{db} = 1{,}391\) mm, 상부 철근 \(l_d = 1{,}809\) mm, 정밀식 하단 859 mm, 갈고리 \(l_{hb} = 556\) mm(보정 0.7 → 389 mm, 바깥 기둥 정착 가능), 압축 \(l_d = 580\) mm. 절단: 하단 4-D25 중 2가닥 지점 중심에서 1.35 m(인장 구역, \(V_u\) 262 ≤ 317 kN), 상단 6-D25 중 4가닥 2.25 m(상부 철근 정착이 지배). 이음: 하단 모서리 철근은 지점 부근 A급 1,391 mm(엇갈림), 상단 모서리 철근은 경간 중앙부 B급 2,351 mm, 기둥 C1 주근은 압축 이음 1,041 mm. 한 경간 주근 질량은 절단 계획으로 "모두 통으로" 대비 약 30 %(이음 포함, 이음을 빼면 24 %) 줄어든다. 모든 계수는 KDS 14 20 52 형태이며 실제 설계에는 현행 기준과 내진 상세(12장)를 적용한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="flexure.html"><small>CH.03 · 단철근 보의 휨</small>철근이 f<sub>y</sub>를 낸다는 가정<br><span>φM<sub>n</sub> 계산은 정착이 확보될 때만 성립.</span></a>
+      <a href="t-beam.html"><small>CH.04 · 복철근 보와 T형 보</small>연속보 포락선과 상하 배근<br><span>G1 6-D25 부모멘트 철근의 절단.</span></a>
+      <a href="shear.html"><small>CH.05 · 전단</small>트러스 모형과 철근 힘의 이동<br><span>연장 길이 d, 인장 구역 절단의 전단 조건.</span></a>
+      <a href="serviceability.html"><small>CH.08 · 처짐과 균열</small>균열 사이 부착과 인장 강성<br><span>균열 간격·폭, 유효 단면 2차 모멘트.</span></a>
+      <a href="footings.html"><small>CH.13 · 기초</small>기둥 장부 철근의 압축 정착<br><span>기초 두께가 압축 l<sub>d</sub>와 갈고리로 정해지기도.</span></a>
+      <a href="walls-detailing.html"><small>CH.12 · 벽체와 내진 상세</small>소성 힌지 밖 이음, 135° 갈고리<br><span>내진 상세의 이음 위치 제한.</span></a>
+      <a href="../../materials/chapters/rebar.html#splices"><small>MaterialsBook · CH.11</small>부착 메커니즘과 이음 방법<br><span>뽑힘 시험, 커플러, 철근 물량.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>부착 응력 u = (d<sub>b</sub>/4)df<sub>s</sub>/dx는 철근 응력이 변하는 곳에서만 생긴다. 정착 부착(끝에서 0 → f<sub>y</sub>), 휨 부착(u = V/(Σ<sub>0</sub>jd)), 균열 사이 부착(부호가 바뀜)이 있다.</li>
+      <li>정착의 평형 l = d<sub>b</sub>f<sub>s</sub>/(4ū)에서 l<sub>d</sub> ∝ d<sub>b</sub>f<sub>y</sub>/√f<sub>ck</sub>. 실제 보에서는 쪼갬 파괴가 지배하므로 피복·간격·스터럽이 중요하다.</li>
+      <li>기본 정착 길이 l<sub>db</sub> = 0.6d<sub>b</sub>f<sub>y</sub>/(λ√f<sub>ck</sub>)(D25 SD500 30 MPa: 1,391 mm ≈ 55d<sub>b</sub>), 보정: 상부 철근 α 1.3, 에폭시 β 1.2·1.5(αβ ≤ 1.7), D19 이하 γ 0.8, 배근 조건 1.5, 과다 철근, l<sub>d</sub> ≥ 300 mm. 정밀식은 0.9/((c + K<sub>tr</sub>)/d<sub>b</sub>) ≤ 2.5로 피복·스터럽 이득을 반영한다.</li>
+      <li>표준 갈고리 l<sub>hb</sub> = 0.24βd<sub>b</sub>f<sub>y</sub>/(λ√f<sub>ck</sub>)(D25: 556 mm), 피복 0.7·띠철근 0.8 보정, ≥ max(8d<sub>b</sub>, 150 mm). 90° 갈고리 연장 12d<sub>b</sub>, 180° 4d<sub>b</sub>·60 mm. 압축 정착에는 갈고리 효과가 없다.</li>
+      <li>압축 정착 l<sub>db</sub> = max(0.25d<sub>b</sub>f<sub>y</sub>/(λ√f<sub>ck</sub>), 0.043d<sub>b</sub>f<sub>y</sub>) ≥ 200 mm(D25: 580 mm). 다발 철근은 3가닥 +20 %, 4가닥 +33 %, 등가 지름 d<sub>b</sub>√n, 절단은 40d<sub>b</sub> 엇갈림.</li>
+      <li>절단점: 이론 절단점 너머 max(d, 12d<sub>b</sub>) 연장, 최대 모멘트 단면에서 l<sub>d</sub>, 계속되는 철근은 이론 절단점 너머 l<sub>d</sub>, 인장 구역 절단은 V<sub>u</sub> ≤ (2/3)φV<sub>n</sub> 등. G1: 하단 2가닥 1.35 m, 상단 4가닥 2.25 m(상부 철근 정착 지배).</li>
+      <li>정모멘트 철근은 연속보 1/4(단순보 1/3) 이상 지점 안 150 mm, 부모멘트 철근 1/3 이상 변곡점 너머 max(d, 12d<sub>b</sub>, l<sub>n</sub>/16). 단순 지점·변곡점에서 l<sub>d</sub> ≤ M<sub>n</sub>/V<sub>u</sub> + l<sub>a</sub>.</li>
+      <li>인장 겹침 이음 A급 1.0l<sub>d</sub>(배근 ≥ 2 × 소요, 이음 ≤ 1/2), B급 1.3l<sub>d</sub>, ≥ 300 mm. 압축 이음 (0.13f<sub>y</sub> − 24)d<sub>b</sub>(f<sub>y</sub> &gt; 400). 기계식·용접 이음은 1.25f<sub>y</sub> 이상(형태). 이음은 응력이 작은 곳에 엇갈려 둔다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. D25 철근의 응력이 길이 500 mm 동안 0에서 250 MPa로 고르게 늘었다. 평균 부착 응력은?</p><div class="opts">
+        <button class="opt">0.79 MPa</button><button class="opt" data-correct>3.18 MPa</button><button class="opt">12.7 MPa</button><button class="opt">0.50 MPa</button>
+      </div><div class="quiz-exp">u = (d<sub>b</sub>/4)·Δf<sub>s</sub>/Δl = (25.4/4) × 250/500 = 6.35 × 0.5 = 3.18 MPa.</div></div>
+      <div class="quiz-q"><p>2. 기본 정착 길이 l<sub>db</sub> = 0.6d<sub>b</sub>f<sub>y</sub>/√f<sub>ck</sub>에서 f<sub>ck</sub>를 25에서 36 MPa로 올리면 길이는?</p><div class="opts">
+        <button class="opt">0.69배</button><button class="opt" data-correct>0.83배</button><button class="opt">1.20배</button><button class="opt">변하지 않는다</button>
+      </div><div class="quiz-exp">√(25/36) = 5/6 = 0.83. 정착 길이는 콘크리트 강도의 제곱근에 반비례하므로 강도를 44 % 올려도 길이는 17 %만 준다.</div></div>
+      <div class="quiz-q"><p>3. 보 춤 700 mm인 G1의 상단 철근에 위치 계수 1.3을 곱하는 이유는?</p><div class="opts">
+        <button class="opt">상단 철근은 압축을 받기 때문</button><button class="opt" data-correct>철근 아래 300 mm 넘게 친 콘크리트의 블리딩 물과 공기가 철근 밑에 고여 부착이 약해지기 때문</button><button class="opt">상단 피복이 더 두껍기 때문</button><button class="opt">부모멘트가 정모멘트보다 크기 때문</button>
+      </div><div class="quiz-exp">굳기 전 콘크리트에서 물과 공기가 위로 올라와 수평 철근 밑에 약한 층을 만든다. 철근 아래로 콘크리트가 깊게 부어질수록 심하다.</div></div>
+      <div class="quiz-q"><p>4. 정밀식에서 (c + K<sub>tr</sub>)/d<sub>b</sub>를 2.5 이하로 제한하는 이유로 가장 알맞은 것은?</p><div class="opts">
+        <button class="opt">계산을 간단히 하려고</button><button class="opt">피복이 2.5d<sub>b</sub>를 넘으면 안 되므로</button><button class="opt" data-correct>구속이 충분해지면 쪼갬 대신 뽑힘 파괴가 지배해 피복·스터럽을 더해도 부착 강도가 더 오르지 않으므로</button><button class="opt">스터럽 간격 제한 때문에</button>
+      </div><div class="quiz-exp">피복과 횡철근은 쪼갬 균열을 늦춘다. 그 효과가 충분하면 마디 사이 콘크리트가 깎이는 뽑힘이 한계가 되고, 이것은 피복을 늘려도 거의 변하지 않는다.</div></div>
+      <div class="quiz-q"><p>5. G1 하단 2-D25의 이론 절단점이 지점 중심에서 2.01 m, d = 634 mm, d<sub>b</sub> = 25.4 mm다. 연장 길이 규정만 볼 때 절단점은 지점에서 몇 m 이하여야 하나?</p><div class="opts">
+        <button class="opt">2.01 m</button><button class="opt">1.71 m</button><button class="opt" data-correct>1.38 m</button><button class="opt">0.62 m</button>
+      </div><div class="quiz-exp">연장 = max(d, 12d<sub>b</sub>) = max(634, 305) = 634 mm. 철근이 지점 쪽으로 더 뻗어야 하므로 2.01 − 0.63 = 1.38 m. 0.62 m는 이론 절단점에서 l<sub>d</sub> 1.39 m를 뺀 값(계속되는 철근 조건)이다.</div></div>
+      <div class="quiz-q"><p>6. G1 상단 2단 철근의 이론 절단점은 지점에서 0.35 m인데 실제 절단점은 2.25 m다. 무엇이 지배했나?</p><div class="opts">
+        <button class="opt">연장 길이 d</button><button class="opt" data-correct>상부 철근의 정착 길이 l<sub>d</sub> = 1.3 × 1,391 = 1,809 mm(기둥 면에서)</button><button class="opt">인장 구역의 전단 조건</button><button class="opt">변곡점 너머 l<sub>n</sub>/16</button>
+      </div><div class="quiz-exp">절단되는 철근은 최대 응력 단면(기둥 면, 0.4 m)에서 l<sub>d</sub> 이상 묻혀야 한다. 0.4 + 1.81 = 2.21 m → 2.25 m. 연장 조건(0.96 m)보다 훨씬 길다.</div></div>
+      <div class="quiz-q"><p>7. 이음 구간의 배근 A<sub>s</sub>가 소요 A<sub>s</sub>의 2.5배이고, 그 구간에서 철근의 전부를 한곳에서 잇는다. 이음 등급과 길이는?</p><div class="opts">
+        <button class="opt">A급, 1.0l<sub>d</sub></button><button class="opt" data-correct>B급, 1.3l<sub>d</sub></button><button class="opt">A급, 0.75l<sub>d</sub></button><button class="opt">이음 불가</button>
+      </div><div class="quiz-exp">A급은 두 조건(배근 ≥ 2 × 소요, 이음 ≤ 1/2)을 모두 만족해야 한다. 전부 한곳에서 이으면 둘째 조건을 어기므로 B급이다. 엇갈려 절반씩 이으면 A급이 된다.</div></div>
+      <div class="quiz-q"><p>8. SD500 D25 기둥 주근의 압축 겹침 이음 길이(f<sub>ck</sub> 30 MPa, 보정 없음)는?</p><div class="opts">
+        <button class="opt">580 mm</button><button class="opt">914 mm</button><button class="opt" data-correct>1,041 mm</button><button class="opt">1,808 mm</button>
+      </div><div class="quiz-exp">f<sub>y</sub> &gt; 400 MPa이므로 (0.13 × 500 − 24) × 25.4 = 41 × 25.4 = 1,041 mm. 914 mm는 0.072f<sub>y</sub>d<sub>b</sub>(f<sub>y</sub> ≤ 400식)를 잘못 쓴 값, 1,808 mm는 인장 B급 이음이다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const DV = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${DV.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    if (!o.noStroke) { ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); }
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = DV._c || (DV._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  msg(id, html, cls) { const el = document.getElementById(id); if (!el) return; el.innerHTML = html; el.className = "dv-msg" + (cls ? " " + cls : ""); },
+  bar(name) { return CB.steel.BARS[name]; },
+  mm(v) { return CB.sig(v, 4) + " mm"; },
+  /** 드래그로 x 값을 정하는 캔버스(차트 상자 기준) */
+  drag(cv, getC, set) {
+    const el = cv.canvas; let on = false;
+    const go = (e) => { const C = getC(); if (!C) return; const r = el.getBoundingClientRect(); set(C, e.clientX - r.left); };
+    el.addEventListener("pointerdown", (e) => { on = true; el.setPointerCapture(e.pointerId); go(e); });
+    el.addEventListener("pointermove", (e) => { if (on) go(e); });
+    el.addEventListener("pointerup", () => (on = false)); el.addEventListener("pointercancel", () => (on = false));
+  },
+};
+
+/* ---------- G1 기준값(CONTRIBUTING · CB.rc) ---------- */
+const G1 = (() => {
+  const R = CB.rc, A = DV.bar("D25").A, db = DV.bar("D25").d, fck = 30, fy = 500, b = 400;
+  const dB = 634, dT = 610, dT2 = 634 - 25.4 - 25;   // 하단 1단, 상단 설계 d, 상단 2단 철근 깊이
+  const fl = (layers) => R.flexure({ b, h: 700, fck, fy, layers }).phiMn;
+  const ldb = R.ldb(db, fy, fck), ldBot = Math.max(300, ldb), ldTop = Math.max(300, 1.3 * ldb);
+  const Vc = R.Vc(fck, b, dT), Vs = R.Vs(2 * DV.bar("D13").A, 400, dT, 150), phiVn = 0.75 * (Vc + Vs);
+  // 하중 경우(교육용): 경간 8 m 단순 지지 + 양 끝 부모멘트
+  const CASES = [{ id: "A", w: 100, Me: 340 }, { id: "B", w: 100, Me: 640 }, { id: "C", w: 1.2 * 56.7, Me: 480 }];
+  const beams = CASES.map((c) => CB.beam({ L: 8, EI: 3.14e5, supports: [{ x: 0, type: "pin" }, { x: 8, type: "roller" }],
+    loads: [{ type: "udl", w: c.w, a: 0, b: 8 }, { type: "moment", M: c.Me, a: 0 }, { type: "moment", M: -c.Me, a: 8 }] }));
+  const N = 320, xs = [], Mc = CASES.map(() => []), pos = [], neg = [], V = [];
+  for (let i = 0; i <= N; i++) {
+    const x = (8 * i) / N; xs.push(x);
+    const m = beams.map((bm) => bm.at(Math.min(7.9999, Math.max(1e-4, x)), 1).M);
+    m.forEach((v, k) => Mc[k].push(v)); pos.push(Math.max(...m)); neg.push(Math.min(...m));
+    V.push(Math.abs(beams[1].at(Math.min(7.9999, Math.max(1e-4, x)), 1).V));
+  }
+  const interp = (arr, x) => { const t = CB.clamp(x, 0, 8) / 8 * N, i = Math.min(N - 1, Math.floor(t)), f = t - i; return arr[i] * (1 - f) + arr[i + 1] * f; };
+  const cap = {
+    b4: fl([{ d: dB, As: 4 * A }]), b2: fl([{ d: dB, As: 2 * A }]),
+    // 상단: 모서리 2가닥(1단) + T2 가운데 2가닥(1단) + T1 2단 2가닥
+    top(T1, T2) { const L = [{ d: dB, As: (2 + (T2 ? 2 : 0)) * A }]; if (T1) L.push({ d: dT2, As: 2 * A }); return fl(L); },
+  };
+  /** 지점(x=0)에서 중앙 쪽으로: f(x) > c인 마지막 점(부모멘트) 또는 처음 점(정모멘트) */
+  const crossFromSupport = (arr, c, decreasing) => {
+    for (let i = 0; i <= N / 2; i++) {
+      const v = arr[i], vn = arr[i + 1];
+      if (decreasing ? v >= c && vn < c : v < c && vn >= c) { const f = (v - c) / (v - vn); return xs[i] + f * (xs[i + 1] - xs[i]); }
+    }
+    return decreasing ? (arr[0] < c ? 0 : 4) : 4;
+  };
+  return { R, A, db, fck, fy, b, dB, dT, dT2, ldb, ldBot, ldTop, Vc, Vs, phiVn, CASES, beams, xs, Mc, pos, neg, V, N, interp, cap, crossFromSupport,
+    negMag: neg.map((v) => -v), face: 0.4, ext: (d) => Math.max(d, 12 * db) / 1000 };
+})();
+
+/* ---------- 1. 부착 응력 분포 ---------- */
+(function () {
+  const mode = CB.seg("dv-bd-mode", go), bar = CB.seg("dv-bd-bar", go);
+  const gl = CB.range("dv-bd-l", (v) => v + " mm", go), gfs = CB.range("dv-bd-fs", (v) => v.toFixed(2), go), gc = CB.range("dv-bd-c", (v) => v.toFixed(1), go), gs = CB.range("dv-bd-s", (v) => v + " mm", go);
+  const fck = 30, fy = 500, sq = Math.sqrt(fck);
+  let S = null;
+  function model() {
+    const B = DV.bar(bar()), db = B.d, m = mode(), c = gc();
+    const upo = 2.5 * sq, usp = 0.6 * sq * (c + 0.5), ucap = Math.min(upo, usp), gov = usp < upo ? "쪼갬" : "뽑힘";
+    if (m === "anc") {
+      const l = gl(), fs0 = gfs() * fy, ubar = (db * fs0) / (4 * l), t = CB.clamp(ubar / ucap, 0, 1), kl = 3, n = 120;
+      const X = [], FS = [], U = [];
+      for (let i = 0; i <= n; i++) { const x = (l * i) / n, z = (kl * x) / l; X.push(x); FS.push(fs0 * ((1 - t) * Math.sinh(z) / Math.sinh(kl) + t * x / l)); U.push(ubar * ((1 - t) * kl * Math.cosh(z) / Math.sinh(kl) + t)); }
+      const fail = ubar > ucap, umax = Math.max(...U);
+      return { m, db, X, FS, U, L: l, ubar, umax, ucap, gov, fail, lreq: (db * fy) / (4 * ucap), fs0, xlab: "자유단에서 거리 x (mm)" };
+    }
+    if (m === "flex") {
+      const As = 4 * DV.bar("D25").A, jd = 0.9 * 634, S0 = 4 * Math.PI * DV.bar("D25").d, n = 120, X = [], FS = [], U = [];
+      for (let i = 0; i <= n; i++) { const x = (4000 * i) / n, M = 50 * (x / 1000) * (8 - x / 1000), Vv = 100 * (4 - x / 1000); X.push(x); FS.push(Math.min(fy, (M * 1e6) / (As * jd))); U.push((Vv * 1000) / (S0 * jd)); }
+      const ucap4 = Math.min(upo, 0.6 * sq * (c + 0.5));
+      return { m, db: DV.bar("D25").d, X, FS, U, L: 4000, ubar: U[0], umax: U[0], ucap: ucap4, gov, fail: U[0] > ucap4, xlab: "지점에서 거리 x (mm) — 단순보 비교, 4-D25" };
+    }
+    // 균열 사이
+    const s = gs(), fs0 = gfs() * fy, Ab = B.A, fct = 0.33 * sq, Aeff = (2.5 * 66 * 400) / 4, dmax = (fct * Aeff) / Ab, ub = 0.5 * ucap;
+    const lt = (db * dmax) / (4 * ub), n = 240, X = [], FS = [], U = [], L = 3 * s;
+    for (let i = 0; i <= n; i++) {
+      const x = (L * i) / n, r = x % s, dist = Math.min(r, s - r), dfs = Math.min(dmax, (4 * ub * dist) / db, fs0 * 0.95);
+      X.push(x); FS.push(fs0 - dfs);
+      const grow = (4 * ub * dist) / db < Math.min(dmax, fs0 * 0.95);
+      U.push(grow ? (r < s / 2 ? ub : -ub) : 0);
+    }
+    const mean = FS.reduce((a, v) => a + v, 0) / FS.length;
+    return { m, db, X, FS, U, L, ubar: ub, umax: ub, ucap, gov, fail: false, lt, s, mean, fs0, newCrack: s / 2 > 2 * lt, xlab: "길이 x (mm) — 균열 세 칸" };
+  }
+  const cv = CB.canvas("#dv-cv-bond", (ctx, W, H) => {
+    const pal = CB.palette(), M = S = model(), padL = 58, padR = 16;
+    // 철근 띠
+    const y0 = 14, hb = 46, bx = padL, bw = W - padL - padR;
+    ctx.fillStyle = pal.surface; ctx.strokeStyle = pal.border; ctx.fillRect(bx, y0, bw, hb); ctx.strokeRect(bx, y0, bw, hb);
+    const fsMax = Math.max(1, ...M.FS);
+    for (let i = 0; i < M.X.length - 1; i++) {
+      const x0 = bx + (M.X[i] / M.L) * bw, x1 = bx + (M.X[i + 1] / M.L) * bw, t = CB.clamp(M.FS[i] / fy, 0, 1);
+      ctx.fillStyle = DV.alpha(pal.tension, 0.18 + 0.8 * t); ctx.fillRect(x0, y0 + hb / 2 - 6, x1 - x0 + 0.5, 12);
+    }
+    if (M.m === "crack") { ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.6; for (let k = 0; k <= 3; k++) { const x = bx + ((k * M.s) / M.L) * bw; ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + hb - 6); ctx.stroke(); } }
+    if (M.m === "anc") DV.arrow(ctx, bx + bw - 30, y0 + hb / 2, bx + bw + 8, y0 + hb / 2, pal.accent2, 2.4, 9);
+    if (M.m === "anc" && M.fail) { ctx.strokeStyle = pal.bad; ctx.lineWidth = 1.8; for (let k = 0; k < 6; k++) { const x = bx + bw * (0.55 + 0.07 * k); ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x + 6, y0 + hb / 2 - 7); ctx.stroke(); } }
+    DV.text(ctx, M.m === "anc" ? "철근 색 = fₛ/fy" : M.m === "flex" ? "G1 하단 4-D25 (단순보 비교)" : "균열 단면에서 fₛ 최대", bx + 6, y0 + 9, pal.dim, { align: "left", size: 11 });
+    const top = y0 + hb + 18, gap = 30, rowH = Math.max(60, (H - top - 40 - gap) / 2);
+    const C1 = CB.chart(ctx, { x: padL, y: top, w: bw, h: rowH }, { x: [0, M.L], y: [0, Math.max(fy * 1.05, fsMax * 1.1)], yLabel: "fₛ (MPa)", xFmt: (v) => String(Math.round(v)),
+      series: [{ data: M.X.map((x, i) => [x, M.FS[i]]), color: pal.tension, width: 2.4, fill: DV.alpha(pal.tension, 0.08) }],
+      hlines: [{ y: fy, color: pal.warn, label: "fy = 500" }].concat(M.m === "crack" ? [{ y: M.mean, color: pal.faint, label: "평균" }] : []) });
+    const uTop = Math.max(M.ucap * 1.15, ...M.U.map(Math.abs)) || 1, uLo = M.m === "crack" ? -uTop : 0;
+    const C2 = CB.chart(ctx, { x: padL, y: top + rowH + gap, w: bw, h: rowH }, { x: [0, M.L], y: [uLo, uTop], yLabel: "u (MPa)", xLabel: M.xlab, xFmt: (v) => String(Math.round(v)),
+      series: [{ data: M.X.map((x, i) => [x, M.U[i]]), color: pal.accent, width: 2.4, fill: DV.alpha(pal.accent, 0.08) }],
+      hlines: [{ y: M.ucap, color: pal.bad, label: "부착 강도(" + M.gov + ")" }, { y: 0, color: pal.axis, dash: [] }].concat(M.m === "anc" ? [{ y: M.ubar, color: pal.faint, label: "평균 ū" }] : []) });
+    if (M.m === "anc" && M.lreq <= M.L) { const X = C1.X(M.lreq); ctx.save(); ctx.strokeStyle = pal.ok; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X, C1.box.y); ctx.lineTo(X, C2.box.y + C2.box.h); ctx.stroke(); ctx.restore(); }
+  }, { aspect: (W) => (W < 520 ? 1.15 : 0.72), minHeight: 360, maxHeight: 500 });
+  function go() {
+    cv.redraw(); const M = S; if (!M) return;
+    CB.stat("dv-bd-u", CB.num(M.ubar, 2) + " MPa"); CB.stat("dv-bd-umax", CB.num(M.umax, 2) + " MPa"); CB.stat("dv-bd-cap", CB.num(M.ucap, 2) + " MPa · " + M.gov);
+    if (M.m === "anc") {
+      CB.stat("dv-bd-ok", M.fail ? "부착 파괴" : "정착 확보");
+      DV.msg("dv-bd-msg", M.fail ? `평균 부착 응력 ${CB.num(M.ubar, 2)} MPa가 부착 강도 ${CB.num(M.ucap, 2)} MPa를 넘습니다. 이 피복에서는 <b>${M.gov}</b> 파괴가 먼저 옵니다. f<sub>s</sub> = ${CB.num(M.fs0, 0)} MPa를 내려면 이 모델로 l ≥ ${CB.num((M.db * M.fs0) / (4 * M.ucap), 0)} mm가 필요합니다.`
+        : `${M.umax > M.ucap ? "하중 쪽 끝의 국부 부착 응력은 강도를 넘지만, 그 부분이 미끄러지며 부착이 안쪽으로 재분배되므로 평균으로 판정합니다(교육용). " : ""}f<sub>y</sub>까지 내는 데 필요한 길이(이 모델, 초록 점선) = d<sub>b</sub>f<sub>y</sub>/(4u) = <b>${CB.num(M.lreq, 0)} mm</b>(${CB.num(M.lreq / M.db, 1)}d<sub>b</sub>). 기준의 기본 정착 길이는 ${CB.num(CB.rc.ldb(M.db, 500, 30), 0)} mm로 훨씬 깁니다 — 부착 응력 불균일·균열·반복 하중·재료 편차를 함께 덮기 때문입니다.`, M.fail ? "bad" : "");
+    } else if (M.m === "flex") {
+      CB.stat("dv-bd-ok", M.fail ? "초과" : "여유");
+      DV.msg("dv-bd-msg", `지점에서 u = V/(Σ<sub>0</sub>jd) = 400,000/(${CB.num(4 * Math.PI * M.db, 0)} × ${CB.num(0.9 * 634, 0)}) = <b>${CB.num(M.ubar, 2)} MPa</b>(${CB.num(M.ubar / Math.sqrt(30), 2)}√f<sub>ck</sub>). 휨 부착은 전단력이 큰 지점에서 크고, 철근 응력은 모멘트가 큰 중앙에서 큽니다. 기준은 이 평균값 대신 정착 길이로 검토합니다(예제 7.1).`);
+    } else {
+      CB.stat("dv-bd-ok", M.newCrack ? "새 균열 가능" : "안정");
+      DV.msg("dv-bd-msg", `전달 길이 l<sub>t</sub> ≈ ${CB.num(M.lt, 0)} mm(콘크리트 인장 ${CB.num(0.33 * Math.sqrt(30), 2)} MPa × 유효 면적에 이르는 길이). 균열 간격 ${M.s} mm의 반이 ${M.newCrack ? "2l<sub>t</sub>보다 커서 균열 사이 콘크리트가 다시 인장 강도에 이릅니다 → <b>새 균열이 생겨 간격이 줄어듭니다</b>" : "l<sub>t</sub>–2l<sub>t</sub> 범위 안이라 균열 간격이 안정합니다"}. 평균 철근 응력 ${CB.num(M.mean, 0)} MPa는 균열 단면 ${CB.num(M.fs0, 0)} MPa보다 작습니다(인장 강성, 8장).`, M.newCrack ? "warn" : "");
+    }
+  }
+  go();
+})();
+
+/* ---------- 2. 정착 길이 계산기 ---------- */
+(function () {
+  const NAMES = ["D10", "D13", "D16", "D19", "D22", "D25", "D29", "D32", "D35"];
+  const gbar = CB.steps("dv-ld-bar", NAMES, (v) => v + " (" + DV.bar(v).d + " mm)", 0, go); gbar.index.set(NAMES.indexOf("D25"), false);
+  const gfy = CB.seg("dv-ld-fy", go), gfck = CB.range("dv-ld-fck", (v) => v + " MPa", go), gpos = CB.seg("dv-ld-pos", go), gcoat = CB.seg("dv-ld-coat", go), glam = CB.seg("dv-ld-lam", go), gcond = CB.seg("dv-ld-cond", go);
+  const gck = CB.range("dv-ld-ck", (v) => v.toFixed(2), go), gex = CB.range("dv-ld-ex", (v) => v.toFixed(2), go);
+  let S = null;
+  function calc() {
+    const name = gbar(), db = DV.bar(name).d, fy = +gfy(), fck = gfck(), lam = +glam(), sq = Math.min(Math.sqrt(fck), 8.4);
+    const al = +gpos(), be = +gcoat(), ab = Math.min(al * be, 1.7), ga = NAMES.indexOf(name) <= 3 ? 0.8 : 1.0, cond = +gcond(), ck = Math.min(gck(), 2.5), ex = gex();
+    const ldb = (0.6 * db * fy) / (lam * sq);
+    const simple = Math.max(300, ldb * ab * ga * cond * ex), precise = Math.max(300, ((0.9 * db * fy) / (lam * sq)) * (ab * ga / ck) * ex);
+    const cb = Math.max((0.25 * db * fy) / (lam * sq), 0.043 * db * fy), comp = Math.max(200, cb * ex);
+    return { name, db, fy, fck, ldb, simple, precise, comp, ab, abRaw: al * be, ga, ck, ckRaw: gck(), sqCap: Math.sqrt(fck) > 8.4 };
+  }
+  const cv = CB.canvas("#dv-cv-ld", (ctx, W, H) => {
+    const pal = CB.palette(), s = (S = calc()), rows = [["기본 ldb", s.ldb, pal.faint], ["간이식 ld", s.simple, pal.tension], ["정밀식 ld", s.precise, pal.accent], ["압축 ld", s.comp, pal.compression]];
+    const padL = W < 480 ? 86 : 104, padR = 22, top = 30, rowH = Math.min(46, (H - top - 50) / rows.length), xmax = Math.max(2000, ...rows.map((r) => r[1])) * 1.08;
+    const X = (v) => padL + (v / xmax) * (W - padL - padR);
+    ctx.font = "11px " + DV.mono(); ctx.fillStyle = pal.dim; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let v = 0; v <= xmax; v += xmax > 3200 ? 1000 : 500) { ctx.strokeStyle = pal.grid; ctx.beginPath(); ctx.moveTo(X(v), top - 6); ctx.lineTo(X(v), top + rowH * rows.length); ctx.stroke(); ctx.fillText(String(v), X(v), top + rowH * rows.length + 6); }
+    DV.text(ctx, "mm", W - padR, top + rowH * rows.length + 24, pal.dim, { align: "right", size: 11, bold: false });
+    [[300, "최소 300"], [800, "기둥 폭 800"]].forEach(([v, lab], k) => { ctx.save(); ctx.strokeStyle = k ? pal.warn : pal.faint; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(X(v), top - 10); ctx.lineTo(X(v), top + rowH * rows.length); ctx.stroke(); ctx.restore(); DV.text(ctx, lab, X(v) + 4, top - 16, k ? pal.warn : pal.dim, { align: "left", size: 10.5 }); });
+    rows.forEach(([lab, v, col], i) => {
+      const y = top + i * rowH + rowH * 0.2, h = rowH * 0.6;
+      ctx.fillStyle = DV.alpha(col, 0.85); ctx.fillRect(X(0), y, X(v) - X(0), h);
+      DV.text(ctx, lab, padL - 8, y + h / 2, pal.text, { align: "right", size: 11.5 });
+      const t = `${CB.num(v, 0)} (${CB.num(v / s.db, 0)}dₙ)`.replace("dₙ", "db"), inside = X(v) - X(0) > 120;
+      DV.text(ctx, t, inside ? X(v) - 6 : X(v) + 6, y + h / 2, inside ? "#fff" : pal.text, { align: inside ? "right" : "left", size: 11, noStroke: inside });
+    });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.5), minHeight: 230, maxHeight: 320 });
+  function go() {
+    cv.redraw(); const s = S;
+    CB.stat("dv-ld-ldb", CB.num(s.ldb, 0) + " mm"); CB.stat("dv-ld-s", CB.num(s.simple, 0) + " mm"); CB.stat("dv-ld-p", CB.num(s.precise, 0) + " mm"); CB.stat("dv-ld-c", CB.num(s.comp, 0) + " mm");
+    const notes = [];
+    if (s.abRaw > 1.7) notes.push(`αβ = ${CB.num(s.abRaw, 2)} → 상한 1.7`);
+    if (s.ga < 1) notes.push("D19 이하 γ = 0.8");
+    if (s.ckRaw > 2.5) notes.push("(c + K<sub>tr</sub>)/d<sub>b</sub> → 상한 2.5");
+    if (s.sqCap) notes.push("√f<sub>ck</sub> → 상한 8.4 MPa");
+    DV.msg("dv-ld-msg", `${s.name}, f<sub>y</sub> ${s.fy}, f<sub>ck</sub> ${s.fck}: 정밀식은 간이식의 <b>${CB.num((100 * s.precise) / s.simple, 0)} %</b>, 압축 정착은 간이식의 ${CB.num((100 * s.comp) / s.simple, 0)} %. ${s.simple > 720 ? "곧은 철근으로는 800 mm 기둥 안에서 정착할 수 없습니다(갈고리 절)." : "800 mm 기둥 안에서 곧게 정착할 수 있는 길이입니다."}${notes.length ? " · " + notes.join(" · ") : ""}`);
+  }
+  go();
+})();
+
+/* ---------- 3. 직선 vs 갈고리 ---------- */
+(function () {
+  const ghc = CB.range("dv-hk-hc", (v) => v + " mm", go), gbar = CB.seg("dv-hk-bar", go), gfy = CB.seg("dv-hk-fy", go), gfck = CB.range("dv-hk-fck", (v) => v + " MPa", go);
+  const gpos = CB.seg("dv-hk-pos", go), gtype = CB.seg("dv-hk-type", go), gcov = CB.check("dv-hk-cov", go), gtie = CB.check("dv-hk-tie", go);
+  let S = null;
+  function calc() {
+    const name = gbar(), db = DV.bar(name).d, fy = +gfy(), fck = gfck(), sq = Math.min(Math.sqrt(fck), 8.4), top = gpos() === "top";
+    const ga = ["D16", "D19"].includes(name) ? 0.8 : 1.0, ld = Math.max(300, ((0.6 * db * fy) / sq) * (top ? 1.3 : 1) * ga);
+    const lhb = CB.rc.ldh(db, fy, Math.min(fck, 70.56)), f = (gcov() ? 0.7 : 1) * (gtie() ? 0.8 : 1), ldh = Math.max(8 * db, 150, lhb * f);
+    const hc = ghc(), av = hc - 40 - 12.7 - 25.4, bend = (["D29", "D32"].includes(name) ? 8 : 6) * db;
+    const choice = ld <= av ? "straight" : ldh <= av ? "hook" : "none";
+    return { name, db, fy, fck, top, ld, lhb, ldh, f, hc, av, bend, choice, tail: gtype() === "90" ? 12 * db : Math.max(4 * db, 60) };
+  }
+  const cv = CB.canvas("#dv-cv-hook", (ctx, W, H) => {
+    const pal = CB.palette(), s = (S = calc()), beamL = 500, span = beamL + Math.max(s.hc, s.ld) + 60;
+    const k = Math.min((W - 30) / span, (H - 60) / 1500), x0 = 14, face = x0 + beamL * k, yb0 = 40, hb = 700 * k;
+    // 기둥
+    ctx.fillStyle = CB.color("surface-2"); ctx.strokeStyle = pal.border; ctx.fillRect(face, 10, s.hc * k, H - 30); ctx.strokeRect(face, 10, s.hc * k, H - 30);
+    ctx.fillStyle = DV.alpha(CB.color("surface-2"), 0.7); ctx.fillRect(x0, yb0, beamL * k, hb); ctx.strokeRect(x0, yb0, beamL * k, hb);
+    // 기둥 주근
+    ctx.strokeStyle = DV.alpha(pal.tension, 0.45); ctx.lineWidth = Math.max(2, 25.4 * k); [52.7 + 12.7, s.hc - 52.7 - 12.7].forEach((u) => { ctx.beginPath(); ctx.moveTo(face + u * k, 10); ctx.lineTo(face + u * k, H - 20); ctx.stroke(); });
+    const yBar = s.top ? yb0 + 66 * k : yb0 + hb - 66 * k, dir = s.top ? 1 : -1, lw = Math.max(3, s.db * k);
+    // 쓸 수 있는 길이
+    ctx.save(); ctx.strokeStyle = pal.warn; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(face + s.av * k, 12); ctx.lineTo(face + s.av * k, H - 22); ctx.stroke(); ctx.restore();
+    DV.text(ctx, "쓸 수 있는 " + CB.num(s.av, 0), face + s.av * k - 4, H - 12, pal.warn, { align: "right", size: 10.5 });
+    // 직선 정착(점선)
+    const straightEnd = face + s.ld * k;
+    DV.line(ctx, [[x0, yBar - dir * lw * 1.6], [straightEnd, yBar - dir * lw * 1.6]], s.choice === "straight" ? pal.ok : DV.alpha(pal.bad, 0.8), Math.max(2, lw * 0.6), [6, 4]);
+    DV.text(ctx, "직선 ld " + CB.num(s.ld, 0), Math.min(W - 70, (face + straightEnd) / 2), yBar - dir * (lw * 1.6 + 12), s.choice === "straight" ? pal.ok : pal.bad, { size: 10.5 });
+    // 갈고리
+    const hx = face + s.ldh * k - s.db * k / 2, r = (s.bend / 2 + s.db / 2) * k;
+    ctx.save(); ctx.strokeStyle = s.choice === "none" ? pal.bad : pal.tension; ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x0, yBar); ctx.lineTo(hx - r, yBar);
+    if (gtype() === "90") { ctx.arc(hx - r, yBar + dir * r, r, -dir * Math.PI / 2, 0, dir < 0); ctx.lineTo(hx, yBar + dir * (r + s.tail * k)); }
+    else { ctx.arc(hx - r, yBar + dir * r, r, -dir * Math.PI / 2, dir * Math.PI / 2, dir < 0); ctx.lineTo(hx - r - s.tail * k, yBar + dir * 2 * r); }
+    ctx.stroke(); ctx.restore();
+    DV.arrow(ctx, face, yBar + dir * (r * 2 + 34), face + s.ldh * k, yBar + dir * (r * 2 + 34), pal.accent2, 1.5, 7);
+    DV.text(ctx, "ldh " + CB.num(s.ldh, 0), face + (s.ldh * k) / 2, yBar + dir * (r * 2 + 48), pal.accent2, { size: 10.5 });
+    DV.text(ctx, "기둥 면", face, 10 + 8, pal.dim, { align: "right", size: 10.5 });
+    DV.text(ctx, "보 " + (s.top ? "상단" : "하단") + " " + s.name, x0 + 4, s.top ? yb0 + hb + 14 : yb0 - 12, pal.dim, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.6), minHeight: 280, maxHeight: 420 });
+  function go() {
+    cv.redraw(); const s = S;
+    CB.stat("dv-hk-ld", CB.num(s.ld, 0) + " mm"); CB.stat("dv-hk-ldh", CB.num(s.ldh, 0) + " mm"); CB.stat("dv-hk-av", CB.num(s.av, 0) + " mm");
+    CB.stat("dv-hk-ok", s.choice === "straight" ? "직선 정착" : s.choice === "hook" ? "표준 갈고리" : "부족");
+    const txt = s.choice === "straight" ? `직선 l<sub>d</sub> = ${CB.num(s.ld, 0)} mm가 기둥 안(${CB.num(s.av, 0)} mm)에 들어갑니다. 갈고리 없이 곧게 정착할 수 있습니다.`
+      : s.choice === "hook" ? `직선 ${CB.num(s.ld, 0)} mm는 들어가지 않지만 갈고리 l<sub>dh</sub> = ${CB.num(s.lhb, 0)} × ${CB.num(s.f, 2)} = <b>${CB.num(s.ldh, 0)} mm</b>(하한 max(8d<sub>b</sub>, 150) = ${CB.num(Math.max(8 * s.db, 150), 0)})는 들어갑니다. 굽힘 안지름 ${CB.num(s.bend, 0)} mm, 연장 ${CB.num(s.tail, 0)} mm, 갈고리는 접합부 안쪽(${s.top ? "아래" : "위"})으로 구부립니다.`
+      : `갈고리 l<sub>dh</sub> = ${CB.num(s.ldh, 0)} mm도 ${CB.num(s.av, 0)} mm를 넘습니다. 기둥을 키우거나, 가는 철근으로 바꾸거나(같은 A<sub>s</sub>를 더 많은 가닥으로), 보정 조건(피복·띠철근)을 확보하거나, 확대머리 철근(현행 기준 확인)을 검토합니다.`;
+    DV.msg("dv-hk-msg", txt, s.choice === "none" ? "bad" : s.choice === "hook" ? "" : "ok");
+  }
+  go();
+})();
+
+/* ---------- 4. 다발 철근 ---------- */
+(function () {
+  const gn = CB.seg("dv-bn-n", go), gbar = CB.seg("dv-bn-bar", go), gmode = CB.seg("dv-bn-mode", go);
+  const FAC = [1, 1, 1, 1.2, 1.33];
+  const centers = (n) => (n === 1 ? [[0, 0]] : n === 2 ? [[-1, 0], [1, 0]] : n === 3 ? [[-1, 0.577], [1, 0.577], [0, -1.155]] : [[-1, -1], [1, -1], [-1, 1], [1, 1]]);
+  const hullPer = (n) => 2 * Math.PI + (n === 1 ? 0 : n === 2 ? 4 : n === 3 ? 6 : 8);   // r = 1, 실로 감싼 둘레
+  let S = null;
+  function calc() {
+    const n = +gn(), name = gbar(), B = DV.bar(name), fy = 500, sq = Math.sqrt(30);
+    const ld1 = gmode() === "t" ? Math.max(300, (0.6 * B.d * fy) / sq * (["D19"].includes(name) ? 0.8 : 1)) : Math.max(200, Math.max((0.25 * B.d * fy) / sq, 0.043 * B.d * fy));
+    return { n, name, B, As: n * B.A, deq: B.d * Math.sqrt(n), per: hullPer(n) / (n * 2 * Math.PI), ld1, ld: ld1 * FAC[n], fac: FAC[n] };
+  }
+  const cv = CB.canvas("#dv-cv-bun", (ctx, W, H) => {
+    const pal = CB.palette(), s = (S = calc()), narrow = W < 520, cx = narrow ? W / 2 : W * 0.27, cy = narrow ? H * 0.3 : H / 2, r = Math.min(narrow ? H * 0.11 : H * 0.14, W * 0.1);
+    const C = centers(s.n);
+    ctx.save(); ctx.strokeStyle = pal.warn; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, r * Math.sqrt(s.n), 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    // 볼록 껍질(실로 감싼 둘레)
+    if (s.n > 1) {
+      ctx.save(); ctx.strokeStyle = pal.accent; ctx.lineWidth = 2.5; ctx.beginPath();
+      const P = C.map(([u, v]) => [cx + u * r, cy + v * r]), m = [cx, cy]; P.sort((a, b) => Math.atan2(a[1] - m[1], a[0] - m[0]) - Math.atan2(b[1] - m[1], b[0] - m[0]));
+      for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy), nx = dy / L, ny = -dx / L; ctx.moveTo(a[0] + nx * r, a[1] + ny * r); ctx.lineTo(b[0] + nx * r, b[1] + ny * r); }
+      ctx.stroke(); ctx.restore();
+    }
+    C.forEach(([u, v]) => { ctx.fillStyle = pal.tension; ctx.beginPath(); ctx.arc(cx + u * r, cy + v * r, r * 0.97, 0, Math.PI * 2); ctx.fill(); });
+    DV.text(ctx, `등가 지름 ${CB.num(s.deq, 1)} mm`, cx, cy + r * Math.sqrt(s.n) + 16, pal.warn, { size: 11 });
+    // 막대: n = 1..4 정착 길이
+    const bx = narrow ? 20 : W * 0.55, bw = narrow ? W - 40 : W * 0.42, by = narrow ? H * 0.58 : 30, bh = narrow ? H * 0.38 : H - 70;
+    const vmax = s.ld1 * 1.33 * 1.15, rowH = bh / 4;
+    for (let n = 1; n <= 4; n++) {
+      const v = s.ld1 * FAC[n], y = by + (n - 1) * rowH + rowH * 0.18, h = rowH * 0.6, w = (v / vmax) * (bw - 40);
+      ctx.fillStyle = DV.alpha(n === s.n ? pal.accent : pal.faint, n === s.n ? 0.9 : 0.45); ctx.fillRect(bx + 34, y, w, h);
+      DV.text(ctx, n + "가닥", bx + 28, y + h / 2, pal.text, { align: "right", size: 11 });
+      DV.text(ctx, CB.num(v, 0) + " mm", bx + 34 + w + 4, y + h / 2, pal.text, { align: "left", size: 11 });
+    }
+    DV.text(ctx, "가닥마다 정착 길이(" + (gmode() === "t" ? "인장, 간이식" : "압축") + ")", bx + 34, by - 12, pal.dim, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 1.05 : 0.5), minHeight: 240, maxHeight: 360 });
+  function go() {
+    cv.redraw(); const s = S;
+    CB.stat("dv-bn-as", CB.sig(s.As, 4) + " mm²"); CB.stat("dv-bn-deq", CB.num(s.deq, 1) + " mm"); CB.stat("dv-bn-per", CB.num(100 * s.per, 0) + " %"); CB.stat("dv-bn-ld", CB.num(s.ld, 0) + " mm (× " + s.fac.toFixed(2) + ")");
+    const bad = s.n > 1 && ["D35"].includes(s.name);
+    DV.msg("dv-bn-msg", s.n === 1 ? `단일 ${s.name}: 정착 길이 ${CB.num(s.ld, 0)} mm. 가닥 수를 늘려 보세요.`
+      : `${s.n}-${s.name} 다발: 콘크리트에 닿는 둘레(볼록 껍질)가 개별 철근 둘레 합의 ${CB.num(100 * s.per, 0)} %로 줄어 부착이 불리합니다. 기준은 정착 길이를 × ${s.fac.toFixed(2)}${s.n === 2 ? "(2가닥은 증가 없음)" : ""}로 늘리고, 피복·간격 제한에는 등가 지름 ${CB.num(s.deq, 1)} mm를 씁니다. 다발의 절단은 ${CB.num(40 * s.B.d, 0)} mm(40d<sub>b</sub>) 이상 엇갈립니다.${bad ? " 보에서 D35 넘는 철근의 다발은 제한됩니다." : ""}`);
+  }
+  go();
+})();
+
+/* ---------- 5. G1 절단점 결정기 ---------- */
+(function () {
+  const grp = CB.seg("dv-ct-grp", go), env = CB.seg("dv-ct-env", go);
+  const gxb = CB.range("dv-ct-xb", (v) => v.toFixed(2) + " m", go), gx1 = CB.range("dv-ct-x1", (v) => v.toFixed(2) + " m", go), gx2 = CB.range("dv-ct-x2", (v) => v.toFixed(2) + " m", go);
+  const lim = (2 / 3) * G1.phiVn;
+  /** 상단 무리 g(1|2)의 검토. x1, x2: 절단 위치(지점 중심에서, m) */
+  function topCheck(g, x1, x2) {
+    const xg = g === 1 ? x1 : x2, xh = g === 1 ? x2 : x1;
+    const rem = { T1: g === 1 ? false : x1 > x2, T2: g === 2 ? false : x2 > x1 };
+    const capRem = G1.cap.top(rem.T1, rem.T2), xt = G1.crossFromSupport(G1.negMag, capRem, true);
+    const ext = xt + G1.ext(G1.dT), ldReq = G1.face + G1.ldTop / 1000;
+    let cont = 0, contTxt = "다른 상단 무리가 먼저 끝나지 않음";
+    if (xh < xg) { const remH = { T1: g === 1, T2: g === 2 }, xtH = G1.crossFromSupport(G1.negMag, G1.cap.top(remH.T1, remH.T2), true); cont = xtH + G1.ldTop / 1000; contTxt = `먼저 끝나는 무리의 이론 절단점 ${xtH.toFixed(2)} m + l<sub>d</sub> 1.81 m = ${cont.toFixed(2)} m`; }
+    const Mx = G1.interp(G1.neg, xg), tz = Mx < -1, Vu = G1.interp(G1.V, xg);
+    const need = Math.max(ext, ldReq, cont);
+    const items = [
+      { ok: xg >= ext - 1e-9, t: `연장: 이론 절단점 ${xt.toFixed(2)} m(남는 φM<sub>n</sub> ${CB.num(capRem, 0)} kN·m) + max(d, 12d<sub>b</sub>) 0.61 m = <b>${ext.toFixed(2)} m</b> 이상` },
+      { ok: xg >= ldReq - 1e-9, t: `정착: 기둥 면 0.40 m + 상부 철근 l<sub>d</sub> 1.81 m = <b>${ldReq.toFixed(2)} m</b> 이상` },
+      { ok: xg >= cont - 1e-9, na: !cont, t: `계속 철근: ${contTxt}` },
+      { ok: !tz || Vu <= lim, na: !tz, t: tz ? `인장 구역 절단(M<sub>u</sub> = ${CB.num(Mx, 0)} kN·m): V<sub>u</sub> ${CB.num(Vu, 0)} ≤ (2/3)φV<sub>n</sub> ${CB.num(lim, 0)} kN` : "압축 구역 절단: 전단 조건 불필요" },
+    ];
+    return { xg, xt, need, items, Vu, tz, ok: items.every((i) => i.ok) };
+  }
+  function botCheck(xb) {
+    const xt = G1.crossFromSupport(G1.pos, G1.cap.b2, false), ext = xt - G1.ext(G1.dB), ldMax = 4 - G1.ldBot / 1000;
+    const Mx = G1.interp(G1.pos, xb), tz = Mx > 1, Vu = G1.interp(G1.V, xb), contOk = xt + 0.35 >= G1.ldBot / 1000;
+    const items = [
+      { ok: xb <= ext + 1e-9, t: `연장: 이론 절단점 ${xt.toFixed(2)} m(2-D25 φM<sub>n</sub> ${CB.num(G1.cap.b2, 0)} kN·m) − max(d, 12d<sub>b</sub>) 0.63 m = <b>${ext.toFixed(2)} m</b> 이하` },
+      { ok: xb <= ldMax + 1e-9, t: `정착: 최대 모멘트 단면(4.0 m)에서 l<sub>d</sub> 1.39 m → <b>${ldMax.toFixed(2)} m</b> 이하` },
+      { ok: contOk, t: `계속 철근: 이론 절단점에서 지점 쪽 ${xt.toFixed(2)} m + 지점 안 0.35 m ≥ l<sub>d</sub> 1.39 m` },
+      { ok: !tz || Vu <= lim, na: !tz, t: tz ? `인장 구역 절단(M<sub>u</sub><sup>+</sup> = ${CB.num(Mx, 0)} kN·m): V<sub>u</sub> ${CB.num(Vu, 0)} ≤ (2/3)φV<sub>n</sub> ${CB.num(lim, 0)} kN` : "정모멘트가 없는 곳: 전단 조건 불필요" },
+    ];
+    return { xg: xb, xt, need: Math.min(ext, ldMax), items, Vu, tz, ok: items.every((i) => i.ok) };
+  }
+  document.getElementById("dv-ct-auto").addEventListener("click", () => {
+    const xb = Math.floor((Math.min(...[botCheck(0).need]) + 1e-9) / 0.05) * 0.05;
+    let best = null;
+    for (let i = 0; i <= 72; i++) for (let j = i; j <= 72; j++) {
+      const x1 = 0.4 + 0.05 * i, x2 = 0.4 + 0.05 * j;
+      if (topCheck(1, x1, x2).ok && topCheck(2, x1, x2).ok && (!best || x1 + x2 < best[0] + best[1] - 1e-9)) best = [x1, x2];
+    }
+    gxb.set(+xb.toFixed(2), false); if (best) { gx1.set(+best[0].toFixed(2), false); gx2.set(+best[1].toFixed(2), false); }
+    go();
+  });
+  let C = null;
+  const pres = (x) => { const u = Math.min(x, 8 - x); return { B: u >= gxb(), T1: u <= gx1(), T2: u <= gx2() }; };
+  const cv = CB.canvas("#dv-cv-cut", (ctx, W, H) => {
+    const pal = CB.palette(), padL = 60, padR = 14, bw = W - padL - padR, X = (x) => padL + (x / 8) * bw;
+    // 보 입면
+    const y0 = 12, hb = 64;
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(X(0) - 14, y0 - 4, 28, hb + 8); ctx.fillRect(X(8) - 14, y0 - 4, 28, hb + 8);
+    ctx.fillStyle = DV.alpha(CB.color("surface-2"), 0.6); ctx.strokeStyle = pal.border; ctx.fillRect(X(0), y0, bw, hb); ctx.strokeRect(X(0), y0, bw, hb);
+    const g = grp(), hl = (k) => (k === g ? 4.2 : 2.6);
+    const seg = (a, b, y, col, w) => DV.line(ctx, [[X(a), y], [X(b), y]], col, w);
+    seg(0, 8, y0 + 8, pal.compression, 2.6);
+    seg(0, gx2(), y0 + 14, pal.compression, hl("T2")); seg(8 - gx2(), 8, y0 + 14, pal.compression, hl("T2"));
+    seg(0, gx1(), y0 + 22, DV.alpha(pal.compression, 0.75), hl("T1")); seg(8 - gx1(), 8, y0 + 22, DV.alpha(pal.compression, 0.75), hl("T1"));
+    seg(0, 8, y0 + hb - 8, pal.tension, 2.6); seg(gxb(), 8 - gxb(), y0 + hb - 15, pal.tension, hl("B"));
+    DV.text(ctx, "상단", X(0) - 18, y0 + 14, pal.dim, { align: "right", size: 10.5 }); DV.text(ctx, "하단", X(0) - 18, y0 + hb - 10, pal.dim, { align: "right", size: 10.5 });
+    // 포락선과 φMn 계단
+    const top = y0 + hb + 16, ch = H - top - 40, xsS = [], capP = [], capN = [];
+    for (let i = 0; i <= 400; i++) { const x = (8 * i) / 400, p = pres(x); xsS.push(x); capP.push(p.B ? G1.cap.b4 : G1.cap.b2); capN.push(-G1.cap.top(p.T1, p.T2)); }
+    const series = [];
+    if (env() === "all") G1.Mc.forEach((m, k) => series.push({ data: G1.xs.map((x, i) => [x, m[i]]), color: [pal.accent, pal.accent2, pal.warn][k], width: 1.8 }));
+    else { series.push({ data: G1.xs.map((x, i) => [x, G1.pos[i]]), color: pal.accent, width: 2.4, fill: DV.alpha(pal.accent, 0.1) }); series.push({ data: G1.xs.map((x, i) => [x, G1.neg[i]]), color: pal.accent, width: 2.4 }); }
+    series.push({ data: xsS.map((x, i) => [x, capP[i]]), color: pal.tension, width: 2, dash: [6, 3] }, { data: xsS.map((x, i) => [x, capN[i]]), color: pal.compression, width: 2, dash: [6, 3] });
+    const sel = g === "B" ? botCheck(gxb()) : topCheck(g === "T1" ? 1 : 2, gx1(), gx2());
+    C = CB.chart(ctx, { x: padL, y: top, w: bw, h: ch }, { x: [0, 8], y: [-760, 560], yLabel: "M (kN·m)", xLabel: "x (m, 지점 중심에서)", series,
+      hlines: [{ y: 0, color: pal.axis, dash: [] }], vlines: [{ x: sel.xt, color: pal.warn, label: "이론" }, { x: sel.xg, color: sel.ok ? pal.ok : pal.bad, dash: [], width: 2, label: "절단" }] });
+    if (env() === "all") ["A", "B", "C"].forEach((t, k) => DV.text(ctx, "경우 " + t, C.box.x + C.box.w - 6, C.box.y + 10 + 14 * k, [pal.accent, pal.accent2, pal.warn][k], { align: "right", size: 10.5 }));
+    DV.text(ctx, "φMn(하단)", C.X(4), C.Y(G1.cap.b4) - 9, pal.tension, { size: 10.5 }); DV.text(ctx, "−φMn(상단)", C.X(1.2), C.Y(-G1.cap.top(true, true)) - 9, pal.compression, { size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 1.1 : 0.66), minHeight: 340, maxHeight: 470 });
+  DV.drag(cv, () => C, (C, px) => {
+    let x = ((px - C.box.x) / C.box.w) * 8; x = Math.min(x, 8 - x); const g = grp(), r = g === "B" ? gxb : g === "T1" ? gx1 : gx2;
+    r.set(Math.round(CB.clamp(x, +r.el.min, +r.el.max) / 0.05) * 0.05);
+  });
+  function go() {
+    cv.redraw();
+    const g = grp(), s = g === "B" ? botCheck(gxb()) : topCheck(g === "T1" ? 1 : 2, gx1(), gx2());
+    CB.stat("dv-ct-xt", s.xt.toFixed(2) + " m"); CB.stat("dv-ct-need", (g === "B" ? "≤ " : "≥ ") + s.need.toFixed(2) + " m");
+    CB.stat("dv-ct-v", s.tz ? CB.num(s.Vu, 0) + " / " + CB.num(lim, 0) + " kN" : "압축 구역");
+    const all = [botCheck(gxb()), topCheck(1, gx1(), gx2()), topCheck(2, gx1(), gx2())].every((c) => c.ok);
+    CB.stat("dv-ct-ok", (s.ok ? "합격" : "불합격") + (all ? " · 계획 전체 합격" : ""));
+    const ul = document.getElementById("dv-ct-list");
+    ul.innerHTML = s.items.map((i) => `<li class="${i.na ? "na" : i.ok ? "ok" : "bad"}">${i.t}</li>`).join("") + (g !== "B" ? `<li class="ok">모서리 2-D25(부모멘트 철근의 1/3)는 연속 → 변곡점 너머 연장 조건 만족</li>` : `<li class="ok">하단 모서리 2-D25(1/2 ≥ 1/4)는 지점 안으로 연장</li>`);
+  }
+  go();
+})();
+
+/* ---------- 6. 겹침 이음 위치 ---------- */
+(function () {
+  const gbars = CB.seg("dv-sp-bars", go), gx = CB.range("dv-sp-x", (v) => v.toFixed(2) + " m", go), gpct = CB.seg("dv-sp-pct", go);
+  const XB = 1.35, XT = 2.25, A = G1.A;
+  const prov = (bot, x) => { const u = Math.min(x, 8 - x); return bot ? (u >= XB ? 4 : 2) * A : (u <= XT ? 6 : 2) * A; };
+  const demand = (bot, x) => Math.max(0, bot ? G1.interp(G1.pos, x) : -G1.interp(G1.neg, x));
+  function evalAt(bot, xc, ls) {
+    const a = Math.max(0, xc - ls / 2000), b = Math.min(8, xc + ls / 2000); let rmin = Infinity, Mmax = 0, insuff = false;
+    for (let i = 0; i <= 60; i++) {
+      const x = a + ((b - a) * i) / 60, M = demand(bot, x); Mmax = Math.max(Mmax, M);
+      if (M > 1) { const req = CB.rc.asReq(M, 400, bot ? G1.dB : G1.dT, 30, 500); if (!isFinite(req)) insuff = true; else rmin = Math.min(rmin, prov(bot, x) / req); }
+    }
+    return { a, b, rmin, Mmax, insuff };
+  }
+  let S = null, C = null;
+  function calc() {
+    const bot = gbars() === "bot", ld = bot ? G1.ldBot : G1.ldTop, half = gpct() === "50";
+    let e = evalAt(bot, gx(), 1.3 * ld), cls = e.rmin >= 2 && half ? "A" : "B";
+    if (cls === "A") e = evalAt(bot, gx(), ld);
+    const ls = Math.max(300, (cls === "A" ? 1.0 : 1.3) * ld);
+    return { bot, ld, half, cls, ls, ...e };
+  }
+  const cv = CB.canvas("#dv-cv-spl", (ctx, W, H) => {
+    const pal = CB.palette(), s = (S = calc()), padL = 60, padR = 14, bw = W - padL - padR, X = (x) => padL + (x / 8) * bw;
+    const y0 = 12, hb = 54; ctx.fillStyle = DV.alpha(CB.color("surface-2"), 0.6); ctx.strokeStyle = pal.border; ctx.fillRect(X(0), y0, bw, hb); ctx.strokeRect(X(0), y0, bw, hb);
+    const yb = s.bot ? y0 + hb - 10 : y0 + 10, col = s.bot ? pal.tension : pal.compression;
+    DV.line(ctx, [[X(0), yb], [X(s.b), yb]], col, 3.2); DV.line(ctx, [[X(s.a), yb + (s.bot ? -7 : 7)], [X(8), yb + (s.bot ? -7 : 7)]], DV.alpha(col, 0.7), 3.2);
+    if (s.half) { DV.line(ctx, [[X(0), yb + (s.bot ? -16 : 16)], [X(8), yb + (s.bot ? -16 : 16)]], DV.alpha(col, 0.45), 2.4, [5, 3]); }
+    ctx.save(); ctx.strokeStyle = pal.accent2; ctx.setLineDash([4, 3]); ctx.strokeRect(X(s.a), y0 + 2, X(s.b) - X(s.a), hb - 4); ctx.restore();
+    DV.text(ctx, (s.half ? "절반은 다른 곳에서 잇는다(점선)" : "전부 이 구간에서 잇는다"), X(0) + 6, s.bot ? y0 + 12 : y0 + hb - 10, pal.dim, { align: "left", size: 10.5 });
+    const top = y0 + hb + 16, ch = H - top - 40, d = [], cap = [];
+    for (let i = 0; i <= 320; i++) { const x = (8 * i) / 320; d.push([x, demand(s.bot, x)]); cap.push([x, CB.rc.flexure({ b: 400, h: 700, fck: 30, fy: 500, layers: [{ d: s.bot ? G1.dB : G1.dT, As: prov(s.bot, x) }] }).phiMn]); }
+    C = CB.chart(ctx, { x: padL, y: top, w: bw, h: ch }, { x: [0, 8], y: [0, 760], yLabel: s.bot ? "Mᵤ⁺ (kN·m)" : "|Mᵤ⁻| (kN·m)", xLabel: "x (m)",
+      bands: [{ x0: s.a, x1: s.b, color: DV.alpha(pal.accent2, 0.14) }],
+      series: [{ data: d, color: pal.accent, width: 2.4, fill: DV.alpha(pal.accent, 0.1) }, { data: cap, color: col, width: 2, dash: [6, 3] }],
+      vlines: [{ x: gx(), color: pal.accent2, dash: [], width: 1.6, label: "" }] });
+    DV.text(ctx, "배근 φMn", C.X(s.bot ? 4 : 0.9), C.Y(cap[s.bot ? 160 : 36][1]) - 9, col, { size: 10.5 });
+    DV.text(ctx, (s.bot ? "하단" : "상단") + " 인장 쪽 포락선", C.box.x + C.box.w - 6, C.box.y + 10, pal.accent, { align: "right", size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.56), minHeight: 300, maxHeight: 420 });
+  DV.drag(cv, () => C, (C, px) => gx.set(Math.round(CB.clamp(((px - C.box.x) / C.box.w) * 8, 0, 8) / 0.05) * 0.05));
+  function go() {
+    cv.redraw(); const s = S;
+    CB.stat("dv-sp-mu", CB.num(s.Mmax, 0) + " kN·m"); CB.stat("dv-sp-r", s.insuff ? "단면 부족" : isFinite(s.rmin) ? CB.num(s.rmin, 2) : "∞(인장 없음)");
+    CB.stat("dv-sp-cls", s.cls + "급"); CB.stat("dv-sp-ls", CB.sig(s.ls, 4) + " mm");
+    const nearSup = Math.min(s.a, 8 - s.b) < G1.face, notes = [];
+    if (s.rmin < 1.2) notes.push(`<b>철근 응력이 거의 f<sub>y</sub>인 구간</b>(배근/소요 ${CB.num(s.rmin, 2)})에 이음이 걸립니다. 이음을 다른 곳으로 옮기세요.`);
+    else if (s.cls === "B" && s.rmin >= 2) notes.push("배근이 소요의 2배 이상이지만 전부 한곳에서 이어 B급입니다. 엇갈려 절반씩 이으면 A급이 됩니다.");
+    else if (s.cls === "B") notes.push(`배근/소요 ${CB.num(s.rmin, 2)} &lt; 2라서 B급입니다.`);
+    else notes.push("A급: 배근이 소요의 2배 이상이고 절반 이하를 잇습니다.");
+    if (nearSup) notes.push("이음이 기둥 면 안쪽(접합부)에 걸칩니다 — 접합부 안 이음은 피하는 것이 보통입니다.");
+    if (Math.min(s.a, 8 - s.b) < 1.4) notes.push("특수 모멘트 골조라면 기둥 면에서 2h(1.4 m) 안 겹침 이음을 금지하는 형태입니다(12장).");
+    DV.msg("dv-sp-msg", `이음 구간 ${s.a.toFixed(2)}–${s.b.toFixed(2)} m, l<sub>d</sub> = ${CB.sig(s.ld, 4)} mm(${s.bot ? "하단" : "상부 철근 α 1.3"}), l<sub>s</sub> = ${s.cls === "A" ? "1.0" : "1.3"}l<sub>d</sub> = <b>${CB.sig(s.ls, 4)} mm</b>. ` + notes.join(" "), s.rmin < 1.2 || s.insuff ? "bad" : s.cls === "A" ? "ok" : "");
+  }
+  go();
+})();
+
+/* ---------- 7. 이음 구간 응력 전달 ---------- */
+(function () {
+  const gls = CB.range("dv-lp-ls", (v) => v + "db (" + Math.round(v * 25.4) + " mm)", go), gc = CB.range("dv-lp-c", (v) => v.toFixed(1), go), gtr = CB.seg("dv-lp-tr", go), gp = CB.range("dv-lp-p", (v) => v.toFixed(2), go);
+  const db = 25.4, Ab = 506.7, fy = 500, sq = Math.sqrt(30);
+  let S = null, anim = null;
+  function calc() {
+    const ls = gls() * db, Ktr = [0, (40 * 2 * 126.7) / (150 * 4), (40 * 2 * 126.7) / (75 * 4)][+gtr()], ck = gc() + Ktr / db;
+    const u = Math.min(2.5 * sq, 0.6 * sq * (ck + 0.5)), Tcap = (u * Math.PI * db * ls) / 1000, Ty = (Ab * fy) / 1000, p = gp();
+    const Tdem = Math.min(p, 1) * Ty, slip = Tdem > Tcap + 1e-9, Tt = slip ? Tcap : Tdem, ratio = Tdem / Tcap;
+    return { ls, u, Tcap, Ty, p, Tdem, slip, Tt, ratio, need: (db * fy) / (4 * u), yielded: p >= 1 && !slip, Ktr };
+  }
+  const cv = CB.canvas("#dv-cv-lap", (ctx, W, H) => {
+    const pal = CB.palette(), s = (S = calc()), padL = 40, padR = 40, L = Math.max(s.ls * 1.9, 900), k = (W - padL - padR) / L, lapA = padL + (L / 2 - s.ls / 2) * k, lapB = lapA + s.ls * k;
+    const y0 = 20, hc = 96; ctx.fillStyle = CB.color("surface-2"); ctx.strokeStyle = pal.border; ctx.fillRect(padL, y0, W - padL - padR, hc); ctx.strokeRect(padL, y0, W - padL - padR, hc);
+    const y1 = y0 + 38, y2 = y0 + 58, lw = 9;
+    if (+gtr()) { const sp = (+gtr() === 1 ? 150 : 75) * k; ctx.strokeStyle = DV.alpha(pal.accent, 0.7); ctx.lineWidth = 2; for (let x = lapA - sp; x < lapB + sp; x += sp) { ctx.beginPath(); ctx.moveTo(x, y0 + 4); ctx.lineTo(x, y0 + hc - 4); ctx.stroke(); } }
+    const n = 14;
+    for (let i = 0; i < n; i++) { const x = lapA + ((i + 0.5) / n) * (lapB - lapA), a = CB.clamp(s.Tt / s.Tcap, 0, 1); DV.line(ctx, [[x - 6, y1 + 5], [x + 6, y2 - 5]], DV.alpha(pal.compression, 0.2 + 0.75 * a), 2.2); }
+    const shade = (x0, x1, y, f) => { const N = 40; for (let i = 0; i < N; i++) { const xa = x0 + ((x1 - x0) * i) / N, xb = x0 + ((x1 - x0) * (i + 1)) / N, t = CB.clamp(f((i + 0.5) / N), 0, 1); ctx.fillStyle = DV.alpha(pal.tension, 0.2 + 0.78 * t); ctx.fillRect(xa, y - lw / 2, xb - xa + 0.5, lw); } };
+    const T1 = s.Tt / s.Ty, slipShift = s.slip ? 6 : 0;
+    shade(padL - 20, lapA, y1, () => T1); shade(lapA, lapB + slipShift, y1, (t) => T1 * (1 - t));
+    shade(lapA - slipShift, lapB, y2, (t) => T1 * t); shade(lapB, W - padR + 20, y2, () => T1);
+    DV.arrow(ctx, padL + 30, y1, padL - 14, y1, pal.accent2, 2.4, 9); DV.arrow(ctx, W - padR - 30, y2, W - padR + 14, y2, pal.accent2, 2.4, 9);
+    if (s.ratio > 0.6) { const g = CB.clamp((s.ratio - 0.6) / 0.4, 0, 1) * (lapB - lapA) * 0.45; ctx.strokeStyle = pal.bad; ctx.lineWidth = 1.8; [[lapA, 1], [lapB, -1]].forEach(([x, d]) => { ctx.beginPath(); ctx.moveTo(x, y0 + 2); ctx.lineTo(x + d * g * 0.3, y0 + 20); ctx.lineTo(x + d * g, y0 + 30); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y0 + hc - 2); ctx.lineTo(x + d * g * 0.5, y0 + hc - 18); ctx.stroke(); }); }
+    DV.text(ctx, "ls = " + CB.num(s.ls, 0) + " mm", (lapA + lapB) / 2, y0 + hc + 12, pal.dim, { size: 11 });
+    const top = y0 + hc + 30, ch = H - top - 34;
+    const f1 = [], f2 = [], xs = [];
+    for (let i = 0; i <= 100; i++) { const x = (L * i) / 100, px = padL + x * k; xs.push(x); const t = CB.clamp((px - lapA) / (lapB - lapA), 0, 1); f1.push([x, (s.Tt * 1000 / Ab) * (px < lapA ? 1 : px > lapB ? 0 : 1 - t)]); f2.push([x, (s.Tt * 1000 / Ab) * (px < lapA ? 0 : px > lapB ? 1 : t)]); }
+    const C = CB.chart(ctx, { x: padL, y: top, w: W - padL - padR, h: ch }, { x: [0, L], y: [0, 560], yLabel: "fₛ (MPa)", xFmt: (v) => String(Math.round(v)),
+      series: [{ data: f1, color: pal.tension, width: 2.4 }, { data: f2, color: pal.accent, width: 2.4, dash: [6, 3] }], hlines: [{ y: fy, color: pal.warn, label: "" }] });
+    DV.text(ctx, "fy = 500", C.box.x + C.box.w / 2, C.Y(fy) - 9, pal.warn, { size: 10.5 });
+    DV.text(ctx, "왼쪽 철근", C.box.x + 6, C.Y(40), pal.tension, { align: "left", size: 10.5 }); DV.text(ctx, "오른쪽 철근(점선)", C.box.x + C.box.w - 6, C.Y(40), pal.accent, { align: "right", size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.56), minHeight: 290, maxHeight: 400 });
+  const play = document.getElementById("dv-lp-play");
+  play.addEventListener("click", () => {
+    if (anim) { anim.stop(); anim = null; play.textContent = "▶ 당기기"; return; }
+    gp.set(0); play.textContent = "■ 정지";
+    anim = CB.loop(cv.canvas, (dt) => { const v = Math.min(1.25, gp() + dt * 0.25); gp.set(+v.toFixed(3)); if (v >= 1.25 || (S && S.slip)) { anim.stop(); anim = null; play.textContent = "▶ 당기기"; } });
+  });
+  function go() {
+    cv.redraw(); const s = S;
+    CB.stat("dv-lp-cap", CB.num(s.Tcap / s.Ty, 2)); CB.stat("dv-lp-need", CB.num(s.need, 0) + " mm (" + CB.num(s.need / db, 1) + "d<sub>b</sub>)");
+    CB.stat("dv-lp-code", CB.sig(1.3 * CB.rc.ldb(db, fy, 30), 4) + " mm");
+    CB.stat("dv-lp-st", s.slip ? "이음 미끄러짐" : s.yielded ? "철근 항복(연성)" : s.ratio > 0.6 ? "쪼갬 균열 진행" : "탄성 전달");
+  }
+  go();
+})();
+
+/* ---------- 8. G1 배근 계획과 물량 ---------- */
+(function () {
+  const gplan = CB.seg("dv-pl-plan", go), glap = CB.seg("dv-pl-lap", go), gn = CB.range("dv-pl-n", (v) => v + "경간", go);
+  const m = DV.bar("D25").m, lA = G1.ldBot / 1000, lBt = (1.3 * G1.ldTop) / 1000, lAt = G1.ldTop / 1000, XB = 1.35, XT = 2.25;
+  function rows(plan) {
+    if (plan === "full") return [["하단 연속", 4, 8, "b"], ["상단 연속", 6, 8, "t"], ["하단 이음(A급, 엇갈림)", 4, lA, "lap"], ["상단 이음(A급, 엇갈림)", 6, lAt, "lap"]];
+    if (plan === "cut") return [["하단 모서리 연속", 2, 8, "b"], ["하단 절단(1.35 m)", 2, 8 - 2 * XB, "b"], ["상단 모서리 연속", 2, 8, "t"], ["상단 절단(지점마다 2 × 2.25 m)", 4, 2 * XT, "t"], ["하단 이음(A급)", 2, lA, "lap"], ["상단 이음(B급)", 2, lBt, "lap"]];
+    return [["하단 7-D25(단순보 근사)", 7, 8, "b"], ["상단 걸이 철근", 2, 8, "t"], ["하단 이음(A급, 엇갈림)", 7, lA, "lap"], ["상단 이음(B급)", 2, lBt, "lap"]];
+  }
+  const total = (plan, lap) => rows(plan).filter((r) => lap || r[3] !== "lap").reduce((s, r) => s + r[1] * r[2], 0);
+  const cv = CB.canvas("#dv-cv-plan", (ctx, W, H) => {
+    const pal = CB.palette(), plan = gplan(), padL = 30, padR = 30, bw = W - padL - padR, X = (x) => padL + (x / 8) * bw, y0 = 30, hb = H - 80;
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(X(0) - 12, 14, 24, H - 40); ctx.fillRect(X(8) - 12, 14, 24, H - 40);
+    ctx.fillStyle = DV.alpha(CB.color("surface-2"), 0.6); ctx.strokeStyle = pal.border; ctx.fillRect(X(0), y0, bw, hb); ctx.strokeRect(X(0), y0, bw, hb);
+    const L = (a, b, y, c, w = 3, dash) => DV.line(ctx, [[X(a), y], [X(b), y]], c, w, dash);
+    const yt = y0 + 10, yb = y0 + hb - 10;
+    if (plan === "full") { for (let i = 0; i < 3; i++) L(-0.3, 8.3, yt + i * 6, pal.compression); for (let i = 0; i < 2; i++) L(-0.3, 8.3, yb - i * 6, pal.tension); DV.text(ctx, "상단 6-D25 전 길이", X(4), yt + 26, pal.compression, { size: 11 }); DV.text(ctx, "하단 4-D25 전 길이", X(4), yb - 22, pal.tension, { size: 11 }); }
+    else if (plan === "cut") {
+      L(-0.3, 8.3, yt, pal.compression); L(-0.3, XT, yt + 7, pal.compression, 4); L(8 - XT, 8.3, yt + 7, pal.compression, 4);
+      L(-0.3, 8.3, yb, pal.tension); L(XB, 8 - XB, yb - 7, pal.tension, 4);
+      ctx.save(); ctx.strokeStyle = pal.accent2; ctx.setLineDash([4, 3]); ctx.strokeRect(X(4 - lBt / 2), yt - 5, X(4 + lBt / 2) - X(4 - lBt / 2), 10); ctx.strokeRect(X(0.05), yb - 5, X(0.05 + lA) - X(0.05), 10); ctx.restore();
+      DV.text(ctx, "4가닥 2.25 m", X(XT) + 4, yt + 18, pal.compression, { align: "left", size: 10.5 }); DV.text(ctx, "2가닥 5.30 m", X(4), yb - 20, pal.tension, { size: 10.5 });
+      DV.text(ctx, "상단 이음 B급 " + CB.num(lBt, 2) + " m", X(4), yt + 34, pal.accent2, { size: 10.5 }); DV.text(ctx, "하단 이음 A급", X(0.05 + lA) + 4, yb - 34, pal.accent2, { align: "left", size: 10.5 });
+    } else { L(-0.3, 8.3, yt, pal.compression); for (let i = 0; i < 4; i++) L(-0.3, 8.3, yb - i * 5, pal.tension); DV.text(ctx, "하단 7-D25 · 상단 걸이 철근 2-D25", X(4), y0 + hb / 2, pal.dim, { size: 11 }); DV.text(ctx, "지점 부모멘트 철근 없음 → 지점 균열·항복", X(4), y0 + hb / 2 + 18, pal.bad, { size: 11 }); }
+    DV.text(ctx, "지점 중심 사이 8.0 m", X(4), H - 12, pal.dim, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.3), minHeight: 170, maxHeight: 240 });
+  function go() {
+    cv.redraw();
+    const plan = gplan(), lap = glap() === "1", n = gn(), Lm = total(plan, lap), kg = Lm * m, full = total("full", lap) * m;
+    CB.stat("dv-pl-len", CB.num(Lm, 1) + " m"); CB.stat("dv-pl-kg", CB.num(kg, 0) + " kg"); CB.stat("dv-pl-tot", CB.sig(kg * n, 4) + " kg (" + n + "경간)");
+    CB.stat("dv-pl-sav", plan === "full" ? "기준" : (kg < full ? "−" : "+") + CB.num(Math.abs(100 * (1 - kg / full)), 0) + " %");
+    const tb = document.querySelector("#dv-pl-tbl tbody");
+    tb.innerHTML = rows(plan).filter((r) => lap || r[3] !== "lap").map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${CB.num(r[2], 2)}</td><td>${CB.num(r[1] * r[2], 1)}</td><td>${CB.num(r[1] * r[2] * m, 0)}</td></tr>`).join("") + `<tr><td><b>합계</b></td><td></td><td></td><td><b>${CB.num(Lm, 1)}</b></td><td><b>${CB.num(kg, 0)}</b></td></tr>`;
+  }
+  go();
+})();
+
+</script>
+</body>
+</html>

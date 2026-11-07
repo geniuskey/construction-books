@@ -1,0 +1,2038 @@
+/* ==========================================================================
+   ConcreteBook 공통 스크립트 — 전역 객체 CB (ConstructionBooks 엔진, MathBook 엔진 기반)
+   - 레이아웃(상단바, 검색, 목차, 이전/다음, 테마) 자동 생성
+   - 시뮬레이터 헬퍼: canvas, chart, plane(드래그 가능한 좌표 평면), orbit(돌려 보는 3D), range, seg, check, 포맷/난수
+   - 수학: 행렬(CB.mat), ODE(CB.rk4), 통계 분포, 색 지도
+   - 구조 해석: CB.frame(2차원 골조·트러스 강성법), CB.section(단면 성질), CB.drawFrame(구조물·하중·단면력도 그리기)
+   이 파일은 <head>에서 defer 없이 로드된다. 페이지 스크립트는 </body> 직전에 둔다.
+   ========================================================================== */
+(function () {
+  "use strict";
+
+  // planned: true인 장은 목차에만 보이고 링크·검색·이전/다음에서 빠진다(집필 예정).
+  const CHAPTERS = [
+    { slug: "overview",        num: "01", part: "제1부 휨", title: "철근콘크리트의 원리",               desc: "인장은 철근이, 압축은 콘크리트가. 두 재료가 함께 일하는 이유, 균열과 부착, 하중에 따른 보의 거동 단계, 기준 부재 G1·C1과 이 책의 지도.", tags: ["원리", "sim"] },
+    { slug: "design-basis",    num: "02", part: "제1부 휨", title: "강도 설계의 기초",                  desc: "설계 강도 ≥ 소요 강도. 하중 계수와 강도 감소 계수, 등가 직사각형 응력 블록, 변형률 적합, 인장 지배·압축 지배 단면.", tags: ["설계법", "sim"] },
+    { slug: "flexure",         num: "03", part: "제1부 휨", title: "단철근 직사각형 보의 휨",            desc: "보 하나를 처음부터 설계한다. 공칭 휨강도, 균형 철근비와 최소·최대 철근, 연성 파괴, 소요 철근량, 철근 배치와 피복.", tags: ["휨", "sim"] },
+    { slug: "t-beam",          num: "04", part: "제1부 휨", title: "복철근 보와 T형 보",                 desc: "압축 철근과 슬래브를 함께 쓴다. 압축 철근의 항복 여부, 연속보의 부모멘트, T형 보의 유효 폭과 두 경우의 해석.", tags: ["T형 보", "sim"] },
+    { slug: "shear",           num: "05", part: "제2부 전단·부착·사용성", title: "전단과 사인장 균열",  desc: "45° 균열을 막는다. 사인장 균열, 콘크리트 전단강도, 스터럽의 트러스 모형, 전단 철근 설계와 간격, 깊은 보 맛보기.", tags: ["전단", "sim"] },
+    { slug: "torsion",         num: "06", part: "제2부 전단·부착·사용성", title: "비틀림",              desc: "비틀리는 보. 박벽관 유추와 전단 흐름, 균열 비틀림 모멘트, 평형·적합 비틀림, 폐쇄 스터럽과 종방향 철근.", tags: ["비틀림", "sim"] },
+    { slug: "development",     num: "07", part: "제2부 전단·부착·사용성", title: "정착과 이음",         desc: "철근이 뽑히지 않게. 부착 응력과 정착 길이, 보정 계수, 표준 갈고리, 철근 절단점, 겹침 이음과 기계식 이음.", tags: ["정착", "sim"] },
+    { slug: "serviceability",  num: "08", part: "제2부 전단·부착·사용성", title: "처짐과 균열",         desc: "쓸 만한 보. 균열 단면과 유효 단면 2차 모멘트, 즉시·장기 처짐, 최소 두께, 균열 폭과 철근 간격 제한.", tags: ["사용성", "sim"] },
+    { slug: "slabs",           num: "09", part: "제3부 부재 설계", title: "슬래브",                     desc: "넓은 판을 설계한다. 1방향 슬래브, 2방향 슬래브와 직접 설계법, 뚫림 전단, 수축·온도 철근, B-10 210 mm 슬래브.", tags: ["슬래브", "sim"] },
+    { slug: "columns",         num: "10", part: "제3부 부재 설계", title: "기둥과 P–M 상관도",           desc: "축력과 휨을 함께. 중심 축하중 강도, 띠·나선 기둥, 변형률 적합으로 그리는 P–M 상관도, 균형점, 2축 휨 맛보기.", tags: ["기둥", "sim"] },
+    { slug: "slender",         num: "11", part: "제3부 부재 설계", title: "장주와 모멘트 확대",          desc: "길어지면 약해진다. 세장비와 단주 한계, 유효 길이, 비횡이동·횡이동 골조의 모멘트 확대, 2차 해석.", tags: ["장주", "sim"] },
+    { slug: "walls-detailing", num: "12", part: "제3부 부재 설계", title: "벽체와 내진 상세",            desc: "지진에 버티는 철근 배치. 전단벽의 휨·전단, 경계 요소, 특수 모멘트 골조의 보·기둥·접합부 상세, 횡보강.", tags: ["내진 상세", "sim"] },
+    { slug: "footings",        num: "13", part: "제4부 기초·특수 구조", title: "기초",                   desc: "기둥의 힘을 땅에 나눈다. 독립 기초의 크기, 1방향·2방향 전단, 휨과 정착, 복합 기초, 말뚝 머리와 전면 기초.", tags: ["기초", "sim"] },
+    { slug: "strut-tie",       num: "14", part: "제4부 기초·특수 구조", title: "스트럿–타이 모델",        desc: "D 영역을 트러스로 푼다. B·D 영역, 스트럿·타이·절점의 강도, 깊은 보, 내민 받침(코벨), 개구부 주변.", tags: ["STM", "sim"] },
+    { slug: "prestressed",     num: "15", part: "제4부 기초·특수 구조", title: "프리스트레스트 콘크리트",     desc: "미리 눌러 둔다. 긴장재와 편심, 하중 단계별 응력, 하중 평형, 프리스트레스 손실, 휨강도와 텐던 배치.", tags: ["PSC", "sim"] },
+    { slug: "case-study",      num: "16", part: "제4부 기초·특수 구조", title: "B-10 설계 실습",           desc: "한 경간을 처음부터 끝까지. 하중 집계에서 G1·C1·슬래브·기초 설계, 배근도와 물량, 검토 체크리스트까지 이어서 푼다.", tags: ["설계 실습", "sim"] },
+    { slug: "glossary",        num: "17", part: "부록", title: "용어집 & 종합 퀴즈",                               desc: "철근콘크리트 용어를 검색하고, 설계식 한눈표와 장별 종합 문제로 실력을 점검하자.", tags: ["정리"] },
+  ];
+
+  const CB = (window.CB = {});
+  CB.CHAPTERS = CHAPTERS;
+  const LIVE = CHAPTERS.filter((c) => !c.planned);
+  CB.LIVE_CHAPTERS = LIVE;
+
+
+  /* ------------------------------------------------------------ math utils */
+  CB.clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  CB.lerp = (a, b, t) => a + (b - a) * t;
+  CB.map = (x, a, b, c, d) => c + ((x - a) * (d - c)) / (b - a);
+  CB.smooth = (a, b, x) => { const t = CB.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  CB.randn = function () {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  CB.poisson = function (lambda) {
+    if (lambda <= 0) return 0;
+    if (lambda > 40) return Math.max(0, Math.round(lambda + Math.sqrt(lambda) * CB.randn()));
+    const L = Math.exp(-lambda);
+    let k = 0, p = 1;
+    do { k++; p *= Math.random(); } while (p > L);
+    return k - 1;
+  };
+  /** 시드 고정 난수 (장면 텍스처가 매번 같게) */
+  CB.rng = function (seed = 1) {
+    let s = seed >>> 0 || 1;
+    const r = () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+    r.range = (a, b) => a + (b - a) * r();
+    r.pick = (arr) => arr[Math.floor(r() * arr.length)];
+    return r;
+  };
+  /** 숫자 포맷: 유효 자리 */
+  CB.fmt = function (x, digits = 3) {
+    if (!isFinite(x)) return "—";
+    if (x === 0) return "0";
+    const a = Math.abs(x);
+    if (a >= 1e6 || a < 1e-3) return x.toExponential(digits - 1).replace("e+", "e");
+    return Number(x.toPrecision(digits)).toLocaleString("en-US", { maximumFractionDigits: 6 });
+  };
+  /** 부호 포함 (±) 포맷 */
+  CB.signed = (x, d = 1) => (x > 0.0001 ? "+" : x < -0.0001 ? "−" : "±") + Math.abs(x).toFixed(d);
+
+  /* ------------------------------------------------------------ theme */
+  const themeCbs = [];
+  CB.onTheme = (cb) => themeCbs.push(cb);
+  CB.isDark = function () {
+    const t = document.documentElement.getAttribute("data-theme");
+    if (t) return t === "dark";
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  };
+  CB.color = function (name) {
+    return getComputedStyle(document.documentElement).getPropertyValue("--" + name).trim();
+  };
+  CB.palette = function () {
+    const c = CB.color;
+    return {
+      bg: c("canvas-bg"), text: c("text"), dim: c("text-dim"), faint: c("text-faint"),
+      grid: c("grid"), axis: c("axis"), border: c("border"), surface: c("surface"), elev: c("bg-elev"),
+      accent: c("accent"), accent2: c("accent-2"), ok: c("ok"), warn: c("warn"), bad: c("bad"),
+      red: c("red"), green: c("green"), blue: c("blue"),
+      tension: c("tension"), compression: c("compression"),
+      series: [c("accent"), c("accent-2"), c("warn"), c("ok"), c("bad"), c("text-dim")],
+    };
+  };
+  function applyTheme(t) {
+    if (t) document.documentElement.setAttribute("data-theme", t);
+    else document.documentElement.removeAttribute("data-theme");
+    themeCbs.forEach((cb) => { try { cb(); } catch (e) { console.error(e); } });
+  }
+  try { const saved = localStorage.getItem("construction-theme"); if (saved) document.documentElement.setAttribute("data-theme", saved); } catch (e) {}
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
+      if (!document.documentElement.getAttribute("data-theme")) applyTheme(null);
+    });
+  }
+
+  /* ------------------------------------------------------------ canvas helper */
+  /**
+   * HiDPI 캔버스. 폭은 부모 폭을 따르고 높이는 aspect(높이/폭) 또는 height(px)로 결정.
+   *   const cv = CB.canvas(el, (ctx,w,h)=>{...}, {aspect:0.5, maxHeight: 420});  aspect는 폭→비율 함수도 가능
+   */
+  CB.canvas = function (canvas, draw, opts = {}) {
+    if (typeof canvas === "string") canvas = document.querySelector(canvas);
+    const ctx = canvas.getContext("2d");
+    const st = { ctx, w: 0, h: 0, canvas, dpr: 1 };
+    function resize() {
+      const parent = canvas.parentElement;
+      const w = Math.max(200, Math.floor(opts.width || parent.clientWidth || 600));
+      let h = opts.height || Math.round(w * (typeof opts.aspect === "function" ? opts.aspect(w) : opts.aspect || 0.5));
+      if (opts.minHeight) h = Math.max(h, opts.minHeight);
+      if (opts.maxHeight) h = Math.min(h, opts.maxHeight);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      canvas.style.height = h + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      st.w = w; st.h = h; st.dpr = dpr;
+      st.redraw();
+    }
+    st.redraw = function () {
+      if (!st.w) return;
+      ctx.save();
+      ctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
+      if (!opts.noClear) {
+        ctx.clearRect(0, 0, st.w, st.h);
+        ctx.fillStyle = CB.color("canvas-bg");
+        ctx.fillRect(0, 0, st.w, st.h);
+      }
+      try { draw && draw(ctx, st.w, st.h); } finally { ctx.restore(); }
+    };
+    st.resize = resize;
+    if (window.ResizeObserver) {
+      let lastW = -1;
+      new ResizeObserver(() => { const w = canvas.parentElement.clientWidth; if (w !== lastW) { lastW = w; resize(); } }).observe(canvas.parentElement);
+    } else window.addEventListener("resize", resize);
+    CB.onTheme(() => st.redraw());
+    resize();
+    return st;
+  };
+
+  /** 화면에 보일 때만 도는 애니메이션 루프. fn(dt초, t초) */
+  CB.loop = function (el, fn) {
+    let raf = 0, last = 0, t = 0, visible = true, running = true;
+    function frame(ts) {
+      raf = 0;
+      if (!running || !visible) return;
+      const dt = last ? Math.min(0.05, (ts - last) / 1000) : 0.016;
+      last = ts; t += dt;
+      fn(dt, t);
+      raf = requestAnimationFrame(frame);
+    }
+    function kick() { if (!raf && running && visible) { last = 0; raf = requestAnimationFrame(frame); } }
+    if (window.IntersectionObserver && el) {
+      new IntersectionObserver((es) => { visible = es[0].isIntersecting; kick(); }).observe(el);
+    }
+    kick();
+    return {
+      start() { running = true; kick(); },
+      stop() { running = false; },
+      get running() { return running; },
+      toggle() { running ? (running = false) : ((running = true), kick()); return running; },
+    };
+  };
+
+  /** 다음 프레임에 한 번만 실행 (슬라이더 입력 폭주 방지) */
+  CB.throttle = function (fn) {
+    let pending = false;
+    return function () {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => { pending = false; fn(); });
+    };
+  };
+
+  /* ------------------------------------------------------------ chart helper */
+  /**
+   * 간단한 선 그래프. box = {x,y,w,h}(생략 시 캔버스 전체에 여백 자동)
+   * opts: { x:[min,max], y:[min,max], logX, logY, xLabel, yLabel, xTicks, yTicks,
+   *         xFmt, yFmt, series:[{data:[[x,y],...], color, width, dash, fill}],
+   *         vlines:[{x,color,label,dash}], hlines:[{y,color,label,dash}], points:[{x,y,color,r,label}],
+   *         bands:[{x0,x1,color}] }
+   */
+  CB.chart = function (ctx, box, opts) {
+    const P = CB.palette();
+    const dpr = (ctx.getTransform && ctx.getTransform().a) || 1;
+    const W = ctx.canvas.width / dpr, H = ctx.canvas.height / dpr;
+    if (!box) box = { x: 58, y: 16, w: W - 58 - 18, h: H - 16 - 46 };
+    const [x0, x1] = opts.x, [y0, y1] = opts.y;
+    const lx = (v) => (opts.logX ? Math.log10(v) : v);
+    const ly = (v) => (opts.logY ? Math.log10(v) : v);
+    const X = (v) => box.x + ((lx(v) - lx(x0)) / (lx(x1) - lx(x0))) * box.w;
+    const Y = (v) => box.y + box.h - ((ly(v) - ly(y0)) / (ly(y1) - ly(y0))) * box.h;
+    const ticks = (a, b, log, n) => {
+      if (log) { const out = []; for (let e = Math.ceil(Math.log10(a) - 1e-9); e <= Math.log10(b) + 1e-9; e++) out.push(Math.pow(10, e)); return out; }
+      const span = b - a, raw = span / (n || 5), mag = Math.pow(10, Math.floor(Math.log10(raw)));
+      const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= (n || 5) + 0.5) || raw;
+      const out = []; for (let v = Math.ceil(a / step - 1e-9) * step; v <= b + step * 1e-6; v += step) out.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+      return out;
+    };
+    const defFmt = (v) => (Math.abs(v) >= 1e5 || (Math.abs(v) < 1e-2 && v !== 0) ? v.toExponential(0).replace("e+", "e") : String(Number(v.toPrecision(4))));
+    const xFmt = opts.xFmt || defFmt, yFmt = opts.yFmt || defFmt;
+    ctx.save();
+    ctx.font = "11px " + getComputedStyle(document.body).getPropertyValue("--mono");
+    ctx.lineWidth = 1;
+    (opts.bands || []).forEach((b) => { ctx.fillStyle = b.color; ctx.fillRect(X(b.x0), box.y, X(b.x1) - X(b.x0), box.h); });
+    const xt = opts.xTicks || ticks(x0, x1, opts.logX, 6);
+    const yt = opts.yTicks || ticks(y0, y1, opts.logY, 5);
+    ctx.strokeStyle = P.grid; ctx.fillStyle = P.dim;
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    xt.forEach((v) => { const px = X(v); if (px < box.x - 1 || px > box.x + box.w + 1) return; ctx.beginPath(); ctx.moveTo(px, box.y); ctx.lineTo(px, box.y + box.h); ctx.stroke(); ctx.fillText(xFmt(v), px, box.y + box.h + 6); });
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    yt.forEach((v) => { const py = Y(v); if (py < box.y - 1 || py > box.y + box.h + 1) return; ctx.beginPath(); ctx.moveTo(box.x, py); ctx.lineTo(box.x + box.w, py); ctx.stroke(); ctx.fillText(yFmt(v), box.x - 6, py); });
+    ctx.strokeStyle = P.axis;
+    ctx.beginPath(); ctx.moveTo(box.x, box.y); ctx.lineTo(box.x, box.y + box.h); ctx.lineTo(box.x + box.w, box.y + box.h); ctx.stroke();
+    ctx.fillStyle = P.dim; ctx.font = "12px " + getComputedStyle(document.body).getPropertyValue("--font");
+    if (opts.xLabel) { ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(opts.xLabel, box.x + box.w / 2, box.y + box.h + 40); }
+    if (opts.yLabel) { ctx.save(); ctx.translate(14, box.y + box.h / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(opts.yLabel, 0, 0); ctx.restore(); }
+    ctx.save(); ctx.beginPath(); ctx.rect(box.x, box.y - 2, box.w + 2, box.h + 4); ctx.clip();
+    (opts.series || []).forEach((s, i) => {
+      if (!s.data || !s.data.length) return;
+      ctx.strokeStyle = s.color || P.series[i % P.series.length];
+      ctx.lineWidth = s.width || 2; ctx.setLineDash(s.dash || []);
+      ctx.beginPath();
+      let started = false;
+      s.data.forEach(([x, y]) => { if (!isFinite(y) || (opts.logY && y <= 0) || (opts.logX && x <= 0)) { started = false; return; } const px = X(x), py = Y(y); started ? ctx.lineTo(px, py) : ctx.moveTo(px, py); started = true; });
+      ctx.stroke();
+      if (s.fill) {
+        ctx.lineTo(X(s.data[s.data.length - 1][0]), Y(opts.logY ? y0 : Math.max(y0, 0)));
+        ctx.lineTo(X(s.data[0][0]), Y(opts.logY ? y0 : Math.max(y0, 0)));
+        ctx.closePath(); ctx.fillStyle = s.fill; ctx.fill();
+      }
+      ctx.setLineDash([]);
+    });
+    (opts.vlines || []).forEach((l) => { ctx.strokeStyle = l.color || P.faint; ctx.setLineDash(l.dash || [4, 4]); ctx.lineWidth = l.width || 1.2; ctx.beginPath(); ctx.moveTo(X(l.x), box.y); ctx.lineTo(X(l.x), box.y + box.h); ctx.stroke(); ctx.setLineDash([]); if (l.label) { ctx.fillStyle = l.color || P.dim; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(l.label, X(l.x) + 4, box.y + 4); } });
+    (opts.hlines || []).forEach((l) => { ctx.strokeStyle = l.color || P.faint; ctx.setLineDash(l.dash || [4, 4]); ctx.lineWidth = l.width || 1.2; ctx.beginPath(); ctx.moveTo(box.x, Y(l.y)); ctx.lineTo(box.x + box.w, Y(l.y)); ctx.stroke(); ctx.setLineDash([]); if (l.label) { ctx.fillStyle = l.color || P.dim; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText(l.label, box.x + box.w - 4, Y(l.y) - 3); } });
+    (opts.points || []).forEach((p) => { ctx.fillStyle = p.color || P.accent; ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), p.r || 4, 0, Math.PI * 2); ctx.fill(); if (p.label) { ctx.fillStyle = P.text; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText(p.label, X(p.x) + 6, Y(p.y) - 4); } });
+    ctx.restore();
+    ctx.restore();
+    return { X, Y, box };
+  };
+
+  /* ------------------------------------------------------------ controls */
+  /**
+   * range 입력 바인딩. output은 id+"-out" 요소.
+   *   const get = CB.range('ev', v => v+' EV', v => redraw());  get() → 현재 값(Number)
+   */
+  CB.range = function (id, fmt, onInput) {
+    const el = typeof id === "string" ? document.getElementById(id) : id;
+    const out = document.getElementById(el.id + "-out") || document.querySelector(`output[for="${el.id}"]`);
+    const update = (fire) => {
+      const v = Number(el.value);
+      const pct = ((v - Number(el.min || 0)) / (Number(el.max || 100) - Number(el.min || 0))) * 100;
+      el.style.setProperty("--fill", pct + "%");
+      if (out) out.textContent = fmt ? fmt(v) : String(v);
+      if (fire && onInput) onInput(v);
+    };
+    el.addEventListener("input", () => update(true));
+    update(false);
+    const get = () => Number(el.value);
+    get.set = (v, fire = true) => { el.value = v; update(fire); };
+    get.el = el;
+    return get;
+  };
+  /**
+   * 이산 값 목록 슬라이더(조리개·셔터·ISO 눈금). HTML은 <input type="range" id="..."> 만 두면 된다.
+   *   const N = CB.steps('ap', CB.APERTURES, CB.fmtN, 5.6, v => redraw());  N() → 값
+   */
+  CB.steps = function (id, list, fmt, initial, onInput) {
+    const el = typeof id === "string" ? document.getElementById(id) : id;
+    el.min = 0; el.max = list.length - 1; el.step = 1;
+    el.value = initial != null ? CB.nearest(list, initial) : 0;
+    const r = CB.range(el, (i) => (fmt ? fmt(list[i]) : String(list[i])), (i) => onInput && onInput(list[i]));
+    const get = () => list[r()];
+    get.set = (v, fire = true) => r.set(CB.nearest(list, v), fire);
+    get.index = r;
+    get.el = el;
+    return get;
+  };
+  /** 세그먼트 버튼: <div class="seg" id="mode"><button data-value="a" class="on">A</button>...</div> */
+  CB.seg = function (id, onChange) {
+    const el = typeof id === "string" ? document.getElementById(id) : id;
+    const btns = [...el.querySelectorAll("button")];
+    let cur = (btns.find((b) => b.classList.contains("on")) || btns[0]).dataset.value;
+    const set = (v, fire = true) => {
+      cur = v;
+      btns.forEach((b) => { const on = b.dataset.value === v; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+      if (fire && onChange) onChange(v);
+    };
+    btns.forEach((b) => b.addEventListener("click", () => set(b.dataset.value)));
+    set(cur, false);
+    const get = () => cur;
+    get.set = set;
+    return get;
+  };
+  /** 체크박스 바인딩 */
+  CB.check = function (id, onChange) {
+    const el = document.getElementById(id);
+    el.addEventListener("change", () => onChange && onChange(el.checked));
+    const get = () => el.checked;
+    get.set = (v) => { el.checked = v; onChange && onChange(v); };
+    return get;
+  };
+  CB.stat = function (id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+
+  CB.nearest = function (list, v, log = false) {
+    let bi = 0, bd = Infinity;
+    list.forEach((x, i) => { const d = log ? Math.abs(Math.log(x) - Math.log(v)) : Math.abs(x - v); if (d < bd) { bd = d; bi = i; } });
+    return bi;
+  };
+  CB.mod = (n, m) => ((n % m) + m) % m;
+
+  /* ==================================================================== statistics */
+  /** 정규분포 확률밀도 */
+  CB.normPdf = (x, mu = 0, s = 1) => Math.exp(-0.5 * ((x - mu) / s) ** 2) / (s * Math.sqrt(2 * Math.PI));
+  /** 오차 함수(Abramowitz–Stegun 7.1.26, 오차 < 1.5e-7) */
+  CB.erf = function (x) {
+    const s = Math.sign(x), a = Math.abs(x), t = 1 / (1 + 0.3275911 * a);
+    const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-a * a);
+    return s * y;
+  };
+  /** 정규분포 누적분포 */
+  CB.normCdf = (x, mu = 0, s = 1) => 0.5 * (1 + CB.erf((x - mu) / (s * Math.SQRT2)));
+  /** ln Γ(x) (Lanczos) */
+  CB.lgamma = function (x) {
+    const g = 7, c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    if (x < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - CB.lgamma(1 - x);
+    x -= 1; let a = c[0]; const t = x + g + 0.5;
+    for (let i = 1; i < g + 2; i++) a += c[i] / (x + i);
+    return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+  };
+  /** 포아송 확률질량 P(K=k) */
+  CB.poissonPmf = (k, lam) => (k < 0 ? 0 : Math.exp(k * Math.log(Math.max(lam, 1e-300)) - lam - CB.lgamma(k + 1)));
+  /** 이항 확률질량 P(K=k) */
+  CB.binomPmf = (k, n, p) => (k < 0 || k > n ? 0 : Math.exp(CB.lgamma(n + 1) - CB.lgamma(k + 1) - CB.lgamma(n - k + 1) + k * Math.log(Math.max(p, 1e-300)) + (n - k) * Math.log(Math.max(1 - p, 1e-300))));
+  CB.mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+  CB.std = (a) => { const m = CB.mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / Math.max(1, a.length - 1)); };
+  /**
+   * 히스토그램. → {counts, edges, width}
+   *   CB.histogram(data, 40, [lo, hi])
+   */
+  CB.histogram = function (data, bins = 30, range) {
+    const lo = range ? range[0] : Math.min(...data), hi = range ? range[1] : Math.max(...data);
+    const w = (hi - lo) / bins || 1, counts = new Array(bins).fill(0);
+    for (const x of data) { const i = Math.floor((x - lo) / w); if (i >= 0 && i < bins) counts[i]++; else if (x === hi) counts[bins - 1]++; }
+    return { counts, edges: counts.map((_, i) => lo + i * w).concat([hi]), width: w };
+  };
+
+  /* ==================================================================== complex numbers */
+  /** 복소수는 [re, im] 배열로 다룬다. */
+  CB.cx = {
+    of: (re, im = 0) => [re, im],
+    polar: (r, th) => [r * Math.cos(th), r * Math.sin(th)],
+    add: (a, b) => [a[0] + b[0], a[1] + b[1]],
+    sub: (a, b) => [a[0] - b[0], a[1] - b[1]],
+    mul: (a, b) => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]],
+    div: (a, b) => { const d = b[0] * b[0] + b[1] * b[1]; return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]; },
+    scale: (a, s) => [a[0] * s, a[1] * s],
+    conj: (a) => [a[0], -a[1]],
+    abs: (a) => Math.hypot(a[0], a[1]),
+    arg: (a) => Math.atan2(a[1], a[0]),
+    exp: (a) => { const e = Math.exp(a[0]); return [e * Math.cos(a[1]), e * Math.sin(a[1])]; },
+    /** e^{iθ} */
+    cis: (th) => [Math.cos(th), Math.sin(th)],
+    sqrt: (a) => { const r = Math.sqrt(Math.hypot(a[0], a[1])), th = Math.atan2(a[1], a[0]) / 2; return [r * Math.cos(th), r * Math.sin(th)]; },
+    str: (a, d = 2) => { const re = +a[0].toFixed(d), im = +a[1].toFixed(d); return im === 0 ? String(re) : re === 0 ? `${im}i` : `${re} ${im < 0 ? "−" : "+"} ${Math.abs(im)}i`; },
+  };
+
+  /* ==================================================================== linear algebra */
+  /** 행렬은 행 배열의 배열([[a,b],[c,d]]), 벡터는 배열. */
+  CB.mat = {
+    identity: (n) => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))),
+    mul: (A, B) => A.map((row) => B[0].map((_, j) => row.reduce((s, a, k) => s + a * B[k][j], 0))),
+    apply: (A, v) => A.map((row) => row.reduce((s, a, k) => s + a * v[k], 0)),
+    transpose: (A) => A[0].map((_, j) => A.map((r) => r[j])),
+    det: function (A) {
+      const n = A.length;
+      if (n === 1) return A[0][0];
+      if (n === 2) return A[0][0] * A[1][1] - A[0][1] * A[1][0];
+      const M = A.map((r) => r.slice()); let d = 1;
+      for (let i = 0; i < n; i++) {
+        let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > Math.abs(M[p][i])) p = r;
+        if (Math.abs(M[p][i]) < 1e-14) return 0;
+        if (p !== i) { [M[p], M[i]] = [M[i], M[p]]; d = -d; }
+        d *= M[i][i];
+        for (let r = i + 1; r < n; r++) { const f = M[r][i] / M[i][i]; for (let c = i; c < n; c++) M[r][c] -= f * M[i][c]; }
+      }
+      return d;
+    },
+    /** 가우스–조르단 역행렬(특이하면 null) */
+    inv: function (A) {
+      const n = A.length, M = A.map((r, i) => r.concat(CB.mat.identity(n)[i]));
+      for (let i = 0; i < n; i++) {
+        let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > Math.abs(M[p][i])) p = r;
+        if (Math.abs(M[p][i]) < 1e-12) return null;
+        [M[p], M[i]] = [M[i], M[p]];
+        const d = M[i][i]; for (let c = 0; c < 2 * n; c++) M[i][c] /= d;
+        for (let r = 0; r < n; r++) if (r !== i) { const f = M[r][i]; for (let c = 0; c < 2 * n; c++) M[r][c] -= f * M[i][c]; }
+      }
+      return M.map((r) => r.slice(n));
+    },
+    /** 연립방정식 A x = b */
+    solve: (A, b) => { const Ai = CB.mat.inv(A); return Ai ? CB.mat.apply(Ai, b) : null; },
+    /**
+     * 2×2 고유값·고유벡터. → {values:[λ1,λ2] (실수) | null, complex:[re, im] | null, vectors:[[x,y],[x,y]]}
+     * 고유값이 복소수이면 values=null, complex=[실부, 허부(+)]
+     */
+    eig2: function (A) {
+      const [[a, b], [c, d]] = A, tr = a + d, det = a * d - b * c, disc = tr * tr / 4 - det;
+      if (disc < -1e-12) return { values: null, complex: [tr / 2, Math.sqrt(-disc)], vectors: [] };
+      const s = Math.sqrt(Math.max(0, disc)), l1 = tr / 2 + s, l2 = tr / 2 - s;
+      const vec = (l) => {
+        let v = Math.abs(b) > 1e-12 ? [b, l - a] : Math.abs(c) > 1e-12 ? [l - d, c] : (Math.abs(l - a) < 1e-12 ? [1, 0] : [0, 1]);
+        const n = Math.hypot(v[0], v[1]) || 1; return [v[0] / n, v[1] / n];
+      };
+      let v1 = vec(l1), v2 = vec(l2);
+      if (Math.abs(disc) < 1e-12 && Math.abs(b) < 1e-12 && Math.abs(c) < 1e-12) { v1 = [1, 0]; v2 = [0, 1]; }
+      return { values: [l1, l2], complex: null, vectors: [v1, v2] };
+    },
+    /**
+     * 대칭 행렬 고유분해(야코비 회전). → {values:[...](내림차순), vectors:[[...]...](각 열 대신 각 원소가 고유벡터)}
+     */
+    eigSym: function (A, iters = 100) {
+      const n = A.length, M = A.map((r) => r.slice()), V = CB.mat.identity(n);
+      for (let sweep = 0; sweep < iters; sweep++) {
+        let off = 0; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) off += M[i][j] * M[i][j];
+        if (off < 1e-20) break;
+        for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) {
+          if (Math.abs(M[p][q]) < 1e-15) continue;
+          const th = (M[q][q] - M[p][p]) / (2 * M[p][q]);
+          const t = Math.sign(th || 1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), s = t * c;
+          for (let k = 0; k < n; k++) { const mkp = M[k][p], mkq = M[k][q]; M[k][p] = c * mkp - s * mkq; M[k][q] = s * mkp + c * mkq; }
+          for (let k = 0; k < n; k++) { const mpk = M[p][k], mqk = M[q][k]; M[p][k] = c * mpk - s * mqk; M[q][k] = s * mpk + c * mqk; }
+          for (let k = 0; k < n; k++) { const vkp = V[k][p], vkq = V[k][q]; V[k][p] = c * vkp - s * vkq; V[k][q] = s * vkp + c * vkq; }
+        }
+      }
+      const idx = [...Array(n).keys()].sort((i, j) => M[j][j] - M[i][i]);
+      return { values: idx.map((i) => M[i][i]), vectors: idx.map((i) => V.map((r) => r[i])) };
+    },
+    /**
+     * 특이값 분해(단측 야코비). A: m×n 행 배열(또는 Float64Array 평면 + m,n).
+     * → {U: m×r, S: r, V: n×r (모두 행 배열), rank 순 내림차순}
+     * 64×64 이미지 정도까지 브라우저에서 즉시 계산된다.
+     */
+    svd: function (A) {
+      const m = A.length, n = A[0].length;
+      const U = A.map((r) => Float64Array.from(r)); // m×n, 열을 직교화
+      const V = Array.from({ length: n }, (_, i) => { const r = new Float64Array(n); r[i] = 1; return r; });
+      for (let sweep = 0; sweep < 60; sweep++) {
+        let rot = 0;
+        for (let p = 0; p < n - 1; p++) for (let q = p + 1; q < n; q++) {
+          let al = 0, be = 0, ga = 0;
+          for (let i = 0; i < m; i++) { const up = U[i][p], uq = U[i][q]; al += up * up; be += uq * uq; ga += up * uq; }
+          if (Math.abs(ga) <= 1e-12 * Math.sqrt(al * be) || ga === 0) continue;
+          rot++;
+          const z = (be - al) / (2 * ga), t = Math.sign(z || 1) / (Math.abs(z) + Math.sqrt(1 + z * z)), c = 1 / Math.sqrt(1 + t * t), s = c * t;
+          for (let i = 0; i < m; i++) { const up = U[i][p], uq = U[i][q]; U[i][p] = c * up - s * uq; U[i][q] = s * up + c * uq; }
+          for (let i = 0; i < n; i++) { const vp = V[i][p], vq = V[i][q]; V[i][p] = c * vp - s * vq; V[i][q] = s * vp + c * vq; }
+        }
+        if (!rot) break;
+      }
+      const S = []; for (let j = 0; j < n; j++) { let s = 0; for (let i = 0; i < m; i++) s += U[i][j] * U[i][j]; S.push(Math.sqrt(s)); }
+      const order = [...Array(n).keys()].sort((a, b) => S[b] - S[a]);
+      const Uo = U.map((r) => order.map((j) => (S[j] > 1e-15 ? r[j] / S[j] : 0)));
+      const Vo = V.map((r) => order.map((j) => r[j]));
+      return { U: Uo, S: order.map((j) => S[j]), V: Vo };
+    },
+  };
+
+  /* ==================================================================== ODE */
+  /**
+   * 룽게–쿠타 4차. f(t, y[]) → dy[], 반환: [[t, y[]], ...] (n+1개)
+   *   CB.rk4((t,y)=>[y[1], -y[0]], [1,0], 0, 0.01, 1000)
+   */
+  CB.rk4 = function (f, y0, t0, dt, n) {
+    const out = [[t0, y0.slice()]]; let y = y0.slice(), t = t0;
+    const add = (a, b, s) => a.map((v, i) => v + b[i] * s);
+    for (let k = 0; k < n; k++) {
+      const k1 = f(t, y), k2 = f(t + dt / 2, add(y, k1, dt / 2)), k3 = f(t + dt / 2, add(y, k2, dt / 2)), k4 = f(t + dt, add(y, k3, dt));
+      y = y.map((v, i) => v + (dt / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i])); t += dt;
+      out.push([t, y.slice()]);
+    }
+    return out;
+  };
+  /** 오일러 전진법(비교용). 형식은 CB.rk4와 같다. */
+  CB.euler = function (f, y0, t0, dt, n) {
+    const out = [[t0, y0.slice()]]; let y = y0.slice(), t = t0;
+    for (let k = 0; k < n; k++) { const d = f(t, y); y = y.map((v, i) => v + dt * d[i]); t += dt; out.push([t, y.slice()]); }
+    return out;
+  };
+
+  /* ==================================================================== color maps
+  /** 색 지도: t(0..1) → [r,g,b]. "viridis"(순차) | "diverge"(파랑–흰–빨강, 0.5가 흰색) | "phase"(색상환, 위상 표시) */
+  CB.colormap = function (t, name = "viridis") {
+    t = CB.clamp(t, 0, 1);
+    if (name === "diverge") {
+      const a = [33, 102, 172], m = [247, 247, 247], b = [178, 24, 43];
+      return t < 0.5 ? a.map((v, i) => Math.round(v + (m[i] - v) * t * 2)) : m.map((v, i) => Math.round(v + (b[i] - v) * (t - 0.5) * 2));
+    }
+    if (name === "phase") {
+      const h = t * 6, c = 220, x = c * (1 - Math.abs((h % 2) - 1)), o = 30;
+      const k = Math.floor(h) % 6; const tbl = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][k];
+      return tbl.map((v) => Math.round(v + o));
+    }
+    const S = [[68, 1, 84], [72, 40, 120], [62, 74, 137], [49, 104, 142], [38, 130, 142], [31, 158, 137], [53, 183, 121], [109, 205, 89], [180, 222, 44], [253, 231, 37]];
+    const f = t * (S.length - 1), i = Math.min(S.length - 2, Math.floor(f)), u = f - i;
+    return S[i].map((v, k) => Math.round(v + (S[i + 1][k] - v) * u));
+  };
+  CB.rgb = (a) => `rgb(${a[0]},${a[1]},${a[2]})`;
+
+  /* ==================================================================== coordinate plane */
+  /**
+   * 3Blue1Brown식 좌표 평면. 캔버스 위에 수학 좌표계를 깔고, 드래그 가능한 점을 다룬다.
+   *   const pl = CB.plane("#cv", {x:[-5,5], y:[-3,3] | null(가로세로 같은 축척), aspect:0.6, grid:true, axes:true,
+   *                              draw(P, api){...}  ← 생성 중에도 동기 호출되므로 pl 대신 api.points를 쓴다, points:[{x,y,color,r,label,snap,lock:"x"|"y",constrain(p)}], onDrag(pt,i)});
+   *   P: {X(x)→px, Y(y)→py, ix(px)→x, iy(py)→y, unit(px/단위), ctx, w, h, P(팔레트),
+   *       line(x1,y1,x2,y2,o), arrow(x1,y1,x2,y2,o), dot(x,y,o), poly(pts,o), circle(x,y,r,o), text(s,x,y,o), curve(fn,o), param(fn,t0,t1,o), grid(o), axes(o)}
+   *   o 공통: {color, width, dash, fill, alpha, label, font, align, baseline, r, head}
+   *   pl.redraw(), pl.points(배열, 직접 수정 가능), pl.view({x:[..], y:[..]}) 범위 변경
+   */
+  CB.plane = function (el, o = {}) {
+    const st = { points: o.points || [], o };
+    let view = { x: (o.x || [-5, 5]).slice(), y: o.y ? o.y.slice() : null };
+    const api = { P: null };
+    Object.defineProperty(api, "points", { get: () => st.points, set: (v) => { st.points = v; } });
+    const cv = CB.canvas(el, (ctx, w, h) => {
+      const pal = CB.palette();
+      const [x0, x1] = view.x;
+      let y0, y1;
+      if (view.y) [y0, y1] = view.y; else { const half = ((x1 - x0) * h) / w / 2, cy = o.cy || 0; y0 = cy - half; y1 = cy + half; }
+      const X = (x) => ((x - x0) / (x1 - x0)) * w, Y = (y) => h - ((y - y0) / (y1 - y0)) * h;
+      const ix = (px) => x0 + (px / w) * (x1 - x0), iy = (py) => y0 + ((h - py) / h) * (y1 - y0);
+      const unit = w / (x1 - x0);
+      const style = (op, def) => { ctx.strokeStyle = op.color || def || pal.text; ctx.fillStyle = op.fill || op.color || def || pal.text; ctx.lineWidth = op.width || 2; ctx.setLineDash(op.dash || []); ctx.globalAlpha = op.alpha != null ? op.alpha : 1; };
+      const reset = () => { ctx.setLineDash([]); ctx.globalAlpha = 1; };
+      const P = {
+        ctx, w, h, X, Y, ix, iy, unit, P: pal, x0, x1, y0, y1,
+        line(a, b, c, d, op = {}) { style(op, pal.dim); ctx.beginPath(); ctx.moveTo(X(a), Y(b)); ctx.lineTo(X(c), Y(d)); ctx.stroke(); reset(); },
+        arrow(a, b, c, d, op = {}) {
+          style(op, pal.accent);
+          const px = X(a), py = Y(b), qx = X(c), qy = Y(d), L = Math.hypot(qx - px, qy - py), hd = Math.min(op.head || 11, L * 0.45);
+          if (L < 0.5) { reset(); return; }
+          const ux = (qx - px) / L, uy = (qy - py) / L;
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(qx - ux * hd * 0.8, qy - uy * hd * 0.8); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(qx - ux * hd - uy * hd * 0.45, qy - uy * hd + ux * hd * 0.45); ctx.lineTo(qx - ux * hd + uy * hd * 0.45, qy - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fillStyle = op.color || pal.accent; ctx.fill();
+          if (op.label) P.text(op.label, c, d, { color: op.color || pal.accent, dx: 8 * Math.sign(ux || 1), dy: -8, bold: true, font: op.font });
+          reset();
+        },
+        dot(x, y, op = {}) { style(op, pal.accent); ctx.beginPath(); ctx.arc(X(x), Y(y), op.r || 4, 0, Math.PI * 2); ctx.fill(); if (op.stroke) { ctx.strokeStyle = op.stroke; ctx.lineWidth = 2; ctx.stroke(); } if (op.label) P.text(op.label, x, y, { color: op.labelColor || pal.text, dx: 8, dy: -8, font: op.font }); reset(); },
+        circle(x, y, r, op = {}) { style(op, pal.dim); ctx.beginPath(); ctx.arc(X(x), Y(y), r * unit, 0, Math.PI * 2); if (op.fill) ctx.fill(); if (op.stroke !== false) ctx.stroke(); reset(); },
+        poly(pts, op = {}) {
+          if (!pts.length) return; style(op, pal.accent); ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))));
+          if (op.close !== false) ctx.closePath();
+          if (op.fill) { ctx.fillStyle = op.fill; ctx.fill(); }
+          if (op.stroke !== false) { ctx.strokeStyle = op.color || pal.accent; ctx.stroke(); }
+          reset();
+        },
+        text(s, x, y, op = {}) {
+          ctx.save(); ctx.fillStyle = op.color || pal.text; ctx.globalAlpha = op.alpha != null ? op.alpha : 1;
+          ctx.font = op.font || `${op.bold ? "700 " : ""}${op.size || 13}px ${getComputedStyle(document.body).getPropertyValue("--font")}`;
+          ctx.textAlign = op.align || "left"; ctx.textBaseline = op.baseline || "middle";
+          ctx.fillText(s, X(x) + (op.dx || 0), Y(y) + (op.dy || 0)); ctx.restore();
+        },
+        curve(fn, op = {}) {
+          style(op, pal.accent); ctx.beginPath(); let started = false;
+          const a = op.from != null ? op.from : x0, b = op.to != null ? op.to : x1, N = op.n || Math.max(100, Math.round(w));
+          for (let i = 0; i <= N; i++) { const x = a + ((b - a) * i) / N, y = fn(x); if (!isFinite(y) || Math.abs(Y(y)) > 1e5) { started = false; continue; } started ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y)); started = true; }
+          ctx.stroke(); reset();
+        },
+        param(fn, t0, t1, op = {}) {
+          style(op, pal.accent); ctx.beginPath(); const N = op.n || 400;
+          for (let i = 0; i <= N; i++) { const [x, y] = fn(t0 + ((t1 - t0) * i) / N); i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y)); }
+          if (op.close) ctx.closePath(); if (op.fill) { ctx.fillStyle = op.fill; ctx.fill(); } ctx.stroke(); reset();
+        },
+        grid(op = {}) {
+          const step = op.step || 1;
+          ctx.strokeStyle = op.color || pal.grid; ctx.lineWidth = op.width || 1; ctx.globalAlpha = op.alpha != null ? op.alpha : 1;
+          ctx.beginPath();
+          for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) { ctx.moveTo(X(x), 0); ctx.lineTo(X(x), h); }
+          for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) { ctx.moveTo(0, Y(y)); ctx.lineTo(w, Y(y)); }
+          ctx.stroke(); ctx.globalAlpha = 1;
+        },
+        axes(op = {}) {
+          ctx.strokeStyle = op.color || pal.axis; ctx.lineWidth = 1.2; ctx.beginPath();
+          ctx.moveTo(0, Y(0)); ctx.lineTo(w, Y(0)); ctx.moveTo(X(0), 0); ctx.lineTo(X(0), h); ctx.stroke();
+          if (op.labels !== false) {
+            const step = op.step || 1; ctx.fillStyle = pal.faint; ctx.font = "10px " + getComputedStyle(document.body).getPropertyValue("--mono");
+            ctx.textAlign = "center"; ctx.textBaseline = "top";
+            for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) if (Math.abs(x) > 1e-9) ctx.fillText(+x.toFixed(3), X(x), Math.min(h - 12, Math.max(2, Y(0) + 3)));
+            ctx.textAlign = "right"; ctx.textBaseline = "middle";
+            for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) if (Math.abs(y) > 1e-9) ctx.fillText(+y.toFixed(3), Math.max(24, Math.min(w - 2, X(0) - 4)), Y(y));
+          }
+        },
+      };
+      api.P = P;
+      if (o.grid !== false && !o.noGrid) P.grid({ step: o.gridStep || 1 });
+      if (o.axes !== false) P.axes({ step: o.gridStep || 1, labels: o.axisLabels });
+      o.draw && o.draw(P, api);
+      st.points.forEach((p) => { if (p.hidden) return; P.dot(p.x, p.y, { r: p.r || 7, color: p.color || pal.accent, stroke: pal.bg, label: p.label }); });
+    }, { aspect: o.aspect || 0.62, maxHeight: o.maxHeight || 520, minHeight: o.minHeight || 220, height: o.height });
+    api.cv = cv;
+    api.redraw = () => cv.redraw();
+    api.view = (v) => { if (v.x) view.x = v.x.slice(); if (v.y !== undefined) view.y = v.y ? v.y.slice() : null; cv.redraw(); };
+    const canvas = cv.canvas;
+    if (o.points || o.onDrag || o.onPointer) {
+      canvas.classList.add("drag");
+      let drag = -1;
+      const pos = (e) => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+      canvas.addEventListener("pointerdown", (e) => {
+        const P = api.P; if (!P) return; const [mx, my] = pos(e);
+        let best = -1, bd = e.pointerType === "touch" ? 30 : 18;
+        st.points.forEach((p, i) => { if (p.hidden || p.fixed) return; const d = Math.hypot(P.X(p.x) - mx, P.Y(p.y) - my); if (d < bd) { bd = d; best = i; } });
+        if (best < 0 && o.onPointer) { o.onPointer(P.ix(mx), P.iy(my), "down"); return; }
+        if (best < 0) return;
+        drag = best; canvas.setPointerCapture(e.pointerId); canvas.classList.add("dragging"); e.preventDefault();
+      });
+      canvas.addEventListener("pointermove", (e) => {
+        const P = api.P; if (!P) return; const [mx, my] = pos(e);
+        if (drag < 0) { if (o.onPointer && e.buttons) o.onPointer(P.ix(mx), P.iy(my), "move"); return; }
+        const p = st.points[drag];
+        let x = P.ix(mx), y = P.iy(my);
+        if (p.snap) { x = Math.round(x / p.snap) * p.snap; y = Math.round(y / p.snap) * p.snap; }
+        if (p.lock !== "x") p.x = CB.clamp(x, P.x0, P.x1);
+        if (p.lock !== "y") p.y = CB.clamp(y, P.y0, P.y1);
+        if (p.constrain) p.constrain(p);
+        o.onDrag && o.onDrag(p, drag);
+        cv.redraw();
+      });
+      const up = (e) => { if (drag >= 0) { drag = -1; canvas.classList.remove("dragging"); o.onDragEnd && o.onDragEnd(); } else if (o.onPointer && api.P) { const [mx, my] = pos(e); o.onPointer(api.P.ix(mx), api.P.iy(my), "up"); } };
+      canvas.addEventListener("pointerup", up);
+      canvas.addEventListener("pointercancel", up);
+    }
+    return api;
+  };
+
+  /** 재생/정지 토글 버튼 바인딩: CB.playButton("btn-id", onStart, onStop) → {set(playing)} */
+  CB.playButton = function (id, onStart, onStop, labels = ["▶ 재생", "■ 정지"]) {
+    const b = document.getElementById(id);
+    let on = false;
+    const set = (v) => { on = v; b.textContent = labels[on ? 1 : 0]; b.classList.toggle("playing", on); };
+    b.addEventListener("click", () => { if (on) { set(false); onStop && onStop(); } else { set(true); onStart && onStart(); } });
+    set(false);
+    return { set, get on() { return on; }, el: b };
+  };
+  /* ==================================================================== number helpers (structures) */
+  /** 부호와 반올림을 정리한 숫자 문자열: 음수는 진짜 빼기표(−), −0은 0. CB.num(-12.345, 1) → "−12.3" */
+  CB.num = function (v, d = 1) {
+    if (!isFinite(v)) return "—";
+    const r = Number(v.toFixed(d));
+    return (Object.is(r, -0) || r === 0 ? (0).toFixed(d) : r.toFixed(d)).replace("-", "−");
+  };
+  /** 유효 자리 기준 숫자 문자열(큰 수에는 천 단위 쉼표). CB.sig(12345.6) → "12,346" */
+  CB.sig = function (v, digits = 3) {
+    if (!isFinite(v)) return "—";
+    if (v === 0) return "0";
+    const a = Math.abs(v), d = Math.max(0, digits - 1 - Math.floor(Math.log10(a)));
+    const s = a >= 1000 ? Math.round(a).toLocaleString("en-US") : a.toFixed(Math.min(d, 6));
+    return (v < 0 ? "−" : "") + s;
+  };
+
+  /* ==================================================================== 3D view */
+  /**
+   * 끌어서 돌려 보는 3D 투시 보기(WebGL 없이 캔버스 2D). z가 연직 위쪽이다.
+   *   const v = CB.orbit("#cv", { yaw: -0.7, pitch: 0.45, dist: 60, target: [x, y, z], fov: 0.9, aspect: 0.6, spin: 0.15, draw(V) { ... } });
+   *   V: { p([x,y,z]) → [px, py, depth] | null, line3(a, b, o), poly3(pts, o), dot3(a, o), text3(s, a, o), depth(pts), ctx, w, h, P }
+   *   면은 깊이(V.depth)가 큰 것부터(먼 것부터) 칠한다. v.redraw(), v.set({yaw, pitch, dist, target}).
+   *   마우스는 가로·세로로 끌어 돌리고, 터치는 가로로 끌어 돌린다(세로 끌기는 쪽 스크롤).
+   */
+  CB.orbit = function (el, o = {}) {
+    const st = { yaw: o.yaw != null ? o.yaw : -0.7, pitch: o.pitch != null ? o.pitch : 0.45, dist: o.dist || 50, target: (o.target || [0, 0, 0]).slice(), fov: o.fov || 0.9 };
+    const api = {};
+    const cv = CB.canvas(el, (ctx, w, h) => {
+      const P = CB.palette();
+      const cy = Math.cos(st.yaw), sy = Math.sin(st.yaw), cp = Math.cos(st.pitch), sp = Math.sin(st.pitch);
+      const F = (Math.min(w, h * 1.6) / 2) / Math.tan(st.fov / 2);
+      const p = ([x, y, z]) => {
+        const X0 = x - st.target[0], Y0 = y - st.target[1], Z0 = z - st.target[2];
+        const x1 = cy * X0 - sy * Y0, y1 = sy * X0 + cy * Y0;
+        const depth = cp * y1 - sp * Z0, up = sp * y1 + cp * Z0, zc = st.dist + depth;
+        if (zc < 0.05) return null;
+        return [w / 2 + (F * x1) / zc, h / 2 - (F * up) / zc, zc];
+      };
+      const style = (op, def) => { ctx.strokeStyle = op.color || def; ctx.lineWidth = op.width || 1.5; ctx.setLineDash(op.dash || []); ctx.globalAlpha = op.alpha != null ? op.alpha : 1; };
+      const reset = () => { ctx.setLineDash([]); ctx.globalAlpha = 1; };
+      const V = {
+        ctx, w, h, P, p, st,
+        depth: (pts) => pts.reduce((s, q) => s + (p(q) || [0, 0, 1e9])[2], 0) / pts.length,
+        line3(a, b, op = {}) { const A = p(a), B = p(b); if (!A || !B) return; style(op, P.text); ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); reset(); },
+        poly3(pts, op = {}) {
+          const q = pts.map(p); if (q.some((v) => !v)) return;
+          ctx.beginPath(); q.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
+          if (op.fill) { ctx.globalAlpha = op.fillAlpha != null ? op.fillAlpha : 1; ctx.fillStyle = op.fill; ctx.fill(); ctx.globalAlpha = 1; }
+          if (op.stroke !== false) { style(op, op.color || P.dim); ctx.stroke(); reset(); }
+        },
+        dot3(a, op = {}) { const A = p(a); if (!A) return; ctx.fillStyle = op.color || P.accent; ctx.beginPath(); ctx.arc(A[0], A[1], op.r || 4, 0, Math.PI * 2); ctx.fill(); },
+        text3(s, a, op = {}) {
+          const A = p(a); if (!A) return;
+          ctx.save(); ctx.fillStyle = op.color || P.text; ctx.font = `${op.bold ? "700 " : ""}${op.size || 12}px ${getComputedStyle(document.body).getPropertyValue("--font")}`;
+          ctx.textAlign = op.align || "center"; ctx.textBaseline = op.baseline || "middle"; ctx.fillText(s, A[0] + (op.dx || 0), A[1] + (op.dy || 0)); ctx.restore();
+        },
+      };
+      o.draw && o.draw(V, api);
+    }, { aspect: o.aspect || 0.62, maxHeight: o.maxHeight || 520, minHeight: o.minHeight || 240, height: o.height });
+    api.cv = cv; api.st = st;
+    api.redraw = () => cv.redraw();
+    api.set = (v) => { Object.assign(st, v); cv.redraw(); };
+    const canvas = cv.canvas;
+    canvas.style.touchAction = "pan-y";
+    canvas.classList.add("drag");
+    let last = null, touched = false;
+    canvas.addEventListener("pointerdown", (e) => { last = [e.clientX, e.clientY]; touched = true; canvas.setPointerCapture(e.pointerId); canvas.classList.add("dragging"); });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!last) return;
+      const dx = e.clientX - last[0], dy = e.clientY - last[1]; last = [e.clientX, e.clientY];
+      st.yaw -= dx * 0.008;
+      if (e.pointerType !== "touch") st.pitch = CB.clamp(st.pitch + dy * 0.006, -0.15, 1.45);
+      cv.redraw();
+    });
+    const up = () => { last = null; canvas.classList.remove("dragging"); };
+    canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
+    if (o.spin) CB.loop(canvas, (dt) => { if (touched) return; st.yaw += o.spin * dt; cv.redraw(); });
+    return api;
+  };
+
+  /* ==================================================================== structural analysis */
+  /*
+   * 2차원 골조·트러스 강성법(직접 강성법) 해석기. 단위는 kN, m, kN·m (E는 kN/m² = kPa, A는 m², I는 m⁴).
+   * 전역 좌표: x 오른쪽, y 위쪽, 회전·모멘트는 반시계 방향이 +. 부재 국부 좌표: x는 i → j, y는 x를 반시계로 90° 돌린 방향.
+   *
+   *   const r = CB.frame({
+   *     nodes: [[0, 0], [8, 0], ...],
+   *     members: [{ i: 0, j: 1, E: 2.75e7, A: 0.28, I: 1.14e-2, hinge: [false, true] }, { i: 1, j: 2, truss: true, E, A }],
+   *     supports: { 0: "pin", 2: "roller", 5: "fixed", 7: [1, 0, 0] },   // pin roller rollerV fixed slider guide 또는 [ux, uy, rz] 구속
+   *     springs: { 3: [0, 5000, 0] },                                     // 지점 스프링(kN/m, kN/m, kN·m/rad)
+   *     loads: [{ node: 1, fx: 0, fy: -50, m: 0 }],                         // 절점 하중(전역)
+   *     memberLoads: [{ member: 0, w: [0, -10] },                           // 등분포(전역 성분, 부재 길이당 kN/m)
+   *                   { member: 0, w: [0, 0], w2: [0, -20], from: 2, to: 6 }, // 선형 분포(시작값 w, 끝값 w2), 일부 구간
+   *                   { member: 1, P: [0, -40], a: 3 },                     // 부재 위 집중 하중(i단에서 거리 a)
+   *                   { member: 1, M: 15, a: 2 },                           // 부재 위 집중 모멘트(반시계 +)
+   *                   { member: 2, w: [0, -5], local: true }],              // local: true면 [축 방향, 직각 방향] 국부 성분
+   *     settlements: [{ node: 2, dof: 1, value: -0.01 }],                   // 지점 침하(구속된 자유도에 강제 변위)
+   *   });
+   *   r.ok(false면 r.reason: "unstable"), r.d[n] = [ux, uy, rz], r.reactions[n] = [Rx, Ry, Mz] | null,
+   *   r.ends[m] = { N1, V1, M1, N2, V2, M2 } (단면력: N 인장 +, V·M은 국부 좌표의 보 부호 규약, M은 처짐 아래로 볼록(새깅) +),
+   *   r.sample(m, n) → [{ s, x, y, N, V, M, ux, uy }] (s: i단에서의 거리, ux·uy 전역 변위), r.maxAbs("M"|"V"|"N"|"disp").
+   */
+  const SUPPORTS = { pin: [1, 1, 0], roller: [0, 1, 0], rollerV: [1, 0, 0], fixed: [1, 1, 1], slider: [0, 1, 1], guide: [1, 0, 1], free: [0, 0, 0] };
+  CB.SUPPORTS = SUPPORTS;
+  const GAUSS3 = [[-Math.sqrt(3 / 5), 5 / 9], [0, 8 / 9], [Math.sqrt(3 / 5), 5 / 9]];
+  const hermite = (xi, L) => [1 - 3 * xi * xi + 2 * xi ** 3, L * (xi - 2 * xi * xi + xi ** 3), 3 * xi * xi - 2 * xi ** 3, L * (-xi * xi + xi ** 3)];
+  const hermiteD = (xi, L) => [(-6 * xi + 6 * xi * xi) / L, 1 - 4 * xi + 3 * xi * xi, (6 * xi - 6 * xi * xi) / L, -2 * xi + 3 * xi * xi];
+  function kLocal(E, A, I, L) {
+    const a = (E * A) / L, b = (12 * E * I) / L ** 3, c = (6 * E * I) / L ** 2, d4 = (4 * E * I) / L, d2 = (2 * E * I) / L;
+    return [[a, 0, 0, -a, 0, 0], [0, b, c, 0, -b, c], [0, c, d4, 0, -c, d2], [-a, 0, 0, a, 0, 0], [0, -b, -c, 0, b, -c], [0, c, d2, 0, -c, d4]];
+  }
+  /** 가우스 소거(부분 피벗). 특이하면 null */
+  function solveDense(K, b, tol) {
+    const n = b.length, M = K.map((r, i) => [...r, b[i]]);
+    for (let c = 0; c < n; c++) {
+      let p = c;
+      for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+      if (Math.abs(M[p][c]) < tol) return null;
+      if (p !== c) [M[p], M[c]] = [M[c], M[p]];
+      for (let r = c + 1; r < n; r++) {
+        const f = M[r][c] / M[c][c]; if (!f) continue;
+        for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
+      }
+    }
+    const x = new Array(n).fill(0);
+    for (let r = n - 1; r >= 0; r--) { let s = M[r][n]; for (let k = r + 1; k < n; k++) s -= M[r][k] * x[k]; x[r] = s / M[r][r]; }
+    return x;
+  }
+  CB.solve = (K, b) => solveDense(K, b, 1e-12 * Math.max(1e-300, ...K.map((r, i) => Math.abs(r[i]))));
+
+  CB.frame = function (model) {
+    const nodes = model.nodes, nn = nodes.length, ndof = nn * 3;
+    const fixed = new Array(ndof).fill(false), presc = new Array(ndof).fill(0), spring = new Array(ndof).fill(0);
+    Object.entries(model.supports || {}).forEach(([k, v]) => {
+      const r = typeof v === "string" ? SUPPORTS[v] : v;
+      if (!r) throw new Error("CB.frame: unknown support " + v);
+      r.forEach((on, d) => { if (on) fixed[+k * 3 + d] = true; });
+    });
+    Object.entries(model.springs || {}).forEach(([k, v]) => v.forEach((kv, d) => { spring[+k * 3 + d] += kv || 0; }));
+    (model.settlements || []).forEach((s) => { presc[s.node * 3 + s.dof] = s.value; });
+
+    const els = model.members.map((m) => {
+      const [x1, y1] = nodes[m.i], [x2, y2] = nodes[m.j];
+      const L = Math.hypot(x2 - x1, y2 - y1), c = (x2 - x1) / L, s = (y2 - y1) / L;
+      const E = m.E != null ? m.E : model.E != null ? model.E : 2.1e8;
+      const A = m.A != null ? m.A : model.A != null ? model.A : 0.01;
+      let I = m.I != null ? m.I : model.I != null ? model.I : 1e-4;
+      const rel = m.truss ? [true, true] : (m.hinge || [false, false]).slice();
+      if (m.truss && !(I > 0)) I = 1e-6;
+      return { m, i: m.i, j: m.j, L, c, s, E, A, I, rel, dist: [], pts: [], mom: [], f: new Array(6).fill(0) };
+    });
+    // 부재 하중 → 국부 성분
+    (model.memberLoads || []).forEach((ld) => {
+      const e = els[ld.member];
+      const toLocal = (v) => (ld.local ? [v[0], v[1]] : [e.c * v[0] + e.s * v[1], -e.s * v[0] + e.c * v[1]]);
+      if (ld.w) {
+        const w1 = toLocal(ld.w), w2 = toLocal(ld.w2 || ld.w);
+        const s0 = CB.clamp(ld.from != null ? ld.from : 0, 0, e.L), s1 = CB.clamp(ld.to != null ? ld.to : e.L, 0, e.L);
+        if (s1 > s0) e.dist.push({ s0, s1, a0: w1[0], a1: w2[0], t0: w1[1], t1: w2[1] });
+      }
+      if (ld.P) { const p = toLocal(ld.P); e.pts.push({ a: CB.clamp(ld.a, 0, e.L), pa: p[0], pt: p[1] }); }
+      if (ld.M) e.mom.push({ a: CB.clamp(ld.a, 0, e.L), M: ld.M });
+    });
+    const P = new Array(ndof).fill(0);
+    (model.loads || []).forEach((ld) => { P[ld.node * 3] += ld.fx || 0; P[ld.node * 3 + 1] += ld.fy || 0; P[ld.node * 3 + 2] += ld.m || 0; });
+
+    const K = Array.from({ length: ndof }, () => new Array(ndof).fill(0));
+    els.forEach((e) => {
+      const { L } = e, f = e.f;
+      e.dist.forEach((q) => {
+        const h = (q.s1 - q.s0) / 2, mid = (q.s1 + q.s0) / 2;
+        GAUSS3.forEach(([g, wt]) => {
+          const sx = mid + g * h, t = (sx - q.s0) / (q.s1 - q.s0), xi = sx / L, W = wt * h;
+          const qa = q.a0 + (q.a1 - q.a0) * t, qt = q.t0 + (q.t1 - q.t0) * t, N = hermite(xi, L);
+          f[0] += (1 - xi) * qa * W; f[3] += xi * qa * W;
+          f[1] += N[0] * qt * W; f[2] += N[1] * qt * W; f[4] += N[2] * qt * W; f[5] += N[3] * qt * W;
+        });
+      });
+      e.pts.forEach((p) => {
+        const xi = p.a / L, N = hermite(xi, L);
+        f[0] += (1 - xi) * p.pa; f[3] += xi * p.pa;
+        f[1] += N[0] * p.pt; f[2] += N[1] * p.pt; f[4] += N[2] * p.pt; f[5] += N[3] * p.pt;
+      });
+      e.mom.forEach((p) => {
+        const D = hermiteD(p.a / L, L);
+        f[1] += D[0] * p.M; f[2] += D[1] * p.M; f[4] += D[2] * p.M; f[5] += D[3] * p.M;
+      });
+      const k = kLocal(e.E, e.A, e.I, L);
+      e.k = k;
+      // 힌지(모멘트 해제): 정적 응축
+      const R = [e.rel[0] ? 2 : -1, e.rel[1] ? 5 : -1].filter((v) => v >= 0);
+      let kc = k.map((r) => r.slice()), fc = f.slice(), rr = null;
+      if (R.length) {
+        const krr = R.map((a) => R.map((b) => k[a][b]));
+        rr = R.length === 1 ? [[1 / krr[0][0]]] : (() => { const d = krr[0][0] * krr[1][1] - krr[0][1] * krr[1][0]; return [[krr[1][1] / d, -krr[0][1] / d], [-krr[1][0] / d, krr[0][0] / d]]; })();
+        for (let a = 0; a < 6; a++) {
+          for (let b = 0; b < 6; b++) { let sum = 0; R.forEach((r1, x) => R.forEach((r2, y) => { sum += k[a][r1] * rr[x][y] * k[r2][b]; })); kc[a][b] = k[a][b] - sum; }
+          let sf = 0; R.forEach((r1, x) => R.forEach((r2, y) => { sf += k[a][r1] * rr[x][y] * f[r2]; })); fc[a] = f[a] - sf;
+        }
+        R.forEach((r1) => { fc[r1] = 0; for (let a = 0; a < 6; a++) { kc[r1][a] = 0; kc[a][r1] = 0; } });
+      }
+      e.R = R; e.rr = rr; e.kc = kc; e.fc = fc;
+      const { c, s } = e, T = [[c, s, 0, 0, 0, 0], [-s, c, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0], [0, 0, 0, c, s, 0], [0, 0, 0, -s, c, 0], [0, 0, 0, 0, 0, 1]];
+      e.T = T;
+      const dofs = [e.i * 3, e.i * 3 + 1, e.i * 3 + 2, e.j * 3, e.j * 3 + 1, e.j * 3 + 2];
+      e.dofs = dofs;
+      // Kg = Tᵀ kc T, Fg = Tᵀ fc
+      const kT = kc.map((row) => T[0].map((_, b) => row.reduce((sum, v, q) => sum + v * T[q][b], 0)));
+      for (let a = 0; a < 6; a++) {
+        let fa = 0; for (let q = 0; q < 6; q++) fa += T[q][a] * fc[q];
+        P[dofs[a]] += fa;
+        for (let b = 0; b < 6; b++) { let v = 0; for (let q = 0; q < 6; q++) v += T[q][a] * kT[q][b]; K[dofs[a]][dofs[b]] += v; }
+      }
+    });
+    for (let d = 0; d < ndof; d++) K[d][d] += spring[d];
+    // 강성이 없는 회전 자유도(모든 부재가 힌지로 모인 절점)는 자동으로 고정한다.
+    const maxDiag = Math.max(1e-300, ...K.map((r, i) => Math.abs(r[i])));
+    const auto = [];
+    for (let n = 0; n < nn; n++) {
+      const d = n * 3 + 2;
+      if (!fixed[d] && Math.abs(K[d][d]) < 1e-12 * maxDiag) {
+        if (Math.abs(P[d]) > 1e-12) return { ok: false, reason: "unstable", model, detail: "모든 부재가 힌지로 모인 절점에 모멘트가 걸렸다" };
+        auto.push(d); fixed[d] = true;
+      }
+    }
+    const free = [], sup = [];
+    for (let d = 0; d < ndof; d++) (fixed[d] ? sup : free).push(d);
+    const D = presc.slice();
+    if (free.length) {
+      const Kff = free.map((a) => free.map((b) => K[a][b]));
+      const rhs = free.map((a) => P[a] - sup.reduce((sum, b) => sum + K[a][b] * D[b], 0));
+      const tol = 1e-9 * Math.max(1e-300, ...free.map((a) => Math.abs(K[a][a])));
+      const x = solveDense(Kff, rhs, tol);
+      if (!x) return { ok: false, reason: "unstable", model };
+      free.forEach((d, i) => { D[d] = x[i]; });
+      const span = Math.max(1, ...nodes.flat().map(Math.abs));
+      if (x.some((v, i) => !isFinite(v) || (free[i] % 3 !== 2 && Math.abs(v) > 1e3 * span))) return { ok: false, reason: "unstable", model };
+    }
+    const reactions = new Array(nn).fill(null);
+    for (let n = 0; n < nn; n++) {
+      let has = false; const r = [0, 0, 0];
+      for (let q = 0; q < 3; q++) {
+        const d = n * 3 + q;
+        if (fixed[d] && !auto.includes(d)) { has = true; r[q] = K[d].reduce((sum, v, b) => sum + v * D[b], 0) - P[d]; }
+        else if (spring[d]) { has = true; r[q] = -spring[d] * D[d]; }
+      }
+      if (has) reactions[n] = r;
+    }
+    // 부재 끝 힘(국부, 절점이 부재에 가하는 힘)
+    els.forEach((e) => {
+      const dg = e.dofs.map((d) => D[d]);
+      const dl = e.T.map((row) => row.reduce((sum, v, q) => sum + v * dg[q], 0));
+      const fe = e.kc.map((row, a) => row.reduce((sum, v, b) => sum + v * dl[b], 0) - e.fc[a]);
+      e.R.forEach((r1) => { fe[r1] = 0; });
+      // 해제된 끝의 부재 회전각 복원: d_r = k_rr⁻¹ (f_r − k_ra d_a)
+      if (e.R.length) {
+        const A = [0, 1, 2, 3, 4, 5].filter((a) => !e.R.includes(a));
+        const rhs = e.R.map((r1) => e.f[r1] - A.reduce((sum, a) => sum + e.k[r1][a] * dl[a], 0));
+        e.R.forEach((r1, x) => { dl[r1] = e.rr[x].reduce((sum, v, y) => sum + v * rhs[y], 0); });
+      }
+      e.dl = dl; e.fe = fe;
+    });
+    const ends = els.map((e) => ({ N1: -e.fe[0], V1: e.fe[1], M1: -e.fe[2], N2: e.fe[3], V2: -e.fe[4], M2: e.fe[5], f: e.fe.slice() }));
+
+    function forcesAt(e, x) {
+      const fe = e.fe;
+      let N = -fe[0], V = fe[1], M = -fe[2] + x * fe[1];
+      e.dist.forEach((q) => {
+        const s0 = q.s0, s1 = Math.min(x, q.s1);
+        if (s1 <= s0) return;
+        const qa = (t) => q.a0 + ((q.a1 - q.a0) * (t - q.s0)) / (q.s1 - q.s0), qt = (t) => q.t0 + ((q.t1 - q.t0) * (t - q.s0)) / (q.s1 - q.s0), m = (s0 + s1) / 2, h = s1 - s0;
+        N -= ((qa(s0) + qa(s1)) / 2) * h;
+        V += ((qt(s0) + qt(s1)) / 2) * h;
+        M += (h / 6) * ((x - s0) * qt(s0) + 4 * (x - m) * qt(m) + (x - s1) * qt(s1));
+      });
+      e.pts.forEach((p) => { if (p.a < x) { N -= p.pa; V += p.pt; M += p.pt * (x - p.a); } });
+      e.mom.forEach((p) => { if (p.a < x) M -= p.M; });
+      return { N, V, M };
+    }
+    function sample(mi, n = 60) {
+      const e = els[mi], L = e.L, eps = L * 1e-6;
+      const ss = new Set();
+      for (let k = 0; k <= n; k++) ss.add((L * k) / n);
+      e.pts.forEach((p) => { ss.add(Math.max(0, p.a - eps)); ss.add(Math.min(L, p.a + eps)); });
+      e.mom.forEach((p) => { ss.add(Math.max(0, p.a - eps)); ss.add(Math.min(L, p.a + eps)); });
+      e.dist.forEach((q) => { ss.add(q.s0); ss.add(q.s1); });
+      const sv = [...ss].sort((a, b) => a - b);
+      const out = sv.map((s) => Object.assign({ s }, forcesAt(e, s)));
+      // 처짐: v'' = M/EI, u' = N/EA (i단의 국부 변위·회전에서 적분, 끝 오차는 선형 보정)
+      const [u1, v1, th1, u2, v2] = e.dl, EI = e.E * e.I, EA = e.E * e.A;
+      let th = th1, v = v1, u = u1;
+      out[0].v = v; out[0].u = u; out[0].th = th;
+      for (let k = 1; k < out.length; k++) {
+        const ds = out[k].s - out[k - 1].s;
+        const k0 = out[k - 1].M / EI, k1 = out[k].M / EI;
+        v += th * ds + ((2 * k0 + k1) / 6) * ds * ds;
+        th += ((k0 + k1) / 2) * ds;
+        u += ((out[k - 1].N + out[k].N) / 2 / EA) * ds;
+        out[k].v = v; out[k].u = u; out[k].th = th;
+      }
+      const ev = v2 - out[out.length - 1].v, eu = u2 - out[out.length - 1].u;
+      const [x1, y1] = nodes[e.i];
+      out.forEach((p) => {
+        p.v += (ev * p.s) / L; p.u += (eu * p.s) / L; p.th += ev / L;
+        p.x = x1 + e.c * p.s; p.y = y1 + e.s * p.s;
+        p.ux = e.c * p.u - e.s * p.v; p.uy = e.s * p.u + e.c * p.v;
+      });
+      return out;
+    }
+    const cache = {};
+    const res = {
+      ok: true, model, els, ends, reactions, auto,
+      d: nodes.map((_, n) => [D[n * 3], D[n * 3 + 1], D[n * 3 + 2]]),
+      sample(mi, n = 60) { const key = mi + ":" + n; return cache[key] || (cache[key] = sample(mi, n)); },
+      at(mi, s) { return forcesAt(els[mi], s); },
+      maxAbs(key) {
+        let best = 0;
+        els.forEach((_, mi) => res.sample(mi).forEach((p) => { const v = key === "disp" ? Math.hypot(p.ux, p.uy) : Math.abs(p[key]); if (v > best) best = v; }));
+        return best;
+      },
+    };
+    return res;
+  };
+
+  /** 트러스 편의 함수: bars: [[i, j], ...], EA(kN) 하나 또는 배열. CB.frame 결과 + r.N[m](부재력, 인장 +) */
+  CB.truss = function (o) {
+    const members = o.bars.map(([i, j], k) => ({ i, j, truss: true, E: 1, A: Array.isArray(o.EA) ? o.EA[k] : o.EA || 1e6 }));
+    const r = CB.frame({ nodes: o.nodes, members, supports: o.supports, loads: o.loads, springs: o.springs, settlements: o.settlements });
+    if (r.ok) r.N = r.ends.map((e) => e.N1);
+    return r;
+  };
+
+  /**
+   * 수평 보(단순보·연속보·캔틸레버·게르버보) 편의 함수. 하중은 아래 방향이 +, 집중 모멘트는 반시계 방향이 +.
+   *   const b = CB.beam({ L: 10, supports: [{ x: 0, type: "pin" }, { x: 10, type: "roller" }],   // pin | roller | fixed | slider | { type: "spring", k }
+   *                       hinges: [6], EI: 2e5, EA: 1e7,
+   *                       loads: [{ type: "udl", w: 10, a: 0, b: 10 }, { type: "lin", w1: 0, w2: 20, a: 0, b: 6 },
+   *                               { type: "point", P: 50, a: 4 }, { type: "moment", M: 20, a: 3 }],
+   *                       settle: [{ x: 10, dy: -0.01 }] });
+   *   b.ok, b.reactions → [{ x, type, R(위 +), M(반시계 +) }], b.at(x, side) → { V, M, v, theta } (side: -1 왼쪽 극한, +1 오른쪽),
+   *   b.sample(n) → [{ x, V, M, v }] (불연속점은 두 번 들어간다), b.extremes() → { Mmax, Mmin, Vmax, vmin, ... 위치 포함 }
+   */
+  CB.beam = function (o) {
+    const L = o.L, EI = o.EI || 1e5, EA = o.EA || 1e8, tol = L * 1e-9;
+    const xs = new Set([0, L]);
+    (o.supports || []).forEach((s) => xs.add(s.x));
+    (o.hinges || []).forEach((h) => xs.add(h));
+    (o.nodes || []).forEach((h) => xs.add(h));
+    const X = [...xs].sort((a, b) => a - b).filter((v, i, a) => i === 0 || v - a[i - 1] > tol);
+    const nodeAt = (x) => X.findIndex((v) => Math.abs(v - x) <= tol);
+    const nodes = X.map((x) => [x, 0]);
+    const members = [];
+    for (let k = 0; k < X.length - 1; k++) members.push({ i: k, j: k + 1, E: 1, A: EA, I: EI, hinge: [false, false] });
+    (o.hinges || []).forEach((h) => { const n = nodeAt(h); if (n > 0) members[n - 1].hinge[1] = true; });
+    const supports = {}, springs = {}, settlements = [];
+    (o.supports || []).forEach((s) => {
+      const n = nodeAt(s.x);
+      if (s.type === "spring") { springs[n] = [0, s.k || 1e4, s.kr || 0]; if (s.fixX !== false) supports[n] = [1, 0, 0]; }
+      else supports[n] = s.type || "pin";
+    });
+    (o.settle || []).forEach((s) => settlements.push({ node: nodeAt(s.x), dof: 1, value: s.dy }));
+    const loads = [], memberLoads = [];
+    const memberOf = (x) => { for (let k = 0; k < members.length; k++) if (x >= X[k] - tol && x <= X[k + 1] + tol) return k; return members.length - 1; };
+    (o.loads || []).forEach((ld) => {
+      if (ld.type === "point" || ld.type === "moment") {
+        const n = nodeAt(ld.a);
+        if (n >= 0) { if (ld.type === "point") loads.push({ node: n, fy: -ld.P }); else loads.push({ node: n, m: ld.M }); return; }
+        const k = memberOf(ld.a);
+        if (ld.type === "point") memberLoads.push({ member: k, P: [0, -ld.P], a: ld.a - X[k] });
+        else memberLoads.push({ member: k, M: ld.M, a: ld.a - X[k] });
+      } else {
+        const a = ld.a != null ? ld.a : 0, bb = ld.b != null ? ld.b : L;
+        const w1 = ld.type === "udl" ? ld.w : ld.w1, w2 = ld.type === "udl" ? ld.w : ld.w2;
+        const wAt = (x) => w1 + ((w2 - w1) * (x - a)) / (bb - a);
+        for (let k = 0; k < members.length; k++) {
+          const s0 = Math.max(a, X[k]), s1 = Math.min(bb, X[k + 1]);
+          if (s1 - s0 <= tol) continue;
+          memberLoads.push({ member: k, w: [0, -wAt(s0)], w2: [0, -wAt(s1)], from: s0 - X[k], to: s1 - X[k] });
+        }
+      }
+    });
+    const r = CB.frame({ nodes, members, supports, springs, loads, memberLoads, settlements });
+    const out = { ok: r.ok, reason: r.reason, frame: r, X, L, EI };
+    if (!r.ok) return out;
+    out.reactions = (o.supports || []).map((s) => { const R = r.reactions[nodeAt(s.x)] || [0, 0, 0]; return { x: s.x, type: s.type, R: R[1], H: R[0], M: R[2] }; });
+    out.at = function (x, side = 1) {
+      let k = memberOf(x);
+      if (side < 0) { for (let q = 0; q < members.length; q++) if (x > X[q] + tol && x <= X[q + 1] + tol) { k = q; break; } }
+      else { for (let q = 0; q < members.length; q++) if (x >= X[q] - tol && x < X[q + 1] - tol) { k = q; break; } }
+      const s = CB.clamp(x - X[k], 0, X[k + 1] - X[k]);
+      const f = r.at(k, side < 0 ? s : s + 1e-12);
+      const pts = r.sample(k, 80);
+      let v = 0, theta = 0;
+      // 처짐각은 곡률 적분값(국부 회전각)을 보간한다. 수평 보이므로 국부 = 전역.
+      for (let q = 1; q < pts.length; q++) if (pts[q].s >= s) { const t = (s - pts[q - 1].s) / Math.max(1e-12, pts[q].s - pts[q - 1].s); v = pts[q - 1].uy + t * (pts[q].uy - pts[q - 1].uy); theta = pts[q - 1].th + t * (pts[q].th - pts[q - 1].th); break; }
+      return { V: f.V, M: f.M, v, theta };
+    };
+    out.sample = function (n = 200) {
+      const res = [];
+      members.forEach((_, k) => {
+        const per = Math.max(8, Math.round((n * (X[k + 1] - X[k])) / L));
+        r.sample(k, per).forEach((p) => res.push({ x: X[k] + p.s, V: p.V, M: p.M, v: p.uy, N: p.N }));
+      });
+      return res;
+    };
+    out.extremes = function () {
+      const pts = out.sample(400);
+      const pick = (key, f) => pts.reduce((b, p) => (f(p[key], b[key]) ? p : b), pts[0]);
+      const Mmax = pick("M", (a, b) => a > b), Mmin = pick("M", (a, b) => a < b), Vmax = pick("V", (a, b) => Math.abs(a) > Math.abs(b)), vmin = pick("v", (a, b) => a < b), vmax = pick("v", (a, b) => a > b);
+      return { Mmax: { x: Mmax.x, v: Mmax.M }, Mmin: { x: Mmin.x, v: Mmin.M }, Vabs: { x: Vmax.x, v: Vmax.V }, vmin: { x: vmin.x, v: vmin.v }, vmax: { x: vmax.x, v: vmax.v } };
+    };
+    return out;
+  };
+
+  /* ==================================================================== cross sections */
+  /**
+   * 단면 성질. 단위는 호출하는 쪽이 정한다(mm 권장). 직사각형 조각의 합으로 계산한다.
+   *   CB.section.rects([{ x, y, b, h, n }])  x, y = 조각의 왼쪽 아래 모서리, n = 환산 계수(구멍은 −1, 합성 단면은 탄성계수비)
+   *   CB.section.rect(b, h), .H(h, b, tw, tf), .tee(b, tf, h, tw), .box(B, H, t), .channel(h, b, tw, tf), .circle(d), .pipe(D, t)
+   *   → { A, cx, cy, Ix, Iy, Ixy, I1, I2, theta, ytop, ybot, Stop, Sbot, Sx(작은 쪽), Sy, rx, ry, Zx, ypna, xmin, xmax, ymin, ymax, rects | circle }
+   *   CB.section.shear(sec, y) → { Q, b } : 높이 y 위쪽 면적의 도심축에 대한 1차 모멘트와 그 높이의 폭(τ = VQ/(Ib))
+   */
+  CB.section = {
+    rects(list) {
+      const pos = list.filter((r) => (r.n == null ? 1 : r.n) > 0);
+      let A = 0, Sx = 0, Sy = 0;
+      list.forEach((r) => { const n = r.n == null ? 1 : r.n, a = n * r.b * r.h; A += a; Sx += a * (r.y + r.h / 2); Sy += a * (r.x + r.b / 2); });
+      const cy = Sx / A, cx = Sy / A;
+      let Ix = 0, Iy = 0, Ixy = 0;
+      list.forEach((r) => {
+        const n = r.n == null ? 1 : r.n, a = n * r.b * r.h, dy = r.y + r.h / 2 - cy, dx = r.x + r.b / 2 - cx;
+        Ix += (n * r.b * r.h ** 3) / 12 + a * dy * dy; Iy += (n * r.h * r.b ** 3) / 12 + a * dx * dx; Ixy += a * dx * dy;
+      });
+      const ymin = Math.min(...pos.map((r) => r.y)), ymax = Math.max(...pos.map((r) => r.y + r.h));
+      const xmin = Math.min(...pos.map((r) => r.x)), xmax = Math.max(...pos.map((r) => r.x + r.b));
+      const avg = (Ix + Iy) / 2, R = Math.hypot((Ix - Iy) / 2, Ixy);
+      // 소성 중립축: 위아래 (환산) 면적이 같아지는 높이
+      const above = (y) => list.reduce((sum, r) => sum + (r.n == null ? 1 : r.n) * r.b * CB.clamp(r.y + r.h - Math.max(y, r.y), 0, r.h), 0);
+      let lo = ymin, hi = ymax;
+      for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (above(mid) > A / 2) lo = mid; else hi = mid; }
+      const yp = (lo + hi) / 2;
+      let Zx = 0;
+      list.forEach((r) => {
+        const n = r.n == null ? 1 : r.n, y0 = r.y, y1 = r.y + r.h;
+        const up0 = Math.max(y0, yp), dn1 = Math.min(y1, yp);
+        if (y1 > up0) Zx += (n * r.b * ((y1 - yp) ** 2 - (up0 - yp) ** 2)) / 2;
+        if (dn1 > y0) Zx += (n * r.b * ((yp - y0) ** 2 - (yp - dn1) ** 2)) / 2;
+      });
+      const ytop = ymax - cy, ybot = cy - ymin;
+      return { A, cx, cy, Ix, Iy, Ixy, I1: avg + R, I2: avg - R, theta: 0.5 * Math.atan2(-2 * Ixy, Ix - Iy), ytop, ybot,
+        Stop: Ix / ytop, Sbot: Ix / ybot, Sx: Ix / Math.max(ytop, ybot), Sy: Iy / Math.max(xmax - cx, cx - xmin),
+        rx: Math.sqrt(Ix / A), ry: Math.sqrt(Iy / A), Zx, ypna: yp, xmin, xmax, ymin, ymax, rects: list };
+    },
+    rect: (b, h) => CB.section.rects([{ x: -b / 2, y: 0, b, h }]),
+    H: (h, b, tw, tf) => CB.section.rects([{ x: -b / 2, y: 0, b, h: tf }, { x: -tw / 2, y: tf, b: tw, h: h - 2 * tf }, { x: -b / 2, y: h - tf, b, h: tf }]),
+    tee: (b, tf, h, tw) => CB.section.rects([{ x: -tw / 2, y: 0, b: tw, h: h - tf }, { x: -b / 2, y: h - tf, b, h: tf }]),
+    box: (B, H, t) => CB.section.rects([{ x: -B / 2, y: 0, b: B, h: H }, { x: -B / 2 + t, y: t, b: B - 2 * t, h: H - 2 * t, n: -1 }]),
+    channel: (h, b, tw, tf) => CB.section.rects([{ x: 0, y: 0, b, h: tf }, { x: 0, y: tf, b: tw, h: h - 2 * tf }, { x: 0, y: h - tf, b, h: tf }]),
+    circle(d) {
+      const A = (Math.PI * d * d) / 4, I = (Math.PI * d ** 4) / 64;
+      return { A, cx: 0, cy: d / 2, Ix: I, Iy: I, Ixy: 0, I1: I, I2: I, theta: 0, ytop: d / 2, ybot: d / 2, Stop: I / (d / 2), Sbot: I / (d / 2), Sx: I / (d / 2), Sy: I / (d / 2), rx: d / 4, ry: d / 4, Zx: d ** 3 / 6, ypna: d / 2, xmin: -d / 2, xmax: d / 2, ymin: 0, ymax: d, circle: { D: d, d: 0 }, J: (Math.PI * d ** 4) / 32 };
+    },
+    pipe(D, t) {
+      const d = D - 2 * t, A = (Math.PI * (D * D - d * d)) / 4, I = (Math.PI * (D ** 4 - d ** 4)) / 64;
+      return { A, cx: 0, cy: D / 2, Ix: I, Iy: I, Ixy: 0, I1: I, I2: I, theta: 0, ytop: D / 2, ybot: D / 2, Stop: I / (D / 2), Sbot: I / (D / 2), Sx: I / (D / 2), Sy: I / (D / 2), rx: Math.sqrt(I / A), ry: Math.sqrt(I / A), Zx: (D ** 3 - d ** 3) / 6, ypna: D / 2, xmin: -D / 2, xmax: D / 2, ymin: 0, ymax: D, circle: { D, d }, J: (Math.PI * (D ** 4 - d ** 4)) / 32 };
+    },
+    shear(sec, y) {
+      if (sec.circle) {
+        // 원·원관: 높이 y 위쪽 원 조각들로 수치 적분
+        const R = sec.circle.D / 2, r = sec.circle.d / 2, yc = y - sec.cy, width = (rad, h) => (Math.abs(h) < rad ? 2 * Math.sqrt(rad * rad - h * h) : 0);
+        let Q = 0; const n = 200;
+        for (let k = 0; k < n; k++) { const h0 = yc + ((R - yc) * (k + 0.5)) / n, dh = (R - yc) / n; Q += (width(R, h0) - width(r, h0)) * h0 * dh; }
+        return { Q, b: width(R, yc) - width(r, yc) };
+      }
+      let Q = 0, b = 0;
+      sec.rects.forEach((r) => {
+        const n = r.n == null ? 1 : r.n, y0 = Math.max(r.y, y), y1 = r.y + r.h;
+        if (y1 > y0) Q += n * r.b * (y1 - y0) * ((y0 + y1) / 2 - sec.cy);
+        if (y >= r.y && y <= r.y + r.h) b += n * r.b;
+      });
+      return { Q, b };
+    },
+  };
+
+  /* ==================================================================== drawing structures */
+  /**
+   * CB.plane의 draw(P) 안에서 CB.frame 결과를 그린다.
+   *   CB.drawFrame(P, r, { diagram: "M"|"V"|"N"|null, diagramScale(px/단위, 생략 시 최댓값 = diagramPx), diagramPx: 46, labels: true,
+   *                        deformed: false | 배율 | "auto", deformPx: 28, axialColors: false, loads: true, loadPx: 42, reactions: false,
+   *                        supports: true, memberColor(mi), memberWidth: 3.5, nodeLabels: false, supportSide: { n: "up"|"down"|"left"|"right" } })
+   *   단면력도: M은 인장측에 그린다(새깅이면 보 아래쪽). V·N은 국부 +y 쪽이 +.
+   *   색: 하중 accent2, 반력 ok, 인장 tension(파랑), 압축 compression(빨강), 변형 accent 점선.
+   */
+  CB.drawFrame = function (P, r, o = {}) {
+    const pal = P.P, ctx = P.ctx, model = r.model, nodes = model.nodes;
+    const tension = CB.color("tension"), compression = CB.color("compression");
+    const mono = getComputedStyle(document.body).getPropertyValue("--mono");
+    const font = getComputedStyle(document.body).getPropertyValue("--font");
+    const label = (s, px, py, op = {}) => {
+      ctx.save(); ctx.font = `${op.bold === false ? "" : "600 "}${op.size || 11.5}px ${op.mono === false ? font : mono}`;
+      ctx.textAlign = op.align || "center"; ctx.textBaseline = op.baseline || "middle";
+      if (op.halo !== false) { ctx.lineWidth = 3.5; ctx.strokeStyle = pal.bg; ctx.lineJoin = "round"; ctx.strokeText(s, px, py); }
+      ctx.fillStyle = op.color || pal.text; ctx.fillText(s, px, py); ctx.restore();
+    };
+    const arrowPx = (x0, y0, x1, y1, color, width = 2, head = 9) => {
+      const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+      const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+      ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * head * 0.7, y1 - uy * head * 0.7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * head - uy * head * 0.45, y1 - uy * head + ux * head * 0.45); ctx.lineTo(x1 - ux * head + uy * head * 0.45, y1 - uy * head - ux * head * 0.45); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    };
+    const momentPx = (cx, cy, M, color, rad = 15) => {
+      const ccw = M > 0, a0 = ccw ? 0.35 * Math.PI : 0.65 * Math.PI, a1 = ccw ? 1.85 * Math.PI : -0.85 * Math.PI;
+      ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, rad, -a0, -a1, ccw); ctx.stroke();
+      const ex = cx + rad * Math.cos(-a1), ey = cy + rad * Math.sin(-a1), tx = ccw ? Math.sin(-a1) : -Math.sin(-a1), ty = ccw ? -Math.cos(-a1) : Math.cos(-a1);
+      ctx.beginPath(); ctx.moveTo(ex + tx * 7, ey + ty * 7); ctx.lineTo(ex - ty * 4.5, ey + tx * 4.5); ctx.lineTo(ex + ty * 4.5, ey - tx * 4.5); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    };
+    const els = r.els || model.members.map((m) => { const [x1, y1] = nodes[m.i], [x2, y2] = nodes[m.j], L = Math.hypot(x2 - x1, y2 - y1); return { m, i: m.i, j: m.j, L, c: (x2 - x1) / L, s: (y2 - y1) / L, rel: m.truss ? [true, true] : m.hinge || [false, false] }; });
+    const NX = (n) => P.X(nodes[n][0]), NY = (n) => P.Y(nodes[n][1]);
+
+    // 단면력도
+    if (o.diagram && r.ok) {
+      const key = o.diagram, maxv = r.maxAbs(key) || 1;
+      const scale = o.diagramScale || (o.diagramPx || 46) / maxv;
+      const color = o.diagramColor || (key === "M" ? pal.accent : key === "V" ? pal.accent2 : pal.warn);
+      els.forEach((e, mi) => {
+        const pts = r.sample(mi);
+        const sign = key === "M" ? -1 : 1;
+        const nx = -e.s, ny = e.c; // 국부 +y(수학 좌표)
+        const line = pts.map((p) => [P.X(p.x) + sign * nx * p[key] * scale, P.Y(p.y) - sign * ny * p[key] * scale]);
+        ctx.save();
+        ctx.beginPath(); ctx.moveTo(P.X(pts[0].x), P.Y(pts[0].y)); line.forEach(([x, y]) => ctx.lineTo(x, y)); ctx.lineTo(P.X(pts[pts.length - 1].x), P.Y(pts[pts.length - 1].y)); ctx.closePath();
+        ctx.globalAlpha = 0.16; ctx.fillStyle = color; ctx.fill(); ctx.globalAlpha = 1;
+        ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); line.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+        ctx.restore();
+        if (o.labels !== false) {
+          // 부재마다 끝값과 최댓값을 적는다(전체 최댓값의 4 % 이하는 생략)
+          const cand = [pts[0], pts[pts.length - 1], pts.reduce((b, p) => (Math.abs(p[key]) > Math.abs(b[key]) ? p : b), pts[0])];
+          const used = [];
+          cand.forEach((p) => {
+            if (Math.abs(p[key]) < 0.04 * maxv) return;
+            if (used.some((q) => Math.abs(q.s - p.s) < e.L * 0.12 && Math.abs(q[key] - p[key]) < 0.08 * maxv)) return;
+            used.push(p);
+            const off = p[key] * scale * sign, ox = P.X(p.x) + nx * off, oy = P.Y(p.y) - ny * off, dirx = nx * Math.sign(off || 1), diry = -ny * Math.sign(off || 1);
+            label(CB.num(p[key], Math.abs(p[key]) >= 100 ? 0 : 1), ox + dirx * 12, oy + diry * 10, { color, size: 11 });
+          });
+        }
+      });
+    }
+    // 변형 형상
+    if (o.deformed && r.ok) {
+      const md = r.maxAbs("disp") || 1;
+      const k = o.deformed === "auto" || o.deformed === true ? (o.deformPx || 28) / (md * P.unit) : o.deformed;
+      ctx.save(); ctx.strokeStyle = o.axialColors ? pal.dim : pal.accent; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+      els.forEach((e, mi) => { const pts = r.sample(mi); ctx.beginPath(); pts.forEach((p, q) => { const x = P.X(p.x + k * p.ux), y = P.Y(p.y + k * p.uy); q ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); });
+      ctx.restore();
+    }
+    // 부재
+    const maxN = o.axialColors && r.ok ? Math.max(1e-9, ...r.ends.map((e) => Math.abs(e.N1))) : 1;
+    els.forEach((e, mi) => {
+      let color = (o.memberColor && o.memberColor(mi)) || pal.text, width = o.memberWidth || (e.m.truss ? 2.6 : 3.5);
+      if (o.axialColors && r.ok) {
+        const N = r.ends[mi].N1, t = Math.abs(N) / maxN;
+        color = Math.abs(N) < 1e-6 * maxN ? pal.faint : N > 0 ? tension : compression;
+        width = 1.6 + 4.4 * t;
+      }
+      ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(NX(e.i), NY(e.i)); ctx.lineTo(NX(e.j), NY(e.j)); ctx.stroke(); ctx.restore();
+      if (o.memberLabels) {
+        const t = o.memberLabels(mi);
+        if (t) label(t, (NX(e.i) + NX(e.j)) / 2 - e.s * 0, (NY(e.i) + NY(e.j)) / 2, { color, size: 11 });
+      }
+      // 부재 끝 힌지
+      e.rel.forEach((rel, end) => {
+        if (!rel || e.m.truss) return;
+        const n = end ? e.j : e.i, dir = end ? -1 : 1;
+        const hx = NX(n) + dir * e.c * 7, hy = NY(n) - dir * e.s * 7;
+        ctx.save(); ctx.fillStyle = pal.bg; ctx.strokeStyle = pal.text; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(hx, hy, 4.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+      });
+    });
+    // 절점(트러스는 작은 원)
+    nodes.forEach((_, n) => {
+      const truss = els.some((e) => (e.i === n || e.j === n) && e.m.truss);
+      if (!truss) return;
+      ctx.save(); ctx.fillStyle = pal.bg; ctx.strokeStyle = pal.text; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(NX(n), NY(n), 3.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+    });
+    // 지점
+    if (o.supports !== false) {
+      Object.entries(model.supports || {}).forEach(([k, v]) => {
+        const n = +k, x = NX(n), y = NY(n), sz = o.supportSize || 13;
+        const rr = typeof v === "string" ? SUPPORTS[v] : v;
+        const type = typeof v === "string" ? v : rr[0] && rr[1] && rr[2] ? "fixed" : rr[0] && rr[1] ? "pin" : rr[1] && rr[2] ? "slider" : rr[0] && rr[2] ? "guide" : rr[1] ? "roller" : rr[0] ? "rollerV" : "free";
+        // 방향: 연결 부재의 반대쪽(기본은 아래)
+        let side = (o.supportSide && o.supportSide[n]) || null;
+        if (!side) {
+          let ax = 0, ay = 0;
+          els.forEach((e) => { if (e.i === n) { ax += e.c; ay += e.s; } if (e.j === n) { ax -= e.c; ay -= e.s; } });
+          if (type === "rollerV" || type === "guide") side = ax >= 0 ? "left" : "right";
+          else if (type === "fixed") side = Math.abs(ay) >= Math.abs(ax) * 0.9 ? (ay >= 0 ? "down" : "up") : ax >= 0 ? "left" : "right";
+          else side = ay < -0.7 && Math.abs(ax) < 0.5 ? "up" : "down";
+        }
+        const rot = { down: 0, up: Math.PI, left: Math.PI / 2, right: -Math.PI / 2 }[side];
+        ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+        ctx.strokeStyle = pal.text; ctx.fillStyle = pal.surface; ctx.lineWidth = 1.6;
+        const hatch = (yy, w) => { ctx.beginPath(); ctx.moveTo(-w, yy); ctx.lineTo(w, yy); ctx.stroke(); ctx.save(); ctx.lineWidth = 1; ctx.strokeStyle = pal.dim; for (let q = -w + 3; q <= w; q += 5) { ctx.beginPath(); ctx.moveTo(q, yy); ctx.lineTo(q - 5, yy + 6); ctx.stroke(); } ctx.restore(); };
+        if (type === "fixed") { ctx.lineWidth = 2.6; hatch(0, sz * 1.1); }
+        else if (type === "pin") { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-sz * 0.8, sz * 1.2); ctx.lineTo(sz * 0.8, sz * 1.2); ctx.closePath(); ctx.fill(); ctx.stroke(); hatch(sz * 1.2, sz); }
+        else if (type === "roller" || type === "rollerV") {
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-sz * 0.8, sz * 0.95); ctx.lineTo(sz * 0.8, sz * 0.95); ctx.closePath(); ctx.fill(); ctx.stroke();
+          [-sz * 0.45, sz * 0.45].forEach((cx) => { ctx.beginPath(); ctx.arc(cx, sz * 0.95 + 3.4, 3.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); });
+          hatch(sz * 0.95 + 6.8, sz);
+        } else if (type === "slider" || type === "guide") {
+          ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(-sz * 0.9, 0); ctx.lineTo(sz * 0.9, 0); ctx.stroke();
+          ctx.lineWidth = 1.6; [-sz * 0.5, sz * 0.5].forEach((cx) => { ctx.beginPath(); ctx.arc(cx, 3.6, 3.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); });
+          hatch(7.4, sz);
+        }
+        ctx.restore();
+      });
+      Object.entries(model.springs || {}).forEach(([k, v]) => {
+        if (!v[1]) return;
+        const x = NX(+k), y = NY(+k);
+        ctx.save(); ctx.strokeStyle = pal.text; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x, y);
+        for (let q = 1; q <= 8; q++) ctx.lineTo(x + (q % 2 ? 6 : -6), y + q * 3.2);
+        ctx.lineTo(x, y + 30); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x - 12, y + 30); ctx.lineTo(x + 12, y + 30); ctx.stroke(); ctx.restore();
+      });
+    }
+    // 하중
+    if (o.loads !== false) {
+      const loadColor = o.loadColor || pal.accent2, Lp = o.loadPx || 42;
+      const ml = model.memberLoads || [];
+      const wmax = Math.max(1e-9, ...ml.filter((q) => q.w).map((q) => Math.max(Math.hypot(...q.w), Math.hypot(...(q.w2 || q.w)))));
+      ml.forEach((q) => {
+        const e = els[q.member], [x1, y1] = nodes[e.i];
+        const glob = (v) => (q.local ? [e.c * v[0] - e.s * v[1], e.s * v[0] + e.c * v[1]] : v);
+        if (q.w) {
+          const wa = glob(q.w), wb = glob(q.w2 || q.w), s0 = q.from != null ? q.from : 0, s1 = q.to != null ? q.to : e.L;
+          const mag = (v) => Math.hypot(v[0], v[1]), dir = mag(wa) > mag(wb) ? wa : wb, dm = mag(dir) || 1;
+          const ux = dir[0] / dm, uy = dir[1] / dm; // 수학 좌표 방향
+          const segPx = Math.hypot(P.X(x1 + e.c * s1) - P.X(x1 + e.c * s0), P.Y(y1 + e.s * s1) - P.Y(y1 + e.s * s0));
+          const nArr = Math.max(2, Math.round(segPx / 20) + 1);
+          const tails = [];
+          for (let k = 0; k < nArr; k++) {
+            const t = k / (nArr - 1), s = s0 + (s1 - s0) * t, w = mag(wa) + (mag(wb) - mag(wa)) * t;
+            const hx = P.X(x1 + e.c * s), hy = P.Y(y1 + e.s * s), len = 10 + (Lp * 0.75 * w) / wmax;
+            const tx = hx - ux * len, ty = hy + uy * len;
+            tails.push([tx, ty]);
+            if (w > 1e-9) arrowPx(tx, ty, hx, hy, loadColor, 1.5, 7);
+          }
+          ctx.save(); ctx.strokeStyle = loadColor; ctx.lineWidth = 1.5; ctx.beginPath(); tails.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); ctx.restore();
+          if (o.loadLabels !== false) {
+            const mid = tails[Math.floor(tails.length / 2)], same = Math.abs(mag(wa) - mag(wb)) < 1e-9;
+            label(same ? `${CB.num(mag(wa), mag(wa) < 10 ? 1 : 0)} kN/m` : `${CB.num(mag(wa), 0)}→${CB.num(mag(wb), 0)} kN/m`, mid[0] - ux * 2, mid[1] + uy * 2 - 9, { color: loadColor, size: 11 });
+          }
+        }
+        if (q.P) {
+          const v = glob(q.P), m = Math.hypot(v[0], v[1]) || 1, hx = P.X(x1 + e.c * q.a), hy = P.Y(y1 + e.s * q.a);
+          arrowPx(hx - (v[0] / m) * Lp, hy + (v[1] / m) * Lp, hx, hy, loadColor, 2.4, 10);
+          if (o.loadLabels !== false) label(`${CB.num(m, m < 10 ? 1 : 0)} kN`, hx - (v[0] / m) * (Lp + 10), hy + (v[1] / m) * (Lp + 10), { color: loadColor });
+        }
+        if (q.M) {
+          const hx = P.X(x1 + e.c * q.a), hy = P.Y(y1 + e.s * q.a);
+          momentPx(hx, hy, q.M, loadColor);
+          if (o.loadLabels !== false) label(`${CB.num(Math.abs(q.M), 0)} kN·m`, hx, hy - 26, { color: loadColor });
+        }
+      });
+      (model.loads || []).forEach((ld) => {
+        const x = NX(ld.node), y = NY(ld.node), fx = ld.fx || 0, fy = ld.fy || 0, m = Math.hypot(fx, fy);
+        if (m > 1e-9) {
+          arrowPx(x - (fx / m) * Lp, y + (fy / m) * Lp, x, y, loadColor, 2.4, 10);
+          if (o.loadLabels !== false) label(`${CB.num(m, m < 10 ? 1 : 0)} kN`, x - (fx / m) * (Lp + 11), y + (fy / m) * (Lp + 11), { color: loadColor });
+        }
+        if (ld.m) { momentPx(x, y, ld.m, loadColor); if (o.loadLabels !== false) label(`${CB.num(Math.abs(ld.m), 0)} kN·m`, x, y - 26, { color: loadColor }); }
+      });
+    }
+    // 반력
+    if (o.reactions && r.ok) {
+      const color = o.reactionColor || pal.ok, Lp = o.reactionPx || 34;
+      r.reactions.forEach((R, n) => {
+        if (!R) return;
+        const x = NX(n), y = NY(n), gap = 18;
+        if (Math.abs(R[1]) > 1e-6) { const d = Math.sign(R[1]); arrowPx(x, y + d * (gap + Lp), x, y + d * gap, color, 2.2, 9); label(`${CB.num(Math.abs(R[1]), Math.abs(R[1]) < 100 ? 1 : 0)}`, x + 4, y + d * (gap + Lp + 9), { color, align: "center" }); }
+        if (Math.abs(R[0]) > 1e-6) { const d = Math.sign(R[0]); arrowPx(x - d * (gap + Lp), y + gap * 0.6, x - d * gap, y + gap * 0.6, color, 2.2, 9); label(`${CB.num(Math.abs(R[0]), Math.abs(R[0]) < 100 ? 1 : 0)}`, x - d * (gap + Lp + 14), y + gap * 0.6, { color }); }
+        if (Math.abs(R[2]) > 1e-6) { momentPx(x, y, R[2], color, 22); label(`${CB.num(Math.abs(R[2]), 0)} kN·m`, x + 30, y - 22, { color, align: "left" }); }
+      });
+    }
+    if (o.nodeLabels) nodes.forEach((_, n) => { const t = typeof o.nodeLabels === "function" ? o.nodeLabels(n) : String.fromCharCode(65 + n); if (t) label(t, NX(n) - 10, NY(n) - 12, { color: pal.dim, size: 11.5 }); });
+  };
+
+  /**
+   * CB.beam 결과의 단면력도·처짐도를 위아래로 쌓아 그린다(보 아래 그래프: 양(+)이 위).
+   *   CB.beamDiagrams(ctx, w, h, b, { keys: ["V", "M"] | ["M", "v"] ..., cursor: x, labels: true, top: 8, padL: 64, n: 240, y: { M: [lo, hi] } })
+   *   → { rows: [{ key, box, X, Y }], X }  키: V(kN) · M(kN·m) · v(처짐, mm) · N(kN)
+   */
+  CB.beamDiagrams = function (ctx, w, h, b, o = {}) {
+    const pal = CB.palette(), keys = o.keys || ["V", "M"], pts = o.points || b.sample(o.n || 240), L = b.L;
+    const meta = {
+      V: { label: "V (kN)", color: pal.accent2, soft: CB.color("accent-2-soft"), f: (p) => p.V, d: 1 },
+      M: { label: "M (kN·m)", color: pal.accent, soft: CB.color("accent-soft"), f: (p) => p.M, d: 1 },
+      v: { label: "v (mm)", color: pal.accent, soft: CB.color("accent-soft"), f: (p) => p.v * 1000, d: 2 },
+      N: { label: "N (kN)", color: pal.warn, soft: CB.color("accent-2-soft"), f: (p) => p.N || 0, d: 1 },
+    };
+    const padL = o.padL || 64, padR = o.padR || 16, top = o.top != null ? o.top : 8, gap = 30, bottom = 24;
+    const rowH = Math.max(40, (h - top - bottom - gap * (keys.length - 1)) / keys.length);
+    const mono = getComputedStyle(document.body).getPropertyValue("--mono");
+    const rows = keys.map((k, i) => {
+      const m = meta[k], vals = pts.map(m.f).filter(isFinite);
+      let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+      if (o.y && o.y[k]) [lo, hi] = o.y[k];
+      if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
+      const pad = (hi - lo) * 0.16;
+      const box = { x: padL, y: top + i * (rowH + gap), w: w - padL - padR, h: rowH };
+      const c = CB.chart(ctx, box, { x: [0, L], y: [lo - pad, hi + pad], yLabel: m.label, xFmt: (v) => String(+v.toFixed(2)),
+        series: [{ data: pts.map((p) => [p.x, m.f(p)]), color: m.color, width: 2.2, fill: m.soft }], hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+      if (o.labels !== false) {
+        const imax = vals.indexOf(Math.max(...vals)), imin = vals.indexOf(Math.min(...vals));
+        const mark = (idx, above) => {
+          const p = pts[idx], v = m.f(p);
+          if (Math.abs(v) < 1e-6 * (Math.abs(hi) + Math.abs(lo))) return;
+          ctx.save(); ctx.fillStyle = m.color; ctx.beginPath(); ctx.arc(c.X(p.x), c.Y(v), 3.2, 0, Math.PI * 2); ctx.fill();
+          ctx.font = "600 11px " + mono; ctx.textAlign = c.X(p.x) > box.x + box.w - 60 ? "right" : c.X(p.x) < box.x + 40 ? "left" : "center"; ctx.textBaseline = above ? "bottom" : "top";
+          ctx.lineWidth = 3; ctx.strokeStyle = pal.bg; const t = CB.num(v, Math.abs(v) >= 100 ? 0 : m.d);
+          ctx.strokeText(t, c.X(p.x), c.Y(v) + (above ? -5 : 5)); ctx.fillText(t, c.X(p.x), c.Y(v) + (above ? -5 : 5)); ctx.restore();
+        };
+        mark(imax, true); if (imin !== imax) mark(imin, false);
+      }
+      return { key: k, box, X: c.X, Y: c.Y };
+    });
+    if (o.cursor != null) {
+      const X = rows[0].X(o.cursor);
+      ctx.save(); ctx.strokeStyle = pal.dim; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X, rows[0].box.y); ctx.lineTo(X, rows[rows.length - 1].box.y + rows[rows.length - 1].box.h); ctx.stroke(); ctx.restore();
+    }
+    ctx.save(); ctx.fillStyle = pal.dim; ctx.font = "12px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+    ctx.fillText("x (m)", padL - 10, h - 2); ctx.restore();
+    return { rows, X: rows[0].X };
+  };
+
+  /**
+   * 단면 그리기: 캔버스 상자 안에 CB.section 결과를 맞춰 그린다. 반환값 { X(x), Y(y), s(px/단위) }로 응력 분포 등을 겹친다.
+   *   CB.drawSection(ctx, sec, { x, y, w, h }, { fill, stroke, centroid: true, pna: false })
+   */
+  CB.drawSection = function (ctx, sec, box, o = {}) {
+    const pal = CB.palette();
+    const W = sec.xmax - sec.xmin, H = sec.ymax - sec.ymin, s = Math.min(box.w / W, box.h / H) * (o.fit || 0.92);
+    const ox = box.x + box.w / 2 - ((sec.xmin + sec.xmax) / 2) * s, oy = box.y + box.h / 2 + ((sec.ymin + sec.ymax) / 2) * s;
+    const X = (x) => ox + x * s, Y = (y) => oy - y * s;
+    ctx.save();
+    ctx.fillStyle = o.fill || CB.color("accent-soft"); ctx.strokeStyle = o.stroke || pal.accent; ctx.lineWidth = 1.6;
+    if (sec.circle) {
+      ctx.beginPath(); ctx.arc(X(0), Y(sec.cy), (sec.circle.D / 2) * s, 0, Math.PI * 2);
+      if (sec.circle.d) ctx.arc(X(0), Y(sec.cy), (sec.circle.d / 2) * s, 0, Math.PI * 2, true);
+      ctx.fill("evenodd"); ctx.stroke();
+    } else {
+      sec.rects.filter((r) => (r.n == null ? 1 : r.n) > 0).forEach((r) => { ctx.fillStyle = r.fill || o.fill || CB.color("accent-soft"); ctx.fillRect(X(r.x), Y(r.y + r.h), r.b * s, r.h * s); ctx.strokeRect(X(r.x), Y(r.y + r.h), r.b * s, r.h * s); });
+      sec.rects.filter((r) => (r.n == null ? 1 : r.n) < 0).forEach((r) => { ctx.fillStyle = pal.bg; ctx.fillRect(X(r.x), Y(r.y + r.h), r.b * s, r.h * s); ctx.strokeRect(X(r.x), Y(r.y + r.h), r.b * s, r.h * s); });
+    }
+    if (o.centroid !== false) {
+      ctx.strokeStyle = pal.accent2; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(X(sec.xmin) - 14, Y(sec.cy)); ctx.lineTo(X(sec.xmax) + 14, Y(sec.cy)); ctx.stroke();
+      ctx.setLineDash([]); ctx.fillStyle = pal.accent2; ctx.beginPath(); ctx.arc(X(sec.cx), Y(sec.cy), 3.5, 0, Math.PI * 2); ctx.fill();
+    }
+    if (o.pna) { ctx.strokeStyle = pal.warn; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(X(sec.xmin) - 14, Y(sec.ypna)); ctx.lineTo(X(sec.xmax) + 14, Y(sec.ypna)); ctx.stroke(); }
+    ctx.restore();
+    return { X, Y, s };
+  };
+
+  /* ------------------------------------------------------------ materials (MaterialsBook) */
+  // 재료 모델. 단위: 응력 MPa, 변형률 무차원, 시간 일(day) 또는 연(year, 이름에 밝힘), 온도 °C, 질량 kg, 부피 m³.
+  // 모든 식은 교육용 모델이다. 기준값은 현행 기준(KDS 14 20, KCS 14 20, KS)을 확인할 것.
+  const R_GAS = 8.314;
+  CB.conc = {
+    /** 평균 압축강도 fcm = fck + Δf (Δf: fck ≤ 40 → 4, ≥ 60 → 6, 사이 직선 보간) [KDS 14 20 10] */
+    fcm(fck) { const df = fck <= 40 ? 4 : fck >= 60 ? 6 : 4 + (fck - 40) / 10; return fck + df; },
+    /** 할선 탄성계수 Ec = 0.077 mc^1.5 ∛fcm (MPa), mc 단위질량 kg/m³ (보통 2300 → 8,500 ∛fcm) */
+    Ec(fck, mc = 2300) { return 0.077 * Math.pow(mc, 1.5) * Math.cbrt(CB.conc.fcm(fck)); },
+    /** 휨인장강도(파괴계수) fr = 0.63 λ √fck */
+    fr(fck, lambda = 1) { return 0.63 * lambda * Math.sqrt(Math.max(0, fck)); },
+    /** 쪼갬인장강도 근사 fsp ≈ 0.56 √fck (교육용) */
+    fsp(fck) { return 0.56 * Math.sqrt(Math.max(0, fck)); },
+    /** 설계용 포물선–직선 곡선의 매개변수 { n, eco, ecu } [KDS 14 20 20 형태] */
+    pr(fck) {
+      if (fck <= 40) return { n: 2, eco: 0.002, ecu: 0.0033 };
+      return { n: Math.min(2, 1.2 + 1.5 * Math.pow((100 - Math.min(fck, 90)) / 60, 4)), eco: 0.002 + (fck - 40) / 1e5, ecu: 0.0033 - (fck - 40) / 1e5 };
+    },
+    /**
+     * 콘크리트 압축 응력–변형률(압축 +).
+     * model "hognestad": 상승 포물선 fc[2η − η²], η = ε/ε0, ε0 = 2fc/Ec, 하강 직선(εu = 0.0038에서 0.85fc), 이후 0.
+     * model "pr": 설계용 포물선–직선 fc[1 − (1 − ε/εco)^n], εcu 넘으면 0(0.85 계수는 곱하지 않는다).
+     */
+    sigma(eps, fc, o = {}) {
+      if (!(eps > 0)) return 0;
+      if (o.model === "pr") {
+        const p = CB.conc.pr(fc);
+        if (eps > p.ecu) return 0;
+        return eps >= p.eco ? fc : fc * (1 - Math.pow(1 - eps / p.eco, p.n));
+      }
+      const Ec = o.Ec || CB.conc.Ec(fc), e0 = Math.max(1.2e-3, (2 * fc) / Ec), eu = o.eu || 0.0038;
+      if (eps <= e0) { const t = eps / e0; return fc * (2 * t - t * t); }
+      if (eps <= eu) return fc * (1 - (0.15 * (eps - e0)) / Math.max(1e-9, eu - e0));
+      return 0;
+    },
+    /** 재령 t일 강도 비 βcc(t) = exp(s(1 − √(28/t))). type: "R"(조강) 0.20, "N"(보통) 0.25, "S"(중용열·혼합) 0.38 [fib MC2010 형태] */
+    beta(t, type = "N") { const s = typeof type === "number" ? type : { R: 0.2, N: 0.25, S: 0.38 }[type] || 0.25; return t <= 0 ? 0 : Math.exp(s * (1 - Math.sqrt(28 / t))); },
+    strengthAt(t, f28, type = "N") { return f28 * CB.conc.beta(t, type); },
+    /** 적산온도(Nurse–Saul) M = Σ(T − T0)Δt, °C·일. hist: [{ dt: 일, T: °C }], T0 기준 온도(−10 °C) */
+    maturity(hist, T0 = -10) { return hist.reduce((m, h) => m + Math.max(0, h.T - T0) * h.dt, 0); },
+    /** 아레니우스 등가 재령(20 °C 환산 일). Ea 활성화 에너지 J/mol(기본 33,500) */
+    equivalentAge(hist, Ea = 33500, Tref = 20) {
+      return hist.reduce((te, h) => te + Math.exp((-Ea / R_GAS) * (1 / (273.15 + h.T) - 1 / (273.15 + Tref))) * h.dt, 0);
+    },
+    /** 탄산화 깊이 x = k √t (mm, t 연, k mm/√년) */
+    carbonation(tYears, k) { return k * Math.sqrt(Math.max(0, tYears)); },
+    /** 탄산화가 피복 c(mm)에 닿는 시간(연) = (c/k)² */
+    carbonationTime(c, k) { return k > 0 ? (c / k) ** 2 : Infinity; },
+    /** 피크 제2법칙 해: C(x,t) = Ci + (Cs − Ci)(1 − erf(x / 2√(Dt))). x mm, t 연, D m²/s. 결과 단위는 Cs와 같다(예: kg/m³) */
+    chloride(x, tYears, Cs, D, Ci = 0) {
+      if (tYears <= 0) return x <= 0 ? Cs : Ci;
+      const Dmm = D * 1e6 * 365.25 * 24 * 3600; // mm²/년
+      return Ci + (Cs - Ci) * (1 - CB.erf(x / (2 * Math.sqrt(Dmm * tYears))));
+    },
+    /** 깊이 x에서 염화물이 임계값 Ccr에 닿는 시간(연). 닿지 않으면 Infinity */
+    chlorideTime(x, Cs, D, Ccr, Ci = 0) {
+      if (Ccr <= Ci) return 0;
+      if (Ccr >= Cs) return Infinity;
+      let lo = 0, hi = 1e4;
+      if (CB.conc.chloride(x, hi, Cs, D, Ci) < Ccr) return Infinity;
+      for (let k = 0; k < 80; k++) { const m = (lo + hi) / 2; if (CB.conc.chloride(x, m, Cs, D, Ci) >= Ccr) hi = m; else lo = m; }
+      return hi;
+    },
+    /** 배합강도 fcr(MPa). s: 표준편차(MPa, 시험 30회 이상일 때). s가 없으면 기록이 없는 경우의 식 [KCS 14 20 10 형태] */
+    fcr(fck, s) {
+      if (s == null || !(s > 0)) return fck < 21 ? fck + 7 : fck <= 35 ? fck + 8.5 : 1.1 * fck + 5;
+      return fck <= 35 ? Math.max(fck + 1.34 * s, fck - 3.5 + 2.33 * s) : Math.max(fck + 1.34 * s, 0.9 * fck + 2.33 * s);
+    },
+    /** 시험 횟수 n이 30회 미만일 때 표준편차 보정 계수(15회 1.16, 20회 1.08, 25회 1.03, 30회 이상 1.00, 사이 보간) */
+    sFactor(n) {
+      if (n >= 30) return 1;
+      if (n < 15) return NaN;
+      const T = [[15, 1.16], [20, 1.08], [25, 1.03], [30, 1]];
+      for (let i = 0; i < 3; i++) if (n <= T[i + 1][0]) return CB.lerp(T[i][1], T[i + 1][1], (n - T[i][0]) / (T[i + 1][0] - T[i][0]));
+      return 1;
+    },
+    /** 강도–결합재수비 관계(교육용 회귀식, 실제로는 시험 비빔으로 정한다): f28 = A + B·(B/W). 기본 A = −13.8, B = 21.1 */
+    REL: { A: -13.8, B: 21.1 },
+    wbFor(f, rel = CB.conc.REL) { return rel.B / Math.max(1e-6, f - rel.A); },
+    strengthFor(wb, rel = CB.conc.REL) { return rel.A + rel.B / Math.max(1e-6, wb); },
+    /**
+     * 배합 설계(절대용적법, 교육용). 표준 조건(슬럼프 80 mm, 공기량 4.5 %, W/B 0.55, 조립률 2.8, AE 콘크리트, 부순 굵은 골재)의
+     * 단위수량·잔골재율 표에서 보정한다: 슬럼프 10 mm↑ → W +1.2 %, 공기량 1 %↑ → W −3 %·S/a −0.75 %, W/B 0.05↑ → S/a +1 %,
+     * 조립률 0.1↑ → S/a +0.5 %, 감수제 → W −reduce %.
+     * 입력 o: { fck, s, slump, Gmax(13|20|25|40), air(%), wb(직접 지정, 없으면 강도·내구성으로), wbMax(내구성 상한), FM,
+     *           scm: { type: "FA"|"GGBS"|"SF", ratio }, reduce(%), dens: { c, fa, ggbs, sf, s, g } (g/cm³), W, sa(직접 지정) }
+     * 결과: { fcr, wbStrength, wb, W, B, C, SCM, S, G, sa, air, vol: {...}, mass, admix, steps: [문자열] }
+     */
+    MIX_TABLE: { 13: { W: 180, sa: 49 }, 20: { W: 175, sa: 47 }, 25: { W: 170, sa: 45 }, 40: { W: 160, sa: 41 } },
+    mix(o = {}) {
+      const fck = o.fck ?? 30, slump = CB.clamp(o.slump ?? 150, 0, 250), air = CB.clamp(o.air ?? 4.5, 1, 9), FM = o.FM ?? 2.8;
+      const G = [13, 20, 25, 40].includes(o.Gmax) ? o.Gmax : 25, base = CB.conc.MIX_TABLE[G];
+      const d = Object.assign({ c: 3.15, fa: 2.2, ggbs: 2.9, sf: 2.2, s: 2.6, g: 2.65 }, o.dens || {});
+      const fcr = CB.conc.fcr(fck, o.s ?? 3.0);
+      const wbStrength = CB.conc.wbFor(fcr, o.rel);
+      let wb = o.wb ?? Math.min(wbStrength, o.wbMax ?? 1);
+      wb = CB.clamp(wb, 0.25, 0.75);
+      let W = o.W ?? base.W * (1 + 0.012 * (slump - 80) / 10) * (1 - 0.03 * (air - 4.5)) * (1 - (o.reduce ?? 5) / 100);
+      let sa = o.sa ?? base.sa + (wb - 0.55) / 0.05 * 1 - 0.75 * (air - 4.5) + 0.5 * (FM - 2.8) / 0.1;
+      sa = CB.clamp(sa, 30, 60);
+      const B = W / wb, r = o.scm && o.scm.ratio ? CB.clamp(o.scm.ratio, 0, 0.7) : 0;
+      const SCM = B * r, C = B - SCM, dScm = o.scm ? d[{ FA: "fa", GGBS: "ggbs", SF: "sf" }[o.scm.type] || "fa"] : 1;
+      const vol = { W: W / 1000, C: C / (d.c * 1000), SCM: r ? SCM / (dScm * 1000) : 0, air: air / 100 };
+      vol.agg = 1 - vol.W - vol.C - vol.SCM - vol.air;
+      vol.S = vol.agg * sa / 100; vol.G = vol.agg - vol.S;
+      const S = vol.S * d.s * 1000, Gm = vol.G * d.g * 1000;
+      return { fcr, wbStrength, wb, W, B, C, SCM, S, G: Gm, sa, air, slump, Gmax: G, vol, mass: W + B + S + Gm, admix: B * (o.admix ?? 0.008), dens: d };
+    },
+    /**
+     * 현장 배합 보정. mix는 표면건조 포화 상태(SSD) 기준. 골재의 전체 함수율 m(%)과 흡수율 a(%)를 받아 표면수만큼 물을 빼고 골재를 늘린다.
+     * o: { sm, sa, gm, ga } (잔골재 함수율·흡수율, 굵은 골재 함수율·흡수율, %)
+     */
+    fieldMix(mix, o = {}) {
+      const sSurf = ((o.sm ?? 5) - (o.sa ?? 1.5)) / 100, gSurf = ((o.gm ?? 1) - (o.ga ?? 0.8)) / 100;
+      const S = mix.S * (1 + sSurf), G = mix.G * (1 + gSurf);
+      const W = mix.W - mix.S * sSurf - mix.G * gSurf;
+      return { W, C: mix.C, SCM: mix.SCM, S, G, sSurf, gSurf };
+    },
+  };
+  CB.agg = {
+    /** 표준체(mm). 조립률은 75 이상의 10개 체(75, 40, 20, 10, 5, 2.5, 1.2, 0.6, 0.3, 0.15)의 누적 잔류율 합 / 100 */
+    SIEVES: [75, 40, 25, 20, 10, 5, 2.5, 1.2, 0.6, 0.3, 0.15],
+    FM_SIEVES: [75, 40, 20, 10, 5, 2.5, 1.2, 0.6, 0.3, 0.15],
+    /** retained: { 체 크기(mm): 잔류 질량 } → { rows: [{ size, mass, pct, cum, pass }], FM, total } */
+    sieve(retained) {
+      const sizes = Object.keys(retained).filter((k) => k !== "pan").map(Number).sort((a, b) => b - a);
+      const total = sizes.reduce((s, k) => s + retained[k], 0) + (retained.pan || 0);
+      let cum = 0;
+      const rows = sizes.map((size) => { const pct = (100 * retained[size]) / total; cum += pct; return { size, mass: retained[size], pct, cum, pass: 100 - cum }; });
+      const cumAt = (size) => { let c = 0; rows.forEach((r) => { if (r.size >= size - 1e-9) c = r.cum; }); return c; };
+      const FM = CB.agg.FM_SIEVES.reduce((s, z) => s + cumAt(z), 0) / 100;
+      return { rows, FM, total };
+    },
+    /** 함수 상태: 절건 질량 Md, SSD 질량 Mssd, 습윤 질량 Mw → { absorption, moisture, surface } (%) */
+    moisture(Md, Mssd, Mw) { return { absorption: (100 * (Mssd - Md)) / Md, moisture: (100 * (Mw - Md)) / Md, surface: (100 * (Mw - Mssd)) / Mssd }; },
+    /** 실적률(%) = 단위용적질량 / (밀도 × 1000) × 100, 공극률 = 100 − 실적률 */
+    solidity(unitMass, density) { const s = (100 * unitMass) / (density * 1000); return { solid: s, void: 100 - s }; },
+  };
+  CB.steel = {
+    /** 철근 강종(KS D 3504 형태, 교육용 — 현행 KS 확인): 항복강도 fy, 인장강도 fu 하한 MPa */
+    GRADES: { SD300: { fy: 300, fu: 440 }, SD400: { fy: 400, fu: 560 }, SD500: { fy: 500, fu: 620 }, SD600: { fy: 600, fu: 710 }, SD700: { fy: 700, fu: 800 } },
+    /** 구조용 강재(두께 16 mm 이하 기준, 교육용): fy, fu MPa */
+    PLATES: { SS275: { fy: 275, fu: 410 }, SM355: { fy: 355, fu: 490 }, SM420: { fy: 420, fu: 520 }, SN355: { fy: 355, fu: 490 }, HSA650: { fy: 650, fu: 800 } },
+    /** 이형철근 공칭 지름 d(mm), 단면적 A(mm²), 단위질량 m(kg/m) */
+    BARS: {
+      D10: { d: 9.53, A: 71.33, m: 0.56 }, D13: { d: 12.7, A: 126.7, m: 0.995 }, D16: { d: 15.9, A: 198.6, m: 1.56 },
+      D19: { d: 19.1, A: 286.5, m: 2.25 }, D22: { d: 22.2, A: 387.1, m: 3.04 }, D25: { d: 25.4, A: 506.7, m: 3.98 },
+      D29: { d: 28.6, A: 642.4, m: 5.04 }, D32: { d: 31.8, A: 794.2, m: 6.23 }, D35: { d: 34.9, A: 956.6, m: 7.51 },
+    },
+    Es: 200000, E: 210000, density: 7850, alpha: 1.2e-5,
+    /**
+     * 강재 응력–변형률(인장 +, 대칭). 탄성 → 항복 단(εsh까지) → 변형 경화(εsu에서 fu, 2차 곡선) → 네킹(εf까지 직선 하강, fu의 80 %) → 파단 0.
+     * o: { fy, fu, E, esh, esu, ef }. 기본: SD500 형태(esh 0.01, esu 0.10, ef 0.14)
+     */
+    sigma(eps, o = {}) {
+      const fy = o.fy ?? 500, fu = o.fu ?? 620, E = o.E ?? 200000, esh = o.esh ?? 0.01, esu = o.esu ?? 0.1, ef = o.ef ?? 0.14;
+      const sg = Math.sign(eps), e = Math.abs(eps), ey = fy / E;
+      let s;
+      if (e <= ey) s = E * e;
+      else if (e <= esh) s = fy;
+      else if (e <= esu) { const t = (esu - e) / Math.max(1e-9, esu - esh); s = fu - (fu - fy) * t * t; }
+      else if (e <= ef) s = fu * (1 - (0.2 * (e - esu)) / Math.max(1e-9, ef - esu));
+      else s = 0;
+      return sg * s;
+    },
+    /** 탄소당량(IIW) Ceq = C + Mn/6 + (Cr + Mo + V)/5 + (Ni + Cu)/15 (%) */
+    ceq(c = {}) { const g = (k) => c[k] || 0; return g("C") + g("Mn") / 6 + (g("Cr") + g("Mo") + g("V")) / 5 + (g("Ni") + g("Cu")) / 15; },
+    /** S–N 곡선(교육용, 상세 등급 Δσc = 2×10⁶회 피로 강도, 기울기 m = 3): 반복 횟수 N = 2e6 (Δσc/Δσ)^m. 일정 진폭 한계 미만이면 Infinity */
+    fatigueLife(dSigma, dSigmaC = 80, m = 3, cutoff = 0.737) {
+      if (dSigma <= 0) return Infinity;
+      if (dSigma < cutoff * dSigmaC) return Infinity;
+      return 2e6 * Math.pow(dSigmaC / dSigma, m);
+    },
+    /** 마이너 법칙 누적 손상 D = Σ n_i / N_i. blocks: [{ dSigma, n }] */
+    miner(blocks, dSigmaC = 80, m = 3) { return blocks.reduce((D, b) => { const N = CB.steel.fatigueLife(b.dSigma, dSigmaC, m, 0); return D + (isFinite(N) ? b.n / N : 0); }, 0); },
+  };
+  CB.asph = {
+    /** 마샬 공극 성질(%). Gmb 다짐 시편 겉보기 밀도, Gmm 이론 최대 밀도, Gsb 골재 겉보기 밀도, Pb 아스팔트 함량(% 혼합물 질량) */
+    volumetrics({ Gmb, Gmm, Gsb, Pb }) {
+      const Va = (100 * (Gmm - Gmb)) / Gmm, VMA = 100 - (Gmb * (100 - Pb)) / Gsb, VFA = VMA > 0 ? (100 * (VMA - Va)) / VMA : 0;
+      return { Va, VMA, VFA };
+    },
+    /** 이론 최대 밀도 Gmm = 100 / (Ps/Gse + Pb/Gb) */
+    Gmm(Pb, Gse = 2.7, Gb = 1.03) { return 100 / ((100 - Pb) / Gse + Pb / Gb); },
+  };
+  /** 혼합 법칙: 평행(보이트) E = Vf Ef + (1 − Vf) Em, 직렬(로이스) 1/E = Vf/Ef + (1 − Vf)/Em */
+  CB.mixRule = (Vf, Ef, Em) => ({ voigt: Vf * Ef + (1 - Vf) * Em, reuss: 1 / (Vf / Ef + (1 - Vf) / Em) });
+  /** 1차원 정상 열전도: 층 [{ t (m), k (W/m·K) }] + 표면 열전달 저항 Rsi, Rse → { R, U, temps(Tin, Tout) } */
+  CB.wall = function (layers, o = {}) {
+    const Rsi = o.Rsi ?? 0.11, Rse = o.Rse ?? 0.043;
+    const Rl = layers.map((l) => (l.k > 0 ? l.t / l.k : 0));
+    const R = Rsi + Rse + Rl.reduce((s, x) => s + x, 0), U = 1 / R;
+    const temps = (Tin, Tout) => { const q = (Tin - Tout) / R; const out = [Tin, Tin - q * Rsi]; Rl.forEach((r) => out.push(out[out.length - 1] - q * r)); out.push(Tout); return { q, T: out }; };
+    return { R, U, Rl, temps };
+  };
+  /** 포화 수증기압(Pa, 마그누스 식)과 이슬점(°C) */
+  CB.psat = (T) => 610.94 * Math.exp((17.625 * T) / (T + 243.04));
+  CB.dewPoint = (T, RH) => { const g = Math.log(Math.max(1e-6, RH / 100)) + (17.625 * T) / (T + 243.04); return (243.04 * g) / (17.625 - g); };
+
+  /* ------------------------------------------------------------ reinforced concrete design (ConcreteBook) */
+  // 강도 설계(KDS 14 20 형태, 교육용). 단위: 길이 mm, 응력 MPa, 힘 kN, 모멘트 kN·m(입출력), 내부 계산 N·mm. 현행 기준을 확인할 것.
+  CB.rc = {
+    Es: 200000,
+    /** 등가 직사각형 응력 블록 계수(KDS 14 20 20 형태): fck → { ecu, eta, beta1 } (40 MPa 이하 0.0033, 1.00, 0.80) */
+    block(fck) {
+      const T = [[40, 0.0033, 1.0, 0.8], [50, 0.0032, 0.97, 0.8], [60, 0.0031, 0.95, 0.76], [70, 0.003, 0.91, 0.74], [80, 0.0029, 0.87, 0.72], [90, 0.0028, 0.84, 0.7]];
+      if (fck <= 40) return { ecu: 0.0033, eta: 1, beta1: 0.8 };
+      for (let i = 0; i < T.length - 1; i++) if (fck <= T[i + 1][0]) { const t = (fck - T[i][0]) / (T[i + 1][0] - T[i][0]); return { ecu: CB.lerp(T[i][1], T[i + 1][1], t), eta: CB.lerp(T[i][2], T[i + 1][2], t), beta1: CB.lerp(T[i][3], T[i + 1][3], t) }; }
+      return { ecu: 0.0028, eta: 0.84, beta1: 0.7 };
+    },
+    /** 순인장 변형률 εt에 따른 강도 감소 계수 φ: 압축 지배(εt ≤ εy) 0.65(띠)·0.70(나선), 인장 지배(εt ≥ εt,tcl) 0.85, 사이 직선. εt,tcl = max(0.005, 2.5εy) */
+    phi(et, fy = 500, spiral = false) {
+      const ey = fy / CB.rc.Es, etl = Math.max(0.005, 2.5 * ey), pc = spiral ? 0.7 : 0.65;
+      if (et <= ey) return pc;
+      if (et >= etl) return 0.85;
+      return pc + ((0.85 - pc) * (et - ey)) / (etl - ey);
+    },
+    /** 휨부재 최소 허용 인장 변형률 εa,min = max(0.004, 2εy) */
+    etMin(fy = 500) { return Math.max(0.004, (2 * fy) / CB.rc.Es); },
+    /**
+     * 직사각형(또는 T형) 단면 휨 강도 — 변형률 적합(층별 철근, 압축 철근 항복 여부 자동). 압축 연단은 위.
+     * o: { b, h, fck, fy, layers: [{ d (위에서 깊이), As }], bf, hf (T형 플랜지, 선택) }
+     * → { c, a, Mn (kN·m), phi, phiMn, et (최외단 인장 철근 변형률), es: [층별 응력 MPa], ok: εt ≥ εmin, rho }
+     */
+    flexure(o) {
+      const { b, fck, fy } = o, L = o.layers, B = CB.rc.block(fck), Es = CB.rc.Es, fc = B.eta * 0.85 * fck;
+      const bf = o.bf ?? b, hf = o.hf ?? 0;
+      const comp = (a) => { if (a <= hf) return { C: fc * bf * a, y: a / 2 }; const C1 = fc * bf * hf, C2 = fc * b * (a - hf); return { C: C1 + C2, y: (C1 * hf / 2 + C2 * (hf + (a - hf) / 2)) / (C1 + C2) }; };
+      const force = (c) => {
+        const a = Math.min(B.beta1 * c, o.h); const cc = comp(a); let N = cc.C, M = cc.C * cc.y; const fs = [];
+        L.forEach((l) => { const e = (B.ecu * (c - l.d)) / c; let s = CB.clamp(Es * e, -fy, fy); if (l.d < a) s -= fc * Math.sign(s) * (s > 0 ? 1 : 0); fs.push(s); N += s * l.As; M += s * l.As * l.d; });
+        return { N, M, fs, a };
+      };
+      let lo = 1e-3, hi = o.h * 3;
+      for (let k = 0; k < 100; k++) { const m = (lo + hi) / 2; if (force(m).N > 0) hi = m; else lo = m; }
+      const c = (lo + hi) / 2, f = force(c), dt = Math.max(...L.map((l) => l.d)), et = (B.ecu * (dt - c)) / c;
+      // 모멘트: 압축 연단에 대한 합(N ≈ 0이므로 기준점 무관)
+      const Mn = -f.M / 1e6 + 0; const MnPos = Math.abs(Mn);
+      const p = CB.rc.phi(et, fy), Ast = L.filter((l) => l.d > c).reduce((s, l) => s + l.As, 0);
+      return { c, a: f.a, Mn: MnPos, phi: p, phiMn: p * MnPos, et, es: f.fs, ok: et >= CB.rc.etMin(fy), rho: Ast / (b * dt), block: B };
+    },
+    /** 단철근 직사각형 보의 필요 철근량(소요 Mu kN·m) → As (mm²), φ = 0.85 가정 후 확인 */
+    asReq(Mu, b, d, fck, fy) {
+      const B = CB.rc.block(fck), fc = B.eta * 0.85 * fck, Rn = (Mu * 1e6) / (0.85 * b * d * d);
+      const disc = 1 - (2 * Rn) / fc;
+      if (disc < 0) return NaN;
+      return ((fc * b * d) / fy) * (1 - Math.sqrt(disc));
+    },
+    /** 최소 휨 철근량 As,min = max(0.25√fck/fy, 1.4/fy) bw d */
+    asMin(bw, d, fck, fy) { return Math.max((0.25 * Math.sqrt(fck)) / fy, 1.4 / fy) * bw * d; },
+    /** 균형 철근비 ρb = η0.85 fck β1 / fy × εcu/(εcu + εy) */
+    rhoB(fck, fy) { const B = CB.rc.block(fck); return ((B.eta * 0.85 * fck * B.beta1) / fy) * (B.ecu / (B.ecu + fy / CB.rc.Es)); },
+    /** 전단: Vc = (1/6)λ√fck bw d (kN), Vs = Av fyt d / s, Vs,max = (2/3)√fck bw d, φ = 0.75 */
+    Vc(fck, bw, d, lambda = 1) { return (lambda * Math.sqrt(fck) * bw * d) / 6 / 1000; },
+    Vs(Av, fyt, d, s) { return (Av * fyt * d) / s / 1000; },
+    VsMax(fck, bw, d) { return ((2 / 3) * Math.sqrt(fck) * bw * d) / 1000; },
+    /** 최소 전단 철근 Av,min/s = max(0.0625√fck, 0.35) bw / fyt (mm²/mm) */
+    avMinPerS(fck, bw, fyt) { return (Math.max(0.0625 * Math.sqrt(fck), 0.35) * bw) / fyt; },
+    /** 기본 정착 길이 ldb = 0.6 db fy / (λ√fck) (mm) */
+    ldb(db, fy, fck, lambda = 1) { return (0.6 * db * fy) / (lambda * Math.sqrt(fck)); },
+    /** 표준 갈고리 정착 ldh = 0.24 β db fy / (λ√fck) (mm) */
+    ldh(db, fy, fck, lambda = 1, beta = 1) { return (0.24 * beta * db * fy) / (lambda * Math.sqrt(fck)); },
+    /**
+     * 균열·유효 단면 2차 모멘트(직사각형, 인장·압축 철근). b, h, d, As, d2, As2 (mm), fck → { n, Ig, kd, Icr, fr, Mcr (kN·m), yt }
+     */
+    crack(o) {
+      const Ec = CB.conc.Ec(o.fck), n = CB.rc.Es / Ec, { b, h, d, As } = o, d2 = o.d2 ?? 0, As2 = o.As2 ?? 0;
+      const A = b / 2, Bq = (n * As + (n - 1) * As2), Cq = -(n * As * d + (n - 1) * As2 * d2);
+      const kd = (-Bq + Math.sqrt(Bq * Bq - 4 * A * Cq)) / (2 * A);
+      const Icr = (b * kd ** 3) / 3 + n * As * (d - kd) ** 2 + (n - 1) * As2 * (kd - d2) ** 2;
+      const Ig = (b * h ** 3) / 12, fr = CB.conc.fr(o.fck), yt = h / 2;
+      return { n, Ec, Ig, kd, Icr, fr, Mcr: (fr * Ig) / yt / 1e6, yt };
+    },
+    /** 브랜슨 유효 단면 2차 모멘트 Ie = (Mcr/Ma)³ Ig + (1 − (Mcr/Ma)³) Icr ≤ Ig */
+    Ie(Mcr, Ma, Ig, Icr) { if (Ma <= Mcr) return Ig; const r = (Mcr / Ma) ** 3; return Math.min(Ig, r * Ig + (1 - r) * Icr); },
+    /** 장기 처짐 계수 λΔ = ξ / (1 + 50ρ′). ξ: 3개월 1.0, 6개월 1.2, 1년 1.4, 5년 이상 2.0 */
+    lambdaD(xi = 2, rhoP = 0) { return xi / (1 + 50 * rhoP); },
+    /** 균열 제어용 철근 간격 상한(KDS 형태): s ≤ min(375 κ/fs − 2.5 cc, 300 κ/fs), κ = 280(건조) / 210(그 외), fs ≈ (2/3)fy */
+    sMax(fs, cc, dry = true) { const k = dry ? 280 : 210; return Math.min((375 * k) / fs - 2.5 * cc, (300 * k) / fs); },
+    /**
+     * 직사각형 기둥 P–M 상관도(변형률 적합, 한 방향 휨). o: { b, h, fck, fy, layers: [{ d, As }], spiral, tied: true }
+     * → { pts: [{ c, Pn, Mn, phi, phiPn, phiMn, et }] (압축 +, kN·m), P0, PnMax (0.80 / 0.85 φ 적용 전), bal (균형점) }
+     */
+    pm(o) {
+      const { b, h, fck, fy } = o, L = o.layers, B = CB.rc.block(fck), Es = CB.rc.Es, fc = B.eta * 0.85 * fck;
+      const Ast = L.reduce((s, l) => s + l.As, 0), Ag = b * h, P0 = (fc * (Ag - Ast) + fy * Ast) / 1000;
+      const dt = Math.max(...L.map((l) => l.d)), at = (c) => {
+        const a = Math.min(B.beta1 * c, h); let P = fc * b * a, M = fc * b * a * (h / 2 - a / 2);
+        L.forEach((l) => { const e = (B.ecu * (c - l.d)) / c; let s = CB.clamp(Es * e, -fy, fy); if (l.d < a && s > 0) s -= fc; P += s * l.As; M += s * l.As * (h / 2 - l.d); });
+        const et = (B.ecu * (dt - c)) / c, p = CB.rc.phi(et, fy, o.spiral);
+        return { c, Pn: P / 1000, Mn: M / 1e6, phi: p, phiPn: (p * P) / 1000, phiMn: (p * M) / 1e6, et };
+      };
+      const cs = []; for (let i = 0; i <= 80; i++) cs.push(h * 3 * Math.pow(0.97, i * 1.8) + 1);
+      const pts = cs.map(at).sort((x, y) => y.Pn - x.Pn);
+      const ey = fy / Es, cb = (B.ecu / (B.ecu + ey)) * dt;
+      const PnMax = (o.spiral ? 0.85 : 0.8) * P0;
+      return { pts, P0, PnMax, phiPnMax: (o.spiral ? 0.7 : 0.65) * PnMax, bal: at(cb), at };
+    },
+    /** 비횡이동 모멘트 확대 δns = Cm / (1 − Pu/(0.75 Pc)) ≥ 1, Pc = π²EI/(kLu)², EI = 0.4 Ec Ig /(1 + βdns). 단위 kN, mm → Pc kN */
+    magnifier(o) {
+      const Ec = CB.conc.Ec(o.fck), EI = (0.4 * Ec * o.Ig) / (1 + (o.betaD ?? 0.6)), Pc = (Math.PI ** 2 * EI) / (o.k * o.Lu) ** 2 / 1000;
+      const Cm = o.Cm ?? 1, r = o.Pu / (0.75 * Pc);
+      return { EI, Pc, Cm, delta: r >= 1 ? Infinity : Math.max(1, Cm / (1 - r)) };
+    },
+    /** 세장비 kLu/r (r = 0.3h 직사각형) */
+    slender(k, Lu, h) { return (k * Lu) / (0.3 * h); },
+  };
+  /** 철근 배치 도우미: n개 호칭 → As (mm²) */
+  CB.rc.bars = (n, name) => n * CB.steel.BARS[name].A;
+  /** 기준 부재(교육용) — CONTRIBUTING.md 표와 같다 */
+  CB.rc.REF = {
+    G1: { b: 400, h: 700, cover: 40, stirrup: "D13", main: "D25", fck: 30, fy: 500, fyt: 400, MuPos: 460, MuNeg: 640, Vu: 400, Ma: 350 },
+    C1: { b: 800, h: 800, cover: 40, tie: "D13", main: "D25", n: 16, fck: 30, fy: 500, Pu: 9000, Mu: 300 },
+  };
+
+  /* ------------------------------------------------------------ layout build */
+  const LOGO = `<svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs><rect x="2" y="2" width="28" height="28" rx="8" fill="url(#mbg)"/><rect x="8" y="6.5" width="16" height="19" rx="1.5" fill="none" stroke="#fff" stroke-width="1.8"/><rect x="10.5" y="9" width="11" height="14" rx="1" fill="none" stroke="#fff" stroke-width="1.1" opacity=".65"/><circle cx="12" cy="21" r="1.6" fill="#fff"/><circle cx="16" cy="21" r="1.6" fill="#fff"/><circle cx="20" cy="21" r="1.6" fill="#fff"/><circle cx="12" cy="11" r="1.1" fill="#fff"/><circle cx="20" cy="11" r="1.1" fill="#fff"/></svg>`;
+  const ICON_MENU = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`;
+  const ICON_MOON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>`;
+  const ICON_SUN = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`;
+
+  function build() {
+    const body = document.body;
+    const root = body.dataset.root != null ? body.dataset.root : body.dataset.chapter ? "../" : "";
+    const curSlug = body.dataset.chapter || "";
+    const href = (slug) => (slug ? `${root}chapters/${slug}.html` : `${root}index.html`);
+    const feedbackUrl = "https://books.euiyun.com/feedback.html?book=concretebook&page=" + encodeURIComponent(location.href);
+
+    const bar = document.createElement("header");
+    bar.className = "sb-topbar";
+    bar.innerHTML = `
+      <button class="sb-btn icon" id="sb-menu" aria-label="챕터 목록">${ICON_MENU}</button>
+      <a class="sb-logo" href="${href("")}">${LOGO}<span>ConcreteBook <small>철근콘크리트 교과서</small></span></a>
+      <span class="spacer"></span>
+      <a class="sb-btn series-link" href="https://books.euiyun.com/" aria-label="전체 책 보기" title="전체 책 보기"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5h6v14H4zM10 5.5h6v14h-6zM17 7l3-1 2 13-3 1z"/></svg><span>전체 책</span></a>
+      <button class="sb-btn icon" id="sb-theme" aria-label="테마 전환"></button>
+      <div class="sb-progress" id="sb-progress"></div>`;
+    const feedbackButton = document.createElement("a");
+    feedbackButton.className = bar.className.replace("-topbar", "-btn") + " icon feedback-button";
+    feedbackButton.href = feedbackUrl;
+    feedbackButton.target = "_blank";
+    feedbackButton.rel = "noopener";
+    feedbackButton.setAttribute("aria-label", "독자 의견 보내기");
+    feedbackButton.title = "독자 의견 보내기";
+    feedbackButton.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 4V6a2 2 0 0 1 2-2z"/><path d="M8 9h8M8 13h5"/></svg>';
+    bar.querySelector("[id$='-theme']").before(feedbackButton);
+    body.prepend(bar);
+
+    // Search chapter metadata immediately; load section and visual titles on demand.
+    const progressBar = bar.querySelector("[id$='-progress']");
+    const spacer = bar.querySelector(".spacer");
+    const leftNav = document.createElement("div");
+    leftNav.className = "book-nav-left";
+    leftNav.append(bar.querySelector("[id$='-menu']"), bar.querySelector("a[class$='-logo']"));
+    const rightNav = document.createElement("div");
+    rightNav.className = "book-nav-right";
+    [...bar.children].filter((el) => el !== spacer && el !== progressBar).forEach((el) => rightNav.appendChild(el));
+    spacer.remove();
+    const search = document.createElement("div");
+    search.className = "book-search";
+    search.innerHTML = '<svg class="book-search-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><input type="search" aria-label="이 책의 챕터, 섹션, 시뮬레이터, 그림 검색" placeholder="이 책 검색" autocomplete="off"><div class="book-search-results" aria-live="polite"></div>';
+    bar.prepend(leftNav);
+    bar.insertBefore(search, progressBar);
+    bar.insertBefore(rightNav, progressBar);
+    const searchInput = search.querySelector("input");
+    const searchResults = search.querySelector(".book-search-results");
+    const closeSearch = () => { search.classList.remove("open"); searchResults.replaceChildren(); };
+    let detailEntries = [];
+    let detailsLoaded = false;
+    let detailPromise;
+    function loadDetails() {
+      if (detailPromise) return detailPromise;
+      detailPromise = Promise.all(LIVE.map(async (chapter) => {
+        try {
+          const response = await fetch(href(chapter.slug));
+          if (!response.ok) return [];
+          const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+          const main = doc.querySelector("main.chapter");
+          if (!main) return [];
+          // 미리 렌더링된 수식은 TeX 원문으로 되돌려 검색어와 맞춘다.
+          main.querySelectorAll(".katex").forEach((k) => k.replaceWith(k.querySelector("annotation")?.textContent || k.textContent));
+          const entries = [];
+          [...main.querySelectorAll("section > h2")].forEach((heading, i) => {
+            entries.push({ type: "섹션", title: heading.textContent.trim(), chapter, hash: heading.parentElement.id || `s${i + 1}` });
+          });
+          [...main.querySelectorAll(".sim")].filter((sim) => sim.querySelector(".sim-head h3")).forEach((sim, i) => {
+            entries.push({ type: "시뮬레이터", title: sim.querySelector(".sim-head h3").textContent.trim(), chapter, hash: sim.id || `search-sim-${i + 1}` });
+          });
+          [...main.querySelectorAll("figure")].filter((figure) => figure.querySelector("figcaption")).forEach((figure, i) => {
+            const caption = figure.querySelector("figcaption").textContent.replace(/\s+/g, " ").trim();
+            entries.push({ type: "그림", title: caption.slice(0, 140), chapter, hash: figure.id || `search-fig-${i + 1}` });
+          });
+          return entries;
+        } catch (error) { return []; }
+      })).then((parts) => { detailEntries = parts.flat(); detailsLoaded = true; renderSearch(); });
+      return detailPromise;
+    }
+    function renderSearch() {
+      const words = searchInput.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+      searchResults.replaceChildren();
+      if (!words.length) { closeSearch(); return; }
+      const includesWords = (value) => words.every((word) => value.toLocaleLowerCase().includes(word));
+      const chapterMatches = LIVE.filter((c) => includesWords([c.num, c.title, c.desc, ...(c.tags || [])].join(" ")))
+        .map((c) => ({ type: "챕터", title: c.title, chapter: c, hash: "" }));
+      const detailMatches = detailEntries.filter((entry) => includesWords(entry.title));
+      const matches = [
+        ...chapterMatches.slice(0, 4),
+        ...detailMatches.filter((entry) => entry.type === "섹션").slice(0, 5),
+        ...detailMatches.filter((entry) => entry.type === "시뮬레이터").slice(0, 4),
+        ...detailMatches.filter((entry) => entry.type === "그림").slice(0, 4),
+      ];
+      matches.forEach((entry) => {
+        const link = document.createElement("a");
+        link.href = href(entry.chapter.slug) + (entry.hash ? `#${entry.hash}` : "");
+        const title = document.createElement("strong");
+        title.textContent = entry.title;
+        const context = document.createElement("small");
+        context.textContent = `${entry.chapter.num} · ${entry.chapter.title} · ${entry.type}`;
+        link.append(title, context);
+        searchResults.appendChild(link);
+      });
+      if (chapterMatches.length + detailMatches.length > matches.length) {
+        const more = document.createElement("p");
+        more.textContent = `상위 ${matches.length}개 표시 · 검색어를 더 구체적으로 입력해 보세요`;
+        searchResults.appendChild(more);
+      }
+      if (detailPromise && !detailsLoaded) {
+        const status = document.createElement("p");
+        status.textContent = "섹션·시뮬레이터·그림 목록을 불러오는 중…";
+        searchResults.appendChild(status);
+      } else if (!matches.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "검색 결과가 없습니다";
+        searchResults.appendChild(empty);
+      }
+      search.classList.add("open");
+    }
+    searchInput.addEventListener("input", () => { if (searchInput.value.trim()) loadDetails(); renderSearch(); });
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { closeSearch(); searchInput.blur(); }
+      else if (e.key === "ArrowDown") { const first = searchResults.querySelector("a"); if (first) { e.preventDefault(); first.focus(); } }
+      else if (e.key === "Enter") { const first = searchResults.querySelector("a"); if (first) { e.preventDefault(); first.click(); } }
+    });
+    searchResults.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { closeSearch(); searchInput.focus(); }
+      else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        const links = [...searchResults.querySelectorAll("a")];
+        const next = links.indexOf(document.activeElement) + (e.key === "ArrowDown" ? 1 : -1);
+        e.preventDefault();
+        (links[next] || searchInput).focus();
+      }
+    });
+    document.addEventListener("pointerdown", (e) => { if (!search.contains(e.target)) closeSearch(); });
+
+
+    const drawer = document.createElement("nav");
+    drawer.className = "sb-drawer";
+    drawer.innerHTML = `<h4>Chapters</h4><ul class="sb-chlist">
+      <li><a href="${href("")}" class="${curSlug ? "" : "active"}"><span class="num">00</span><span>홈 · 로드맵</span></a></li>
+      ${CHAPTERS.map((c) => c.planned ? `<li><span class="planned" title="집필 예정"><span class="num">${c.num}</span><span>${c.title}</span></span></li>` : `<li><a href="${href(c.slug)}" class="${c.slug === curSlug ? "active" : ""}"><span class="num">${c.num}</span><span>${c.title}</span></a></li>`).join("")}
+    </ul>
+    <h4 style="margin-top:22px">함께 읽기</h4><ul class="sb-chlist">
+      <li><a href="${root}../mechanics/"><span class="num">↗</span><span>MechanicsBook · 구조역학</span></a></li>
+      <li><a href="${root}../materials/"><span class="num">↗</span><span>MaterialsBook · 건설재료</span></a></li>
+      <li><a href="${root}../geotech/"><span class="num">↗</span><span>GeotechBook · 지반공학</span></a></li>
+      <li><a href="${root}../structure/"><span class="num">↗</span><span>StructureBook · 건축구조</span></a></li>
+      <li><a href="https://books.euiyun.com/"><span class="num">↗</span><span>전체 책 · books.euiyun.com</span></a></li>
+      <li><a href="${root}../"><span class="num">↗</span><span>건설 서가</span></a></li>
+    </ul>`;
+    const backdrop = document.createElement("div");
+    backdrop.className = "sb-drawer-backdrop";
+    body.append(backdrop, drawer);
+    const toggleDrawer = (o) => body.classList.toggle("drawer-open", o);
+    bar.querySelector("#sb-menu").addEventListener("click", () => toggleDrawer(true));
+    backdrop.addEventListener("click", () => toggleDrawer(false));
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") toggleDrawer(false); });
+
+    const tbtn = bar.querySelector("#sb-theme");
+    const setIcon = () => (tbtn.innerHTML = CB.isDark() ? ICON_SUN : ICON_MOON);
+    setIcon();
+    tbtn.addEventListener("click", () => {
+      const next = CB.isDark() ? "light" : "dark";
+      try { localStorage.setItem("construction-theme", next); } catch (e) {}
+      applyTheme(next); setIcon();
+    });
+
+    const prog = bar.querySelector("#sb-progress");
+    const onScroll = () => { const h = document.documentElement.scrollHeight - innerHeight; prog.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + "%"; };
+    addEventListener("scroll", onScroll, { passive: true }); onScroll();
+
+    const main = document.querySelector("main.chapter");
+    if (main) {
+      // Give search results stable anchors even when the source has no id.
+      [...main.querySelectorAll(".sim")].filter((sim) => sim.querySelector(".sim-head h3")).forEach((sim, i) => { if (!sim.id) sim.id = `search-sim-${i + 1}`; });
+      [...main.querySelectorAll("figure")].filter((figure) => figure.querySelector("figcaption")).forEach((figure, i) => { if (!figure.id) figure.id = `search-fig-${i + 1}`; });
+      if (/^#(?:s\d+|search-(?:sim|fig)-)/.test(location.hash)) {
+        requestAnimationFrame(() => document.getElementById(location.hash.slice(1))?.scrollIntoView());
+      }
+      const layout = document.createElement("div");
+      layout.className = "sb-layout";
+      main.parentNode.insertBefore(layout, main);
+      layout.appendChild(main);
+      const toc = document.createElement("aside");
+      toc.className = "sb-toc";
+      const h2s = [...main.querySelectorAll("section > h2")];
+      let n = 0;
+      toc.innerHTML = "<h4>ON THIS PAGE</h4>" + h2s.map((h, i) => {
+        const sec = h.parentElement;
+        if (!sec.id) sec.id = "s" + (i + 1);
+        const numbered = !sec.classList.contains("keypoints") && !sec.classList.contains("quiz-sec") && !sec.hasAttribute("data-nonum");
+        if (numbered && !h.querySelector(".h-num")) { n++; h.insertAdjacentHTML("afterbegin", `<span class="h-num">${String(n).padStart(2, "0")}</span>`); }
+        // 제목 텍스트를 쓰되, 빌드가 렌더링한 수식은 마크업 그대로 옮긴다.
+        const label = [...h.childNodes].filter((node) => !node.classList?.contains("h-num"))
+          .map((node) => (node.querySelector?.(".katex") ? node.outerHTML : node.textContent)).join("").trim();
+        return `<a href="#${sec.id}">${label}</a>`;
+      }).join("");
+      layout.appendChild(toc);
+      const links = [...toc.querySelectorAll("a")];
+      if (window.IntersectionObserver && h2s.length) {
+        const io = new IntersectionObserver((es) => {
+          es.forEach((e) => { if (e.isIntersecting) { links.forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + e.target.id)); } });
+        }, { rootMargin: "-20% 0px -70% 0px" });
+        h2s.forEach((h) => io.observe(h.parentElement));
+      }
+
+      const idx = LIVE.findIndex((c) => c.slug === curSlug);
+      const prev = idx > 0 ? LIVE[idx - 1] : null;
+      const next = idx >= 0 && idx < LIVE.length - 1 ? LIVE[idx + 1] : null;
+      const pager = document.createElement("nav");
+      pager.className = "sb-pager";
+      pager.innerHTML =
+        (prev ? `<a class="prev" href="${href(prev.slug)}"><small>← 이전 · ${prev.num}</small>${prev.title}</a>` : `<a class="prev" href="${href("")}"><small>← 처음으로</small>홈 · 로드맵</a>`) +
+        (next ? `<a class="next" href="${href(next.slug)}"><small>다음 · ${next.num} →</small>${next.title}</a>` : "");
+      layout.after(pager);
+    }
+    const foot = document.createElement("footer");
+    foot.className = "sb-foot";
+    foot.innerHTML = `ConcreteBook — 단면을 그리고 철근을 놓아 보며 배우는 철근콘크리트 교과서 · 시뮬레이터의 수치는 브라우저에서 바로 계산하는 교육용 모델이며, 실제 구조 설계·안전 판단에 쓰지 않습니다.
+      <br>함께 읽기: <a href="${root}../mechanics/">MechanicsBook · 구조역학</a> · <a href="${root}../materials/">MaterialsBook · 건설재료</a> · <a href="${root}../structure/">StructureBook · 건축구조</a> · <a href="https://semi.euiyun.com/infra/chapters/build.html">InfraBook · 팹 건설</a> · <a href="${root}../">건설 서가</a> · <a href="https://books.euiyun.com/">books.euiyun.com</a>
+      <br>© 2026 geniuskey · 교재 콘텐츠 <a href="https://creativecommons.org/licenses/by/4.0/deed.ko">CC BY 4.0</a> ·
+      코드 <a href="https://github.com/geniuskey/construction-books/blob/main/LICENSE-MIT">MIT</a> ·
+      <a href="https://github.com/geniuskey/construction-books/blob/main/concrete/LICENSE.md">라이선스 안내</a>`;
+    const feedbackLink = document.createElement("a");
+    feedbackLink.href = feedbackUrl;
+    feedbackLink.target = "_blank";
+    feedbackLink.rel = "noopener";
+    feedbackLink.textContent = "독자 의견";
+    foot.append(" · ", feedbackLink);
+    body.appendChild(foot);
+
+    document.querySelectorAll(".quiz-q").forEach((q) => {
+      const opts = [...q.querySelectorAll("button.opt")];
+      opts.forEach((b) => b.addEventListener("click", () => {
+        opts.forEach((o) => { o.disabled = true; if (o.hasAttribute("data-correct")) o.classList.add("right"); });
+        if (!b.hasAttribute("data-correct")) b.classList.add("wrong");
+        q.classList.add("done");
+        q.dispatchEvent(new CustomEvent("answered", { bubbles: true, detail: { correct: b.hasAttribute("data-correct") } }));
+      }));
+    });
+
+    // KaTeX: 배포물의 수식은 빌드(tools/katex.mjs)가 미리 렌더링한다. 소스 파일을 바로 열었을 때만 CDN에서 불러와 렌더링한다.
+    if (!document.querySelector(".katex") && /\\\(|\\\[|\$\$/.test(document.body.innerText)) {
+      const KATEX = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/";
+      const load = (tag, props) => new Promise((resolve, reject) => {
+        const el = Object.assign(document.createElement(tag), props, { onload: resolve, onerror: reject });
+        document.head.insertBefore(el, tag === "link" ? document.head.querySelector('link[rel="stylesheet"]') : null);
+      });
+      Promise.all([load("link", { rel: "stylesheet", href: KATEX + "katex.min.css" }), load("script", { src: KATEX + "katex.min.js" })])
+        .then(() => load("script", { src: KATEX + "contrib/auto-render.min.js" }))
+        .then(() => renderMathInElement(document.body, {
+          delimiters: [{ left: "$$", right: "$$", display: true }, { left: "\\(", right: "\\)", display: false }, { left: "\\[", right: "\\]", display: true }],
+          throwOnError: false,
+          ignoredClasses: ["no-math"],
+        }))
+        .catch(() => {});
+    }
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build);
+  else build();
+})();
+
+// Simulator deep links: add a shareable # link to each simulator heading.
+(function () {
+  function addSimulatorLinks() {
+    document.querySelectorAll(".sim[id] > .sim-head").forEach((head) => {
+      if (head.querySelector(".sim-link")) return;
+      const link = document.createElement("a");
+      link.className = "sim-link";
+      link.href = "#" + head.parentElement.id;
+      link.textContent = "#";
+      link.title = "이 시뮬레이터로 가는 링크";
+      link.setAttribute("aria-label", "이 시뮬레이터로 가는 링크");
+      head.appendChild(link);
+    });
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", addSimulatorLinks, { once: true });
+  } else {
+    addSimulatorLinks();
+  }
+})();
+
+// Series glossary tooltips (same runtime across independently deployed books).
+(function () {
+  const base = new URL(".", document.currentScript.src);
+  window.BOOK_GLOSSARY_CONFIG = { dataUrl: new URL("glossary-data.js", base).href };
+  const script = document.createElement("script");
+  script.src = new URL("glossary-tooltips.js", base).href;
+  document.head.append(script);
+})();

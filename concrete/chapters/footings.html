@@ -1,0 +1,1225 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>기초 · ConcreteBook</title>
+<meta name="description" content="기둥의 힘을 땅에 나눈다. 독립 기초의 크기와 계수 접지압, 1방향·뚫림 전단, 기둥면 휨과 정착, 지압, 편심 하중, 복합 기초, 말뚝 캡의 반력과 펀칭, B-10 C1 아래 말뚝 5본 캡을 시뮬레이터로 설계한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .ft-stack { display: grid; grid-template-columns: 1fr; }
+  .ft-stack > div { position: relative; min-width: 0; }
+  .ft-stack > div + div { border-top: 1px solid var(--border); }
+  .ft-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .ft-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .ft-msg b { color: var(--text); }
+  .ft-msg.ok { color: var(--ok); font-weight: 600; }
+  .ft-msg.bad { color: var(--bad); font-weight: 600; }
+  .ft-tbl td, .ft-tbl th { font-variant-numeric: tabular-nums; }
+  .ft-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .ft-steps { margin: 6px 0 0; }
+  .ft-steps li { margin: 4px 0; }
+  .ft-card { list-style: none; margin: 0; padding: 12px 18px 14px; border-top: 1px solid var(--border); display: grid; gap: 8px; counter-reset: ftc; }
+  .ft-card li { counter-increment: ftc; position: relative; padding: 8px 12px 8px 40px; border: 1px solid var(--border); border-left: 4px solid var(--text-faint); border-radius: 8px; background: var(--bg); font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+  .ft-card li::before { content: counter(ftc); position: absolute; left: 12px; top: 8px; font: 700 13px var(--mono); color: var(--text-dim); }
+  .ft-card li.ok { border-left-color: var(--ok); }
+  .ft-card li.bad { border-left-color: var(--bad); }
+  .ft-card li b.ok { color: var(--ok); }
+  .ft-card li b.bad { color: var(--bad); }
+  .ft-card li .k { color: var(--text); font-weight: 700; margin-right: 6px; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="concrete"></script>
+</head>
+<body data-chapter="footings">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="ft-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="ft-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="ft-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="ft-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+      <pattern id="ft-soil" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 12L12 0" style="stroke:var(--text-faint);stroke-width:0.8"/></pattern>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 13</div>
+    <h1 data-no-glossary>기초</h1>
+    <p class="lead">10장에서 1층 기둥 C1이 계수 축력 <b>9,000 kN</b>을 800 × 800 mm 단면으로 받는 것을 확인했습니다. 단면 위의 평균 압축 응력은 14 MPa입니다. 그런데 기둥 아래의 흙은 보통 0.1–0.5 MPa(100–500 kPa)밖에 견디지 못합니다. 그 사이의 30–100배 차이를 메우는 부재가 <b>기초</b>입니다. 기초판은 기둥이 내려보낸 힘을 넓게 펴서 땅이 견딜 수 있는 압력으로 바꾸고, 그 과정에서 땅의 반력을 받아 거꾸로 선 캔틸레버 슬래브처럼 휘고 전단을 받습니다. 이 장은 지반공학이 정해 준 허용 지지력에서 출발해 기초판의 크기를 정하고, 계수 접지압으로 1방향 전단·뚫림 전단·기둥면 휨·정착·지압을 차례로 검토하는 독립 기초 설계를 손과 시뮬레이터로 한 번 끝까지 해 봅니다. 이어서 편심 하중, 두 기둥을 한 판에 올리는 복합 기초, 말뚝 머리 반력과 말뚝 캡의 펀칭을 다루고, B-10 기둥 C1 아래 PHC 말뚝 다섯 본을 묶는 캡의 두께를 정합니다.</p>
+    <ul class="objectives">
+      <li>기초의 종류(독립·줄·복합·전면·말뚝 기초)를 지반 조건과 하중에 따라 고르고, GeotechBook의 허용 지지력·말뚝 지지력과의 역할 분담을 설명한다.</li>
+      <li>사용 하중과 허용 지지력으로 기초판 면적을 정하고, 계수 하중으로 계수 접지압 \(q_u\)를 구하며 자중이 휨·전단에 들어가지 않는 이유를 설명한다.</li>
+      <li>1방향 전단(기둥면에서 \(d\))과 뚫림 전단(기둥면에서 \(d/2\)의 임계 둘레 \(b_0\))으로 기초 두께를 정한다.</li>
+      <li>기둥면의 휨모멘트로 소요 철근량을 구하고(<code>CB.rc.asReq</code>), 최소 철근·간격·정착 길이·기둥–기초 지압과 다월 철근을 검토한다.</li>
+      <li>편심 하중의 사다리꼴·삼각형 접지압, 복합 기초의 강체 가정 접지압과 휨모멘트도(<code>CB.beam</code>), 탄성 지반 근사와의 차이를 계산한다.</li>
+      <li>강체 캡 가정으로 말뚝 머리 반력을 나누고, 말뚝 캡의 기둥·말뚝 펀칭을 검토해 B-10 C1 아래 5본 캡의 두께를 정한다(교육용).</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>14 MPa로 누르는 기둥, 0.3 MPa를 견디는 흙</b></div>
+      <div class="o-body"><p>기둥을 땅에 그대로 세우면 어떻게 될까요. C1의 사용 축력 약 6,700 kN을 0.8 × 0.8 m 바닥으로 받으면 접지압은 약 10,500 kPa입니다. 단단한 풍화토의 허용 지지력을 300 kPa로 잡아도 35배가 넘습니다. 흙은 기둥 둘레로 밀려 나가며 전단 파괴되고(GeotechBook 13장), 그 전에 침하가 수십 cm에 이릅니다. 그래서 기둥 아래에는 반드시 힘을 펴 주는 판이 있어야 합니다.</p>
+        <p>판을 넓게 만든다고 끝나지 않습니다. 20세기 초 미국 일리노이 대학교의 탤벗(A. N. Talbot)이 기둥 기초를 실물 크기로 부숴 본 실험(1913년 보고)에서, 두께가 모자란 기초판은 휨으로 부서지기 전에 기둥 둘레가 원뿔 모양으로 뚫려 나가는 <b>뚫림 전단</b>으로 먼저 무너졌습니다. 이후 기초 설계의 중심은 "얼마나 넓게"(지반)와 함께 "얼마나 두껍게"(전단)와 "철근은 얼마나"(휨)가 되었습니다. 이 장의 계산 순서가 바로 그것입니다.</p>
+        <div class="o-chain"><span>기둥 축력 · 모멘트 · 허용 지지력</span><i>→</i><span class="tool">면적 · 계수 접지압 · 1방향/뚫림 전단 · 휨 · 정착 · 지압</span><i>→</i><span>기초판 크기 · 두께 · 배근 · 말뚝 캡</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="foundation-types">
+    <h2>기초의 종류와 선택</h2>
+    <div class="problem"><strong>같은 기둥이라도 땅에 따라 기초가 달라진다</strong>
+      <p>기초 형식은 구조 설계자가 혼자 정하지 않습니다. 지반 조사(GeotechBook 1장)에서 얕은 곳에 충분히 단단한 층이 있으면 기초판을 바로 앉히고(<span class="term">얕은 기초</span><span class="en">(shallow foundation)</span>), 연약층이 두꺼우면 말뚝으로 깊은 층까지 내려갑니다(<span class="term">깊은 기초</span><span class="en">(deep foundation)</span>). 구조 설계자의 몫은 그 결정에 맞춰 철근콘크리트 부재로서의 기초판·캡·매트를 설계하는 것입니다.</p></div>
+    <figure class="diagram" id="fig-ft-types">
+      <svg viewBox="0 0 860 280" role="img" aria-label="독립 기초, 줄기초, 복합 기초, 전면 기초, 말뚝 기초의 단면 비교">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g class="t" text-anchor="middle" style="font-weight:700"><text x="92" y="38">독립 기초</text><text x="252" y="38">줄기초</text><text x="420" y="38">복합 기초</text><text x="600" y="38">전면 기초(매트)</text><text x="770" y="38">말뚝 기초</text></g>
+        <rect x="20" y="170" width="820" height="80" style="fill:url(#ft-soil);opacity:.55"/>
+        <line x1="20" y1="170" x2="840" y2="170" class="s-line"/>
+        <!-- isolated -->
+        <rect x="80" y="60" width="24" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="42" y="170" width="100" height="26" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <g style="stroke:var(--accent-2);stroke-width:1.4"><line x1="48" y1="214" x2="48" y2="200" marker-end="url(#ft-ah-ld)"/><line x1="72" y1="214" x2="72" y2="200" marker-end="url(#ft-ah-ld)"/><line x1="96" y1="214" x2="96" y2="200" marker-end="url(#ft-ah-ld)"/><line x1="120" y1="214" x2="120" y2="200" marker-end="url(#ft-ah-ld)"/><line x1="138" y1="214" x2="138" y2="200" marker-end="url(#ft-ah-ld)"/></g>
+        <text x="92" y="236" class="t-mono" text-anchor="middle">기둥 1개 · 판 1장</text>
+        <!-- strip -->
+        <rect x="236" y="60" width="32" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="205" y="170" width="94" height="22" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <text x="252" y="120" class="t-mono" text-anchor="middle" transform="rotate(-90 252 120)">벽</text>
+        <text x="252" y="236" class="t-mono" text-anchor="middle">벽 아래 연속</text>
+        <!-- combined -->
+        <rect x="358" y="60" width="20" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="456" y="60" width="24" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="348" y="170" width="152" height="30" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <line x1="348" y1="56" x2="348" y2="252" style="stroke:var(--bad);stroke-dasharray:5 3"/>
+        <text x="352" y="252" class="t-mono" style="fill:var(--bad)">대지 경계</text>
+        <text x="430" y="236" class="t-mono" text-anchor="middle">기둥 2개 · 판 1장</text>
+        <!-- mat -->
+        <g style="fill:var(--surface-2);stroke:var(--text-dim)"><rect x="540" y="60" width="16" height="110"/><rect x="592" y="60" width="16" height="110"/><rect x="644" y="60" width="16" height="110"/></g>
+        <rect x="528" y="170" width="144" height="40" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <text x="600" y="236" class="t-mono" text-anchor="middle">건물 전체 · 두꺼운 판</text>
+        <!-- pile -->
+        <rect x="760" y="60" width="20" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="722" y="164" width="96" height="34" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <g style="fill:var(--bg-elev);stroke:var(--text-dim)"><rect x="732" y="198" width="12" height="52"/><rect x="764" y="198" width="12" height="52"/><rect x="796" y="198" width="12" height="52"/></g>
+        <text x="770" y="262" class="t-mono" text-anchor="middle">캡 + 말뚝</text>
+        <text x="430" y="264" class="t-dim" text-anchor="middle">주황 화살표: 접지압(땅이 기초판을 미는 힘)</text>
+      </svg>
+      <figcaption><b>그림 13-1.</b> 기초의 다섯 가지 형식. 앞의 넷은 판이 흙에 직접 하중을 전하는 얕은 기초이고, 말뚝 기초는 캡이 기둥 하중을 말뚝 머리로 모아 깊은 층에 전한다. B-10은 두께 2.5 m의 매트 아래 PHC 말뚝을 박은 <b>말뚝 지지 전면 기초</b>다(GeotechBook 14장).</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="ft-tbl">
+      <thead><tr><th>형식</th><th>쓰는 곳</th><th>설계의 핵심</th></tr></thead>
+      <tbody>
+        <tr><td><span class="term">독립 기초</span><span class="en">(isolated footing)</span></td><td>기둥 하나, 얕은 곳에 지지층</td><td>면적(지반) → 두께(전단) → 철근(휨)</td></tr>
+        <tr><td><span class="term">줄기초</span><span class="en">(wall footing)</span></td><td>내력벽·담장 아래 연속</td><td>단위 길이 1방향 캔틸레버</td></tr>
+        <tr><td><span class="term">복합 기초</span><span class="en">(combined footing)</span></td><td>대지 경계에 붙은 기둥, 가까운 두 기둥</td><td>합력과 도심을 맞춰 접지압을 고르게, 보처럼 휨</td></tr>
+        <tr><td><span class="term">전면 기초</span><span class="en">(mat foundation)</span></td><td>지지력이 낮거나 독립 기초가 겹칠 때, 지하층</td><td>판 해석(탄성 지반), 부등 침하, 부력</td></tr>
+        <tr><td><span class="term">말뚝 캡</span><span class="en">(pile cap)</span></td><td>연약층이 두꺼워 말뚝이 필요할 때</td><td>말뚝 머리 반력 → 펀칭·휨, 깊은 부재(14장)</td></tr>
+      </tbody></table></div>
+    <p>지반공학과 철근콘크리트의 경계는 분명합니다. GeotechBook 13장이 "땅이 얼마를 견디는가"(극한 지지력과 안전율로 정한 허용 지지력, 침하)를, 14장이 "말뚝 한 본이 얼마를 견디는가"(허용 지지력 1,500 kN/본)를 답했습니다. 이 장은 그 답을 받아 <b>기초판이라는 콘크리트 부재가 그 힘을 견디는가</b>를 묻습니다. 그래서 크기는 사용 하중과 허용 지지력으로, 두께와 철근은 계수 하중과 강도 설계로 정한다는 두 단계가 생깁니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="sizing">
+    <h2>크기 정하기: 사용 하중과 허용 지지력</h2>
+    <div class="problem"><strong>왜 크기는 계수 하중이 아니라 사용 하중으로 정할까</strong>
+      <p><span class="term">허용 지지력</span><span class="en">(allowable bearing capacity)</span> \(q_a\)는 극한 지지력을 안전율(보통 3)로 나눈 값이며, 침하 한계도 사용 하중에 대한 것입니다. 안전율이 이미 들어 있으므로 하중 계수를 곱한 계수 하중과 비교하면 안전율을 두 번 쓰게 됩니다. 그래서 면적은 사용 하중으로, 콘크리트 부재 설계는 계수 하중으로 합니다.</p></div>
+    <div class="callout def"><strong>정의 13.1 (기초판의 소요 면적)</strong> 사용 하중(고정 \(D\) + 활 \(L\), 필요하면 풍하중·지진 조합)과 허용 지지력으로
+      <div class="formula">$$A_{req} = \frac{D + L}{q_e}, \qquad q_e = q_a - \gamma_c h_f - \gamma_s (D_f - h_f) - q_s$$<div class="where">\(q_e\): <span class="term">유효 허용 지지력</span><span class="en">(effective allowable bearing pressure)</span>. \(q_a\)가 기초 바닥의 <b>전체</b> 압력으로 주어졌다면 기초판 자중(\(\gamma_c \approx 24\) kN/m³, 두께 \(h_f\))과 그 위 흙(\(\gamma_s\), 근입 깊이 \(D_f\)), 바닥 위 상재 하중 \(q_s\)를 빼야 기둥 하중이 쓸 수 있는 몫이 된다. \(q_a\)가 <b>순</b> 허용 지지력(GeotechBook 13장 "순 지지력")이면 기초판과 흙의 무게는 파낸 흙의 무게와 거의 같아 \(q_e \approx q_a\)로 둔다.</div></div></div>
+    <figure class="diagram" id="fig-ft-press">
+      <svg viewBox="0 0 860 300" role="img" aria-label="사용 하중에 의한 전체 접지압과 계수 하중에 의한 계수 접지압 비교">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">① 크기: 사용 하중 + 자중 + 흙</text>
+          <rect x="0" y="40" width="360" height="110" style="fill:url(#ft-soil);opacity:.5"/>
+          <line x1="0" y1="40" x2="360" y2="40" class="s-line"/>
+          <rect x="164" y="20" width="32" height="104" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="70" y="124" width="220" height="30" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="180" y1="-6" x2="180" y2="18" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#ft-ah-ld)"/>
+          <text x="190" y="6" class="t-mono" style="fill:var(--accent-2)">D + L</text>
+          <text x="116" y="96" class="t-mono" text-anchor="middle">흙 γ<tspan baseline-shift="sub" font-size="8">s</tspan>(D<tspan baseline-shift="sub" font-size="8">f</tspan> − h<tspan baseline-shift="sub" font-size="8">f</tspan>)</text>
+          <text x="244" y="144" class="t-mono" text-anchor="middle">γ<tspan baseline-shift="sub" font-size="8">c</tspan>h<tspan baseline-shift="sub" font-size="8">f</tspan></text>
+          <line x1="330" y1="40" x2="330" y2="154" style="stroke:var(--text-dim)" marker-start="url(#ft-ah-t)" marker-end="url(#ft-ah-t)"/><text x="338" y="102" class="t-mono">D<tspan baseline-shift="sub" font-size="8">f</tspan></text>
+          <g style="stroke:var(--accent-2);stroke-width:1.4"><line x1="80" y1="190" x2="80" y2="158" marker-end="url(#ft-ah-ld)"/><line x1="125" y1="190" x2="125" y2="158" marker-end="url(#ft-ah-ld)"/><line x1="170" y1="190" x2="170" y2="158" marker-end="url(#ft-ah-ld)"/><line x1="215" y1="190" x2="215" y2="158" marker-end="url(#ft-ah-ld)"/><line x1="260" y1="190" x2="260" y2="158" marker-end="url(#ft-ah-ld)"/><line x1="282" y1="190" x2="282" y2="158" marker-end="url(#ft-ah-ld)"/></g>
+          <rect x="70" y="190" width="220" height="4" style="fill:var(--accent-2)"/>
+          <text x="180" y="214" class="t-mono" text-anchor="middle" style="fill:var(--accent-2)">전체 접지압 ≤ q<tspan baseline-shift="sub" font-size="8">a</tspan></text>
+          <text x="180" y="236" class="t-dim" text-anchor="middle">(순 허용 지지력이면 자중·흙 ≈ 파낸 흙)</text>
+        </g>
+        <g transform="translate(460,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">② 강도: 계수 하중만</text>
+          <rect x="144" y="20" width="32" height="104" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="50" y="124" width="220" height="30" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="160" y1="-6" x2="160" y2="18" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#ft-ah-ld)"/>
+          <text x="170" y="6" class="t-mono" style="fill:var(--accent-2)">P<tspan baseline-shift="sub" font-size="8">u</tspan> = 1.2D + 1.6L</text>
+          <g style="stroke:var(--compression);stroke-width:1.4"><line x1="60" y1="196" x2="60" y2="158" marker-end="url(#ft-ah-t)"/><line x1="105" y1="196" x2="105" y2="158" marker-end="url(#ft-ah-t)"/><line x1="150" y1="196" x2="150" y2="158" marker-end="url(#ft-ah-t)"/><line x1="195" y1="196" x2="195" y2="158" marker-end="url(#ft-ah-t)"/><line x1="240" y1="196" x2="240" y2="158" marker-end="url(#ft-ah-t)"/><line x1="262" y1="196" x2="262" y2="158" marker-end="url(#ft-ah-t)"/></g>
+          <rect x="50" y="196" width="220" height="4" style="fill:var(--compression)"/>
+          <text x="160" y="220" class="t-mono" text-anchor="middle" style="fill:var(--compression)">q<tspan baseline-shift="sub" font-size="8">u</tspan> = P<tspan baseline-shift="sub" font-size="8">u</tspan> / A</text>
+          <text x="160" y="242" class="t-dim" text-anchor="middle">자중·흙은 같은 크기의 접지압과 상쇄 → 휨·전단 없음</text>
+          <path d="M 50 154 Q 160 176 270 154" style="fill:none;stroke:var(--text-faint);stroke-dasharray:4 3"/>
+          <text x="300" y="150" class="t-mono">위로 휨</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-2.</b> 두 단계의 접지압. ① 면적은 사용 하중과 허용 지지력으로 정한다. ② 두께·철근은 기둥의 계수 하중만으로 만든 계수 접지압 \(q_u\)로 정한다. 기초판 자중과 흙의 무게는 판 바로 아래에서 같은 크기의 접지압으로 받쳐지므로 판을 휘게 하지 않는다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 13.2 (계수 접지압)</strong> 강체 기초판이 중심 축하중을 받으면 접지압은 고르다고 본다. 기초판의 휨·전단 설계에는 기둥에서 오는 계수 하중만으로 만든
+      <div class="formula">$$q_u = \frac{P_u}{A} \qquad (P_u = \max(1.4D,\ 1.2D + 1.6L) \text{ 등 하중 조합, KDS 41 10 15 형태})$$<div class="where">를 쓴다. \(q_u\)는 실제 흙이 받는 압력이 아니라 <span class="term">계수 접지압</span><span class="en">(factored soil pressure)</span>, 곧 설계용 가상 압력이다. 실제 접지압 분포는 흙의 종류와 기초판 강성에 따라 다르다(모래 위 강성 기초는 가장자리가 작고, 점토 위는 가장자리가 크다). 보통 크기의 독립 기초는 고른 분포로 설계해도 결과 차이가 작다.</div></div></div>
+    <div class="callout"><strong>예제 13.1 (독립 기초 F-1의 크기, 교육용)</strong> 기둥 500 × 500 mm, 사용 하중 \(D = 1{,}000\) kN, \(L = 600\) kN, 순 허용 지지력 \(q_a = 300\) kPa(단단한 풍화토, 교육용), \(f_{ck} = 30\) MPa, SD500. B-10과 별개인 교육용 기초다.
+      <ol class="ft-steps">
+        <li><b>소요 면적.</b> \(A_{req} = 1{,}600/300 = 5.33\) m² → 정사각형 \(B = \sqrt{5.33} = 2.31\) m → <b>B = 2.4 m</b>(A = 5.76 m²). 사용 접지압 1,600/5.76 = 278 kPa ≤ 300 kPa <b>OK</b>.</li>
+        <li><b>계수 하중.</b> \(1.4D = 1{,}400\), \(1.2D + 1.6L = 2{,}160\) kN → \(P_u = 2{,}160\) kN.</li>
+        <li><b>계수 접지압.</b> \(q_u = 2{,}160/5.76 = 375\) kPa. 허용 지지력 300 kPa보다 크지만 문제가 아니다. 계수 하중과 비교할 지반 값은 없고, \(q_u\)는 콘크리트 설계용이다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="critical-sections">
+    <h2>기초판의 거동과 위험 단면</h2>
+    <div class="problem"><strong>거꾸로 선 슬래브</strong>
+      <p>계수 접지압이 아래에서 위로 기초판을 밀고 기둥이 가운데를 눌러 잡고 있으니, 기초판은 기둥에서 사방으로 뻗은 캔틸레버 슬래브가 위로 휘는 것과 같습니다. 인장은 바닥면에 생기고 철근은 아래에 둡니다. 9장의 플랫 플레이트를 뒤집어 놓은 모습이며, 기둥 둘레의 뚫림 전단도 똑같이 생깁니다.</p></div>
+    <figure class="diagram" id="fig-ft-crit">
+      <svg viewBox="0 0 860 340" role="img" aria-label="독립 기초 평면의 1방향 전단 위험 단면, 뚫림 전단 임계 둘레, 휨 위험 단면과 단면도의 파괴 형태">
+        <rect x="10" y="10" width="840" height="320" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">평면</text>
+          <rect x="20" y="20" width="260" height="260" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="225" y="20" width="55" height="260" style="fill:var(--accent-2-soft)"/>
+          <line x1="225" y1="14" x2="225" y2="286" style="stroke:var(--accent-2);stroke-width:2;stroke-dasharray:6 3"/>
+          <text x="229" y="300" class="t-mono" style="fill:var(--accent-2)">1방향: 기둥면 + d</text>
+          <rect x="100" y="100" width="100" height="100" style="fill:none;stroke:var(--compression);stroke-width:2;stroke-dasharray:5 3"/>
+          <text x="106" y="114" class="t-mono" style="fill:var(--compression)">b₀</text>
+          <text x="40" y="92" class="t-mono" style="fill:var(--compression)">임계 둘레: 기둥면 + d/2</text>
+          <rect x="125" y="125" width="50" height="50" style="fill:var(--text-dim);opacity:.65"/>
+          <line x1="175" y1="40" x2="175" y2="260" style="stroke:var(--accent);stroke-width:1.6"/>
+          <text x="178" y="52" class="t-mono" style="fill:var(--accent)">휨: 기둥면</text>
+          <line x1="175" y1="236" x2="225" y2="236" style="stroke:var(--text-dim)" marker-start="url(#ft-ah-t)" marker-end="url(#ft-ah-t)"/><text x="200" y="250" class="t-mono" text-anchor="middle">d</text>
+          <line x1="175" y1="214" x2="280" y2="214" style="stroke:var(--text-dim)" marker-start="url(#ft-ah-t)" marker-end="url(#ft-ah-t)"/><text x="248" y="208" class="t-mono" text-anchor="middle">l</text>
+        </g>
+        <g transform="translate(400,40)">
+          <text x="0" y="-10" class="t" style="font-weight:700">단면</text>
+          <rect x="170" y="0" width="70" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="0" y="110" width="410" height="90" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:var(--tension)"><circle cx="30" cy="186" r="5"/><circle cx="80" cy="186" r="5"/><circle cx="130" cy="186" r="5"/><circle cx="180" cy="186" r="5"/><circle cx="230" cy="186" r="5"/><circle cx="280" cy="186" r="5"/><circle cx="330" cy="186" r="5"/><circle cx="380" cy="186" r="5"/></g>
+          <line x1="14" y1="182" x2="396" y2="182" style="stroke:var(--tension);stroke-width:2"/>
+          <path d="M170 112 L 90 190 M240 112 L 320 190" style="stroke:var(--compression);stroke-width:2.2;stroke-dasharray:6 4"/>
+          <text x="70" y="140" class="t-mono" style="fill:var(--compression)">뚫림 원뿔</text>
+          <line x1="240" y1="112" x2="240" y2="200" style="stroke:var(--accent);stroke-width:1.4"/>
+          <line x1="290" y1="112" x2="290" y2="200" style="stroke:var(--accent-2);stroke-width:1.6;stroke-dasharray:5 3"/>
+          <line x1="424" y1="110" x2="424" y2="200" style="stroke:var(--text-dim)" marker-start="url(#ft-ah-t)" marker-end="url(#ft-ah-t)"/><text x="430" y="160" class="t-mono">h</text>
+          <line x1="250" y1="112" x2="250" y2="182" style="stroke:var(--text-dim)" marker-start="url(#ft-ah-t)" marker-end="url(#ft-ah-t)"/><text x="256" y="150" class="t-mono">d</text>
+          <g style="stroke:var(--accent-2);stroke-width:1.3"><line x1="20" y1="240" x2="20" y2="206" marker-end="url(#ft-ah-ld)"/><line x1="80" y1="240" x2="80" y2="206" marker-end="url(#ft-ah-ld)"/><line x1="140" y1="240" x2="140" y2="206" marker-end="url(#ft-ah-ld)"/><line x1="200" y1="240" x2="200" y2="206" marker-end="url(#ft-ah-ld)"/><line x1="260" y1="240" x2="260" y2="206" marker-end="url(#ft-ah-ld)"/><line x1="320" y1="240" x2="320" y2="206" marker-end="url(#ft-ah-ld)"/><line x1="390" y1="240" x2="390" y2="206" marker-end="url(#ft-ah-ld)"/></g>
+          <text x="205" y="262" class="t-mono" text-anchor="middle" style="fill:var(--accent-2)">q<tspan baseline-shift="sub" font-size="8">u</tspan></text>
+          <text x="205" y="284" class="t-dim" text-anchor="middle">바닥 인장 → 주근은 아래, 피복 75 mm(흙에 직접 타설)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-3.</b> 독립 기초의 세 위험 단면. 휨은 기둥면, 1방향 전단은 기둥면에서 \(d\) 떨어진 단면(주황 영역의 접지압이 만드는 전단), 뚫림 전단은 기둥면에서 \(d/2\) 떨어진 임계 둘레 \(b_0\)(빨간 점선 바깥의 접지압이 만드는 전단). 단면도의 점선은 뚫림 파괴면이 기둥 둘레에서 비스듬히(약 45° 안팎) 내려가는 모습이다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 13.3 (기초판의 위험 단면, KDS 14 20 70 / ACI 318 형태)</strong> 콘크리트 기둥을 받는 기초판의 <span class="term">위험 단면</span><span class="en">(critical section)</span>은
+      <ol class="ft-steps">
+        <li><b>휨</b>: 기둥면. 정사각형이 아닌 기둥(원형·다각형)은 같은 면적의 정사각형으로 바꿔 생각한다. 조적 벽 아래 줄기초는 벽 중심과 벽면의 중간, 강재 베이스 플레이트는 기둥면과 플레이트 끝의 중간(형태).</li>
+        <li><b>1방향 전단</b>: 기둥면에서 \(d\) 떨어진 단면(5장의 "지점에서 \(d\)"와 같은 이유 — 그 안쪽 하중은 경사 스트럿으로 기둥에 바로 간다).</li>
+        <li><b>2방향(뚫림) 전단</b>: 기둥면에서 \(d/2\) 떨어진 <span class="term">임계 둘레</span><span class="en">(critical perimeter)</span> \(b_0\)(9장 슬래브와 같다).</li>
+      </ol>
+      두께는 보통 전단이 정하고, 철근은 휨이 정한다. 흙에 접해 타설하는 기초판의 피복은 75 mm, 바닥 철근 위의 깊이는 150 mm 이상(말뚝 캡 300 mm 이상, ACI 318 형태)이다. 현행 기준을 확인할 것.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="shear">
+    <h2>1방향 전단과 뚫림 전단</h2>
+    <div class="problem"><strong>두께를 정하는 두 가지 전단</strong>
+      <p>기초판은 전단 철근을 넣지 않는 것이 보통입니다. 철근 조립과 콘크리트 타설이 번거로운 데다, 두께를 조금 늘리는 것이 더 싸기 때문입니다. 그래서 두께는 콘크리트만의 전단강도 \(\phi V_c\)가 두 가지 전단 요구를 모두 넘도록 정합니다.</p></div>
+    <p><span class="term">1방향 전단</span><span class="en">(one-way shear)</span>은 기초판 전체 폭을 가로지르는 넓은 보의 전단으로, 5장의 \(V_c = \tfrac16\lambda\sqrt{f_{ck}}\,b_w d\)를 폭 \(B\)로 그대로 쓴다(<code>CB.rc.Vc</code>). <span class="term">뚫림 전단</span><span class="en">(punching shear)</span>은 기둥이 판을 원뿔 모양으로 뚫고 나가는 2방향 전단으로, 둘레 \(b_0\) 전체가 함께 저항하고 주위 콘크리트가 3축으로 구속되어 단위 면적당 강도가 1방향보다 크다.</p>
+    <div class="callout def"><strong>원리 13.4 (기초판의 전단, ACI 318 SI 형태)</strong> 정사각형 기초 \(B \times B\), 기둥 \(c_1 \times c_2\), 유효 깊이 \(d\):
+      <div class="formula">$$\text{1방향: } V_u = q_u B\,(l - d), \quad \phi V_c = \phi\,\tfrac16\lambda\sqrt{f_{ck}}\,B d, \qquad l = \frac{B - c}{2}$$
+      $$\text{뚫림: } V_u = q_u\big[A - (c_1 + d)(c_2 + d)\big], \quad b_0 = 2(c_1 + d) + 2(c_2 + d)$$
+      $$v_c = \min\!\Big\{0.33,\ 0.17\Big(1 + \frac{2}{\beta_c}\Big),\ 0.083\Big(\frac{\alpha_s d}{b_0} + 2\Big)\Big\}\lambda\sqrt{f_{ck}}\ \text{(MPa)}, \qquad \phi V_c = \phi\, v_c\, b_0 d, \quad \phi = 0.75$$<div class="where">\(\beta_c\): 기둥 긴 변/짧은 변, \(\alpha_s\): 내부 기둥 40, 외부 30, 모서리 20. \(\lambda\): 경량 콘크리트 계수(보통 1.0). 이 식은 ACI 318-14의 형태다. ACI 318-19는 두꺼운 부재에 <span class="term">크기 효과</span><span class="en">(size effect)</span> 계수 \(\lambda_s = \sqrt{2/(1 + 0.004d)} \le 1\)을 곱하고, KDS 14 20 22(2021 개정)는 휨 철근비·압축대 깊이를 반영하는 다른 형태의 뚫림 전단식을 쓴다. 이 장은 교육용으로 ACI 318-14 형태를 기본으로 하고 시뮬레이터에서 \(\lambda_s\)를 켜 볼 수 있게 했다. 실제 설계는 현행 KDS를 따를 것.</div></div></div>
+    <div class="sim" id="sim-ft-shear">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>1방향·뚫림 전단 위험 단면</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ft-cv-sh" aria-label="기초 평면 위의 1방향 전단 단면과 뚫림 전단 임계 둘레, 요구와 강도 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>두께 h <output id="ft-sh-h-out"></output></span><input type="range" id="ft-sh-h" min="300" max="1200" step="10" value="600"></label>
+          <label class="ctrl"><span>기초 폭 B <output id="ft-sh-B-out"></output></span><input type="range" id="ft-sh-B" min="1.5" max="4.5" step="0.1" value="2.4"></label>
+          <label class="ctrl"><span>기둥 c <output id="ft-sh-c-out"></output></span><input type="range" id="ft-sh-c" min="300" max="900" step="50" value="500"></label>
+          <label class="ctrl"><span><i style="font-style:normal">계수 하중 P<sub>u</sub></i> <output id="ft-sh-P-out"></output></span><input type="range" id="ft-sh-P" min="500" max="6000" step="20" value="2160"></label>
+          <div class="ctrl"><span>강조</span><div class="seg" id="ft-sh-mode"><button data-value="two" class="on">뚫림</button><button data-value="one">1방향</button></div></div>
+          <div class="ctrl"><span><i style="font-style:normal">크기 효과 λ<sub>s</sub></i></span><div class="seg" id="ft-sh-ls"><button data-value="off" class="on">끔(318-14 형태)</button><button data-value="on">켬(318-19 형태)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">d · q<sub>u</sub></span><span class="v" id="ft-sh-o-d">—</span></div>
+        <div class="stat"><span class="k">뚫림 V<sub>u</sub> / φV<sub>c</sub></span><span class="v" id="ft-sh-o-two">—</span></div>
+        <div class="stat"><span class="k">1방향 V<sub>u</sub> / φV<sub>c</sub></span><span class="v" id="ft-sh-o-one">—</span></div>
+        <div class="stat"><span class="k">b₀ · v<sub>c</sub></span><span class="v" id="ft-sh-o-b0">—</span></div>
+      </div>
+      <div class="ft-msg" id="ft-sh-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(예제 13.1의 F-1)에서 뚫림 이용률 약 0.66, 1방향 약 0.49로 둘 다 여유가 있습니다 · h를 400 mm까지 줄여 어느 전단이 먼저 불합격하는지 보세요(보통 뚫림) · B를 키우면 l이 길어져 1방향 전단이 빠르게 커집니다 · d가 커서 1방향 단면이 기초 끝을 넘으면 1방향 전단은 0입니다 · 모델: 원리 13.4, d = h − 100 mm(피복 75 + 철근 지름 약 25, 교육용), f<sub>ck</sub> = 30 MPa, 내부 기둥 α<sub>s</sub> = 40, <code>CB.rc.Vc</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 13.2 (F-1의 두께)</strong> \(h = 600\) mm, 철근 D19 두 방향 → \(d \approx 600 - 75 - 19 = 506\) → 보수적으로 \(d = 500\) mm.
+      <ol class="ft-steps">
+        <li><b>뚫림 전단.</b> \(c + d = 1.0\) m, \(b_0 = 4 \times 1{,}000 = 4{,}000\) mm. \(V_u = 375(5.76 - 1.0^2) = 1{,}785\) kN. \(v_c\): \(0.33\sqrt{30} = 1.81\), \(0.17(1 + 2)\sqrt{30} = 2.79\), \(0.083(40 \times 500/4{,}000 + 2)\sqrt{30} = 3.18\) MPa → 1.81 MPa. \(\phi V_c = 0.75 \times 1.81 \times 4{,}000 \times 500 = 2{,}711\) kN ≥ 1,785 kN <b>OK</b>(이용률 0.66). 크기 효과를 넣어도(\(\lambda_s = 0.82\)) 2,213 kN으로 OK.</li>
+        <li><b>1방향 전단.</b> \(l = (2.4 - 0.5)/2 = 0.95\) m, 위험 단면 바깥 길이 \(0.95 - 0.50 = 0.45\) m. \(V_u = 375 \times 2.4 \times 0.45 = 405\) kN. \(\phi V_c = 0.75 \times \tfrac16\sqrt{30} \times 2{,}400 \times 500 = 822\) kN <b>OK</b>.</li>
+        <li><b>판단.</b> \(h = 500\) mm(\(d = 400\))로 줄이면 뚫림 \(V_u = 375(5.76 - 0.81) = 1{,}856\) kN, \(\phi V_c = 0.75 \times 1.81 \times 3{,}600 \times 400 = 1{,}952\) kN으로 아슬아슬하게 통과한다. 위 시뮬레이터로 확인할 수 있다. 크기 효과·시공 오차를 생각해 600 mm를 택한다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="flexure">
+    <h2>기둥면의 휨과 철근</h2>
+    <div class="problem"><strong>폭 2.4 m짜리 캔틸레버 보</strong>
+      <p>기둥면에서 끊어 보면, 길이 \(l\)의 캔틸레버가 접지압 \(q_u\)를 받습니다. 폭은 기초판 전체 폭 \(B\)입니다. 3장의 단철근 직사각형 보와 같은 식이지만 폭이 아주 넓어 철근비가 작고, 그래서 최소 철근이 설계를 정하는 일이 많습니다.</p></div>
+    <div class="callout def"><strong>원리 13.5 (기초판의 휨)</strong> 기둥면 위험 단면에서
+      <div class="formula">$$M_u = q_u B\,\frac{l^2}{2}, \qquad A_{s,req} = \text{asReq}(M_u, B, d), \qquad A_s \ge \rho_{min} B h, \quad \rho_{min} = 0.0020 \times \frac{400}{f_y} \ge 0.0014$$<div class="where">최소 철근비는 <span class="term">수축·온도 철근</span><span class="en">(shrinkage and temperature reinforcement)</span>의 형태(KDS 14 20 50 / ACI 318의 기초판 규정 형태, 현행 기준 확인)이며 전체 두께 \(h\)에 곱한다. 철근 간격은 \(3h\)와 450 mm 이하(형태). 정사각형 기초는 두 방향에 같은 철근을 고르게 둔다. 직사각형 기초 \(B \times L\)(\(\beta = L/B\))의 짧은 방향 철근은 기둥 아래 폭 \(B\)의 중앙대에 \(\tfrac{2}{\beta + 1}\)만큼, 나머지를 양쪽에 나누어 둔다(형태).</div></div></div>
+    <figure class="diagram" id="fig-ft-flex">
+      <svg viewBox="0 0 860 280" role="img" aria-label="기둥면에서 끊은 캔틸레버, 휨모멘트와 바닥 철근의 정착 가능 길이">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <rect x="300" y="0" width="80" height="70" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="0" y="70" width="680" height="80" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="300" y1="60" x2="300" y2="162" style="stroke:var(--accent);stroke-width:2"/>
+          <text x="296" y="176" class="t-mono" text-anchor="end" style="fill:var(--accent)">위험 단면(기둥면)</text>
+          <line x1="22" y1="130" x2="658" y2="130" style="stroke:var(--tension);stroke-width:3"/>
+          <line x1="22" y1="130" x2="22" y2="94" style="stroke:var(--tension);stroke-width:3"/>
+          <line x1="658" y1="130" x2="658" y2="94" style="stroke:var(--tension);stroke-width:3"/>
+          <text x="30" y="102" class="t-mono" style="fill:var(--tension)">갈고리(필요할 때)</text>
+          <g style="stroke:var(--accent-2);stroke-width:1.3"><line x1="400" y1="186" x2="400" y2="156" marker-end="url(#ft-ah-ld)"/><line x1="470" y1="186" x2="470" y2="156" marker-end="url(#ft-ah-ld)"/><line x1="540" y1="186" x2="540" y2="156" marker-end="url(#ft-ah-ld)"/><line x1="610" y1="186" x2="610" y2="156" marker-end="url(#ft-ah-ld)"/><line x1="676" y1="186" x2="676" y2="156" marker-end="url(#ft-ah-ld)"/></g>
+          <text x="540" y="202" class="t-mono" text-anchor="middle" style="fill:var(--accent-2)">q<tspan baseline-shift="sub" font-size="8">u</tspan> × B</text>
+          <text x="530" y="40" class="t-mono" text-anchor="middle" style="fill:var(--accent)">M<tspan baseline-shift="sub" font-size="8">u</tspan> = q<tspan baseline-shift="sub" font-size="8">u</tspan>Bl²/2 (기둥면)</text>
+          <line x1="22" y1="196" x2="300" y2="196" style="stroke:var(--ok);stroke-width:1.6" marker-start="url(#ft-ah-ok)" marker-end="url(#ft-ah-ok)"/>
+          <text x="160" y="212" class="t-mono" text-anchor="middle" style="fill:var(--ok)">정착 가능 길이 l<tspan baseline-shift="sub" font-size="8">a</tspan> = l − 75</text>
+          <line x1="0" y1="226" x2="300" y2="226" style="stroke:var(--text-dim)" marker-start="url(#ft-ah-t)" marker-end="url(#ft-ah-t)"/>
+          <text x="150" y="242" class="t-mono" text-anchor="middle">l = (B − c)/2</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-4.</b> 기초판의 휨과 정착. 바닥 철근은 기둥면에서 최대 응력 \(f_y\)에 이르므로, 기둥면에서 기초 끝(피복 75 mm 제외)까지의 길이 \(l_a\) 안에서 정착 길이 \(l_d\)를 확보해야 한다. 모자라면 철근을 가늘게 하거나 끝에 표준 갈고리를 둔다(7장).</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 13.3 (F-1의 철근)</strong> \(q_u = 375\) kPa, \(B = 2.4\) m, \(l = 0.95\) m, \(d = 500\) mm, \(h = 600\) mm.
+      <ol class="ft-steps">
+        <li><b>휨모멘트.</b> \(M_u = 375 \times 2.4 \times 0.95^2/2 = 406\) kN·m.</li>
+        <li><b>소요 철근.</b> <code>CB.rc.asReq(406, 2400, 500, 30, 500)</code> = 1,942 mm². 최소 철근 \(\rho_{min} = 0.0020 \times 400/500 = 0.0016\) → \(0.0016 \times 2{,}400 \times 600 = 2{,}304\) mm² → <b>최소 철근이 지배</b>.</li>
+        <li><b>철근 선택.</b> D19(286.5 mm²) 9개 = 2,579 mm², 간격 \((2{,}400 - 150)/8 = 281\) mm ≤ \(\min(3h, 450) = 450\) mm <b>OK</b>. 두 방향 모두 9-D19(위층 철근은 \(d\)가 19 mm 작지만 \(d = 500\)을 이미 보수적으로 잡았다).</li>
+        <li><b>강도 확인.</b> <code>CB.rc.flexure</code>(b 2,400, d 500, 9-D19): \(a = 21\) mm, \(\varepsilon_t = 0.059\)(인장 지배), \(\phi M_n = 536\) kN·m ≥ 406 kN·m <b>OK</b>.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="development">
+    <h2>철근의 정착</h2>
+    <div class="problem"><strong>짧은 캔틸레버, 굵은 철근</strong>
+      <p>기초판 철근은 기둥면에서 항복 응력까지 올라가야 하는데, 기둥면에서 기초 끝까지는 1 m도 되지 않는 경우가 많습니다. 7장의 기본 정착 길이 \(l_{db} = 0.6 d_b f_y/(\lambda\sqrt{f_{ck}})\)는 D19, SD500, 30 MPa에서 1,046 mm입니다. F-1의 \(l_a = 950 - 75 = 875\) mm보다 깁니다.</p></div>
+    <p><span class="term">기본 정착 길이</span><span class="en">(basic development length)</span>는 보정 계수를 모두 1로 둔 보수적인 값입니다. 기초판 철근은 피복이 두껍고(75 mm) 간격이 넓어 쪼갬 파괴가 잘 일어나지 않으므로, 피복·간격을 반영하는 정밀식을 쓰면 정착 길이가 크게 줄어듭니다.</p>
+    <div class="callout def"><strong>원리 13.6 (기초판 철근의 정착, KDS 14 20 52 형태)</strong>
+      <div class="formula">$$l_d = \frac{0.90\, d_b f_y}{\lambda\sqrt{f_{ck}}}\cdot\frac{\alpha\beta\gamma}{\left(\dfrac{c + K_{tr}}{d_b}\right)} \ge 300 \text{ mm}, \qquad \frac{c + K_{tr}}{d_b} \le 2.5$$<div class="where">\(c\): 철근 중심까지의 피복과 철근 중심 간격의 1/2 중 작은 값, \(K_{tr}\): 횡철근 지수(기초판은 보통 0). \(\alpha\): 위치(하단 철근 1.0), \(\beta\): 도막(1.0), \(\gamma\): 크기(D19 이하 0.8, D22 이상 1.0). 모자라면 갈고리 정착 \(l_{dh} = 0.24\beta d_b f_y/(\lambda\sqrt{f_{ck}})\)(<code>CB.rc.ldh</code>)를 쓴다. 계수와 상한은 현행 KDS 14 20 52를 확인할 것.</div></div></div>
+    <p>F-1의 9-D19(간격 281 mm)는 \(c = \min(75 + 9.6,\ 281/2) = 84.6\) mm, \((c + 0)/d_b = 4.4 \to 2.5\)이므로 \(l_d = 0.90 \times 19.1 \times 500/\sqrt{30} \times 0.8/2.5 = 502\) mm ≤ 875 mm로 직선 정착이 <b>OK</b>입니다. D25를 쓰면 \(\gamma = 1.0\)이고 \(l_d = 0.90 \times 25.4 \times 500/\sqrt{30} \times 1.0/2.5 = 835\) mm로 여유가 거의 없어집니다. 기초판에서 가는 철근을 촘촘히 두는 이유가 여기에 있습니다.</p>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="bearing">
+    <h2>기둥–기초 하중 전달: 지압과 다월 철근</h2>
+    <div class="problem"><strong>기둥 철근은 기초판 위에서 끝나는가</strong>
+      <p>기둥의 축력은 기둥 바닥의 콘크리트 지압과 기둥 주근(또는 이를 잇는 다월 철근)으로 기초판에 넘어갑니다. 콘크리트가 맡는 부분은 지압 강도로 확인하고, 나머지와 모멘트·인장은 철근이 넘겨야 합니다.</p></div>
+    <div class="callout def"><strong>원리 13.7 (지압 강도, KDS 14 20 20 / ACI 318 형태)</strong>
+      <div class="formula">$$\phi B_n = \phi\,(0.85 f_{ck} A_1)\sqrt{\frac{A_2}{A_1}}, \qquad \sqrt{\frac{A_2}{A_1}} \le 2, \qquad \phi = 0.65$$<div class="where">\(A_1\): 재하 면적(기둥 단면), \(A_2\): 지지면 안에 들어가며 재하 면적과 닮은꼴·같은 중심인 가장 큰 면적. 재하면에서 1(연직) : 2(수평) 기울기로 내려간 절두체의 아랫면이다. 둘레 콘크리트가 재하 부분을 구속해 기초판의 <span class="term">지압 강도</span><span class="en">(bearing strength)</span>는 기둥 쪽보다 최대 2배 크다. 기둥 쪽(\(\sqrt{A_2/A_1} = 1\))과 기초판 쪽 중 작은 값이 지배한다. 기둥과 기초판을 잇는 <span class="term">다월 철근</span><span class="en">(dowel bar)</span>은 지압이 충분해도 \(A_s \ge 0.005A_g\)(기둥 총단면적) 이상 둔다(형태).</div></div></div>
+    <figure class="diagram" id="fig-ft-bear">
+      <svg viewBox="0 0 860 280" role="img" aria-label="기둥 아래 지압 면적 A1과 1대2 기울기 절두체의 아랫면 A2, 다월 철근">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(70,40)">
+          <text x="0" y="-8" class="t" style="font-weight:700">단면</text>
+          <rect x="190" y="0" width="80" height="90" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="0" y="90" width="460" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M190 90 L 110 130 L 350 130 L 270 90 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <text x="230" y="122" class="t-mono" text-anchor="middle" style="fill:var(--accent)">1 : 2</text>
+          <line x1="110" y1="140" x2="350" y2="140" style="stroke:var(--accent)" marker-start="url(#ft-ah-acc)" marker-end="url(#ft-ah-acc)"/>
+          <text x="230" y="156" class="t-mono" text-anchor="middle" style="fill:var(--accent)">A₂의 한 변 = c + 4·(깊이)</text>
+          <g style="stroke:var(--compression);stroke-width:2.6"><line x1="202" y1="10" x2="202" y2="176"/><line x1="258" y1="10" x2="258" y2="176"/></g>
+          <path d="M202 176 L 170 176 M258 176 L 290 176" style="stroke:var(--compression);stroke-width:2.6"/>
+          <text x="300" y="40" class="t-mono" style="fill:var(--compression)">다월 철근(정착 l<tspan baseline-shift="sub" font-size="8">dc</tspan>)</text>
+          <line x1="30" y1="188" x2="430" y2="188" style="stroke:var(--tension);stroke-width:2.4"/>
+          <text x="230" y="80" class="t-mono" text-anchor="middle">A₁</text>
+        </g>
+        <g transform="translate(600,50)">
+          <text x="0" y="-18" class="t" style="font-weight:700">평면</text>
+          <rect x="0" y="0" width="200" height="200" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="40" y="40" width="120" height="120" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <rect x="80" y="80" width="40" height="40" style="fill:var(--text-dim);opacity:.65"/>
+          <text x="100" y="104" class="t-mono" text-anchor="middle" style="fill:var(--bg-elev)">A₁</text>
+          <text x="100" y="56" class="t-mono" text-anchor="middle" style="fill:var(--accent)">A₂</text>
+          <text x="100" y="190" class="t-mono" text-anchor="middle">기초판(지지면)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-5.</b> 지압 면적. \(A_2\)는 기둥 바닥에서 1 : 2로 퍼지는 절두체가 기초판 안에 들어가는 한 가장 큰 아랫면이다. \(\sqrt{A_2/A_1}\)는 2를 넘지 못하므로 \(A_2 \ge 4A_1\)이면 더 넓어도 이득이 없다. 기둥 주근과 겹치는 다월 철근은 기초판 안에 압축 정착 길이만큼 들어가고, 끝은 바닥 철근 위에 갈고리로 얹어 시공 중 위치를 잡는다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ft-bear">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>기둥–기초 지압 검토</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ft-cv-br" aria-label="기둥, 지압 절두체, 기초판과 지압 강도 막대"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시</span><div class="seg" id="ft-br-pre"><button data-value="f1" class="on">F-1</button><button data-value="c1">C1 · 매트</button><button data-value="hi">고강도 기둥</button></div></div>
+          <label class="ctrl"><span>기둥 c <output id="ft-br-c-out"></output></span><input type="range" id="ft-br-c" min="300" max="1200" step="50" value="500"></label>
+          <label class="ctrl"><span>기초 폭 B <output id="ft-br-B-out"></output></span><input type="range" id="ft-br-B" min="1.0" max="8.0" step="0.1" value="2.4"></label>
+          <label class="ctrl"><span>기초 두께 h <output id="ft-br-h-out"></output></span><input type="range" id="ft-br-h" min="300" max="2500" step="50" value="600"></label>
+          <label class="ctrl"><span><i style="font-style:normal">기둥 f<sub>ck</sub></i> <output id="ft-br-fc-out"></output></span><input type="range" id="ft-br-fc" min="21" max="60" step="1" value="30"></label>
+          <label class="ctrl"><span><i style="font-style:normal">기초 f<sub>ck</sub></i> <output id="ft-br-ff-out"></output></span><input type="range" id="ft-br-ff" min="21" max="40" step="1" value="30"></label>
+          <label class="ctrl"><span><i style="font-style:normal">계수 축력 P<sub>u</sub></i> <output id="ft-br-P-out"></output></span><input type="range" id="ft-br-P" min="500" max="20000" step="20" value="2160"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">√(A₂/A₁)</span><span class="v" id="ft-br-o-r">—</span></div>
+        <div class="stat"><span class="k">φB<sub>n</sub> 기둥 · 기초</span><span class="v" id="ft-br-o-bn">—</span></div>
+        <div class="stat"><span class="k">다월 최소 0.005A<sub>g</sub></span><span class="v" id="ft-br-o-dw">—</span></div>
+        <div class="stat"><span class="k">초과분 철근</span><span class="v" id="ft-br-o-ex">—</span></div>
+      </div>
+      <div class="ft-msg" id="ft-br-msg"></div>
+      <div class="sim-note">해볼 것: F-1은 기둥 쪽 지압 4,144 kN이 P<sub>u</sub> 2,160 kN의 두 배 가까이라 다월은 최소량(1,250 mm² → 4-D22)이면 됩니다 · "C1 · 매트"는 9,000 kN을 기둥 쪽 10,608 kN으로 받습니다 · "고강도 기둥"(f<sub>ck</sub> 50 기둥, 30 기초)에서는 기초 쪽이 지배하는지 보세요 — 기초판의 구속 효과(최대 2배)가 강도 차이를 메웁니다 · 지압이 모자라면 초과분을 다월이 φ = 0.65로 넘긴다고 보고 철근량을 냅니다(교육용) · 모델: 원리 13.7, 기둥은 기초판 중앙, A₂ 한 변 = min(B, c + 4h).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="design">
+    <h2>독립 기초 설계를 한 번에</h2>
+    <div class="problem"><strong>순서가 곧 설계다</strong>
+      <p>앞의 다섯 절을 하나로 이으면 독립 기초 설계의 표준 순서가 됩니다: 하중 → 면적(사용 하중) → 계수 접지압 → 두께(뚫림·1방향 전단) → 철근(휨·최소·간격) → 정착 → 지압과 다월. 아래 설계기는 이 순서를 단계 카드로 보여 주고, 입력 하나를 바꾸면 뒤 단계가 모두 다시 계산됩니다.</p></div>
+    <div class="sim" id="sim-ft-design">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>독립 기초 설계기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ft-cv-ds" aria-label="설계된 독립 기초의 평면 배근과 단면, 계수 접지압"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>고정 하중 D <output id="ft-ds-D-out"></output></span><input type="range" id="ft-ds-D" min="200" max="4000" step="50" value="1000"></label>
+          <label class="ctrl"><span>활하중 L <output id="ft-ds-L-out"></output></span><input type="range" id="ft-ds-L" min="0" max="2500" step="50" value="600"></label>
+          <label class="ctrl"><span><i style="font-style:normal">순 허용 지지력 q<sub>a</sub></i> <output id="ft-ds-qa-out"></output></span><input type="range" id="ft-ds-qa" min="100" max="600" step="10" value="300"></label>
+          <label class="ctrl"><span>기둥 c <output id="ft-ds-c-out"></output></span><input type="range" id="ft-ds-c" min="300" max="900" step="50" value="500"></label>
+          <label class="ctrl"><span>두께 h <output id="ft-ds-h-out"></output></span><input type="range" id="ft-ds-h" min="300" max="1500" step="50" value="600"></label>
+          <div class="ctrl"><span>철근</span><div class="seg" id="ft-ds-bar"><button data-value="D16">D16</button><button data-value="D19" class="on">D19</button><button data-value="D22">D22</button><button data-value="D25">D25</button></div></div>
+          <div class="btn-row"><button class="btn" id="ft-ds-auto">최소 두께로 맞추기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">B × B</span><span class="v" id="ft-ds-o-B">—</span></div>
+        <div class="stat"><span class="k">h · d</span><span class="v" id="ft-ds-o-h">—</span></div>
+        <div class="stat"><span class="k">배근(두 방향)</span><span class="v" id="ft-ds-o-bar">—</span></div>
+        <div class="stat"><span class="k">콘크리트 · 철근</span><span class="v" id="ft-ds-o-q">—</span></div>
+      </div>
+      <ol class="ft-card" id="ft-ds-steps"></ol>
+      <div class="sim-note">해볼 것: 기본값은 예제 13.1–13.3의 F-1(2.4 m, h 600, 9-D19)입니다. 여기서는 d = 600 − 75 − 19 = 506 mm로 계산해 예제(보수적으로 d = 500)와 숫자가 조금 다릅니다 · "최소 두께로 맞추기"는 전단을 통과하는 가장 얇은 h(50 mm 단위)를 찾습니다 · 철근을 D25로 바꾸면 정착이 빠듯해지는 것을 보세요 · q<sub>a</sub>를 100 kPa로 내리면 기초가 4 m를 넘어 커지고, 이웃 기초와 겹치면 복합 기초·전면 기초를 생각합니다 · 모델: 정의 13.1(순 허용 지지력), 원리 13.2–13.7, d = h − 75 − d<sub>b</sub>, f<sub>ck</sub> = 30 MPa, SD500, B는 0.1 m 단위 올림, <code>CB.rc.asReq</code>·<code>flexure</code>·<code>Vc</code>·<code>ldh</code>. 교육용이며 실제 설계용이 아닙니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="eccentric">
+    <h2>편심 하중과 접지압</h2>
+    <div class="problem"><strong>기둥이 모멘트도 내려보낸다면</strong>
+      <p>골조 기둥은 축력과 함께 휨모멘트를 기초에 전합니다(10장, StructureBook 4장). <span class="term">편심 하중</span><span class="en">(eccentric load)</span>: 모멘트 \(M\)과 축력 \(P\)는 축력이 중심에서 \(e = M/P\)만큼 벗어난 것과 같습니다. 접지압은 한쪽이 커지고 반대쪽이 작아지며, 편심이 크면 한쪽 끝이 들립니다.</p></div>
+    <div class="callout def"><strong>원리 13.8 (편심 하중의 접지압)</strong> 길이 \(B\)(모멘트 방향), 폭 \(L\)인 강체 기초에서 \(e = M/P\)일 때
+      <div class="formula">$$e \le \frac{B}{6}: \quad q_{max,min} = \frac{P}{BL}\left(1 \pm \frac{6e}{B}\right), \qquad e \gt \frac{B}{6}: \quad q_{max} = \frac{2P}{3L\,(B/2 - e)},\ \ \text{접촉 길이 } 3\Big(\frac{B}{2} - e\Big)$$<div class="where">\(e \le B/6\)이면 합력이 기초 바닥의 가운데 1/3, 곧 <span class="term">핵</span><span class="en">(kern)</span> 안에 있어 접지압이 모두 압축(사다리꼴)이다. 핵을 벗어나면 흙은 인장을 받을 수 없으므로 한쪽이 들리고 남은 부분의 삼각형 압력이 합력과 같은 자리에서 P를 받는다. GeotechBook 13장은 같은 상황을 유효 폭 \(B' = B - 2e\)(마이어호프)로 지지력에 반영했다. 기초 크기를 정할 때는 사용 하중의 \(q_{max} \le q_a\)를, 판 설계에는 계수 하중의 분포를 쓴다.</div></div></div>
+    <figure class="diagram" id="fig-ft-ecc">
+      <svg viewBox="0 0 860 250" role="img" aria-label="편심이 0, B/6 미만, B/6, B/6 초과일 때 접지압 분포의 네 경우">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g class="t" text-anchor="middle" style="font-weight:700"><text x="115" y="36">e = 0</text><text x="320" y="36">e &lt; B/6</text><text x="530" y="36">e = B/6</text><text x="740" y="36">e &gt; B/6</text></g>
+        <g transform="translate(35,60)">
+          <rect x="0" y="40" width="160" height="22" style="fill:var(--surface-2);stroke:var(--text-dim)"/><line x1="80" y1="0" x2="80" y2="36" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#ft-ah-ld)"/>
+          <rect x="0" y="66" width="160" height="40" style="fill:var(--compression);opacity:.22;stroke:var(--compression)"/>
+          <text x="80" y="156" class="t-mono" text-anchor="middle">q = P/A 고르게</text>
+        </g>
+        <g transform="translate(240,60)">
+          <rect x="0" y="40" width="160" height="22" style="fill:var(--surface-2);stroke:var(--text-dim)"/><line x1="100" y1="0" x2="100" y2="36" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#ft-ah-ld)"/>
+          <path d="M0 66 L160 66 L160 122 L0 86 Z" style="fill:var(--compression);fill-opacity:.22;stroke:var(--compression)"/>
+          <text x="80" y="156" class="t-mono" text-anchor="middle">사다리꼴</text>
+        </g>
+        <g transform="translate(450,60)">
+          <rect x="0" y="40" width="160" height="22" style="fill:var(--surface-2);stroke:var(--text-dim)"/><line x1="107" y1="0" x2="107" y2="36" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#ft-ah-ld)"/>
+          <path d="M0 66 L160 66 L160 136 Z" style="fill:var(--compression);fill-opacity:.22;stroke:var(--compression)"/>
+          <text x="80" y="156" class="t-mono" text-anchor="middle">한쪽 0, q<tspan baseline-shift="sub" font-size="8">max</tspan> = 2P/A</text>
+        </g>
+        <g transform="translate(660,60)">
+          <rect x="0" y="40" width="160" height="22" style="fill:var(--surface-2);stroke:var(--text-dim)"/><line x1="125" y1="0" x2="125" y2="36" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#ft-ah-ld)"/>
+          <path d="M65 66 L160 66 L160 150 Z" style="fill:var(--compression);fill-opacity:.22;stroke:var(--compression)"/>
+          <line x1="0" y1="70" x2="62" y2="70" style="stroke:var(--bad);stroke-dasharray:3 3"/>
+          <text x="30" y="90" class="t-mono" text-anchor="middle" style="fill:var(--bad)">들림</text>
+          <text x="60" y="166" class="t-mono" text-anchor="middle">접촉 3(B/2 − e)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-6.</b> 편심에 따른 접지압 분포. 합력의 위치(주황 화살표)와 압력 분포의 도심은 언제나 같은 연직선 위에 있다. 편심이 핵을 넘으면 접촉 면적이 줄어 최대 압력이 빠르게 커진다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ft-ecc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>편심 하중 접지압</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ft-cv-ec" aria-label="기초 단면 위의 하중 위치와 접지압 분포, 핵 범위"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>사용 축력 P <output id="ft-ec-P-out"></output></span><input type="range" id="ft-ec-P" min="200" max="4000" step="20" value="1600"></label>
+          <label class="ctrl"><span>사용 모멘트 M <output id="ft-ec-M-out"></output></span><input type="range" id="ft-ec-M" min="0" max="1500" step="10" value="240"></label>
+          <label class="ctrl"><span>길이 B (모멘트 방향) <output id="ft-ec-B-out"></output></span><input type="range" id="ft-ec-B" min="1.2" max="5.0" step="0.1" value="2.4"></label>
+          <label class="ctrl"><span>폭 L <output id="ft-ec-L-out"></output></span><input type="range" id="ft-ec-L" min="1.2" max="5.0" step="0.1" value="2.4"></label>
+          <label class="ctrl"><span><i style="font-style:normal">허용 지지력 q<sub>a</sub></i> <output id="ft-ec-qa-out"></output></span><input type="range" id="ft-ec-qa" min="100" max="600" step="10" value="300"></label>
+          <div class="ctrl"><span>기둥 위치</span><div class="seg" id="ft-ec-off"><button data-value="0" class="on">중앙</button><button data-value="1">모멘트 반대로 이동</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">e = M/P · B/6</span><span class="v" id="ft-ec-o-e">—</span></div>
+        <div class="stat"><span class="k">q<sub>max</sub> · q<sub>min</sub></span><span class="v" id="ft-ec-o-q">—</span></div>
+        <div class="stat"><span class="k">접촉 길이</span><span class="v" id="ft-ec-o-c">—</span></div>
+        <div class="stat"><span class="k">q<sub>max</sub> / q<sub>a</sub></span><span class="v" id="ft-ec-o-r">—</span></div>
+      </div>
+      <div class="ft-msg" id="ft-ec-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(P 1,600 kN, M 240 kN·m → e = 0.15 m &lt; B/6 = 0.40 m)에서 q<sub>max</sub> = 382, q<sub>min</sub> = 174 kPa입니다. 중심 하중 278 kPa로 크기를 정한 F-1은 q<sub>max</sub>가 q<sub>a</sub>를 넘습니다 · M을 키워 e가 B/6을 넘는 순간 한쪽이 들리는 것을 보세요 · "모멘트 반대로 이동"은 기둥을 e만큼 옮겨 앉혀 상시 모멘트(예: 고정하중의 편심)에 대해 접지압을 고르게 만드는 방법입니다(바람·지진처럼 방향이 바뀌는 모멘트에는 쓸 수 없음) · 모델: 원리 13.8, 강체 기초, 흙은 인장 없음.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="combined">
+    <h2>복합 기초</h2>
+    <div class="problem"><strong>대지 경계에 붙은 기둥</strong>
+      <p>건물 외벽 기둥이 대지 경계에 붙어 있으면 기초판을 기둥 중심에 맞춰 대칭으로 펼 수 없습니다. 한쪽으로만 내민 기초는 큰 편심을 받습니다. 해법은 안쪽 기둥과 한 판으로 묶는 것입니다. 두 기둥 하중의 <b>합력 위치</b>에 기초판의 도심을 맞추면 접지압이 다시 고르게 됩니다.</p></div>
+    <div class="callout def"><strong>원리 13.9 (복합 기초의 <span class="term">강체 기초 가정</span><span class="en">(rigid footing assumption)</span>)</strong> 기둥 하중 \(P_1\), \(P_2\)(대지 경계에서 \(x_1\), \(x_2\))의 합력 위치 \(\bar x = (P_1 x_1 + P_2 x_2)/(P_1 + P_2)\)에 길이 \(L = 2\bar x\)인 직사각형 기초의 도심을 맞추면, 강체 기초의 접지압은 고르게
+      <div class="formula">$$q = \frac{P_1 + P_2}{BL}, \qquad w = qB \ \text{(kN/m)}$$<div class="where">가 된다. 길이 방향으로는 두 기둥을 지점으로 하고 위로 \(w\)를 받는 보(내민 끝이 있는 연속보를 뒤집은 것)로 보고 <code>CB.beam</code>으로 전단력도·휨모멘트도를 그린다. 기둥 사이에는 위가 인장(상부 철근), 기둥 아래와 내민 부분은 아래가 인장이다. 폭 방향으로는 기둥 아래 폭 \(c + d\) 안팎의 가로 보가 접지압을 기둥으로 모은다(형태). 기초판이 유연하거나 흙이 연약하면 강체 가정 대신 <span class="term">지반 반력 계수</span><span class="en">(modulus of subgrade reaction)</span> \(k_s\)로 흙을 스프링으로 본 <span class="term">탄성 지반 위 보</span><span class="en">(beam on elastic foundation)</span>로 해석한다.</div></div></div>
+    <figure class="diagram" id="fig-ft-comb">
+      <svg viewBox="0 0 860 300" role="img" aria-label="대지 경계의 복합 기초, 합력 위치와 고른 접지압, 휨모멘트도">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <line x1="0" y1="0" x2="0" y2="240" style="stroke:var(--bad);stroke-width:1.6;stroke-dasharray:6 3"/>
+          <text x="6" y="252" class="t-mono" style="fill:var(--bad)">대지 경계</text>
+          <rect x="4" y="30" width="24" height="60" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="472" y="30" width="30" height="60" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="0" y="90" width="620" height="30" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="16" y1="2" x2="16" y2="28" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#ft-ah-ld)"/><text x="24" y="14" class="t-mono" style="fill:var(--accent-2)">P₁</text>
+          <line x1="487" y1="2" x2="487" y2="28" style="stroke:var(--accent-2);stroke-width:2.8" marker-end="url(#ft-ah-ld)"/><text x="495" y="14" class="t-mono" style="fill:var(--accent-2)">P₂</text>
+          <line x1="310" y1="60" x2="310" y2="88" style="stroke:var(--accent);stroke-width:1.6;stroke-dasharray:4 3"/>
+          <text x="310" y="54" class="t-mono" text-anchor="middle" style="fill:var(--accent)">합력 위치 = 도심 = L/2</text>
+          <g style="stroke:var(--compression);stroke-width:1.2"><line x1="10" y1="150" x2="10" y2="124" marker-end="url(#ft-ah-t)"/><line x1="90" y1="150" x2="90" y2="124" marker-end="url(#ft-ah-t)"/><line x1="170" y1="150" x2="170" y2="124" marker-end="url(#ft-ah-t)"/><line x1="250" y1="150" x2="250" y2="124" marker-end="url(#ft-ah-t)"/><line x1="330" y1="150" x2="330" y2="124" marker-end="url(#ft-ah-t)"/><line x1="410" y1="150" x2="410" y2="124" marker-end="url(#ft-ah-t)"/><line x1="490" y1="150" x2="490" y2="124" marker-end="url(#ft-ah-t)"/><line x1="570" y1="150" x2="570" y2="124" marker-end="url(#ft-ah-t)"/><line x1="612" y1="150" x2="612" y2="124" marker-end="url(#ft-ah-t)"/></g>
+          <rect x="0" y="150" width="620" height="3" style="fill:var(--compression)"/>
+          <text x="640" y="140" class="t-mono" style="fill:var(--compression)">w = qB</text>
+          <line x1="0" y1="200" x2="620" y2="200" class="s-axis"/>
+          <path d="M0 200 L16 198 Q 250 140 487 214 Q 560 206 620 200" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="250" y="164" class="t-mono" text-anchor="middle" style="fill:var(--accent)">위 인장(상부 철근)</text>
+          <text x="520" y="234" class="t-mono" text-anchor="middle" style="fill:var(--accent)">아래 인장</text>
+          <text x="660" y="204" class="t-mono">M</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-7.</b> 대지 경계에 붙은 복합 기초. 기초판 길이를 합력 위치의 두 배로 하면 도심이 합력과 겹쳐 접지압이 고르다. 휨모멘트도는 인장측에 그렸다(MechanicsBook 규약): 기둥 사이는 위가, 안쪽 기둥 아래와 내민 끝은 아래가 인장이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ft-comb">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>복합 기초의 접지압과 휨모멘트도</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view ft-stack">
+          <div><canvas id="ft-cv-cb1" aria-label="복합 기초 단면, 기둥 하중과 접지압 분포"></canvas><span class="ft-cap">접지압(계수)</span></div>
+          <div><canvas id="ft-cv-cb2" aria-label="복합 기초의 전단력도와 휨모멘트도"></canvas><span class="ft-cap">V · M (인장측)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>바깥 기둥 P₁(사용) <output id="ft-cb-P1-out"></output></span><input type="range" id="ft-cb-P1" min="200" max="3000" step="50" value="900"></label>
+          <label class="ctrl"><span>안쪽 기둥 P₂(사용) <output id="ft-cb-P2-out"></output></span><input type="range" id="ft-cb-P2" min="200" max="4000" step="50" value="1300"></label>
+          <label class="ctrl"><span>기둥 중심 간격 <output id="ft-cb-s-out"></output></span><input type="range" id="ft-cb-s" min="2" max="8" step="0.1" value="4.5"></label>
+          <label class="ctrl"><span>기초 길이 L <output id="ft-cb-L-out"></output></span><input type="range" id="ft-cb-L" min="2.5" max="12" step="0.02" value="5.72"></label>
+          <div class="btn-row"><button class="btn" id="ft-cb-auto">L = 2x̄로 맞추기</button></div>
+          <div class="ctrl"><span>지반 모델</span><div class="seg" id="ft-cb-mode"><button data-value="rigid" class="on">강체 기초</button><button data-value="wink">탄성 지반</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">지반 반력 계수 k<sub>s</sub></i> <output id="ft-cb-k-out"></output></span><input type="range" id="ft-cb-k" min="5" max="200" step="5" value="30"></label>
+          <label class="ctrl"><span>두께 h <output id="ft-cb-h-out"></output></span><input type="range" id="ft-cb-h" min="500" max="2000" step="50" value="1000"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">x̄ · 편심</span><span class="v" id="ft-cb-o-x">—</span></div>
+        <div class="stat"><span class="k">q<sub>u</sub> 최대 · 최소</span><span class="v" id="ft-cb-o-q">—</span></div>
+        <div class="stat"><span class="k">M<sub>u</sub> 위 인장 · 아래 인장</span><span class="v" id="ft-cb-o-m">—</span></div>
+        <div class="stat"><span class="k">상부 철근 소요</span><span class="v" id="ft-cb-o-as">—</span></div>
+      </div>
+      <div class="ft-msg" id="ft-cb-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(예제 13.4)에서 L = 5.72 m이면 접지압이 고르고 기둥 사이 M<sub>u</sub> ≈ −1,177 kN·m입니다 · L을 줄이거나 늘려 합력과 도심이 어긋나면 사다리꼴 접지압이 되는 것을 보세요 · "탄성 지반"으로 바꾸고 k<sub>s</sub>를 내리거나 h를 키우면(강성 기초에 가까움) 강체 가정과 비슷해지고, k<sub>s</sub>를 키우거나 h를 줄이면 접지압이 기둥 아래로 몰려 기둥 사이 모멘트가 줄어듭니다 · 모델: 폭 B = 1.6 m 고정, 계수 하중 = 1.35 × 사용 하중(교육용 평균 하중 계수), 강체는 <code>CB.beam</code>(기둥 = 지점, 위로 선형 분포), 탄성 지반은 <code>CB.beam</code>에 스프링 61개(k<sub>s</sub>BΔx, MN/m³ 입력), E<sub>c</sub> = 27,500 MPa, 균열 무시, 상부 철근은 <code>asReq</code>(b = B, d = h − 100).</div>
+    </div>
+    <div class="callout"><strong>예제 13.4 (대지 경계의 복합 기초, 교육용)</strong> 바깥 기둥 400 × 400(중심이 경계에서 0.2 m), 사용 하중 \(P_1 = 900\) kN, 안쪽 기둥 500 × 500(경계에서 4.7 m), \(P_2 = 1{,}300\) kN, 순 허용 지지력 250 kPa.
+      <ol class="ft-steps">
+        <li><b>합력과 길이.</b> \(\bar x = (900 \times 0.2 + 1{,}300 \times 4.7)/2{,}200 = 2.86\) m → \(L = 5.72\) m. 폭 \(B = 2{,}200/(250 \times 5.72) = 1.54\) → <b>1.6 m</b>(사용 접지압 240 kPa).</li>
+        <li><b>계수 접지압.</b> 두 기둥 모두 \(P_u \approx 1.35P\)라 하면(교육용) \(w_u = 1.35 \times 2{,}200/5.72 = 519\) kN/m, \(q_u = 325\) kPa.</li>
+        <li><b>부재력(<code>CB.beam</code>).</b> 기둥 반력 1,214 kN·1,756 kN(= 1.35P, 검산), 기둥 사이 최대 \(M_u = -1{,}177\) kN·m(경계에서 2.34 m, 위 인장), 안쪽 기둥 위 \(M_u = +270\) kN·m(아래 인장), 최대 전단 약 1,226 kN.</li>
+        <li><b>철근.</b> \(h = 1{,}000\), \(d = 900\) mm라 하면 상부 \(A_s\) = asReq(1,177, 1,600, 900) = 3,144 mm² → 7-D25(3,547 mm²). 하부(안쪽 기둥 아래)는 709 mm²로 최소 철근 \(0.0016 \times 1{,}600 \times 1{,}000 = 2{,}560\) mm²가 지배. 1방향 전단은 안쪽 기둥면에서 \(d\) 떨어진 곳의 \(V_u \approx 655\) kN ≤ \(\phi V_c = 986\) kN OK.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="pile-cap">
+    <h2>말뚝 기초: 말뚝 머리 반력과 캡</h2>
+    <div class="problem"><strong>땅 대신 말뚝이 받친다</strong>
+      <p>B-10 부지(G-10)는 GL −11 m 매트 바닥 아래에 연약 점토가 있어, 기둥 하중을 PHC φ600 말뚝으로 풍화암까지 내립니다(GeotechBook 14장). 이제 기초판은 고른 접지압이 아니라 몇 개의 <b>집중 반력</b>(말뚝 머리)을 받습니다. 캡은 그 반력을 기둥으로 모으는 짧고 두꺼운 부재입니다.</p></div>
+    <div class="callout def"><strong>원리 13.10 (강체 캡의 말뚝 머리 반력)</strong> 캡이 충분히 강하고 말뚝이 같은 강성이면 캡은 강체로 움직이므로 말뚝 \(i\)(무리 도심에서 \(x_i\), \(y_i\))의 반력은
+      <div class="formula">$$R_i = \frac{P}{n} + \frac{M_y\,x_i}{\sum x_j^2} + \frac{M_x\,y_i}{\sum y_j^2}$$<div class="where">\(P\): 기둥 축력 + 캡 자중·흙, \(n\): 말뚝 수, \(M_x\), \(M_y\): 무리 도심에 대한 모멘트. 사용 하중의 \(R_{i,max}\)를 말뚝 <b>허용 지지력</b>(B-10 PHC φ600: 1,500 kN/본)과, \(R_{i,min}\)을 0(인발이 없게) 또는 허용 인발력과 비교한다. 캡 설계에는 계수 하중의 <span class="term">말뚝 머리 반력</span><span class="en">(pile reaction)</span>을 쓴다. GeotechBook 14장 정의 14.10과 같은 식이다.</div></div></div>
+    <figure class="diagram" id="fig-ft-cap">
+      <svg viewBox="0 0 860 330" role="img" aria-label="B-10 기둥 C1 아래 말뚝 다섯 본 캡의 평면 배치와 단면">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(40,30)">
+          <text x="0" y="0" class="t" style="font-weight:700">평면(교육용 독립 캡)</text>
+          <rect x="20" y="20" width="266" height="266" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:var(--bg-elev);stroke:var(--accent);stroke-width:1.6"><circle cx="153" cy="153" r="21"/><circle cx="64" cy="64" r="21"/><circle cx="242" cy="64" r="21"/><circle cx="64" cy="242" r="21"/><circle cx="242" cy="242" r="21"/></g>
+          <rect x="125" y="125" width="56" height="56" style="fill:var(--text-dim);opacity:.65"/>
+          <line x1="153" y1="153" x2="242" y2="242" style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#ft-ah-ld)"/>
+          <text x="214" y="196" class="t-mono" style="fill:var(--accent-2)">s = 1.8 m</text>
+          <line x1="64" y1="274" x2="242" y2="274" style="stroke:var(--text-dim)" marker-start="url(#ft-ah-t)" marker-end="url(#ft-ah-t)"/>
+          <text x="153" y="270" class="t-mono" text-anchor="middle">2.55 m</text>
+          <line x1="300" y1="20" x2="300" y2="286" style="stroke:var(--text-dim)" marker-start="url(#ft-ah-t)" marker-end="url(#ft-ah-t)"/>
+          <text x="306" y="156" class="t-mono">3.8 m</text>
+        </g>
+        <g transform="translate(400,40)">
+          <text x="0" y="-10" class="t" style="font-weight:700">단면(대각선 방향 아님, x 방향)</text>
+          <rect x="172" y="10" width="56" height="60" style="fill:var(--text-dim);opacity:.65"/>
+          <rect x="0" y="70" width="400" height="98" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:var(--bg-elev);stroke:var(--accent);stroke-width:1.4"><rect x="40" y="160" width="42" height="66"/><rect x="179" y="160" width="42" height="66"/><rect x="318" y="160" width="42" height="66"/></g>
+          <line x1="20" y1="150" x2="380" y2="150" style="stroke:var(--tension);stroke-width:2.6"/>
+          <path d="M 200 74 L 61 150 M 200 74 L 339 150" style="stroke:var(--compression);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="200" y="120" class="t-mono" text-anchor="middle" style="fill:var(--compression)">스트럿(14장)</text>
+          <line x1="414" y1="70" x2="414" y2="168" style="stroke:var(--text-dim)" marker-start="url(#ft-ah-t)" marker-end="url(#ft-ah-t)"/><text x="420" y="124" class="t-mono">h</text>
+          <text x="200" y="274" class="t-mono" text-anchor="middle">말뚝 머리 100 mm 매입 · 바닥 철근은 말뚝 머리 위</text>
+          <g style="stroke:var(--accent-2);stroke-width:1.6"><line x1="61" y1="256" x2="61" y2="230" marker-end="url(#ft-ah-ld)"/><line x1="200" y1="256" x2="200" y2="230" marker-end="url(#ft-ah-ld)"/><line x1="339" y1="256" x2="339" y2="230" marker-end="url(#ft-ah-ld)"/></g>
+        </g>
+      </svg>
+      <figcaption><b>그림 13-8.</b> C1 아래 다섯 본 "주사위" 배치(GeotechBook 14장): 가운데 한 본과 중심에서 \(s = 3D = 1.8\) m 떨어진 네 모서리 말뚝(좌표 ±1.27 m). 이 장의 교육용 독립 캡은 말뚝 중심에서 가장자리까지 0.6 m(1D)를 두어 3.8 × 3.8 m다. 실제 B-10에서는 이 캡이 두께 2.5 m의 매트 일부다. 단면의 점선은 캡 안의 하중 경로(14장 스트럿–타이 모델)다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ft-pile">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>말뚝 머리 반력 분배</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ft-cv-pl" aria-label="말뚝 캡 평면, 말뚝별 반력 크기와 허용 지지력 판정"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>배치</span><div class="seg" id="ft-pl-lay"><button data-value="4">2 × 2</button><button data-value="5" class="on">주사위 5</button><button data-value="6">3 × 2</button><button data-value="9">3 × 3</button></div></div>
+          <label class="ctrl"><span>말뚝 간격 s / D <output id="ft-pl-s-out"></output></span><input type="range" id="ft-pl-s" min="2.5" max="5" step="0.1" value="3"></label>
+          <label class="ctrl"><span>사용 축력 P <output id="ft-pl-P-out"></output></span><input type="range" id="ft-pl-P" min="1000" max="12000" step="50" value="6700"></label>
+          <label class="ctrl"><span><i style="font-style:normal">사용 모멘트 M<sub>y</sub></i> <output id="ft-pl-My-out"></output></span><input type="range" id="ft-pl-My" min="-3000" max="3000" step="10" value="222"></label>
+          <label class="ctrl"><span><i style="font-style:normal">사용 모멘트 M<sub>x</sub></i> <output id="ft-pl-Mx-out"></output></span><input type="range" id="ft-pl-Mx" min="-3000" max="3000" step="10" value="0"></label>
+          <div class="ctrl"><span>캡 자중(h 1.4 m)</span><div class="seg" id="ft-pl-w"><button data-value="0" class="on">제외</button><button data-value="1">포함</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">R<sub>max</sub> · R<sub>min</sub>(사용)</span><span class="v" id="ft-pl-o-r">—</span></div>
+        <div class="stat"><span class="k">허용 1,500 kN 대비</span><span class="v" id="ft-pl-o-u">—</span></div>
+        <div class="stat"><span class="k">계수 반력(×1.35)</span><span class="v" id="ft-pl-o-f">—</span></div>
+        <div class="stat"><span class="k">캡 크기</span><span class="v" id="ft-pl-o-sz">—</span></div>
+      </div>
+      <div class="ft-msg" id="ft-pl-msg"></div>
+      <div class="sim-note">해볼 것: 기본값은 C1(사용 축력 6,700 kN, 사용 모멘트 300/1.35 ≈ 222 kN·m)의 주사위 배치로 R = 1,340 kN 안팎(최대 1,384 kN)입니다 · M<sub>y</sub>를 키워 모서리 말뚝이 1,500 kN을 넘거나 반대쪽이 인발(음수)이 되는 순간을 찾아 보세요 · 간격을 넓히면 같은 모멘트에 반력 차이가 줄어듭니다 · 캡 자중(두께 1.4 m, 24 kN/m³)을 켜면 말뚝마다 약 100 kN이 더해집니다 · 모델: 원리 13.10, 강체 캡, D = 0.6 m, 가장자리 거리 1D, 계수 반력 = 1.35 × 사용(교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 12 -->
+  <section id="pile-cap-shear">
+    <h2>말뚝 캡의 전단: 기둥 펀칭과 말뚝 펀칭</h2>
+    <div class="problem"><strong>위험 단면 안쪽의 말뚝은 전단을 만들지 않는다</strong>
+      <p>독립 기초에서는 위험 단면 바깥의 접지압이 전단력이었습니다. 말뚝 캡에서는 위험 단면 바깥에 있는 <b>말뚝 반력</b>이 전단력입니다. 말뚝이 위험 단면 바로 위에 걸쳐 있으면 어떻게 셀까요? 캡이 두꺼워져 말뚝이 위험 단면 안으로 들어오면, 하중은 기둥에서 말뚝 머리로 비스듬한 압축대(스트럿)를 따라 직접 흐르고 전단 계산은 의미를 잃습니다. 그 경계를 넘어서면 14장의 스트럿–타이 모델이 필요합니다.</p></div>
+    <div class="callout def"><strong>원리 13.11 (말뚝 캡의 전단, ACI 318 형태)</strong>
+      <ol class="ft-steps">
+        <li><b>말뚝 반력의 계산.</b> 말뚝 중심이 위험 단면 바깥으로 \(D_p/2\) 이상이면 반력 전부를, 안쪽으로 \(D_p/2\) 이상이면 0을, 그 사이는 직선 보간한 몫을 전단력에 넣는다(\(D_p\): 말뚝 지름).</li>
+        <li><b>기둥 펀칭.</b> 기둥면에서 \(d/2\)의 둘레 \(b_0\), 원리 13.4의 \(v_c\).</li>
+        <li><b><span class="term">말뚝 펀칭</span><span class="en">(pile punching)</span>.</b> 말뚝 둘레 \(d/2\)의 원, 모서리 말뚝은 캡 가장자리로 잘린 둘레(교육용: 1/4 원 + 가장자리까지 두 직선).</li>
+        <li><b>1방향 전단.</b> 기둥면에서 \(d\), 캡 전체 폭.</li>
+        <li><b>깊이.</b> 바닥 철근 위 깊이 300 mm 이상. 말뚝이 위험 단면 안으로 들어오는 두꺼운 캡은 깊은 부재로 보고 스트럿–타이 모델(14장)로 검토할 수 있다.</li>
+      </ol></div>
+    <div class="sim" id="sim-ft-cappunch">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>말뚝 캡 펀칭 검토 (C1, 5본)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ft-cv-cp" aria-label="말뚝 캡 평면의 기둥 펀칭 둘레와 말뚝별 전단 기여율, 검토 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>캡 두께 h <output id="ft-cp-h-out"></output></span><input type="range" id="ft-cp-h" min="800" max="2600" step="50" value="1400"></label>
+          <label class="ctrl"><span>말뚝 간격 s <output id="ft-cp-s-out"></output></span><input type="range" id="ft-cp-s" min="1.5" max="3.0" step="0.05" value="1.8"></label>
+          <label class="ctrl"><span><i style="font-style:normal">계수 축력 P<sub>u</sub></i> <output id="ft-cp-P-out"></output></span><input type="range" id="ft-cp-P" min="3000" max="14000" step="100" value="9000"></label>
+          <label class="ctrl"><span><i style="font-style:normal">계수 모멘트 M<sub>u</sub></i> <output id="ft-cp-M-out"></output></span><input type="range" id="ft-cp-M" min="0" max="3000" step="10" value="300"></label>
+          <div class="ctrl"><span><i style="font-style:normal">크기 효과 λ<sub>s</sub></i></span><div class="seg" id="ft-cp-ls"><button data-value="off" class="on">끔</button><button data-value="on">켬</button></div></div>
+          <div class="ctrl"><span>보기</span><div class="seg" id="ft-cp-view"><button data-value="col" class="on">기둥 펀칭</button><button data-value="one">1방향</button><button data-value="pile">말뚝 펀칭</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">d · b₀</span><span class="v" id="ft-cp-o-d">—</span></div>
+        <div class="stat"><span class="k">기둥 펀칭 V<sub>u</sub>/φV<sub>c</sub></span><span class="v" id="ft-cp-o-col">—</span></div>
+        <div class="stat"><span class="k">1방향 V<sub>u</sub>/φV<sub>c</sub></span><span class="v" id="ft-cp-o-one">—</span></div>
+        <div class="stat"><span class="k">모서리 말뚝 펀칭</span><span class="v" id="ft-cp-o-pile">—</span></div>
+      </div>
+      <div class="ft-msg" id="ft-cp-msg"></div>
+      <div class="sim-note">해볼 것: h = 1,400 mm(d = 1,200)에서 모서리 말뚝 중심이 임계 둘레 바깥 0.27 m라 반력의 95 %가 전단에 들어갑니다 · h를 1,600 mm 이상으로 키우면 말뚝이 둘레 안으로 들어와 기둥 펀칭 전단이 빠르게 0으로 줄어드는 것을 보세요 — B-10 매트(2.5 m)는 이 상태입니다 · h를 1,000 mm로 줄이면 1방향 단면 바깥에도 말뚝이 남아 1방향 전단이 생깁니다 · 크기 효과를 켜면 두꺼운 캡의 강도가 크게 줄어듭니다 · 모델: 원리 13.11, d = h − 200 mm(말뚝 매입 100 + 철근 중심까지 100, 교육용), 캡 3.8 m(간격에 따라 2·0.707s + 1.2 m), 위험 단면 바깥 거리는 정사각형 둘레까지의 거리 max(|x|, |y|) − (c/2 + d/2)로 잰 교육용 근사, 반력은 원리 13.10.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 13 -->
+  <section id="b10-cap">
+    <h2>B-10 C1 아래 말뚝 5본 캡</h2>
+    <p>지금까지의 도구로 B-10 기둥 C1 아래의 캡을 설계해 봅니다. B-10에서는 이 캡이 2.5 m 매트의 일부이지만, 매트가 없는 <b>독립 캡이라면</b> 얼마나 두꺼워야 하는지를 먼저 정하고 매트와 비교합니다.</p>
+    <div class="callout"><strong>예제 13.5 (C1의 5본 캡, 교육용)</strong> \(P_u = 9{,}000\) kN, \(M_u = 300\) kN·m(10장), 사용 축력 6,700 kN, PHC φ600, 주사위 배치 \(s = 1.8\) m(모서리 말뚝 좌표 ±1.273 m), 캡 3.8 × 3.8 m, \(f_{ck} = 30\) MPa, SD500.
+      <ol class="ft-steps">
+        <li><b>말뚝 반력(사용).</b> \(6{,}700/5 = 1{,}340\) kN, 모멘트 222 kN·m에 \(\sum x^2 = 4 \times 1.273^2 = 6.48\) m² → ±43.6 kN → 최대 1,384 kN ≤ 1,500 kN <b>OK</b>(GeotechBook 14장과 같은 결과). 캡 자중(약 485 kN, 말뚝당 97 kN)을 넣으면 1,481 kN으로 여유가 거의 없다.</li>
+        <li><b>말뚝 반력(계수).</b> \(9{,}000/5 = 1{,}800\) kN, \(\pm 300 \times 1.273/6.48 = \pm 58.9\) kN → 최대 \(R_u = 1{,}859\) kN.</li>
+        <li><b>두께 가정.</b> \(h = 1{,}400\) mm, \(d = 1{,}200\) mm(말뚝 매입 100, 철근 중심까지 100). 바닥 철근 위 깊이 300 mm 이상 OK.</li>
+        <li><b>기둥 펀칭.</b> 임계 둘레 반폭 \(0.4 + 0.6 = 1.0\) m, \(b_0 = 4 \times 2{,}000 = 8{,}000\) mm. 모서리 말뚝 중심은 둘레 바깥 0.273 m(\(D_p/2 = 0.3\) m보다 작음) → 몫 \((0.273 + 0.3)/0.6 = 0.955\). 가운데 말뚝은 기둥 바로 아래라 0. \(V_u = 4 \times 1{,}800 \times 0.955 = 6{,}874\) kN. \(\phi V_c = 0.75 \times 1.81 \times 8{,}000 \times 1{,}200 = 13{,}014\) kN <b>OK</b>(크기 효과 \(\lambda_s = 0.59\)를 넣어도 7,642 kN OK).</li>
+        <li><b>1방향 전단.</b> 위험 단면이 기둥 중심에서 \(0.4 + 1.2 = 1.6\) m. 모서리 말뚝 중심(1.273 m)은 단면 안쪽 0.327 m(\(\ge D_p/2\)) → 전단 0. 말뚝이 모두 기둥 쪽에 있어 하중은 경사 압축대로 직접 흐른다.</li>
+        <li><b>모서리 말뚝 펀칭.</b> \(b_0 = \pi(600 + 1{,}200)/4 + 2 \times 600 = 2{,}614\) mm → \(\phi V_c = 0.75 \times 1.81 \times 2{,}614 \times 1{,}200 = 4{,}252\) kN ≥ 1,859 kN <b>OK</b>.</li>
+        <li><b>휨(기둥면).</b> 한쪽 모서리 말뚝 두 본: \(M_u = 2 \times 1{,}859 \times (1.273 - 0.4) = 3{,}245\) kN·m(가운데 말뚝은 기둥 중심 아래라 기둥면 모멘트에 기여하지 않음). asReq(3,245, 3,800, 1,200) = 6,452 mm², 최소 \(0.0016 \times 3{,}800 \times 1{,}400 = 8{,}512\) mm² 지배 → <b>17-D25</b>(8,614 mm², 간격 약 225 mm) 두 방향. \(\phi M_n = 4{,}312\) kN·m.</li>
+        <li><b>판정.</b> 독립 캡이라면 <b>h = 1.4 m</b>로 모든 전단·휨을 만족한다(교육용). 말뚝이 기둥 펀칭 둘레에 걸칠 만큼 두꺼운 캡이므로, 14장에서 같은 캡을 스트럿–타이 모델로 다시 풀어 단면 설계와 비교한다.</li>
+      </ol></div>
+    <div class="sim" id="sim-ft-3d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>C1 말뚝 캡 3D: 위험 단면과 배근</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="ft-cv-3d" aria-label="기둥 C1, 말뚝 다섯 본, 캡 배근과 뚫림 전단 임계 둘레의 3차원 그림"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>캡 두께 h <output id="ft-3d-h-out"></output></span><input type="range" id="ft-3d-h" min="800" max="2600" step="50" value="1400"></label>
+          <div class="ctrl"><span>보이기</span><div class="seg" id="ft-3d-show"><button data-value="crit" class="on">임계 둘레</button><button data-value="bars">바닥 철근</button><button data-value="flow">하중 흐름</button></div></div>
+          <div class="btn-row"><button class="btn" id="ft-3d-reset">시점 처음으로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">d</span><span class="v" id="ft-3d-o-d">—</span></div>
+        <div class="stat"><span class="k">모서리 말뚝 전단 몫</span><span class="v" id="ft-3d-o-f">—</span></div>
+        <div class="stat"><span class="k">스트럿 경사(수평과)</span><span class="v" id="ft-3d-o-a">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 끌어서 돌려 보세요(터치는 가로로) · "임계 둘레"에서 h를 키우면 d/2 둘레 상자가 커져 모서리 말뚝(주황)을 삼키는 것이 보입니다 · "하중 흐름"은 기둥에서 말뚝 머리로 가는 압축 스트럿과 말뚝 사이 바닥의 인장 타이로, 14장의 3차원 스트럿–타이 모델입니다 · 모델: 예제 13.5의 캡 3.8 × 3.8 m, 말뚝 길이는 일부만 그림, d = h − 200 mm, 바닥 철근 17-D25 두 방향(교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 14 -->
+  <section id="mat">
+    <h2>전면 기초(매트)와 말뚝 지지 전면 기초</h2>
+    <div class="problem"><strong>독립 기초가 서로 겹치기 시작하면</strong>
+      <p>지지력이 낮아 독립 기초가 기둥 간격의 절반을 넘게 커지면, 기초판을 따로 만드는 것보다 건물 바닥 전체를 한 장의 두꺼운 판으로 만드는 편이 낫습니다. 지하층이 있으면 그 판이 지하수압도 받고, 파낸 흙의 무게만큼 하중을 상쇄하는 보상 효과도 얻습니다(GeotechBook 13장).</p></div>
+    <p>전면 기초는 흙 위의 거꾸로 선 플랫 슬래브입니다. 기둥 하중을 받아 2방향으로 휘고, 기둥 둘레에서 뚫림 전단을 받습니다. 설계 해석은 세 가지 수준이 있습니다. ① <b>강체 매트</b>: 기둥 하중의 합력과 매트 도심으로 고른 또는 평면 분포 접지압을 가정하고, 기둥 열을 따라 띠로 끊어 복합 기초처럼 푼다(이 장의 복합 기초 시뮬레이터). ② <b>탄성 지반 위 판</b>: 흙을 지반 반력 계수 \(k_s\)의 스프링으로 보고 판 해석(유한 요소)으로 푼다. ③ <b>지반–구조 상호작용</b>: 침하 해석(GeotechBook 6–7장)과 반복해 스프링을 맞춘다. 강성이 큰 매트일수록 ①에 가깝고, 얇고 넓은 매트일수록 기둥 아래로 접지압이 몰린다.</p>
+    <p>B-10처럼 매트 아래에 말뚝을 둔 <span class="term">말뚝 지지 전면 기초</span><span class="en">(piled raft)</span>에서는 하중이 매트 접지압과 말뚝 반력으로 나뉩니다. GeotechBook 14장은 매트 분담을 해석으로 정한다고 했습니다. 이 장은 보수적으로 C1 하중을 다섯 본의 말뚝이 모두 받는다고 보고 캡 부분을 검토했습니다.</p>
+    <div class="callout site"><strong>B-10 매트 2.5 m와 C1 아래 캡 부분</strong> 매트 32 × 24 m, 두께 2.5 m, 바닥 GL −11.0 m, PHC φ600 허용 1,500 kN/본(GeotechBook 14장). C1 아래 다섯 본(s = 1.8 m)의 사용 반력 1,340 kN(최대 1,384 kN), 계수 1,800 kN(최대 1,859 kN). 매트에서는 \(d \approx 2{,}300\) mm(교육용)라 기둥 펀칭 임계 둘레의 반폭이 0.4 + 1.15 = 1.55 m로 모서리 말뚝(1.27 m)을 완전히 감싼다. 둘레 바깥에 남는 말뚝 반력은 거의 없고(약 4 %), 기둥 펀칭은 지배하지 않는다. 대신 매트 두께를 정한 것은 ① 지하수압 88 kPa에 대한 공사 중·완공 후 부력 저항과 자중(60 kPa), ② 코어 벽과 외곽 기둥 사이의 부등 침하를 고르게 하는 강성, ③ 기둥 사이의 2방향 휨이다. 휨 철근은 매트 해석에서 정하며 최소 철근 \(0.0016 \times 2{,}500 = 4{,}000\) mm²/m(위아래 나누어, 예: 위·아래 각 D25 @ 250, 교육용)가 기본선이 된다. 모든 값은 교육용이며 실제 설계는 지반–구조 상호작용 해석과 현행 기준으로 한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="../../geotech/chapters/bearing.html"><small>GeotechBook · CH.13</small>얕은 기초의 지지력<br><span>허용 지지력, 편심의 유효 폭, 보상 기초.</span></a>
+      <a href="../../geotech/chapters/piles.html"><small>GeotechBook · CH.14</small>말뚝 기초<br><span>PHC φ600 1,500 kN/본, C1 아래 5본, 무리 효과.</span></a>
+      <a href="slabs.html"><small>CH.09 · 슬래브</small>뚫림 전단<br><span>임계 둘레 b₀, 전단 보강, 거꾸로 선 슬래브.</span></a>
+      <a href="development.html"><small>CH.07 · 정착과 이음</small>짧은 캔틸레버의 정착<br><span>정밀식 l<sub>d</sub>, 표준 갈고리, 압축 정착.</span></a>
+      <a href="columns.html"><small>CH.10 · 기둥과 P–M 상관도</small>기초로 내려오는 힘<br><span>C1 P<sub>u</sub> 9,000 kN, M<sub>u</sub> 300 kN·m.</span></a>
+      <a href="strut-tie.html"><small>CH.14 · 스트럿–타이 모델</small>두꺼운 말뚝 캡<br><span>말뚝이 임계 둘레 안에 들어오면 STM으로.</span></a>
+      <a href="case-study.html"><small>CH.16 · B-10 설계 실습</small>하중 경로의 끝<br><span>기둥 → 캡 → 말뚝까지의 설계 요약.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>크기는 사용 하중과 허용 지지력(\(A = (D + L)/q_e\)), 두께와 철근은 계수 하중의 계수 접지압 \(q_u = P_u/A\)로 정한다. 자중·흙은 같은 크기의 접지압과 상쇄되어 휨·전단을 만들지 않는다.</li>
+      <li>위험 단면: 휨은 기둥면, 1방향 전단은 기둥면에서 \(d\), 뚫림 전단은 기둥면에서 \(d/2\)의 둘레 \(b_0\). 기초판 두께는 보통 뚫림 전단이 정한다.</li>
+      <li>뚫림 전단 \(v_c = \min\{0.33,\ 0.17(1 + 2/\beta_c),\ 0.083(\alpha_s d/b_0 + 2)\}\sqrt{f_{ck}}\)(ACI 318-14 형태). 두꺼운 부재는 크기 효과(318-19의 \(\lambda_s\), KDS 2021 형태)를 현행 기준으로 확인한다.</li>
+      <li>기둥면 휨 \(M_u = q_u B l^2/2\) → asReq. 폭이 넓어 최소 철근(\(0.0020 \times 400/f_y\), 전체 두께)이 지배하기 쉽다. F-1: 9-D19, \(\phi M_n = 536\) kN·m.</li>
+      <li>짧은 캔틸레버라 정착이 빠듯하다. 두꺼운 피복과 넓은 간격을 반영하는 정밀식(\((c + K_{tr})/d_b \le 2.5\)), 가는 철근, 갈고리로 해결한다.</li>
+      <li>지압 \(\phi B_n = 0.65 \times 0.85 f_{ck}A_1\sqrt{A_2/A_1}\)(\(\le 2\)), 다월 철근 \(0.005A_g\) 이상. C1: 기둥 쪽 10,608 kN ≥ 9,000 kN.</li>
+      <li>편심 \(e \le B/6\)이면 사다리꼴, 넘으면 들림과 삼각형 압력(\(q_{max} = 2P/(3L(B/2 - e))\)). 복합 기초는 합력에 도심을 맞추고(\(L = 2\bar x\)) 뒤집힌 보로 푼다. 탄성 지반 근사는 기둥 아래로 접지압을 모은다.</li>
+      <li>말뚝 반력 \(R_i = P/n + M_y x_i/\sum x^2 + M_x y_i/\sum y^2\). 캡 전단은 위험 단면 바깥 말뚝 반력(경계 \(\pm D_p/2\) 보간)으로 계산한다. C1 5본 캡: 독립 캡이면 h 1.4 m·17-D25, B-10 매트 2.5 m에서는 말뚝이 펀칭 둘레 안 → 스트럿–타이 모델(14장).</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 기초판의 면적은 사용 하중으로, 철근은 계수 하중으로 정하는 이유는?</p><div class="opts">
+        <button class="opt">계수 하중이 더 작기 때문</button><button class="opt" data-correct>허용 지지력에 이미 안전율이 들어 있어 계수 하중과 비교하면 안전율을 두 번 쓰게 되기 때문</button><button class="opt">흙은 강도 감소 계수가 1이기 때문</button><button class="opt">기준이 임의로 정했을 뿐 근거는 없다</button>
+      </div><div class="quiz-exp">허용 지지력 = 극한 지지력/안전율(보통 3)이고 침하 기준도 사용 하중에 대한 것이다. 콘크리트 부재 강도는 하중 계수와 φ로 안전을 확보한다.</div></div>
+      <div class="quiz-q"><p>2. 기둥 400 × 400 mm, 기초 2.0 × 2.0 m, \(q_u\) = 400 kPa, d = 400 mm일 때 뚫림 전단의 \(V_u\)는?</p><div class="opts">
+        <button class="opt">1,088 kN</button><button class="opt" data-correct>1,344 kN</button><button class="opt">1,536 kN</button><button class="opt">1,600 kN</button>
+      </div><div class="quiz-exp">\(V_u = q_u[A - (c + d)^2] = 400 \times (4.0 - 0.8^2) = 400 \times 3.36 = 1{,}344\) kN. 전체 하중 1,600 kN에서 임계 둘레 안쪽 0.64 m²의 몫 256 kN을 뺀 값이다.</div></div>
+      <div class="quiz-q"><p>3. 1방향 전단의 위험 단면이 기둥면에서 d 떨어진 곳인 이유는?</p><div class="opts">
+        <button class="opt">철근이 그곳에서 끝나기 때문</button><button class="opt">모멘트가 최대이기 때문</button><button class="opt" data-correct>그 안쪽의 하중은 경사 압축대로 기둥에 직접 전달되어 사인장 균열을 만들지 않기 때문</button><button class="opt">시공 이음 위치이기 때문</button>
+      </div><div class="quiz-exp">5장의 보에서 "지점에서 d"와 같은 이유다. 기둥(지점) 가까이의 하중은 아치 작용으로 직접 흐른다.</div></div>
+      <div class="quiz-q"><p>4. 기초판 휨 설계에서 소요 As 1,900 mm², 최소 철근 2,300 mm²가 나왔다. 옳은 것은?</p><div class="opts">
+        <button class="opt">1,900 mm²를 쓰고 최소 철근은 무시한다</button><button class="opt" data-correct>2,300 mm² 이상을 배근한다</button><button class="opt">두 값의 평균을 쓴다</button><button class="opt">두께를 줄여 소요 As를 키운다</button>
+      </div><div class="quiz-exp">폭이 넓은 기초판은 철근비가 작아 수축·온도 철근 형태의 최소 철근이 지배하는 일이 흔하다. 예제 13.3의 F-1이 그렇다.</div></div>
+      <div class="quiz-q"><p>5. 기둥 c = 500 mm, 기초 두께 h = 600 mm, 폭 2.4 m일 때 지압의 \(\sqrt{A_2/A_1}\)는? (1 : 2 절두체)</p><div class="opts">
+        <button class="opt">1.0</button><button class="opt">4.8</button><button class="opt">2.9</button><button class="opt" data-correct>2.0(상한)</button>
+      </div><div class="quiz-exp">\(A_2\)의 한 변 = min(2.4, 0.5 + 4 × 0.6 = 2.9) = 2.4 m → \(\sqrt{A_2/A_1} = 2.4/0.5 = 4.8\)이지만 상한 2를 적용한다.</div></div>
+      <div class="quiz-q"><p>6. 길이 B = 3.0 m인 기초에 P = 1,200 kN, M = 720 kN·m가 작용한다. 접지압 분포는?</p><div class="opts">
+        <button class="opt">고른 분포</button><button class="opt">사다리꼴, 양쪽 모두 압축</button><button class="opt" data-correct>한쪽이 들리고 남은 부분이 삼각형 분포</button><button class="opt">반대쪽이 인장 접지압을 받는다</button>
+      </div><div class="quiz-exp">e = 720/1,200 = 0.60 m &gt; B/6 = 0.50 m. 합력이 핵 밖이라 접촉 길이 3(1.5 − 0.6) = 2.7 m의 삼각형 압력이 된다. 흙은 인장을 받지 못한다.</div></div>
+      <div class="quiz-q"><p>7. 대지 경계 기둥과 안쪽 기둥을 묶는 복합 기초에서 접지압을 고르게 하는 방법은?</p><div class="opts">
+        <button class="opt">두 기둥 사이 중앙에 기초 도심을 둔다</button><button class="opt" data-correct>두 기둥 하중 합력의 위치에 기초 도심을 맞춘다</button><button class="opt">큰 기둥 아래에 도심을 둔다</button><button class="opt">기초를 최대한 길게 만든다</button>
+      </div><div class="quiz-exp">강체 기초에서 접지압 합력은 하중 합력과 같은 연직선 위에 있어야 한다. 도심이 합력과 겹치면 편심 0, 고른 분포다. 예제 13.4: x̄ = 2.86 m → L = 5.72 m.</div></div>
+      <div class="quiz-q"><p>8. 말뚝 캡을 두껍게 해 모서리 말뚝 중심이 기둥 펀칭 임계 둘레 안쪽으로 \(D_p/2\) 이상 들어왔다. 이 말뚝 반력의 기둥 펀칭 전단 기여는?</p><div class="opts">
+        <button class="opt">반력 전부</button><button class="opt">반력의 절반</button><button class="opt" data-correct>0 — 하중이 경사 압축대로 말뚝에 직접 흐른다</button><button class="opt">반력의 두 배</button>
+      </div><div class="quiz-exp">ACI 318 형태의 규정: 바깥 \(D_p/2\) 이상이면 전부, 안쪽 \(D_p/2\) 이상이면 0, 그 사이는 직선 보간. 이런 두꺼운 캡은 스트럿–타이 모델(14장)로 검토할 수 있다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const FT = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${FT.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  poly(ctx, pts, fill, stroke, width = 1.2, dash) {
+    ctx.save(); ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.stroke(); }
+    ctx.restore();
+  },
+  rect(ctx, x, y, w, h, fill, stroke, width = 1.2, dash) { FT.poly(ctx, [[x, y], [x + w, y], [x + w, y + h], [x, y + h]], fill, stroke, width, dash); },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = FT._c || (FT._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  k(v) { return isFinite(v) ? Math.round(v).toLocaleString("en-US").replace("-", "−") : "—"; },
+  ok(b) { return b ? '<b style="color:var(--ok)">OK</b>' : '<b style="color:var(--bad)">NG</b>'; },
+  msg(id, html, cls) { const el = document.getElementById(id); if (!el) return; el.innerHTML = html; el.className = "ft-msg" + (cls ? " " + cls : ""); },
+  s30: Math.sqrt(30),
+  /** 뚫림 전단 v_c (MPa), ACI 318-14 SI 형태. bc: 긴 변/짧은 변, as: 40/30/20, ls: 크기 효과 적용 여부 */
+  vc2(fck, b0, d, bc = 1, as = 40, ls = false) {
+    const r = Math.sqrt(fck), lam = ls ? Math.min(1, Math.sqrt(2 / (1 + 0.004 * d))) : 1;
+    return Math.min(0.33, 0.17 * (1 + 2 / bc), 0.083 * ((as * d) / b0 + 2)) * r * lam;
+  },
+  rhoMin(fy) { return Math.max(0.0014, (0.002 * 400) / fy); },
+  /** 정밀 정착 길이(KDS 14 20 52 형태): (c+Ktr)/db ≤ 2.5, γ = 0.8(D19 이하) */
+  ld(db, fy, fck, cb) { const g = db <= 19.2 ? 0.8 : 1.0, r = Math.min(2.5, cb / db); return Math.max(300, ((0.9 * db * fy) / Math.sqrt(fck)) * (g / r)); },
+  /** 막대(요구 vs 강도) */
+  bars(ctx, box, rows, pal) {
+    const max = Math.max(1, ...rows.flatMap((r) => [r.u, r.c])) * 1.12;
+    const rowH = box.h / rows.length;
+    rows.forEach((r, i) => {
+      const y = box.y + i * rowH, bw = (v) => (Math.max(0, v) / max) * box.w, bh = Math.min(16, rowH * 0.22);
+      FT.text(ctx, r.name, box.x, y + 12, pal.text, { align: "left", size: 12 });
+      const ok = r.u <= r.c + 1e-9;
+      ctx.fillStyle = FT.alpha(pal.accent2, 0.85); ctx.fillRect(box.x, y + 24, bw(r.u), bh);
+      ctx.fillStyle = FT.alpha(ok ? pal.ok : pal.bad, 0.75); ctx.fillRect(box.x, y + 28 + bh, bw(r.c), bh);
+      FT.text(ctx, `Vu ${FT.k(r.u)}`, box.x + bw(r.u) + 6, y + 24 + bh / 2, pal.accent2, { align: "left", size: 11 });
+      FT.text(ctx, `φVc ${FT.k(r.c)}`, box.x + bw(r.c) + 6, y + 28 + bh * 1.5, ok ? pal.ok : pal.bad, { align: "left", size: 11 });
+      const ratio = r.c > 0 ? r.u / r.c : Infinity;
+      FT.text(ctx, isFinite(ratio) ? `이용률 ${ratio.toFixed(2)}` : "—", box.x + box.w, y + 12, ok ? pal.ok : pal.bad, { align: "right", size: 11.5 });
+    });
+  },
+};
+
+/* ---------- 1. 1방향·뚫림 전단 위험 단면 ---------- */
+(function () {
+  const gh = CB.range("ft-sh-h", (v) => v + " mm", go), gB = CB.range("ft-sh-B", (v) => v.toFixed(1) + " m", go), gc = CB.range("ft-sh-c", (v) => v + " mm", go), gP = CB.range("ft-sh-P", (v) => FT.k(v) + " kN", go);
+  const mode = CB.seg("ft-sh-mode", go), ls = CB.seg("ft-sh-ls", go);
+  function calc() {
+    const h = gh(), d = h - 100, B = gB(), c = gc() / 1000, P = gP(), A = B * B, qu = P / A, dm = d / 1000;
+    const cd = Math.min(B, c + dm), Vu2 = qu * Math.max(0, A - cd * cd), b0 = 4 * (c * 1000 + d);
+    const vc = FT.vc2(30, b0, d, 1, 40, ls() === "on"), pV2 = c + dm >= B ? Infinity : (0.75 * vc * b0 * d) / 1000;
+    const l = (B - c) / 2, out = Math.max(0, l - dm), Vu1 = qu * B * out, pV1 = 0.75 * CB.rc.Vc(30, B * 1000, d);
+    return { h, d, B, c, P, qu, dm, Vu2: c + dm >= B ? 0 : Vu2, b0, vc, pV2, l, out, Vu1, pV1 };
+  }
+  const cv = CB.canvas("#ft-cv-sh", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), wide = W >= 560;
+    const S = wide ? Math.min(H - 40, W * 0.52) : Math.min(W - 40, H * 0.56), ox = wide ? 20 : (W - S) / 2, oy = wide ? (H - S) / 2 : 14, sc = S / r.B;
+    const X = (x) => ox + S / 2 + x * sc, Y = (y) => oy + S / 2 - y * sc, two = mode() === "two";
+    FT.rect(ctx, X(-r.B / 2), Y(r.B / 2), S, S, FT.alpha(pal.dim, 0.12), pal.dim, 1.2);
+    if (two) {
+      const a = Math.min(r.B / 2, (r.c + r.dm) / 2);
+      ctx.save(); ctx.beginPath(); ctx.rect(X(-r.B / 2), Y(r.B / 2), S, S); ctx.rect(X(a), Y(a), -2 * a * sc, 2 * a * sc); ctx.fillStyle = FT.alpha(pal.compression, 0.18); ctx.fill("evenodd"); ctx.restore();
+      FT.rect(ctx, X(-a), Y(a), 2 * a * sc, 2 * a * sc, null, pal.compression, 2, [6, 4]);
+      FT.text(ctx, `b₀ = ${FT.k(r.b0)} mm`, X(0), Y(a) - 12, pal.compression, { size: 11.5 });
+    } else if (r.out > 0) {
+      const xs = r.c / 2 + r.dm;
+      FT.rect(ctx, X(xs), Y(r.B / 2), (r.B / 2 - xs) * sc, S, FT.alpha(pal.accent2, 0.2), null);
+      FT.line(ctx, [[X(xs), Y(r.B / 2) - 6], [X(xs), Y(-r.B / 2) + 6]], pal.accent2, 2, [6, 4]);
+      FT.line(ctx, [[X(-xs), Y(r.B / 2)], [X(-xs), Y(-r.B / 2)]], FT.alpha(pal.accent2, 0.6), 1.4, [6, 4]);
+      FT.text(ctx, "기둥면 + d", X(xs), Y(-r.B / 2) + 14 > H - 6 ? H - 8 : Y(-r.B / 2) + 14, pal.accent2, { size: 11 });
+    } else FT.text(ctx, "1방향 단면이 기초 밖 → Vu = 0", X(0), Y(-r.B / 2) + 14, pal.accent2, { size: 11 });
+    FT.rect(ctx, X(-r.c / 2), Y(r.c / 2), r.c * sc, r.c * sc, FT.alpha(pal.text, 0.55), pal.text, 1);
+    FT.text(ctx, `B = ${r.B.toFixed(1)} m`, X(0), Y(-r.B / 2) + (two ? 14 : 28), pal.dim, { size: 11 });
+    const box = wide ? { x: ox + S + 30, y: oy + 10, w: W - (ox + S + 30) - 70, h: S - 20 } : { x: 20, y: oy + S + 24, w: W - 110, h: H - (oy + S + 24) - 6 };
+    FT.bars(ctx, box, [{ name: "뚫림 전단", u: r.Vu2, c: isFinite(r.pV2) ? r.pV2 : 0 }, { name: "1방향 전단", u: r.Vu1, c: r.pV1 }], pal);
+  }, { aspect: (W) => (W < 560 ? 1.25 : 0.56), minHeight: 300, maxHeight: 560 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("ft-sh-o-d", `${FT.k(r.d)} mm · ${FT.k(r.qu)} kPa`);
+    CB.stat("ft-sh-o-two", isFinite(r.pV2) ? `${FT.k(r.Vu2)} / ${FT.k(r.pV2)} kN` : "둘레가 기초 밖");
+    CB.stat("ft-sh-o-one", `${FT.k(r.Vu1)} / ${FT.k(r.pV1)} kN`);
+    CB.stat("ft-sh-o-b0", `${FT.k(r.b0)} mm · ${r.vc.toFixed(2)} MPa`);
+    const ok2 = r.Vu2 <= r.pV2, ok1 = r.Vu1 <= r.pV1;
+    if (ok1 && ok2) FT.msg("ft-sh-msg", `두께 OK: 뚫림 이용률 ${(r.Vu2 / r.pV2).toFixed(2)}, 1방향 이용률 ${(r.Vu1 / r.pV1).toFixed(2)}. 지배: <b>${r.Vu2 / r.pV2 >= r.Vu1 / r.pV1 ? "뚫림 전단" : "1방향 전단"}</b>.`, "ok");
+    else FT.msg("ft-sh-msg", `두께 부족: ${ok2 ? "" : "뚫림 전단 "}${ok1 ? "" : "1방향 전단 "}불합격 — h를 키우거나(전단 철근보다 보통 경제적) 기둥 크기를 키운다.`, "bad");
+  }
+  go();
+})();
+
+/* ---------- 2. 기둥–기초 지압 ---------- */
+(function () {
+  const PRE = { f1: [500, 2.4, 600, 30, 30, 2160], c1: [800, 8.0, 2500, 30, 30, 9000], hi: [600, 2.4, 600, 50, 30, 7000] };
+  const pre = CB.seg("ft-br-pre", (v) => { const p = PRE[v]; [gc, gB, gh, gfc, gff, gP].forEach((g, i) => g.set(p[i], false)); go(); });
+  const gc = CB.range("ft-br-c", (v) => v + " mm", go), gB = CB.range("ft-br-B", (v) => v.toFixed(1) + " m", go), gh = CB.range("ft-br-h", (v) => v + " mm", go);
+  const gfc = CB.range("ft-br-fc", (v) => v + " MPa", go), gff = CB.range("ft-br-ff", (v) => v + " MPa", go), gP = CB.range("ft-br-P", (v) => FT.k(v) + " kN", go);
+  function calc() {
+    const c = gc(), B = Math.max(gB() * 1000, c), h = gh(), A1 = c * c, s2 = Math.min(B, c + 4 * h), r = Math.min(2, s2 / c);
+    const Bc = (0.65 * 0.85 * gfc() * A1) / 1000, Bf = (0.65 * 0.85 * gff() * A1 * r) / 1000, Bn = Math.min(Bc, Bf), P = gP();
+    const dmin = 0.005 * A1, ex = P > Bn ? ((P - Bn) * 1000) / (0.65 * 500) : 0, need = Math.max(dmin, ex);
+    const cand = ["D19", "D22", "D25", "D29", "D32"].map((n) => ({ n, k: Math.max(4, Math.ceil(need / CB.steel.BARS[n].A / 4) * 4) }));
+    const pick = [4, 8, 12, 16, 24].map((lim) => cand.find((o) => o.k <= lim)).find(Boolean) || { n: "D32", k: Math.ceil(need / CB.steel.BARS.D32.A / 4) * 4 };
+    return { c, B, h, A1, s2, r, Bc, Bf, Bn, P, dmin, ex, need, pick };
+  }
+  const cv = CB.canvas("#ft-cv-br", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), wide = W >= 560;
+    const vw = wide ? W * 0.56 : W, vh = wide ? H : H * 0.58;
+    const sc = Math.min((vw - 40) / Math.max(r.B, r.s2), (vh - 60) / (r.h + 1.2 * r.c + 200));
+    const cx = vw / 2, top = 20 + 1.0 * r.c * sc, X = (x) => cx + x * sc, Y = (y) => top + y * sc;
+    const Bv = Math.min(r.B, (vw - 30) / sc);
+    FT.rect(ctx, X(-Bv / 2), Y(0), Bv * sc, r.h * sc, FT.alpha(pal.dim, 0.12), pal.dim);
+    if (Bv < r.B) FT.text(ctx, "≈", X(-Bv / 2) + 8, Y(r.h / 2), pal.dim);
+    const dz = Math.min(r.h, (r.s2 - r.c) / 4);
+    FT.poly(ctx, [[X(-r.c / 2), Y(0)], [X(r.c / 2), Y(0)], [X(r.s2 / 2), Y(dz)], [X(-r.s2 / 2), Y(dz)]], FT.alpha(pal.accent, 0.18), pal.accent, 1.6);
+    FT.rect(ctx, X(-r.c / 2), Y(-r.c), r.c * sc, r.c * sc, FT.alpha(pal.text, 0.35), pal.text, 1);
+    FT.arrow(ctx, X(0), 4, X(0), Y(-r.c) - 2, pal.accent2, 2.6, 10);
+    FT.text(ctx, `Pu ${FT.k(r.P)} kN`, X(0) + 10, 14, pal.accent2, { align: "left", size: 11.5 });
+    FT.text(ctx, `A₂ 한 변 ${FT.k(r.s2)} mm`, X(0), Y(r.h) + 14, pal.accent, { size: 11 });
+    const n = Math.min(6, Math.max(2, Math.round(r.pick.k / 4) + 1));
+    for (let i = 0; i < n; i++) { const x = -r.c / 2 + 60 + ((r.c - 120) * i) / (n - 1); FT.line(ctx, [[X(x), Y(-r.c * 0.8)], [X(x), Y(Math.min(r.h - 90, r.h * 0.85))]], pal.compression, 2); }
+    const bx = wide ? { x: vw + 10, y: 26, w: W - vw - 30, h: H - 60 } : { x: 16, y: vh + 16, w: W - 32, h: H - vh - 30 };
+    const rows = [["Pu", r.P, pal.accent2], ["φBn 기둥", r.Bc, r.Bc >= r.P ? pal.ok : pal.bad], ["φBn 기초", r.Bf, r.Bf >= r.P ? pal.ok : pal.bad]];
+    const max = Math.max(...rows.map((q) => q[1])), rh = bx.h / rows.length;
+    rows.forEach(([k, v, col], i) => {
+      const y = bx.y + i * rh, w = (v / max) * Math.max(40, bx.w - 90);
+      FT.text(ctx, k, bx.x, y + 8, pal.text, { align: "left", size: 11.5 });
+      ctx.fillStyle = FT.alpha(col, 0.75); ctx.fillRect(bx.x, y + 18, w, Math.min(16, rh * 0.3));
+      FT.text(ctx, FT.k(v) + " kN", bx.x + w + 6, y + 18 + Math.min(8, rh * 0.15), col, { align: "left", size: 11 });
+    });
+  }, { aspect: (W) => (W < 560 ? 1.15 : 0.56), minHeight: 300, maxHeight: 520 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("ft-br-o-r", `${(r.s2 / r.c).toFixed(2)} → ${r.r.toFixed(2)}`);
+    CB.stat("ft-br-o-bn", `${FT.k(r.Bc)} · ${FT.k(r.Bf)} kN`);
+    CB.stat("ft-br-o-dw", `${FT.k(r.dmin)} mm²`);
+    CB.stat("ft-br-o-ex", r.ex > 0 ? `${FT.k(r.ex)} mm²` : "없음");
+    const gov = r.Bc <= r.Bf ? "기둥 쪽" : "기초 쪽", A = r.pick.k * CB.steel.BARS[r.pick.n].A;
+    if (r.P <= r.Bn) FT.msg("ft-br-msg", `지압 OK(${gov} 지배, 이용률 ${(r.P / r.Bn).toFixed(2)}) → 다월 최소량 ${FT.k(r.dmin)} mm² → <b>${r.pick.k}-${r.pick.n}</b>(${FT.k(A)} mm²)`, "ok");
+    else FT.msg("ft-br-msg", `지압 부족(${gov} 지배): 초과분 ${FT.k(r.P - r.Bn)} kN을 다월이 넘긴다고 보면 ${FT.k(r.need)} mm² → <b>${r.pick.k}-${r.pick.n}</b>. 기둥 쪽이 지배하면 기둥 주근을 기초 안으로 연장하는 것과 같다.`, "bad");
+  }
+  go();
+})();
+
+/* ---------- 3. 독립 기초 설계기 ---------- */
+(function () {
+  const gD = CB.range("ft-ds-D", (v) => FT.k(v) + " kN", go), gL = CB.range("ft-ds-L", (v) => FT.k(v) + " kN", go), gqa = CB.range("ft-ds-qa", (v) => v + " kPa", go);
+  const gc = CB.range("ft-ds-c", (v) => v + " mm", go), gh = CB.range("ft-ds-h", (v) => v + " mm", go), bar = CB.seg("ft-ds-bar", go);
+  function design(hIn) {
+    const D = gD(), L = gL(), qa = gqa(), c = gc(), h = hIn ?? gh(), bn = bar(), BAR = CB.steel.BARS[bn], db = BAR.d;
+    const Ps = D + L, Pu = Math.max(1.4 * D, 1.2 * D + 1.6 * L), Areq = Ps / qa;
+    let B = Math.ceil(Math.sqrt(Areq) * 10 - 1e-9) / 10; B = Math.max(B, Math.ceil((c / 1000 + 0.4) * 10) / 10);
+    const A = B * B, qs = Ps / A, qu = Pu / A, d = h - 75 - db, dm = d / 1000, cm = c / 1000;
+    const b0 = 4 * (c + d), Vu2 = qu * Math.max(0, A - Math.min(B, cm + dm) ** 2), pV2 = (0.75 * FT.vc2(30, b0, d) * b0 * d) / 1000;
+    const l = (B - cm) / 2, Vu1 = qu * B * Math.max(0, l - dm), pV1 = 0.75 * CB.rc.Vc(30, B * 1000, d);
+    const shearOk = Vu2 <= pV2 && Vu1 <= pV1 && d >= 150;
+    const Mu = (qu * B * l * l) / 2, Asr = CB.rc.asReq(Mu, B * 1000, d, 30, 500), Amin = FT.rhoMin(500) * B * 1000 * h, Ad = Math.max(isFinite(Asr) ? Asr : Infinity, Amin);
+    let n = Math.max(2, Math.ceil(Ad / BAR.A)), s = (B * 1000 - 150) / (n - 1); const smax = Math.min(3 * h, 450);
+    if (s > smax) { n = Math.ceil((B * 1000 - 150) / smax) + 1; s = (B * 1000 - 150) / (n - 1); }
+    const clearOk = s - db >= Math.max(25, db);
+    const f = isFinite(Ad) ? CB.rc.flexure({ b: B * 1000, h, fck: 30, fy: 500, layers: [{ d, As: n * BAR.A }] }) : null;
+    const flexOk = isFinite(Asr) && f && f.phiMn >= Mu - 1e-6 && f.ok && clearOk;
+    const la = l * 1000 - 75, cb = Math.min(75 + db / 2, s / 2), ld = FT.ld(db, 500, 30, cb), ldh = Math.max(8 * db, 150, CB.rc.ldh(db, 500, 30));
+    const anch = ld <= la ? "straight" : ldh <= la ? "hook" : "fail";
+    const Bc = (0.65 * 0.85 * 30 * c * c) / 1000, s2 = Math.min(B * 1000, c + 4 * h), rr = Math.min(2, s2 / c), Bn = Math.min(Bc, Bc * rr);
+    const dmin = 0.005 * c * c, dreq = Math.max(dmin, Pu > Bn ? ((Pu - Bn) * 1000) / (0.65 * 500) : 0);
+    const vol = A * (h / 1000), len = B - 0.15 + (anch === "hook" ? 2 * 12 * db / 1000 : 0), steel = 2 * n * len * BAR.m;
+    return { D, L, qa, c, h, bn, BAR, db, Ps, Pu, Areq, B, A, qs, qu, d, b0, Vu2, pV2, l, Vu1, pV1, shearOk, Mu, Asr, Amin, Ad, n, s, smax, clearOk, f, flexOk, la, cb, ld, ldh, anch, Bc, s2, rr, Bn, dmin, dreq, vol, steel };
+  }
+  document.getElementById("ft-ds-auto").addEventListener("click", () => { for (let h = 300; h <= 1500; h += 50) if (design(h).shearOk) { gh.set(h); return; } gh.set(1500); });
+  const cv = CB.canvas("#ft-cv-ds", (ctx, W, H) => {
+    const pal = CB.palette(), r = design(), wide = W >= 560;
+    const S = wide ? Math.min(H - 50, W * 0.46) : Math.min(W - 60, H * 0.5), ox = wide ? 24 : (W - S) / 2, oy = wide ? 28 : 26, sc = S / r.B;
+    const X = (x) => ox + S / 2 + x * sc, Y = (y) => oy + S / 2 - y * sc;
+    FT.text(ctx, "평면", ox, 12, pal.dim, { align: "left", size: 11.5 });
+    FT.rect(ctx, X(-r.B / 2), Y(r.B / 2), S, S, FT.alpha(pal.dim, 0.12), pal.dim);
+    const span = r.B - 0.15;
+    for (let i = 0; i < r.n; i++) {
+      const t = -span / 2 + (r.n > 1 ? (span * i) / (r.n - 1) : 0);
+      FT.line(ctx, [[X(-r.B / 2 + 0.075), Y(t)], [X(r.B / 2 - 0.075), Y(t)]], FT.alpha(pal.tension, 0.75), 1.4);
+      FT.line(ctx, [[X(t), Y(-r.B / 2 + 0.075)], [X(t), Y(r.B / 2 - 0.075)]], FT.alpha(pal.tension, 0.45), 1.4);
+    }
+    const a = (r.c / 1000 + r.d / 1000) / 2;
+    FT.rect(ctx, X(-a), Y(a), 2 * a * sc, 2 * a * sc, null, r.Vu2 <= r.pV2 ? pal.ok : pal.bad, 1.6, [5, 4]);
+    FT.rect(ctx, X(-r.c / 2000), Y(r.c / 2000), (r.c / 1000) * sc, (r.c / 1000) * sc, FT.alpha(pal.text, 0.55), pal.text);
+    FT.text(ctx, `${r.B.toFixed(1)} × ${r.B.toFixed(1)} m · ${r.n}-${r.bn} @ ${FT.k(r.s)}`, X(0), Y(-r.B / 2) + 14, pal.text, { size: 11.5 });
+    // 단면
+    const sx0 = wide ? ox + S + 40 : 20, sw = wide ? W - sx0 - 20 : W - 40, sy0 = wide ? oy + 40 : oy + S + 50;
+    const ss = Math.min(sw / r.B, (wide ? H - sy0 - 60 : H - sy0 - 50) / (r.h / 1000 + 0.9)), XC = (x) => sx0 + sw / 2 + x * ss, YC = (y) => sy0 + 0.6 * ss - y * ss;
+    FT.text(ctx, "단면", sx0, sy0 - 26, pal.dim, { align: "left", size: 11.5 });
+    const hm = r.h / 1000, cm = r.c / 1000;
+    FT.rect(ctx, XC(-cm / 2), YC(0.6), cm * ss, 0.6 * ss, FT.alpha(pal.text, 0.35), pal.text);
+    FT.rect(ctx, XC(-r.B / 2), YC(0), r.B * ss, hm * ss, FT.alpha(pal.dim, 0.12), pal.dim);
+    FT.arrow(ctx, XC(0), YC(0.6) - 26, XC(0), YC(0.6) - 2, pal.accent2, 2.6, 9);
+    FT.text(ctx, `Pu ${FT.k(r.Pu)} kN`, XC(0) + 8, YC(0.6) - 20, pal.accent2, { align: "left", size: 11 });
+    const yb = -hm + (75 + r.db / 2) / 1000, nd = Math.min(r.n, 30);
+    for (let i = 0; i < nd; i++) { const t = -span / 2 + (nd > 1 ? (span * i) / (nd - 1) : 0); ctx.fillStyle = pal.tension; ctx.beginPath(); ctx.arc(XC(t), YC(yb), Math.max(2, (r.db / 2000) * ss), 0, Math.PI * 2); ctx.fill(); }
+    FT.line(ctx, [[XC(-r.B / 2 + 0.075), YC(yb - 0.03)], [XC(r.B / 2 - 0.075), YC(yb - 0.03)]], FT.alpha(pal.tension, 0.7), 1.6);
+    if (r.anch === "hook") [[-1], [1]].forEach(([sg]) => FT.line(ctx, [[XC(sg * (r.B / 2 - 0.075)), YC(yb - 0.03)], [XC(sg * (r.B / 2 - 0.075)), YC(yb + 0.25)]], pal.tension, 1.6));
+    const qy = YC(-hm) + 4, qL = Math.min(34, 18 + r.qu / 25);
+    for (let i = 0; i <= 8; i++) { const x = -r.B / 2 + (r.B * i) / 8; FT.arrow(ctx, XC(x), qy + qL, XC(x), qy + 2, pal.compression, 1.3, 6); }
+    FT.text(ctx, `qu ${FT.k(r.qu)} kPa`, XC(0), qy + qL + 10, pal.compression, { size: 11 });
+    FT.line(ctx, [[XC(-cm / 2 - r.d / 1000), YC(0) + 2], [XC(-cm / 2 - r.d / 1000), YC(-hm) - 2]], r.Vu1 <= r.pV1 ? pal.ok : pal.bad, 1.4, [4, 3]);
+    FT.text(ctx, `h ${r.h}`, XC(r.B / 2) - 4, YC(-hm / 2), pal.dim, { align: "right", size: 11 });
+  }, { aspect: (W) => (W < 560 ? 1.4 : 0.6), minHeight: 320, maxHeight: 620 });
+  function go() {
+    cv.redraw(); const r = design();
+    CB.stat("ft-ds-o-B", `${r.B.toFixed(1)} m`);
+    CB.stat("ft-ds-o-h", `${r.h} · ${FT.k(r.d)} mm`);
+    CB.stat("ft-ds-o-bar", `${r.n}-${r.bn} @ ${FT.k(r.s)}`);
+    CB.stat("ft-ds-o-q", `${r.vol.toFixed(2)} m³ · ${FT.k(r.steel)} kg`);
+    const st = [];
+    const li = (ok, k, html) => st.push(`<li class="${ok == null ? "" : ok ? "ok" : "bad"}"><span class="k">${k}</span>${html}</li>`);
+    li(null, "하중", `사용 P = D + L = ${FT.k(r.Ps)} kN, 계수 P<sub>u</sub> = max(1.4D, 1.2D + 1.6L) = ${FT.k(r.Pu)} kN`);
+    li(r.qs <= r.qa + 1e-6, "크기", `A<sub>req</sub> = ${FT.k(r.Ps)}/${r.qa} = ${r.Areq.toFixed(2)} m² → B = ${r.B.toFixed(1)} m(A = ${r.A.toFixed(2)} m²), 사용 접지압 ${FT.k(r.qs)} kPa ≤ q<sub>a</sub> ${FT.ok(r.qs <= r.qa + 1e-6)}`);
+    li(null, "계수 접지압", `q<sub>u</sub> = ${FT.k(r.Pu)}/${r.A.toFixed(2)} = <b>${FT.k(r.qu)} kPa</b>`);
+    li(r.Vu2 <= r.pV2 && r.d >= 150, "뚫림 전단", `d = ${r.h} − 75 − ${r.db.toFixed(0)} = ${FT.k(r.d)} mm, b₀ = ${FT.k(r.b0)} mm, V<sub>u</sub> = ${FT.k(r.Vu2)} kN ≤ φV<sub>c</sub> = ${FT.k(r.pV2)} kN ${FT.ok(r.Vu2 <= r.pV2)}${r.d < 150 ? " · d &lt; 150 mm NG" : ""}`);
+    li(r.Vu1 <= r.pV1, "1방향 전단", `l = ${r.l.toFixed(2)} m, V<sub>u</sub> = ${FT.k(r.qu)} × ${r.B.toFixed(1)} × ${Math.max(0, r.l - r.d / 1000).toFixed(2)} = ${FT.k(r.Vu1)} kN ≤ φV<sub>c</sub> = ${FT.k(r.pV1)} kN ${FT.ok(r.Vu1 <= r.pV1)}`);
+    li(r.flexOk, "휨", isFinite(r.Asr) ? `M<sub>u</sub> = ${FT.k(r.Mu)} kN·m, 소요 ${FT.k(r.Asr)} · 최소 ${FT.k(r.Amin)} mm² → <b>${r.n}-${r.bn}</b>(${FT.k(r.n * r.BAR.A)} mm², 간격 ${FT.k(r.s)} ≤ ${FT.k(r.smax)})${r.clearOk ? "" : " · 순간격 부족 NG"}, φM<sub>n</sub> = ${FT.k(r.f.phiMn)} kN·m ${FT.ok(r.flexOk)}` : `M<sub>u</sub> = ${FT.k(r.Mu)} kN·m — 단면 부족(asReq NaN): h를 키울 것 <b style="color:var(--bad)">NG</b>`);
+    li(r.anch !== "fail", "정착", `l<sub>a</sub> = ${FT.k(r.la)} mm, 정밀식 l<sub>d</sub> = ${FT.k(r.ld)} mm${r.anch === "straight" ? ` → 직선 정착 ${FT.ok(true)}` : r.anch === "hook" ? ` &gt; l<sub>a</sub> → 표준 갈고리 l<sub>dh</sub> = ${FT.k(r.ldh)} mm ${FT.ok(true)}` : ` · 갈고리 ${FT.k(r.ldh)} mm도 부족 <b style="color:var(--bad)">NG</b> — 가는 철근으로`}`);
+    li(r.Pu <= r.Bn || true, "지압·다월", `φB<sub>n</sub> = min(기둥 ${FT.k(r.Bc)}, 기초 ${FT.k(r.Bc * r.rr)}) = ${FT.k(r.Bn)} kN ${r.Pu <= r.Bn ? "≥ P<sub>u</sub> " + FT.ok(true) : "&lt; P<sub>u</sub> → 초과분 다월"}, 다월 ${FT.k(r.dreq)} mm² 이상`);
+    document.getElementById("ft-ds-steps").innerHTML = st.join("");
+  }
+  go();
+})();
+
+/* ---------- 4. 편심 하중 접지압 ---------- */
+(function () {
+  const gP = CB.range("ft-ec-P", (v) => FT.k(v) + " kN", go), gM = CB.range("ft-ec-M", (v) => FT.k(v) + " kN·m", go), gB = CB.range("ft-ec-B", (v) => v.toFixed(1) + " m", go);
+  const gL = CB.range("ft-ec-L", (v) => v.toFixed(1) + " m", go), gqa = CB.range("ft-ec-qa", (v) => v + " kPa", go), off = CB.seg("ft-ec-off", go);
+  function calc() {
+    const P = gP(), M = gM(), B = gB(), L = gL(), qa = gqa(), e0 = M / P, xc = off() === "1" ? -Math.min(e0, B / 2 - 0.3) : 0, e = e0 + xc;
+    let qmax, qmin, cont, tip = false;
+    if (e <= B / 6 + 1e-12) { qmax = (P / (B * L)) * (1 + (6 * e) / B); qmin = (P / (B * L)) * (1 - (6 * e) / B); cont = B; }
+    else if (e < B / 2) { cont = 3 * (B / 2 - e); qmax = (2 * P) / (3 * L * (B / 2 - e)); qmin = 0; }
+    else { cont = 0; qmax = Infinity; qmin = 0; tip = true; }
+    return { P, M, B, L, qa, e0, xc, e, qmax, qmin, cont, tip };
+  }
+  const cv = CB.canvas("#ft-cv-ec", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), sc = (W - 60) / 5.2, cx = W / 2, X = (x) => cx + x * sc, yf = H * 0.36, hf = 18;
+    FT.rect(ctx, X(-r.B / 6), yf - 6, (r.B / 3) * sc, hf + 12, FT.alpha(pal.accent, 0.12), null);
+    FT.text(ctx, "핵(가운데 1/3)", X(r.B / 6) + 6, yf - 12, pal.accent, { size: 11, align: "left" });
+    FT.rect(ctx, X(-r.B / 2), yf, r.B * sc, hf, FT.alpha(pal.dim, 0.18), pal.dim);
+    FT.rect(ctx, X(r.xc - 0.2), yf - 70, 0.4 * sc, 70, FT.alpha(pal.text, 0.35), pal.text);
+    const xr = Math.min(r.e, r.B / 2 + 0.3);
+    FT.arrow(ctx, X(xr), yf - 110, X(xr), yf - 4, pal.accent2, 2.6, 10);
+    FT.text(ctx, `P ${FT.k(r.P)} kN @ e = ${r.e.toFixed(2)} m`, X(xr), yf - 120, pal.accent2, { size: 11.5 });
+    if (r.M > 0) { ctx.save(); ctx.strokeStyle = pal.accent2; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(X(r.xc), yf - 80, 22, Math.PI * 1.05, Math.PI * 1.85); ctx.stroke(); ctx.restore(); FT.text(ctx, "M", X(r.xc) - 30, yf - 96, pal.accent2, { size: 11 }); }
+    const qs = Math.max(r.qa * 1.4, isFinite(r.qmax) ? r.qmax : r.qa * 1.4), py = (q) => yf + hf + 6 + (q / qs) * (H - yf - hf - 40);
+    if (!r.tip) {
+      const x0 = r.B / 2 - r.cont, pts = [[X(-r.B / 2), py(0)], [X(r.B / 2), py(0)], [X(r.B / 2), py(r.qmax)]];
+      if (r.cont >= r.B - 1e-9) pts.push([X(-r.B / 2), py(r.qmin)]); else pts.push([X(x0), py(0)]);
+      FT.poly(ctx, pts, FT.alpha(pal.compression, 0.2), pal.compression, 1.8);
+      if (r.cont < r.B - 1e-9) { FT.line(ctx, [[X(-r.B / 2), py(0) + 4], [X(x0), py(0) + 4]], pal.bad, 2, [4, 3]); FT.text(ctx, "들림", X((x0 - r.B / 2) / 2), py(0) + 16, pal.bad, { size: 11 }); }
+      FT.text(ctx, `${FT.k(r.qmax)} kPa`, X(r.B / 2) + 6, py(r.qmax), pal.compression, { align: "left", size: 11 });
+      if (r.cont >= r.B - 1e-9) FT.text(ctx, `${FT.k(r.qmin)}`, X(-r.B / 2) - 6, py(r.qmin), pal.compression, { align: "right", size: 11 });
+    } else FT.text(ctx, "합력이 기초 밖 → 전도", W / 2, py(r.qa * 0.6), pal.bad, { size: 13 });
+    FT.line(ctx, [[X(-r.B / 2) - 10, py(r.qa)], [X(r.B / 2) + 10, py(r.qa)]], pal.warn, 1.4, [6, 4]);
+    FT.text(ctx, `qa ${r.qa}`, X(-r.B / 2) - 12, py(r.qa), pal.warn, { align: "right", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.6), minHeight: 300, maxHeight: 460 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("ft-ec-o-e", `${r.e.toFixed(3)} · ${(r.B / 6).toFixed(3)} m`);
+    CB.stat("ft-ec-o-q", r.tip ? "—" : `${FT.k(r.qmax)} · ${FT.k(r.qmin)} kPa`);
+    CB.stat("ft-ec-o-c", r.tip ? "0" : `${r.cont.toFixed(2)} m (${Math.round((100 * r.cont) / r.B)} %)`);
+    CB.stat("ft-ec-o-r", r.tip ? "—" : (r.qmax / r.qa).toFixed(2));
+    if (r.tip) FT.msg("ft-ec-msg", "합력이 기초 바닥을 벗어나 전도된다 — 기초를 키우거나 모멘트를 줄여야 한다.", "bad");
+    else if (r.qmax > r.qa) FT.msg("ft-ec-msg", `q<sub>max</sub> ${FT.k(r.qmax)} kPa &gt; q<sub>a</sub> ${r.qa} kPa — 기초 길이 B를 늘리거나${r.xc === 0 ? " 상시 모멘트라면 기둥을 옮겨 앉힌다" : " 크기를 키운다"}.${r.cont < r.B ? " 접지면 일부가 들린다(e &gt; B/6)." : ""}`, "bad");
+    else FT.msg("ft-ec-msg", `접지압 OK: q<sub>max</sub>/q<sub>a</sub> = ${(r.qmax / r.qa).toFixed(2)}${r.cont < r.B ? " — 다만 e &gt; B/6이라 일부가 들린다(사용 하중에서는 피하는 것이 보통)" : r.xc !== 0 ? " — 기둥을 옮겨 상시 모멘트의 편심을 없앴다" : ""}.`, r.cont < r.B ? "" : "ok");
+  }
+  go();
+})();
+
+/* ---------- 5. 복합 기초 ---------- */
+(function () {
+  const gP1 = CB.range("ft-cb-P1", (v) => FT.k(v) + " kN", go), gP2 = CB.range("ft-cb-P2", (v) => FT.k(v) + " kN", go), gs = CB.range("ft-cb-s", (v) => v.toFixed(1) + " m", go);
+  const gL = CB.range("ft-cb-L", (v) => v.toFixed(2) + " m", go), mode = CB.seg("ft-cb-mode", go), gk = CB.range("ft-cb-k", (v) => v + " MN/m³", go), gh = CB.range("ft-cb-h", (v) => v + " mm", go);
+  const B = 1.6, F = 1.35, x1 = 0.2;
+  document.getElementById("ft-cb-auto").addEventListener("click", () => { const x2 = x1 + gs(), xb = (gP1() * x1 + gP2() * x2) / (gP1() + gP2()); gL.set(Math.min(12, Math.max(x2 + 0.3, Math.round(2 * xb * 50) / 50))); });
+  let R = null;
+  function calc() {
+    const P1 = gP1(), P2 = gP2(), x2 = x1 + gs(), L = Math.max(gL(), x2 + 0.3), Pu1 = F * P1, Pu2 = F * P2, Pu = Pu1 + Pu2;
+    const xb = (P1 * x1 + P2 * x2) / (P1 + P2), e = xb - L / 2, h = gh() / 1000, EI = 2.75e7 * (B * h ** 3) / 12;
+    let w1, w2, a = 0, b = L;
+    if (Math.abs(e) <= L / 6) { w1 = (Pu / L) * (1 - (6 * e) / L); w2 = (Pu / L) * (1 + (6 * e) / L); }
+    else { const c = 3 * (L / 2 - Math.abs(e)), qm = (2 * Pu) / c; if (e > 0) { a = L - c; w1 = 0; w2 = qm; } else { b = c; w1 = qm; w2 = 0; } }
+    const wAt = (x) => (x < a - 1e-9 || x > b + 1e-9 ? 0 : w1 + ((w2 - w1) * (x - a)) / (b - a));
+    let beam, pres = [];
+    if (mode() === "rigid") {
+      beam = CB.beam({ L, EI, supports: [{ x: x1, type: "pin" }, { x: x2, type: "roller" }], loads: [{ type: "lin", w1: -w1, w2: -w2, a, b }] });
+      for (let i = 0; i <= 120; i++) { const x = (L * i) / 120; pres.push([x, wAt(x) / B]); }
+    } else {
+      const N = 60, dx = L / N, ks = gk() * 1000, sup = [];
+      for (let i = 0; i <= N; i++) sup.push({ x: i * dx, type: "spring", k: ks * B * dx * (i === 0 || i === N ? 0.5 : 1) });
+      beam = CB.beam({ L, EI, supports: sup, loads: [{ type: "point", P: Pu1, a: x1 }, { type: "point", P: Pu2, a: x2 }] });
+      if (beam.ok) pres = beam.reactions.map((rr, i) => [rr.x, rr.R / (B * dx * (i === 0 || i === N ? 0.5 : 1))]);
+    }
+    const smp = beam.ok ? beam.sample(240) : [], Mneg = Math.min(0, ...smp.map((p) => p.M)), Mpos = Math.max(0, ...smp.map((p) => p.M));
+    const rig = []; for (let i = 0; i <= 120; i++) { const x = (L * i) / 120; rig.push([x, wAt(x) / B]); }
+    const d = gh() - 100, As = CB.rc.asReq(-Mneg, B * 1000, d, 30, 500);
+    return { P1, P2, x2, L, Pu1, Pu2, Pu, xb, e, w1, w2, beam, pres, rig, smp, Mneg, Mpos, As, d, Lclip: L > gL() + 1e-9 };
+  }
+  const draw1 = (ctx, W, H) => {
+    const pal = CB.palette(), r = R || calc(), sc = (W - 70) / r.L, X = (x) => 40 + x * sc, yf = 70, hf = Math.max(12, Math.min(30, (gh() / 1000) * sc * 0.5));
+    FT.line(ctx, [[X(0), 18], [X(0), H - 6]], pal.bad, 1.4, [6, 3]);
+    FT.rect(ctx, X(0), yf, r.L * sc, hf, FT.alpha(pal.dim, 0.18), pal.dim);
+    [[x1, 0.4, r.Pu1], [r.x2, 0.5, r.Pu2]].forEach(([x, c, P]) => { FT.rect(ctx, X(x - c / 2), yf - 26, c * sc, 26, FT.alpha(pal.text, 0.35), pal.text); FT.arrow(ctx, X(x), 26, X(x), yf - 28, pal.accent2, 2.4, 9); FT.text(ctx, `${FT.k(P)} kN`, X(x) + 8, 36, pal.accent2, { align: "left", size: 11 }); });
+    FT.line(ctx, [[X(r.xb), yf - 8], [X(r.xb), yf + hf + 8]], pal.accent, 1.4, [3, 3]);
+    const qmax = Math.max(1, ...r.pres.map((p) => p[1]), ...r.rig.map((p) => p[1])), py = (q) => yf + hf + 4 + (q / qmax) * (H - yf - hf - 22);
+    FT.poly(ctx, [[X(0), py(0)], ...r.pres.map(([x, q]) => [X(x), py(Math.max(0, q))]), [X(r.L), py(0)]], FT.alpha(pal.compression, 0.2), pal.compression, 1.6);
+    if (mode() !== "rigid") FT.line(ctx, r.rig.map(([x, q]) => [X(x), py(q)]), pal.dim, 1.3, [5, 4]);
+    const qm = Math.max(...r.pres.map((p) => p[1])); const im = r.pres.findIndex((p) => p[1] === qm);
+    if (im >= 0) FT.text(ctx, `${FT.k(qm)} kPa`, Math.min(W - 40, X(r.pres[im][0])), py(qm) + 10, pal.compression, { size: 11 });
+  };
+  const draw2 = (ctx, W, H) => {
+    const pal = CB.palette(), r = R || calc(); if (!r.beam.ok) return;
+    const box1 = { x: 54, y: 28, w: W - 70, h: H * 0.32 }, box2 = { x: 54, y: H * 0.5, w: W - 70, h: H * 0.42 };
+    const Vm = Math.max(1, ...r.smp.map((p) => Math.abs(p.V))) * 1.1, Mm = Math.max(1, ...r.smp.map((p) => Math.abs(p.M))) * 1.15;
+    const c1 = CB.chart(ctx, box1, { x: [0, r.L], y: [-Vm, Vm], yLabel: "V (kN)", series: [{ data: r.smp.map((p) => [p.x, p.V]), color: pal.accent2, width: 2, fill: FT.alpha(pal.accent2, 0.1) }], xFmt: () => "" });
+    const c2 = CB.chart(ctx, box2, { x: [0, r.L], y: [-Mm, Mm], yLabel: "M (kN·m)", yFmt: (v) => String(-v), series: [{ data: r.smp.map((p) => [p.x, -p.M]), color: pal.accent, width: 2.2, fill: FT.alpha(pal.accent, 0.14) }] });
+    const iN = r.smp.findIndex((p) => p.M === r.Mneg);
+    if (iN >= 0 && r.Mneg < -1) FT.text(ctx, `${FT.k(r.Mneg)} (위 인장)`, c2.X(r.smp[iN].x), c2.Y(-r.Mneg) - 10, pal.accent, { size: 11 });
+    const iP = r.smp.findIndex((p) => p.M === r.Mpos);
+    if (iP >= 0 && r.Mpos > 1) FT.text(ctx, `+${FT.k(r.Mpos)} (아래 인장)`, Math.min(W - 70, c2.X(r.smp[iP].x)), c2.Y(-r.Mpos) + 12, pal.accent, { size: 11 });
+  };
+  const cv1 = CB.canvas("#ft-cv-cb1", draw1, { aspect: (W) => (W < 520 ? 0.5 : 0.3), minHeight: 170, maxHeight: 240 });
+  const cv2 = CB.canvas("#ft-cv-cb2", draw2, { aspect: (W) => (W < 520 ? 0.75 : 0.42), minHeight: 230, maxHeight: 330 });
+  function go() {
+    R = calc(); cv1.redraw(); cv2.redraw(); const r = R;
+    CB.stat("ft-cb-o-x", `${r.xb.toFixed(2)} m · ${Math.abs(r.e) < 0.005 ? "0.00" : (r.e > 0 ? "+" : "−") + Math.abs(r.e).toFixed(2)} m`);
+    const qs = r.pres.map((p) => p[1]);
+    CB.stat("ft-cb-o-q", `${FT.k(Math.max(...qs))} · ${FT.k(Math.max(0, Math.min(...qs)))} kPa`);
+    CB.stat("ft-cb-o-m", `${FT.k(r.Mneg)} · +${FT.k(r.Mpos)} kN·m`);
+    CB.stat("ft-cb-o-as", isFinite(r.As) ? `${FT.k(r.As)} mm² (d ${r.d})` : "단면 부족");
+    const rig = mode() === "rigid";
+    if (!r.beam.ok) FT.msg("ft-cb-msg", "해석 불안정 — 입력을 확인하세요.", "bad");
+    else if (Math.abs(r.e) > r.L / 6) FT.msg("ft-cb-msg", `편심 ${Math.abs(r.e).toFixed(2)} m &gt; L/6 — 접지면 일부가 들린다. "L = 2x̄로 맞추기"를 누르세요.`, "bad");
+    else if (Math.abs(r.e) < 0.02) FT.msg("ft-cb-msg", `합력과 도심이 일치(L = ${r.L.toFixed(2)} m) → ${rig ? "고른 접지압 " + FT.k(r.Pu / (r.L * B)) + " kPa" : "탄성 지반: 기둥 아래로 접지압이 몰린다(점선은 강체 가정)"}. 기둥 반력 검산 ${rig ? FT.k(-r.beam.reactions[0].R) + " · " + FT.k(-r.beam.reactions[1].R) + " kN" : "—"}.`, "ok");
+    else FT.msg("ft-cb-msg", `편심 ${r.e >= 0 ? "+" : "−"}${Math.abs(r.e).toFixed(2)} m → 사다리꼴 접지압${r.Lclip ? " (L이 안쪽 기둥에 닿지 않게 " + r.L.toFixed(2) + " m로 늘림)" : ""}.`, "");
+  }
+  go();
+})();
+
+/* ---------- 6. 말뚝 머리 반력 ---------- */
+(function () {
+  const lay = CB.seg("ft-pl-lay", go), gs = CB.range("ft-pl-s", (v) => v.toFixed(1) + " (" + (v * 0.6).toFixed(2) + " m)", go), gP = CB.range("ft-pl-P", (v) => FT.k(v) + " kN", go);
+  const gMy = CB.range("ft-pl-My", (v) => FT.k(v) + " kN·m", go), gMx = CB.range("ft-pl-Mx", (v) => FT.k(v) + " kN·m", go), gw = CB.seg("ft-pl-w", go);
+  const g = (xs, ys) => xs.flatMap((x) => ys.map((y) => [x, y])), c = 0.70711;
+  const LAY = { 4: g([-0.5, 0.5], [-0.5, 0.5]), 5: [[0, 0], [-c, -c], [c, -c], [-c, c], [c, c]], 6: g([-1, 0, 1], [-0.5, 0.5]), 9: g([-1, 0, 1], [-1, 0, 1]) };
+  const D = 0.6, Qa = 1500;
+  function calc() {
+    const s = gs() * D, pts = LAY[lay()].map(([x, y]) => [x * s, y * s]), n = pts.length;
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]), Wx = Math.ceil((Math.max(...xs) - Math.min(...xs) + 2 * D) * 10 - 1e-9) / 10, Wy = Math.ceil((Math.max(...ys) - Math.min(...ys) + 2 * D) * 10 - 1e-9) / 10;
+    const Wc = gw() === "1" ? Wx * Wy * 1.4 * 24 : 0, P = gP() + Wc, sx2 = xs.reduce((a, x) => a + x * x, 0), sy2 = ys.reduce((a, y) => a + y * y, 0);
+    const R = pts.map(([x, y]) => P / n + (sx2 > 0 ? (gMy() * x) / sx2 : 0) + (sy2 > 0 ? (gMx() * y) / sy2 : 0));
+    return { s, pts, n, Wx, Wy, Wc, P, R, Rmax: Math.max(...R), Rmin: Math.min(...R) };
+  }
+  const cv = CB.canvas("#ft-cv-pl", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), sc = Math.min(W - 40, H - 40) / Math.max(r.Wx, r.Wy, 3), cx = W / 2, cy = H / 2, X = (x) => cx + x * sc, Y = (y) => cy - y * sc;
+    FT.rect(ctx, X(-r.Wx / 2), Y(r.Wy / 2), r.Wx * sc, r.Wy * sc, FT.alpha(pal.dim, 0.14), pal.dim);
+    FT.rect(ctx, X(-0.4), Y(0.4), 0.8 * sc, 0.8 * sc, FT.alpha(pal.text, 0.25), pal.text, 1, [3, 3]);
+    r.pts.forEach(([x, y], i) => {
+      const q = r.R[i], u = q / Qa, col = q < 0 ? pal.bad : u > 1 ? pal.bad : u > 0.9 ? pal.warn : pal.ok;
+      ctx.save(); ctx.fillStyle = FT.alpha(col, 0.28); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(x), Y(y), (D / 2) * sc, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+      FT.text(ctx, FT.k(q), X(x), Y(y), pal.text, { size: Math.max(10, Math.min(13, sc * 0.17)) });
+    });
+    const My = gMy(), Mx = gMx();
+    if (Math.abs(My) > 0) { FT.arrow(ctx, X(0), Y(-r.Wy / 2) + 14, X(Math.sign(My) * Math.min(r.Wx / 2, 0.4 + Math.abs(My) / 2000)), Y(-r.Wy / 2) + 14, pal.accent2, 2, 8); FT.text(ctx, "My", X(0) - 14, Y(-r.Wy / 2) + 14, pal.accent2, { align: "right", size: 11 }); }
+    if (Math.abs(Mx) > 0) { FT.arrow(ctx, X(r.Wx / 2) + 14, Y(0), X(r.Wx / 2) + 14, Y(Math.sign(Mx) * Math.min(r.Wy / 2, 0.4 + Math.abs(Mx) / 2000)), pal.accent2, 2, 8); }
+    FT.text(ctx, `${r.Wx.toFixed(1)} × ${r.Wy.toFixed(1)} m`, X(0), Y(r.Wy / 2) - 10, pal.dim, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.66), minHeight: 280, maxHeight: 460 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("ft-pl-o-r", `${FT.k(r.Rmax)} · ${FT.k(r.Rmin)} kN`);
+    CB.stat("ft-pl-o-u", `${(r.Rmax / Qa).toFixed(2)}`);
+    CB.stat("ft-pl-o-f", `최대 ${FT.k(1.35 * r.Rmax)} kN`);
+    CB.stat("ft-pl-o-sz", `${r.Wx.toFixed(1)} × ${r.Wy.toFixed(1)} m${r.Wc ? " · 자중 " + FT.k(r.Wc) + " kN" : ""}`);
+    if (r.Rmin < 0) FT.msg("ft-pl-msg", `인발 발생(R<sub>min</sub> = ${FT.k(r.Rmin)} kN) — 말뚝 허용 인발력과 이음 상세를 확인하거나 배치를 키운다.`, "bad");
+    else if (r.Rmax > Qa) FT.msg("ft-pl-msg", `최대 반력 ${FT.k(r.Rmax)} kN &gt; 허용 ${Qa} kN — 말뚝을 늘리거나 간격을 넓힌다.`, "bad");
+    else FT.msg("ft-pl-msg", `모든 말뚝 OK: 최대 ${FT.k(r.Rmax)} kN ≤ ${Qa} kN(이용률 ${(r.Rmax / Qa).toFixed(2)}), 인발 없음.`, "ok");
+  }
+  go();
+})();
+
+/* ---------- 7. 말뚝 캡 펀칭 ---------- */
+(function () {
+  const gh = CB.range("ft-cp-h", (v) => FT.k(v) + " mm", go), gs = CB.range("ft-cp-s", (v) => v.toFixed(2) + " m", go), gP = CB.range("ft-cp-P", (v) => FT.k(v) + " kN", go), gM = CB.range("ft-cp-M", (v) => FT.k(v) + " kN·m", go);
+  const ls = CB.seg("ft-cp-ls", go), view = CB.seg("ft-cp-view", go), Dp = 0.6;
+  const frac = (out) => CB.clamp((out + Dp / 2) / Dp, 0, 1);
+  function calc() {
+    const h = gh(), d = h - 200, dm = d / 1000, s = gs(), a = s * 0.70711, W = Math.ceil((2 * a + 1.2) * 10 - 1e-9) / 10, Pu = gP(), Mu = gM();
+    const piles = [[0, 0], [a, a], [a, -a], [-a, a], [-a, -a]].map(([x, y]) => ({ x, y, R: Pu / 5 + (x !== 0 ? (Mu * x) / (4 * a * a) : 0) }));
+    const half = 0.4 + dm / 2, b0 = 4 * (800 + d), L = ls() === "on";
+    piles.forEach((p) => { p.fc = frac(Math.max(Math.abs(p.x), Math.abs(p.y)) - half); });
+    const Vc = piles.reduce((t, p) => t + p.fc * p.R, 0), pVc = half >= W / 2 ? Infinity : (0.75 * FT.vc2(30, b0, d, 1, 40, L) * b0 * d) / 1000;
+    const xs = 0.4 + dm; piles.forEach((p) => { p.f1 = frac(p.x - xs); });
+    const V1 = piles.reduce((t, p) => t + p.f1 * p.R, 0), pV1 = 0.75 * CB.rc.Vc(30, W * 1000, d) * (L ? Math.min(1, Math.sqrt(2 / (1 + 0.004 * d))) : 1);
+    const e = W / 2 - a, b0p = Math.min(Math.PI * (600 + d), (Math.PI * (600 + d)) / 4 + 2 * e * 1000), Rp = Math.max(...piles.slice(1).map((p) => p.R));
+    const pVp = (0.75 * FT.vc2(30, b0p, d, 1, 20, L) * b0p * d) / 1000;
+    return { h, d, dm, s, a, W, Pu, Mu, piles, half, b0, Vc, pVc, xs, V1, pV1, e, b0p, Rp, pVp };
+  }
+  const cv = CB.canvas("#ft-cv-cp", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), wide = W >= 560, v = view();
+    const S = wide ? Math.min(H - 40, W * 0.52) : Math.min(W - 40, H * 0.56), ox = wide ? 20 : (W - S) / 2, oy = wide ? (H - S) / 2 : 14, sc = S / r.W;
+    const X = (x) => ox + S / 2 + x * sc, Y = (y) => oy + S / 2 - y * sc;
+    FT.rect(ctx, X(-r.W / 2), Y(r.W / 2), S, S, FT.alpha(pal.dim, 0.12), pal.dim);
+    ctx.save(); ctx.beginPath(); ctx.rect(X(-r.W / 2), Y(r.W / 2), S, S); ctx.clip();
+    if (v === "col") FT.rect(ctx, X(-r.half), Y(r.half), 2 * r.half * sc, 2 * r.half * sc, FT.alpha(pal.compression, 0.08), pal.compression, 2, [6, 4]);
+    if (v === "one") { FT.rect(ctx, X(r.xs), Y(r.W / 2), (r.W / 2 - r.xs) * sc, S, FT.alpha(pal.accent2, 0.15), null); FT.line(ctx, [[X(r.xs), Y(r.W / 2)], [X(r.xs), Y(-r.W / 2)]], pal.accent2, 2, [6, 4]); }
+    if (v === "pile") { const p = r.piles[1]; ctx.save(); ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), (0.3 + r.dm / 2) * sc, 0, Math.PI * 2); ctx.fillStyle = FT.alpha(pal.compression, 0.1); ctx.fill(); ctx.strokeStyle = pal.compression; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.stroke(); ctx.restore(); }
+    ctx.restore();
+    FT.rect(ctx, X(-0.4), Y(0.4), 0.8 * sc, 0.8 * sc, FT.alpha(pal.text, 0.5), pal.text);
+    r.piles.forEach((p) => {
+      const f = v === "one" ? p.f1 : v === "col" ? p.fc : null, col = f == null ? pal.accent : f > 0.999 ? pal.accent2 : f < 0.001 ? pal.ok : pal.warn;
+      ctx.save(); ctx.fillStyle = FT.alpha(col, 0.3); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 0.3 * sc, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+      FT.text(ctx, f == null ? FT.k(p.R) : Math.round(f * 100) + " %", X(p.x), Y(p.y), pal.text, { size: 11 });
+    });
+    const box = wide ? { x: ox + S + 30, y: oy + 6, w: W - (ox + S + 30) - 70, h: S - 12 } : { x: 20, y: oy + S + 22, w: W - 110, h: H - (oy + S + 22) - 6 };
+    FT.bars(ctx, box, [{ name: "기둥 펀칭", u: r.Vc, c: isFinite(r.pVc) ? r.pVc : 0 }, { name: "1방향", u: r.V1, c: r.pV1 }, { name: "모서리 말뚝 펀칭", u: r.Rp, c: r.pVp }], pal);
+  }, { aspect: (W) => (W < 560 ? 1.4 : 0.6), minHeight: 320, maxHeight: 600 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("ft-cp-o-d", `${FT.k(r.d)} · ${FT.k(r.b0)} mm`);
+    CB.stat("ft-cp-o-col", isFinite(r.pVc) ? `${FT.k(r.Vc)} / ${FT.k(r.pVc)} kN` : "둘레가 캡 밖");
+    CB.stat("ft-cp-o-one", `${FT.k(r.V1)} / ${FT.k(r.pV1)} kN`);
+    CB.stat("ft-cp-o-pile", `${FT.k(r.Rp)} / ${FT.k(r.pVp)} kN`);
+    const ok = r.Vc <= r.pVc && r.V1 <= r.pV1 && r.Rp <= r.pVp && r.d >= 300, fC = r.piles[1].fc;
+    const note = fC < 0.05 ? " 모서리 말뚝이 펀칭 둘레 안 → 하중은 경사 스트럿으로 직접 흐른다(14장 STM)." : fC < 0.999 ? ` 모서리 말뚝 반력의 ${Math.round(fC * 100)} %만 기둥 펀칭에 들어간다.` : "";
+    FT.msg("ft-cp-msg", ok ? `캡 ${r.W.toFixed(1)} × ${r.W.toFixed(1)} m, h = ${FT.k(r.h)} mm: 모든 전단 검토 OK.${note}` : `전단 불합격: ${r.Vc > r.pVc ? "기둥 펀칭 " : ""}${r.V1 > r.pV1 ? "1방향 " : ""}${r.Rp > r.pVp ? "말뚝 펀칭 " : ""}${r.d < 300 ? "d &lt; 300 mm " : ""}— 캡을 두껍게.${note}`, ok ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 8. C1 말뚝 캡 3D ---------- */
+(function () {
+  const gh = CB.range("ft-3d-h", (v) => FT.k(v) + " mm", go), show = CB.seg("ft-3d-show", go);
+  const a = 1.8 * 0.70711, Wc = 3.8, init = { yaw: -0.75, pitch: 0.42, dist: 11.5, target: [0, 0, -0.9] };
+  const box = (x0, x1, y0, y1, z0, z1) => [[[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]]];
+  const piles = [[0, 0], [a, a], [a, -a], [-a, a], [-a, -a]];
+  const orb = CB.orbit("#ft-cv-3d", Object.assign({}, init, {
+    aspect: 0.7, minHeight: 300, maxHeight: 480,
+    draw(V) {
+      const pal = V.P, h = gh() / 1000, d = h - 0.2, mode = show(), faces = [];
+      box(-Wc / 2, Wc / 2, -Wc / 2, Wc / 2, -h, 0).forEach((f) => faces.push({ f, fill: pal.dim, al: 0.13, st: FT.alpha(pal.dim, 0.7) }));
+      box(-0.4, 0.4, -0.4, 0.4, 0, 1.4).forEach((f) => faces.push({ f, fill: pal.text, al: 0.28, st: pal.text }));
+      piles.forEach(([x, y], i) => {
+        const N = 8, r = 0.3, z0 = -h + 0.1, z1 = -h - 1.6, ring = (z) => Array.from({ length: N }, (_, k) => [x + r * Math.cos((2 * Math.PI * k) / N), y + r * Math.sin((2 * Math.PI * k) / N), z]);
+        const A = ring(z0), B = ring(z1);
+        for (let k = 0; k < N; k++) faces.push({ f: [A[k], A[(k + 1) % N], B[(k + 1) % N], B[k]], fill: i ? pal.accent2 : pal.accent, al: 0.35, st: null });
+      });
+      faces.sort((p, q) => V.depth(q.f) - V.depth(p.f)).forEach((o) => V.poly3(o.f, { fill: o.fill, fillAlpha: o.al, stroke: !!o.st, color: o.st || undefined, width: 1 }));
+      if (mode === "crit") {
+        const hf = 0.4 + d / 2;
+        box(-hf, hf, -hf, hf, -d, 0).forEach((f) => V.poly3(f, { stroke: true, color: pal.compression, width: 1.6, dash: [5, 4] }));
+        V.text3("b₀ (d/2)", [hf, -hf, 0.15], { color: pal.compression, size: 12, bold: true });
+      } else if (mode === "bars") {
+        const zb = -h + 0.2, n = 17;
+        for (let i = 0; i < n; i++) { const t = -Wc / 2 + 0.1 + ((Wc - 0.2) * i) / (n - 1); V.line3([-Wc / 2 + 0.075, t, zb], [Wc / 2 - 0.075, t, zb], { color: pal.tension, width: 1.4 }); V.line3([t, -Wc / 2 + 0.075, zb + 0.03], [t, Wc / 2 - 0.075, zb + 0.03], { color: pal.tension, width: 1.4 }); }
+        V.text3("17-D25 두 방향", [Wc / 2, Wc / 2, zb], { color: pal.tension, size: 12, bold: true, dx: 10 });
+      } else {
+        const zt = -0.15, zb = -h + 0.2;
+        piles.forEach(([x, y]) => V.line3([Math.sign(x) * 0.2, Math.sign(y) * 0.2, zt], [x, y, zb], { color: pal.compression, width: 3.2 }));
+        [[[a, a], [a, -a]], [[-a, a], [-a, -a]], [[a, a], [-a, a]], [[a, -a], [-a, -a]]].forEach(([p, q]) => V.line3([p[0], p[1], zb], [q[0], q[1], zb], { color: pal.tension, width: 3 }));
+        V.text3("스트럿", [a / 2, -a / 2, (zt + zb) / 2], { color: pal.compression, size: 12, bold: true, dx: 12 });
+        V.text3("타이", [a, 0, zb], { color: pal.tension, size: 12, bold: true, dx: 14 });
+      }
+      V.text3("C1", [0, 0, 1.55], { color: pal.text, size: 12, bold: true });
+    },
+  }));
+  document.getElementById("ft-3d-reset").addEventListener("click", () => orb.set(Object.assign({}, init)));
+  function go() {
+    orb.redraw(); const h = gh() / 1000, d = h - 0.2, half = 0.4 + d / 2, f = CB.clamp((a - half + 0.3) / 0.6, 0, 1), z = h - 0.35, hor = Math.SQRT2 * (a - 0.2);
+    CB.stat("ft-3d-o-d", `${FT.k(d * 1000)} mm`); CB.stat("ft-3d-o-f", `${Math.round(f * 100)} %`); CB.stat("ft-3d-o-a", `${((Math.atan(z / hor) * 180) / Math.PI).toFixed(1)}°`);
+  }
+  go();
+})();
+</script>
+</body>
+</html>

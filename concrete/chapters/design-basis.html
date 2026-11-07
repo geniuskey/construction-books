@@ -1,0 +1,1018 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>강도 설계의 기초 · ConcreteBook</title>
+<meta name="description" content="설계 강도 φSn ≥ 소요 강도 U. 허용 응력 설계에서 강도 설계로, 하중 조합과 신뢰도, 기본 가정, 포물선–직선 분포에서 유도하는 등가 직사각형 응력 블록, 변형률 적합, φ와 εt, 인장 지배·압축 지배 단면, 균형 철근비를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .db-stack { display: grid; grid-template-columns: 1fr; }
+  .db-stack > div { position: relative; min-width: 0; }
+  .db-stack > div + div { border-top: 1px solid var(--border); }
+  .db-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .db-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .db-msg b { color: var(--text); }
+  .db-msg.ok { color: var(--ok); font-weight: 600; }
+  .db-msg.bad { color: var(--bad); font-weight: 600; }
+  .db-msg.warn { color: var(--warn); font-weight: 600; }
+  .db-tbl td, .db-tbl th { font-variant-numeric: tabular-nums; }
+  .db-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .db-steps { margin: 6px 0 0; }
+  .db-steps li { margin: 4px 0; }
+  #db-cv-strain { touch-action: none; cursor: ns-resize; }
+  #db-cv-phi { touch-action: pan-y; cursor: ew-resize; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="concrete"></script>
+</head>
+<body data-chapter="design-basis">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="db-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="db-ah-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--compression)"/></marker>
+      <marker id="db-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--tension)"/></marker>
+      <marker id="db-ah-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 02</div>
+    <h1 data-no-glossary>강도 설계의 기초</h1>
+    <p class="lead">1장에서 G1의 공칭 휨강도를 \(M_n = A_sf_y(d - a/2)\)로 미리 계산했습니다. 이 장은 그 식이 어디서 왔는지를 처음부터 세웁니다. 설계의 약속은 한 줄입니다: <b>설계 강도 \(\phi S_n\) ≥ 소요 강도 \(U\)</b>. 하중 쪽은 하중 계수로 키우고(StructureBook 2장), 저항 쪽은 강도 감소 계수 φ로 줄입니다. 저항을 계산하려면 파괴 순간의 단면을 알아야 하므로, 평면 유지와 극한 변형률 같은 기본 가정을 세우고, 실제 콘크리트 응력 분포(포물선–직선)를 <b>합력과 작용점이 같은</b> 직사각형 블록으로 바꾸고, 변형률 적합과 힘의 평형으로 중립축을 찾습니다. 마지막으로 파괴 순간의 철근 변형률 \(\varepsilon_t\)로 단면을 인장 지배·변화 구간·압축 지배로 나누고, 그에 따라 φ와 철근량의 상한이 정해지는 과정을 시뮬레이터로 따라갑니다.</p>
+    <ul class="objectives">
+      <li>허용 응력 설계와 강도 설계(한계상태 설계)의 차이를 설명하고, \(\phi S_n \ge U\)의 두 쪽이 각각 무엇을 담는지 말한다.</li>
+      <li>하중 조합으로 소요 강도 U를 구하고(G1 \(w_u\) ≈ 100 kN/m), 하중 계수와 φ가 파괴 확률(신뢰도 지수 β)에 미치는 영향을 계산한다.</li>
+      <li>강도 설계의 다섯 가지 기본 가정을 단면 그림 위에서 설명한다.</li>
+      <li>포물선–직선 응력 분포를 적분해 합력 계수와 작용점을 구하고, 등가 직사각형 응력 블록의 η·0.85fck와 \(a = \beta_1c\)가 그 둘을 맞춘 것임을 보인다.</li>
+      <li>변형률 적합과 힘의 평형(C = T)으로 중립축 깊이 c를 구하고 철근 항복 여부를 확인한다.</li>
+      <li>\(\varepsilon_t\)로 인장 지배·변화 구간·압축 지배 단면을 판정하고 φ(<code>CB.rc.phi</code>), 최소 허용 인장 변형률(<code>etMin</code>), 균형 철근비(<code>rhoB</code>)를 계산한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>같은 안전율, 다른 안전</b></div>
+      <div class="o-body"><p>사용 하중 모멘트가 똑같이 300 kN·m인 보 두 개가 있다고 합시다. 하나는 고정하중이 250, 활하중이 50이고(두꺼운 지붕), 다른 하나는 고정하중이 50, 활하중이 250입니다(창고 바닥). 20세기 중반까지 쓰던 <b>허용 응력 설계</b>는 두 보를 똑같이 다뤘습니다. 사용 하중에서 콘크리트와 철근의 응력이 허용값(강도의 일정 비율) 아래면 합격입니다. 그런데 고정하중은 도면대로 거의 정확히 오고, 활하중은 사용자가 무엇을 쌓느냐에 따라 크게 흩어집니다. 같은 안전율이라도 두 번째 보가 무너질 확률이 훨씬 큽니다.</p>
+        <p><b>강도 설계</b>는 하중마다 다른 계수(고정 1.2, 활 1.6)를 곱해 이 차이를 반영합니다. 첫 보의 소요 강도는 \(1.2 \times 250 + 1.6 \times 50 = 380\), 두 번째는 \(1.2 \times 50 + 1.6 \times 250 = 460\) kN·m입니다. 그리고 비교 대상은 사용 하중의 응력이 아니라 <b>파괴 순간의 강도</b>입니다. 그 강도를 계산하는 방법의 출발점이 1937년 휘트니(C. S. Whitney)가 제안한 직사각형 응력 블록이며, 미국 ACI 318은 1956년 부록, 1963년 병기를 거쳐 1971년부터 강도 설계를 중심에 두었습니다.</p>
+        <div class="o-chain"><span>하중의 불확실성 · 재료·시공의 불확실성</span><i>→</i><span class="tool">하중 계수 · φ · 응력 블록 · 변형률 적합</span><i>→</i><span>φM<sub>n</sub> ≥ M<sub>u</sub> · 연성 확보</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="philosophy">
+    <h2>허용 응력 설계에서 강도 설계로</h2>
+    <div class="problem"><strong>사용 하중의 응력을 볼 것인가, 파괴 순간의 강도를 볼 것인가</strong>
+      <p>설계자가 정말 알고 싶은 것은 "이 보가 무너지지 않을 만큼 강한가"와 "평소에 너무 처지거나 균열이 넓지 않은가"입니다. 앞의 질문은 파괴 순간(극한)의 문제이고, 뒤의 질문은 사용 하중의 문제입니다. 두 설계법은 이 두 질문을 다른 방식으로 묶습니다.</p></div>
+    <figure class="diagram" id="fig-db-philo">
+      <svg viewBox="0 0 860 320" role="img" aria-label="허용 응력 설계는 사용 하중에서 탄성 응력을 허용값과 비교하고, 강도 설계는 계수 하중을 파괴 순간의 단면 강도에 φ를 곱한 값과 비교한다">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(36,36)">
+          <text x="0" y="0" class="t" style="font-weight:700">허용 응력 설계(ASD)</text>
+          <text x="0" y="22" class="t-dim">사용 하중 M<tspan baseline-shift="sub" font-size="8">s</tspan> = D + L에서 탄성(균열 단면) 응력</text>
+          <rect x="20" y="44" width="70" height="170" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <circle cx="40" cy="196" r="5" style="fill:var(--tension)"/><circle cx="70" cy="196" r="5" style="fill:var(--tension)"/>
+          <line x1="150" y1="44" x2="150" y2="214" class="s-axis"/>
+          <path d="M150 44 L186 44 L150 100 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+          <line x1="150" y1="196" x2="112" y2="196" style="stroke:var(--tension);stroke-width:2.4" marker-end="url(#db-ah-t)"/>
+          <text x="192" y="52" class="t-mono" style="fill:var(--compression)">f<tspan baseline-shift="sub" font-size="8">c</tspan> ≤ f<tspan baseline-shift="sub" font-size="8">ca</tspan> (≈0.45f<tspan baseline-shift="sub" font-size="8">ck</tspan>)</text>
+          <text x="160" y="200" class="t-mono" style="fill:var(--tension)">f<tspan baseline-shift="sub" font-size="8">s</tspan> ≤ f<tspan baseline-shift="sub" font-size="8">sa</tspan> (≈0.4f<tspan baseline-shift="sub" font-size="8">y</tspan>)</text>
+          <line x1="150" y1="100" x2="196" y2="100" style="stroke:var(--warn);stroke-dasharray:4 3"/><text x="200" y="104" class="t-mono" style="fill:var(--warn)">kd</text>
+          <text x="0" y="242" class="t-dim">안전 여유 = 강도 ÷ 허용 응력(한 개의 안전율)</text>
+          <text x="0" y="262" class="t-dim">하중 종류마다 다른 불확실성을 구분하지 못한다</text>
+        </g>
+        <line x1="430" y1="36" x2="430" y2="290" style="stroke:var(--border)"/>
+        <g transform="translate(456,36)">
+          <text x="0" y="0" class="t" style="font-weight:700">강도 설계(한계상태 설계)</text>
+          <text x="0" y="22" class="t-dim">계수 하중 U = 1.2D + 1.6L 등과 파괴 순간 강도</text>
+          <rect x="20" y="44" width="70" height="170" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <circle cx="40" cy="196" r="5" style="fill:var(--tension)"/><circle cx="70" cy="196" r="5" style="fill:var(--tension)"/>
+          <path d="M26 44 l6 6 l6 -6 l6 6 l6 -6 l6 6 l6 -6 l6 6 l6 -6" style="fill:none;stroke:var(--bad);stroke-width:1.2"/>
+          <line x1="150" y1="44" x2="150" y2="214" class="s-axis"/>
+          <rect x="150" y="44" width="34" height="34" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+          <line x1="150" y1="196" x2="108" y2="196" style="stroke:var(--tension);stroke-width:2.8" marker-end="url(#db-ah-t)"/>
+          <text x="192" y="62" class="t-mono" style="fill:var(--compression)">η·0.85f<tspan baseline-shift="sub" font-size="8">ck</tspan>, a = β₁c</text>
+          <text x="160" y="200" class="t-mono" style="fill:var(--tension)">f<tspan baseline-shift="sub" font-size="8">s</tspan> = f<tspan baseline-shift="sub" font-size="8">y</tspan>(항복)</text>
+          <text x="192" y="40" class="t-mono" style="fill:var(--bad)">ε<tspan baseline-shift="sub" font-size="8">cu</tspan> = 0.0033</text>
+          <text x="0" y="242" class="t-dim">φM<tspan baseline-shift="sub" font-size="8">n</tspan> ≥ M<tspan baseline-shift="sub" font-size="8">u</tspan>: 하중은 키우고(γ) 강도는 줄인다(φ)</text>
+          <text x="0" y="262" class="t-dim">사용성(처짐·균열)은 사용 하중으로 따로 검토</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-1.</b> 두 설계법의 비교. 허용 응력 설계는 사용 하중에서 균열 단면의 탄성 응력을 허용 응력(강도의 일정 비율, ACI 대체 설계법 형태의 대략값)과 비교한다. 강도 설계는 하중 종류마다 다른 계수를 곱한 계수 하중을, 파괴 순간(압축 연단 \(\varepsilon_{cu}\))의 공칭 강도에 φ를 곱한 설계 강도와 비교하고, 사용 하중의 처짐·균열은 따로 검토한다(8장).</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 2.1 (허용 응력 설계)</strong> <span class="term">허용 응력 설계</span><span class="en">(allowable stress design, ASD)</span>는 사용 하중에서 탄성 이론으로 구한 재료 응력이 허용 응력 이하가 되게 하는 설계법이다. 허용 응력은 재료 강도를 하나의 안전율로 나눈 값이다. 계산이 사용 상태와 같아 직관적이지만, 하중마다 다른 불확실성을 구분하지 못하고 파괴 순간의 여유(연성, 응력 재분배)를 알려 주지 않는다.</div>
+    <div class="callout def"><strong>원리 2.2 (강도 설계의 기본식)</strong> <span class="term">강도 설계법</span><span class="en">(strength design method)</span>은 단면의 모든 작용(휨·전단·축력·비틀림)에 대해
+      <div class="formula">$$\phi S_n \;\ge\; U = \sum_i \gamma_i Q_i \qquad \text{예: } \phi M_n \ge M_u,\quad \phi V_n \ge V_u,\quad \phi P_n \ge P_u$$<div class="where">\(S_n\): <span class="term">공칭 강도</span><span class="en">(nominal strength)</span> — 규정된 재료 강도와 치수로 계산한 파괴 순간의 저항, \(\phi\): <span class="term">강도 감소 계수</span><span class="en">(strength reduction factor)</span>(≤ 1), \(\phi S_n\): <span class="term">설계 강도</span><span class="en">(design strength)</span>. \(U\): <span class="term">소요 강도</span><span class="en">(required strength)</span> — 하중 효과 \(Q_i\)에 <span class="term">하중 계수</span><span class="en">(load factor)</span> \(\gamma_i\)를 곱해 조합한 값 중 가장 불리한 것. 강도와 함께 사용성(처짐·균열·진동)은 사용 하중으로 따로 검토하므로, 이 체계를 <span class="term">한계상태 설계</span><span class="en">(limit state design)</span>라고도 한다.</div></div></div>
+    <p>국내 콘크리트구조 설계기준(KDS 14 20 계열, 건축물은 KDS 41 20)도 강도 설계법을 기본으로 하고, 사용성은 사용 하중으로 검토합니다(현행 기준 확인). 이 책의 계수와 식은 <code>CB.rc</code>에 들어 있는 값이며, 학습용임을 다시 밝혀 둡니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="required-strength">
+    <h2>소요 강도 U와 하중 조합</h2>
+    <div class="problem"><strong>G1이 견뎌야 할 모멘트는 얼마인가</strong>
+      <p>MechanicsBook과 StructureBook에서 G1의 하중을 정리했습니다. 고정하중 \(w_D \approx 56.7\) kN/m(바닥 52.0 + 보 자중 4.7), 활하중 \(w_L = 20\) kN/m입니다. 여기에 바람과 지진이 더해질 수도 있습니다. 어느 조합이 G1을 지배할까요?</p></div>
+    <p><span class="term">하중 조합</span><span class="en">(load combination)</span>은 "여러 하중이 동시에 최대가 될 가능성은 낮다"는 확률적 판단을 계수로 나타낸 것입니다(StructureBook <a href="../../structure/chapters/loads.html">2장</a>). 주된 하중에는 큰 계수, 함께 작용하는 하중에는 작은 계수를 붙이고, 고정하중이 저항 쪽으로 작용하는 경우(들림·전도)에는 0.9D를 씁니다. 아래 표는 KDS 형태이며 계수와 조합은 현행 기준을 확인해야 합니다.</p>
+    <div class="table-wrap"><table class="db-tbl">
+      <thead><tr><th>조합(KDS 형태)</th><th>주된 하중</th><th>G1 계수 등분포 하중</th></tr></thead>
+      <tbody>
+        <tr><td>1.4D</td><td>고정하중만</td><td>1.4 × 56.7 = 79.4 kN/m</td></tr>
+        <tr><td class="hl">1.2D + 1.6L + 0.5S</td><td>활하중(바닥)</td><td class="hl">1.2 × 56.7 + 1.6 × 20 = 100.0 kN/m</td></tr>
+        <tr><td>1.2D + 1.0W + 1.0L</td><td>풍하중</td><td>연직 68.0 + 20 = 88.0 kN/m + 풍하중 모멘트</td></tr>
+        <tr><td>1.2D + 1.0E + 1.0L</td><td>지진하중</td><td>연직 88.0 kN/m + 지진 모멘트(StructureBook 8장)</td></tr>
+        <tr><td>0.9D + 1.0W, 0.9D + 1.0E</td><td>들림·전도</td><td>연직 51.0 kN/m — 기둥 인장·기초 들림 검토</td></tr>
+      </tbody></table></div>
+    <div class="callout"><strong>예제 2.1 (G1의 소요 강도)</strong> 경간 L = 8.0 m(기둥 중심 간)인 연속보, 연직 하중 조합만 본다.
+      <ol class="db-steps">
+        <li><b>계수 하중.</b> \(w_u = \max(1.4 \times 56.7,\ 1.2 \times 56.7 + 1.6 \times 20) = \max(79.4,\ 100.0) = 100\) kN/m → 1.2D + 1.6L이 지배.</li>
+        <li><b>정모멘트.</b> 외단 경간 정모멘트의 근사 계수(교육용·보수적, 4장 연속보 해석으로 확인) \(M_u^+ \approx w_uL^2/14 = 100 \times 64/14 = 457 \approx 460\) kN·m.</li>
+        <li><b>부모멘트·전단.</b> 첫 내부 지점 \(M_u^- \approx w_uL^2/10 = 640\) kN·m, \(V_u \approx 400\) kN(5장).</li>
+        <li><b>사용 하중.</b> \(w = 56.7 + 20 = 76.7\) kN/m → \(M_a \approx 76.7 \times 64/14 = 351 \approx 350\) kN·m(8장 처짐·균열에 쓴다).</li>
+        <li><b>판정 준비.</b> 1장의 G1 4-D25(설계값 d = 610 mm)는 \(\phi M_n = 0.85 \times 568 = 483 \ge 460\) kN·m → <b>합격</b>(φ = 0.85인 이유는 이 장 뒤에서 εt로 확인).</li>
+      </ol></div>
+    <div class="sim" id="sim-db-combo">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>하중 조합과 설계 강도: 소요 vs 설계</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="db-cv-combo" aria-label="하중 조합별 계수 모멘트 막대와 설계 강도, 사용 하중 모멘트 비교"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">고정하중 w<sub>D</sub></i> <output id="db-cb-wd-out"></output></span><input type="range" id="db-cb-wd" min="20" max="120" step="0.1" value="56.7"></label>
+          <label class="ctrl"><span><i style="font-style:normal">활하중 w<sub>L</sub></i> <output id="db-cb-wl-out"></output></span><input type="range" id="db-cb-wl" min="0" max="80" step="0.5" value="20"></label>
+          <div class="ctrl"><span>모멘트 계수(L = 8 m)</span><div class="seg" id="db-cb-co"><button data-value="14" class="on">wL²/14 연속 정</button><button data-value="10">wL²/10 연속 부</button><button data-value="8">wL²/8 단순</button></div></div>
+          <label class="ctrl"><span>인장 D25 개수(d = 610) <output id="db-cb-n-out"></output></span><input type="range" id="db-cb-n" min="2" max="9" step="1" value="4"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">지배 조합 · M<sub>u</sub></span><span class="v" id="db-cb-u">—</span></div>
+        <div class="stat"><span class="k">설계 강도 φM<sub>n</sub></span><span class="v" id="db-cb-pm">—</span></div>
+        <div class="stat"><span class="k">M<sub>u</sub> / φM<sub>n</sub></span><span class="v" id="db-cb-r">—</span></div>
+        <div class="stat"><span class="k">ASD 철근 응력 f<sub>s</sub> / f<sub>sa</sub></span><span class="v" id="db-cb-asd">—</span></div>
+      </div>
+      <div class="db-msg" id="db-cb-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(G1)에서 1.2D + 1.6L이 지배하고 4-D25로 합격합니다 · 활하중을 0으로 내리면 1.4D가 지배로 바뀝니다(w<sub>L</sub>/w<sub>D</sub> &lt; 1/8 정도) · "wL²/8 단순"을 고르면 앞 권의 단순보 근사 800 kN·m가 나오고 7-D25가 필요합니다 · ASD 열은 같은 보를 사용 하중과 허용 응력으로 본 결과입니다 — 고정하중이 큰 보와 활하중이 큰 보에서 두 방법의 판정이 어긋나는 것을 찾아보세요 · 모델: 조합은 KDS 형태(1.4D, 1.2D + 1.6L), φM<sub>n</sub> = CB.rc.flexure(b 400, h 700, d 610 한 층으로 가정), ASD는 균열 단면 f<sub>s</sub> = M<sub>s</sub>/(A<sub>s</sub>jd), f<sub>sa</sub> = 0.4f<sub>y</sub> = 200 MPa(ACI 대체 설계법 형태의 교육용 값).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="reliability">
+    <h2>신뢰도로 본 안전: 하중 계수와 φ의 근거</h2>
+    <div class="problem"><strong>1.2, 1.6, 0.85는 어디서 왔나</strong>
+      <p>하중도 강도도 확률 변수입니다. 실제 하중 효과 Q는 설계값 주위로 흩어지고, 실제 강도 R도 재료·치수·시공 오차로 흩어집니다. R &lt; Q가 될 확률이 파괴 확률이고, 하중 계수와 φ는 이 확률이 구조물마다 비슷하게 작아지도록 정한 값입니다.</p></div>
+    <figure class="diagram" id="fig-db-dist">
+      <svg viewBox="0 0 860 300" role="img" aria-label="하중 효과 Q와 저항 R의 확률 분포, 공칭값과 설계값, 두 분포가 겹치는 파괴 영역">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <line x1="0" y1="200" x2="740" y2="200" class="s-axis"/>
+          <text x="736" y="220" text-anchor="end" class="t-mono">모멘트(하중 효과 · 저항)</text>
+          <path d="M40 200 C 120 200, 150 40, 210 40 C 270 40, 300 200, 380 200" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:2.4"/>
+          <path d="M300 200 C 390 200, 430 70, 500 70 C 570 70, 610 200, 700 200" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.4"/>
+          <path d="M318 200 C 330 196, 340 186, 344 180 C 352 186, 362 196, 372 200 Z" style="fill:var(--bad);opacity:.55"/>
+          <text x="210" y="30" text-anchor="middle" class="t" style="fill:var(--accent-2);font-weight:700">하중 효과 Q</text>
+          <text x="500" y="60" text-anchor="middle" class="t" style="fill:var(--accent);font-weight:700">저항 R</text>
+          <g style="stroke-width:1.4;stroke-dasharray:4 3">
+            <line x1="226" y1="40" x2="226" y2="200" style="stroke:var(--accent-2)"/>
+            <line x1="300" y1="80" x2="300" y2="200" style="stroke:var(--accent-2)"/>
+            <line x1="380" y1="80" x2="380" y2="200" style="stroke:var(--accent)"/>
+            <line x1="470" y1="70" x2="470" y2="200" style="stroke:var(--accent)"/>
+          </g>
+          <g class="t-mono" text-anchor="middle">
+            <text x="226" y="236">Q<tspan baseline-shift="sub" font-size="8">n</tspan></text>
+            <text x="300" y="236" style="fill:var(--accent-2)">U = γQ<tspan baseline-shift="sub" font-size="8">n</tspan></text>
+            <text x="380" y="236" style="fill:var(--accent)">φR<tspan baseline-shift="sub" font-size="8">n</tspan> ≥ U</text>
+            <text x="470" y="236">R<tspan baseline-shift="sub" font-size="8">n</tspan></text>
+          </g>
+          <line x1="344" y1="176" x2="400" y2="130" style="stroke:var(--bad)"/>
+          <text x="404" y="128" class="t-mono" style="fill:var(--bad)">R &lt; Q: 파괴 확률 P<tspan baseline-shift="sub" font-size="8">f</tspan></text>
+          <text x="0" y="258" class="t-dim">하중 계수 γ는 Q를 오른쪽 꼬리로, φ는 R을 왼쪽 꼬리로 옮긴다. 두 분포의 평균 차이를 표준편차로 잰 것이 신뢰도 지수 β.</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-2.</b> 하중 효과 Q와 저항 R의 분포(개념도). 공칭 하중 \(Q_n\)에 하중 계수를 곱한 U와, 공칭 강도 \(R_n\)에 φ를 곱한 설계 강도를 같게 두면 두 분포 사이에 간격이 생긴다. 겹치는 부분(빨강)이 파괴 확률이며, 간격이 클수록 β가 커지고 파괴 확률이 작아진다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 2.3 (신뢰도 지수)</strong> 안전 여유 \(g = R - Q\)가 정규분포를 따른다고 보면
+      <div class="formula">$$\beta = \frac{\mu_R - \mu_Q}{\sqrt{\sigma_R^2 + \sigma_Q^2}}, \qquad P_f = P(R \lt Q) = \Phi(-\beta)$$<div class="where">\(\mu\), \(\sigma\): 평균과 표준편차, \(\Phi\): 표준 정규분포 누적 함수. \(\beta\): <span class="term">신뢰도 지수</span><span class="en">(reliability index)</span>, \(P_f\): <span class="term">파괴 확률</span><span class="en">(probability of failure)</span>. β = 3이면 \(P_f \approx 1.3 \times 10^{-3}\), β = 3.5이면 약 \(2.3 \times 10^{-4}\). 기준의 하중 계수와 φ는 일반 부재의 목표 β가 대략 3–3.5 안팎이 되도록 보정되었다고 알려져 있다(기준·문헌마다 다름, 교육용 설명).</div></div></div>
+    <div class="sim" id="sim-db-reliab">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>신뢰도 맛보기: γ와 φ가 파괴 확률에 미치는 영향</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view db-stack">
+          <div><canvas id="db-cv-rel" aria-label="하중 효과와 저항의 확률 밀도 곡선과 겹치는 파괴 영역"></canvas><span class="db-cap">확률 밀도: Q(주황) · R(청회)</span></div>
+          <div><canvas id="db-cv-rel-b" aria-label="활하중/고정하중 비에 따른 신뢰도 지수: 강도 설계와 단일 안전율 설계"></canvas><span class="db-cap">β vs L/D: 강도 설계(청회) · 단일 안전율(점선)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>강도 감소 계수 φ <output id="db-rl-phi-out"></output></span><input type="range" id="db-rl-phi" min="0.6" max="1" step="0.01" value="0.85"></label>
+          <label class="ctrl"><span><i style="font-style:normal">활하중 계수 γ<sub>L</sub></i> <output id="db-rl-gl-out"></output></span><input type="range" id="db-rl-gl" min="1" max="2" step="0.05" value="1.6"></label>
+          <label class="ctrl"><span>활하중/고정하중 L/D <output id="db-rl-ld-out"></output></span><input type="range" id="db-rl-ld" min="0" max="3" step="0.05" value="0.35"></label>
+          <label class="ctrl"><span><i style="font-style:normal">저항 변동 계수 V<sub>R</sub></i> <output id="db-rl-vr-out"></output></span><input type="range" id="db-rl-vr" min="0.05" max="0.25" step="0.01" value="0.12"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">R<sub>n</sub> = (1.2D + γ<sub>L</sub>L)/φ</span><span class="v" id="db-rl-rn">—</span></div>
+        <div class="stat"><span class="k">신뢰도 지수 β</span><span class="v" id="db-rl-b">—</span></div>
+        <div class="stat"><span class="k">파괴 확률 P<sub>f</sub></span><span class="v" id="db-rl-pf">—</span></div>
+        <div class="stat"><span class="k">단일 안전율(1.7) β</span><span class="v" id="db-rl-b2">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: G1(L/D = 0.35)의 기본값에서 β ≈ 3.1입니다 · φ를 0.85에서 0.75로 내리면 β가 얼마나 오르는지 보세요(전단 φ = 0.75) · 아래 그래프에서 하나의 안전율(R<sub>n</sub> = 1.7(D + L))은 활하중 비중이 커질수록 β가 꾸준히 낮아지고, 강도 설계는 L/D ≳ 0.5에서 거의 일정합니다(L/D가 아주 작을 때는 1.4D 조합이 받쳐 줍니다) — 불확실성이 큰 하중에 큰 계수를 준 효과 · 모델: 교육용 통계값. D: 평균/공칭 1.05, 변동 계수 0.10. L(설계 기간 최대): 평균/공칭 1.0, 변동 계수 0.25. R: 평균/공칭 1.15, 변동 계수 V<sub>R</sub>. 모두 정규분포로 근사하고 β = (μ<sub>R</sub> − μ<sub>Q</sub>)/√(σ<sub>R</sub>² + σ<sub>Q</sub>²), P<sub>f</sub> = CB.normCdf(−β). 실제 보정은 대수정규분포·FORM 등을 쓴다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="phi-factors">
+    <h2>강도 감소 계수 φ</h2>
+    <div class="problem"><strong>왜 휨은 0.85, 기둥은 0.65인가</strong>
+      <p>φ는 단순히 "재료가 약할 수도 있으니 조금 깎는" 계수가 아닙니다. 공칭 강도식의 정확도, 파괴가 얼마나 갑작스러운지, 그 부재가 무너졌을 때의 결과까지 함께 담습니다. 그래서 같은 콘크리트라도 경고 없이 부서지는 압축 지배 부재와 전단에 더 작은 값을 씁니다.</p></div>
+    <div class="table-wrap"><table class="db-tbl">
+      <thead><tr><th>작용·단면(KDS 14 20 10 형태)</th><th>φ</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>인장 지배 단면(휨)</td><td class="hl">0.85</td><td>철근 항복 → 연성, 강도식이 정확</td></tr>
+        <tr><td>압축 지배 단면 — 나선 철근 기둥</td><td>0.70</td><td>나선의 구속으로 어느 정도 연성</td></tr>
+        <tr><td>압축 지배 단면 — 그 밖(띠철근 기둥 등)</td><td>0.65</td><td>콘크리트 압괴, 취성, 기둥 파괴의 결과가 큼</td></tr>
+        <tr><td>변화 구간 단면</td><td>0.65(0.70)–0.85 직선 보간</td><td>ε<sub>t</sub>에 따라 연속적으로</td></tr>
+        <tr><td>전단·비틀림</td><td>0.75</td><td>사인장 파괴의 취성, 강도식의 흩어짐</td></tr>
+        <tr><td>콘크리트 지압</td><td>0.65</td><td>국부 압괴</td></tr>
+        <tr><td>스트럿–타이 모델</td><td>0.75</td><td>14장</td></tr>
+        <tr><td>무근 콘크리트(휨·압축·전단)</td><td>0.55</td><td>첫 균열 = 파괴</td></tr>
+      </tbody></table></div>
+    <p>표의 값은 국내 기준의 형태를 정리한 것으로 현행 기준을 확인해야 합니다. 이 장의 핵심은 첫 세 줄입니다. 휨과 축력을 받는 단면의 φ는 부재 종류(보냐 기둥이냐)가 아니라 <b>파괴 순간 인장 철근이 얼마나 늘어났는가</b>, 곧 순인장 변형률 \(\varepsilon_t\)로 정합니다. 그 값을 구하려면 파괴 순간의 단면을 계산할 수 있어야 하므로, 먼저 기본 가정을 세웁니다.</p>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="assumptions">
+    <h2>강도 설계의 기본 가정</h2>
+    <div class="problem"><strong>파괴 순간의 단면을 어떻게 그릴까</strong>
+      <p>1장의 섬유 해석은 콘크리트 응력–변형률 곡선 전체를 적분했습니다. 정확하지만 손계산에는 무겁습니다. 강도 설계는 몇 가지 가정으로 파괴 순간(압축 연단 변형률 = \(\varepsilon_{cu}\))의 단면을 단순하게 만들어, 손으로 강도를 계산할 수 있게 합니다.</p></div>
+    <figure class="diagram" id="fig-db-assume">
+      <svg viewBox="0 0 860 330" role="img" aria-label="단면, 변형률 분포, 실제 응력 분포, 등가 직사각형 응력 블록과 합력. 기본 가정 다섯 가지 표시">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(40,44)">
+          <g class="t" style="font-weight:700"><text x="20" y="-10">단면</text><text x="180" y="-10">변형률</text><text x="350" y="-10">실제 응력</text><text x="520" y="-10">등가 블록 · 합력</text></g>
+          <rect x="0" y="0" width="100" height="220" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <circle cx="25" cy="196" r="6" style="fill:var(--tension)"/><circle cx="50" cy="196" r="6" style="fill:var(--tension)"/><circle cx="75" cy="196" r="6" style="fill:var(--tension)"/>
+          <line x1="-6" y1="72" x2="680" y2="72" style="stroke:var(--warn);stroke-dasharray:5 4"/>
+          <text x="104" y="68" class="t-mono" style="fill:var(--warn)">중립축 c</text>
+          <g class="t-mono"><text x="-24" y="200">d</text></g>
+          <line x1="-12" y1="0" x2="-12" y2="196" style="stroke:var(--text-dim)" marker-start="url(#db-ah-d)" marker-end="url(#db-ah-d)"/>
+          <text x="10" y="242" class="t-mono">b</text>
+          <line x1="200" y1="0" x2="200" y2="220" class="s-axis"/>
+          <path d="M200 0 L236 0 L200 72 L138 196" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <line x1="200" y1="196" x2="138" y2="196" style="stroke:var(--tension)"/>
+          <text x="240" y="10" class="t-mono" style="fill:var(--bad)">ε<tspan baseline-shift="sub" font-size="8">cu</tspan> = 0.0033</text>
+          <text x="148" y="214" class="t-mono" style="fill:var(--tension)">ε<tspan baseline-shift="sub" font-size="8">s</tspan> = ε<tspan baseline-shift="sub" font-size="8">t</tspan></text>
+          <line x1="370" y1="0" x2="370" y2="220" class="s-axis"/>
+          <path d="M370 0 L414 0 Q416 30 400 50 Q386 66 370 72 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+          <line x1="370" y1="196" x2="330" y2="196" style="stroke:var(--tension);stroke-width:2.6" marker-end="url(#db-ah-t)"/>
+          <text x="420" y="14" class="t-mono" style="fill:var(--compression)">0.85f<tspan baseline-shift="sub" font-size="8">ck</tspan></text>
+          <text x="378" y="214" class="t-mono" style="fill:var(--tension)">A<tspan baseline-shift="sub" font-size="8">s</tspan>f<tspan baseline-shift="sub" font-size="8">s</tspan></text>
+          <line x1="540" y1="0" x2="540" y2="220" class="s-axis"/>
+          <rect x="540" y="0" width="42" height="58" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+          <line x1="600" y1="29" x2="556" y2="29" style="stroke:var(--compression);stroke-width:2.6" marker-end="url(#db-ah-c)"/>
+          <text x="606" y="33" class="t-mono" style="fill:var(--compression)">C = η0.85f<tspan baseline-shift="sub" font-size="8">ck</tspan>ab</text>
+          <line x1="560" y1="196" x2="604" y2="196" style="stroke:var(--tension);stroke-width:2.6" marker-end="url(#db-ah-t)"/>
+          <text x="610" y="200" class="t-mono" style="fill:var(--tension)">T = A<tspan baseline-shift="sub" font-size="8">s</tspan>f<tspan baseline-shift="sub" font-size="8">y</tspan></text>
+          <line x1="528" y1="0" x2="528" y2="58" style="stroke:var(--text-dim)" marker-start="url(#db-ah-d)" marker-end="url(#db-ah-d)"/>
+          <text x="512" y="34" text-anchor="end" class="t-mono">a = β₁c</text>
+          <line x1="660" y1="29" x2="660" y2="196" style="stroke:var(--text-dim)" marker-start="url(#db-ah-d)" marker-end="url(#db-ah-d)"/>
+          <text x="666" y="118" class="t-mono">z = d − a/2</text>
+        </g>
+        <g class="t-mono" transform="translate(40,300)">
+          <text x="0" y="0">① 평면 유지(변형률 직선) ② ε<tspan baseline-shift="sub" font-size="8">s</tspan> = ε<tspan baseline-shift="sub" font-size="8">c</tspan>(완전 부착) ③ 압축 연단 ε<tspan baseline-shift="sub" font-size="8">cu</tspan> ④ 철근 f<tspan baseline-shift="sub" font-size="8">s</tspan> = E<tspan baseline-shift="sub" font-size="8">s</tspan>ε<tspan baseline-shift="sub" font-size="8">s</tspan> ≤ f<tspan baseline-shift="sub" font-size="8">y</tspan> ⑤ 콘크리트 인장 무시</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-3.</b> 강도 설계의 기본 가정이 만드는 단면 그림. 변형률은 직선이고 압축 연단에서 \(\varepsilon_{cu}\)이며, 철근 변형률은 같은 깊이 콘크리트의 변형률이다. 실제 압축 응력 분포(곡선)를 합력과 작용점이 같은 직사각형 블록으로 바꾸면 C와 T, 팔 길이 z로 강도를 손으로 계산할 수 있다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 2.4 (휨·축력 강도 계산의 기본 가정, KDS 14 20 20 형태)</strong>
+      <ol class="db-steps">
+        <li><b>평면 유지.</b> 철근과 콘크리트의 변형률은 중립축에서의 거리에 비례한다(<span class="term">평면 유지 가정</span><span class="en">(plane sections assumption)</span>). 깊은 보·코벨 같은 D 영역은 예외(14장).</li>
+        <li><b>변형률 적합.</b> 철근의 변형률은 같은 위치 콘크리트의 변형률과 같다(1장 원리 1.3).</li>
+        <li><b>극한 변형률.</b> 압축 연단 콘크리트의 변형률이 <span class="term">극한 변형률</span><span class="en">(ultimate concrete strain)</span> \(\varepsilon_{cu}\)에 이를 때를 파괴로 본다. fck ≤ 40 MPa이면 0.0033, 그보다 크면 점차 작아진다(<code>CB.rc.block</code>).</li>
+        <li><b>철근은 탄성–완전소성.</b> \(f_s = E_s\varepsilon_s\)(\(\le f_y\)), \(E_s = 200{,}000\) MPa. 변형 경화는 무시한다.</li>
+        <li><b>콘크리트 인장 무시.</b> 휨강도 계산에서 콘크리트의 인장 강도는 무시한다. 압축 응력 분포는 시험 결과와 맞는 어떤 모양(직사각형·사다리꼴·포물선)이든 쓸 수 있으며, 다음 절의 등가 직사각형 블록이 대표적이다.</li>
+      </ol></div>
+    <p>가정 ③은 "콘크리트가 0.0033에서 부서진다"는 뜻이라기보다, 여러 시험에서 보의 최대 모멘트 근처의 압축 연단 변형률이 대략 0.003–0.004였다는 관찰을 하나의 값으로 정한 것입니다. ACI 318은 0.003을, KDS와 유로코드 형태는 0.0033(fck ≤ 40–50 MPa)을 씁니다. 그래서 국내 계산의 c와 a는 ACI 예제와 조금 다릅니다.</p>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="stress-block">
+    <h2>등가 직사각형 응력 블록</h2>
+    <div class="problem"><strong>곡선을 직사각형으로 바꿔도 되는 이유</strong>
+      <p>강도 계산에 필요한 것은 압축 응력 분포의 모양이 아니라 두 숫자, 압축 합력 C의 <b>크기</b>와 <b>작용점</b>(압축 연단에서의 거리)뿐입니다. 이 둘만 맞으면 어떤 모양이든 같은 \(M_n = C \cdot z\)를 줍니다. 그렇다면 실제 분포의 두 숫자를 계산해, 같은 두 숫자를 주는 가장 간단한 모양인 직사각형을 고르면 됩니다.</p></div>
+    <p>설계용 콘크리트 응력–변형률 관계로 기준이 제시하는 <span class="term">포물선–직선 응력 분포</span><span class="en">(parabola–rectangle stress distribution)</span>는 다음과 같습니다(KDS 14 20 20 형태, <code>CB.conc.sigma</code>의 "pr" 모델에 0.85를 곱한 것).</p>
+    <div class="callout def"><strong>정의 2.5 (포물선–직선 분포)</strong>
+      <div class="formula">$$f_c = \begin{cases} 0.85f_{ck}\left[1 - \left(1 - \dfrac{\varepsilon_c}{\varepsilon_{co}}\right)^{n}\right] & 0 \le \varepsilon_c \le \varepsilon_{co} \\[6pt] 0.85f_{ck} & \varepsilon_{co} \le \varepsilon_c \le \varepsilon_{cu} \end{cases}$$<div class="where">fck ≤ 40 MPa: \(n = 2\), \(\varepsilon_{co} = 0.002\), \(\varepsilon_{cu} = 0.0033\). fck &gt; 40 MPa: \(n = 1.2 + 1.5\left(\frac{100 - f_{ck}}{60}\right)^4 \le 2.0\), \(\varepsilon_{co} = 0.002 + (f_{ck} - 40)/10^5\), \(\varepsilon_{cu} = 0.0033 - (f_{ck} - 40)/10^5\)(<code>CB.conc.pr</code>, 현행 기준 확인). 0.85는 구조물 속 콘크리트 강도가 공시체보다 낮은 효과(크기, 타설 방향, 지속 하중) 등을 반영한다.</div></div></div>
+    <p>변형률이 단면 깊이에 따라 직선이므로, 압축 연단에서 중립축까지 깊이 c를 \(\xi = \varepsilon_c/\varepsilon_{cu}\)(중립축에서 0, 압축 연단에서 1)로 바꿔 적분하면 됩니다. \(r = \varepsilon_{co}/\varepsilon_{cu}\)라 두면, n = 2일 때 폭 b의 압축 합력과 그 작용점은</p>
+    <div class="formula">$$C = \alpha\,f_{ck}\,b\,c, \qquad \alpha = 0.85\left(1 - \frac{r}{3}\right), \qquad \frac{\bar y}{c} = k_2 = \frac{\tfrac12 - \tfrac{r}{3} + \tfrac{r^2}{12}}{1 - \tfrac{r}{3}}$$<div class="where">\(\bar y\): 압축 연단에서 합력 작용점까지 거리. 직선 구간(\(\xi\) = r–1)의 넓이 \(1 - r\)와 포물선 구간의 넓이 \(2r/3\)을 더한 것이 \(1 - r/3\)이고, 중립축에 대한 1차 모멘트 \((1 - r^2)/2 + 5r^2/12 = 1/2 - r^2/12\)를 넓이로 나눠 중립축에서의 거리를 구한 뒤 1에서 빼면 \(k_2\)가 된다.</div></div>
+    <div class="callout def"><strong>원리 2.6 (등가 직사각형 응력 블록)</strong> 실제 분포 대신 크기 \(\eta(0.85f_{ck})\), 깊이 \(a = \beta_1c\)인 직사각형을 쓰면 합력 \(C = \eta(0.85f_{ck})\,a\,b\)는 압축 연단에서 \(a/2\)에 작용한다. 두 분포의 합력과 작용점이 같으려면
+      <div class="formula">$$\eta \cdot 0.85 \cdot \beta_1 = \alpha, \qquad \frac{\beta_1}{2} = k_2 \quad\Longrightarrow\quad \beta_1 = 2k_2, \qquad \eta = \frac{\alpha}{0.85\,\beta_1}$$<div class="where">이렇게 정한 블록이 <span class="term">등가 직사각형 응력 블록</span><span class="en">(equivalent rectangular stress block)</span>이다. \(\beta_1\): <span class="term">응력 블록 깊이 계수</span><span class="en">(stress block depth factor)</span>, \(\eta\): 블록 크기 계수. 기준은 이 값을 반올림해 표로 준다: fck ≤ 40 MPa에서 \(\varepsilon_{cu} = 0.0033\), \(\eta = 1.00\), \(\beta_1 = 0.80\)(<code>CB.rc.block</code>).</div></div></div>
+    <figure class="diagram" id="fig-db-block">
+      <svg viewBox="0 0 860 300" role="img" aria-label="포물선-직선 응력 분포와 등가 직사각형 응력 블록, 두 합력의 크기와 작용점 비교">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(70,40)">
+          <text x="0" y="-8" class="t" style="font-weight:700">포물선–직선(fck 30)</text>
+          <line x1="0" y1="0" x2="0" y2="220" class="s-axis"/>
+          <line x1="0" y1="220" x2="240" y2="220" style="stroke:var(--warn);stroke-dasharray:5 4"/>
+          <path d="M0 0 L170 0 L170 87 Q166 160 0 220 Z" style="fill:var(--compression);opacity:.28;stroke:var(--compression);stroke-width:1.6"/>
+          <line x1="170" y1="87" x2="230" y2="87" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="176" y="80" class="t-mono">ε = ε<tspan baseline-shift="sub" font-size="8">co</tspan></text>
+          <text x="174" y="14" class="t-mono" style="fill:var(--compression)">0.85f<tspan baseline-shift="sub" font-size="8">ck</tspan></text>
+          <line x1="120" y1="91" x2="10" y2="91" style="stroke:var(--compression);stroke-width:2.6" marker-end="url(#db-ah-c)"/>
+          <text x="124" y="118" class="t-mono" style="fill:var(--compression)">C = 0.678f<tspan baseline-shift="sub" font-size="8">ck</tspan>bc</text>
+          <text x="124" y="136" class="t-mono" style="fill:var(--compression)">ȳ = 0.412c</text>
+          <text x="-8" y="224" text-anchor="end" class="t-mono" style="fill:var(--warn)">c</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="0" y="-8" class="t" style="font-weight:700">등가 직사각형 블록</text>
+          <line x1="0" y1="0" x2="0" y2="220" class="s-axis"/>
+          <line x1="0" y1="220" x2="240" y2="220" style="stroke:var(--warn);stroke-dasharray:5 4"/>
+          <rect x="0" y="0" width="170" height="176" style="fill:var(--compression);opacity:.28;stroke:var(--compression);stroke-width:1.6"/>
+          <line x1="120" y1="88" x2="10" y2="88" style="stroke:var(--compression);stroke-width:2.6" marker-end="url(#db-ah-c)"/>
+          <text x="174" y="14" class="t-mono" style="fill:var(--compression)">η·0.85f<tspan baseline-shift="sub" font-size="8">ck</tspan> (η = 1)</text>
+          <text x="124" y="118" class="t-mono" style="fill:var(--compression)">C = 0.85 × 0.80 f<tspan baseline-shift="sub" font-size="8">ck</tspan>bc</text>
+          <text x="124" y="136" class="t-mono" style="fill:var(--compression)">   = 0.680f<tspan baseline-shift="sub" font-size="8">ck</tspan>bc</text>
+          <text x="124" y="154" class="t-mono" style="fill:var(--compression)">a/2 = 0.400c</text>
+          <line x1="-14" y1="0" x2="-14" y2="176" style="stroke:var(--text-dim)" marker-start="url(#db-ah-d)" marker-end="url(#db-ah-d)"/>
+          <text x="-20" y="92" text-anchor="end" class="t-mono">a = 0.80c</text>
+          <text x="-8" y="224" text-anchor="end" class="t-mono" style="fill:var(--warn)">c</text>
+        </g>
+        <text x="430" y="284" text-anchor="middle" class="t-dim">합력 차이 +0.3 % · 작용점 차이 0.012c → G1의 M<tspan baseline-shift="sub" font-size="8">n</tspan> 차이 약 0.3 %</text>
+      </svg>
+      <figcaption><b>그림 2-4.</b> fck 30 MPa(r = 0.002/0.0033 = 0.606)의 포물선–직선 분포와 등가 직사각형 블록. 실제 분포의 합력은 \(0.678f_{ck}bc\), 작용점은 0.412c이고, 블록은 \(0.680f_{ck}bc\), 0.400c다. 정확히 맞추면 β₁ = 0.82, η = 0.97이지만 기준은 반올림한 β₁ = 0.80, η = 1.00을 쓴다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 2.2 (fck 30 MPa의 블록 계수 유도)</strong> n = 2, \(\varepsilon_{co} = 0.002\), \(\varepsilon_{cu} = 0.0033\).
+      <ol class="db-steps">
+        <li><b>비.</b> \(r = 0.002/0.0033 = 0.6061\), \(r^2 = 0.3673\).</li>
+        <li><b>합력 계수.</b> \(\alpha = 0.85(1 - 0.6061/3) = 0.85 \times 0.7980 = 0.6783\).</li>
+        <li><b>작용점.</b> \(k_2 = (0.5 - 0.2020 + 0.0306)/0.7980 = 0.3286/0.7980 = 0.4118\).</li>
+        <li><b>정확히 맞는 블록.</b> \(\beta_1 = 2 \times 0.4118 = 0.824\), \(\eta = 0.6783/(0.85 \times 0.824) = 0.969\).</li>
+        <li><b>기준값과 비교.</b> 기준 블록(η 1.00, β₁ 0.80)의 합력 계수 0.680은 0.678보다 0.3 % 크고, 작용점 0.400c는 0.412c보다 0.012c 위다. G1 4-D25(c ≈ 124 mm)에서 팔 길이 차이는 약 1.5 mm, \(M_n\) 차이는 0.3 % 안팎(곡선 적분 590.5, 블록 592.2 kN·m)이다. 블록은 충분히 정확하다.</li>
+      </ol></div>
+    <div class="sim" id="sim-db-block">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>응력 블록의 근거: 포물선–직선 vs 등가 직사각형</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="db-cv-block" aria-label="콘크리트 응력-변형률 곡선과 압축 영역의 실제 응력 분포, 등가 직사각형 블록, 두 합력의 위치"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">f<sub>ck</sub></i> <output id="db-bk-fck-out"></output></span><input type="range" id="db-bk-fck" min="21" max="90" step="1" value="30"></label>
+          <div class="ctrl"><span>실제 분포 모델</span><div class="seg" id="db-bk-model"><button data-value="pr" class="on">포물선–직선(설계)</button><button data-value="hognestad">호그네스타드</button></div></div>
+          <div class="ctrl"><span>블록</span><div class="seg" id="db-bk-blk"><button data-value="code" class="on">기준(반올림)</button><button data-value="fit">정확히 맞춤</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">합력 계수 C/(f<sub>ck</sub>bc): 곡선 · 블록</span><span class="v" id="db-bk-a">—</span></div>
+        <div class="stat"><span class="k">작용점 ȳ/c: 곡선 · 블록</span><span class="v" id="db-bk-y">—</span></div>
+        <div class="stat"><span class="k">맞춤 β₁* · η*</span><span class="v" id="db-bk-fit">—</span></div>
+        <div class="stat"><span class="k">G1 4-D25 M<sub>n</sub> 차이</span><span class="v" id="db-bk-mn">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: fck 30에서 곡선과 블록의 합력·작용점이 거의 같습니다 · fck를 60, 90으로 올리면 곡선이 덜 뭉툭해지고(n이 작아지고 ε<sub>cu</sub>가 줄어) β₁과 η가 함께 줄어야 맞습니다 — 표의 값(마지막 절)이 이 적분에서 나온 것임을 확인하세요 · "호그네스타드"로 바꾸면 다른 곡선(0.85 × 호그네스타드, ε<sub>cu</sub>에서 자름)도 합력은 조금 작지만 작용점은 거의 같습니다 · 모델: 0.85 × 응력 곡선(포물선–직선은 CB.conc.pr 매개변수, n ≤ 2.0; 호그네스타드는 CB.conc.sigma)을 깊이 방향 400칸으로 수치 적분, 블록은 CB.rc.block. M<sub>n</sub> 차이는 G1(b 400, d 634, 4-D25, fy 500)에서 곡선 분포로 C = T를 푼 값과 CB.rc.flexure의 비교.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="strain-compatibility">
+    <h2>변형률 적합과 힘의 평형으로 중립축 찾기</h2>
+    <div class="problem"><strong>중립축은 어디에 있어야 하나</strong>
+      <p>블록의 깊이 a는 c에 비례하고, c는 아직 모릅니다. 압축 연단의 변형률은 \(\varepsilon_{cu}\)로 정해져 있으니, 중립축을 위아래로 옮기면 변형률 직선이 그 점을 중심으로 돌아갑니다. c가 깊으면 압축 블록이 커지고(C 증가) 철근 변형률이 작아지며(T 감소), 얕으면 반대입니다. 둘이 같아지는 c가 하나 있습니다.</p></div>
+    <div class="callout def"><strong>원리 2.7 (단철근 직사각형 단면의 중립축)</strong> 압축 연단 \(\varepsilon_{cu}\), 중립축 깊이 c일 때
+      <div class="formula">$$\varepsilon_s = \varepsilon_{cu}\,\frac{d - c}{c}, \qquad f_s = \min(E_s\varepsilon_s,\ f_y), \qquad C = \eta(0.85f_{ck})\,b\,\beta_1c = T = A_sf_s$$
+      $$\text{철근 항복 시: } c = \frac{A_sf_y}{\eta(0.85f_{ck})\,b\,\beta_1}, \quad a = \beta_1c, \quad M_n = A_sf_y\left(d - \frac a2\right)$$<div class="where">항복을 가정해 c를 구한 뒤 \(\varepsilon_s \ge \varepsilon_y = f_y/E_s\)인지 반드시 확인한다. 항복하지 않으면 \(f_s = E_s\varepsilon_{cu}(d - c)/c\)를 평형식에 넣어 c의 2차 방정식을 푼다. <code>CB.rc.flexure</code>는 층별 철근에 대해 이 평형을 이분법으로 푼다.</div></div></div>
+    <div class="callout"><strong>예제 2.3 (G1 4-D25의 중립축을 손으로)</strong> b = 400, d = 634 mm, \(A_s = 2{,}027\) mm², fck 30(η 1, β₁ 0.80), SD500.
+      <ol class="db-steps">
+        <li><b>시도 c = 200 mm.</b> \(C = 0.85 \times 30 \times 400 \times 0.8 \times 200 = 1{,}632\) kN. \(\varepsilon_s = 0.0033 \times 434/200 = 0.00716 \gt \varepsilon_y\) → \(T = 2{,}027 \times 500 = 1{,}013\) kN. C &gt; T → c가 너무 깊다.</li>
+        <li><b>항복 가정으로 바로.</b> \(c = 1{,}013{,}500/(0.85 \times 30 \times 400 \times 0.8) = 1{,}013{,}500/8{,}160 = 124.2\) mm, \(a = 99.4\) mm.</li>
+        <li><b>항복 확인.</b> \(\varepsilon_s = 0.0033 \times (634 - 124.2)/124.2 = 0.0135 \ge 0.0025\) → 가정 맞음.</li>
+        <li><b>강도.</b> \(M_n = 1{,}013.5 \times (634 - 49.7)/1{,}000 = 592\) kN·m. 1장의 섬유 해석(약 597 kN·m)과 1 % 안에서 맞는다.</li>
+      </ol></div>
+    <div class="sim" id="sim-db-strain">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>변형률 적합 끌기: C = T가 될 때까지</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view db-stack">
+          <div><canvas id="db-cv-strain" aria-label="단면 위에서 중립축을 끌어 변형률 분포와 응력 블록을 바꾸는 그림"></canvas><span class="db-cap">중립축(주황)을 위아래로 끌기</span></div>
+          <div><canvas id="db-cv-strain-b" aria-label="압축 합력 C와 인장 합력 T 막대 비교"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>중립축 깊이 c <output id="db-st-c-out"></output></span><input type="range" id="db-st-c" min="20" max="600" step="1" value="250"></label>
+          <label class="ctrl"><span>인장 D25 개수 <output id="db-st-n-out"></output></span><input type="range" id="db-st-n" min="2" max="14" step="1" value="4"></label>
+          <label class="ctrl"><span><i style="font-style:normal">f<sub>ck</sub></i> <output id="db-st-fck-out"></output></span><input type="range" id="db-st-fck" min="21" max="80" step="1" value="30"></label>
+          <div class="ctrl"><span>철근</span><div class="seg" id="db-st-fy"><button data-value="400">SD400</button><button data-value="500" class="on">SD500</button><button data-value="600">SD600</button></div></div>
+          <div class="btn-row"><button class="btn" id="db-st-solve">평형 찾기(이분법)</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">ε<sub>s</sub> · f<sub>s</sub></span><span class="v" id="db-st-es">—</span></div>
+        <div class="stat"><span class="k">C · T</span><span class="v" id="db-st-ct">—</span></div>
+        <div class="stat"><span class="k">C − T</span><span class="v" id="db-st-dn">—</span></div>
+        <div class="stat"><span class="k">M<sub>n</sub>(평형일 때)</span><span class="v" id="db-st-mn">—</span></div>
+      </div>
+      <div class="db-msg" id="db-st-msg"></div>
+      <div class="sim-note">해볼 것: 단면 그림에서 주황 중립축을 위아래로 끌어 C와 T 막대 길이가 같아지는 곳을 찾아보세요(4-D25 → c ≈ 124 mm) · "평형 찾기"는 이분법이 c 구간을 반씩 줄여 가는 과정을 보여 줍니다 · 철근을 12개 이상으로 늘리면 평형점에서 ε<sub>s</sub> &lt; ε<sub>y</sub> — 철근이 항복하지 않는 과다 철근입니다 · fck를 바꾸면 ε<sub>cu</sub>와 β₁도 같이 바뀝니다 · 모델: 원리 2.7, 블록 CB.rc.block, 평형 결과는 CB.rc.flexure와 같습니다. 단면 G1(b 400, h 700, d 634, 철근 한 층으로 가정).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="controls">
+    <h2>인장 지배·변화 구간·압축 지배 단면</h2>
+    <div class="problem"><strong>파괴 순간 철근이 얼마나 늘어났는가</strong>
+      <p>예제 2.3의 G1은 파괴 순간 철근 변형률이 0.0135로 항복 변형률의 다섯 배가 넘습니다. 철근이 크게 늘어났다는 것은 보가 크게 휘고 균열이 벌어졌다는 뜻 — 연성입니다. 반대로 이 값이 \(\varepsilon_y\)보다 작으면 철근이 항복하기 전에 콘크리트가 부서집니다. 기준은 이 하나의 숫자로 단면을 분류하고 φ를 정합니다.</p></div>
+    <div class="callout def"><strong>정의 2.8 (순인장 변형률과 단면 분류)</strong> <span class="term">순인장 변형률</span><span class="en">(net tensile strain)</span> \(\varepsilon_t\)는 공칭 강도 상태(압축 연단 \(\varepsilon_{cu}\))에서 최외단 인장 철근(깊이 \(d_t\))의 인장 변형률이다(프리스트레스·크리프·수축·온도에 의한 변형률 제외).
+      <ul>
+        <li><span class="term">압축 지배 단면</span><span class="en">(compression-controlled section)</span>: \(\varepsilon_t \le \varepsilon_y\)(\(= f_y/E_s\)) — φ = 0.65(띠), 0.70(나선).</li>
+        <li><span class="term">인장 지배 단면</span><span class="en">(tension-controlled section)</span>: \(\varepsilon_t \ge \varepsilon_{t,tcl}\), \(\varepsilon_{t,tcl} = 0.005\)(\(f_y \le 400\) MPa) 또는 \(2.5\varepsilon_y\)(\(f_y \gt 400\) MPa) — φ = 0.85.</li>
+        <li><span class="term">변화 구간 단면</span><span class="en">(transition section)</span>: 그 사이 — φ를 \(\varepsilon_t\)에 따라 직선 보간.</li>
+      </ul>
+      휨부재(축력이 작은 보·슬래브)는 여기에 더해 \(\varepsilon_t \ge \varepsilon_{t,min}\)이어야 한다. <span class="term">최소 허용 인장 변형률</span><span class="en">(minimum allowable tensile strain)</span> \(\varepsilon_{t,min} = 0.004\)(\(f_y \le 400\)) 또는 \(2\varepsilon_y\)(\(f_y \gt 400\))(<code>CB.rc.etMin</code>, KDS 14 20 20 형태, 현행 기준 확인).</div>
+    <figure class="diagram" id="fig-db-zones">
+      <svg viewBox="0 0 860 300" role="img" aria-label="압축 연단 변형률을 중심으로 회전하는 세 변형률 분포: 압축 지배, 변화 구간, 인장 지배와 c/dt 한계">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(200,40)">
+          <line x1="0" y1="0" x2="0" y2="200" class="s-axis"/>
+          <line x1="-150" y1="200" x2="330" y2="200" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <text x="-156" y="204" text-anchor="end" class="t-mono">d<tspan baseline-shift="sub" font-size="8">t</tspan></text>
+          <line x1="0" y1="0" x2="60" y2="0" style="stroke:var(--bad);stroke-width:2"/>
+          <text x="64" y="4" class="t-mono" style="fill:var(--bad)">ε<tspan baseline-shift="sub" font-size="8">cu</tspan> 0.0033(고정)</text>
+          <line x1="60" y1="0" x2="-45.5" y2="200" style="stroke:var(--bad);stroke-width:2.2"/>
+          <line x1="60" y1="0" x2="-91" y2="200" style="stroke:var(--warn);stroke-width:2.2"/>
+          <line x1="60" y1="0" x2="-114" y2="200" style="stroke:var(--ok);stroke-width:2.2"/>
+          <circle cx="0" cy="113.7" r="4" style="fill:var(--bad)"/><circle cx="0" cy="79.5" r="4" style="fill:var(--warn)"/><circle cx="0" cy="69" r="4" style="fill:var(--ok)"/>
+          <g style="stroke:var(--text-faint)"><line x1="4" y1="69" x2="40" y2="40"/><line x1="4" y1="79.5" x2="40" y2="92"/><line x1="4" y1="113.7" x2="40" y2="144"/></g>
+          <g class="t-mono"><text x="44" y="44" style="fill:var(--ok)">인장 지배: c/d<tspan baseline-shift="sub" font-size="8">t</tspan> ≤ 0.346 (ε<tspan baseline-shift="sub" font-size="8">t</tspan> ≥ 0.00625)</text>
+          <text x="44" y="96" style="fill:var(--warn)">휨부재 한계: c/d<tspan baseline-shift="sub" font-size="8">t</tspan> = 0.398 (ε<tspan baseline-shift="sub" font-size="8">t</tspan> = 0.005)</text>
+          <text x="44" y="148" style="fill:var(--bad)">균형·압축 지배: c/d<tspan baseline-shift="sub" font-size="8">t</tspan> ≥ 0.569 (ε<tspan baseline-shift="sub" font-size="8">t</tspan> ≤ ε<tspan baseline-shift="sub" font-size="8">y</tspan>)</text></g>
+          <text x="-150" y="226" class="t-mono">← 인장 변형률 ε<tspan baseline-shift="sub" font-size="8">t</tspan>(철근 깊이 d<tspan baseline-shift="sub" font-size="8">t</tspan>)</text>
+        </g>
+        <g transform="translate(560,50)">
+          <text x="0" y="0" class="t" style="font-weight:700">SD500(ε<tspan baseline-shift="sub" font-size="9">y</tspan> = 0.0025), ε<tspan baseline-shift="sub" font-size="9">cu</tspan> = 0.0033</text>
+          <g class="t-mono">
+            <text x="0" y="30">c/d<tspan baseline-shift="sub" font-size="8">t</tspan> = ε<tspan baseline-shift="sub" font-size="8">cu</tspan>/(ε<tspan baseline-shift="sub" font-size="8">cu</tspan> + ε<tspan baseline-shift="sub" font-size="8">t</tspan>)</text>
+            <text x="0" y="60" style="fill:var(--ok)">ε<tspan baseline-shift="sub" font-size="8">t</tspan> ≥ 0.00625 → φ = 0.85</text>
+            <text x="0" y="84" style="fill:var(--warn)">0.005 ≤ ε<tspan baseline-shift="sub" font-size="8">t</tspan> &lt; 0.00625 → φ 0.78–0.85</text>
+            <text x="0" y="108" style="fill:var(--bad)">ε<tspan baseline-shift="sub" font-size="8">t</tspan> &lt; 0.005 → 보로는 불허</text>
+            <text x="0" y="132" style="fill:var(--bad)">ε<tspan baseline-shift="sub" font-size="8">t</tspan> ≤ 0.0025 → φ = 0.65(기둥)</text>
+          </g>
+          <text x="0" y="170" class="t-dim">철근이 많을수록 c가 깊어지고</text>
+          <text x="0" y="188" class="t-dim">변형률 직선이 오른쪽(압축 지배)으로 돈다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-5.</b> 압축 연단 변형률 \(\varepsilon_{cu}\)를 축으로 도는 변형률 분포. 중립축이 얕을수록(c/dt가 작을수록) 최외단 철근 변형률 \(\varepsilon_t\)가 커져 인장 지배(초록), 깊을수록 압축 지배(빨강)가 된다. SD500에서는 인장 지배 한계가 \(2.5\varepsilon_y = 0.00625\)이고 휨부재 최소 허용값이 \(2\varepsilon_y = 0.005\)다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 2.9 (εt에 따른 φ)</strong> 띠철근(일반) 단면에서
+      <div class="formula">$$\phi = \begin{cases} 0.65 & \varepsilon_t \le \varepsilon_y \\[4pt] 0.65 + 0.20\,\dfrac{\varepsilon_t - \varepsilon_y}{\varepsilon_{t,tcl} - \varepsilon_y} & \varepsilon_y \lt \varepsilon_t \lt \varepsilon_{t,tcl} \\[6pt] 0.85 & \varepsilon_t \ge \varepsilon_{t,tcl} \end{cases} \qquad \frac{c}{d_t} = \frac{\varepsilon_{cu}}{\varepsilon_{cu} + \varepsilon_t}$$<div class="where">나선 철근 기둥은 0.65 대신 0.70, 계수 0.20 대신 0.15. <code>CB.rc.phi(et, fy, spiral)</code>. 변형률 대신 c/dt로 판정할 수도 있다(오른쪽 식).</div></div></div>
+    <div class="table-wrap"><table class="db-tbl">
+      <thead><tr><th>철근</th><th>ε<sub>y</sub></th><th>인장 지배 ε<sub>t,tcl</sub> · c/d<sub>t</sub></th><th>휨부재 최소 ε<sub>t,min</sub> · c/d<sub>t</sub> · φ</th><th>균형 c<sub>b</sub>/d<sub>t</sub></th></tr></thead>
+      <tbody>
+        <tr><td>SD400</td><td>0.0020</td><td>0.005 · 0.398</td><td>0.004 · 0.452 · 0.783</td><td>0.623</td></tr>
+        <tr><td class="hl">SD500</td><td>0.0025</td><td class="hl">0.00625 · 0.346</td><td class="hl">0.005 · 0.398 · 0.783</td><td>0.569</td></tr>
+        <tr><td>SD600</td><td>0.0030</td><td>0.0075 · 0.306</td><td>0.006 · 0.355 · 0.783</td><td>0.524</td></tr>
+      </tbody></table></div>
+    <p>표에서 눈에 띄는 것은 \(\varepsilon_{t,min}\)에서의 φ가 강종과 상관없이 0.783이라는 점입니다(\(0.65 + 0.20 \times (2\varepsilon_y - \varepsilon_y)/(2.5\varepsilon_y - \varepsilon_y) = 0.65 + 0.20/1.5\)). 고강도 철근일수록 항복 변형률이 커서 같은 연성을 얻으려면 철근 변형률 한계도 함께 올려야 한다는 생각이 담겨 있습니다(fck ≤ 40, \(\varepsilon_{cu}\) 0.0033 기준).</p>
+    <div class="sim" id="sim-db-phi">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>φ 곡선: εt를 끌어 단면 분류 보기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view db-stack">
+          <div><canvas id="db-cv-phi" aria-label="순인장 변형률에 따른 강도 감소 계수 곡선과 구간 색칠, 끌 수 있는 점"></canvas><span class="db-cap">그래프를 좌우로 끌기</span></div>
+          <div><canvas id="db-cv-phi-s" aria-label="현재 변형률 분포와 중립축 깊이"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">순인장 변형률 ε<sub>t</sub></i> <output id="db-ph-et-out"></output></span><input type="range" id="db-ph-et" min="0" max="0.015" step="0.0001" value="0.0129"></label>
+          <div class="ctrl"><span>철근</span><div class="seg" id="db-ph-fy"><button data-value="400">SD400</button><button data-value="500" class="on">SD500</button><button data-value="600">SD600</button></div></div>
+          <div class="ctrl"><span>횡철근</span><div class="seg" id="db-ph-sp"><button data-value="tie" class="on">띠철근</button><button data-value="spiral">나선</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">φ</span><span class="v" id="db-ph-phi">—</span></div>
+        <div class="stat"><span class="k">단면 분류</span><span class="v" id="db-ph-zone">—</span></div>
+        <div class="stat"><span class="k">c/d<sub>t</sub></span><span class="v" id="db-ph-cd">—</span></div>
+        <div class="stat"><span class="k">휨부재(보)로</span><span class="v" id="db-ph-beam">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: G1 4-D25의 ε<sub>t</sub> ≈ 0.013은 오른쪽 끝, 인장 지배입니다 · 0.006으로 옮기면 SD500에서는 변화 구간(φ ≈ 0.83)이지만 SD400에서는 인장 지배입니다 · 0.0045에서 SD500은 휨부재로 허용되지 않지만(ε<sub>t,min</sub> = 0.005) 기둥으로는 φ ≈ 0.76으로 쓸 수 있습니다 · 나선으로 바꾸면 압축 지배 φ가 0.70으로 올라갑니다 · 모델: CB.rc.phi, CB.rc.etMin, ε<sub>cu</sub> = 0.0033(fck ≤ 40).</div>
+    </div>
+    <div class="callout"><strong>예제 2.4 (단순보 근사 7-D25의 φ)</strong> G1을 단순보로 보고 하단에 7-D25(\(A_s = 3{,}547\) mm²)를 넣었다. b = 400, fck 30, SD500.
+      <ol class="db-steps">
+        <li><b>d = 630 mm(1장 표의 값).</b> \(c = 3{,}547 \times 500/8{,}160 = 217.3\) mm, \(\varepsilon_t = 0.0033 \times (630 - 217.3)/217.3 = 0.00627 \ge 0.00625\) → 인장 지배 턱걸이, φ = 0.85. \(M_n = 1{,}773.5 \times (630 - 86.9)/1{,}000 = 963\), \(\phi M_n = 819\) kN·m.</li>
+        <li><b>d = 610 mm(2단 배근 설계값).</b> \(\varepsilon_t = 0.0033 \times (610 - 217.3)/217.3 = 0.00596\) → 변화 구간, \(\phi = 0.65 + 0.20 \times (0.00596 - 0.0025)/0.00375 = 0.835\). \(M_n = 928\), \(\phi M_n = 774\) kN·m. 휨부재 최소 0.005는 만족(<b>허용</b>).</li>
+        <li><b>8-D25, d = 610.</b> \(c = 248.4\) mm, \(\varepsilon_t = 0.00480 \lt 0.005\) → 휨부재로 <b>불허</b>. 강도(\(\phi M_n = 800\))가 부족해서가 아니라 연성이 부족해서다. 단면을 키우거나 압축 철근을 넣는다(4장).</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="balanced">
+    <h2>균형 철근비와 철근량의 상한</h2>
+    <div class="problem"><strong>철근을 어디까지 넣을 수 있나</strong>
+      <p>1장에서 철근이 항복하는 순간 콘크리트가 부서지는 경계를 균형 철근비라 불렀습니다. 이제 변형률 적합으로 그 값을 유도하고, 실제 설계의 상한인 \(\varepsilon_{t,min}\)과 인장 지배 한계가 철근비로 얼마인지 계산합니다.</p></div>
+    <figure class="diagram" id="fig-db-balanced">
+      <svg viewBox="0 0 860 280" role="img" aria-label="균형 변형률 상태: 압축 연단 εcu와 철근 εy가 동시에, 중립축 cb와 응력 블록">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(80,40)">
+          <rect x="0" y="0" width="90" height="200" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <circle cx="25" cy="180" r="6" style="fill:var(--tension)"/><circle cx="45" cy="180" r="6" style="fill:var(--tension)"/><circle cx="65" cy="180" r="6" style="fill:var(--tension)"/>
+          <line x1="-6" y1="102" x2="460" y2="102" style="stroke:var(--warn);stroke-dasharray:5 4"/>
+          <text x="0" y="222" class="t-mono" style="fill:var(--warn)">c<tspan baseline-shift="sub" font-size="8">b</tspan> = ε<tspan baseline-shift="sub" font-size="8">cu</tspan>d/(ε<tspan baseline-shift="sub" font-size="8">cu</tspan> + ε<tspan baseline-shift="sub" font-size="8">y</tspan>)</text>
+          <line x1="250" y1="0" x2="250" y2="200" class="s-axis"/>
+          <path d="M250 0 L290 0 L250 102 L218 180" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <line x1="250" y1="180" x2="218" y2="180" style="stroke:var(--tension)"/>
+          <text x="294" y="12" class="t-mono" style="fill:var(--bad)">ε<tspan baseline-shift="sub" font-size="8">cu</tspan></text>
+          <text x="196" y="198" class="t-mono" style="fill:var(--tension)">ε<tspan baseline-shift="sub" font-size="8">y</tspan></text>
+          <line x1="400" y1="0" x2="400" y2="200" class="s-axis"/>
+          <rect x="400" y="0" width="40" height="82" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+          <line x1="460" y1="41" x2="416" y2="41" style="stroke:var(--compression);stroke-width:2.4" marker-end="url(#db-ah-c)"/>
+          <line x1="420" y1="180" x2="464" y2="180" style="stroke:var(--tension);stroke-width:2.4" marker-end="url(#db-ah-t)"/>
+          <text x="466" y="45" class="t-mono" style="fill:var(--compression)">C = η0.85f<tspan baseline-shift="sub" font-size="8">ck</tspan>bβ₁c<tspan baseline-shift="sub" font-size="8">b</tspan></text>
+          <text x="470" y="184" class="t-mono" style="fill:var(--tension)">T = ρ<tspan baseline-shift="sub" font-size="8">b</tspan>bd·f<tspan baseline-shift="sub" font-size="8">y</tspan></text>
+          <text x="470" y="100" class="t-mono">C = T →</text>
+          <text x="470" y="120" class="t-mono" style="fill:var(--accent)">ρ<tspan baseline-shift="sub" font-size="8">b</tspan> = (η0.85f<tspan baseline-shift="sub" font-size="8">ck</tspan>β₁/f<tspan baseline-shift="sub" font-size="8">y</tspan>)·c<tspan baseline-shift="sub" font-size="8">b</tspan>/d</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-6.</b> 균형 변형률 상태. 압축 연단이 \(\varepsilon_{cu}\)에 이르는 순간 철근이 마침 \(\varepsilon_y\)에 이른다. 변형률 직선의 닮은 삼각형으로 \(c_b\)가, 힘의 평형으로 \(\rho_b\)가 나온다. 같은 방법으로 \(\varepsilon_t\)를 0.005나 0.00625에 두면 휨부재의 철근비 상한이 나온다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 2.10 (균형 철근비와 철근비 상한)</strong> 철근이 항복한 상태에서 \(\varepsilon_t\)를 지정하면 c/d가 정해지고, C = T에서 철근비가 정해진다.
+      <div class="formula">$$\rho(\varepsilon_t) = \frac{\eta(0.85f_{ck})\beta_1}{f_y}\cdot\frac{\varepsilon_{cu}}{\varepsilon_{cu} + \varepsilon_t}, \qquad \rho_b = \rho(\varepsilon_y), \qquad \rho_{max} = \rho(\varepsilon_{t,min}), \qquad \rho_{tcl} = \rho(\varepsilon_{t,tcl})$$<div class="where">\(\rho_b\): <span class="term">균형 철근비</span><span class="en">(balanced reinforcement ratio)</span>(<code>CB.rc.rhoB</code>), \(\rho_{max}\): 휨부재 철근비 상한, \(\rho_{tcl}\): 인장 지배(φ = 0.85)가 되는 철근비 상한. 단철근 직사각형 단면, 철근 한 층 기준(\(d = d_t\)).</div></div></div>
+    <div class="callout"><strong>예제 2.5 (G1의 철근비 한계)</strong> fck 30(η 1, β₁ 0.80, εcu 0.0033), SD500, b = 400, d = 634 mm. 공통 계수 \(0.85 \times 30 \times 0.8/500 = 0.0408\).
+      <ol class="db-steps">
+        <li><b>균형.</b> \(\rho_b = 0.0408 \times 0.0033/0.0058 = 0.0232\) → \(A_s = 5{,}887\) mm²(D25 11.6개).</li>
+        <li><b>휨부재 상한.</b> \(\rho_{max} = 0.0408 \times 0.0033/0.0083 = 0.0162\) → 4,114 mm²(8.1개). \(\rho_{max}/\rho_b = 0.70\).</li>
+        <li><b>인장 지배 한계.</b> \(\rho_{tcl} = 0.0408 \times 0.0033/0.00955 = 0.0141\) → 3,575 mm²(7.1개). \(\rho_{tcl}/\rho_b = 0.61\).</li>
+        <li><b>G1 4-D25.</b> \(\rho = 0.0080 = 0.34\rho_b\) — 인장 지배로 충분한 여유. 단순보 근사의 7-D25(\(\rho = 0.0141\), d 630)는 인장 지배 한계와 거의 같다(예제 2.4).</li>
+      </ol></div>
+    <div class="sim" id="sim-db-rho">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>철근비 → a, c, εt, φMn: 구간과 상한</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view db-stack">
+          <div><canvas id="db-cv-rho" aria-label="철근비에 따른 공칭 휨강도와 설계 휨강도 곡선, 인장 지배·변화 구간·불허 구간 색칠"></canvas><span class="db-cap">M<sub>n</sub>(점선) · φM<sub>n</sub>(실선)</span></div>
+          <div><canvas id="db-cv-rho-s" aria-label="현재 철근비의 단면, 응력 블록 깊이 a와 중립축 깊이 c"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>철근비 ρ <output id="db-rh-r-out"></output></span><input type="range" id="db-rh-r" min="0.002" max="0.035" step="0.0002" value="0.008"></label>
+          <div class="ctrl"><span><i style="font-style:normal">f<sub>ck</sub></i></span><div class="seg" id="db-rh-fck"><button data-value="24">24</button><button data-value="30" class="on">30</button><button data-value="40">40</button><button data-value="60">60</button></div></div>
+          <div class="ctrl"><span>철근</span><div class="seg" id="db-rh-fy"><button data-value="400">SD400</button><button data-value="500" class="on">SD500</button><button data-value="600">SD600</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">a = β₁c · c</span><span class="v" id="db-rh-ac">—</span></div>
+        <div class="stat"><span class="k">ε<sub>t</sub> · φ</span><span class="v" id="db-rh-et">—</span></div>
+        <div class="stat"><span class="k">φM<sub>n</sub></span><span class="v" id="db-rh-pm">—</span></div>
+        <div class="stat"><span class="k">ρ / ρ<sub>b</sub> · 판정</span><span class="v" id="db-rh-ok">—</span></div>
+      </div>
+      <div class="db-msg" id="db-rh-msg"></div>
+      <div class="sim-note">해볼 것: ρ를 늘리면 M<sub>n</sub>은 계속 오르지만 ρ<sub>tcl</sub>을 지나면 φ가 줄어 φM<sub>n</sub>이 거의 늘지 않습니다 — 철근을 더 넣어도 설계 강도가 별로 늘지 않는 구간 · ρ<sub>max</sub>를 넘으면 휨부재로 쓸 수 없습니다(빨강) · fck를 60으로 올리면 β₁이 0.76으로 줄지만 ρ 한계는 오히려 커집니다 · 모델: G1 단면(b 400, d 634, 철근 한 층), CB.rc.flexure, CB.rc.rhoB, CB.rc.etMin, 원리 2.10.</div>
+    </div>
+    <div class="callout site"><strong>G1 정모멘트 단면의 강도 설계 요약</strong> 소요: \(w_u = 1.2D + 1.6L = 100\) kN/m → \(M_u^+ \approx 460\) kN·m. 공급: 하단 4-D25, 설계값 d = 610 mm → \(c = 124\) mm(η 1, β₁ 0.80, εcu 0.0033), \(a = 99\) mm, \(\varepsilon_t = 0.0129 \ge 0.00625\) → 인장 지배, φ = 0.85, \(M_n = 568\), \(\phi M_n = 483 \ge 460\) kN·m(<b>합격</b>, 여유 5 %). 철근비 \(\rho = 0.0083 = 0.36\rho_b\), 휨부재 상한 \(\rho_{max} = 0.0162\)의 절반. 최소 철근(\(A_{s,min}\))과 철근 배치·순간격은 3장에서 확인한다. 교육용 계산이며 현행 KDS 14 20 20을 확인할 것.</div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="high-strength">
+    <h2>고강도 콘크리트에서 블록 계수의 변화</h2>
+    <div class="problem"><strong>fck 60 MPa에도 β₁ = 0.80을 써도 되나</strong>
+      <p>고강도 콘크리트는 최대 응력까지 거의 직선으로 오르다가 최대 응력 뒤에 빨리 부서집니다. 포물선이 덜 뭉툭하고(n이 작음) 극한 변형률이 작습니다. 그러면 같은 c에서 압축 블록의 합력이 작아지고 작용점이 압축 연단 쪽으로 올라갑니다. 기준은 이를 εcu, η, β₁을 함께 줄이는 표로 반영합니다.</p></div>
+    <div class="table-wrap"><table class="db-tbl">
+      <thead><tr><th>f<sub>ck</sub> (MPa)</th><th>≤ 40</th><th>50</th><th>60</th><th>70</th><th>80</th><th>90</th></tr></thead>
+      <tbody>
+        <tr><td>ε<sub>cu</sub></td><td>0.0033</td><td>0.0032</td><td>0.0031</td><td>0.0030</td><td>0.0029</td><td>0.0028</td></tr>
+        <tr><td>η</td><td>1.00</td><td>0.97</td><td>0.95</td><td>0.91</td><td>0.87</td><td>0.84</td></tr>
+        <tr><td>β₁</td><td>0.80</td><td>0.80</td><td>0.76</td><td>0.74</td><td>0.72</td><td>0.70</td></tr>
+        <tr><td>곡선 적분 맞춤 η* · β₁*</td><td>0.97 · 0.82</td><td>0.96 · 0.81</td><td>0.94 · 0.76</td><td>0.91 · 0.73</td><td>0.88 · 0.71</td><td>0.85 · 0.70</td></tr>
+      </tbody></table></div>
+    <p>위 세 줄은 <code>CB.rc.block</code>에 들어 있는 KDS 14 20 20 형태의 표이고(사이 값은 직선 보간, 현행 기준 확인), 마지막 줄은 이 장의 방법으로 포물선–직선 분포를 적분해 합력과 작용점을 정확히 맞춘 값입니다. 두 값이 거의 같아, 표가 바로 이 적분에서 나왔음을 알 수 있습니다. ACI 318은 다른 방식(\(0.85f'_c\) 고정, β₁만 28 MPa 초과에서 7 MPa마다 0.05씩 줄여 0.65까지)을 씁니다.</p>
+    <div class="sim" id="sim-db-coef">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>블록 계수 탐색: fck → εcu · η · β₁</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view db-stack">
+          <div><canvas id="db-cv-coef" aria-label="fck에 따른 eta와 beta1 기준값 선과 곡선 적분 맞춤 점"></canvas><span class="db-cap">η · β₁: 기준(선) · 적분 맞춤(점)</span></div>
+          <div><canvas id="db-cv-coef-b" aria-label="fck에 따른 극한 변형률과 포물선 지수 n"></canvas><span class="db-cap">ε<sub>cu</sub>(‰) · 지수 n</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">f<sub>ck</sub></i> <output id="db-cf-fck-out"></output></span><input type="range" id="db-cf-fck" min="21" max="90" step="1" value="60"></label>
+          <label class="ctrl"><span>G1 인장 D25 개수 <output id="db-cf-n-out"></output></span><input type="range" id="db-cf-n" min="2" max="12" step="1" value="7"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기준 η · β₁</span><span class="v" id="db-cf-tab">—</span></div>
+        <div class="stat"><span class="k">맞춤 η* · β₁*</span><span class="v" id="db-cf-fit">—</span></div>
+        <div class="stat"><span class="k">G1 c · ε<sub>t</sub></span><span class="v" id="db-cf-c">—</span></div>
+        <div class="stat"><span class="k">φM<sub>n</sub>(fck 30 대비)</span><span class="v" id="db-cf-mn">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: fck가 40을 넘는 순간부터 선(기준)과 점(적분)이 함께 내려갑니다 · G1 7-D25를 fck 30에서 60으로 바꾸면 c가 줄어 ε<sub>t</sub>가 커지고 인장 지배로 바뀌지만, φM<sub>n</sub>은 10 % 남짓(그중 상당 부분은 φ가 0.835에서 0.85로 오른 효과) 늘 뿐입니다 — 휨강도는 철근이 정하고 콘크리트 강도는 팔 길이를 조금 늘릴 뿐 · 고강도 콘크리트의 이점은 기둥(10장)에서 큽니다 · 모델: CB.rc.block(기준 표), CB.conc.pr(곡선 매개변수), 적분은 0.85 × 포물선–직선 400칸, CB.rc.flexure(G1 b 400, h 700, d 610). 포물선 지수 n은 기준 형태대로 2.0 이하로 자릅니다(CB.conc.pr은 fck 40 바로 위에서 n이 2.7까지 튀므로 페이지에서 보정).</div>
+    </div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="flexure.html"><small>CH.03 · 단철근 보의 휨</small>소요 철근량과 최소·최대 철근<br><span>asReq · asMin · ε<sub>t</sub> 확인, G1 4-D25.</span></a>
+      <a href="t-beam.html"><small>CH.04 · 복철근·T형 보</small>층별 철근의 변형률 적합<br><span>압축 철근 항복 여부, T형 블록.</span></a>
+      <a href="columns.html"><small>CH.10 · 기둥과 P–M</small>c를 바꿔 가며 P–M 점 찍기<br><span>압축 지배 φ 0.65, 균형점.</span></a>
+      <a href="shear.html"><small>CH.05 · 전단</small>φ = 0.75<br><span>V<sub>u</sub> 400 kN, φV<sub>c</sub> 167 kN.</span></a>
+      <a href="overview.html"><small>CH.01 · 원리</small>섬유 해석과 네 단계<br><span>블록 없이 곡선 전체를 적분한 M–φ.</span></a>
+      <a href="../../structure/chapters/loads.html"><small>StructureBook · CH.02</small>하중 조합과 신뢰도<br><span>1.4D, 1.2D + 1.6L, β와 파괴 확률.</span></a>
+      <a href="../../materials/chapters/strength.html"><small>MaterialsBook · CH.07</small>콘크리트 강도와 응력–변형률<br><span>fck, 0.002·0.0033, 호그네스타드·포물선.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>강도 설계: φS<sub>n</sub> ≥ U. U는 하중 조합(1.4D, 1.2D + 1.6L 등, KDS 형태)의 최댓값, S<sub>n</sub>은 파괴 순간의 공칭 강도, φ ≤ 1. 사용성은 사용 하중으로 따로 검토한다. 허용 응력 설계는 하중별 불확실성을 구분하지 못한다.</li>
+      <li>G1: w<sub>u</sub> = 1.2 × 56.7 + 1.6 × 20 = 100 kN/m → M<sub>u</sub><sup>+</sup> ≈ 460, M<sub>u</sub><sup>−</sup> ≈ 640 kN·m, 사용 M<sub>a</sub> ≈ 350 kN·m.</li>
+      <li>하중 계수와 φ는 신뢰도 지수 β = (μ<sub>R</sub> − μ<sub>Q</sub>)/√(σ<sub>R</sub>² + σ<sub>Q</sub>²)를 구조물마다 비슷하게(대략 3–3.5) 맞추려는 값이다. 하중마다 계수를 나눠 주면 활하중 비중이 큰 구조에서도 β가 크게 떨어지지 않는다.</li>
+      <li>기본 가정: 평면 유지, 변형률 적합, 압축 연단 ε<sub>cu</sub>(fck ≤ 40 → 0.0033), 철근 탄성–완전소성(E<sub>s</sub> 200,000), 콘크리트 인장 무시.</li>
+      <li>포물선–직선 분포(n 2, ε<sub>co</sub> 0.002)의 합력 0.678f<sub>ck</sub>bc, 작용점 0.412c. 등가 블록 η·0.85f<sub>ck</sub>, a = β₁c(η 1.00, β₁ 0.80)는 합력 0.680f<sub>ck</sub>bc, 작용점 0.400c — 합력과 작용점을 맞춘 것이다.</li>
+      <li>변형률 적합: ε<sub>s</sub> = ε<sub>cu</sub>(d − c)/c, C = η0.85f<sub>ck</sub>bβ₁c = A<sub>s</sub>f<sub>s</sub>. 항복 가정 뒤 반드시 ε<sub>s</sub> ≥ ε<sub>y</sub> 확인. G1 4-D25: c = 124 mm, M<sub>n</sub> = 592 kN·m(d 634).</li>
+      <li>ε<sub>t</sub> ≤ ε<sub>y</sub>: 압축 지배(φ 0.65·0.70), ε<sub>t</sub> ≥ max(0.005, 2.5ε<sub>y</sub>): 인장 지배(φ 0.85), 사이 직선. 휨부재는 ε<sub>t</sub> ≥ max(0.004, 2ε<sub>y</sub>) — SD500에서 0.00625와 0.005.</li>
+      <li>ρ<sub>b</sub> = (η0.85f<sub>ck</sub>β₁/f<sub>y</sub>)·ε<sub>cu</sub>/(ε<sub>cu</sub> + ε<sub>y</sub>) — fck 30·SD500에서 0.0232, ρ<sub>max</sub> 0.0162, ρ<sub>tcl</sub> 0.0141. fck가 40을 넘으면 ε<sub>cu</sub>, η, β₁이 함께 줄어든다(표, 곡선 적분과 일치).</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 고정하중 모멘트 200 kN·m, 활하중 모멘트 100 kN·m인 보의 소요 강도 M<sub>u</sub>(1.4D, 1.2D + 1.6L 중 큰 값)는?</p><div class="opts">
+        <button class="opt">280 kN·m</button><button class="opt">300 kN·m</button><button class="opt" data-correct>400 kN·m</button><button class="opt">440 kN·m</button>
+      </div><div class="quiz-exp">1.4 × 200 = 280, 1.2 × 200 + 1.6 × 100 = 400 → 400 kN·m. 고정하중이 활하중보다 훨씬 클 때(L/D &lt; 1/8)만 1.4D가 지배한다.</div></div>
+      <div class="quiz-q"><p>2. SD500 철근(ε<sub>y</sub> = 0.0025)을 쓴 띠철근 단면에서 ε<sub>t</sub> = 0.004일 때 φ는?</p><div class="opts">
+        <button class="opt">0.65</button><button class="opt" data-correct>0.73</button><button class="opt">0.78</button><button class="opt">0.85</button>
+      </div><div class="quiz-exp">ε<sub>t,tcl</sub> = 2.5 × 0.0025 = 0.00625. φ = 0.65 + 0.20 × (0.004 − 0.0025)/(0.00625 − 0.0025) = 0.65 + 0.08 = 0.73. 이 단면은 ε<sub>t</sub> &lt; 2ε<sub>y</sub> = 0.005라 휨부재로는 쓸 수 없다.</div></div>
+      <div class="quiz-q"><p>3. 등가 직사각형 응력 블록이 실제 압축 응력 분포와 같게 맞춘 두 가지는?</p><div class="opts">
+        <button class="opt">최대 응력과 중립축 깊이</button><button class="opt" data-correct>압축 합력의 크기와 작용점 위치</button><button class="opt">압축 영역의 넓이와 철근 응력</button><button class="opt">극한 변형률과 탄성계수</button>
+      </div><div class="quiz-exp">휨강도 M<sub>n</sub> = C·z에 필요한 것은 C의 크기와 작용점뿐이다. 그래서 η·0.85·β₁ = α(합력), β₁/2 = k₂(작용점)로 블록을 정한다.</div></div>
+      <div class="quiz-q"><p>4. fck = 30 MPa, 압축 연단 ε<sub>cu</sub> = 0.0033, 중립축 c = 150 mm, d = 600 mm일 때 인장 철근의 변형률은?</p><div class="opts">
+        <button class="opt">0.0033</button><button class="opt">0.0066</button><button class="opt" data-correct>0.0099</button><button class="opt">0.0132</button>
+      </div><div class="quiz-exp">ε<sub>s</sub> = 0.0033 × (600 − 150)/150 = 0.0099. 평면 유지(변형률 직선)와 변형률 적합에서 바로 나온다.</div></div>
+      <div class="quiz-q"><p>5. fck = 30 MPa(β₁ 0.80), fy = 400 MPa(ε<sub>y</sub> 0.002)의 균형 철근비 ρ<sub>b</sub>는? (η = 1, ε<sub>cu</sub> = 0.0033)</p><div class="opts">
+        <button class="opt">0.0204</button><button class="opt">0.0232</button><button class="opt" data-correct>0.0318</button><button class="opt">0.0510</button>
+      </div><div class="quiz-exp">ρ<sub>b</sub> = (0.85 × 30 × 0.8/400) × 0.0033/(0.0033 + 0.002) = 0.051 × 0.6226 = 0.0318. 같은 콘크리트에서 SD500이면 0.0232로 작아진다.</div></div>
+      <div class="quiz-q"><p>6. 강도 설계의 휨강도 계산에서 쓰지 <b>않는</b> 가정은?</p><div class="opts">
+        <button class="opt">변형률은 중립축에서의 거리에 비례한다</button><button class="opt">철근의 변형률은 같은 위치 콘크리트의 변형률과 같다</button><button class="opt" data-correct>콘크리트의 인장 강도를 휨강도에 더한다</button><button class="opt">철근 응력은 E<sub>s</sub>ε<sub>s</sub>이되 f<sub>y</sub>를 넘지 않는다</button>
+      </div><div class="quiz-exp">휨강도 계산에서 콘크리트 인장은 무시한다. 콘크리트 인장 강도는 균열 모멘트(최소 철근, 처짐)에만 쓴다.</div></div>
+      <div class="quiz-q"><p>7. 단철근 보 b = 300 mm, d = 500 mm, A<sub>s</sub> = 4,800 mm², fck 30, SD500을 변형률 적합으로 풀었더니 c = 312 mm였다. 이 단면에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">인장 지배 단면이므로 φ = 0.85</button><button class="opt">변화 구간이므로 φ ≈ 0.78</button><button class="opt" data-correct>ε<sub>t</sub> ≈ 0.0020 &lt; ε<sub>y</sub>인 압축 지배 단면으로, 휨부재로 쓸 수 없다</button><button class="opt">철근이 항복하므로 M<sub>n</sub> = A<sub>s</sub>f<sub>y</sub>(d − a/2)</button>
+      </div><div class="quiz-exp">ε<sub>t</sub> = 0.0033 × (500 − 312)/312 = 0.0020 &lt; 0.0025 → 철근이 항복하지 않는다(f<sub>s</sub> ≈ 398 MPa). φ = 0.65, M<sub>n</sub> ≈ 716, φM<sub>n</sub> ≈ 466 kN·m이지만 ε<sub>t,min</sub> = 0.005를 만족하지 못해 보로는 불허.</div></div>
+      <div class="quiz-q"><p>8. 다른 조건이 같을 때 강도 감소 계수 φ를 0.85에서 0.75로 낮추면?</p><div class="opts">
+        <button class="opt">필요 공칭 강도가 줄고 파괴 확률이 커진다</button><button class="opt" data-correct>필요 공칭 강도가 커지고 신뢰도 지수 β가 커진다</button><button class="opt">하중 조합이 바뀐다</button><button class="opt">β는 φ와 무관하다</button>
+      </div><div class="quiz-exp">R<sub>n</sub> = U/φ이므로 φ가 작을수록 더 큰 공칭 강도를 요구하고, 저항 분포가 오른쪽으로 옮겨 β가 커진다(파괴 확률 감소). 전단처럼 취성적인 작용에 φ = 0.75를 쓰는 이유다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const DB = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${DB.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = DB._c || (DB._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  n(v, d = 1) { return isFinite(v) && Math.abs(v) >= 1000 ? (v < 0 ? "−" : "") + Math.round(Math.abs(v)).toLocaleString("en-US") : CB.num(v, d); },
+  setMsg(id, html, cls) { const el = document.getElementById(id); if (!el) return; el.innerHTML = html; el.className = "db-msg" + (cls ? " " + cls : ""); },
+  A25: CB.steel.BARS.D25.A,
+  /** 압축 영역 응력 분포 적분(교육용 페이지 내 계산): 0.85 × CB.conc.sigma, 연단 ε_cu(CB.conc.pr). → { alpha, k2, ecu, prof: [{ xi(연단 0 → 중립축 1), s/fck }] } */
+  integ(fck, model = "pr") {
+    const P = CB.conc.pr(fck), ecu = P.ecu, N = 400, prof = []; let A = 0, M = 0;
+    for (let i = 0; i < N; i++) {
+      const t = (i + 0.5) / N, e = ecu * (1 - t), s = (0.85 * DB.sig(e, fck, model)) / fck;
+      A += s / N; M += (s * t) / N;
+    }
+    for (let i = 0; i <= 100; i++) { const t = i / 100, e = ecu * (1 - t); prof.push({ t, s: (0.85 * DB.sig(e, fck, model)) / fck }); }
+    return { alpha: A, k2: M / A, ecu, prof, n: Math.min(2, P.n), eco: P.eco };
+  },
+  /** 설계용 포물선–직선(n ≤ 2.0으로 자름, 기준 형태) 또는 호그네스타드. CB.conc.pr의 n은 fck 40 바로 위에서 2를 넘으므로 여기서 자른다 */
+  sig(e, fck, model = "pr") {
+    if (model !== "pr") return CB.conc.sigma(e, fck);
+    const P = CB.conc.pr(fck), n = Math.min(2, P.n);
+    if (!(e > 0) || e > P.ecu) return 0;
+    return e >= P.eco ? fck : fck * (1 - Math.pow(1 - e / P.eco, n));
+  },
+  zone(et, fy) { const ey = fy / CB.rc.Es, tcl = Math.max(0.005, 2.5 * ey); return et >= tcl ? "인장 지배" : et > ey ? "변화 구간" : "압축 지배"; },
+};
+
+/* ---------- 1. 하중 조합과 설계 강도 ---------- */
+(function () {
+  const gD = CB.range("db-cb-wd", (v) => v.toFixed(1) + " kN/m", draw), gL = CB.range("db-cb-wl", (v) => v.toFixed(1) + " kN/m", draw), co = CB.seg("db-cb-co", draw), gn = CB.range("db-cb-n", (v) => v + "개", draw);
+  let S = null;
+  const cv = CB.canvas("#db-cv-combo", (ctx, W, H) => {
+    if (!S) return;
+    const pal = CB.palette(), narrow = W < 520, lx = narrow ? 92 : 120, bw = W - lx - (narrow ? 70 : 110), top = 18, rows = 5, rh = Math.min(34, (H - top - 40) / rows - 10);
+    const vmax = Math.max(S.c1, S.c2, S.Mn, S.Ms) * 1.08;
+    const bar = (i, v, color, lab, bold) => {
+      const y = top + i * (rh + 10), w = (bw * v) / vmax;
+      ctx.fillStyle = DB.alpha(color, bold ? 0.4 : 0.2); ctx.strokeStyle = color; ctx.lineWidth = bold ? 2.2 : 1.2;
+      ctx.fillRect(lx, y, w, rh); ctx.strokeRect(lx, y, w, rh);
+      DB.text(ctx, lab, lx - 8, y + rh / 2, pal.text, { size: 11.5, align: "right" });
+      DB.text(ctx, DB.n(v, 0), lx + w + 6, y + rh / 2, color, { size: 11.5, align: "left" });
+    };
+    bar(0, S.c1, pal.accent2, "1.4D", S.c1 >= S.c2);
+    bar(1, S.c2, pal.accent2, "1.2D+1.6L", S.c2 > S.c1);
+    bar(2, S.Ms, pal.dim, "사용 D+L", false);
+    bar(3, S.phiMn, S.phiMn >= S.Mu ? pal.ok : pal.bad, "φMn", true);
+    bar(4, S.Mn, pal.accent, "Mn", false);
+    const xu = lx + (bw * S.Mu) / vmax;
+    DB.line(ctx, [[xu, top - 6], [xu, top + rows * (rh + 10) - 4]], pal.warn, 1.4, [5, 4]);
+    DB.text(ctx, "Mu " + DB.n(S.Mu, 0) + " kN·m", Math.min(xu, W - 70), top + rows * (rh + 10) + 8, pal.warn, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.78 : 0.48), minHeight: 240, maxHeight: 320 });
+  function draw() {
+    const wD = gD(), wL = gL(), k = +co(), n = gn(), M = (w) => (w * 64) / k;
+    const c1 = M(1.4 * wD), c2 = M(1.2 * wD + 1.6 * wL), Mu = Math.max(c1, c2), Ms = M(wD + wL);
+    const As = n * DB.A25, d = 610, b = 400, f = CB.rc.flexure({ b, h: 700, fck: 30, fy: 500, layers: [{ d, As }] });
+    const nn = CB.rc.Es / CB.conc.Ec(30), rho = As / (b * d), k1 = Math.sqrt(2 * nn * rho + (nn * rho) ** 2) - nn * rho, j = 1 - k1 / 3;
+    const fs = (Ms * 1e6) / (As * j * d), fc = (2 * Ms * 1e6) / (k1 * j * b * d * d), fsa = 200, fca = 0.45 * 30;
+    S = { c1, c2, Mu, Ms, Mn: f.Mn, phiMn: f.phiMn };
+    CB.stat("db-cb-u", (c1 >= c2 ? "1.4D" : "1.2D+1.6L") + " · " + DB.n(Mu, 0));
+    CB.stat("db-cb-pm", DB.n(f.phiMn, 0) + " kN·m");
+    CB.stat("db-cb-r", (Mu / f.phiMn).toFixed(2));
+    CB.stat("db-cb-asd", DB.n(fs, 0) + " / " + fsa + " MPa");
+    const sdOk = f.phiMn >= Mu, asdOk = fs <= fsa && fc <= fca, ductOk = f.et >= CB.rc.etMin(500);
+    let msg = `강도 설계: ${sdOk ? "φM<sub>n</sub> ≥ M<sub>u</sub> <b>합격</b>" : "φM<sub>n</sub> &lt; M<sub>u</sub> <b>불합격</b>"}(ε<sub>t</sub> = ${(f.et * 1000).toFixed(2)}‰${ductOk ? "" : ", 휨부재 최소 0.005 미달"}). ASD: f<sub>s</sub> = ${DB.n(fs, 0)} ${fs <= fsa ? "≤" : "&gt;"} f<sub>sa</sub> 200, f<sub>c</sub> = ${fc.toFixed(1)} ${fc <= fca ? "≤" : "&gt;"} f<sub>ca</sub> ${fca.toFixed(1)} MPa → ${asdOk ? "합격" : "불합격"}.`;
+    if (sdOk !== asdOk) msg += sdOk ? ` 두 방법의 판정이 다르다: 허용 응력 설계는 사용 하중의 철근 응력을 0.4f<sub>y</sub>로 묶어 SD500의 강도를 다 쓰지 못한다(L/D = ${(wL / wD).toFixed(2)}).` : ` 두 방법의 판정이 다르다: 활하중 비중이 커서(L/D = ${(wL / wD).toFixed(2)}) 하중 계수 1.6이 더 큰 강도를 요구한다.`;
+    DB.setMsg("db-cb-msg", msg, sdOk && ductOk ? "ok" : "bad");
+    cv.redraw();
+  }
+  draw();
+})();
+
+/* ---------- 2. 신뢰도 맛보기 ---------- */
+(function () {
+  const gp = CB.range("db-rl-phi", (v) => v.toFixed(2), draw), gg = CB.range("db-rl-gl", (v) => v.toFixed(2), draw), gx = CB.range("db-rl-ld", (v) => v.toFixed(2), draw), gv = CB.range("db-rl-vr", (v) => v.toFixed(2), draw);
+  const beta = (x, phi, gl, vr, single) => {
+    const muQ = 1.05 + x, sQ = Math.hypot(0.105, 0.25 * x);
+    const Rn = single ? 1.7 * (1 + x) : Math.max(1.4, 1.2 + gl * x) / phi, muR = 1.15 * Rn, sR = vr * muR;
+    return { b: (muR - muQ) / Math.hypot(sR, sQ), muQ, sQ, muR, sR, Rn };
+  };
+  const cvA = CB.canvas("#db-cv-rel", (ctx, W, H) => {
+    const pal = CB.palette(), r = beta(gx(), gp(), gg(), gv());
+    const x1 = r.muR + 4 * r.sR, dq = [], dr = [], ov = [], N = 300;
+    let ym = 0;
+    for (let i = 0; i <= N; i++) { const x = (x1 * i) / N, q = CB.normPdf(x, r.muQ, r.sQ), rr = CB.normPdf(x, r.muR, r.sR); dq.push([x, q]); dr.push([x, rr]); ov.push([x, Math.min(q, rr)]); ym = Math.max(ym, q, rr); }
+    const C = CB.chart(ctx, { x: 46, y: 26, w: W - 46 - 16, h: H - 26 - 40 }, { x: [0, x1], y: [0, ym * 1.1], xLabel: "하중 효과 · 저항(고정하중 공칭값 = 1)", yFmt: () => "",
+      series: [{ data: ov, color: pal.bad, width: 0.1, fill: DB.alpha(pal.bad, 0.5) }, { data: dq, color: pal.accent2, width: 2.4, fill: DB.alpha(pal.accent2, 0.1) }, { data: dr, color: pal.accent, width: 2.4, fill: DB.alpha(pal.accent, 0.1) }],
+      vlines: [{ x: 1.2 + gg() * gx() > 1.4 ? 1.2 + gg() * gx() : 1.4, color: pal.accent2, label: "U" }, { x: r.Rn, color: pal.accent, label: "Rn" }] });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.36), minHeight: 190, maxHeight: 250 });
+  const cvB = CB.canvas("#db-cv-rel-b", (ctx, W, H) => {
+    const pal = CB.palette(), a = [], b = [];
+    for (let i = 0; i <= 120; i++) { const x = (3 * i) / 120; a.push([x, beta(x, gp(), gg(), gv()).b]); b.push([x, beta(x, gp(), gg(), gv(), true).b]); }
+    const ym = Math.max(...a.map((p) => p[1]), ...b.map((p) => p[1]), 4.5) + 0.3, yl = Math.min(...a.map((p) => p[1]), ...b.map((p) => p[1]), 2) - 0.3;
+    CB.chart(ctx, { x: 46, y: 26, w: W - 46 - 16, h: H - 26 - 40 }, { x: [0, 3], y: [Math.max(0, yl), ym], xLabel: "활하중 / 고정하중", yLabel: "β",
+      series: [{ data: b, color: pal.dim, width: 1.8, dash: [5, 4] }, { data: a, color: pal.accent, width: 2.6 }],
+      hlines: [{ y: 3, color: pal.faint, label: "β = 3" }], points: [{ x: gx(), y: beta(gx(), gp(), gg(), gv()).b, color: pal.accent2, r: 6 }] });
+  }, { aspect: (W) => (W < 520 ? 0.58 : 0.32), minHeight: 180, maxHeight: 230 });
+  function draw() {
+    const r = beta(gx(), gp(), gg(), gv()), s = beta(gx(), gp(), gg(), gv(), true), pf = CB.normCdf(-r.b);
+    CB.stat("db-rl-rn", r.Rn.toFixed(2) + " (D = 1)");
+    CB.stat("db-rl-b", r.b.toFixed(2));
+    CB.stat("db-rl-pf", pf < 1e-6 ? "< 10⁻⁶" : pf.toExponential(1).replace("e-", "×10⁻").replace(/⁻(\d+)/, (m, d) => "⁻" + [...d].map((c) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[c]).join("")));
+    CB.stat("db-rl-b2", s.b.toFixed(2));
+    cvA.redraw(); cvB.redraw();
+  }
+  draw();
+})();
+
+/* ---------- 3. 응력 블록 근거 ---------- */
+(function () {
+  const gf = CB.range("db-bk-fck", (v) => v + " MPa", draw), model = CB.seg("db-bk-model", draw), blk = CB.seg("db-bk-blk", draw);
+  let S = null;
+  const cv = CB.canvas("#db-cv-block", (ctx, W, H) => {
+    if (!S) return;
+    const pal = CB.palette(), narrow = W < 560, fck = gf();
+    // 왼쪽(위): σ–ε 곡선
+    const bx1 = narrow ? { x: 46, y: 18, w: W - 46 - 16, h: H * 0.42 - 50 } : { x: 50, y: 18, w: W * 0.4 - 60, h: H - 18 - 46 };
+    const data = []; for (let i = 0; i <= 200; i++) { const e = (S.I.ecu * i) / 200; data.push([e * 1000, (0.85 * DB.sig(e, fck, model())) / fck]); }
+    CB.chart(ctx, bx1, { x: [0, 4], y: [0, 1], xLabel: "ε (‰)", yLabel: "σ / fck", series: [{ data, color: pal.compression, width: 2.4 }], vlines: [{ x: S.I.ecu * 1000, color: pal.bad, label: "εcu" }], hlines: [{ y: 0.85, color: pal.faint, label: "" }] });
+    // 오른쪽(아래): 압축 영역(깊이 c)의 분포
+    const rx = narrow ? 70 : W * 0.4 + 60, ry = narrow ? H * 0.42 + 14 : 30, rw = narrow ? W - 70 - 30 : W - rx - 40, rh = narrow ? H - ry - 30 : H - ry - 40;
+    const sx = (s) => rx + s * rw * 0.5, sy = (t) => ry + t * rh;
+    DB.line(ctx, [[rx, ry], [rx, ry + rh]], pal.axis, 1.2);
+    DB.line(ctx, [[rx - 10, ry + rh], [rx + rw, ry + rh]], pal.warn, 1.4, [5, 4]);
+    DB.text(ctx, "중립축(깊이 c)", rx + rw, ry + rh + 12, pal.warn, { size: 11, align: "right" });
+    DB.text(ctx, "압축 연단", rx - 6, ry - 2, pal.dim, { size: 10.5, align: "right" });
+    ctx.beginPath(); ctx.moveTo(rx, ry); S.I.prof.forEach((p) => ctx.lineTo(sx(p.s), sy(p.t))); ctx.lineTo(rx, ry + rh); ctx.closePath();
+    ctx.fillStyle = DB.alpha(pal.compression, 0.25); ctx.fill(); ctx.strokeStyle = pal.compression; ctx.lineWidth = 1.6; ctx.stroke();
+    const bw = S.etaB * 0.85, bh = S.b1;
+    ctx.strokeStyle = pal.accent; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(rx, ry, sx(bw) - rx, bh * rh); ctx.setLineDash([]);
+    ctx.fillStyle = DB.alpha(pal.accent, 0.08); ctx.fillRect(rx, ry, sx(bw) - rx, bh * rh);
+    const yc = sy(S.I.k2), yb = sy(bh / 2);
+    DB.arrow(ctx, sx(0.98), yc, rx + 4, yc, pal.compression, 2.6);
+    DB.arrow(ctx, sx(0.98), yb, rx + 4, yb, pal.accent, 2.2);
+    const lab1 = `곡선 ${S.I.alpha.toFixed(3)} @ ${S.I.k2.toFixed(3)}c`, lab2 = `블록 ${(S.etaB * 0.85 * S.b1).toFixed(3)} @ ${(S.b1 / 2).toFixed(3)}c`;
+    const dy = Math.abs(yc - yb) < 16 ? 9 : 0;
+    DB.text(ctx, lab1, sx(1.0), yc + (yc >= yb ? dy : -dy), pal.compression, { size: 11, align: "left" });
+    DB.text(ctx, lab2, sx(1.0), yb + (yb > yc ? dy : -dy), pal.accent, { size: 11, align: "left" });
+    DB.text(ctx, `a = ${S.b1.toFixed(3)}c`, sx(bw) + 6, ry + bh * rh - 8, pal.accent, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 560 ? 1.15 : 0.46), minHeight: 280, maxHeight: 420 });
+  function draw() {
+    const fck = gf(), I = DB.integ(fck, model()), B = CB.rc.block(fck);
+    const b1f = 2 * I.k2, etf = I.alpha / (0.85 * b1f);
+    const fit = blk() === "fit";
+    S = { I, b1: fit ? b1f : B.beta1, etaB: fit ? etf : B.eta };
+    // G1 4-D25 Mn 비교
+    const As = 4 * DB.A25, T = As * 500, c = T / (I.alpha * fck * 400), Mc = (T * (634 - I.k2 * c)) / 1e6, Mb = CB.rc.flexure({ b: 400, h: 700, fck, fy: 500, layers: [{ d: 634, As }] }).Mn;
+    CB.stat("db-bk-a", I.alpha.toFixed(3) + " · " + (S.etaB * 0.85 * S.b1).toFixed(3));
+    CB.stat("db-bk-y", I.k2.toFixed(3) + " · " + (S.b1 / 2).toFixed(3));
+    CB.stat("db-bk-fit", b1f.toFixed(3) + " · " + etf.toFixed(3));
+    CB.stat("db-bk-mn", (((Mb - Mc) / Mc) * 100 >= 0 ? "+" : "−") + Math.abs(((Mb - Mc) / Mc) * 100).toFixed(2) + " %");
+    cv.redraw();
+  }
+  draw();
+})();
+
+/* ---------- 4. 변형률 적합 끌기 ---------- */
+(function () {
+  const b = 400, h = 700, d = 634;
+  const gc = CB.range("db-st-c", (v) => v.toFixed(0) + " mm", () => draw()), gn = CB.range("db-st-n", (v) => v + "개", () => draw()), gf = CB.range("db-st-fck", (v) => v + " MPa", () => draw()), gfy = CB.seg("db-st-fy", () => draw());
+  let view = null, log = [];
+  const calc = (c) => {
+    const fck = gf(), fy = +gfy(), B = CB.rc.block(fck), As = gn() * DB.A25, es = (B.ecu * (d - c)) / c, fs = CB.clamp(CB.rc.Es * es, -fy, fy);
+    const a = Math.min(B.beta1 * c, h), C = (B.eta * 0.85 * fck * b * a) / 1000, T = (As * fs) / 1000;
+    return { B, As, es, fs, a, C, T, fy, fck };
+  };
+  const cv = CB.canvas("#db-cv-strain", (ctx, W, H) => {
+    const pal = CB.palette(), c = gc(), r = calc(c), narrow = W < 520;
+    const top = 26, sc = Math.min((H - top - 20) / h, (W * (narrow ? 0.24 : 0.2)) / b), bw = b * sc, x0 = narrow ? 34 : 40;
+    view = { top, sc };
+    ctx.fillStyle = pal.surface; ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.2; ctx.fillRect(x0, top, bw, h * sc); ctx.strokeRect(x0, top, bw, h * sc);
+    ctx.fillStyle = DB.alpha(pal.compression, 0.25); ctx.fillRect(x0, top, bw, r.a * sc);
+    const nb = gn(); for (let i = 0; i < nb; i++) { ctx.fillStyle = pal.tension; ctx.beginPath(); ctx.arc(x0 + (bw * (i + 1)) / (nb + 1), top + d * sc, Math.max(2, 12.7 * sc), 0, Math.PI * 2); ctx.fill(); }
+    const yN = top + Math.min(c, h) * sc;
+    DB.line(ctx, [[x0 - 8, yN], [W - 10, yN]], pal.warn, 2, [6, 4]);
+    DB.text(ctx, "⇕ c " + c.toFixed(0), x0 + bw + 4, yN - 10, pal.warn, { size: 11, align: "left" });
+    // 변형률도
+    const ex = x0 + bw + (narrow ? 70 : 110), smax = Math.max(Math.abs(r.es), r.B.ecu, 0.004), es = ((narrow ? 50 : 80)) / smax;
+    DB.line(ctx, [[ex, top], [ex, top + h * sc]], pal.axis, 1);
+    DB.line(ctx, [[ex, top], [ex + r.B.ecu * es, top], [ex - r.es * es, top + d * sc], [ex, top + d * sc]], pal.accent, 1.8);
+    DB.line(ctx, [[ex - (r.fy / CB.rc.Es) * es, top + d * sc - 8], [ex - (r.fy / CB.rc.Es) * es, top + d * sc + 8]], pal.warn, 1.6);
+    DB.text(ctx, "εcu " + (r.B.ecu * 1000).toFixed(1) + "‰", ex + r.B.ecu * es + 4, top + 2, pal.bad, { size: 10.5, align: "left" });
+    DB.text(ctx, "εs " + (r.es * 1000).toFixed(2) + "‰", ex - r.es * es - 4, top + d * sc + 14, pal.tension, { size: 10.5, align: r.es >= 0 ? "right" : "left" });
+    DB.text(ctx, "εy", ex - (r.fy / CB.rc.Es) * es, top + d * sc - 16, pal.warn, { size: 10 });
+    // 힘
+    const fx = ex + (narrow ? 70 : 120), Fm = Math.max(r.C, Math.abs(r.T), 1), L = (W - fx - (narrow ? 30 : 120)) / Fm;
+    if (L > 0) {
+      DB.arrow(ctx, fx + r.C * L, top + (r.a / 2) * sc, fx, top + (r.a / 2) * sc, pal.compression, 2.6);
+      DB.arrow(ctx, fx, top + d * sc, fx + Math.abs(r.T) * L, top + d * sc, pal.tension, 2.6);
+      if (!narrow) { DB.text(ctx, "C " + DB.n(r.C, 0), fx + r.C * L + 6, top + (r.a / 2) * sc, pal.compression, { size: 11, align: "left" }); DB.text(ctx, "T " + DB.n(r.T, 0) + " kN", fx + Math.abs(r.T) * L + 6, top + d * sc, pal.tension, { size: 11, align: "left" }); }
+    }
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.46), minHeight: 200, maxHeight: 340 });
+  const cvB = CB.canvas("#db-cv-strain-b", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(gc()), lx = 70, bw = W - lx - 90, Fm = Math.max(r.C, Math.abs(r.T), 1) * 1.1, rh = 18;
+    [[r.C, pal.compression, "C"], [r.T, pal.tension, "T"]].forEach(([v, col, lab], i) => {
+      const y = 16 + i * (rh + 10), w = (bw * Math.abs(v)) / Fm;
+      ctx.fillStyle = DB.alpha(col, 0.3); ctx.fillRect(lx, y, w, rh); ctx.strokeStyle = col; ctx.strokeRect(lx, y, w, rh);
+      DB.text(ctx, lab, lx - 10, y + rh / 2, col, { size: 12, align: "right" });
+      DB.text(ctx, DB.n(v, 0) + " kN", lx + w + 6, y + rh / 2, col, { size: 11, align: "left" });
+    });
+    const ok = Math.abs(r.C - r.T) / Math.max(r.T, 1) < 0.01;
+    DB.text(ctx, ok ? "C = T 평형" : r.C > r.T ? "C > T → c를 줄인다(위로)" : "C < T → c를 키운다(아래로)", lx, H - 12, ok ? pal.ok : pal.warn, { size: 12, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.32 : 0.15), minHeight: 92, maxHeight: 110 });
+  const el = cv.canvas; let drag = false;
+  const setC = (e) => { if (!view) return; const rr = el.getBoundingClientRect(); gc.set(Math.round(CB.clamp((e.clientY - rr.top - view.top) / view.sc, 20, 600))); };
+  el.addEventListener("pointerdown", (e) => { drag = true; el.setPointerCapture(e.pointerId); setC(e); });
+  el.addEventListener("pointermove", (e) => { if (drag) setC(e); });
+  el.addEventListener("pointerup", () => (drag = false)); el.addEventListener("pointercancel", () => (drag = false));
+  let timer = null;
+  document.getElementById("db-st-solve").addEventListener("click", () => {
+    if (timer) clearInterval(timer);
+    let lo = 20, hi = 600, k = 0; log = [];
+    timer = setInterval(() => {
+      const m = (lo + hi) / 2, r = calc(m); k++;
+      log.push(`${k}) c = ${m.toFixed(1)} → ${r.C > r.T ? "C &gt; T" : "C &lt; T"}`);
+      if (r.C > r.T) hi = m; else lo = m;
+      gc.set(Math.round(m * 10) / 10);
+      if (k >= 12 || Math.abs(r.C - r.T) / Math.max(1, r.T) < 0.002) { clearInterval(timer); timer = null; const f = solve(); gc.set(Math.round(f.c * 10) / 10); }
+    }, 320);
+  });
+  const solve = () => CB.rc.flexure({ b, h, fck: gf(), fy: +gfy(), layers: [{ d, As: gn() * DB.A25 }] });
+  function draw() {
+    const c = gc(), r = calc(c), f = solve(), ok = Math.abs(r.C - r.T) / Math.max(r.T, 1) < 0.01;
+    CB.stat("db-st-es", (r.es * 1000).toFixed(2) + "‰ · " + DB.n(r.fs, 0) + " MPa");
+    CB.stat("db-st-ct", DB.n(r.C, 0) + " · " + DB.n(r.T, 0) + " kN");
+    CB.stat("db-st-dn", (r.C - r.T >= 0 ? "+" : "−") + DB.n(Math.abs(r.C - r.T), 0) + " kN");
+    CB.stat("db-st-mn", ok ? DB.n(f.Mn, 0) + " kN·m" : "평형 아님");
+    const yields = f.et >= r.fy / CB.rc.Es;
+    const tail = log.length ? " 이분법: " + log.slice(-5).join(" · ") : "";
+    DB.setMsg("db-st-msg", ok ? `평형: c = ${f.c.toFixed(1)} mm, a = ${f.a.toFixed(1)} mm, ε<sub>s</sub> = ${(f.et * 1000).toFixed(2)}‰ ${yields ? "≥ ε<sub>y</sub> → 철근 항복" : "&lt; ε<sub>y</sub> → 철근 미항복(과다 철근)"}, M<sub>n</sub> = ${DB.n(f.Mn, 0)} kN·m, ${DB.zone(f.et, r.fy)}.${tail}` : `평형 c* = ${f.c.toFixed(1)} mm. 지금 c = ${c.toFixed(0)} mm에서 ${r.C > r.T ? "압축이 크다 — 중립축을 올려라" : "인장이 크다 — 중립축을 내려라"}.${tail}`, ok ? (yields ? "ok" : "bad") : "");
+    cv.redraw(); cvB.redraw();
+  }
+  draw();
+})();
+
+/* ---------- 5. φ 곡선 ---------- */
+(function () {
+  const ge = CB.range("db-ph-et", (v) => (v * 1000).toFixed(2) + "‰", draw), gfy = CB.seg("db-ph-fy", draw), gsp = CB.seg("db-ph-sp", draw);
+  let C = null;
+  const cv = CB.canvas("#db-cv-phi", (ctx, W, H) => {
+    const pal = CB.palette(), fy = +gfy(), sp = gsp() === "spiral", ey = fy / CB.rc.Es, tcl = Math.max(0.005, 2.5 * ey), em = CB.rc.etMin(fy), et = ge();
+    const data = []; for (let i = 0; i <= 300; i++) { const e = (0.015 * i) / 300; data.push([e * 1000, CB.rc.phi(e, fy, sp)]); }
+    C = CB.chart(ctx, { x: 52, y: 16, w: W - 52 - 16, h: H - 16 - 46 }, { x: [0, 15], y: [0.6, 0.9], xLabel: "순인장 변형률 εt (‰)", yLabel: "φ",
+      bands: [{ x0: 0, x1: ey * 1000, color: DB.alpha(pal.bad, 0.1) }, { x0: ey * 1000, x1: tcl * 1000, color: DB.alpha(pal.warn, 0.12) }, { x0: tcl * 1000, x1: 15, color: DB.alpha(pal.ok, 0.1) }],
+      series: [{ data, color: pal.accent, width: 2.8 }],
+      vlines: [{ x: em * 1000, color: pal.bad, label: "εt,min" }, { x: ey * 1000, color: pal.faint, label: "εy" }],
+      points: [{ x: et * 1000, y: CB.rc.phi(et, fy, sp), color: pal.accent2, r: 7 }] });
+    DB.text(ctx, "압축 지배", C.X(ey * 500), C.Y(0.62), pal.bad, { size: 10.5 });
+    DB.text(ctx, "변화", C.X((ey + tcl) * 500), C.Y(0.62), pal.warn, { size: 10.5 });
+    DB.text(ctx, "인장 지배", C.X(Math.min(13.5, tcl * 1000 + 3)), C.Y(0.62), pal.ok, { size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 0.72 : 0.4), minHeight: 220, maxHeight: 300 });
+  const cvS = CB.canvas("#db-cv-phi-s", (ctx, W, H) => {
+    const pal = CB.palette(), et = ge(), cd = 0.0033 / (0.0033 + et), top = 14, hh = H - 30, x0 = 30, bw = Math.min(60, W * 0.12);
+    ctx.fillStyle = pal.surface; ctx.strokeStyle = pal.dim; ctx.fillRect(x0, top, bw, hh); ctx.strokeRect(x0, top, bw, hh);
+    const yt = top + hh * 0.92, yN = top + (yt - top) * cd;
+    ctx.fillStyle = pal.tension; [0.3, 0.7].forEach((t) => { ctx.beginPath(); ctx.arc(x0 + bw * t, yt, 4, 0, Math.PI * 2); ctx.fill(); });
+    DB.line(ctx, [[x0 - 6, yN], [W - 20, yN]], pal.warn, 1.4, [5, 4]);
+    const ex = x0 + bw + 80, s = Math.min(70, (W - ex - 140)) / 0.015;
+    DB.line(ctx, [[ex, top], [ex, yt]], pal.axis, 1);
+    DB.line(ctx, [[ex + 0.0033 * s, top], [ex - et * s, yt]], pal.accent, 2);
+    DB.line(ctx, [[ex, top], [ex + 0.0033 * s, top]], pal.bad, 2);
+    DB.line(ctx, [[ex, yt], [ex - et * s, yt]], pal.tension, 2);
+    DB.text(ctx, "c/dt = " + cd.toFixed(3), x0 + bw + 6, yN - 9, pal.warn, { size: 11, align: "left" });
+    DB.text(ctx, "εt " + (et * 1000).toFixed(2) + "‰", ex + 8, yt, pal.tension, { size: 11, align: "left" });
+    DB.text(ctx, "εcu 3.3‰", ex + 0.0033 * s + 6, top + 4, pal.bad, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.5 : 0.24), minHeight: 130, maxHeight: 170 });
+  const el = cv.canvas; let drag = false;
+  const setE = (e) => { if (!C) return; const r = el.getBoundingClientRect(), x = e.clientX - r.left, v = ((x - C.box.x) / C.box.w) * 15; ge.set(CB.clamp(Math.round(v * 10) / 10000, 0, 0.015)); };
+  el.addEventListener("pointerdown", (e) => { drag = true; el.setPointerCapture(e.pointerId); setE(e); });
+  el.addEventListener("pointermove", (e) => { if (drag) setE(e); });
+  el.addEventListener("pointerup", () => (drag = false)); el.addEventListener("pointercancel", () => (drag = false));
+  function draw() {
+    const fy = +gfy(), sp = gsp() === "spiral", et = ge(), p = CB.rc.phi(et, fy, sp), em = CB.rc.etMin(fy);
+    CB.stat("db-ph-phi", p.toFixed(3));
+    CB.stat("db-ph-zone", DB.zone(et, fy));
+    CB.stat("db-ph-cd", (0.0033 / (0.0033 + et)).toFixed(3));
+    CB.stat("db-ph-beam", et >= em ? "허용" : "불허(ε<sub>t</sub> &lt; " + (em * 1000).toFixed(1) + "‰)");
+    cv.redraw(); cvS.redraw();
+  }
+  draw();
+})();
+
+/* ---------- 6. 철근비와 구간 ---------- */
+(function () {
+  const b = 400, d = 634, h = 700;
+  const gr = CB.range("db-rh-r", (v) => (v * 100).toFixed(2) + " %", draw), gf = CB.seg("db-rh-fck", draw), gfy = CB.seg("db-rh-fy", draw);
+  const lim = () => { const fck = +gf(), fy = +gfy(), B = CB.rc.block(fck), k = (B.eta * 0.85 * fck * B.beta1) / fy, ey = fy / CB.rc.Es, tcl = Math.max(0.005, 2.5 * ey), em = CB.rc.etMin(fy), r = (et) => (k * B.ecu) / (B.ecu + et); return { fck, fy, B, rb: CB.rc.rhoB(fck, fy), rt: r(tcl), rm: r(em), ey, tcl, em }; };
+  const F = (rho) => { const L = lim(); return CB.rc.flexure({ b, h, fck: L.fck, fy: L.fy, layers: [{ d, As: rho * b * d }] }); };
+  const cv = CB.canvas("#db-cv-rho", (ctx, W, H) => {
+    const pal = CB.palette(), L = lim(), mn = [], pm = [];
+    for (let i = 0; i <= 160; i++) { const r = 0.002 + (0.033 * i) / 160, f = F(r); mn.push([r * 100, f.Mn]); pm.push([r * 100, f.phiMn]); }
+    const cur = F(gr()), ym = Math.max(...mn.map((p) => p[1])) * 1.1;
+    const C = CB.chart(ctx, { x: 58, y: 16, w: W - 58 - 16, h: H - 16 - 46 }, { x: [0.2, 3.5], y: [0, ym], xLabel: "철근비 ρ (%)", yLabel: "모멘트 (kN·m)",
+      bands: [{ x0: 0.2, x1: L.rt * 100, color: DB.alpha(pal.ok, 0.08) }, { x0: L.rt * 100, x1: L.rm * 100, color: DB.alpha(pal.warn, 0.12) }, { x0: L.rm * 100, x1: 3.5, color: DB.alpha(pal.bad, 0.08) }],
+      series: [{ data: mn, color: pal.accent, width: 1.8, dash: [5, 4] }, { data: pm, color: pal.accent, width: 2.8 }],
+      vlines: [{ x: L.rt * 100, color: pal.ok, label: "ρtcl" }, { x: L.rm * 100, color: pal.bad, label: "ρmax" }, { x: Math.min(L.rb * 100, 3.45), color: pal.warn, label: "ρb" }],
+      points: [{ x: gr() * 100, y: cur.phiMn, color: pal.accent2, r: 6.5 }] });
+  }, { aspect: (W) => (W < 520 ? 0.72 : 0.42), minHeight: 220, maxHeight: 300 });
+  const cvS = CB.canvas("#db-cv-rho-s", (ctx, W, H) => {
+    const pal = CB.palette(), L = lim(), f = F(gr()), top = 12, sc = (H - 24) / h, bw = b * sc, x0 = 30;
+    ctx.fillStyle = pal.surface; ctx.strokeStyle = pal.dim; ctx.fillRect(x0, top, bw, h * sc); ctx.strokeRect(x0, top, bw, h * sc);
+    ctx.fillStyle = DB.alpha(pal.compression, 0.3); ctx.fillRect(x0, top, bw, f.a * sc);
+    DB.line(ctx, [[x0 - 4, top + f.c * sc], [x0 + bw + 150, top + f.c * sc]], pal.warn, 1.4, [5, 4]);
+    DB.line(ctx, [[x0 + 3, top + d * sc], [x0 + bw - 3, top + d * sc]], pal.tension, Math.max(2, Math.min(8, gr() * 300)));
+    DB.text(ctx, "a = " + f.a.toFixed(0) + " mm", x0 + bw + 8, top + (f.a * sc) / 2, pal.compression, { size: 11, align: "left" });
+    DB.text(ctx, "c = " + f.c.toFixed(0) + " mm (a/c = β₁ = " + L.B.beta1.toFixed(2) + ")", x0 + bw + 8, top + f.c * sc + 10, pal.warn, { size: 11, align: "left" });
+    DB.text(ctx, "d = 634", x0 + bw + 8, top + d * sc, pal.tension, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.5 : 0.24), minHeight: 130, maxHeight: 170 });
+  function draw() {
+    const L = lim(), r = gr(), f = F(r), okFlex = f.et >= L.em;
+    CB.stat("db-rh-ac", f.a.toFixed(0) + " · " + f.c.toFixed(0) + " mm");
+    CB.stat("db-rh-et", (f.et * 1000).toFixed(2) + "‰ · " + f.phi.toFixed(3));
+    CB.stat("db-rh-pm", DB.n(f.phiMn, 0) + " kN·m");
+    CB.stat("db-rh-ok", (r / L.rb).toFixed(2) + " · " + (okFlex ? DB.zone(f.et, L.fy) : "불허"));
+    DB.setMsg("db-rh-msg", `fck ${L.fck}, ${"SD" + L.fy}: ρ<sub>tcl</sub> = ${L.rt.toFixed(4)}, ρ<sub>max</sub> = ${L.rm.toFixed(4)}, ρ<sub>b</sub> = ${L.rb.toFixed(4)}. 현재 A<sub>s</sub> = ${DB.n(r * b * d, 0)} mm²(D25 ${(r * b * d / DB.A25).toFixed(1)}개) → ${okFlex ? (f.et >= L.tcl ? "인장 지배, φ = 0.85" : `변화 구간, φ = ${f.phi.toFixed(3)} — 철근을 더 넣어도 φM<sub>n</sub>이 잘 늘지 않는다`) : "ε<sub>t</sub> &lt; ε<sub>t,min</sub>: 휨부재로 불허 — 단면을 키우거나 압축 철근(4장)"}.`, okFlex ? (f.et >= L.tcl ? "ok" : "warn") : "bad");
+    cv.redraw(); cvS.redraw();
+  }
+  draw();
+})();
+
+/* ---------- 7. 블록 계수 탐색 ---------- */
+(function () {
+  const gf = CB.range("db-cf-fck", (v) => v + " MPa", draw), gn = CB.range("db-cf-n", (v) => v + "개", draw);
+  const fits = []; for (let f = 25; f <= 90; f += 5) { const I = DB.integ(f, "pr"), b1 = 2 * I.k2; fits.push({ f, b1, eta: I.alpha / (0.85 * b1), n: I.n, ecu: I.ecu }); }
+  const cvA = CB.canvas("#db-cv-coef", (ctx, W, H) => {
+    const pal = CB.palette(), eta = [], b1 = [];
+    for (let f = 21; f <= 90; f += 0.5) { const B = CB.rc.block(f); eta.push([f, B.eta]); b1.push([f, B.beta1]); }
+    const pts = [];
+    fits.forEach((p) => { pts.push({ x: p.f, y: p.eta, color: pal.accent2, r: 3.5 }); pts.push({ x: p.f, y: p.b1, color: pal.tension, r: 3.5 }); });
+    const C = CB.chart(ctx, { x: 52, y: 26, w: W - 52 - 16, h: H - 26 - 44 }, { x: [20, 90], y: [0.6, 1.05], xLabel: "fck (MPa)", series: [{ data: eta, color: pal.accent2, width: 2.4 }, { data: b1, color: pal.tension, width: 2.4 }], vlines: [{ x: gf(), color: pal.faint, label: "" }], points: pts });
+    DB.text(ctx, "η", C.X(86), C.Y(CB.rc.block(86).eta) - 12, pal.accent2, { size: 12 });
+    DB.text(ctx, "β₁", C.X(86), C.Y(CB.rc.block(86).beta1) - 12, pal.tension, { size: 12 });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.34), minHeight: 190, maxHeight: 250 });
+  const cvB = CB.canvas("#db-cv-coef-b", (ctx, W, H) => {
+    const pal = CB.palette(), ec = [], nn = [];
+    for (let f = 21; f <= 90; f += 0.5) { ec.push([f, CB.rc.block(f).ecu * 1000]); nn.push([f, Math.min(2, CB.conc.pr(f).n)]); }
+    const C = CB.chart(ctx, { x: 52, y: 26, w: W - 52 - 16, h: H - 26 - 44 }, { x: [20, 90], y: [1, 3.6], xLabel: "fck (MPa)", series: [{ data: ec, color: pal.bad, width: 2.4 }, { data: nn, color: pal.accent, width: 2.4, dash: [5, 3] }], vlines: [{ x: gf(), color: pal.faint, label: "" }] });
+    DB.text(ctx, "εcu (‰)", C.X(30), C.Y(3.3) - 12, pal.bad, { size: 11 });
+    DB.text(ctx, "포물선 지수 n", C.X(30), C.Y(2) - 12, pal.accent, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.56 : 0.3), minHeight: 170, maxHeight: 230 });
+  function draw() {
+    const fck = gf(), B = CB.rc.block(fck), I = DB.integ(fck, "pr"), b1 = 2 * I.k2, eta = I.alpha / (0.85 * b1);
+    const As = gn() * DB.A25, f = CB.rc.flexure({ b: 400, h: 700, fck, fy: 500, layers: [{ d: 610, As }] }), f30 = CB.rc.flexure({ b: 400, h: 700, fck: 30, fy: 500, layers: [{ d: 610, As }] });
+    CB.stat("db-cf-tab", B.eta.toFixed(2) + " · " + B.beta1.toFixed(2));
+    CB.stat("db-cf-fit", eta.toFixed(3) + " · " + b1.toFixed(3));
+    CB.stat("db-cf-c", f.c.toFixed(0) + " mm · " + (f.et * 1000).toFixed(2) + "‰");
+    CB.stat("db-cf-mn", DB.n(f.phiMn, 0) + " (" + (f.phiMn >= f30.phiMn ? "+" : "−") + Math.abs((f.phiMn / f30.phiMn - 1) * 100).toFixed(1) + " %)");
+    cvA.redraw(); cvB.redraw();
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

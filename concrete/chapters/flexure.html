@@ -1,0 +1,1249 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>단철근 직사각형 보의 휨 · ConcreteBook</title>
+<meta name="description" content="보 하나를 처음부터 설계한다. 변형률 적합에서 공칭 휨강도 Mn = As fy (d − a/2)를 유도하고, 철근 항복 확인, 철근비와 파괴 형태, 최소·최대 철근, 소요 철근량과 철근 선택·순간격·2단 배근, 단면 크기의 경제성, B-10 큰보 G1의 정모멘트 설계(4-D25)를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .fx-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .fx-msg b { color: var(--text); }
+  .fx-msg.ok { color: var(--ok); font-weight: 600; }
+  .fx-msg.warn { color: var(--warn); font-weight: 600; }
+  .fx-msg.bad { color: var(--bad); font-weight: 600; }
+  .fx-tbl td, .fx-tbl th { font-variant-numeric: tabular-nums; }
+  .fx-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .fx-tbl td.ok { color: var(--ok); font-weight: 600; }
+  .fx-tbl td.bad { color: var(--bad); font-weight: 600; }
+  .fx-tbl tr.fx-pick td { background: var(--accent-soft); }
+  .fx-tbl tbody tr.fx-row { cursor: pointer; }
+  .fx-tbl tbody tr.fx-row:hover td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .fx-steps { margin: 6px 0 0; }
+  .fx-steps li { margin: 4px 0; }
+  .fx-wz { margin: 0; padding: 12px 18px 12px 40px; border-top: 1px solid var(--border); font-size: 14px; line-height: 1.75; }
+  .fx-wz li { margin: 2px 0; }
+  .fx-wz li b { color: var(--text); }
+  .fx-wz .ok { color: var(--ok); font-weight: 600; }
+  .fx-wz .bad { color: var(--bad); font-weight: 600; }
+  .fx-wz .warn { color: var(--warn); font-weight: 600; }
+  .fx-cand { padding: 0 12px 10px; border-top: 1px solid var(--border); }
+  .fx-cand .table-wrap { margin: 10px 0 0; }
+  .fx-cand table { font-size: 13px; }
+  #fx-cv-sec { touch-action: none; cursor: crosshair; }
+  #fx-cv-sec.fx-grab { cursor: grab; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="concrete"></script>
+</head>
+<body data-chapter="flexure">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="fx-ah-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--compression)"/></marker>
+      <marker id="fx-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--tension)"/></marker>
+      <marker id="fx-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="fx-ah-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="fx-ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 03</div>
+    <h1 data-no-glossary>단철근 직사각형 보의 휨</h1>
+    <p class="lead">2장에서 강도 설계의 약속(설계 강도 ≥ 소요 강도)과 등가 직사각형 응력 블록, 강도 감소 계수 φ를 정했습니다. 이제 그 도구로 보 하나를 처음부터 설계합니다. 인장 쪽에만 철근을 넣은 직사각형 보에서 <b>변형률 적합과 힘의 평형</b>만으로 공칭 휨강도 \(M_n = A_s f_y (d - a/2)\)를 유도하고, 그 식이 성립하는 조건(철근 항복)을 확인합니다. 철근을 얼마나 넣느냐가 파괴의 성격을 바꾸므로 최소·최대 철근을 정하고, 소요 철근량에서 철근의 호칭과 개수, 배치와 순간격, 2단 배근의 유효 깊이까지 결정합니다. 마지막으로 B-10 큰보 G1의 경간 중앙을 설계해 <b>4-D25</b>를 얻고, 앞 권들이 단순보로 근사해 쓴 7-D25와 비교합니다.</p>
+    <ul class="objectives">
+      <li>단철근 직사각형 단면의 변형률 분포·응력 블록·내력 짝힘을 그리고, 평형과 변형률 적합에서 \(a\), \(c\), \(M_n\)을 유도한다.</li>
+      <li>인장 철근의 항복 여부를 \(\varepsilon_t\)와 \(\varepsilon_y\)로 확인하고, 항복하지 않는 단면의 중립축을 2차 방정식으로 푼다.</li>
+      <li>철근비 \(\rho\)와 균형 철근비 \(\rho_b\)로 과소·균형·과다 철근 파괴를 구별하고, 연성(곡률 연성비)이 어떻게 달라지는지 설명한다.</li>
+      <li>최대 철근(최소 허용 인장 변형률)과 최소 철근(\(A_{s,min}\), 균열 모멘트 조건)의 근거를 계산으로 보인다.</li>
+      <li>설계 순서(단면 가정 → 소요 \(A_s\) → 철근 선택 → 순간격·피복 → \(\varepsilon_t\)·\(\phi M_n\) 확인)를 따라 보를 설계하고, 2단 배근과 단면 크기의 경제성을 판단한다.</li>
+      <li>G1 경간 중앙(\(M_u^+ = 460\) kN·m)을 4-D25로 설계하고, 단순보 근사 7-D25(\(\phi M_n \approx 800\) kN·m)와의 차이를 설명한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>콘크리트의 압축 응력은 어떤 모양인가</b></div>
+      <div class="o-body"><p>20세기 전반의 철근콘크리트 보는 대부분 허용 응력 설계로 만들었습니다. 사용 하중에서 콘크리트와 철근이 탄성이라고 보고, 응력이 허용값을 넘지 않게 단면을 정하는 방법입니다. 그러나 콘크리트는 응력이 커지면 곡선을 그리며 변형하고, 철근은 항복한 뒤에도 늘어납니다. 보가 실제로 부서지는 하중은 탄성 계산으로는 알 수 없었습니다.</p>
+        <p>미국의 엔지니어 휘트니(Charles S. Whitney)는 1930년대 후반, 파괴 순간 콘크리트의 곡선형 압축 응력을 <b>같은 합력과 같은 작용점을 갖는 직사각형</b>으로 바꾸어도 휨강도가 거의 같다는 것을 보였습니다. 이 등가 직사각형 응력 블록 덕분에 극한 강도 계산이 손으로 풀 수 있는 몇 줄의 식이 되었고, 미국 콘크리트 학회(ACI) 기준은 1956년 부록으로 강도 설계를 받아들인 뒤 1963년 판에서 허용 응력 설계와 동등하게, 1971년 판에서 주된 방법으로 삼았습니다. 이 장의 식 \(M_n = A_s f_y(d - a/2)\)가 그 결과입니다.</p>
+        <div class="o-chain"><span>단면 · 철근 · 재료</span><i>→</i><span class="tool">변형률 적합 · 응력 블록 · 평형 · φ</span><i>→</i><span>A<sub>s</sub> · 배치 · φM<sub>n</sub> ≥ M<sub>u</sub></span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="beam-couple">
+    <h2>보 속의 짝힘: 휨을 버티는 방식</h2>
+    <div class="problem"><strong>콘크리트 보는 휨모멘트를 어디서 버티는가</strong>
+      <p>G1의 경간 중앙을 잘라 왼쪽 조각을 떼어 놓으면, 잘린 면에는 하중이 만든 휨모멘트를 되돌려 놓는 힘이 있어야 합니다. 콘크리트는 아래쪽이 갈라져 인장을 거의 전하지 못합니다. 그렇다면 잘린 면의 무엇이 모멘트를 만들까요?</p></div>
+    <p>답은 <b>짝힘</b>입니다. 보의 윗부분 콘크리트가 압축력 \(C\)를, 아래쪽 철근이 인장력 \(T\)를 낸다. 단면에 축력이 없으므로 두 힘은 크기가 같고(\(C = T\)), 그 사이 거리 \(z\)를 <span class="term">내력 팔 길이</span><span class="en">(internal lever arm)</span>라 하면 단면의 저항 모멘트는 \(M = Tz = Cz\)입니다. 휨 설계는 결국 세 가지 질문입니다. 철근이 낼 수 있는 \(T\)는 얼마인가, 그 \(T\)와 평형을 이루려면 콘크리트가 얼마나 깊이 눌려야 하는가(그래서 \(z\)는 얼마인가), 그리고 그 상태에 이르기 전에 무엇이 먼저 부서지는가.</p>
+    <figure class="diagram" id="fig-fx-couple">
+      <svg viewBox="0 0 860 300" role="img" aria-label="등분포 하중을 받는 보의 휨 균열과, 잘린 면에서 콘크리트 압축력 C와 철근 인장력 T가 만드는 짝힘">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">보와 균열</text>
+          <g style="stroke:var(--accent-2);stroke-width:1.6">
+            <line x1="20" y1="20" x2="20" y2="44" marker-end="url(#fx-ah-ld)"/><line x1="70" y1="20" x2="70" y2="44" marker-end="url(#fx-ah-ld)"/><line x1="120" y1="20" x2="120" y2="44" marker-end="url(#fx-ah-ld)"/><line x1="170" y1="20" x2="170" y2="44" marker-end="url(#fx-ah-ld)"/><line x1="220" y1="20" x2="220" y2="44" marker-end="url(#fx-ah-ld)"/><line x1="270" y1="20" x2="270" y2="44" marker-end="url(#fx-ah-ld)"/><line x1="320" y1="20" x2="320" y2="44" marker-end="url(#fx-ah-ld)"/><line x1="370" y1="20" x2="370" y2="44" marker-end="url(#fx-ah-ld)"/>
+          </g>
+          <line x1="20" y1="20" x2="370" y2="20" style="stroke:var(--accent-2);stroke-width:1.6"/>
+          <text x="380" y="26" class="t-mono" style="fill:var(--accent-2)">w<tspan baseline-shift="sub" font-size="8">u</tspan></text>
+          <rect x="10" y="50" width="370" height="70" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="16" y1="108" x2="374" y2="108" style="stroke:var(--tension);stroke-width:3"/>
+          <g style="stroke:var(--text-dim);stroke-width:1.3;fill:none">
+            <path d="M150 120 L152 104 L149 90 L151 80"/><path d="M195 120 L196 100 L194 84 L196 72"/><path d="M240 120 L241 102 L239 88 L240 78"/><path d="M110 120 L112 106 L110 96"/><path d="M285 120 L286 106 L284 96"/>
+          </g>
+          <path d="M10 130 l-10 16 h20 z" style="fill:none;stroke:var(--text-dim)"/><circle cx="380" cy="134" r="5" style="fill:none;stroke:var(--text-dim)"/><line x1="368" y1="142" x2="392" y2="142" style="stroke:var(--text-dim)"/>
+          <line x1="195" y1="40" x2="195" y2="160" style="stroke:var(--accent);stroke-dasharray:5 4"/>
+          <text x="195" y="178" text-anchor="middle" class="t-mono">이 단면을 자른다</text>
+          <text x="0" y="214" class="t-dim">아래쪽 콘크리트는 인장 강도를 넘으면 갈라진다(휨 균열).</text>
+          <text x="0" y="232" class="t-dim">균열이 지나간 자리의 인장은 철근(파랑)만 전한다.</text>
+        </g>
+        <g transform="translate(480,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">잘린 왼쪽 조각의 오른쪽 면</text>
+          <rect x="20" y="40" width="150" height="160" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="120" y="40" width="50" height="42" style="fill:var(--compression);opacity:.28"/>
+          <line x1="20" y1="180" x2="170" y2="180" style="stroke:var(--tension);stroke-width:3"/>
+          <line x1="240" y1="61" x2="180" y2="61" style="stroke:var(--compression);stroke-width:3" marker-end="url(#fx-ah-c)"/>
+          <text x="248" y="66" class="t-mono" style="fill:var(--compression)">C (콘크리트 압축)</text>
+          <line x1="180" y1="180" x2="240" y2="180" style="stroke:var(--tension);stroke-width:3" marker-end="url(#fx-ah-t)"/>
+          <text x="248" y="185" class="t-mono" style="fill:var(--tension)">T = A<tspan baseline-shift="sub" font-size="8">s</tspan>f<tspan baseline-shift="sub" font-size="8">s</tspan> (철근)</text>
+          <line x1="205" y1="64" x2="205" y2="176" style="stroke:var(--text-dim);stroke-width:1.2" marker-start="url(#fx-ah-d)" marker-end="url(#fx-ah-d)"/>
+          <text x="212" y="124" class="t-mono">z</text>
+          <path d="M60 120 a28 28 0 1 1 0.1 0" style="fill:none;stroke:var(--accent);stroke-width:2" marker-end="url(#fx-ah-a)" transform="rotate(-60 60 120)"/>
+          <text x="52" y="124" class="t-mono" style="fill:var(--accent)">M</text>
+          <text x="0" y="230" class="t-dim">ΣF = 0 → C = T,  ΣM = 0 → M = T·z</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-1.</b> 보가 휨모멘트를 버티는 방식. 새깅 모멘트에서 아래쪽 콘크리트는 갈라지고, 잘린 면의 저항 모멘트는 위쪽 콘크리트의 압축력 \(C\)와 철근의 인장력 \(T\)가 만드는 짝힘 \(Tz\)다. 강철 보의 플랜지 두 개가 하는 일을 콘크리트 블록과 철근이 나눠 맡는다(MechanicsBook 9장 소성 모멘트와 비교).</figcaption>
+    </figure>
+    <p>이 그림은 MechanicsBook 9장의 <a href="../../mechanics/chapters/bending.html#plastic">소성 모멘트</a>와 닮았습니다. 강재 단면이 모두 항복한 상태에서 압축 쪽 합력과 인장 쪽 합력이 짝힘을 이루던 것처럼, RC 단면도 파괴 직전에는 압축 콘크리트와 항복한 철근이 짝힘을 이룹니다. 다른 점은 두 재료가 다르다는 것입니다. 콘크리트는 압축 변형률이 약 0.003에 이르면 부서지고, 철근은 0.0025(SD500)에서 항복한 뒤 수십 배 늘어날 수 있습니다. 어느 쪽이 먼저 한계에 닿느냐가 파괴의 성격을 정하고, 그것을 정하는 것이 <b>철근의 양</b>입니다.</p>
+    <p>이 장은 인장 쪽에만 철근이 있는 직사각형 단면, 곧 <span class="term">단철근 보</span><span class="en">(singly reinforced beam)</span>를 다룹니다. 압축 쪽에도 철근을 넣은 복철근 보와 슬래브가 플랜지 역할을 하는 T형 보는 <a href="t-beam.html">4장</a>에서 이 장의 방법을 그대로 넓힙니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="nominal">
+    <h2>공칭 휨강도의 유도</h2>
+    <div class="problem"><strong>철근 4-D25를 넣은 G1은 얼마의 모멘트에서 부서지는가</strong>
+      <p>단면(400 × 700 mm), 철근(4-D25, \(A_s = 2{,}027\) mm²), 재료(\(f_{ck} = 30\) MPa, SD500)를 알 때, 그 단면이 낼 수 있는 최대 휨모멘트를 계산하고 싶습니다. 실험 없이, 2장의 가정만으로.</p></div>
+    <p>2장의 <a href="design-basis.html">기본 가정</a>을 다시 적습니다. ① 변형 전에 평면인 단면은 변형 뒤에도 평면이다(변형률은 중립축에서의 거리에 비례). ② 철근과 주변 콘크리트의 변형률은 같다(완전 부착). ③ 콘크리트의 인장 강도는 무시한다. ④ 압축 연단의 콘크리트 변형률이 \(\varepsilon_{cu}\)(fck ≤ 40 MPa에서 0.0033)에 이르면 단면이 파괴된다. ⑤ 철근은 탄성–완전 소성(\(f_s = E_s\varepsilon_s \le f_y\)). ⑥ 콘크리트 압축 응력은 깊이 \(a = \beta_1 c\), 크기 \(\eta(0.85f_{ck})\)인 등가 직사각형으로 바꿀 수 있다.</p>
+    <div class="callout def"><strong>정의 3.1 (단철근 직사각형 단면의 기호)</strong> 폭 \(b\), 전체 높이 \(h\), 압축 연단에서 인장 철근 도심까지의 거리 \(d\)를 <span class="term">유효 깊이</span><span class="en">(effective depth)</span>, 가장 바깥 인장 철근까지의 거리를 \(d_t\), 중립축 깊이 \(c\), 응력 블록 깊이 \(a = \beta_1 c\), 인장 철근 단면적 \(A_s\). 파괴 순간 가장 바깥 인장 철근의 변형률을 <span class="term">순인장 변형률</span><span class="en">(net tensile strain)</span> \(\varepsilon_t\)라 한다. 철근이 한 층이면 \(d = d_t\)다.</div>
+    <figure class="diagram" id="fig-fx-derive">
+      <svg viewBox="0 0 860 340" role="img" aria-label="단면, 변형률 분포, 실제 응력 분포, 등가 직사각형 응력 블록, 내력의 다섯 그림">
+        <rect x="10" y="10" width="840" height="320" rx="10" class="f-surface"/>
+        <g class="t" style="font-weight:700" text-anchor="middle"><text x="105" y="38">① 단면</text><text x="275" y="38">② 변형률</text><text x="440" y="38">③ 실제 응력</text><text x="605" y="38">④ 등가 블록</text><text x="765" y="38">⑤ 내력</text></g>
+        <!-- section -->
+        <rect x="55" y="60" width="100" height="240" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <g style="fill:var(--tension)"><circle cx="75" cy="270" r="7"/><circle cx="95" cy="270" r="7"/><circle cx="115" cy="270" r="7"/><circle cx="135" cy="270" r="7"/></g>
+        <line x1="45" y1="60" x2="45" y2="270" style="stroke:var(--text-dim)" marker-start="url(#fx-ah-d)" marker-end="url(#fx-ah-d)"/><text x="38" y="170" text-anchor="end" class="t-mono">d</text>
+        <line x1="55" y1="314" x2="155" y2="314" style="stroke:var(--text-dim)" marker-start="url(#fx-ah-d)" marker-end="url(#fx-ah-d)"/><text x="105" y="326" text-anchor="middle" class="t-mono">b</text>
+        <line x1="40" y1="138" x2="860" y2="138" style="stroke:var(--warn);stroke-dasharray:6 4"/>
+        <text x="160" y="134" class="t-mono" style="fill:var(--warn)">중립축</text>
+        <!-- strain -->
+        <line x1="250" y1="60" x2="250" y2="300" class="s-axis"/>
+        <path d="M250 60 L300 60 L250 138 Z" style="fill:var(--compression);opacity:.25"/>
+        <path d="M250 138 L250 270 L166 270 Z" style="fill:var(--tension);opacity:.22"/>
+        <line x1="300" y1="60" x2="166" y2="270" style="stroke:var(--text);stroke-width:1.6"/>
+        <text x="304" y="64" class="t-mono" style="fill:var(--compression)">ε<tspan baseline-shift="sub" font-size="8">cu</tspan> = 0.0033</text>
+        <text x="172" y="290" class="t-mono" style="fill:var(--tension)">ε<tspan baseline-shift="sub" font-size="8">t</tspan></text>
+        <line x1="262" y1="60" x2="262" y2="138" style="stroke:var(--text-dim)" marker-start="url(#fx-ah-d)" marker-end="url(#fx-ah-d)"/><text x="268" y="104" class="t-mono">c</text>
+        <!-- actual stress -->
+        <line x1="420" y1="60" x2="420" y2="300" class="s-axis"/>
+        <path d="M420 60 L478 60 C 486 82, 482 104, 470 118 C 456 130, 440 136, 420 138 Z" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+        <text x="482" y="78" class="t-mono" style="fill:var(--compression)">≈ f<tspan baseline-shift="sub" font-size="8">c</tspan>(ε)</text>
+        <circle cx="420" cy="270" r="5" style="fill:var(--tension)"/><text x="430" y="274" class="t-mono" style="fill:var(--tension)">f<tspan baseline-shift="sub" font-size="8">s</tspan></text>
+        <!-- equivalent block -->
+        <line x1="580" y1="60" x2="580" y2="300" class="s-axis"/>
+        <rect x="580" y="60" width="58" height="62" style="fill:var(--compression);opacity:.3;stroke:var(--compression)"/>
+        <text x="642" y="78" class="t-mono" style="fill:var(--compression)">η(0.85f<tspan baseline-shift="sub" font-size="8">ck</tspan>)</text>
+        <line x1="570" y1="60" x2="570" y2="122" style="stroke:var(--text-dim)" marker-start="url(#fx-ah-d)" marker-end="url(#fx-ah-d)"/><text x="564" y="96" text-anchor="end" class="t-mono">a = β₁c</text>
+        <!-- forces -->
+        <line x1="800" y1="91" x2="740" y2="91" style="stroke:var(--compression);stroke-width:3" marker-end="url(#fx-ah-c)"/>
+        <text x="806" y="96" class="t-mono" style="fill:var(--compression)">C</text>
+        <line x1="740" y1="270" x2="800" y2="270" style="stroke:var(--tension);stroke-width:3" marker-end="url(#fx-ah-t)"/>
+        <text x="806" y="275" class="t-mono" style="fill:var(--tension)">T</text>
+        <line x1="720" y1="91" x2="720" y2="270" style="stroke:var(--text-dim)" marker-start="url(#fx-ah-d)" marker-end="url(#fx-ah-d)"/>
+        <text x="714" y="190" text-anchor="end" class="t-mono">z = d − a/2</text>
+        <line x1="700" y1="91" x2="740" y2="91" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+      </svg>
+      <figcaption><b>그림 3-2.</b> 변형률 적합에서 내력까지. ② 평면 유지 가정으로 변형률은 직선이고, 압축 연단에서 \(\varepsilon_{cu}\)일 때를 파괴로 본다. ③ 실제 콘크리트 응력은 곡선이지만 ④ 합력과 작용점이 같은 직사각형(깊이 \(a = \beta_1 c\))으로 바꾼다(2장). ⑤ 압축 합력 \(C\)는 블록 중심 \(a/2\)에, 인장 합력 \(T\)는 철근 도심에 작용하고 둘 사이가 내력 팔 길이 \(z\)다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 3.2 (변형률 적합)</strong> 파괴 순간 단면의 변형률 분포는 압축 연단에서 \(\varepsilon_{cu}\), 중립축에서 0인 직선이므로, 깊이 \(y\)의 철근 변형률은 닮은 삼각형으로 정해진다.
+      <div class="formula">$$\varepsilon_s = \varepsilon_{cu}\,\frac{d - c}{c}, \qquad \varepsilon_t = \varepsilon_{cu}\,\frac{d_t - c}{c}, \qquad c = \frac{\varepsilon_{cu}}{\varepsilon_{cu} + \varepsilon_t}\,d_t$$<div class="where">이 관계가 <span class="term">변형률 적합</span><span class="en">(strain compatibility)</span>이다. 중립축이 얕을수록(\(c\)가 작을수록) 철근 변형률이 커진다. \(\varepsilon_{cu}\)·\(\beta_1\)·\(\eta\)는 <code>CB.rc.block(fck)</code>.</div></div></div>
+    <div class="callout def"><strong>원리 3.3 (단철근 직사각형 보의 공칭 휨강도)</strong> 인장 철근이 항복한다고 가정하면(\(f_s = f_y\)), 힘의 평형 \(C = T\)에서
+      <div class="formula">$$\eta(0.85f_{ck})\,a\,b = A_s f_y \;\Rightarrow\; a = \frac{A_s f_y}{\eta(0.85f_{ck})\,b}, \qquad c = \frac{a}{\beta_1}$$</div>
+      모멘트 평형(압축 합력 위치에 대한 \(T\)의 모멘트)에서
+      <div class="formula">$$M_n = T\left(d - \frac{a}{2}\right) = A_s f_y\left(d - \frac{a}{2}\right) = \rho f_y b d^2\left(1 - \frac{\rho f_y}{2\eta(0.85f_{ck})}\right)$$<div class="where">\(M_n\): <span class="term">공칭 휨강도</span><span class="en">(nominal flexural strength)</span>. 설계에 쓰는 값은 강도 감소 계수를 곱한 <span class="term">설계 휨강도</span><span class="en">(design flexural strength)</span> \(\phi M_n\)이고, \(\phi\)는 \(\varepsilon_t\)로 정한다(2장, <code>CB.rc.phi</code>). 마지막 꼴은 \(\rho = A_s/(bd)\)로 쓴 것이다. 유도에 쓴 "철근 항복" 가정은 반드시 \(\varepsilon_t \ge \varepsilon_y\)로 확인한다(다음 절).</div></div></div>
+    <p>식의 모양에 설계의 감각이 다 들어 있습니다. \(M_n\)은 \(A_s\)에 거의 비례하지만 \(a/2\)만큼 팔 길이가 줄어 조금씩 덜 늘어나고, \(d\)에는 정확히 비례하는 몫이 있습니다. 같은 철근이라면 <b>깊은 보가 강하고</b>, 같은 보라면 철근을 두 배로 넣어도 강도는 두 배가 되지 않습니다. 콘크리트 강도 \(f_{ck}\)는 \(a\)를 줄여 팔 길이를 조금 늘릴 뿐이라 휨강도에 대한 영향이 작습니다.</p>
+    <div class="callout"><strong>예제 3.1 (공칭 휨강도 계산)</strong> \(b = 300\) mm, \(h = 500\) mm, \(d = 440\) mm, 인장 철근 3-D22(\(A_s = 3 \times 387.1 = 1{,}161\) mm²), \(f_{ck} = 30\) MPa(\(\eta = 1.0\), \(\beta_1 = 0.80\), \(\varepsilon_{cu} = 0.0033\)), SD500.
+      <ol class="fx-steps">
+        <li><b>응력 블록.</b> \(a = 1{,}161 \times 500/(1.0 \times 0.85 \times 30 \times 300) = 580{,}650/7{,}650 = 75.9\) mm, \(c = 75.9/0.80 = 94.9\) mm.</li>
+        <li><b>항복 확인.</b> \(\varepsilon_t = 0.0033 \times (440 - 94.9)/94.9 = 0.0120 \ge \varepsilon_y = 500/200{,}000 = 0.0025\) → 항복 가정 맞음.</li>
+        <li><b>강도.</b> \(M_n = 1{,}161 \times 500 \times (440 - 75.9/2)/10^6 = 233.4\) kN·m.</li>
+        <li><b>φ.</b> \(\varepsilon_t = 0.0120 \ge \varepsilon_{t,tcl} = \max(0.005,\ 2.5\varepsilon_y) = 0.00625\) → 인장 지배, \(\phi = 0.85\), \(\phi M_n = 198.4\) kN·m.</li>
+        <li><b>검산.</b> 팔 길이 \(z = 402\) mm는 \(d\)의 91 %다. 보통의 보에서 \(z \approx 0.85\)–\(0.95d\)라는 감각을 기억해 두면 손계산을 빨리 점검할 수 있다.</li>
+      </ol></div>
+    <p>아래 시뮬레이터가 이 장의 기본 화면입니다. 단면 안의 빈 곳을 누르면 철근이 생기고, 철근을 끌어 옮기거나 단면 밖으로 끌어내 지울 수 있습니다. 철근마다 깊이를 따로 보고 변형률 적합을 풀기 때문에, 철근을 중립축 위로 올리면 압축 철근이 되고(4장), 두 층으로 쌓으면 \(d\)와 \(d_t\)가 갈라집니다.</p>
+    <div class="sim" id="sim-fx-section">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>단면 휨강도 계산기: 철근을 놓고 끌기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-sec" aria-label="보 단면과 철근, 변형률 분포, 등가 응력 블록과 내력. 단면을 눌러 철근을 추가하고 끌어 옮길 수 있다"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시</span><div class="seg" id="fx-sc-pre"><button data-value="g1" class="on">G1 4-D25</button><button data-value="s7">7-D25</button><button data-value="over">과다</button><button data-value="min">최소</button></div></div>
+          <div class="ctrl"><span>추가할 철근</span><div class="seg" id="fx-sc-bar"><button data-value="D19">D19</button><button data-value="D22">D22</button><button data-value="D25" class="on">D25</button><button data-value="D29">D29</button></div></div>
+          <label class="ctrl"><span>폭 b <output id="fx-sc-b-out"></output></span><input type="range" id="fx-sc-b" min="250" max="600" step="10" value="400"></label>
+          <label class="ctrl"><span>높이 h <output id="fx-sc-h-out"></output></span><input type="range" id="fx-sc-h" min="400" max="1000" step="10" value="700"></label>
+          <div class="ctrl"><span><span>f<sub>ck</sub> (MPa)</span></span><div class="seg" id="fx-sc-fck"><button data-value="24">24</button><button data-value="30" class="on">30</button><button data-value="40">40</button><button data-value="60">60</button></div></div>
+          <div class="ctrl"><span>철근 강종</span><div class="seg" id="fx-sc-fy"><button data-value="400">SD400</button><button data-value="500" class="on">SD500</button><button data-value="600">SD600</button></div></div>
+          <label class="ctrl"><span><span>소요 강도 M<sub>u</sub></span> <output id="fx-sc-mu-out"></output></span><input type="range" id="fx-sc-mu" min="0" max="1500" step="10" value="460"></label>
+          <div class="btn-row"><button class="btn" id="fx-sc-add">+ 아래층에 한 개</button><button class="btn" id="fx-sc-del">− 마지막 철근</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">A<sub>s</sub> · ρ</span><span class="v" id="fx-sc-as">—</span></div>
+        <div class="stat"><span class="k">a · c</span><span class="v" id="fx-sc-ac">—</span></div>
+        <div class="stat"><span class="k">ε<sub>t</sub> · φ</span><span class="v" id="fx-sc-et">—</span></div>
+        <div class="stat"><span class="k">M<sub>n</sub> · φM<sub>n</sub></span><span class="v" id="fx-sc-mn">—</span></div>
+      </div>
+      <div class="fx-msg" id="fx-sc-msg">—</div>
+      <div class="sim-note">해볼 것: 기본값(G1, 4-D25 한 층)에서 φM<sub>n</sub> ≈ 504 kN·m ≥ 460을 확인하세요 · "7-D25"는 5 + 2의 두 층이라 d(도심)와 d<sub>t</sub>(맨 아래)가 다릅니다 · "과다"(10-D25)에서는 ε<sub>t</sub>가 최소 허용값 0.005 아래로 내려가 휨부재로 쓸 수 없습니다 · 철근 하나를 위로 끌어 중립축 위로 올려 보세요: 압축 철근이 되어 강도는 거의 그대로인데 c가 줄고 ε<sub>t</sub>가 커집니다(4장) · 철근끼리 너무 가까우면 빨간 테두리로 순간격 부족을 알립니다 · 모델: 원리 3.2–3.3, <code>CB.rc.flexure</code>(철근마다 층으로 넣는 변형률 적합, 압축 철근 항복 여부 자동), 순간격 max(25, d<sub>b</sub>, 4/3 × 25 mm), 피복 40 mm·스터럽 D13. 교육용.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="yielding">
+    <h2>철근이 항복하는지 확인하기</h2>
+    <div class="problem"><strong>철근을 많이 넣으면 식이 거짓말을 한다</strong>
+      <p>원리 3.3은 \(f_s = f_y\)를 가정했습니다. 300 × 500 mm 보에 8-D25(4,054 mm²)를 넣고 그 식을 쓰면 \(a = 265\) mm, \(M_n = 623\) kN·m가 나옵니다. 그런데 이 단면은 실제로 그만큼 버티지 못합니다. 무엇이 틀렸을까요?</p></div>
+    <p>철근이 많으면 \(T\)가 커지고, 평형을 위해 콘크리트가 깊이 눌려야 하므로 중립축이 내려갑니다. 중립축이 철근에 가까워지면 원리 3.2에 따라 철근 변형률이 작아지고, 콘크리트가 \(\varepsilon_{cu}\)에 닿는 순간까지 철근이 <span class="term">항복</span><span class="en">(yielding)</span>하지 못할 수 있습니다. 그러면 \(f_s \lt f_y\)이고, 항복을 가정해 구한 \(a\)는 너무 크며, 무엇보다 파괴가 철근의 늘어남 없이 콘크리트의 압괴로 갑자기 옵니다.</p>
+    <div class="callout def"><strong>원리 3.4 (항복 확인과 미항복 단면의 해)</strong> ① \(f_s = f_y\)로 \(a\), \(c\)를 구한다. ② \(\varepsilon_s = \varepsilon_{cu}(d - c)/c \ge \varepsilon_y = f_y/E_s\)이면 가정이 맞다. ③ 아니면 \(f_s = E_s\varepsilon_{cu}(d - c)/c\)를 평형식에 넣어 \(c\)에 대한 2차 방정식을 푼다.
+      <div class="formula">$$\eta(0.85f_{ck})\,\beta_1 b\,c^2 + A_s E_s\varepsilon_{cu}\,c - A_s E_s\varepsilon_{cu}\,d = 0, \qquad M_n = \eta(0.85f_{ck})\,\beta_1 c\, b\left(d - \frac{\beta_1 c}{2}\right)$$<div class="where">\(c\)의 양의 근을 쓴다. 이 계산을 철근 층마다 일반화한 것이 <code>CB.rc.flexure</code>이며, 이분법으로 \(\Sigma F = 0\)인 \(c\)를 찾는다. 균형 상태(\(\varepsilon_s = \varepsilon_y\)와 \(\varepsilon_c = \varepsilon_{cu}\)가 동시)의 중립축은 \(c_b = \varepsilon_{cu}d/(\varepsilon_{cu} + \varepsilon_y)\), SD500·fck 30이면 \(c_b = 0.569d\).</div></div></div>
+    <div class="callout"><strong>예제 3.2 (철근이 항복하지 않는 단면)</strong> \(b = 300\), \(d = 440\) mm, 8-D25(\(A_s = 4{,}054\) mm²), fck 30, SD500.
+      <ol class="fx-steps">
+        <li><b>항복 가정.</b> \(a = 4{,}054 \times 500/7{,}650 = 265\) mm, \(c = 331\) mm → \(\varepsilon_s = 0.0033 \times (440 - 331)/331 = 0.00109 \lt 0.0025\). <b>가정이 틀렸다.</b></li>
+        <li><b>2차 방정식.</b> \(25.5 \times 0.8 \times 300\,c^2 + 4{,}054 \times 200{,}000 \times 0.0033\,c - 4{,}054 \times 660 \times 440 = 0\), 곧 \(6{,}120c^2 + 2{,}675{,}000c - 1{,}177{,}000{,}000 = 0\) → \(c = 271\) mm.</li>
+        <li><b>철근 응력.</b> \(\varepsilon_s = 0.0033 \times (440 - 271)/271 = 0.00205\), \(f_s = 410\) MPa(항복 전).</li>
+        <li><b>강도.</b> \(a = 217\) mm, \(C = 25.5 \times 217 \times 300 = 1{,}661\) kN \(= A_s f_s\) ✓. \(M_n = 1{,}661 \times (440 - 108.6)/10^3 = 551\) kN·m. 항복 가정의 623 kN·m보다 12 % 작다.</li>
+        <li><b>판정.</b> \(\varepsilon_t = 0.00205 \lt \varepsilon_y\) → 압축 지배(\(\phi = 0.65\)), \(\phi M_n = 358\) kN·m. 게다가 \(\varepsilon_t\)가 최소 허용 인장 변형률 0.005보다 작아 <b>휨부재로 허용되지 않는다</b>(원리 3.6). 철근을 줄이고 단면을 키우거나, 4장의 압축 철근을 쓴다.</li>
+      </ol></div>
+    <div class="sim" id="sim-fx-yield">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>철근은 항복하는가: 가정하고 확인하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-yld" aria-label="변형률 분포에서 철근 변형률과 항복 변형률의 비교, 철근 응력–변형률 곡선 위의 위치"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>철근량 A<sub>s</sub></span> <output id="fx-yd-as-out"></output></span><input type="range" id="fx-yd-as" min="300" max="6000" step="20" value="1160"></label>
+          <label class="ctrl"><span>폭 b <output id="fx-yd-b-out"></output></span><input type="range" id="fx-yd-b" min="200" max="500" step="10" value="300"></label>
+          <label class="ctrl"><span>유효 깊이 d <output id="fx-yd-d-out"></output></span><input type="range" id="fx-yd-d" min="300" max="900" step="10" value="440"></label>
+          <div class="ctrl"><span>철근 강종</span><div class="seg" id="fx-yd-fy"><button data-value="400">SD400</button><button data-value="500" class="on">SD500</button><button data-value="600">SD600</button></div></div>
+          <div class="btn-row"><button class="btn" id="fx-yd-ex1">예제 3.1</button><button class="btn" id="fx-yd-ex2">예제 3.2</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">항복 가정: c · ε<sub>s</sub></span><span class="v" id="fx-yd-c1">—</span></div>
+        <div class="stat"><span class="k">실제: c · f<sub>s</sub></span><span class="v" id="fx-yd-c2">—</span></div>
+        <div class="stat"><span class="k">M<sub>n</sub> 가정 · 실제</span><span class="v" id="fx-yd-mn">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="fx-yd-st">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 예제 3.2(8-D25)를 눌러 "항복 가정"의 철근 변형률(빈 원)이 ε<sub>y</sub> 선 안쪽에 있음을 확인하세요. 실제 해(채운 원)는 2차 방정식으로 다시 찾은 점입니다 · A<sub>s</sub>를 천천히 키우면 두 원이 함께 움직이다가 균형점(c = c<sub>b</sub>)에서 갈라집니다 · SD600은 ε<sub>y</sub> = 0.003이라 같은 단면에서 더 일찍 미항복이 됩니다 · 모델: 원리 3.4(fck 30 MPa, ε<sub>cu</sub> 0.0033, β<sub>1</sub> 0.80, 탄성–완전 소성 철근, E<sub>s</sub> = 200,000 MPa).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="ratio">
+    <h2>철근비와 파괴 형태</h2>
+    <div class="problem"><strong>철근을 많이 넣을수록 안전한가</strong>
+      <p>예제 3.2의 단면은 철근을 두 배로 넣었는데 설계 강도가 오히려 비슷했고, 더 나쁜 것은 경고 없이 부서진다는 점이었습니다. 철근의 양을 단면 크기로 나눈 하나의 숫자가 이 거동을 가릅니다.</p></div>
+    <div class="callout def"><strong>정의 3.5 (철근비와 균형 철근비)</strong> 인장 철근 단면적을 유효 단면적으로 나눈 값 \(\rho = A_s/(bd)\)를 <span class="term">철근비</span><span class="en">(reinforcement ratio)</span>라 한다. 콘크리트가 \(\varepsilon_{cu}\)에 닿는 순간 철근이 정확히 \(\varepsilon_y\)에 이르는 철근비를 <span class="term">균형 철근비</span><span class="en">(balanced reinforcement ratio)</span>라 한다.
+      <div class="formula">$$\rho_b = \frac{\eta(0.85f_{ck})\,\beta_1}{f_y}\cdot\frac{\varepsilon_{cu}}{\varepsilon_{cu} + \varepsilon_y}$$<div class="where">유도: \(c_b = \varepsilon_{cu}d/(\varepsilon_{cu} + \varepsilon_y)\)를 \(\eta(0.85f_{ck})\beta_1 c_b b = \rho_b b d f_y\)에 넣는다. fck 30, SD500: \(\rho_b = (25.5 \times 0.8/500) \times 0.0033/0.0058 = 0.0232\)(<code>CB.rc.rhoB</code>).</div></div></div>
+    <p>\(\rho\)가 \(\rho_b\)보다 작은 보를 <span class="term">과소 철근 보</span><span class="en">(under-reinforced beam)</span>, 큰 보를 <span class="term">과다 철근 보</span><span class="en">(over-reinforced beam)</span>라 합니다. 이름과 달리 "과소"가 좋은 쪽입니다. 과소 철근 보는 철근이 먼저 항복해 크게 늘어나고, 균열이 벌어지고 처짐이 커진 뒤에야 콘크리트가 부서집니다. 사람이 알아채고 피할 시간이 있는 <span class="term">연성 파괴</span><span class="en">(ductile failure)</span>입니다. 과다 철근 보는 철근이 탄성인 채로 압축 콘크리트가 부서지는 <span class="term">취성 파괴</span><span class="en">(brittle failure)</span>로, 하중이 최대에 이른 뒤 거의 변형 없이 무너집니다.</p>
+    <figure class="diagram" id="fig-fx-modes">
+      <svg viewBox="0 0 860 330" role="img" aria-label="과소, 균형, 과다 철근 보의 파괴 순간 변형률 분포와 모멘트–곡률 곡선 비교">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(40,34)">
+          <text x="0" y="0" class="t" style="font-weight:700">파괴 순간의 변형률</text>
+          <g transform="translate(40,26)">
+            <line x1="50" y1="0" x2="50" y2="220" class="s-axis"/>
+            <line x1="70" y1="0" x2="-19" y2="200" style="stroke:var(--ok);stroke-width:2.4"/>
+            <line x1="70" y1="0" x2="35" y2="200" style="stroke:var(--warn);stroke-width:2.4;stroke-dasharray:7 4"/>
+            <line x1="70" y1="0" x2="43" y2="200" style="stroke:var(--bad);stroke-width:2.4"/>
+            <line x1="-40" y1="200" x2="110" y2="200" style="stroke:var(--text-faint);stroke-dasharray:3 3"/><text x="62" y="216" class="t-mono">철근 위치 d</text>
+            <line x1="35" y1="194" x2="35" y2="232" style="stroke:var(--text-dim)"/><text x="35" y="246" text-anchor="middle" class="t-mono">ε<tspan baseline-shift="sub" font-size="8">y</tspan></text>
+            <text x="74" y="4" class="t-mono" style="fill:var(--compression)">ε<tspan baseline-shift="sub" font-size="8">cu</tspan></text>
+            <text x="-36" y="236" class="t-mono" style="fill:var(--ok)">ε<tspan baseline-shift="sub" font-size="8">t</tspan> ≈ 4.5ε<tspan baseline-shift="sub" font-size="8">y</tspan></text>
+            <g style="fill:var(--warn)"><circle cx="50" cy="45" r="3.5" style="fill:var(--ok)"/><circle cx="50" cy="114" r="3.5"/><circle cx="50" cy="150" r="3.5" style="fill:var(--bad)"/></g>
+            <g class="t-mono" text-anchor="start"><text x="56" y="49" style="fill:var(--ok)">c (과소)</text><text x="56" y="118" style="fill:var(--warn)">c<tspan baseline-shift="sub" font-size="8">b</tspan></text><text x="56" y="154" style="fill:var(--bad)">c (과다)</text></g>
+          </g>
+          <g class="t-mono" transform="translate(190,60)"><text x="0" y="0" style="fill:var(--ok)">— 과소 철근 ρ &lt; ρ<tspan baseline-shift="sub" font-size="8">b</tspan>: 얕은 c, 철근 크게 늘어남</text><text x="0" y="22" style="fill:var(--warn)">— 균형 ρ = ρ<tspan baseline-shift="sub" font-size="8">b</tspan>: ε<tspan baseline-shift="sub" font-size="8">cu</tspan>와 ε<tspan baseline-shift="sub" font-size="8">y</tspan>가 동시에</text><text x="0" y="44" style="fill:var(--bad)">— 과다 철근 ρ &gt; ρ<tspan baseline-shift="sub" font-size="8">b</tspan>: 깊은 c, 철근 탄성</text></g>
+        </g>
+        <g transform="translate(480,34)">
+          <text x="0" y="0" class="t" style="font-weight:700">모멘트–곡률 (개념도)</text>
+          <g transform="translate(30,20)">
+            <line x1="0" y1="230" x2="320" y2="230" class="s-axis"/><line x1="0" y1="0" x2="0" y2="230" class="s-axis"/>
+            <text x="318" y="222" text-anchor="end" class="t-mono">곡률 ψ</text><text x="6" y="10" class="t-mono">M</text>
+            <path d="M0 230 L10 205 L14 207 L50 140 L262 128" style="fill:none;stroke:var(--ok);stroke-width:2.6"/>
+            <circle cx="262" cy="128" r="4.5" style="fill:var(--ok)"/>
+            <path d="M0 230 L12 190 L16 193 L80 70 L92 62" style="fill:none;stroke:var(--warn);stroke-width:2.6"/>
+            <path d="M0 230 L13 180 L18 184 L70 40 L74 38" style="fill:none;stroke:var(--bad);stroke-width:2.6"/>
+            <text x="78" y="34" class="t-mono" style="fill:var(--bad)">갑자기 압괴</text>
+            <text x="120" y="118" class="t-mono" style="fill:var(--ok)">항복 뒤 긴 수평 구간 = 연성</text>
+            <line x1="50" y1="140" x2="50" y2="230" style="stroke:var(--text-faint);stroke-dasharray:3 3"/><text x="50" y="246" text-anchor="middle" class="t-mono">ψ<tspan baseline-shift="sub" font-size="8">y</tspan></text>
+            <line x1="262" y1="128" x2="262" y2="230" style="stroke:var(--text-faint);stroke-dasharray:3 3"/><text x="262" y="246" text-anchor="middle" class="t-mono">ψ<tspan baseline-shift="sub" font-size="8">u</tspan></text>
+            <text x="20" y="214" class="t-mono">균열</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-3.</b> 철근비에 따른 세 가지 파괴. 왼쪽: 파괴 순간 압축 연단은 모두 \(\varepsilon_{cu}\)이고, 철근이 많을수록 중립축이 깊어져 철근 변형률이 작다. 오른쪽: 과소 철근 보는 항복(\(\psi_y\)) 뒤 모멘트를 거의 유지하며 크게 휜 뒤(\(\psi_u\)) 부서지고, 과다 철근 보는 강도는 크지만 곡률 여유 없이 압괴한다. 기준은 균형점보다 훨씬 안쪽(\(\varepsilon_t \ge 0.005\), SD500)에서 설계하게 한다.</figcaption>
+    </figure>
+    <div class="callout deep"><strong>곡률 연성비</strong> 철근이 처음 항복할 때의 곡률 \(\psi_y = \varepsilon_y/(d - kd)\)(\(kd\): 균열 단면의 탄성 중립축 깊이, 8장 <code>CB.rc.crack</code>)와 파괴 때의 곡률 \(\psi_u = \varepsilon_{cu}/c\)의 비 \(\mu_\psi = \psi_u/\psi_y\)를 <span class="term">곡률 연성비</span><span class="en">(curvature ductility ratio)</span>라 한다. G1(4-D25, \(d = 634\) mm)은 \(kd = 182\) mm, \(c = 124\) mm이므로 \(\psi_y = 0.0025/452 = 5.53 \times 10^{-6}\)/mm, \(\psi_u = 0.0033/124 = 2.66 \times 10^{-5}\)/mm, \(\mu_\psi \approx 4.8\)이다. 철근비가 \(\rho_b\)에 다가가면 \(\mu_\psi \to 1\)이 된다. 이 계산은 철근 항복 시 콘크리트를 선형으로 본 교육용 근사이며, 내진 부재(12장)는 띠철근 구속으로 \(\varepsilon_{cu}\) 자체를 키워 연성을 더한다.</div>
+    <div class="sim" id="sim-fx-rho">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>철근비 슬라이더: 강도·φ·연성과 파괴 형태</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-rho" aria-label="철근비에 따른 휨저항 계수와 설계 휨저항, 곡률 연성비, 파괴 형태 구간"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>철근비 ρ <output id="fx-rh-r-out"></output></span><input type="range" id="fx-rh-r" min="0.001" max="0.035" step="0.0002" value="0.0083"></label>
+          <div class="ctrl"><span><span>f<sub>ck</sub> (MPa)</span></span><div class="seg" id="fx-rh-fck"><button data-value="24">24</button><button data-value="30" class="on">30</button><button data-value="40">40</button><button data-value="60">60</button></div></div>
+          <div class="ctrl"><span>철근 강종</span><div class="seg" id="fx-rh-fy"><button data-value="400">SD400</button><button data-value="500" class="on">SD500</button><button data-value="600">SD600</button></div></div>
+          <div class="ctrl"><span>세로축</span><div class="seg" id="fx-rh-ax"><button data-value="R" class="on">M/(bd²)</button><button data-value="mu">곡률 연성비</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">ρ<sub>min</sub> · ρ<sub>max</sub> · ρ<sub>b</sub></span><span class="v" id="fx-rh-lim">—</span></div>
+        <div class="stat"><span class="k">ε<sub>t</sub> · φ</span><span class="v" id="fx-rh-et">—</span></div>
+        <div class="stat"><span class="k">M<sub>n</sub>/(bd²) · φM<sub>n</sub>/(bd²)</span><span class="v" id="fx-rh-rn">—</span></div>
+        <div class="stat"><span class="k">G1(400 × 610)이면 φM<sub>n</sub></span><span class="v" id="fx-rh-g1">—</span></div>
+      </div>
+      <div class="fx-msg" id="fx-rh-msg">—</div>
+      <div class="sim-note">해볼 것: ρ를 0.0083(G1 4-D25)에서 오른쪽으로 밀어 보세요. M<sub>n</sub>/(bd²)(점선)는 계속 오르지만 φM<sub>n</sub>/(bd²)(실선)은 ε<sub>t</sub>가 0.00625 아래로 내려가는 순간부터 꺾입니다. 그래서 변화 구간 안쪽으로 철근을 더 넣는 것은 강도 면에서도 거의 이득이 없습니다 · 세로축을 곡률 연성비로 바꾸면 ρ<sub>b</sub>에서 1로 떨어지는 것이 보입니다 · fck를 60으로 올리면 β<sub>1</sub>이 줄고 ε<sub>cu</sub>가 작아져 ρ<sub>b</sub>가 fck에 비례하는 것보다 덜 늘어납니다 · 모델: 원리 3.3–3.4, 정의 3.5, 원리 3.6–3.7, 연성비는 심화 상자의 교육용 근사(<code>CB.rc.crack</code>의 kd).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="limits">
+    <h2>최대 철근과 최소 철근</h2>
+    <div class="problem"><strong>철근의 양에는 위아래 울타리가 있다</strong>
+      <p>철근이 너무 많으면 철근이 항복하지 못해 취성 파괴가 오고, 너무 적으면 또 다른 취성 파괴가 옵니다. 콘크리트가 갈라지는 순간 그 인장력을 받아 줄 철근이 모자라 철근이 바로 끊어지는 파괴입니다. 기준은 두 울타리를 모두 변형률과 강도의 언어로 정합니다.</p></div>
+    <div class="callout def"><strong>원리 3.6 (최대 철근: 최소 허용 인장 변형률)</strong> 휨부재는 공칭 강도 상태에서 순인장 변형률이 <span class="term">최소 허용 인장 변형률</span><span class="en">(minimum allowable tensile strain)</span> 이상이어야 한다.
+      <div class="formula">$$\varepsilon_t \ge \varepsilon_{a,min} = \begin{cases} 0.004 & f_y \le 400\ \text{MPa} \\ 2\varepsilon_y & f_y \gt 400\ \text{MPa} \end{cases} \qquad \rho_{max} = \frac{\eta(0.85f_{ck})\,\beta_1}{f_y}\cdot\frac{\varepsilon_{cu}}{\varepsilon_{cu} + \varepsilon_{a,min}}$$<div class="where">KDS 14 20 20 형태(현행 기준 확인), <code>CB.rc.etMin</code>. \(\rho_{max}\)는 철근이 한 층일 때(\(d = d_t\))의 값이다. 같은 방식으로 \(\varepsilon_t = \varepsilon_{t,tcl} = \max(0.005,\ 2.5\varepsilon_y)\)을 넣으면 <span class="term">인장 지배 단면</span><span class="en">(tension-controlled section)</span>의 한계 철근비 \(\rho_{tcl}\)이 나온다. \(\varepsilon_{a,min} \le \varepsilon_t \lt \varepsilon_{t,tcl}\)인 단면은 <span class="term">변화 구간 단면</span><span class="en">(transition section)</span>으로 쓸 수는 있지만 \(\phi\)가 0.85보다 작다.</div></div></div>
+    <p>SD500(\(\varepsilon_y = 0.0025\))이면 \(\varepsilon_{a,min} = 0.005\), \(\varepsilon_{t,tcl} = 0.00625\)입니다. 균형 상태의 \(\varepsilon_t = \varepsilon_y = 0.0025\)와 비교하면, 기준이 허용하는 가장 많은 철근도 철근을 항복 변형률의 두 배 이상 늘어나게 합니다. fck 30이면 \(\rho_{max} = 0.0408 \times 0.0033/0.0083 = 0.0162\)로 \(\rho_b = 0.0232\)의 70 %, 인장 지배 한계는 \(\rho_{tcl} = 0.0408 \times 0.0033/0.00955 = 0.0141\)로 \(\rho_b\)의 61 %입니다.</p>
+    <div class="callout def"><strong>원리 3.7 (최소 철근)</strong> 휨부재의 설계 강도는 균열 모멘트보다 충분히 커야 한다. 이 책의 계산 함수 <code>CB.rc.asMin</code>은 다음 식을 쓴다.
+      <div class="formula">$$A_{s,min} = \max\!\left(\frac{0.25\sqrt{f_{ck}}}{f_y},\ \frac{1.4}{f_y}\right) b_w d, \qquad M_{cr} = \frac{f_r I_g}{y_t},\quad f_r = 0.63\lambda\sqrt{f_{ck}}$$<div class="where"><span class="term">최소 철근량</span><span class="en">(minimum flexural reinforcement)</span>의 이 식은 ACI 318과 이전 국내 기준의 형태다. 현행 KDS 14 20 20은 같은 목적을 \(\phi M_n \ge 1.2M_{cr}\)의 형태로 요구하고, 배치한 철근이 해석상 필요한 양의 4/3 이상이면 이 조건을 면제하는 형태다(현행 기준 확인). \(M_{cr}\): <span class="term">균열 모멘트</span><span class="en">(cracking moment)</span>, \(I_g\): 철근을 무시한 전체 단면 2차 모멘트, \(y_t\): 도심에서 인장 연단까지 거리(<code>CB.rc.crack</code>).</div></div></div>
+    <p>최소 철근의 이유는 그림 3-3의 왼쪽 아래에 숨어 있습니다. 균열 전의 보는 콘크리트 전체가 인장을 함께 받아 \(M_{cr}\)까지 버팁니다. 균열이 생기는 순간 그 인장력이 모두 철근으로 넘어가는데, 철근이 그 힘을 받을 만큼 없으면(\(M_n \lt M_{cr}\)) 철근은 즉시 항복하고 변형 경화 구간을 지나 끊어집니다. 콘크리트 보에 철근을 아주 조금 넣는 것은 무근 콘크리트보다 나을 것이 없다는 뜻입니다. 1.2라는 여유는 실제 \(f_r\)가 기준값보다 클 수 있다는 불확실성을 덮습니다.</p>
+    <div class="sim" id="sim-fx-mincr">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>최소 철근의 이유: 균열 모멘트와 공칭 강도</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-mcr" aria-label="철근량에 따른 모멘트–곡률 곡선과 균열 모멘트, 최소 철근량"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>철근량 A<sub>s</sub></span> <output id="fx-mc-as-out"></output></span><input type="range" id="fx-mc-as" min="0" max="2500" step="10" value="400"></label>
+          <label class="ctrl"><span>높이 h <output id="fx-mc-h-out"></output></span><input type="range" id="fx-mc-h" min="400" max="1200" step="10" value="700"></label>
+          <label class="ctrl"><span>폭 b <output id="fx-mc-b-out"></output></span><input type="range" id="fx-mc-b" min="250" max="800" step="10" value="400"></label>
+          <div class="ctrl"><span><span>f<sub>ck</sub> (MPa)</span></span><div class="seg" id="fx-mc-fck"><button data-value="24">24</button><button data-value="30" class="on">30</button><button data-value="40">40</button><button data-value="60">60</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">M<sub>cr</sub> · 1.2M<sub>cr</sub></span><span class="v" id="fx-mc-mcr">—</span></div>
+        <div class="stat"><span class="k">M<sub>y</sub> · φM<sub>n</sub></span><span class="v" id="fx-mc-mn">—</span></div>
+        <div class="stat"><span class="k">A<sub>s,min</sub>(식) · 1.2M<sub>cr</sub> 조건</span><span class="v" id="fx-mc-amin">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="fx-mc-st">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: A<sub>s</sub>를 0에서 천천히 올려 보세요. M<sub>n</sub>이 M<sub>cr</sub>보다 작을 때는 균열 순간 모멘트가 뚝 떨어지고(취성), M<sub>n</sub>이 M<sub>cr</sub>을 넘어야 비로소 "균열 → 항복 → 극한"의 연성 곡선이 됩니다 · 보를 깊게(h ↑) 하면 M<sub>cr</sub>이 h²에 비례해 커져 최소 철근도 늘어납니다 · 모델(교육용 3직선): 균열 전 E<sub>c</sub>I<sub>g</sub>, 균열 후 E<sub>c</sub>I<sub>cr</sub>로 항복 모멘트 M<sub>y</sub> = A<sub>s</sub>f<sub>y</sub>(d − kd/3)까지, 그 뒤 M<sub>n</sub>까지 직선, ψ<sub>u</sub> = ε<sub>cu</sub>/c. d = h − 65 mm, SD500, <code>CB.rc.crack</code>·<code>flexure</code>·<code>asMin</code>.</div>
+    </div>
+    <figure class="diagram" id="fig-fx-rhoscale">
+      <svg viewBox="0 0 860 230" role="img" aria-label="G1 단면에서 최소 철근비, G1 4-D25, 인장 지배 한계, 최대 철근비, 균형 철근비의 위치를 나타낸 눈금">
+        <rect x="10" y="10" width="840" height="210" rx="10" class="f-surface"/>
+        <text x="40" y="40" class="t" style="font-weight:700">G1 단면(b = 400, d = 610 mm, fck 30, SD500)의 철근비 눈금</text>
+        <g transform="translate(60,110)">
+          <rect x="0" y="-12" width="69" height="24" style="fill:var(--bad);opacity:.18"/>
+          <rect x="69" y="-12" width="279" height="24" style="fill:var(--ok);opacity:.18"/>
+          <rect x="348" y="-12" width="52" height="24" style="fill:var(--warn);opacity:.25"/>
+          <rect x="400" y="-12" width="340" height="24" style="fill:var(--bad);opacity:.18"/>
+          <line x1="0" y1="0" x2="740" y2="0" class="s-axis"/>
+          <g class="t-mono" text-anchor="middle">
+            <line x1="69" y1="-20" x2="69" y2="20" style="stroke:var(--text-dim)"/><text x="62" y="38">ρ<tspan baseline-shift="sub" font-size="8">min</tspan> 0.0028</text><text x="62" y="54">683 mm²</text>
+            <line x1="205" y1="-26" x2="205" y2="26" style="stroke:var(--accent);stroke-width:3"/><text x="205" y="-34" style="fill:var(--accent)">G1 4-D25 0.0083</text>
+            <line x1="348" y1="-20" x2="348" y2="20" style="stroke:var(--text-dim)"/><text x="330" y="38">ρ<tspan baseline-shift="sub" font-size="8">tcl</tspan> 0.0141</text><text x="330" y="54">3,440 mm²</text>
+            <line x1="400" y1="-20" x2="400" y2="20" style="stroke:var(--warn);stroke-width:2;stroke-dasharray:4 3"/><text x="410" y="-28" style="fill:var(--warn)">ρ<tspan baseline-shift="sub" font-size="8">max</tspan> 0.0162</text><text x="432" y="38">3,958 mm²</text>
+            <line x1="572" y1="-20" x2="572" y2="20" style="stroke:var(--bad);stroke-width:2;stroke-dasharray:4 3"/><text x="572" y="38" style="fill:var(--bad)">ρ<tspan baseline-shift="sub" font-size="8">b</tspan> 0.0232</text><text x="572" y="54">5,661 mm²</text>
+            <text x="740" y="38" text-anchor="end">0.030</text>
+          </g>
+          <g class="t-dim" text-anchor="middle"><text x="34" y="84">균열 즉시 파단</text><text x="208" y="84">인장 지배 φ = 0.85</text><text x="374" y="84">변화 구간</text><text x="580" y="84">휨부재로 허용 안 됨(과다)</text></g>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-4.</b> G1 단면의 철근비 울타리. 눈금은 \(\rho\)에 비례(0 → 0.030). 설계는 초록 구간 안, 가능하면 왼쪽에서 한다. 4-D25(\(\rho = 2{,}027/(400 \times 610) = 0.0083\))는 \(\rho_{tcl}\)의 약 60 %로 넉넉한 인장 지배 단면이다. 두 층 배근이면 \(d_t \gt d\)라 같은 철근량에서 \(\varepsilon_t\)가 조금 더 크다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 3.3 (G1 단면의 철근 울타리)</strong> \(b = 400\), \(h = 700\), \(d = 610\) mm(설계값), fck 30, SD500.
+      <ol class="fx-steps">
+        <li><b>최대.</b> \(\rho_{max} = 0.0162\) → \(A_{s,max} = 0.0162 \times 400 \times 610 = 3{,}958\) mm²(약 7.8-D25). 인장 지배 한계 \(\rho_{tcl} = 0.0141\) → 3,440 mm²(6.8-D25).</li>
+        <li><b>최소(식).</b> \(0.25\sqrt{30}/500 = 0.00274\), \(1.4/500 = 0.0028\) → \(A_{s,min} = 0.0028 \times 400 \times 610 = 683\) mm²(\(d = 634\)이면 710 mm²).</li>
+        <li><b>최소(1.2M<sub>cr</sub> 형태).</b> \(I_g = 400 \times 700^3/12 = 1.143 \times 10^{10}\) mm⁴, \(f_r = 0.63\sqrt{30} = 3.45\) MPa, \(M_{cr} = 3.45 \times 1.143 \times 10^{10}/350/10^6 = 112.7\) kN·m, \(1.2M_{cr} = 135\) kN·m. 이를 내는 철근은 약 512 mm²(\(d = 634\))로 식의 값보다 작다.</li>
+        <li><b>판정.</b> 683–3,958 mm²(인장 지배를 원하면 3,440 mm²까지)가 단철근 G1에 쓸 수 있는 범위다. 소요 1,923 mm²는 그 안쪽에 있다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="procedure">
+    <h2>설계 순서: 단면 가정에서 철근 선택까지</h2>
+    <div class="problem"><strong>강도 계산은 거꾸로 풀어야 설계가 된다</strong>
+      <p>지금까지는 철근을 알고 강도를 구했습니다(검토). 설계는 반대입니다. 소요 강도 \(M_u\)를 알고 단면과 철근을 정해야 합니다. 미지수가 \(b\), \(h\), \(A_s\) 셋인데 식은 하나이므로, 경험으로 단면을 먼저 가정하고 철근을 푼 뒤 확인하는 순서를 밟습니다.</p></div>
+    <figure class="diagram" id="fig-fx-flow">
+      <svg viewBox="0 0 860 330" role="img" aria-label="휨 설계 순서도: 하중과 Mu, 단면 가정, 소요 철근량, 철근 선택, 배치와 순간격, 강도와 변형률 확인, 실패 시 되돌아감">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g text-anchor="middle">
+          <rect x="30" y="50" width="120" height="70" rx="10" class="f-elev"/><text x="90" y="78" class="t" style="font-weight:700">① M<tspan baseline-shift="sub" font-size="9">u</tspan></text><text x="90" y="100" class="t-dim">하중 조합·해석</text>
+          <rect x="190" y="50" width="120" height="70" rx="10" class="f-elev"/><text x="250" y="78" class="t" style="font-weight:700">② 단면 가정</text><text x="250" y="100" class="t-dim">h ≈ L/10–L/12</text>
+          <rect x="350" y="50" width="120" height="70" rx="10" class="f-elev"/><text x="410" y="78" class="t" style="font-weight:700">③ 소요 A<tspan baseline-shift="sub" font-size="9">s</tspan></text><text x="410" y="100" class="t-dim">φ = 0.85 가정</text>
+          <rect x="510" y="50" width="120" height="70" rx="10" class="f-elev"/><text x="570" y="78" class="t" style="font-weight:700">④ 철근 선택</text><text x="570" y="100" class="t-dim">호칭·개수</text>
+          <rect x="670" y="50" width="150" height="70" rx="10" class="f-elev"/><text x="745" y="78" class="t" style="font-weight:700">⑤ 배치</text><text x="745" y="100" class="t-dim">피복·순간격·층 수</text>
+          <rect x="590" y="170" width="230" height="80" rx="10" class="f-acc-soft"/><text x="705" y="198" class="t" style="font-weight:700">⑥ 확인</text><text x="705" y="220" class="t-dim">실제 d·d<tspan baseline-shift="sub" font-size="8">t</tspan>로 φM<tspan baseline-shift="sub" font-size="8">n</tspan> ≥ M<tspan baseline-shift="sub" font-size="8">u</tspan></text><text x="705" y="238" class="t-dim">ε<tspan baseline-shift="sub" font-size="8">t</tspan> ≥ ε<tspan baseline-shift="sub" font-size="8">a,min</tspan>, A<tspan baseline-shift="sub" font-size="8">s</tspan> ≥ A<tspan baseline-shift="sub" font-size="8">s,min</tspan></text>
+          <rect x="300" y="180" width="200" height="60" rx="10" style="fill:var(--surface-2);stroke:var(--border)"/><text x="400" y="206" class="t" style="font-weight:700">끝: 배근도</text><text x="400" y="226" class="t-dim">전단·정착·처짐(5–8장)</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.6;fill:none">
+          <line x1="150" y1="85" x2="186" y2="85" marker-end="url(#fx-ah-d)"/><line x1="310" y1="85" x2="346" y2="85" marker-end="url(#fx-ah-d)"/><line x1="470" y1="85" x2="506" y2="85" marker-end="url(#fx-ah-d)"/><line x1="630" y1="85" x2="666" y2="85" marker-end="url(#fx-ah-d)"/>
+          <line x1="745" y1="120" x2="745" y2="166" marker-end="url(#fx-ah-d)"/>
+          <line x1="590" y1="210" x2="504" y2="210" marker-end="url(#fx-ah-d)"/>
+          <path d="M650 170 C 640 140, 600 134, 570 124" marker-end="url(#fx-ah-d)" style="stroke:var(--bad)"/>
+          <path d="M640 250 C 600 280, 280 280, 250 124" marker-end="url(#fx-ah-d)" style="stroke:var(--bad);stroke-dasharray:5 4"/>
+        </g>
+        <text x="548" y="152" class="t-mono" style="fill:var(--bad)">부족 → 철근 바꿈</text>
+        <text x="430" y="300" text-anchor="middle" class="t-mono" style="fill:var(--bad)">ε<tspan baseline-shift="sub" font-size="8">t</tspan> 부족·한 층에 안 들어감 → 단면 키움(또는 4장 복철근)</text>
+        <text x="555" y="204" class="t-mono" style="fill:var(--ok)">합격</text>
+      </svg>
+      <figcaption><b>그림 3-5.</b> 휨 설계의 순서. 소요 철근량은 가정한 \(d\)로 구하므로, 철근을 고르고 배치한 뒤에는 반드시 실제 \(d\)와 \(d_t\)로 다시 검토한다. 철근이 한 층에 들어가지 않거나 \(\varepsilon_t\)가 모자라면 단면 가정으로 되돌아간다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 3.8 (소요 철근량)</strong> \(\phi\)를 가정하고 \(M_u = \phi A_s f_y(d - a/2)\)를 \(A_s\)에 대해 풀면, 휨저항 계수 \(R_n\)을 써서
+      <div class="formula">$$R_n = \frac{M_u}{\phi\,b\,d^2}, \qquad \rho = \frac{\eta(0.85f_{ck})}{f_y}\left(1 - \sqrt{1 - \frac{2R_n}{\eta(0.85f_{ck})}}\right), \qquad A_{s,req} = \rho\,b\,d$$<div class="where">이 \(A_{s,req}\)가 <span class="term">소요 철근량</span><span class="en">(required reinforcement)</span>이다. \(R_n\)은 <span class="term">휨저항 계수</span><span class="en">(flexural resistance factor)</span>. 근호 안이 음수(\(R_n \gt \eta(0.85f_{ck})/2\))이면 어떤 철근으로도 단철근 단면이 \(M_u\)를 낼 수 없다는 뜻이다(단면 부족). <code>CB.rc.asReq</code>는 \(\phi = 0.85\)를 가정하고 이 경우 NaN을 돌려준다. 실무에서는 근호가 음수가 되기 훨씬 전에 \(\rho_{max}\)를 넘으므로 둘 다 확인한다.</div></div></div>
+    <p>단면 가정에는 몇 가지 경험칙이 있습니다. 보 춤 \(h\)는 처짐 제한에서 오는 최소 두께(8장, 처짐을 계산하지 않을 때 양단 연속 보 \(L/21\), 단순보 \(L/16\) — fy 400 기준이며 fy 500이면 \(0.43 + f_y/700 = 1.14\)를 곱하는 형태, KDS 14 20 30 확인)보다 크게, 큰보는 대개 경간의 1/10–1/12로 잡습니다. 폭 \(b\)는 \(h\)의 0.4–0.6배, 기둥 폭보다 조금 좁게 해 기둥 철근과 겹치지 않게 합니다. 유효 깊이는 \(d \approx h - 65\) mm(한 층, D13 스터럽·D25 주근·피복 40 mm), 두 층이 될 것 같으면 \(h - 90\) mm 정도로 가정합니다. G1은 \(h = 700\) mm(\(L/11.4\)), \(b = 400\) mm, 설계용 \(d = 610\) mm입니다.</p>
+    <div class="callout"><strong>예제 3.4 (단순보 설계: 철근이 들어가지 않는 경우)</strong> 경간 6 m 단순보, 계수 하중 \(w_u = 60\) kN/m → \(M_u = 60 \times 6^2/8 = 270\) kN·m. fck 30, SD500, 피복 40 mm, 스터럽 D13, 굵은 골재 25 mm.
+      <ol class="fx-steps">
+        <li><b>단면 가정.</b> \(h = 500\) mm(L/12), \(b = 300\) mm, \(d = 435\) mm(한 층 가정).</li>
+        <li><b>소요 철근.</b> \(R_n = 270 \times 10^6/(0.85 \times 300 \times 435^2) = 5.60\) MPa, \(\rho = (25.5/500)(1 - \sqrt{1 - 2 \times 5.60/25.5}) = 0.0128\), \(A_{s,req} = 0.0128 \times 300 \times 435 = 1{,}670\) mm². \(A_{s,min} = 365\) mm², \(\rho \lt \rho_{max} = 0.0162\) ✓.</li>
+        <li><b>철근 후보.</b> 3-D25(1,520) ✗ 부족. 4-D25(2,027): 스터럽 안쪽 폭 \(300 - 80 - 25.4 = 194.6\) mm에서 순간격 \((194.6 - 4 \times 25.4)/3 = 31.0 \lt 33.3\) mm ✗ 한 층에 안 들어감. <b>3-D29</b>(1,927): 순간격 \((194.6 - 3 \times 28.6)/2 = 54.4\) mm ✓.</li>
+        <li><b>확인.</b> \(d = 500 - 40 - 12.7 - 14.3 = 433\) mm, \(a = 1{,}927 \times 500/(25.5 \times 300) = 126\) mm, \(c = 157.5\) mm, \(\varepsilon_t = 0.0033 \times (433 - 157.5)/157.5 = 0.00577\). \(\varepsilon_{a,min} = 0.005\) ✓이지만 \(0.00625\)보다 작아 변화 구간: \(\phi = 0.65 + 0.20 \times (0.00577 - 0.0025)/0.00375 = 0.825\).</li>
+        <li><b>강도.</b> \(M_n = 1{,}927 \times 500 \times (433 - 63)/10^6 = 356.5\) kN·m, \(\phi M_n = 294\) kN·m \(\ge 270\) ✓. <b>합격</b>이지만 φ가 깎였다. \(h = 550\) mm로 키우면 인장 지배가 되어 철근이 줄어든다. 설계는 한 번에 끝나지 않는다.</li>
+      </ol></div>
+    <div class="sim" id="sim-fx-design">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>소요 철근 설계기: A<sub>s</sub> 소요 → 철근 조합 후보</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-des" aria-label="선택한 철근 조합의 단면 배치와 순간격, 강도 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>소요 강도 M<sub>u</sub></span> <output id="fx-ds-mu-out"></output></span><input type="range" id="fx-ds-mu" min="50" max="1400" step="5" value="460"></label>
+          <label class="ctrl"><span>폭 b <output id="fx-ds-b-out"></output></span><input type="range" id="fx-ds-b" min="250" max="600" step="10" value="400"></label>
+          <label class="ctrl"><span>높이 h <output id="fx-ds-h-out"></output></span><input type="range" id="fx-ds-h" min="400" max="1100" step="10" value="700"></label>
+          <div class="ctrl"><span>설계용 d 가정</span><div class="seg" id="fx-ds-dd"><button data-value="65">h − 65 (1단)</button><button data-value="90" class="on">h − 90 (2단 여유)</button></div></div>
+          <div class="ctrl"><span>굵은 골재 최대 치수</span><div class="seg" id="fx-ds-g"><button data-value="20">20 mm</button><button data-value="25" class="on">25 mm</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">R<sub>n</sub> · ρ</span><span class="v" id="fx-ds-rn">—</span></div>
+        <div class="stat"><span class="k">A<sub>s,req</sub></span><span class="v" id="fx-ds-req">—</span></div>
+        <div class="stat"><span class="k">A<sub>s,min</sub> · A<sub>s,max</sub></span><span class="v" id="fx-ds-lim">—</span></div>
+        <div class="stat"><span class="k">선택한 조합</span><span class="v" id="fx-ds-sel">—</span></div>
+      </div>
+      <div class="fx-cand"><div class="table-wrap"><table class="fx-tbl" id="fx-ds-tbl"><thead><tr><th>철근</th><th>A<sub>s</sub> (mm²)</th><th>여유</th><th>배치</th><th>d · d<sub>t</sub></th><th>ε<sub>t</sub></th><th>φM<sub>n</sub></th><th>판정</th></tr></thead><tbody></tbody></table></div></div>
+      <div class="sim-note">해볼 것: 표의 줄을 누르면 그 조합이 단면 그림에 배치됩니다 · 기본값(G1, M<sub>u</sub> 460)에서 4-D25가 한 층에 들어가 φM<sub>n</sub> ≈ 504 kN·m인 것을 확인하세요. 3-D29와 5-D22도 합격이지만 G1은 지점 상부 철근·기둥 철근과 같은 D25로 통일합니다 · M<sub>u</sub>를 800(단순보 근사)으로 올리면 7-D25가 5 + 2의 두 층이 됩니다 · h를 500으로 줄이면 소요 철근이 A<sub>s,max</sub>를 넘어 "단면 부족"이 됩니다 · 모델: 정의 3.8(<code>CB.rc.asReq</code>, φ = 0.85 가정), 실제 배치로 <code>CB.rc.flexure</code> 재검토, 한 층 최대 개수 원리 3.9, 층 사이 순간격 25 mm, 피복 40 mm·스터럽 D13. 교육용.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="detailing">
+    <h2>철근 배치: 피복과 순간격</h2>
+    <div class="problem"><strong>계산서의 4-D25는 단면 안 어디에 놓이는가</strong>
+      <p>소요 철근량은 숫자이지만, 철근은 지름이 있는 막대입니다. 콘크리트가 철근 사이를 빠져나가 아래를 채울 수 있어야 하고, 철근을 녹으로부터 지킬 덮개가 있어야 하며, 스터럽이 그 둘레를 감아야 합니다. 이 조건들이 한 층에 놓을 수 있는 철근 수와 유효 깊이를 정합니다.</p></div>
+    <figure class="diagram" id="fig-fx-detail">
+      <svg viewBox="0 0 860 380" role="img" aria-label="보 단면 상세: 피복 두께, 스터럽, 철근 지름, 수평 순간격, 층 사이 순간격, 유효 깊이 d와 최외단 깊이 dt">
+        <rect x="10" y="10" width="840" height="360" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <rect x="0" y="0" width="300" height="300" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="30" y="30" width="240" height="240" rx="12" style="fill:none;stroke:var(--accent);stroke-width:6;opacity:.85"/>
+          <g style="fill:var(--tension)"><circle cx="52" cy="248" r="13"/><circle cx="101" cy="248" r="13"/><circle cx="150" cy="248" r="13"/><circle cx="199" cy="248" r="13"/><circle cx="248" cy="248" r="13"/><circle cx="52" cy="197" r="13"/><circle cx="248" cy="197" r="13"/></g>
+          <g style="fill:var(--text-faint)"><circle cx="52" cy="52" r="8"/><circle cx="248" cy="52" r="8"/></g>
+          <line x1="0" y1="315" x2="30" y2="315" style="stroke:var(--text-dim)" marker-start="url(#fx-ah-d)" marker-end="url(#fx-ah-d)"/>
+          <text x="15" y="332" text-anchor="middle" class="t-mono">피복 40</text>
+          <line x1="65" y1="285" x2="88" y2="285" style="stroke:var(--accent-2);stroke-width:1.5" marker-start="url(#fx-ah-ld)" marker-end="url(#fx-ah-ld)"/>
+          <text x="76" y="300" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">s</text>
+          <line x1="275" y1="210" x2="275" y2="235" style="stroke:var(--accent-2);stroke-width:1.5" marker-start="url(#fx-ah-ld)" marker-end="url(#fx-ah-ld)"/>
+          <text x="282" y="226" class="t-mono" style="fill:var(--accent-2)">25</text>
+          <line x1="-18" y1="0" x2="-18" y2="248" style="stroke:var(--text-dim)" marker-start="url(#fx-ah-d)" marker-end="url(#fx-ah-d)"/>
+          <text x="-24" y="150" text-anchor="end" class="t-mono">d<tspan baseline-shift="sub" font-size="8">t</tspan></text>
+          <line x1="-40" y1="0" x2="-40" y2="236" style="stroke:var(--accent);stroke-width:1.5" marker-start="url(#fx-ah-a)" marker-end="url(#fx-ah-a)"/>
+          <text x="-46" y="120" text-anchor="end" class="t-mono" style="fill:var(--accent)">d</text>
+          <line x1="-48" y1="236" x2="40" y2="236" style="stroke:var(--accent);stroke-dasharray:3 3"/>
+          <text x="150" y="-8" text-anchor="middle" class="t-mono">b</text>
+        </g>
+        <g transform="translate(450,50)" class="t-dim">
+          <text x="0" y="0" class="t" style="font-weight:700">G1 하단(b = 400 mm, D13 스터럽, D25 주근)</text>
+          <text x="0" y="28">• 피복: 스터럽 바깥면까지 40 mm(실내 보, 기준 확인)</text>
+          <text x="0" y="50">• 스터럽 안쪽 폭: 400 − 2 × 40 − 2 × 12.7 = 294.6 mm</text>
+          <text x="0" y="72">• 최소 수평 순간격 s = max(25, d<tspan baseline-shift="sub" font-size="8">b</tspan>, 4/3 × 25) = 33.3 mm</text>
+          <text x="0" y="94">• 한 층 최대: ⌊(294.6 + 33.3)/(25.4 + 33.3)⌋ = 5개</text>
+          <text x="0" y="116">• 아래층 중심: 40 + 12.7 + 12.7 = 65.4 mm → d₁ = 634.6</text>
+          <text x="0" y="138">• 위층 중심: 65.4 + 25.4 + 25 = 115.8 mm → d₂ = 584.2</text>
+          <text x="0" y="160">• 7-D25(5 + 2): d = (5 × 634.6 + 2 × 584.2)/7 = 620.2</text>
+          <text x="0" y="190" style="fill:var(--accent)">d = 철근 도심(강도 계산의 팔 길이)</text>
+          <text x="0" y="212" style="fill:var(--accent)">d<tspan baseline-shift="sub" font-size="8">t</tspan> = 가장 바깥 철근(ε<tspan baseline-shift="sub" font-size="8">t</tspan>와 φ)</text>
+          <text x="0" y="242">회색 원: 스터럽 모서리를 받치는 조립용 상부 철근</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-6.</b> 보 단면의 배근 상세(G1 하단 7-D25, 5 + 2). 위층 철근은 아래층 철근 바로 위에 놓아 콘크리트가 내려갈 길을 막지 않는다. 철근은 공칭 지름의 원으로 그렸고 마디는 무시했다(MaterialsBook 11장).</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 3.9 (피복과 순간격, KDS 14 20 형태)</strong> ① 흙에 접하거나 옥외 공기에 노출되지 않는 현장치기 보·기둥의 최소 <span class="term">피복 두께</span><span class="en">(concrete cover)</span>는 40 mm(스터럽·띠철근 바깥면 기준)다. ② 같은 층의 평행한 철근 사이 수평 <span class="term">순간격</span><span class="en">(clear spacing)</span>은 25 mm, 철근 공칭 지름 \(d_b\), 굵은 골재 최대 치수의 4/3 가운데 큰 값 이상이다. ③ 두 층 이상이면 위층 철근은 아래층 바로 위에 두고 층 사이 순간격은 25 mm 이상이다. 따라서 폭 \(b\)인 보의 한 층 최대 철근 수는
+      <div class="formula">$$n_{max} = \left\lfloor \frac{b - 2c_c - 2d_s + s_{min}}{d_b + s_{min}} \right\rfloor$$<div class="where">\(c_c\): 피복, \(d_s\): 스터럽 지름, \(s_{min}\): 최소 순간격. 실제 값은 노출 환경·부재·내화 요구에 따라 다르므로 현행 기준(KDS 14 20 50 등)을 확인한다. 배근 간격의 근거와 철근 표는 MaterialsBook 11장 <a href="../../materials/chapters/rebar.html#bars">호칭과 공칭 단면적, 배근 간격</a>에 있다.</div></div></div>
+    <p>순간격에는 위 하한 외에 상한도 있습니다. 철근을 너무 성기게 두면 철근 사이의 균열 폭이 커지므로, 인장 연단에 가까운 철근의 간격을 철근 응력과 피복으로 정한 값 이하로 제한합니다(8장 <code>CB.rc.sMax</code>). G1의 4-D25 한 층은 중심 간격 약 90 mm로 이 상한(약 200 mm대)보다 훨씬 촘촘합니다. 보 춤이 큰 보는 옆면에 균열이 퍼지지 않도록 표피 철근을 두는 규정이 있고(기준 형태, 8장), 한 층에 다 들어가지 않을 때는 2단 배근 대신 철근 2–4개를 묶은 다발 철근을 쓸 수도 있습니다(7장).</p>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="layers">
+    <h2>유효 깊이와 2단 배근</h2>
+    <div class="problem"><strong>철근을 한 층 더 쌓으면 무엇을 잃는가</strong>
+      <p>7-D25는 G1 폭에 한 층으로 들어가지 않아 5 + 2로 쌓아야 합니다. 위층 철근은 아래층보다 50 mm 높아 팔 길이가 짧습니다. 강도 계산에는 어느 깊이를 써야 할까요?</p></div>
+    <p>철근이 여러 층이면 두 깊이를 구별합니다. 모든 인장 철근의 도심까지가 유효 깊이 \(d\)이고, 이것이 팔 길이 \(z = d - a/2\)를 정합니다(모든 층이 항복한다면 \(T\)의 작용점이 도심이므로). 반면 \(\phi\)와 최소 허용 변형률은 가장 바깥 철근의 \(\varepsilon_t\), 곧 \(d_t\)로 판정합니다. 철근을 두 층 이상으로 쌓는 <span class="term">2단 배근</span><span class="en">(multi-layer reinforcement)</span>은 \(d\)를 줄여 강도를 조금 잃지만, 아래층 철근이 더 깊이 있어 \(\varepsilon_t\)는 \(d\)로 계산한 것보다 조금 큽니다. 위층 철근이 항복하는지도 확인해야 하는데, 철근 층마다 변형률 적합을 쓰는 <code>CB.rc.flexure</code>는 이것을 자동으로 따집니다.</p>
+    <div class="callout"><strong>예제 3.5 (7-D25 두 층의 강도)</strong> G1, 7-D25(\(A_s = 3{,}547\) mm²)를 5 + 2로 배치. \(d_1 = 634.6\), \(d_2 = 584.2\) mm(그림 3-6).
+      <ol class="fx-steps">
+        <li><b>도심.</b> \(d = (5 \times 634.6 + 2 \times 584.2)/7 = 620.2\) mm, \(d_t = 634.6\) mm.</li>
+        <li><b>블록.</b> \(a = 3{,}547 \times 500/(25.5 \times 400) = 173.9\) mm, \(c = 217.3\) mm.</li>
+        <li><b>변형률.</b> 위층 \(\varepsilon_s = 0.0033 \times (584.2 - 217.3)/217.3 = 0.00557 \ge \varepsilon_y\) ✓(항복), 아래층 \(\varepsilon_t = 0.0033 \times (634.6 - 217.3)/217.3 = 0.00634 \ge 0.00625\) → 인장 지배, \(\phi = 0.85\).</li>
+        <li><b>강도.</b> \(M_n = 3{,}547 \times 500 \times (620.2 - 86.9)/10^6 = 945.8\) kN·m, \(\phi M_n = 804\) kN·m \(\ge 800\) ✓(단순보 근사 \(M_u\)).</li>
+        <li><b>비교.</b> 모든 철근이 \(d = 630\) mm에 있다고 근사하면 \(\phi M_n = 819\) kN·m(이 책 CONTRIBUTING의 값)으로 약 2 % 크다. 만약 \(\varepsilon_t\)를 도심 \(d\)로 판정했다면 0.00612로 변화 구간(\(\phi = 0.843\), 797 kN·m)이 되어 불합격으로 잘못 판정했을 것이다.</li>
+      </ol></div>
+    <div class="sim" id="sim-fx-layers">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>2단 배근 효과: 층이 늘면 d가 준다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-lay" aria-label="철근 개수에 따라 자동으로 층을 나눈 단면과, 개수에 따른 실제 φMn과 한 층 가정 φMn의 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>철근 개수 n <output id="fx-ly-n-out"></output></span><input type="range" id="fx-ly-n" min="2" max="14" step="1" value="7"></label>
+          <div class="ctrl"><span>호칭</span><div class="seg" id="fx-ly-bar"><button data-value="D22">D22</button><button data-value="D25" class="on">D25</button><button data-value="D29">D29</button><button data-value="D32">D32</button></div></div>
+          <label class="ctrl"><span>폭 b <output id="fx-ly-b-out"></output></span><input type="range" id="fx-ly-b" min="250" max="600" step="10" value="400"></label>
+          <label class="ctrl"><span>층 사이 순간격 <output id="fx-ly-v-out"></output></span><input type="range" id="fx-ly-v" min="25" max="60" step="1" value="25"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">층 배치</span><span class="v" id="fx-ly-lay">—</span></div>
+        <div class="stat"><span class="k">d · d<sub>t</sub></span><span class="v" id="fx-ly-d">—</span></div>
+        <div class="stat"><span class="k">φM<sub>n</sub> 실제 · 한 층 가정</span><span class="v" id="fx-ly-mn">—</span></div>
+        <div class="stat"><span class="k">ε<sub>t</sub> · φ</span><span class="v" id="fx-ly-et">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: n = 5에서 6으로 넘어가는 순간 두 번째 층이 생기고 d가 약 8 mm 줄어듭니다 · 같은 A<sub>s</sub>를 굵은 D32로 바꾸면 한 층에 들어가 d를 지킬 수 있지만, 철근이 굵을수록 정착 길이가 길어지고(7장) 균열 제어에 불리합니다 · 개수를 계속 늘리면 회색 곡선(한 층 가정)과 파란 곡선(실제)이 벌어지고, 결국 ε<sub>t</sub> &lt; 0.005가 되어 빨간 영역으로 들어갑니다 · 모델: G1 h = 700, 피복 40, 스터럽 D13, 원리 3.9의 한 층 최대 개수, 철근 층마다 <code>CB.rc.flexure</code>.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="economy">
+    <h2>단면 크기와 철근량의 경제성</h2>
+    <div class="problem"><strong>보를 깊게 할까, 철근을 더 넣을까</strong>
+      <p>같은 \(M_u = 460\) kN·m를 h 600 mm 보로도, 800 mm 보로도 버틸 수 있습니다. 얕은 보는 철근이 많고 깊은 보는 콘크리트와 거푸집이 많습니다. 어느 쪽이 싸고, 무엇이 그 선택을 제한할까요?</p></div>
+    <p>\(M_n \approx A_s f_y \cdot 0.9d\)이므로 소요 철근량은 대략 \(d\)에 반비례합니다. 폭 400 mm, \(d = h - 90\)으로 계산한 G1의 소요 철근량은 다음과 같습니다.</p>
+    <div class="table-wrap"><table class="fx-tbl">
+      <thead><tr><th>h (mm)</th><th>d (mm)</th><th>A<sub>s,req</sub> (mm²)</th><th>ρ</th><th>판정(fck 30, SD500)</th></tr></thead>
+      <tbody>
+        <tr><td>500</td><td>410</td><td>3,285</td><td>0.0200</td><td class="bad">ρ &gt; ρ<sub>max</sub> 0.0162 → 단철근 불가(4장 복철근)</td></tr>
+        <tr><td>550</td><td>460</td><td>2,758</td><td>0.0150</td><td>ρ<sub>tcl</sub> 0.0141 초과 → 변화 구간, φ 감소로 실제 소요는 더 큼</td></tr>
+        <tr><td>600</td><td>510</td><td>2,399</td><td>0.0118</td><td class="ok">인장 지배</td></tr>
+        <tr><td class="hl">700</td><td class="hl">610</td><td class="hl">1,923</td><td class="hl">0.0079</td><td class="ok">인장 지배 (G1)</td></tr>
+        <tr><td>800</td><td>710</td><td>1,614</td><td>0.0057</td><td class="ok">인장 지배</td></tr>
+        <tr><td>900</td><td>810</td><td>1,395</td><td>0.0043</td><td class="ok">인장 지배, 표피 철근 검토(형태)</td></tr>
+      </tbody></table></div>
+    <p>철근은 같은 부피의 콘크리트보다 수십 배 비싸지만 보 전체에서 차지하는 부피는 1–2 %입니다. 보 춤을 키우면 콘크리트·거푸집이 늘고, 무엇보다 층고가 높아져 기둥·벽·외장·설비 덕트까지 비용이 번집니다. 그래서 실무의 최적점은 대개 "철근비가 너무 높지 않은 범위에서 가능한 얕은 보"이고, 처짐(8장)과 전단(5장), 한 층의 보 춤을 통일하는 거푸집 재사용이 그 범위를 좁힙니다. 철근비 0.5–1.0 % 정도가 흔히 경제적인 영역으로 꼽히며, 그보다 높으면 철근 사이에 콘크리트를 채우기도 어렵습니다(교육용 경험칙).</p>
+    <div class="sim" id="sim-fx-econ">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>단면 크기 최적화: 보 춤 h → 철근·콘크리트·비용</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-eco" aria-label="보 춤에 따른 미터당 비용 곡선(콘크리트, 거푸집, 철근, 층고)과 단철근 불가 구간"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>보 춤 h <output id="fx-ec-h-out"></output></span><input type="range" id="fx-ec-h" min="450" max="1000" step="10" value="700"></label>
+          <label class="ctrl"><span><span>소요 강도 M<sub>u</sub></span> <output id="fx-ec-mu-out"></output></span><input type="range" id="fx-ec-mu" min="100" max="1000" step="10" value="460"></label>
+          <div class="ctrl"><span>폭 b</span><div class="seg" id="fx-ec-b"><button data-value="300">300</button><button data-value="400" class="on">400</button><button data-value="500">500</button></div></div>
+          <div class="ctrl"><span>받아들이는 철근비 상한</span><div class="seg" id="fx-ec-lim"><button data-value="max" class="on">ρ<sub>max</sub>(기준)</button><button data-value="tcl">ρ<sub>tcl</sub>(인장 지배)</button><button data-value="one">1.0 %(경험)</button></div></div>
+          <label class="ctrl"><span>철근 단가(가공·조립 포함) <output id="fx-ec-ps-out"></output></span><input type="range" id="fx-ec-ps" min="800" max="3000" step="50" value="1500"></label>
+          <label class="ctrl"><span>층고 1 mm당 비용(보 1 m 몫) <output id="fx-ec-pf-out"></output></span><input type="range" id="fx-ec-pf" min="0" max="0.6" step="0.01" value="0.15"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">A<sub>s,req</sub> · ρ</span><span class="v" id="fx-ec-as">—</span></div>
+        <div class="stat"><span class="k">철근 · 콘크리트 (1 m당)</span><span class="v" id="fx-ec-q">—</span></div>
+        <div class="stat"><span class="k">비용 지수 (천 원/m)</span><span class="v" id="fx-ec-c">—</span></div>
+        <div class="stat"><span class="k">이 조건의 최적 h</span><span class="v" id="fx-ec-opt">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본 단가에서는 비용 곡선이 오른쪽으로 계속 오릅니다. 보 춤 1 mm가 늘리는 콘크리트·거푸집·층고 비용이 그만큼 줄어드는 철근 값보다 크기 때문입니다. 그래서 "최적 h"는 언제나 빨간 구간의 경계, 곧 <b>받아들이는 철근비 상한</b>이 정합니다 · 상한을 ρ<sub>max</sub> → ρ<sub>tcl</sub> → 1.0 %로 바꿔 최적 h가 얼마나 깊어지는지 보세요. 연성(φ = 0.85), 철근 사이 콘크리트 채움, 처짐(8장)을 위해 실무는 대개 기준 한계보다 보수적인 상한을 고릅니다 · 철근 단가를 3,000천 원/t로 올리고 층고 비용을 0으로 해도 순위가 바뀌지 않는다는 점도 확인하세요 · 모델(교육용 단가): 콘크리트 120천 원/m³, 거푸집(바닥 + 양 옆면) 45천 원/m², 주근만 계산(스터럽·정착 제외), d = h − 90, φ를 반영한 <code>CB.rc.asReq</code> 반복, A<sub>s</sub> ≥ A<sub>s,min</sub>. 실제 공사비가 아닙니다.</div>
+    </div>
+    <div class="callout tip"><strong>설계자의 감각</strong> 철근비가 \(\rho_{tcl}\)에 가까워졌다면 철근을 더 넣기 전에 단면을 키울지, 압축 철근(4장)을 넣을지, T형 보 효과(4장)를 쓸 수 있는지 먼저 묻는다. 반대로 \(\rho\)가 \(\rho_{min}\) 근처라면 단면이 필요 이상으로 크거나 콘크리트 강도가 과한 것일 수 있다. 보 크기는 한 층에서 몇 가지로 통일하고, 철근 호칭도 2–3종으로 줄이는 것이 현장의 실수와 비용을 함께 줄인다.</div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="g1-positive">
+    <h2>G1 정모멘트 설계</h2>
+    <div class="problem"><strong>4-D25인가 7-D25인가</strong>
+      <p>MechanicsBook과 MaterialsBook은 G1의 하단 철근을 7-D25로 적었습니다. 경간 8 m 보를 단순보로 보고 \(w_uL^2/8 = 800\) kN·m에 맞춘 값입니다. 그러나 G1은 기둥 사이에 이어진 연속보입니다. 연속보로 설계하면 경간 중앙의 철근은 얼마일까요?</p></div>
+    <figure class="diagram" id="fig-fx-g1bmd">
+      <svg viewBox="0 0 860 370" role="img" aria-label="단순보 가정의 휨모멘트도 800 kN·m와 연속보 근사 계수의 중앙 460, 지점 640 kN·m 비교">
+        <rect x="10" y="10" width="840" height="350" rx="10" class="f-surface"/>
+        <g transform="translate(50,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">단순보 근사(앞 권)</text>
+          <line x1="20" y1="30" x2="340" y2="30" style="stroke:var(--text-dim);stroke-width:4"/>
+          <path d="M20 34 l-8 12 h16 z" style="fill:none;stroke:var(--text-dim)"/><circle cx="340" cy="39" r="5" style="fill:none;stroke:var(--text-dim)"/>
+          <path d="M20 130 Q180 322 340 130 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.4"/>
+          <line x1="0" y1="130" x2="360" y2="130" class="s-axis"/>
+          <text x="180" y="200" text-anchor="middle" class="t-mono" style="fill:var(--accent)">+800 (w<tspan baseline-shift="sub" font-size="8">u</tspan>L²/8)</text>
+          <text x="180" y="250" text-anchor="middle" class="t-dim">하단 7-D25(5 + 2), 지점 상부 철근 계산 없음</text>
+          <text x="180" y="272" text-anchor="middle" class="t-dim">φM<tspan baseline-shift="sub" font-size="8">n</tspan> ≈ 804 kN·m</text>
+        </g>
+        <g transform="translate(450,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">연속보(근사 모멘트 계수 형태)</text>
+          <line x1="0" y1="30" x2="360" y2="30" style="stroke:var(--text-dim);stroke-width:4"/>
+          <path d="M20 34 l-8 12 h16 z" style="fill:none;stroke:var(--text-dim)"/><path d="M340 34 l-8 12 h16 z" style="fill:none;stroke:var(--text-dim)"/>
+          <path d="M20 53 Q180 317 340 53 L340 130 L20 130 Z" style="fill:var(--accent-soft);stroke:none"/>
+          <line x1="0" y1="130" x2="360" y2="130" class="s-axis"/>
+          <path d="M0 80 L20 53 Q180 317 340 53 L360 80" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+          <text x="28" y="56" class="t-mono" style="fill:var(--compression)">−640</text><text x="332" y="56" text-anchor="end" class="t-mono" style="fill:var(--compression)">−640</text>
+          <text x="180" y="172" text-anchor="middle" class="t-mono" style="fill:var(--accent)">+460</text>
+          <text x="180" y="250" text-anchor="middle" class="t-dim">하단 4-D25(한 층), 지점 상단 6-D25(4장)</text>
+          <text x="180" y="272" text-anchor="middle" class="t-dim">중앙 φM<tspan baseline-shift="sub" font-size="8">n</tspan> ≈ 504, 지점 φM<tspan baseline-shift="sub" font-size="8">n</tspan> ≈ 700 kN·m</text>
+        </g>
+        <text x="430" y="346" text-anchor="middle" class="t-dim">휨모멘트도는 인장측(새깅은 축 아래, 지점의 호깅은 축 위). 단위 kN·m, w<tspan baseline-shift="sub" font-size="8">u</tspan> = 100 kN/m, L = 8 m. 세로 축척은 두 그림이 같다.</text>
+      </svg>
+      <figcaption><b>그림 3-7.</b> G1의 두 모형. 단순보는 지점의 부모멘트를 무시하고 경간 중앙에 모든 모멘트를 몰아 하단 철근이 많아진다. 연속보는 정적 모멘트 \(w_uL^2/8\)을 지점과 경간이 나눠 가지므로 중앙 철근이 줄고 지점 상부 철근이 생긴다. 460과 640은 서로 다른 활하중 배치에서 나온 포락선 값이라 합(1,100)이 800보다 크다(4장 패턴 재하).</figcaption>
+    </figure>
+    <p>연속보의 정·부모멘트는 해석(MechanicsBook 14–16장, <code>CB.beam</code>)으로 구하거나, 경간·하중이 규칙적이면 기준이 주는 근사 모멘트 계수를 씁니다(KDS 14 20 형태: 끝 경간 정모멘트 \(w_uL^2/14\)(불연속단이 지지부와 일체), 내부 경간 \(w_uL^2/16\), 첫 내부 지점의 부모멘트 \(w_uL^2/10\) 등, 적용 조건과 값은 현행 기준 확인). 이 책은 G1의 설계값을 \(M_u^+ = 460\) kN·m(\(\approx w_uL^2/14\)), \(M_u^- = 640\) kN·m(\(\approx w_uL^2/10\))로 둡니다. 4경간 G1의 가장 불리한 경간에 맞춘 값이므로 다른 경간에는 여유가 있습니다. 패턴 재하와 지점 조건에 따라 탄성 해석값이 어떻게 달라지는지는 4장의 포락선 시뮬레이터에서 직접 확인합니다.</p>
+    <div class="callout"><strong>예제 3.6 (G1 경간 중앙 정모멘트 설계)</strong> \(b = 400\), \(h = 700\) mm, fck 30, SD500, 피복 40 mm, 스터럽 D13, 굵은 골재 25 mm. \(w_u = 1.2 \times 56.7 + 1.6 \times 20 = 100\) kN/m, \(L = 8\) m.
+      <ol class="fx-steps">
+        <li><b>소요 강도.</b> \(M_u^+ \approx w_uL^2/14 = 100 \times 64/14 = 457\) → <b>460 kN·m</b>.</li>
+        <li><b>d 가정.</b> 두 층이 될 수도 있다고 보고 \(d = 610\) mm.</li>
+        <li><b>소요 철근.</b> \(R_n = 460 \times 10^6/(0.85 \times 400 \times 610^2) = 3.636\) MPa, \(\rho = 0.051 \times (1 - \sqrt{1 - 2 \times 3.636/25.5}) = 0.00788\), \(A_{s,req} = 0.00788 \times 400 \times 610 = \mathbf{1{,}923}\) mm². \(A_{s,min} = 683\) ✓, \(\rho \lt \rho_{tcl} = 0.0141\) ✓.</li>
+        <li><b>철근 선택.</b> 4-D25 = 2,027 mm²(+5.4 %), 5-D22 = 1,936(+0.7 %), 3-D29 = 1,927(+0.2 %), 7-D19 = 2,006(한 층 순간격 26.8 mm ✗). 지점 상부 6-D25, 기둥 D25와 호칭을 맞추고 스터럽 네 모서리에 철근이 오도록 <b>4-D25</b>를 고른다.</li>
+        <li><b>배치.</b> 한 층, 순간격 \((294.6 - 4 \times 25.4)/3 = 64.3 \ge 33.3\) mm ✓. 실제 \(d = d_t = 634.6\) mm.</li>
+        <li><b>확인.</b> \(a = 2{,}027 \times 500/(25.5 \times 400) = 99.4\) mm, \(c = 124.2\) mm, \(\varepsilon_t = 0.0033 \times (634.6 - 124.2)/124.2 = 0.0136 \ge 0.00625\) → 인장 지배 \(\phi = 0.85\). \(M_n = 2{,}027 \times 500 \times (634.6 - 49.7)/10^6 = 592.8\) kN·m, \(\phi M_n = \mathbf{504}\) kN·m \(\ge 460\) ✓(사용률 0.91). \(\phi M_n \ge 1.2M_{cr} = 135\) ✓.</li>
+      </ol></div>
+    <div class="sim" id="sim-fx-g1">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>G1 정모멘트 단면 설계 마법사</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fx-cv-g1" aria-label="G1 경간 중앙 단면의 설계 결과 배치와 소요·설계 강도 막대, 철근 질량 비교"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>해석 모형</span><div class="seg" id="fx-g1-model"><button data-value="8">단순보 wL²/8</button><button data-value="14" class="on">끝 경간 wL²/14</button><button data-value="16">내부 경간 wL²/16</button></div></div>
+          <label class="ctrl"><span><span>계수 하중 w<sub>u</sub></span> <output id="fx-g1-w-out"></output></span><input type="range" id="fx-g1-w" min="40" max="160" step="1" value="100"></label>
+          <label class="ctrl"><span>경간 L <output id="fx-g1-L-out"></output></span><input type="range" id="fx-g1-L" min="5" max="12" step="0.1" value="8"></label>
+          <div class="ctrl"><span>주근 호칭</span><div class="seg" id="fx-g1-bar"><button data-value="D22">D22</button><button data-value="D25" class="on">D25</button><button data-value="D29">D29</button></div></div>
+          <label class="ctrl"><span>보 춤 h <output id="fx-g1-h-out"></output></span><input type="range" id="fx-g1-h" min="500" max="1000" step="10" value="700"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">M<sub>u</sub></span><span class="v" id="fx-g1-mu">—</span></div>
+        <div class="stat"><span class="k">A<sub>s,req</sub> → 선택</span><span class="v" id="fx-g1-as">—</span></div>
+        <div class="stat"><span class="k">φM<sub>n</sub> · 사용률</span><span class="v" id="fx-g1-mn">—</span></div>
+        <div class="stat"><span class="k">하단 주근 질량 (1경간)</span><span class="v" id="fx-g1-kg">—</span></div>
+      </div>
+      <ol class="fx-wz" id="fx-g1-steps"></ol>
+      <div class="sim-note">해볼 것: 기본값(끝 경간 계수, w<sub>u</sub> 100, L 8 m)에서 표의 1,923 mm² → 4-D25 → φM<sub>n</sub> 504 kN·m를 확인하세요 · "단순보 wL²/8"을 누르면 M<sub>u</sub> 800 → 7-D25(5 + 2, φM<sub>n</sub> ≈ 804)가 되고 하단 철근이 1경간에 약 96 kg 늘어납니다 · 내부 경간(wL²/16 = 400)은 4-D25로 여유가 더 큽니다 · 경간을 10 m로 늘리면 모멘트가 L²에 비례해 1.56배가 되어 보 춤을 키우거나 굵은 철근이 필요합니다 · 모델: 예제 3.6 순서, 정의 3.8(d = 610 가정 → d 실제), 원리 3.9, <code>CB.rc.asReq</code>·<code>flexure</code>·<code>asMin</code>, 철근 단위 질량 <code>CB.steel.BARS</code>, 길이는 경간 L로 단순화.</div>
+    </div>
+    <div class="callout site"><strong>G1 정모멘트 설계 결과</strong> 경간 중앙 \(M_u^+ = 460\) kN·m, 설계용 \(d = 610\) mm → \(A_{s,req} = 1{,}923\) mm² → <b>4-D25</b>(2,027 mm², 한 층). 실제 \(d = 634.6\) mm, \(a = 99\) mm, \(c = 124\) mm, \(\varepsilon_t = 0.0136\)(인장 지배), \(\phi M_n = 504\) kN·m(사용률 0.91), \(\rho = 0.0080\)(d 634 기준) — \(\rho_{min}\)의 2.9배, \(\rho_{tcl}\)의 57 %. 곡률 연성비 약 4.8. 지점의 부모멘트(\(M_u^- = 640\) kN·m → 6-D25 상단 2단)와 슬래브가 플랜지로 일하는 T형 보 효과(중앙 \(\phi M_n\) 약 7 % 증가)는 <a href="t-beam.html">4장</a>, 전단(\(V_u = 400\) kN → 스터럽 2-D13 @150)은 <a href="shear.html">5장</a>, 처짐(\(M_a = 350\) kN·m)은 <a href="serviceability.html">8장</a>에서 이어서 검토한다. 모든 값은 교육용이며 실제 설계에는 현행 KDS 14 20을 적용한다.</div>
+    <div class="callout site"><strong>앞 권의 7-D25는 어디서 왔나</strong> MechanicsBook·MaterialsBook의 "G1 하단 7-D25"는 G1을 단순보로 본 \(M_u = w_uL^2/8 = 800\) kN·m에서 나왔다(\(A_{s,req} = 3{,}451\) mm², \(d = 630\) 가정). 실제 5 + 2 배치로 다시 계산하면 \(d = 620\) mm, \(d_t = 635\) mm에서 \(\phi M_n = 804\) kN·m로 여전히 합격이고, CONTRIBUTING의 819 kN·m는 \(d = 630\) 근사값이다. 단순보 근사는 경간 중앙에는 보수적이지만 지점의 부모멘트를 무시하므로 <b>지점 위의 균열과 상부 철근을 설명하지 못한다</b>는 점에서 위험 쪽이다. 연속보 설계로 바꾸면 하단 주근은 경간당 약 96 kg(3-D25 × 8 m) 줄지만 지점 상단에 6-D25가 생긴다. 철근 물량 전체의 비교는 <a href="case-study.html">16장</a>에서 한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="design-basis.html"><small>CH.02 · 강도 설계의 기초</small>응력 블록·φ·변형률 적합<br><span>이 장의 모든 식이 출발한 가정과 계수.</span></a>
+      <a href="t-beam.html"><small>CH.04 · 복철근 보와 T형 보</small>압축 철근·T형 보·부모멘트<br><span>G1 지점 6-D25와 중앙 T형 보 효과.</span></a>
+      <a href="shear.html"><small>CH.05 · 전단과 사인장 균열</small>휨 다음은 전단<br><span>같은 d로 V<sub>c</sub>와 스터럽 간격을 정한다.</span></a>
+      <a href="development.html"><small>CH.07 · 정착과 이음</small>철근을 어디서 끊나<br><span>M<sub>n</sub>이 필요 없는 곳에서 절단, 정착 길이.</span></a>
+      <a href="serviceability.html"><small>CH.08 · 처짐과 균열</small>강도 다음은 사용성<br><span>균열 단면 kd·I<sub>cr</sub>, 최소 두께, 균열 간격.</span></a>
+      <a href="case-study.html"><small>CH.16 · B-10 설계 실습</small>G1 전 과정<br><span>정·부모멘트, 전단, 처짐, 배근도와 물량.</span></a>
+      <a href="../../materials/chapters/rebar.html#bars"><small>MaterialsBook · CH.11</small>철근 호칭·공칭 단면적·배근 간격<br><span>D10–D35 표, 순간격, 7-D25 5 + 2 배치.</span></a>
+      <a href="../../mechanics/chapters/bending.html#plastic"><small>MechanicsBook · CH.09</small>탄성에서 소성으로<br><span>짝힘으로 보는 단면의 극한 모멘트.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>RC 보는 압축 콘크리트 \(C\)와 인장 철근 \(T\)의 짝힘으로 휨을 버틴다. \(C = T\), \(M = Tz\), 보통 \(z \approx 0.85\)–\(0.95d\).</li>
+      <li>변형률 적합: \(\varepsilon_s = \varepsilon_{cu}(d - c)/c\). 철근 항복을 가정한 평형에서 \(a = A_sf_y/(\eta 0.85f_{ck}b)\), \(c = a/\beta_1\), \(M_n = A_sf_y(d - a/2)\).</li>
+      <li>항복 가정은 \(\varepsilon_t \ge \varepsilon_y\)로 확인하고, 아니면 \(f_s = E_s\varepsilon_s\)로 2차 방정식을 푼다. 미항복 단면은 휨부재로 쓰지 않는다.</li>
+      <li>\(\rho_b = (\eta 0.85f_{ck}\beta_1/f_y)\cdot\varepsilon_{cu}/(\varepsilon_{cu} + \varepsilon_y)\). 과소 철근 보는 연성, 과다 철근 보는 취성. fck 30·SD500: \(\rho_b = 0.0232\).</li>
+      <li>최대 철근: \(\varepsilon_t \ge \varepsilon_{a,min}\)(fy ≤ 400: 0.004, fy &gt; 400: \(2\varepsilon_y\) — SD500 0.005, KDS 형태). 인장 지배는 \(\varepsilon_t \ge \max(0.005, 2.5\varepsilon_y)\). SD500·fck 30: \(\rho_{max} = 0.0162\), \(\rho_{tcl} = 0.0141\).</li>
+      <li>최소 철근: \(M_n\)이 \(M_{cr}\)보다 작으면 균열과 함께 철근이 끊어진다. \(A_{s,min} = \max(0.25\sqrt{f_{ck}}, 1.4)b_wd/f_y\)(ACI 형태) 또는 \(\phi M_n \ge 1.2M_{cr}\)(KDS 형태). G1: \(M_{cr} = 113\) kN·m.</li>
+      <li>설계: 단면 가정(h ≈ L/10–L/12, d ≈ h − 65·90) → \(R_n\)·\(\rho\)·\(A_{s,req}\) → 철근 선택 → 피복 40·순간격 max(25, d<sub>b</sub>, 4/3G<sub>max</sub>) → 실제 \(d\)·\(d_t\)로 \(\phi M_n\)·\(\varepsilon_t\) 확인. \(d\)는 도심(강도), \(d_t\)는 맨 바깥(φ).</li>
+      <li>G1 중앙: \(M_u^+ = 460\) → 1,923 mm² → 4-D25 한 층, \(\phi M_n = 504\) kN·m, \(\varepsilon_t = 0.0136\). 단순보 근사 800 kN·m의 7-D25(5 + 2, \(\phi M_n \approx 804\))는 중앙에 과하고 지점 부모멘트를 놓친다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. b = 300 mm, A<sub>s</sub> = 1,530 mm², f<sub>ck</sub> = 30 MPa(η = 1.0), f<sub>y</sub> = 500 MPa인 단철근 보의 응력 블록 깊이 a는?</p><div class="opts">
+        <button class="opt">60 mm</button><button class="opt" data-correct>100 mm</button><button class="opt">125 mm</button><button class="opt">255 mm</button>
+      </div><div class="quiz-exp">a = A<sub>s</sub>f<sub>y</sub>/(0.85f<sub>ck</sub>b) = 1,530 × 500/(25.5 × 300) = 765,000/7,650 = 100 mm. c = a/β<sub>1</sub> = 125 mm는 중립축 깊이다.</div></div>
+      <div class="quiz-q"><p>2. 단철근 단면에서 c/d<sub>t</sub> = 0.30이었다(ε<sub>cu</sub> = 0.0033, SD500). 이 단면은?</p><div class="opts">
+        <button class="opt">압축 지배, φ = 0.65</button><button class="opt">변화 구간, φ ≈ 0.78</button><button class="opt" data-correct>인장 지배, φ = 0.85</button><button class="opt">휨부재로 허용되지 않음</button>
+      </div><div class="quiz-exp">ε<sub>t</sub> = 0.0033 × (1 − 0.30)/0.30 = 0.0077 ≥ max(0.005, 2.5 × 0.0025) = 0.00625이므로 인장 지배다. c/d<sub>t</sub>가 0.346보다 작으면 SD500에서 인장 지배다.</div></div>
+      <div class="quiz-q"><p>3. 항복을 가정해 구한 c로 계산한 철근 변형률이 0.0015(SD500)였다. 올바른 다음 단계는?</p><div class="opts">
+        <button class="opt">그대로 M<sub>n</sub> = A<sub>s</sub>f<sub>y</sub>(d − a/2)를 쓴다</button><button class="opt" data-correct>f<sub>s</sub> = E<sub>s</sub>ε<sub>s</sub>로 평형식을 다시 세워 c를 2차 방정식으로 푼다</button><button class="opt">φ = 0.85를 쓰면 된다</button><button class="opt">f<sub>ck</sub>를 줄여 다시 계산한다</button>
+      </div><div class="quiz-exp">0.0015 &lt; ε<sub>y</sub> = 0.0025이므로 철근은 항복하지 않는다. 실제 c는 가정보다 작고 f<sub>s</sub> &lt; f<sub>y</sub>다(원리 3.4). 이런 단면은 ε<sub>t</sub>가 최소 허용값보다 작아 휨부재로 쓰지 않으므로 단면을 바꿔야 한다.</div></div>
+      <div class="quiz-q"><p>4. 과소 철근 보와 과다 철근 보에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">과다 철근 보가 강도도 크고 연성도 크다</button><button class="opt">과소 철근 보는 콘크리트가 먼저 부서진다</button><button class="opt" data-correct>과소 철근 보는 철근이 먼저 항복해 큰 처짐과 균열로 파괴를 예고한다</button><button class="opt">균형 철근비로 설계하는 것이 가장 바람직하다</button>
+      </div><div class="quiz-exp">ρ &lt; ρ<sub>b</sub>이면 철근이 먼저 항복하고 곡률이 크게 늘어난 뒤 압괴가 온다(연성 파괴). 균형 철근비는 연성이 없으므로 기준은 그보다 훨씬 작은 ρ<sub>max</sub>(ε<sub>t</sub> ≥ ε<sub>a,min</sub>)로 제한한다.</div></div>
+      <div class="quiz-q"><p>5. 최소 철근량을 두는 주된 이유는?</p><div class="opts">
+        <button class="opt">처짐을 줄이기 위해</button><button class="opt" data-correct>균열 순간 넘어오는 인장력을 철근이 받지 못해 갑자기 끊어지는 것을 막기 위해</button><button class="opt">압축 콘크리트의 압괴를 막기 위해</button><button class="opt">전단 강도를 높이기 위해</button>
+      </div><div class="quiz-exp">M<sub>n</sub> &lt; M<sub>cr</sub>이면 균열과 동시에 철근이 항복·파단한다. 그래서 φM<sub>n</sub> ≥ 1.2M<sub>cr</sub>(KDS 형태) 또는 A<sub>s,min</sub> 식으로 균열 모멘트보다 충분한 강도를 요구한다.</div></div>
+      <div class="quiz-q"><p>6. b = 400 mm, 피복 40 mm, 스터럽 D13, D25 주근, 굵은 골재 25 mm일 때 한 층에 놓을 수 있는 최대 철근 수는?</p><div class="opts">
+        <button class="opt">4개</button><button class="opt" data-correct>5개</button><button class="opt">6개</button><button class="opt">7개</button>
+      </div><div class="quiz-exp">스터럽 안쪽 폭 294.6 mm, s<sub>min</sub> = max(25, 25.4, 33.3) = 33.3 mm. n<sub>max</sub> = ⌊(294.6 + 33.3)/(25.4 + 33.3)⌋ = ⌊5.59⌋ = 5개.</div></div>
+      <div class="quiz-q"><p>7. 철근이 두 층(아래 d<sub>1</sub> = 635, 위 d<sub>2</sub> = 585 mm)일 때 강도 계산과 φ 판정에 쓰는 깊이의 조합으로 옳은 것은?</p><div class="opts">
+        <button class="opt">둘 다 d<sub>1</sub></button><button class="opt">둘 다 도심 d</button><button class="opt" data-correct>강도는 도심 d, φ는 d<sub>t</sub> = d<sub>1</sub></button><button class="opt">강도는 d<sub>2</sub>, φ는 도심 d</button>
+      </div><div class="quiz-exp">모든 층이 항복하면 T는 철근 도심에 작용하므로 팔 길이는 d − a/2(도심 d). ε<sub>t</sub>와 φ는 가장 바깥 철근(d<sub>t</sub>)의 변형률로 정한다. 예제 3.5에서 이를 바꾸면 합격이 불합격으로 뒤집힌다.</div></div>
+      <div class="quiz-q"><p>8. G1의 하단 철근이 연속보 설계에서 7-D25가 아니라 4-D25로 충분한 이유는?</p><div class="opts">
+        <button class="opt">연속보는 하중이 작기 때문</button><button class="opt">T형 보 효과만으로 강도가 두 배가 되기 때문</button><button class="opt" data-correct>정적 모멘트를 지점의 부모멘트가 나눠 가져 경간 중앙의 소요 모멘트가 800에서 460 kN·m로 줄기 때문</button><button class="opt">연속보에는 φ = 1.0을 쓰기 때문</button>
+      </div><div class="quiz-exp">하중(w<sub>u</sub> = 100 kN/m)은 같다. 연속보에서는 지점이 회전을 구속해 부모멘트가 생기고, 경간 중앙 정모멘트가 w<sub>u</sub>L²/14 ≈ 460 kN·m로 준다. 대신 지점 상부에 6-D25가 필요하다(4장).</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const FX = {
+  CC: 40, DS: 12.7, GMAX: 25, VCLEAR: 25,
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${FX.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = FX._c || (FX._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  db(name) { return CB.steel.BARS[name].d; },
+  A(name) { return CB.steel.BARS[name].A; },
+  fc(fck) { const B = CB.rc.block(fck); return B.eta * 0.85 * fck; },
+  /** 한 층 최대 개수(원리 3.9) */
+  nmax(b, name, gmax = FX.GMAX) { const db = FX.db(name), s = Math.max(25, db, (4 / 3) * gmax); return Math.max(0, Math.floor((b - 2 * FX.CC - 2 * FX.DS + s) / (db + s))); },
+  /** 철근 n개 자동 배치: 아래층부터 채우고 위층은 아래층 철근 바로 위 */
+  arrange(n, name, b, h, o = {}) {
+    const db = FX.db(name), vc = o.vclear ?? FX.VCLEAR, nm = FX.nmax(b, name, o.gmax ?? FX.GMAX);
+    const out = { bars: [], layers: [], nmax: nm, ok: nm >= 2, As: n * FX.A(name), db };
+    if (nm < 2) { out.ok = false; return out; }
+    const xL = FX.CC + FX.DS + db / 2, xR = b - xL;
+    let left = n, k = 0; const base = [];
+    while (left > 0 && k < 6) {
+      const c = Math.min(nm, left), y = h - FX.CC - FX.DS - db / 2 - k * (db + vc);
+      let xs;
+      if (k === 0) { xs = c === 1 ? [b / 2] : Array.from({ length: c }, (_, i) => xL + (i * (xR - xL)) / (c - 1)); base.push(...xs); }
+      else if (c === 1) xs = [base[Math.floor((base.length - 1) / 2)]];
+      else xs = Array.from({ length: c }, (_, i) => base[Math.round((i * (base.length - 1)) / (c - 1))]);
+      xs.forEach((x) => out.bars.push({ x, y, bar: name }));
+      out.layers.push({ y, n: c }); left -= c; k++;
+    }
+    if (left > 0 || out.layers.length > 3) out.ok = false;
+    const As = out.As; out.d = out.layers.reduce((s, l) => s + l.y * l.n, 0) / Math.max(1, n); out.dt = out.layers.length ? out.layers[0].y : h;
+    out.flex = (fck, fy) => CB.rc.flexure({ b, h, fck, fy, layers: out.layers.map((l) => ({ d: l.y, As: l.n * FX.A(name) })) });
+    return out;
+  },
+  /** 단면 그리기: box 안에 b × h, 스터럽, 철근. 반환 { X, Y, s } (mm → px, y는 위에서 깊이) */
+  section(ctx, box, b, h, bars, o = {}) {
+    const pal = CB.palette(), s = o.scale || Math.min((box.w * 0.86) / b, (box.h * 0.9) / h);
+    const ox = box.x + box.w / 2 - (b * s) / 2, oy = o.oy != null ? o.oy : box.y + box.h / 2 - (h * s) / 2;
+    const X = (x) => ox + x * s, Y = (y) => oy + y * s;
+    ctx.save();
+    ctx.fillStyle = CB.color("surface-2"); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.4;
+    ctx.fillRect(X(0), Y(0), b * s, h * s); ctx.strokeRect(X(0), Y(0), b * s, h * s);
+    if (o.block > 0) { ctx.fillStyle = FX.alpha(pal.compression, 0.22); ctx.fillRect(X(0), Y(0), b * s, Math.min(h, o.block) * s); }
+    if (o.na != null && o.na > 0 && o.na < h) { ctx.strokeStyle = pal.warn; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(X(0) - 8, Y(o.na)); ctx.lineTo(X(b) + 8, Y(o.na)); ctx.stroke(); ctx.setLineDash([]); }
+    if (o.stirrup !== false) {
+      const t = FX.DS; ctx.strokeStyle = FX.alpha(pal.accent, 0.85); ctx.lineWidth = Math.max(1.5, t * s);
+      const x0 = X(FX.CC + t / 2), y0 = Y(FX.CC + t / 2), w = (b - 2 * FX.CC - t) * s, hh = (h - 2 * FX.CC - t) * s, r = Math.min(10, 2 * t * s + 2);
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0, y0, w, hh, r) : ctx.rect(x0, y0, w, hh); ctx.stroke();
+    }
+    (bars || []).forEach((br, i) => {
+      const r = Math.max(2.5, (FX.db(br.bar) / 2) * s), col = br.color || pal.tension;
+      ctx.globalAlpha = br.ghost ? 0.45 : 1;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(br.px != null ? br.px : X(br.x), br.py != null ? br.py : Y(br.y), r, 0, Math.PI * 2); ctx.fill();
+      if (br.flag) { ctx.strokeStyle = pal.bad; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(X(br.x), Y(br.y), r + 3, 0, Math.PI * 2); ctx.stroke(); }
+      if (br.ghost) { ctx.strokeStyle = pal.bad; ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(br.px, br.py, r + 4, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.globalAlpha = 1;
+    });
+    if (o.dims !== false) {
+      FX.text(ctx, `b = ${Math.round(b)}`, X(b / 2), Y(h) + 13, pal.dim, { size: 11 });
+      ctx.save(); ctx.translate(X(0) - 12, Y(h / 2)); ctx.rotate(-Math.PI / 2); FX.text(ctx, `h = ${Math.round(h)}`, 0, 0, pal.dim, { size: 11 }); ctx.restore();
+    }
+    ctx.restore();
+    return { X, Y, s, ox, oy };
+  },
+  /** 순간격 검사: 위반한 철근 인덱스 집합 */
+  spacing(bars, gmax = FX.GMAX) {
+    const bad = new Set();
+    for (let i = 0; i < bars.length; i++) for (let j = i + 1; j < bars.length; j++) {
+      const a = bars[i], c = bars[j], da = FX.db(a.bar), dc = FX.db(c.bar), dy = Math.abs(a.y - c.y);
+      const clear = Math.hypot(a.x - c.x, a.y - c.y) - (da + dc) / 2;
+      const req = dy < (da + dc) / 2 ? Math.max(25, da, dc, (4 / 3) * gmax) : 25;
+      if (clear < req - 0.5) { bad.add(i); bad.add(j); }
+    }
+    return bad;
+  },
+  /** φ를 반영해 소요 철근 반복(변화 구간이면 늘어남) */
+  asReqPhi(Mu, b, h, d, fck, fy) {
+    let As = CB.rc.asReq(Mu, b, d, fck, fy); if (!isFinite(As)) return NaN;
+    for (let k = 0; k < 8; k++) { const f = CB.rc.flexure({ b, h, fck, fy, layers: [{ d, As }] }); if (f.phiMn >= Mu * 0.999) break; const A2 = CB.rc.asReq((Mu * 0.85) / f.phi, b, d, fck, fy); if (!isFinite(A2)) return NaN; As = Math.max(As * 1.002, A2); }
+    return As;
+  },
+  rhoLim(fck, fy) {
+    const B = CB.rc.block(fck), k = (B.eta * 0.85 * fck * B.beta1) / fy, ey = fy / CB.rc.Es;
+    return { min: Math.max(0.25 * Math.sqrt(fck), 1.4) / fy, tcl: (k * B.ecu) / (B.ecu + Math.max(0.005, 2.5 * ey)), max: (k * B.ecu) / (B.ecu + CB.rc.etMin(fy)), b: CB.rc.rhoB(fck, fy), B };
+  },
+  zone(et, fy) { const ey = fy / CB.rc.Es; return et >= Math.max(0.005, 2.5 * ey) ? "인장 지배" : et >= CB.rc.etMin(fy) ? "변화 구간" : et > ey ? "변화 구간(휨부재 불가)" : "압축 지배"; },
+  kn(v, d = 0) { if (!isFinite(v)) return "—"; const t = Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }); return (v < -1e-9 && t !== (0).toFixed(d) ? "−" : "") + t; },
+  ylab(ctx, t, x, y) { ctx.save(); ctx.fillStyle = CB.palette().dim; ctx.font = "12px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.translate(x, y); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(t, 0, 0); ctx.restore(); },
+};
+
+/* ---------- 1. 단면 휨강도 계산기(끌기) ---------- */
+(function () {
+  const S = { bars: [], b: 400, h: 700, drag: -1, raw: null };
+  const gb = CB.range("fx-sc-b", (v) => v + " mm", (v) => { rescale(v, S.h); }), gh = CB.range("fx-sc-h", (v) => v + " mm", (v) => { rescale(S.b, v); });
+  const gmu = CB.range("fx-sc-mu", (v) => v + " kN·m", go), bar = CB.seg("fx-sc-bar"), fck = CB.seg("fx-sc-fck", go), fy = CB.seg("fx-sc-fy", go);
+  const pre = CB.seg("fx-sc-pre", (v) => preset(v));
+  function clamp(br) { const r = FX.db(br.bar) / 2, m = FX.CC + FX.DS + r; br.x = CB.clamp(br.x, m, S.b - m); br.y = CB.clamp(br.y, m, S.h - m); return br; }
+  function rescale(b, h) {
+    const b0 = S.b, h0 = S.h; S.b = b; S.h = h;
+    S.bars.forEach((br) => { br.x = (br.x / b0) * b; if (br.y > h0 / 2) br.y += h - h0; clamp(br); }); go();
+  }
+  function preset(v) {
+    gb.set(400, false); gh.set(700, false); S.b = 400; S.h = 700;
+    const map = { g1: [4, "D25"], s7: [7, "D25"], over: [10, "D25"], min: [2, "D13"] }[v];
+    S.bars = FX.arrange(map[0], map[1], S.b, S.h).bars.map((b) => ({ x: b.x, y: b.y, bar: b.bar }));
+    if (v === "min") gmu.set(100, false); else if (v === "s7") gmu.set(800, false); else gmu.set(460, false);
+    go();
+  }
+  let T = null, R = null;
+  function calc() {
+    const k = +fck(), y = +fy();
+    if (!S.bars.length) return null;
+    const f = CB.rc.flexure({ b: S.b, h: S.h, fck: k, fy: y, layers: S.bars.map((br) => ({ d: br.y, As: FX.A(br.bar) })) });
+    const As = S.bars.reduce((s, br) => s + FX.A(br.bar), 0), tens = S.bars.filter((br) => br.y > f.c), Ast = tens.reduce((s, br) => s + FX.A(br.bar), 0);
+    const dc = Ast > 0 ? tens.reduce((s, br) => s + br.y * FX.A(br.bar), 0) / Ast : S.h - 65;
+    const cr = CB.rc.crack({ b: S.b, h: S.h, d: dc, As: Math.max(1, Ast), fck: k });
+    return { f, As, Ast, dc, Mcr: cr.Mcr, Amin: CB.rc.asMin(S.b, dc, k, y), sp: FX.spacing(S.bars), fck: k, fy: y };
+  }
+  const cv = CB.canvas("#fx-cv-sec", (ctx, W, H) => {
+    const pal = CB.palette(); R = calc(); const wide = W >= 600;
+    let secBox, strBox, stsBox;
+    if (wide) { secBox = { x: 18, y: 26, w: W * 0.4 - 18, h: H - 52 }; strBox = { x: W * 0.4, y: 26, w: W * 0.28, h: H - 52 }; stsBox = { x: W * 0.68, y: 26, w: W * 0.32 - 10, h: H - 52 }; }
+    else { secBox = { x: 18, y: 22, w: W - 36, h: H * 0.5 - 30 }; strBox = { x: 8, y: H * 0.5 + 34, w: W * 0.48, h: H * 0.5 - 56 }; stsBox = { x: W * 0.5, y: H * 0.5 + 34, w: W * 0.5 - 8, h: H * 0.5 - 56 }; }
+    const f = R && R.f, c = f ? f.c : 0, B = CB.rc.block(+fck());
+    const bars = S.bars.map((br, i) => { const comp = f && br.y < c; return { ...br, color: comp ? pal.compression : pal.tension, flag: R && R.sp.has(i) }; });
+    if (S.drag >= 0 && S.raw && S.raw.out) { bars[S.drag].ghost = true; bars[S.drag].px = S.raw.px; bars[S.drag].py = S.raw.py; }
+    T = FX.section(ctx, secBox, S.b, S.h, bars, { block: f ? f.a : 0, na: f ? c : null });
+    FX.text(ctx, "단면 (누르면 철근 추가 · 끌어 이동 · 밖으로 끌면 삭제)", wide ? secBox.x + secBox.w / 2 : W / 2, 12, pal.dim, { size: 10.5, bold: false });
+    if (!f) { FX.text(ctx, "철근이 없습니다: 무근 단면은 균열과 함께 파괴", W / 2, wide ? H / 2 : H * 0.75, pal.bad, { size: 12.5 }); return; }
+    // 깊이 축: 넓은 화면은 단면과 같은 축척, 좁은 화면은 아래 패널 축척
+    const s2 = wide ? T.s : Math.min(strBox.h / S.h, 1e9), Y = wide ? T.Y : (y) => strBox.y + y * s2;
+    // 변형률도
+    const ecu = B.ecu, eBot = (ecu * (c - S.h)) / c, ey = +fy() / CB.rc.Es;
+    const x0 = strBox.x + strBox.w * 0.62, kx = Math.min((strBox.w * 0.34) / ecu, (strBox.w * 0.56) / Math.max(1e-6, Math.abs(eBot)));
+    const EX = (e) => x0 + e * kx;
+    ctx.save(); ctx.strokeStyle = pal.axis; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x0, Y(0)); ctx.lineTo(x0, Y(S.h)); ctx.stroke();
+    ctx.fillStyle = FX.alpha(pal.compression, 0.22); ctx.beginPath(); ctx.moveTo(x0, Y(0)); ctx.lineTo(EX(ecu), Y(0)); ctx.lineTo(x0, Y(c)); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = FX.alpha(pal.tension, 0.2); ctx.beginPath(); ctx.moveTo(x0, Y(c)); ctx.lineTo(EX(eBot), Y(S.h)); ctx.lineTo(x0, Y(S.h)); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = pal.text; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(EX(ecu), Y(0)); ctx.lineTo(EX(eBot), Y(S.h)); ctx.stroke();
+    if (EX(-ey) > strBox.x) { ctx.strokeStyle = pal.warn; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(EX(-ey), Y(c)); ctx.lineTo(EX(-ey), Y(S.h)); ctx.stroke(); ctx.setLineDash([]); FX.text(ctx, "−εy", EX(-ey), Y(S.h) + 10, pal.warn, { size: 10 }); }
+    ctx.strokeStyle = pal.warn; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(strBox.x + 4, Y(c)); ctx.lineTo(strBox.x + strBox.w, Y(c)); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+    S.bars.forEach((br) => { const e = (ecu * (c - br.y)) / c; ctx.fillStyle = e > 0 ? pal.compression : pal.tension; ctx.beginPath(); ctx.arc(EX(e), Y(br.y), 3.6, 0, Math.PI * 2); ctx.fill(); });
+    FX.text(ctx, `εcu ${ecu.toFixed(4)}`, Math.min(EX(ecu), strBox.x + strBox.w - 40), Y(0) - 9, pal.compression, { size: 10.5 });
+    const yt = Math.max(...S.bars.map((b) => b.y)); FX.text(ctx, `εt = ${f.et.toFixed(4)}`, Math.max(strBox.x + 44, Math.min(strBox.x + strBox.w - 44, EX((ecu * (c - yt)) / c))), Y(yt) + 14, pal.tension, { size: 10.5 });
+    FX.text(ctx, `c = ${c.toFixed(0)}`, strBox.x + 24, Y(c) - 8, pal.warn, { size: 10.5 });
+    FX.text(ctx, "변형률", strBox.x + strBox.w / 2, wide ? 12 : strBox.y - 24, pal.dim, { size: 10.5, bold: false });
+    // 응력 블록·내력
+    const fcv = FX.fc(+fck()), bw = stsBox.w * 0.3, sx0 = stsBox.x + 6;
+    ctx.save(); ctx.fillStyle = FX.alpha(pal.compression, 0.28); ctx.strokeStyle = pal.compression; ctx.lineWidth = 1.3;
+    ctx.fillRect(sx0, Y(0), bw, Math.min(S.h, f.a) * s2); ctx.strokeRect(sx0, Y(0), bw, Math.min(S.h, f.a) * s2);
+    ctx.strokeStyle = pal.axis; ctx.beginPath(); ctx.moveTo(sx0, Y(0)); ctx.lineTo(sx0, Y(S.h)); ctx.stroke(); ctx.restore();
+    const blkH = Math.min(S.h, f.a) * s2; FX.text(ctx, `${fcv.toFixed(1)} MPa`, sx0 + bw / 2, blkH > 16 ? Y(0) + blkH / 2 : Y(0) - 9, pal.compression, { size: 10 });
+    const Cc = (fcv * S.b * Math.min(S.h, f.a)) / 1000;
+    const ax = sx0 + bw + 8, aw = wide ? Math.max(26, stsBox.w * 0.3) : Math.max(16, Math.min(stsBox.w * 0.3, stsBox.x + stsBox.w - ax - 72));
+    FX.arrow(ctx, ax + aw, Y(f.a / 2), ax, Y(f.a / 2), pal.compression, 2.6);
+    FX.text(ctx, wide ? `C ${FX.kn(Cc)} kN` : `C ${FX.kn(Cc)}`, ax + aw + 4, Y(f.a / 2), pal.compression, { size: wide ? 10.5 : 10, align: "left" });
+    // 철근 층별 힘
+    const groups = {}; S.bars.forEach((br, i) => { const k = Math.round(br.y); (groups[k] = groups[k] || { y: br.y, F: 0 }).F += (f.es[i] * FX.A(br.bar)) / 1000; });
+    let Tsum = 0, Ty = 0, Csum = 0, Cy = 0;
+    Object.values(groups).forEach((g) => { const comp = g.F > 0; const len = CB.clamp(Math.abs(g.F) / Math.max(1, Cc) * aw, 6, aw * 1.3);
+      if (comp) { FX.arrow(ctx, ax + len, Y(g.y), ax, Y(g.y), pal.compression, 2); Csum += g.F; Cy += g.F * g.y; }
+      else { FX.arrow(ctx, ax, Y(g.y), ax + len, Y(g.y), pal.tension, 2.4); Tsum += -g.F; Ty += -g.F * g.y; } });
+    if (Tsum > 0) { const yT = Ty / Tsum; FX.text(ctx, wide ? `T ${FX.kn(Tsum)} kN` : `T ${FX.kn(Tsum)}`, Math.min(ax + aw + 4, W - 50), Y(yT) + 13, pal.tension, { size: wide ? 10.5 : 10, align: "left" });
+      const zx = ax - 2; ctx.save(); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(zx, Y(f.a / 2)); ctx.lineTo(zx, Y(yT)); ctx.stroke(); ctx.restore();
+      FX.text(ctx, `z ≈ ${(yT - (Cc * f.a / 2 + Cy) / (Cc + Csum)).toFixed(0)}`, zx - 2, (Y(f.a / 2) + Y(yT)) / 2, pal.dim, { size: 10, align: "right" }); }
+    FX.text(ctx, "응력 블록 · 내력", stsBox.x + stsBox.w / 2, wide ? 12 : stsBox.y - 24, pal.dim, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 600 ? 1.45 : 0.56), minHeight: 340, maxHeight: 620 });
+  const el = cv.canvas;
+  const toMM = (e) => { const r = el.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top; return { px, py, x: (px - T.ox) / T.s, y: (py - T.oy) / T.s }; };
+  el.addEventListener("pointerdown", (e) => {
+    if (!T) return; const p = toMM(e); let best = -1, bd = 1e9;
+    S.bars.forEach((br, i) => { const d = Math.hypot((br.x - p.x) * T.s, (br.y - p.y) * T.s); if (d < Math.max(14, (FX.db(br.bar) / 2) * T.s + 6) && d < bd) { bd = d; best = i; } });
+    if (best < 0) { if (p.x < 0 || p.x > S.b || p.y < 0 || p.y > S.h || S.bars.length >= 30) return; S.bars.push(clamp({ x: p.x, y: p.y, bar: bar() })); best = S.bars.length - 1; }
+    S.drag = best; S.raw = null; el.setPointerCapture(e.pointerId); el.classList.add("fx-grab"); go(); e.preventDefault();
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (S.drag < 0) return; const p = toMM(e), m = 18 / T.s;
+    const out = p.x < -m || p.x > S.b + m || p.y < -m || p.y > S.h + m;
+    S.raw = { px: p.px, py: p.py, out }; const br = S.bars[S.drag]; br.x = p.x; br.y = p.y; clamp(br); go();
+  });
+  const end = () => { if (S.drag >= 0 && S.raw && S.raw.out) S.bars.splice(S.drag, 1); S.drag = -1; S.raw = null; el.classList.remove("fx-grab"); go(); };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+  document.getElementById("fx-sc-add").addEventListener("click", () => {
+    if (S.bars.length >= 30) return; const nm = bar(), arr = FX.arrange(S.bars.length + 1, nm, S.b, S.h);
+    const cand = arr.bars.filter((p) => !S.bars.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 20));
+    const p = cand.length ? cand[cand.length - 1] : { x: S.b / 2, y: S.h - 65 }; S.bars.push(clamp({ x: p.x, y: p.y, bar: nm })); go();
+  });
+  document.getElementById("fx-sc-del").addEventListener("click", () => { S.bars.pop(); go(); });
+  function go() {
+    cv.redraw(); const r = R;
+    if (!r) { ["fx-sc-as", "fx-sc-ac", "fx-sc-et", "fx-sc-mn"].forEach((id) => CB.stat(id, "—")); const m = document.getElementById("fx-sc-msg"); m.className = "fx-msg bad"; m.innerHTML = "철근이 없습니다. 단면을 눌러 철근을 놓으세요."; return; }
+    const f = r.f, Mu = gmu();
+    CB.stat("fx-sc-as", `${FX.kn(r.As)} mm² · ${(100 * f.rho).toFixed(2)} %`);
+    CB.stat("fx-sc-ac", `${f.a.toFixed(0)} · ${f.c.toFixed(0)} mm`);
+    CB.stat("fx-sc-et", `${f.et.toFixed(4)} · ${f.phi.toFixed(3)}`);
+    CB.stat("fx-sc-mn", `${FX.kn(f.Mn)} · <b>${FX.kn(f.phiMn)}</b> kN·m`);
+    const msgs = []; let cls = "ok";
+    const zone = FX.zone(f.et, r.fy);
+    if (!f.ok) { msgs.push(`ε<sub>t</sub> = ${f.et.toFixed(4)} &lt; ε<sub>a,min</sub> = ${CB.rc.etMin(r.fy).toFixed(4)} → <b>휨부재로 허용되지 않음</b>(과다 철근: 철근을 줄이거나 단면을 키우거나 압축 철근)`); cls = "bad"; }
+    else msgs.push(`${zone}(φ = ${f.phi.toFixed(3)})`);
+    if (r.Ast < r.Amin && f.phiMn < 1.2 * r.Mcr) { msgs.push(`인장 철근 ${FX.kn(r.Ast)} mm² &lt; A<sub>s,min</sub> ${FX.kn(r.Amin)}, φM<sub>n</sub> &lt; 1.2M<sub>cr</sub> = ${FX.kn(1.2 * r.Mcr)} → <b>최소 철근 부족</b>`); cls = "bad"; }
+    if (r.sp.size) { msgs.push(`순간격 부족 철근 ${r.sp.size}개(빨간 테두리)`); if (cls === "ok") cls = "warn"; }
+    if (Mu > 0) { if (f.phiMn >= Mu) msgs.push(`φM<sub>n</sub> ${FX.kn(f.phiMn)} ≥ M<sub>u</sub> ${Mu} kN·m → 강도 <b>합격</b>(사용률 ${(Mu / f.phiMn).toFixed(2)})`); else { msgs.push(`φM<sub>n</sub> ${FX.kn(f.phiMn)} &lt; M<sub>u</sub> ${Mu} kN·m → <b>강도 부족</b>`); cls = "bad"; } }
+    const comp = S.bars.filter((br) => br.y < f.c).length; if (comp) msgs.push(`압축 철근 ${comp}개(빨강, 4장)`);
+    const m = document.getElementById("fx-sc-msg"); m.className = "fx-msg " + cls; m.innerHTML = msgs.join(" · ");
+  }
+  preset("g1");
+})();
+
+/* ---------- 2. 철근 항복 확인 ---------- */
+(function () {
+  const gas = CB.range("fx-yd-as", (v) => CB.sig(v, 5) + " mm²", go), gb = CB.range("fx-yd-b", (v) => v + " mm", go), gd = CB.range("fx-yd-d", (v) => v + " mm", go), gfy = CB.seg("fx-yd-fy", go);
+  document.getElementById("fx-yd-ex1").addEventListener("click", () => { gb.set(300, false); gd.set(440, false); gas.set(1160, false); gfy.set("500", false); go(); });
+  document.getElementById("fx-yd-ex2").addEventListener("click", () => { gb.set(300, false); gd.set(440, false); gas.set(4060, false); gfy.set("500", false); go(); });
+  function calc() {
+    const As = gas(), b = gb(), d = gd(), fy = +gfy(), B = CB.rc.block(30), fc = FX.fc(30), ey = fy / CB.rc.Es;
+    const aY = (As * fy) / (fc * b), c1 = aY / B.beta1, e1 = (B.ecu * (d - c1)) / c1;
+    const f = CB.rc.flexure({ b, h: d + 60, fck: 30, fy, layers: [{ d, As }] }), c2 = f.c, e2 = (B.ecu * (d - c2)) / c2, fs2 = Math.min(fy, CB.rc.Es * Math.max(0, e2));
+    const MnY = aY < d ? (As * fy * (d - aY / 2)) / 1e6 : NaN;
+    return { As, b, d, fy, B, ey, aY, c1, e1, f, c2, e2, fs2, MnY, cb: (B.ecu / (B.ecu + ey)) * d };
+  }
+  const cv = CB.canvas("#fx-cv-yld", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), wide = W >= 560;
+    const L = wide ? { x: 20, y: 30, w: W * 0.42, h: H - 60 } : { x: 14, y: 26, w: W - 28, h: H * 0.48 - 30 };
+    const Rb = wide ? { x: W * 0.47 + 40, y: 20, w: W * 0.53 - 60, h: H - 64 } : { x: 54, y: H * 0.52 + 10, w: W - 70, h: H * 0.48 - 52 };
+    // 변형률도: 깊이 0..d
+    const s = L.h / r.d, Y = (y) => L.y + y * s, ecu = r.B.ecu;
+    const emax = Math.max(Math.abs(r.e1), Math.abs(r.e2), r.ey * 1.3, 0.004), x0 = L.x + L.w * 0.7, kx = Math.min((L.w * 0.26) / ecu, (L.w * 0.64) / emax), EX = (e) => x0 + e * kx;
+    ctx.save(); ctx.strokeStyle = pal.axis; ctx.beginPath(); ctx.moveTo(x0, Y(0)); ctx.lineTo(x0, Y(r.d)); ctx.stroke();
+    ctx.strokeStyle = pal.warn; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(EX(-r.ey), Y(0)); ctx.lineTo(EX(-r.ey), Y(r.d)); ctx.stroke(); ctx.setLineDash([]);
+    const line = (c, col, dash) => { const ed = (ecu * (c - r.d)) / c; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(EX(ecu), Y(0)); ctx.lineTo(EX(ed), Y(r.d)); ctx.stroke(); ctx.setLineDash([]); };
+    line(Math.max(1, r.c1), pal.faint, [6, 4]); line(r.c2, pal.accent);
+    ctx.lineWidth = 2; ctx.strokeStyle = pal.tension; ctx.fillStyle = pal.bg;
+    const p1 = EX(-r.e1), p2 = EX(-r.e2);
+    ctx.beginPath(); ctx.arc(CB.clamp(p1, L.x, L.x + L.w), Y(r.d), 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = pal.tension; ctx.beginPath(); ctx.arc(p2, Y(r.d), 6, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    FX.text(ctx, "εy", EX(-r.ey), Y(0) - 8, pal.warn, { size: 10.5 });
+    FX.text(ctx, "εcu", EX(ecu), Y(0) - 8, pal.compression, { size: 10.5 });
+    FX.text(ctx, "변형률(점선: 항복 가정, 실선: 실제)", L.x + L.w / 2, Y(r.d) + 18, pal.dim, { size: 10.5, bold: false });
+    ctx.save(); ctx.strokeStyle = pal.warn; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(L.x, Y(r.c2)); ctx.lineTo(L.x + L.w, Y(r.c2)); ctx.stroke(); ctx.restore();
+    const near = Math.abs(r.c1 - r.c2) * s < 16;
+    if (r.c1 < r.d && !near) FX.text(ctx, `c 가정 ${r.c1.toFixed(0)}`, L.x + 2, Y(r.c1) - 9, pal.dim, { size: 10, align: "left" });
+    FX.text(ctx, near ? `c ${r.c2.toFixed(0)} (가정 = 실제)` : `c 실제 ${r.c2.toFixed(0)}`, L.x + 2, Y(r.c2) - 9, pal.warn, { size: 10, align: "left" });
+    // 철근 응력–변형률
+    const ex = Math.max(0.012, Math.abs(r.e1) * 1.15, r.e2 * 1.15);
+    const C = CB.chart(ctx, Rb, { x: [0, ex], y: [0, r.fy * 1.25], xLabel: "철근 변형률 εs", xFmt: (v) => v.toFixed(3),
+      series: [{ data: [[0, 0], [r.ey, r.fy], [ex, r.fy]], color: pal.tension, width: 2.4 }], vlines: [{ x: r.ey, color: pal.warn, label: "εy" }] });
+    FX.ylab(ctx, "fs (MPa)", Rb.x - 44, Rb.y + Rb.h / 2);
+    ctx.save(); ctx.lineWidth = 2; ctx.strokeStyle = pal.tension; ctx.fillStyle = pal.bg;
+    const e1 = Math.max(0, r.e1); ctx.beginPath(); ctx.arc(C.X(Math.min(e1, ex)), C.Y(r.fy), 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = pal.tension; ctx.beginPath(); ctx.arc(C.X(Math.min(Math.max(0, r.e2), ex)), C.Y(r.fs2), 6, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    if (r.e1 < r.ey) FX.text(ctx, "가정(fy)이 곡선 밖 → 모순", C.X(Math.min(e1, ex)) + 8, C.Y(r.fy) - 14, pal.bad, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 560 ? 1.25 : 0.52), minHeight: 300, maxHeight: 520 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("fx-yd-c1", `${r.c1.toFixed(0)} mm · ${r.e1 > -1 ? r.e1.toFixed(4) : "—"}`);
+    CB.stat("fx-yd-c2", `${r.c2.toFixed(0)} mm · ${r.fs2.toFixed(0)} MPa`);
+    CB.stat("fx-yd-mn", `${isFinite(r.MnY) ? FX.kn(r.MnY) : "a &gt; d"} · ${FX.kn(r.f.Mn)} kN·m`);
+    const y = r.e2 >= r.ey;
+    CB.stat("fx-yd-st", y ? (r.f.ok ? `<span style="color:var(--ok)">항복 ✓ ${FX.zone(r.f.et, r.fy)}</span>` : `<span style="color:var(--warn)">항복하지만 ε<sub>t</sub> &lt; ε<sub>a,min</sub></span>`) : `<span style="color:var(--bad)">미항복 → 과다 철근(c &gt; c<sub>b</sub> = ${r.cb.toFixed(0)})</span>`);
+  }
+  go();
+})();
+
+/* ---------- 3. 철근비 슬라이더 ---------- */
+(function () {
+  const gr = CB.range("fx-rh-r", (v) => (100 * v).toFixed(2) + " %", go), gfck = CB.seg("fx-rh-fck", go), gfy = CB.seg("fx-rh-fy", go), ax = CB.seg("fx-rh-ax", go);
+  const at = (rho, fck, fy) => {
+    const f = CB.rc.flexure({ b: 1000, h: 1100, fck, fy, layers: [{ d: 1000, As: rho * 1e6 }] });
+    const ey = fy / CB.rc.Es, cr = CB.rc.crack({ b: 1000, h: 1100, d: 1000, As: rho * 1e6, fck }), psy = ey / Math.max(1, 1000 - cr.kd), psu = f.block.ecu / f.c;
+    return { f, R: f.Mn / 1000, pR: f.phiMn / 1000, mu: f.et >= ey ? psu / psy : Math.max(0, f.et / ey) };
+  };
+  const cv = CB.canvas("#fx-cv-rho", (ctx, W, H) => {
+    const pal = CB.palette(), fck = +gfck(), fy = +gfy(), L = FX.rhoLim(fck, fy), rho = gr(), mode = ax();
+    const pts = []; for (let r = 0.0005; r <= 0.0351; r += 0.0005) pts.push([r, at(r, fck, fy)]);
+    const cur = at(rho, fck, fy);
+    const bands = [{ x0: 0, x1: L.min, color: FX.alpha(pal.bad, 0.1) }, { x0: L.min, x1: L.tcl, color: FX.alpha(pal.ok, 0.09) }, { x0: L.tcl, x1: L.max, color: FX.alpha(pal.warn, 0.14) }, { x0: L.max, x1: 0.035, color: FX.alpha(pal.bad, 0.1) }];
+    const vl = [{ x: L.min, color: pal.dim, label: "ρmin" }, { x: L.tcl, color: pal.ok, label: "ρtcl" }, { x: L.max, color: pal.warn, label: "ρmax" }, { x: L.b, color: pal.bad, label: "ρb" }];
+    const box = { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 };
+    if (mode === "R") {
+      const top = Math.max(...pts.map((p) => p[1].R)) * 1.1;
+      CB.chart(ctx, box, { x: [0, 0.035], y: [0, top], xLabel: "철근비 ρ", yLabel: "M/(bd²) (MPa)", xFmt: (v) => (100 * v).toFixed(1) + "%", bands, vlines: vl,
+        series: [{ data: pts.map((p) => [p[0], p[1].R]), color: pal.accent, width: 2, dash: [6, 4] }, { data: pts.map((p) => [p[0], p[1].pR]), color: pal.accent, width: 2.8 }],
+        points: [{ x: rho, y: cur.pR, color: pal.accent2, r: 6 }, { x: rho, y: cur.R, color: pal.faint, r: 4 }] });
+    } else {
+      const C = CB.chart(ctx, box, { x: [0, 0.035], y: [0, 16], xLabel: "철근비 ρ", yLabel: "곡률 연성비 ψu/ψy", xFmt: (v) => (100 * v).toFixed(1) + "%", bands, vlines: vl,
+        series: [{ data: pts.map((p) => [p[0], Math.min(16, p[1].mu)]), color: pal.accent, width: 2.8 }], hlines: [{ y: 1, color: pal.bad, label: "μ = 1(연성 없음)" }],
+        points: [{ x: rho, y: Math.min(16, cur.mu), color: pal.accent2, r: 6 }] });
+      FX.text(ctx, `μψ ≈ ${cur.mu > 16 ? "> 16" : cur.mu.toFixed(1)}`, C.X(rho) + (C.X(rho) > W - 110 ? -8 : 8), C.Y(Math.min(16, cur.mu)) - 14, pal.accent2, { size: 11.5, align: C.X(rho) > W - 110 ? "right" : "left" });
+    }
+  }, { aspect: (W) => (W < 520 ? 0.82 : 0.5), minHeight: 250, maxHeight: 360 });
+  function go() {
+    cv.redraw(); const fck = +gfck(), fy = +gfy(), L = FX.rhoLim(fck, fy), rho = gr(), c = at(rho, fck, fy), f = c.f;
+    CB.stat("fx-rh-lim", `${L.min.toFixed(4)} · ${L.max.toFixed(4)} · ${L.b.toFixed(4)}`);
+    CB.stat("fx-rh-et", `${f.et.toFixed(4)} · ${f.phi.toFixed(3)}`);
+    CB.stat("fx-rh-rn", `${c.R.toFixed(2)} · ${c.pR.toFixed(2)} MPa`);
+    CB.stat("fx-rh-g1", `${FX.kn((c.pR * 400 * 610 * 610) / 1e6)} kN·m (A<sub>s</sub> ${FX.kn(rho * 400 * 610)} mm²)`);
+    const m = document.getElementById("fx-rh-msg"); const ey = fy / CB.rc.Es;
+    if (rho < L.min) { m.className = "fx-msg bad"; m.innerHTML = "ρ &lt; ρ<sub>min</sub>: 균열 순간 철근이 인장력을 받지 못할 수 있다 → <b>최소 철근 부족</b>"; }
+    else if (f.et < ey) { m.className = "fx-msg bad"; m.innerHTML = `ρ &gt; ρ<sub>b</sub> = ${L.b.toFixed(4)}: 철근이 항복하기 전에 콘크리트가 압괴 → <b>과다 철근, 취성 파괴</b>`; }
+    else if (!f.ok) { m.className = "fx-msg bad"; m.innerHTML = `ε<sub>t</sub> = ${f.et.toFixed(4)} &lt; ε<sub>a,min</sub> = ${CB.rc.etMin(fy).toFixed(4)}: 철근은 항복하지만 연성이 모자라 <b>휨부재로 허용되지 않음</b>`; }
+    else if (f.phi < 0.85) { m.className = "fx-msg warn"; m.innerHTML = `변화 구간: φ = ${f.phi.toFixed(3)}. 철근을 더 넣어도 설계 강도가 거의 늘지 않는다`; }
+    else { m.className = "fx-msg ok"; m.innerHTML = `과소 철근·인장 지배: 철근이 먼저 항복해 크게 늘어난 뒤 파괴(연성). ε<sub>t</sub>/ε<sub>y</sub> = ${(f.et / ey).toFixed(1)}`; }
+  }
+  go();
+})();
+
+/* ---------- 4. 최소 철근의 이유 ---------- */
+(function () {
+  const gas = CB.range("fx-mc-as", (v) => CB.sig(v, 5) + " mm²", go), gh = CB.range("fx-mc-h", (v) => v + " mm", go), gb = CB.range("fx-mc-b", (v) => v + " mm", go), gfck = CB.seg("fx-mc-fck", go);
+  function calc() {
+    const As = gas(), h = gh(), b = gb(), fck = +gfck(), fy = 500, d = h - 65;
+    const cr = CB.rc.crack({ b, h, d, As: Math.max(1, As), fck }), Ec = cr.Ec;
+    const f = As > 0.5 ? CB.rc.flexure({ b, h, fck, fy, layers: [{ d, As }] }) : null;
+    const Mn = f ? f.Mn : 0, My = Math.min(Mn * 0.98, (As * fy * (d - cr.kd / 3)) / 1e6);
+    const pcr = (cr.Mcr * 1e6) / (Ec * cr.Ig), pu = f ? f.block.ecu / f.c : pcr;
+    const Amin = CB.rc.asMin(b, d, fck, fy), A12 = CB.rc.asReq(1.2 * cr.Mcr, b, d, fck, fy);
+    return { As, h, b, d, fck, cr, Ec, f, Mn, My, pcr, pu, Amin, A12, brittle: Mn < cr.Mcr };
+  }
+  const cv = CB.canvas("#fx-cv-mcr", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), cr = r.cr, k = 1e6;
+    const pts = [[0, 0], [r.pcr * k, cr.Mcr]]; let xmax;
+    if (r.brittle || r.My <= cr.Mcr) {
+      xmax = r.pcr * k * 6; pts.push([r.pcr * k, Math.max(0, r.Mn)], [r.pcr * k * 3, Math.max(0, r.Mn)]);
+    } else {
+      const pc2 = (cr.Mcr * 1e6) / (r.Ec * cr.Icr), py = (r.My * 1e6) / (r.Ec * cr.Icr);
+      xmax = Math.max(py * k * 3.2, r.pcr * k * 10); pts.push([pc2 * k, cr.Mcr], [py * k, r.My], [Math.min(r.pu * k, xmax * 0.97), r.Mn]);
+    }
+    const top = Math.max(cr.Mcr * 1.25, r.Mn * 1.15, 1.2 * cr.Mcr * 1.1);
+    const C = CB.chart(ctx, { x: 62, y: 14, w: W - 62 - 16, h: H - 14 - 46 }, { x: [0, xmax], y: [0, top], xLabel: "곡률 ψ (×10⁻⁶ /mm)", yLabel: "M (kN·m)", xFmt: (v) => v.toFixed(1),
+      series: [{ data: pts, color: r.brittle ? pal.bad : pal.accent, width: 2.8 }],
+      hlines: [{ y: cr.Mcr, color: pal.warn, label: "Mcr" }, { y: 1.2 * cr.Mcr, color: pal.faint, label: "1.2Mcr" }] });
+    if (r.brittle) { const x = C.X(r.pcr * k * 3), y = C.Y(Math.max(0, r.Mn)); ctx.save(); ctx.strokeStyle = pal.bad; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x - 7, y - 7); ctx.lineTo(x + 7, y + 7); ctx.moveTo(x + 7, y - 7); ctx.lineTo(x - 7, y + 7); ctx.stroke(); ctx.restore();
+      FX.text(ctx, "균열 → 철근 즉시 항복·파단", C.X(r.pcr * k) + 10, C.Y(cr.Mcr) + 18, pal.bad, { size: 11, align: "left" }); }
+    else { FX.text(ctx, "균열", C.X(r.pcr * k), C.Y(cr.Mcr) - 12, pal.warn, { size: 10.5 });
+      FX.text(ctx, `Mn ${FX.kn(r.Mn)} kN·m`, C.box.x + C.box.w * 0.55, C.Y(r.Mn) + 16, pal.accent, { size: 11 });
+      if (r.pu * k > xmax) FX.text(ctx, "ψu는 오른쪽 밖(연성 큼) →", C.box.x + C.box.w - 6, C.box.y + C.box.h - 12, pal.dim, { size: 10, align: "right" }); }
+  }, { aspect: (W) => (W < 520 ? 0.82 : 0.5), minHeight: 250, maxHeight: 360 });
+  function go() {
+    cv.redraw(); const r = calc(), phiMn = r.f ? r.f.phiMn : 0;
+    CB.stat("fx-mc-mcr", `${FX.kn(r.cr.Mcr, 1)} · ${FX.kn(1.2 * r.cr.Mcr, 1)} kN·m`);
+    CB.stat("fx-mc-mn", `${FX.kn(Math.max(0, r.My), 1)} · ${FX.kn(phiMn, 1)} kN·m`);
+    CB.stat("fx-mc-amin", `${FX.kn(r.Amin)} · ${isFinite(r.A12) ? FX.kn(r.A12) : "—"} mm²`);
+    const ok12 = phiMn >= 1.2 * r.cr.Mcr, okA = r.As >= r.Amin;
+    CB.stat("fx-mc-st", r.brittle ? `<span style="color:var(--bad)">M<sub>n</sub> &lt; M<sub>cr</sub>: 취성</span>` : ok12 && okA ? `<span style="color:var(--ok)">두 조건 만족</span>` : ok12 ? `<span style="color:var(--warn)">1.2M<sub>cr</sub> ✓, 식 A<sub>s,min</sub> ✗</span>` : `<span style="color:var(--warn)">연성이지만 φM<sub>n</sub> &lt; 1.2M<sub>cr</sub></span>`);
+  }
+  go();
+})();
+
+/* ---------- 5. 소요 철근 설계기 ---------- */
+(function () {
+  const gmu = CB.range("fx-ds-mu", (v) => v + " kN·m", go), gb = CB.range("fx-ds-b", (v) => v + " mm", go), gh = CB.range("fx-ds-h", (v) => v + " mm", go), gdd = CB.seg("fx-ds-dd", go), gg = CB.seg("fx-ds-g", go);
+  const SIZES = ["D16", "D19", "D22", "D25", "D29", "D32"];
+  let pick = null, last = null;
+  function calc() {
+    const Mu = gmu(), b = gb(), h = gh(), d = h - +gdd(), fck = 30, fy = 500, gmax = +gg();
+    const req = CB.rc.asReq(Mu, b, d, fck, fy), Amin = CB.rc.asMin(b, d, fck, fy), L = FX.rhoLim(fck, fy), Amax = L.max * b * d;
+    const Rn = (Mu * 1e6) / (0.85 * b * d * d), rho = req / (b * d);
+    const rows = [];
+    if (isFinite(req)) SIZES.forEach((nm) => {
+      const A = FX.A(nm), n = Math.max(2, Math.ceil(Math.max(req, Amin) / A - 1e-9));
+      const arr = FX.arrange(n, nm, b, h, { gmax });
+      if (!arr.ok || n > 16) { rows.push({ nm, n, As: n * A, arr, fits: false }); return; }
+      const f = arr.flex(fck, fy), pass = f.phiMn >= Mu && f.ok && n * A >= Amin;
+      rows.push({ nm, n, As: n * A, arr, f, fits: true, pass });
+    });
+    return { Mu, b, h, d, req, Amin, Amax, Rn, rho, rows, gmax, over: !isFinite(req) || req > Amax };
+  }
+  const tb = document.querySelector("#fx-ds-tbl tbody");
+  tb.addEventListener("click", (e) => { const tr = e.target.closest("tr[data-k]"); if (!tr) return; pick = tr.dataset.k; go(); });
+  const cv = CB.canvas("#fx-cv-des", (ctx, W, H) => {
+    const pal = CB.palette(), r = last; if (!r) return;
+    const row = r.rows.find((x) => x.nm === pick) || r.rows.find((x) => x.pass) || r.rows[0];
+    const wide = W >= 520, sb = wide ? { x: 10, y: 24, w: W * 0.5, h: H - 48 } : { x: 10, y: 22, w: W - 20, h: H * 0.62 - 30 };
+    const bb = wide ? { x: W * 0.56, y: 40, w: W * 0.4, h: H - 90 } : { x: 30, y: H * 0.66, w: W - 60, h: H * 0.3 };
+    if (!row || r.over) { FX.section(ctx, sb, r.b, r.h, []); FX.text(ctx, "단면 부족: 단철근으로 Mu를 낼 수 없음", W / 2, wide ? H / 2 : H * 0.8, pal.bad, { size: 12.5 }); return; }
+    const f = row.f, bars = row.arr.bars.map((p) => ({ ...p, color: pal.tension }));
+    const T = FX.section(ctx, sb, r.b, r.h, bars, { block: f ? f.a : 0, na: f ? f.c : null });
+    FX.text(ctx, `${row.n}-${row.nm}${row.fits ? "" : " (배치 불가)"}`, sb.x + sb.w / 2, 11, row.fits ? pal.text : pal.bad, { size: 12 });
+    if (row.fits && row.arr.layers.length) {
+      const l0 = row.arr.layers[0], xs = row.arr.bars.filter((p) => p.y === l0.y).map((p) => p.x).sort((a, c) => a - c);
+      if (xs.length >= 2) { const clr = xs[1] - xs[0] - row.arr.db; FX.text(ctx, `순간격 ${clr.toFixed(1)}`, T.X((xs[0] + xs[1]) / 2), T.Y(l0.y) - (row.arr.db / 2) * T.s - 10, clr >= Math.max(25, row.arr.db, (4 / 3) * r.gmax) - 0.1 ? pal.ok : pal.bad, { size: 10.5 }); }
+      FX.text(ctx, `d ${row.arr.d.toFixed(0)}`, T.X(r.b) + 6, T.Y(row.arr.d), pal.accent, { size: 10.5, align: "left" });
+    }
+    if (f) {
+      const mx = Math.max(r.Mu, f.phiMn) * 1.15, X = (v) => bb.x + (v / mx) * bb.w, hb = Math.min(26, bb.h / 4);
+      ctx.save(); ctx.fillStyle = FX.alpha(pal.accent2, 0.75); ctx.fillRect(bb.x, bb.y, X(r.Mu) - bb.x, hb);
+      ctx.fillStyle = row.pass ? FX.alpha(pal.ok, 0.75) : FX.alpha(pal.bad, 0.75); ctx.fillRect(bb.x, bb.y + hb * 1.8, X(f.phiMn) - bb.x, hb); ctx.restore();
+      FX.text(ctx, `Mu ${r.Mu}`, bb.x + 4, bb.y + hb / 2, pal.text, { size: 11, align: "left" });
+      FX.text(ctx, `φMn ${FX.kn(f.phiMn)} kN·m`, bb.x + 4, bb.y + hb * 2.3, pal.text, { size: 11, align: "left" });
+      FX.text(ctx, `εt ${f.et.toFixed(4)} · φ ${f.phi.toFixed(3)}`, bb.x + 4, bb.y + hb * 3.6, pal.dim, { size: 11, align: "left", bold: false });
+    }
+  }, { aspect: (W) => (W < 520 ? 1.05 : 0.48), minHeight: 260, maxHeight: 420 });
+  function go() {
+    const r = (last = calc());
+    if (!r.rows.some((x) => x.nm === pick)) pick = null;
+    if (!pick) { const pass = r.rows.filter((x) => x.pass), d25 = pass.find((x) => x.nm === "D25" && x.arr.layers.length === 1); const best = d25 || pass.sort((a, c) => a.arr.layers.length - c.arr.layers.length || a.As - c.As)[0]; pick = best ? best.nm : null; }
+    CB.stat("fx-ds-rn", isFinite(r.req) ? `${r.Rn.toFixed(2)} MPa · ${(100 * r.rho).toFixed(2)} %` : `${r.Rn.toFixed(2)} MPa · —`);
+    CB.stat("fx-ds-req", isFinite(r.req) ? `<b>${FX.kn(r.req)}</b> mm²${r.req > r.Amax ? ' <span style="color:var(--bad)">&gt; A<sub>s,max</sub></span>' : ""}` : '<span style="color:var(--bad)">단면 부족</span>');
+    CB.stat("fx-ds-lim", `${FX.kn(r.Amin)} · ${FX.kn(r.Amax)} mm²`);
+    const sel = r.rows.find((x) => x.nm === pick);
+    CB.stat("fx-ds-sel", sel ? `${sel.n}-${sel.nm} (${FX.kn(sel.As)} mm²)` : "—");
+    tb.innerHTML = r.over ? `<tr><td colspan="8" class="bad">단철근 단면 부족(A<sub>s,req</sub> &gt; A<sub>s,max</sub> 또는 R<sub>n</sub> 과다): 단면을 키우거나 4장의 복철근을 쓴다</td></tr>` : r.rows.map((x) => {
+      const lay = x.fits ? x.arr.layers.map((l) => l.n).join(" + ") : `한 층 최대 ${x.arr.nmax}개`;
+      const cls = x.nm === pick ? "fx-row fx-pick" : "fx-row";
+      if (!x.fits) return `<tr class="${cls}" data-k="${x.nm}"><td>${x.n}-${x.nm}</td><td>${FX.kn(x.As)}</td><td>—</td><td>${lay}</td><td>—</td><td>—</td><td>—</td><td class="bad">배치 불가</td></tr>`;
+      const f = x.f; return `<tr class="${cls}" data-k="${x.nm}"><td>${x.n}-${x.nm}</td><td>${FX.kn(x.As)}</td><td>${(100 * (x.As / r.req - 1)).toFixed(1)} %</td><td>${lay}</td><td>${x.arr.d.toFixed(0)} · ${x.arr.dt.toFixed(0)}</td><td>${f.et.toFixed(4)}</td><td>${FX.kn(f.phiMn)}</td><td class="${x.pass ? "ok" : "bad"}">${x.pass ? (f.phi < 0.85 ? "합격(변화 구간)" : "합격") : !f.ok ? "ε<sub>t</sub> 부족" : "강도 부족"}</td></tr>`;
+    }).join("");
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 6. 2단 배근 효과 ---------- */
+(function () {
+  const gn = CB.range("fx-ly-n", (v) => v + "개", go), gbar = CB.seg("fx-ly-bar", go), gb = CB.range("fx-ly-b", (v) => v + " mm", go), gv = CB.range("fx-ly-v", (v) => v + " mm", go);
+  const H = 700, fck = 30, fy = 500;
+  function one(n, nm, b, vc) {
+    const arr = FX.arrange(n, nm, b, H, { vclear: vc }); if (!arr.ok) return { arr };
+    const f = arr.flex(fck, fy), f1 = CB.rc.flexure({ b, h: H, fck, fy, layers: [{ d: arr.dt, As: arr.As }] });
+    return { arr, f, f1 };
+  }
+  const cv = CB.canvas("#fx-cv-lay", (ctx, W, Hc) => {
+    const pal = CB.palette(), n = gn(), nm = gbar(), b = gb(), vc = gv(), r = one(n, nm, b, vc), wide = W >= 560;
+    const sb = wide ? { x: 8, y: 20, w: W * 0.36, h: Hc - 40 } : { x: 8, y: 18, w: W - 16, h: Hc * 0.46 - 24 };
+    const cb = wide ? { x: W * 0.36 + 56, y: 14, w: W * 0.64 - 72, h: Hc - 60 } : { x: 56, y: Hc * 0.5 + 6, w: W - 72, h: Hc * 0.5 - 52 };
+    const bars = r.arr.ok ? r.arr.bars.map((p) => ({ ...p, color: pal.tension })) : [];
+    const T = FX.section(ctx, sb, b, H, bars, { block: r.f ? r.f.a : 0, na: r.f ? r.f.c : null });
+    if (!r.arr.ok) FX.text(ctx, "3층을 넘거나 한 층에 2개도 안 들어감", sb.x + sb.w / 2, sb.y + sb.h / 2, pal.bad, { size: 11.5 });
+    else { FX.text(ctx, `d ${r.arr.d.toFixed(1)}`, T.X(b) + 4, T.Y(r.arr.d), pal.accent, { size: 10.5, align: "left" });
+      ctx.save(); ctx.strokeStyle = pal.accent; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(T.X(0), T.Y(r.arr.d)); ctx.lineTo(T.X(b) + 2, T.Y(r.arr.d)); ctx.stroke(); ctx.restore(); }
+    const s1 = [], s2 = [], bad = [];
+    for (let k = 2; k <= 14; k++) { const q = one(k, nm, b, vc); if (!q.arr.ok) continue; s1.push([k, q.f.phiMn]); s2.push([k, q.f1.phiMn]); if (!q.f.ok) bad.push(k); }
+    const top = Math.max(1, ...s1.map((p) => p[1]), ...s2.map((p) => p[1])) * 1.12, bx0 = bad.length ? bad[0] - 0.5 : 15;
+    CB.chart(ctx, cb, { x: [2, 14], y: [0, top], xLabel: `${nm} 개수`, yLabel: "φMn (kN·m)", xFmt: (v) => String(Math.round(v)),
+      bands: [{ x0: bx0, x1: 14, color: FX.alpha(pal.bad, 0.12) }],
+      series: [{ data: s2, color: pal.faint, width: 2, dash: [6, 4] }, { data: s1, color: pal.tension, width: 2.8 }],
+      vlines: r.arr.nmax + 0.5 > 2 && r.arr.nmax + 0.5 < 14 ? [{ x: r.arr.nmax + 0.5, color: pal.warn, label: "2층 시작" }] : [],
+      points: r.f ? [{ x: n, y: r.f.phiMn, color: pal.accent2, r: 6 }] : [] });
+  }, { aspect: (W) => (W < 560 ? 1.25 : 0.5), minHeight: 290, maxHeight: 460 });
+  function go() {
+    cv.redraw(); const r = one(gn(), gbar(), gb(), gv());
+    if (!r.arr.ok) { ["fx-ly-lay", "fx-ly-d", "fx-ly-mn", "fx-ly-et"].forEach((id) => CB.stat(id, "—")); CB.stat("fx-ly-lay", `<span style="color:var(--bad)">배치 불가(한 층 ${r.arr.nmax}개)</span>`); return; }
+    CB.stat("fx-ly-lay", `${r.arr.layers.map((l) => l.n).join(" + ")} (한 층 최대 ${r.arr.nmax})`);
+    CB.stat("fx-ly-d", `${r.arr.d.toFixed(1)} · ${r.arr.dt.toFixed(1)} mm`);
+    CB.stat("fx-ly-mn", `<b>${FX.kn(r.f.phiMn)}</b> · ${FX.kn(r.f1.phiMn)} kN·m (${(100 * (r.f.phiMn / r.f1.phiMn - 1)).toFixed(1)} %)`);
+    CB.stat("fx-ly-et", `${r.f.et.toFixed(4)} · ${r.f.phi.toFixed(3)}${r.f.ok ? "" : ' <span style="color:var(--bad)">불가</span>'}`);
+  }
+  go();
+})();
+
+/* ---------- 7. 단면 크기 최적화 ---------- */
+(function () {
+  const gh = CB.range("fx-ec-h", (v) => v + " mm", go), gmu = CB.range("fx-ec-mu", (v) => v + " kN·m", go), gb = CB.seg("fx-ec-b", go);
+  const gps = CB.range("fx-ec-ps", (v) => CB.sig(v, 4) + "천 원/t", go), gpf = CB.range("fx-ec-pf", (v) => v.toFixed(2) + "천 원", go), glim = CB.seg("fx-ec-lim", go);
+  const PC = 120, PF = 45, fck = 30, fy = 500;
+  function at(h, b, Mu) {
+    const d = h - 90, L = FX.rhoLim(fck, fy); let As = FX.asReqPhi(Mu, b, h, d, fck, fy);
+    const lim = { max: L.max, tcl: L.tcl, one: 0.01 }[glim()], ok = isFinite(As) && As <= lim * b * d; As = Math.max(isFinite(As) ? As : NaN, CB.rc.asMin(b, d, fck, fy));
+    const kg = As * 1e-6 * 7850, cs = (kg / 1000) * gps(), cc = b * h * 1e-6 * PC + ((b + 2 * h) / 1000) * PF, ch = h * gpf();
+    return { h, d, As, ok, kg, cs, cc, ch, tot: cs + cc + ch, rho: As / (b * d) };
+  }
+  function scan() { const b = +gb(), Mu = gmu(), out = []; for (let h = 450; h <= 1000; h += 10) out.push(at(h, b, Mu)); return out; }
+  const cv = CB.canvas("#fx-cv-eco", (ctx, W, H) => {
+    const pal = CB.palette(), pts = scan(), okp = pts.filter((p) => p.ok), cur = at(gh(), +gb(), gmu());
+    const top = Math.max(10, ...okp.map((p) => p.tot)) * 1.15, firstOk = okp.length ? okp[0].h : 1000;
+    const opt = okp.reduce((m, p) => (p.tot < m.tot ? p : m), okp[0] || { h: NaN, tot: NaN });
+    const C = CB.chart(ctx, { x: 62, y: 14, w: W - 62 - 16, h: H - 14 - 46 }, { x: [450, 1000], y: [0, top], xLabel: "보 춤 h (mm)", yLabel: "비용 지수 (천 원/m)",
+      bands: firstOk > 450 ? [{ x0: 450, x1: firstOk - 5, color: FX.alpha(pal.bad, 0.13) }] : [],
+      series: [{ data: okp.map((p) => [p.h, p.cc]), color: pal.dim, width: 2 }, { data: okp.map((p) => [p.h, p.cs]), color: pal.tension, width: 2 }, { data: okp.map((p) => [p.h, p.ch]), color: pal.warn, width: 2, dash: [5, 4] }, { data: okp.map((p) => [p.h, p.tot]), color: pal.accent2, width: 3 }],
+      vlines: [{ x: gh(), color: pal.accent, label: "" }].concat(isFinite(opt.h) ? [{ x: opt.h, color: pal.ok, label: "최적" }] : []),
+      points: cur.ok ? [{ x: cur.h, y: cur.tot, color: pal.accent2, r: 6 }] : [] });
+    let ly = C.box.y + 12; const lx = Math.min(C.box.x + C.box.w - 150, Math.max(C.box.x + 8, C.X(firstOk) + 10));
+    [["합계", pal.accent2], ["콘크리트 + 거푸집", pal.dim], ["철근(주근)", pal.tension], ["층고", pal.warn]].forEach(([t, c]) => { FX.text(ctx, "— " + t, lx, ly, c, { size: 10.5, align: "left" }); ly += 15; });
+    if (firstOk > 450) FX.text(ctx, "ρ 상한 초과", C.X((450 + firstOk) / 2), C.box.y + C.box.h - 12, pal.bad, { size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 360 });
+  function go() {
+    cv.redraw(); const b = +gb(), cur = at(gh(), b, gmu()), okp = scan().filter((p) => p.ok), opt = okp.reduce((m, p) => (p.tot < m.tot ? p : m), okp[0]);
+    CB.stat("fx-ec-as", cur.ok ? `${FX.kn(cur.As)} mm² · ${(100 * cur.rho).toFixed(2)} %` : '<span style="color:var(--bad)">ρ 상한 초과</span>');
+    CB.stat("fx-ec-q", cur.ok ? `${cur.kg.toFixed(1)} kg · ${(b * cur.h * 1e-6).toFixed(3)} m³` : "—");
+    CB.stat("fx-ec-c", cur.ok ? `${cur.tot.toFixed(1)} (철근 ${(100 * cur.cs / cur.tot).toFixed(0)} %)` : "—");
+    CB.stat("fx-ec-opt", opt ? `h ≈ ${opt.h} mm (${opt.tot.toFixed(1)})` : "—");
+  }
+  go();
+})();
+
+/* ---------- 8. G1 정모멘트 설계 마법사 ---------- */
+(function () {
+  const gm = CB.seg("fx-g1-model", go), gw = CB.range("fx-g1-w", (v) => v + " kN/m", go), gL = CB.range("fx-g1-L", (v) => v.toFixed(1) + " m", go), gbar = CB.seg("fx-g1-bar", go), gh = CB.range("fx-g1-h", (v) => v + " mm", go);
+  const b = 400, fck = 30, fy = 500;
+  function calc() {
+    const k = +gm(), w = gw(), L = gL(), nm = gbar(), h = gh(), Mraw = (w * L * L) / k, Mu = Math.ceil(Mraw / 10 - 1e-9) * 10, d0 = h - 90;
+    const req = CB.rc.asReq(Mu, b, d0, fck, fy), Amin = CB.rc.asMin(b, d0, fck, fy), lim = FX.rhoLim(fck, fy);
+    const out = { k, w, L, nm, h, Mu, Mraw, d0, req, Amin, Amax: lim.max * b * d0, steps: [] };
+    if (!isFinite(req) || req > out.Amax) { out.fail = "section"; return out; }
+    let n = Math.max(2, Math.ceil(Math.max(req, Amin) / FX.A(nm) - 1e-9)), arr, f;
+    for (; n <= 16; n++) { arr = FX.arrange(n, nm, b, h); if (!arr.ok) break; f = arr.flex(fck, fy); if (f.phiMn >= Mu && f.ok) break; }
+    out.n = n; out.arr = arr; out.f = f;
+    if (!arr || !arr.ok) out.fail = "fit"; else if (!f.ok) out.fail = "et"; else if (f.phiMn < Mu) out.fail = "str";
+    const ref = FX.arrange(4, "D25", b, 700).As;
+    out.kg = n * CB.steel.BARS[nm].m * L; out.kg4 = 4 * CB.steel.BARS.D25.m * L; out.kg7 = 7 * CB.steel.BARS.D25.m * L; out.ref = ref;
+    return out;
+  }
+  const cv = CB.canvas("#fx-cv-g1", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), wide = W >= 540;
+    const sb = wide ? { x: 8, y: 22, w: W * 0.42, h: H - 44 } : { x: 8, y: 20, w: W - 16, h: H * 0.55 - 24 };
+    const bb = wide ? { x: W * 0.47, y: 30, w: W * 0.49, h: H - 60 } : { x: 16, y: H * 0.58, w: W - 32, h: H * 0.4 - 10 };
+    const bars = r.arr && r.arr.ok ? r.arr.bars.map((p) => ({ ...p, color: pal.tension })) : [];
+    FX.section(ctx, sb, b, r.h, bars, { block: r.f ? r.f.a : 0, na: r.f ? r.f.c : null });
+    FX.text(ctx, r.fail === "section" ? "단철근 단면 부족" : `${r.n}-${r.nm}`, sb.x + sb.w / 2, 11, r.fail ? pal.bad : pal.text, { size: 12 });
+    const rowsH = Math.min(24, bb.h / 6.5), items = [["Mu", r.Mu, pal.accent2]];
+    if (r.f) items.push(["φMn", r.f.phiMn, r.fail ? pal.bad : pal.ok]);
+    const mx = Math.max(...items.map((x) => x[1]), 1) * 1.18, X = (v) => bb.x + (v / mx) * bb.w;
+    items.forEach(([t, v, c], i) => { const y = bb.y + i * rowsH * 1.5; ctx.fillStyle = FX.alpha(c, 0.75); ctx.fillRect(bb.x, y, X(v) - bb.x, rowsH); FX.text(ctx, `${t} ${FX.kn(v)} kN·m`, bb.x + 4, y + rowsH / 2, pal.text, { size: 11, align: "left" }); });
+    if (r.kg) {
+      const y0 = bb.y + rowsH * 3.4, km = Math.max(r.kg, r.kg7) * 1.15, KX = (v) => bb.x + (v / km) * bb.w;
+      FX.text(ctx, "하단 주근 질량(1경간)", bb.x, y0 - 4, pal.dim, { size: 10.5, align: "left", bold: false });
+      [["이 설계", r.kg, pal.tension], ["4-D25", r.kg4, pal.faint], ["7-D25", r.kg7, pal.faint]].forEach(([t, v, c], i) => { const y = y0 + 8 + i * rowsH * 1.05; ctx.fillStyle = FX.alpha(c, i ? 0.4 : 0.7); ctx.fillRect(bb.x, y, KX(v) - bb.x, rowsH * 0.8); FX.text(ctx, `${t} ${v.toFixed(0)} kg`, bb.x + 4, y + rowsH * 0.4, pal.text, { size: 10.5, align: "left" }); });
+    }
+  }, { aspect: (W) => (W < 540 ? 1.15 : 0.52), minHeight: 290, maxHeight: 460 });
+  function go() {
+    cv.redraw(); const r = calc(), steps = [];
+    const kName = { 8: "단순보 w<sub>u</sub>L²/8", 14: "끝 경간 w<sub>u</sub>L²/14", 16: "내부 경간 w<sub>u</sub>L²/16" }[r.k];
+    steps.push(`<b>소요 강도</b> ${kName} = ${r.w} × ${r.L.toFixed(1)}² / ${r.k} = ${FX.kn(r.Mraw, 1)} → 설계값 <b>${FX.kn(r.Mu)}</b> kN·m(10 kN·m 단위 올림)`);
+    steps.push(`<b>d 가정</b> h − 90 = ${r.d0} mm`);
+    if (r.fail === "section") { steps.push(`<b>소요 철근</b> <span class="bad">${isFinite(r.req) ? FX.kn(r.req) + " mm² &gt; A<sub>s,max</sub> " + FX.kn(r.Amax) : "R<sub>n</sub> 과다"} → 단철근 불가. 보 춤을 키우거나 4장 복철근</span>`); }
+    else {
+      steps.push(`<b>소요 철근</b> A<sub>s,req</sub> = ${FX.kn(r.req)} mm² (A<sub>s,min</sub> ${FX.kn(r.Amin)}, A<sub>s,max</sub> ${FX.kn(r.Amax)})`);
+      if (r.arr && r.arr.ok) {
+        steps.push(`<b>철근 선택·배치</b> ${r.n}-${r.nm} = ${FX.kn(r.arr.As)} mm², ${r.arr.layers.map((l) => l.n).join(" + ")} (${r.arr.layers.length}단, 한 층 최대 ${r.arr.nmax})`);
+        const f = r.f; steps.push(`<b>확인</b> d = ${r.arr.d.toFixed(1)}, d<sub>t</sub> = ${r.arr.dt.toFixed(1)} mm, a = ${f.a.toFixed(0)}, c = ${f.c.toFixed(0)} mm, ε<sub>t</sub> = ${f.et.toFixed(4)} (${FX.zone(f.et, fy)}, φ ${f.phi.toFixed(3)})`);
+        steps.push(r.fail ? `<span class="bad">φM<sub>n</sub> = ${FX.kn(f.phiMn)} kN·m — ${r.fail === "et" ? "ε<sub>t</sub> 부족" : "강도 부족"}: 보 춤을 키운다</span>` : `<span class="ok">φM<sub>n</sub> = ${FX.kn(f.phiMn)} ≥ M<sub>u</sub> ${FX.kn(r.Mu)} kN·m → 합격</span>`);
+      } else steps.push(`<span class="bad">${r.nm}로는 3단 안에 배치할 수 없음 → 굵은 철근이나 큰 단면</span>`);
+    }
+    document.getElementById("fx-g1-steps").innerHTML = steps.map((s) => `<li>${s}</li>`).join("");
+    CB.stat("fx-g1-mu", `${FX.kn(r.Mu)} kN·m`);
+    CB.stat("fx-g1-as", r.fail === "section" ? '<span style="color:var(--bad)">단면 부족</span>' : `${FX.kn(r.req)} → ${r.n}-${r.nm}`);
+    CB.stat("fx-g1-mn", r.f ? `${FX.kn(r.f.phiMn)} kN·m · ${(r.Mu / r.f.phiMn).toFixed(2)}` : "—");
+    CB.stat("fx-g1-kg", r.kg ? `${r.kg.toFixed(0)} kg (4-D25 ${r.kg4.toFixed(0)} · 7-D25 ${r.kg7.toFixed(0)})` : "—");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

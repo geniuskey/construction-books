@@ -36,6 +36,14 @@ LOCAL_BOOKS = [{
     'status': 'published', 'level': '건축공학 3학년', 'stage': 'design', 'slug': 'structure', 'legacyUrl': None,
     'color': '#0b7285', 'colorDark': '#66d9e8', 'motif': 'tower',
     'topics': ['하중·바닥', '골조·코어', '풍하중', '구조 동역학', '내진·면진', '강·합성·대공간', '사용성·보강'],
+}, {
+    'id': 'concretebook', 'code': 'RCS', 'title': 'ConcreteBook', 'subtitle': '철근콘크리트 구조 교과서',
+    'headline': '인장은 철근이, 압축은 콘크리트가',
+    'description': '강도 설계와 등가 응력 블록, 단철근·복철근·T형 보의 휨, 전단과 비틀림, 정착과 이음, 처짐과 균열, 슬래브, 기둥 P–M 상관도와 장주, 내진 상세, 기초, 스트럿–타이 모델, 프리스트레스트 콘크리트까지 — 단면을 그리고 철근을 놓아 보며 기준 부재 G1·C1을 직접 설계하는 철근콘크리트 교과서.',
+    'url': 'https://construction.euiyun.com/concrete/', 'repo': 'https://github.com/geniuskey/construction-books', 'field': 'construction',
+    'status': 'published', 'level': '건축·토목 3학년', 'stage': 'design', 'slug': 'concrete', 'legacyUrl': None,
+    'color': '#5c677d', 'colorDark': '#a9b4c8', 'motif': 'rebar',
+    'topics': ['응력 블록·휨', '전단·비틀림', '정착·처짐·균열', '슬래브', 'P–M 상관도', '내진 상세', '기초·STM·PSC'],
 }]
 books = LOCAL_BOOKS
 catalog = []

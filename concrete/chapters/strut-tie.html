@@ -1,0 +1,1085 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>스트럿–타이 모델 · ConcreteBook</title>
+<meta name="description" content="평면 유지가 깨지는 D 영역을 트러스로 푼다. B·D 영역, 스트럿·타이·절점과 강도 계수, 하중 경로로 모델 고르기, 깊은 보·코벨·개구부, 13장 말뚝 캡의 3차원 스트럿–타이 모델을 시뮬레이터로 설계한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .st-stack { display: grid; grid-template-columns: 1fr; }
+  .st-stack > div { position: relative; min-width: 0; }
+  .st-stack > div + div { border-top: 1px solid var(--border); }
+  .st-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .st-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .st-msg b { color: var(--text); }
+  .st-msg.ok { color: var(--ok); font-weight: 600; }
+  .st-msg.bad { color: var(--bad); font-weight: 600; }
+  .st-tbl td, .st-tbl th { font-variant-numeric: tabular-nums; }
+  .st-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .st-steps { margin: 6px 0 0; }
+  .st-steps li { margin: 4px 0; }
+  .st-chk { list-style: none; margin: 0; padding: 10px 18px 12px; border-top: 1px solid var(--border); display: grid; gap: 6px; font-size: 14px; line-height: 1.6; }
+  .st-chk li { padding: 6px 10px 6px 12px; border-left: 4px solid var(--text-faint); background: var(--bg); border-radius: 6px; overflow-wrap: anywhere; }
+  .st-chk li.ok { border-left-color: var(--ok); }
+  .st-chk li.bad { border-left-color: var(--bad); }
+  #st-cv-truss, #st-cv-open { touch-action: none; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="concrete"></script>
+</head>
+<body data-chapter="strut-tie">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="st-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="st-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="st-ah-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--compression)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 14</div>
+    <h1 data-no-glossary>스트럿–타이 모델</h1>
+    <p class="lead">3장부터 13장까지의 설계식은 모두 하나의 가정 위에 서 있습니다. "변형 전에 평면이던 단면은 변형 뒤에도 평면이다." 보의 가운데라면 이 가정이 잘 맞습니다. 그러나 지점 바로 위, 큰 집중 하중 아래, 단면이 갑자기 바뀌는 곳, 구멍 둘레, 13장의 두꺼운 말뚝 캡 안에서는 변형률이 직선으로 분포하지 않고 힘이 비스듬히 흐릅니다. 이런 곳을 <b>D 영역</b>이라 하고, 철근콘크리트는 그 안의 힘의 흐름을 콘크리트 압축대(<b>스트럿</b>), 철근 인장재(<b>타이</b>), 그 만나는 점(<b>절점</b>)으로 된 트러스로 바꾸어 설계합니다. 이 장은 유한 요소로 D 영역을 직접 보고, 스트럿·타이·절점의 강도를 정한 뒤, 하중 경로를 따라 모델을 고르는 법을 익혀 깊은 보·코벨·개구부와 13장의 C1 말뚝 캡을 스트럿–타이 모델로 설계합니다.</p>
+    <ul class="objectives">
+      <li>B 영역과 D 영역을 생브낭 원리로 구분하고, D 영역에서 평면 유지 가정과 단면 설계식이 맞지 않는 이유를 응력 궤적으로 설명한다.</li>
+      <li>스트럿(각기둥·병 모양·부채꼴), 타이, 절점(CCC·CCT·CTT)의 역할과 유효 압축 강도 \(f_{ce} = 0.85\beta f_{ck}\)의 계수를 구분한다.</li>
+      <li>하중 경로법과 탄성 응력 궤적으로 스트럿–타이 모델을 고르고, 스트럿–타이 각도 제한(25° 형태)과 최소 분산 철근을 적용한다.</li>
+      <li>깊은 보를 스트럿–타이 모델로 설계한다: 절점 크기, 스트럿 폭, 타이 철근, 정착(<code>CB.truss</code>로 부재력 확인).</li>
+      <li>코벨과 개구부 주변의 하중 경로를 모델로 만들고, 단면 설계식(전단 마찰)과 비교한다.</li>
+      <li>13장의 C1 말뚝 캡을 3차원 스트럿–타이 모델로 풀어 단면 설계 결과와 비교한다(교육용).</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>"전단 경간이 짧은 보"는 식이 없었다</b></div>
+      <div class="o-body"><p>철근콘크리트 보 안의 힘을 트러스로 생각하는 발상은 오래되었습니다. 19세기 말 스위스의 리터(W. Ritter)와 20세기 초 독일의 뫼르쉬(E. Mörsch)가 균열 난 보를 콘크리트 경사 압축대와 스터럽·주근 인장재의 트러스로 설명했고, 5장의 스터럽 설계식이 그 후손입니다. 그러나 오랫동안 지점 근처, 깊은 보, 코벨, 말뚝 캡 같은 곳에는 실험에서 얻은 경험식이나 "상세 규칙"만 있었습니다. 부재마다 식이 따로 있고, 식이 없는 모양은 설계자의 감에 맡겨졌습니다.</p>
+        <p>1987년 슐라이히(J. Schlaich)와 동료들은 PCI Journal에 발표한 논문에서 구조물을 B 영역과 D 영역으로 나누고, D 영역은 모두 같은 방법—스트럿, 타이, 절점으로 된 모델—으로 설계하자고 제안했습니다. 이 방법은 소성 이론의 <span class="term">하한 정리</span><span class="en">(lower bound theorem)</span>(평형을 만족하고 어디서도 강도를 넘지 않는 응력장이 있으면 실제 강도는 그 이상)에 기대고 있어, 모양이 아무리 특이해도 안전 측의 답을 줍니다. 미국 ACI 318은 2002년판 부록으로 스트럿–타이 모델을 받아들였고, 우리 기준(KDS 14 20 24 형태)에도 같은 체계가 들어 있습니다.</p>
+        <div class="o-chain"><span>D 영역 · 하중 경로 · 응력 궤적</span><i>→</i><span class="tool">스트럿 · 타이 · 절점 · β<sub>s</sub> · β<sub>n</sub> · 트러스 평형</span><i>→</i><span>깊은 보 · 코벨 · 개구부 · 말뚝 캡</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="b-d-regions">
+    <h2>B 영역과 D 영역</h2>
+    <div class="problem"><strong>평면 유지는 어디까지 맞는가</strong>
+      <p>단순보 가운데를 집중 하중으로 누르면, 하중 바로 아래와 지점 위에서는 응력이 한 점에서 퍼져 나갑니다. 단면의 변형률이 직선이 되려면 힘이 단면 전체로 고르게 퍼질 거리가 필요합니다. 그 거리는 얼마일까요?</p></div>
+    <div class="callout def"><strong>정의 14.1 (B 영역과 D 영역)</strong> 평면 유지(베르누이 가정)가 성립해 단면 해석(3–12장)을 쓸 수 있는 부분을 <span class="term">B 영역</span><span class="en">(B-region, Bernoulli region)</span>, 하중·지점·단면 변화·개구부 같은 정적·기하학적 불연속 때문에 변형률이 직선이 아닌 부분을 <span class="term">D 영역</span><span class="en">(D-region, discontinuity region)</span>이라 한다. <span class="term">생브낭 원리</span><span class="en">(Saint-Venant's principle)</span>에 따라 불연속의 영향은 대략 부재 깊이 \(h\)만큼 떨어지면 사라지므로, D 영역은 불연속점에서 양쪽으로 약 \(h\)까지로 잡는다. 두 D 영역이 겹치면(\(a \lt 2h\) 형태) 부재 전체가 D 영역이다.</div>
+    <figure class="diagram" id="fig-st-bd">
+      <svg viewBox="0 0 860 300" role="img" aria-label="단순보, 깊은 보, 코벨이 달린 기둥, 개구부가 있는 보, 단부를 따낸 보에서의 D 영역">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="0" y="-8" class="t" style="font-weight:700">보통 보: 지점·하중 주변만 D</text>
+          <rect x="0" y="20" width="400" height="60" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="0" y="20" width="60" height="60" style="fill:var(--accent-2-soft)"/><rect x="340" y="20" width="60" height="60" style="fill:var(--accent-2-soft)"/><rect x="140" y="20" width="120" height="60" style="fill:var(--accent-2-soft)"/>
+          <g class="t-mono" text-anchor="middle"><text x="30" y="56" style="fill:var(--accent-2)">D</text><text x="100" y="56" style="fill:var(--accent)">B</text><text x="200" y="56" style="fill:var(--accent-2)">D</text><text x="300" y="56" style="fill:var(--accent)">B</text><text x="370" y="56" style="fill:var(--accent-2)">D</text></g>
+          <line x1="200" y1="-2" x2="200" y2="18" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#st-ah-ld)"/>
+          <path d="M10 92 L20 80 L30 92 Z M370 92 L380 80 L390 92 Z" style="fill:none;stroke:var(--text-dim)"/>
+          <line x1="140" y1="104" x2="200" y2="104" style="stroke:var(--text-dim)" marker-start="url(#st-ah-t)" marker-end="url(#st-ah-t)"/><text x="170" y="120" class="t-mono" text-anchor="middle">≈ h</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="0" y="-8" class="t" style="font-weight:700">깊은 보: 전체가 D</text>
+          <rect x="0" y="20" width="200" height="110" style="fill:var(--accent-2-soft);stroke:var(--text-dim)"/>
+          <line x1="100" y1="-2" x2="100" y2="18" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#st-ah-ld)"/>
+          <path d="M100 24 L 22 122 M100 24 L178 122" style="stroke:var(--compression);stroke-width:2;stroke-dasharray:6 4"/>
+          <line x1="16" y1="122" x2="184" y2="122" style="stroke:var(--tension);stroke-width:2.4"/>
+          <text x="100" y="150" class="t-mono" text-anchor="middle">L/h &lt; 4 형태</text>
+        </g>
+        <g transform="translate(720,30)">
+          <text x="-10" y="2" class="t" style="font-weight:700">코벨</text>
+          <rect x="20" y="20" width="40" height="230" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M60 90 L110 90 L110 120 L60 150 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="20" y="60" width="90" height="130" style="fill:var(--accent-2-soft)"/>
+          <line x1="95" y1="66" x2="95" y2="88" style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#st-ah-ld)"/>
+        </g>
+        <g transform="translate(30,190)">
+          <text x="0" y="-12" class="t" style="font-weight:700">개구부·단부 따냄</text>
+          <rect x="0" y="0" width="300" height="60" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="110" y="18" width="70" height="26" style="fill:var(--bg-elev);stroke:var(--text-dim)"/>
+          <rect x="60" y="0" width="170" height="60" style="fill:var(--accent-2-soft)"/>
+          <path d="M340 0 L 560 0 L 560 60 L 400 60 L 400 30 L 340 30 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="340" y="0" width="120" height="60" style="fill:var(--accent-2-soft)"/>
+          <text x="145" y="80" class="t-mono" text-anchor="middle">구멍 둘레 ±h</text>
+          <text x="400" y="80" class="t-mono" text-anchor="middle">따낸 단부(dapped end)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-1.</b> 주황 영역이 D 영역이다. 보통 보에서도 지점과 집중 하중 둘레 약 \(h\)는 D 영역이며, 깊은 보·코벨처럼 짧은 부재는 전체가 D 영역이다. 5장이 "지점에서 \(d\)" 안쪽의 하중을 따로 다룬 것, 13장이 말뚝이 펀칭 둘레 안에 들어오면 전단 계산이 의미를 잃는다고 한 것이 같은 이야기다.</figcaption>
+    </figure>
+    <p>아래 시뮬레이터는 보를 수백 개의 삼각형 요소로 나눈 탄성 유한 요소 해석으로 <span class="term">주응력 궤적</span><span class="en">(principal stress trajectory)</span>(MechanicsBook 10장)을 그립니다. 각 단면에서 휨 응력 \(\sigma_x\)가 직선에서 얼마나 벗어나는지를 계산해, 벗어남이 큰 구간을 D 영역으로 칠합니다. 깊이에 비해 짧은 보는 처음부터 끝까지 D 영역이고, 긴 보는 가운데 B 영역이 생깁니다.</p>
+    <div class="sim" id="sim-st-fe">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B·D 영역과 주응력 궤적(탄성 유한 요소)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view st-stack">
+          <div><canvas id="st-cv-fe" aria-label="보의 주응력 방향(압축 빨강, 인장 파랑)과 D 영역 표시"></canvas><span class="st-cap">주응력: 압축(빨강) · 인장(파랑)</span></div>
+          <div><canvas id="st-cv-fe2" aria-label="선택한 단면의 휨 응력 분포와 직선 분포 비교"></canvas><span class="st-cap">단면의 σx: 유한 요소(청회) vs 최적 직선(점선)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경간/깊이 L/h <output id="st-fe-L-out"></output></span><input type="range" id="st-fe-L" min="1" max="6" step="0.1" value="4"></label>
+          <label class="ctrl"><span>하중 위치 a/L <output id="st-fe-a-out"></output></span><input type="range" id="st-fe-a" min="0.15" max="0.85" step="0.01" value="0.5"></label>
+          <label class="ctrl"><span>살펴볼 단면 x/L <output id="st-fe-x-out"></output></span><input type="range" id="st-fe-x" min="0.02" max="0.98" step="0.01" value="0.3"></label>
+          <div class="ctrl"><span>보기</span><div class="seg" id="st-fe-view"><button data-value="traj" class="on">궤적 + D 영역</button><button data-value="comp">압축만</button><button data-value="tens">인장만</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">D 영역 비율</span><span class="v" id="st-fe-o-d">—</span></div>
+        <div class="stat"><span class="k">선택 단면의 직선 이탈</span><span class="v" id="st-fe-o-dev">—</span></div>
+        <div class="stat"><span class="k">요소 수</span><span class="v" id="st-fe-o-n">—</span></div>
+      </div>
+      <div class="st-msg" id="st-fe-msg"></div>
+      <div class="sim-note">해볼 것: L/h = 4에서 지점과 하중 둘레가 칠해지고 그 사이에 넓은 B 영역이 남는 것을 보세요 · L/h를 2 안팎으로 줄이면 B 영역이 거의 사라지고 압축 궤적이 하중에서 지점으로 곧장 가는 "아치"가 됩니다 — 깊은 보 · 단면을 지점 가까이 옮기면 σ<sub>x</sub>가 직선에서 크게 벗어납니다 · 모델(페이지 내, 교육용): 평면 응력 상수 변형률 삼각형 요소(CST), 깊이 방향 12칸, E = 1, ν = 0.2, 지점·하중은 폭 0.2h의 판으로 나눠 줌, 띠 행렬 촐레스키 풀이. 단면의 직선 이탈 = (최소 제곱 직선과의 RMS 차) / 단면 최대 |σ<sub>x</sub>|, 0.035를 넘으면 D 영역으로 칠함(교육용 기준). 주황 눈금은 생브낭 원리의 어림 범위(불연속에서 ±h)로, 유한 요소가 찾은 범위보다 넓게(보수적으로) 잡힌다는 것을 비교할 수 있습니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="components">
+    <h2>스트럿, 타이, 절점</h2>
+    <div class="problem"><strong>트러스지만 부재에 폭이 있다</strong>
+      <p>구조역학의 트러스(MechanicsBook 3장)는 선으로 된 부재와 핀 절점입니다. 콘크리트 속의 트러스는 다릅니다. 압축대는 폭이 있는 콘크리트 띠이고, 절점은 여러 힘이 만나는 콘크리트 덩어리입니다. 그래서 "부재력이 얼마인가" 다음에 "그 힘을 받을 만큼 넓은가"를 물어야 합니다.</p></div>
+    <div class="callout def"><strong>정의 14.2 (스트럿–타이 모델의 요소)</strong> <span class="term">스트럿–타이 모델</span><span class="en">(strut-and-tie model, STM)</span>은 D 영역의 응력장을 다음 세 요소의 트러스로 이상화한 것이다.
+      <ol class="st-steps">
+        <li><span class="term">스트럿</span><span class="en">(strut)</span>: 콘크리트 압축대. 폭이 일정한 <b>각기둥형</b>, 가운데가 부푼 <span class="term">병 모양 스트럿</span><span class="en">(bottle-shaped strut)</span>(가로 인장이 생김), 한 점에서 퍼지는 <span class="term">부채꼴 스트럿</span><span class="en">(fan-shaped strut)</span>이 있다.</li>
+        <li><span class="term">타이</span><span class="en">(tie)</span>: 인장재. 철근(또는 긴장재)과 그 둘레의 콘크리트로, 강도는 철근만 센다.</li>
+        <li><span class="term">절점</span><span class="en">(node)</span>: 부재 축선이 만나는 점, 그리고 그 둘레의 콘크리트 <span class="term">절점 영역</span><span class="en">(nodal zone)</span>. 만나는 힘의 종류로 <span class="term">CCC 절점</span><span class="en">(CCC node)</span>(압축 셋), <span class="term">CCT 절점</span><span class="en">(CCT node)</span>(압축 둘 + 타이 하나), <span class="term">CTT 절점</span><span class="en">(CTT node)</span>(압축 하나 + 타이 둘)로 나눈다.</li>
+      </ol>
+      모델은 외력·반력과 평형이어야 하고(정정 트러스가 편하다), 각 요소의 응력은 유효 강도를 넘지 않아야 하며, 타이는 절점 너머로 정착되어야 한다.</div>
+    <figure class="diagram" id="fig-st-parts">
+      <svg viewBox="0 0 860 290" role="img" aria-label="각기둥형, 병 모양, 부채꼴 스트럿과 CCC, CCT, CTT 절점">
+        <rect x="10" y="10" width="840" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">스트럿</text>
+          <rect x="10" y="20" width="40" height="160" style="fill:var(--compression);fill-opacity:.2;stroke:var(--compression)"/>
+          <text x="30" y="200" class="t-mono" text-anchor="middle">각기둥</text>
+          <path d="M100 20 L120 20 C 160 70, 160 130, 120 180 L100 180 C 60 130, 60 70, 100 20 Z" style="fill:var(--compression);fill-opacity:.2;stroke:var(--compression)"/>
+          <g style="stroke:var(--tension);stroke-width:2"><line x1="74" y1="80" x2="146" y2="80"/><line x1="70" y1="100" x2="150" y2="100"/><line x1="74" y1="120" x2="146" y2="120"/></g>
+          <text x="110" y="200" class="t-mono" text-anchor="middle">병 모양</text>
+          <text x="110" y="216" class="t-mono" text-anchor="middle" style="fill:var(--tension)">가로 인장 → 분산 철근</text>
+          <path d="M210 20 L 170 180 L 250 180 Z" style="fill:var(--compression);fill-opacity:.2;stroke:var(--compression)"/>
+          <text x="210" y="200" class="t-mono" text-anchor="middle">부채꼴</text>
+        </g>
+        <g transform="translate(330,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">절점</text>
+          <g transform="translate(70,110)">
+            <polygon points="-30,-18 30,-18 0,34" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+            <line x1="0" y1="-18" x2="0" y2="-70" style="stroke:var(--compression);stroke-width:7;opacity:.6"/>
+            <line x1="-14" y1="8" x2="-60" y2="60" style="stroke:var(--compression);stroke-width:7;opacity:.6"/>
+            <line x1="14" y1="8" x2="60" y2="60" style="stroke:var(--compression);stroke-width:7;opacity:.6"/>
+            <text x="0" y="96" class="t-mono" text-anchor="middle">CCC (β<tspan baseline-shift="sub" font-size="8">n</tspan> 1.0)</text>
+          </g>
+          <g transform="translate(240,110)">
+            <rect x="-34" y="-20" width="68" height="40" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+            <line x1="-80" y1="0" x2="80" y2="0" style="stroke:var(--tension);stroke-width:3"/>
+            <line x1="10" y1="-14" x2="60" y2="-72" style="stroke:var(--compression);stroke-width:8;opacity:.6"/>
+            <line x1="0" y1="20" x2="0" y2="60" style="stroke:var(--compression);stroke-width:8;opacity:.6"/>
+            <path d="M-34 66 L34 66" style="stroke:var(--accent-2);stroke-width:3"/>
+            <text x="0" y="96" class="t-mono" text-anchor="middle">CCT (β<tspan baseline-shift="sub" font-size="8">n</tspan> 0.80)</text>
+          </g>
+          <g transform="translate(410,110)">
+            <rect x="-24" y="-24" width="48" height="48" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+            <line x1="-80" y1="0" x2="80" y2="0" style="stroke:var(--tension);stroke-width:3"/>
+            <line x1="0" y1="-70" x2="0" y2="60" style="stroke:var(--tension);stroke-width:3"/>
+            <line x1="-12" y1="12" x2="-60" y2="60" style="stroke:var(--compression);stroke-width:8;opacity:.6"/>
+            <text x="0" y="96" class="t-mono" text-anchor="middle">CTT (β<tspan baseline-shift="sub" font-size="8">n</tspan> 0.60)</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-2.</b> 스트럿의 세 모양과 절점의 세 종류(빨강 압축, 파랑 타이, 주황 지압판). 병 모양 스트럿은 힘이 퍼지며 가로 인장을 만들어 쪼개지므로 그 방향으로 분산 철근을 둔다. 타이가 정착되는 절점은 철근의 부착·갈고리 때문에 콘크리트가 덜 구속되어 강도 계수가 작다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="strength">
+    <h2>스트럿과 절점의 강도</h2>
+    <div class="problem"><strong>콘크리트 압축 강도를 그대로 쓸 수 없는 이유</strong>
+      <p>스트럿은 실린더 공시체처럼 깨끗한 일축 압축을 받지 않습니다. 옆으로 지나는 균열, 가로 인장, 철근의 인장 변형이 콘크리트를 약하게 합니다. 기준은 이 영향을 계수 β로 묶어 <span class="term">유효 압축 강도</span><span class="en">(effective compressive strength)</span>를 정합니다.</p></div>
+    <div class="callout def"><strong>원리 14.3 (유효 압축 강도, ACI 318-14 / KDS 14 20 24 형태)</strong>
+      <div class="formula">$$\phi F_{ns} = \phi f_{ce} A_{cs}, \quad f_{ce} = 0.85\beta_s f_{ck}; \qquad \phi F_{nn} = \phi f_{ce} A_{nz}, \quad f_{ce} = 0.85\beta_n f_{ck}; \qquad \phi F_{nt} = \phi A_{ts} f_y; \qquad \phi = 0.75$$<div class="where">\(\beta_s\): <span class="term">스트럿 강도 계수</span><span class="en">(strut coefficient)</span>, \(\beta_n\): <span class="term">절점 강도 계수</span><span class="en">(nodal zone coefficient)</span>. \(A_{cs}\): 스트럿 끝의 단면적(폭 × 부재 두께), \(A_{nz}\): 절점 영역 면의 면적, \(A_{ts}\): 타이 철근 단면적. 스트럿의 유효 강도는 스트럿 자체(\(\beta_s\))와 양 끝 절점 면(\(\beta_n\)) 중 작은 쪽이 정한다. 아래 표의 값은 널리 쓰이는 ACI 318-14 형태이며, 현행 KDS와 ACI 318-19의 세부(예: 분산 철근 조건, 구속 효과)는 현행 기준을 확인할 것.</div></div></div>
+    <div class="table-wrap"><table class="st-tbl">
+      <thead><tr><th>요소</th><th>조건</th><th>계수</th><th>f<sub>ce</sub> (f<sub>ck</sub> 30 MPa), φf<sub>ce</sub></th></tr></thead>
+      <tbody>
+        <tr><td>스트럿 β<sub>s</sub></td><td>각기둥형(폭이 일정, 예: 휨 압축대)</td><td class="hl">1.0</td><td>25.5, 19.1 MPa</td></tr>
+        <tr><td></td><td>병 모양 + 분산 철근 조건 만족</td><td class="hl">0.75</td><td>19.1, 14.3 MPa</td></tr>
+        <tr><td></td><td>병 모양, 분산 철근 부족</td><td>0.60λ</td><td>15.3, 11.5 MPa</td></tr>
+        <tr><td></td><td>인장 부재·인장 플랜지 안의 스트럿</td><td>0.40</td><td>10.2, 7.7 MPa</td></tr>
+        <tr><td>절점 β<sub>n</sub></td><td>CCC(타이 정착 없음)</td><td class="hl">1.0</td><td>25.5, 19.1 MPa</td></tr>
+        <tr><td></td><td>CCT(타이 하나 정착)</td><td class="hl">0.80</td><td>20.4, 15.3 MPa</td></tr>
+        <tr><td></td><td>CTT(타이 둘 이상 정착)</td><td>0.60</td><td>15.3, 11.5 MPa</td></tr>
+      </tbody></table></div>
+    <p>절점 영역의 모양은 보통 <span class="term">정수압 절점</span><span class="en">(hydrostatic node)</span>, 곧 각 면에 같은 응력이 작용하도록 면의 폭을 힘에 비례하게 잡는 방식이나, 더 실용적으로 <span class="term">확장 절점 영역</span><span class="en">(extended nodal zone)</span>(지압판 폭과 타이의 유효 높이로 정하는 방식)으로 그립니다. 확장 절점에서 스트럿이 닿는 면의 폭은</p>
+    <div class="formula">$$w_s = l_b \sin\theta + w_t \cos\theta$$</div>
+    <p>입니다. \(l_b\)는 지압판 폭, \(w_t\)는 타이의 유효 높이(타이 철근 중심 높이의 약 두 배), \(\theta\)는 스트럿이 타이와 이루는 각입니다. 스트럿이 가팔라질수록(θ가 클수록) 지압판 폭이, 완만할수록 타이 높이가 스트럿 폭을 정합니다.</p>
+    <div class="sim" id="sim-st-node">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>절점 영역 검토(확장 절점)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="st-cv-node" aria-label="지압판, 타이, 경사 스트럿이 만나는 절점 영역과 각 면의 응력"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>절점 종류</span><div class="seg" id="st-nd-type"><button data-value="CCT" class="on">CCT(지점)</button><button data-value="CCC">CCC(하중점)</button><button data-value="CTT">CTT</button></div></div>
+          <label class="ctrl"><span>반력 R <output id="st-nd-R-out"></output></span><input type="range" id="st-nd-R" min="200" max="4000" step="20" value="1500"></label>
+          <label class="ctrl"><span>스트럿 각 θ <output id="st-nd-th-out"></output></span><input type="range" id="st-nd-th" min="20" max="70" step="0.5" value="32.5"></label>
+          <label class="ctrl"><span><i style="font-style:normal">지압판 폭 l<sub>b</sub></i> <output id="st-nd-lb-out"></output></span><input type="range" id="st-nd-lb" min="150" max="900" step="10" value="500"></label>
+          <label class="ctrl"><span><i style="font-style:normal">타이 유효 높이 w<sub>t</sub></i> <output id="st-nd-wt-out"></output></span><input type="range" id="st-nd-wt" min="0" max="600" step="10" value="300"></label>
+          <label class="ctrl"><span>부재 두께 b <output id="st-nd-b-out"></output></span><input type="range" id="st-nd-b" min="200" max="1000" step="10" value="500"></label>
+          <div class="ctrl"><span><i style="font-style:normal">스트럿 β<sub>s</sub></i></span><div class="seg" id="st-nd-bs"><button data-value="0.75" class="on">0.75 병+철근</button><button data-value="0.6">0.60</button><button data-value="1">1.0</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">스트럿 힘 · 타이 힘</span><span class="v" id="st-nd-o-f">—</span></div>
+        <div class="stat"><span class="k">w<sub>s</sub></span><span class="v" id="st-nd-o-ws">—</span></div>
+        <div class="stat"><span class="k">지압면 응력 / 한계</span><span class="v" id="st-nd-o-b">—</span></div>
+        <div class="stat"><span class="k">스트럿면 응력 / 한계</span><span class="v" id="st-nd-o-s">—</span></div>
+      </div>
+      <div class="st-msg" id="st-nd-msg"></div>
+      <div class="sim-note">해볼 것: 기본값은 예제 14.1 첫 시도의 지점 절점(R 1,500 kN, θ 32.5°, 지압판 500, 타이 높이 300, b 500)입니다 · θ를 25° 아래로 내리면 스트럿이 타이와 너무 나란해져 기준 형태의 각도 제한(25°)에 걸리고, 타이 힘이 급격히 커집니다 · w<sub>t</sub>를 키우면(철근을 여러 단으로) 스트럿 면이 넓어집니다 · CTT는 계수 0.60이라 같은 힘에 면이 더 넓어야 합니다 · 모델: 원리 14.3, 확장 절점, f<sub>ck</sub> = 30 MPa, φ = 0.75. CCC는 지압판이 하중판, 수평면은 맞은편 스트럿(수평 압축)이 닿는 면으로 보고 w<sub>t</sub>를 그 높이로 씁니다(교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="bottle">
+    <h2>병 모양 스트럿과 분산 철근</h2>
+    <div class="problem"><strong>왜 압축대가 쪼개지는가</strong>
+      <p>좁은 지압판에서 들어간 압축력은 부재 안에서 넓게 퍼졌다가 다시 반대쪽 좁은 면으로 모입니다. 퍼지는 동안 힘의 방향이 바뀌므로 가로 방향 성분이 생기고, 그것이 스트럿을 길이 방향으로 쪼개는 인장이 됩니다. 실린더 쪼갬 시험(MaterialsBook)과 같은 원리입니다.</p></div>
+    <div class="callout def"><strong>원리 14.4 (병 모양 스트럿의 가로 인장과 분산 철근)</strong> 폭 \(a\)의 판에서 들어간 힘 \(F\)가 1 : 2 기울기로 폭 \(b_{ef}\)까지 퍼진다고 보면 가로 인장의 합은 대략
+      <div class="formula">$$T \approx \frac{F}{4}\left(1 - \frac{a}{b_{ef}}\right) \qquad \text{(슐라이히–셰퍼 형태, 교육용)}$$<div class="where">이다. 기준은 이 인장을 직접 계산하는 대신, 스트럿을 가로지르는 <span class="term">분산 철근</span><span class="en">(distributed reinforcement)</span>이 \(\sum \dfrac{A_{si}}{b s_i}\sin\gamma_i \ge 0.003\)(ACI 318-14 형태, \(\gamma_i\): 철근과 스트럿 축의 각)을 만족하면 \(\beta_s = 0.75\), 아니면 0.60으로 낮추게 한다. 깊은 보에는 이와 별도로 수직·수평 분산 철근 각 \(0.0025 b s\) 이상을 두는 규정(ACI 318 형태)이 있다. 현행 기준을 확인할 것.</div></div></div>
+    <div class="sim" id="sim-st-bottle">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>병 모양 스트럿의 가로 인장</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="st-cv-bt" aria-label="병 모양으로 퍼지는 압축대와 가로 인장, 분산 철근"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>스트럿 힘 F <output id="st-bt-F-out"></output></span><input type="range" id="st-bt-F" min="200" max="4000" step="10" value="2770"></label>
+          <label class="ctrl"><span>끝 폭 a <output id="st-bt-a-out"></output></span><input type="range" id="st-bt-a" min="150" max="900" step="10" value="420"></label>
+          <label class="ctrl"><span><i style="font-style:normal">스트럿 길이 L<sub>s</sub></i> <output id="st-bt-L-out"></output></span><input type="range" id="st-bt-L" min="600" max="4000" step="10" value="2860"></label>
+          <label class="ctrl"><span>부재 두께 b <output id="st-bt-b-out"></output></span><input type="range" id="st-bt-b" min="200" max="1000" step="10" value="600"></label>
+          <div class="ctrl"><span>분산 철근(양면, 수직·수평)</span><div class="seg" id="st-bt-bar"><button data-value="0">없음</button><button data-value="D10">D10</button><button data-value="D13" class="on">D13</button><button data-value="D16">D16</button></div></div>
+          <label class="ctrl"><span>간격 s <output id="st-bt-s-out"></output></span><input type="range" id="st-bt-s" min="100" max="400" step="10" value="160"></label>
+          <label class="ctrl"><span>스트럿 각(수평과) <output id="st-bt-g-out"></output></span><input type="range" id="st-bt-g" min="25" max="70" step="0.5" value="33"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">퍼진 폭 b<sub>ef</sub></span><span class="v" id="st-bt-o-bef">—</span></div>
+        <div class="stat"><span class="k">가로 인장 T</span><span class="v" id="st-bt-o-T">—</span></div>
+        <div class="stat"><span class="k">Σρ<sub>i</sub> sin γ<sub>i</sub></span><span class="v" id="st-bt-o-r">—</span></div>
+        <div class="stat"><span class="k">β<sub>s</sub> · 철근이 받는 T</span><span class="v" id="st-bt-o-bs">—</span></div>
+      </div>
+      <div class="st-msg" id="st-bt-msg"></div>
+      <div class="sim-note">해볼 것: 기본값은 예제 14.1(수정안)의 경사 스트럿과 분산 철근(양면 D13 @ 160, Σ = 0.0037)입니다 · 간격을 200 mm로 넓히면 Σ가 0.003 아래로 떨어집니다 · 분산 철근을 "없음"으로 하면 β<sub>s</sub>가 0.60으로 떨어집니다 · 끝 폭 a를 키우면 덜 퍼지므로 가로 인장이 줄어듭니다 · 스트럿 각을 바꾸면 수평·수직 철근이 스트럿을 가로지르는 각 γ가 달라집니다 · 모델: 원리 14.4, b<sub>ef</sub> = a + L<sub>s</sub>/2(양끝에서 1 : 2로 퍼져 가운데에서 최대, 교육용), 철근이 받는 인장 = 스트럿을 가로지르는 분산 철근 성분 × f<sub>y</sub>(SD400) × φ 0.75(교육용 확인).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="choosing">
+    <h2>모델 고르기: 하중 경로와 응력 궤적</h2>
+    <div class="problem"><strong>같은 부재에 모델이 여러 개</strong>
+      <p>스트럿–타이 모델은 하나로 정해지지 않습니다. 평형을 만족하는 트러스는 무수히 많고, 하한 정리에 따라 그중 어느 것을 써도(강도를 넘지 않게 설계하면) 안전 측입니다. 그렇다고 아무 모델이나 좋은 것은 아닙니다. 탄성 응력장과 너무 다른 모델은 사용 하중에서 균열이 크고, 콘크리트가 큰 소성 변형을 해야 그 응력장에 도달합니다.</p></div>
+    <div class="callout def"><strong>원리 14.5 (좋은 모델의 조건)</strong>
+      <ol class="st-steps">
+        <li><span class="term">하중 경로법</span><span class="en">(load path method)</span>: D 영역 경계의 하중과 반력을 짝지어 가장 짧고 매끄러운 길로 잇는다. 힘은 게으르다 — 짧은 타이와 적은 철근을 쓰는 모델이 대개 좋은 모델이다(최소 변형 에너지에 가깝다).</li>
+        <li><b>응력 궤적 따르기</b>: 탄성 해석(위의 유한 요소)의 압축 궤적 방향에 스트럿을, 인장 궤적 방향에 타이를 둔다. 철근은 시공을 생각해 수평·수직으로 둔다.</li>
+        <li><b>각도 제한</b>: 스트럿과 타이 사이 각은 25° 이상(ACI 318 형태). 더 완만하면 타이가 커지고 스트럿이 균열을 가로지르며 약해진다.</li>
+        <li><b>최소 철근</b>: 모델에 없더라도 균열 제어와 연성을 위해 분산 철근(원리 14.4)을 둔다.</li>
+      </ol></div>
+    <figure class="diagram" id="fig-st-path">
+      <svg viewBox="0 0 860 260" role="img" aria-label="깊은 보의 좋은 모델과 나쁜 모델 비교">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">좋은 모델: 직접 아치</text>
+          <rect x="0" y="20" width="340" height="150" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="170" y1="0" x2="170" y2="18" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#st-ah-ld)"/>
+          <path d="M170 32 L 30 150 M170 32 L310 150" style="stroke:var(--compression);stroke-width:6;opacity:.65"/>
+          <line x1="30" y1="150" x2="310" y2="150" style="stroke:var(--tension);stroke-width:3"/>
+          <text x="170" y="196" class="t-mono" text-anchor="middle" style="fill:var(--ok)">타이 1개 · 짧은 경로 · 궤적과 일치</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">나쁜 모델: 보 트러스 흉내</text>
+          <rect x="0" y="20" width="340" height="150" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="170" y1="0" x2="170" y2="18" style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#st-ah-ld)"/>
+          <path d="M30 150 L100 32 M100 150 L170 32 M240 150 L170 32 M310 150 L240 32 M30 32 L310 32" style="stroke:var(--compression);stroke-width:4;opacity:.6"/>
+          <path d="M100 32 L100 150 M240 32 L240 150 M30 150 L310 150" style="stroke:var(--tension);stroke-width:2.6"/>
+          <text x="170" y="196" class="t-mono" text-anchor="middle" style="fill:var(--bad)">수직 타이 필요 · 긴 경로 · 철근 낭비</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-3.</b> 짧은 깊은 보(L/h ≈ 2)의 두 모델. 왼쪽은 하중이 지점으로 바로 가는 <span class="term">타이드 아치</span><span class="en">(tied arch)</span>로 탄성 압축 궤적과 같다. 오른쪽은 5장의 보 트러스를 억지로 넣은 것으로 평형은 맞지만 수직 타이(스터럽)가 하중의 상당 부분을 다시 들어 올려야 하고 변형이 크다. 하중 경로가 짧은 왼쪽 모델이 좋은 모델이다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="deep-beam">
+    <h2>깊은 보</h2>
+    <div class="problem"><strong>B-10 지하의 전이보</strong>
+      <p>지하 주차장의 기둥 간격을 넓히려고 위층 기둥 하나를 깊은 보(<span class="term">전이보</span><span class="en">(transfer girder)</span>) 위에 얹는다고 합시다(교육용 DB-1). 순경간에 비해 깊이가 큰 보는 하중이 지점으로 아치처럼 바로 갑니다. 5장의 전단 설계식은 이 아치 작용을 모르므로 강도를 크게 과소평가하거나, 반대로 안전하지 않은 상세를 낳습니다.</p></div>
+    <div class="callout def"><strong>정의 14.6 (깊은 보, ACI 318 형태)</strong> 순경간 \(l_n \le 4h\)이거나, 집중 하중이 지점면에서 \(2h\) 안에 있는 보를 <span class="term">깊은 보</span><span class="en">(deep beam)</span>라 한다. 스트럿–타이 모델이나 비선형 해석으로 설계하며, 단면 크기는 \(V_u \le \phi\, 0.83\sqrt{f_{ck}}\, b_w d\)(형태)로 제한하고, 분산 철근은 수직·수평 각 \(0.0025 b_w s\) 이상, 간격 \(d/5\)와 300 mm 이하(형태)로 둔다. 현행 KDS를 확인할 것.</div>
+    <p>아래 시뮬레이터에서 트러스의 윗 절점(하중 절점)과 타이 높이를 끌어 보세요. 부재력은 <code>CB.truss</code>(MechanicsBook의 직접 강성법)가 계산합니다. 절점을 내리면 스트럿이 완만해져 타이 힘이 커지고, 올리면 줄어들지만 윗 절점이 보 위로 나갈 수는 없습니다. 실제 절점 높이는 그 절점이 받을 수 있는 압축 응력이 정합니다(예제 14.1).</p>
+    <div class="sim" id="sim-st-truss">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>깊은 보 STM: 절점을 끌어 부재력 보기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="st-cv-truss" aria-label="깊은 보 안의 트러스 모델, 끌 수 있는 절점, 부재력"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>하중</span><div class="seg" id="st-tr-mode"><button data-value="one" class="on">가운데 1점</button><button data-value="two">3등분점 2점</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">전체 하중 P<sub>u</sub></i> <output id="st-tr-P-out"></output></span><input type="range" id="st-tr-P" min="500" max="6000" step="50" value="3000"></label>
+          <label class="ctrl"><span>경간 L (지점 중심) <output id="st-tr-L-out"></output></span><input type="range" id="st-tr-L" min="2.4" max="9" step="0.1" value="4.8"></label>
+          <div class="btn-row"><button class="btn" id="st-tr-reset">절점 처음 위치로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">팔 길이 z</span><span class="v" id="st-tr-o-z">—</span></div>
+        <div class="stat"><span class="k">경사 스트럿 각</span><span class="v" id="st-tr-o-th">—</span></div>
+        <div class="stat"><span class="k">타이 힘 · 소요 A<sub>s</sub></span><span class="v" id="st-tr-o-T">—</span></div>
+        <div class="stat"><span class="k">최대 스트럿 힘</span><span class="v" id="st-tr-o-C">—</span></div>
+      </div>
+      <div class="st-msg" id="st-tr-msg"></div>
+      <div class="sim-note">해볼 것: 주황 점(하중 절점)을 위아래로, 파란 점(타이 높이)을 끌어 보세요 · 기본값(DB-1, 깊이 1.8 m)에서 z ≈ 1.55 m일 때 T ≈ 2,330 kN입니다 · "3등분점 2점"에서 두 윗 절점을 서로 다른 높이로 끌면 대각 부재(웹)에 힘이 생깁니다 — 하중이 비대칭으로 흐르려면 웹 철근이나 웹 스트럿이 필요하다는 뜻입니다 · L을 9 m로 키우면 각도가 25° 아래로 떨어집니다: 이제는 깊은 보가 아니라 보통 보(5장의 보 트러스)로 보는 편이 낫습니다 · 모델: <code>CB.truss</code>(핀 절점, 정정), 보 깊이 1.8 m, 부재 선 두께 ∝ |N|, 타이 A<sub>s</sub> = T/(φf<sub>y</sub>), φ 0.75, SD500.</div>
+    </div>
+    <figure class="diagram" id="fig-st-deep">
+      <svg viewBox="0 0 860 310" role="img" aria-label="깊은 보 DB-1의 스트럿–타이 모델과 절점 영역, 치수">
+        <rect x="10" y="10" width="840" height="290" rx="10" class="f-surface"/>
+        <g transform="translate(70,50)">
+          <rect x="0" y="0" width="720" height="200" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="320" y="-36" width="80" height="36" style="fill:var(--text-dim);opacity:.55"/>
+          <line x1="360" y1="-30" x2="360" y2="-6" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#st-ah-ld)"/>
+          <rect x="320" y="0" width="80" height="28" style="fill:var(--compression);fill-opacity:.35;stroke:var(--compression)"/>
+          <path d="M350 20 L 48 174 M370 20 L 672 174" style="stroke:var(--compression);stroke-width:30;opacity:.25;stroke-linecap:butt"/>
+          <path d="M360 14 L 60 178 M360 14 L 660 178" style="stroke:var(--compression);stroke-width:2;stroke-dasharray:6 4"/>
+          <line x1="20" y1="178" x2="700" y2="178" style="stroke:var(--tension);stroke-width:3"/>
+          <rect x="22" y="156" width="76" height="44" style="fill:none;stroke:var(--accent);stroke-width:1.4;stroke-dasharray:4 3"/>
+          <rect x="622" y="156" width="76" height="44" style="fill:none;stroke:var(--accent);stroke-width:1.4;stroke-dasharray:4 3"/>
+          <rect x="22" y="200" width="76" height="10" style="fill:var(--accent-2)"/><rect x="622" y="200" width="76" height="10" style="fill:var(--accent-2)"/>
+          <line x1="-20" y1="14" x2="-20" y2="178" style="stroke:var(--text-dim)" marker-start="url(#st-ah-t)" marker-end="url(#st-ah-t)"/>
+          <text x="-26" y="100" class="t-mono" text-anchor="end">z</text>
+          <text x="410" y="18" class="t-mono" style="fill:var(--compression)">CCC 절점: 수평 스트럿 높이 w</text>
+          <text x="104" y="196" class="t-mono" style="fill:var(--accent)">◂ CCT 절점(확장)</text>
+          <text x="120" y="80" class="t-mono" style="fill:var(--compression)">경사 스트럿 θ</text>
+          <text x="560" y="196" class="t-mono" style="fill:var(--tension)">타이 T (w<tspan baseline-shift="sub" font-size="8">t</tspan> = 2 × 150)</text>
+          <line x1="60" y1="230" x2="660" y2="230" style="stroke:var(--text-dim)" marker-start="url(#st-ah-t)" marker-end="url(#st-ah-t)"/>
+          <text x="360" y="246" class="t-mono" text-anchor="middle">L = 4.8 m (지점 중심), h = 1.8 m</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-4.</b> 깊은 보 DB-1의 스트럿–타이 모델. 하중 아래 CCC 절점에서 두 경사 스트럿과 수평 압축(높이 \(w\))이 만나고, 지점의 CCT 절점에서 경사 스트럿·지점 반력·타이가 만난다. 타이 중심이 바닥에서 150 mm이면 타이 유효 높이 \(w_t\) = 300 mm다. 팔 길이 \(z\)는 \(h\)에서 타이 중심 높이와 \(w/2\)를 뺀 값이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 14.1 (깊은 보 DB-1, 교육용)</strong> 지점 중심 간 \(L = 4.8\) m, \(h = 1.8\) m, 가운데에 위층 기둥의 계수 하중 \(P_u = 3{,}000\) kN, 지점 지압판 500 mm, \(f_{ck} = 30\) MPa, SD500. \(L/h = 2.7 \lt 4\) → 깊은 보.
+      <ol class="st-steps">
+        <li><b>첫 시도(b = 500, 기둥 500 × 500).</b> 윗 절점(CCC)의 수평 스트럿 높이 \(w = T/(\phi \cdot 0.85 \cdot 1.0 f_{ck}\, b)\)와 \(z = h - 0.15 - w/2\)를 반복하면 \(w = 247\) mm, \(z = 1.527\) m, \(T = (1{,}500 \times 2.4)/1.527 = 2{,}358\) kN, \(\theta = \arctan(1.527/2.4) = 32.5°\)(≥ 25° OK), 경사 스트럿 \(C = 1{,}500/\sin\theta = 2{,}795\) kN.</li>
+        <li><b>지점 절점(CCT).</b> 지압 \(1{,}500{,}000/(500 \times 500) = 6.0\) MPa ≤ \(\phi \cdot 0.85 \cdot 0.80 \times 30 = 15.3\) MPa OK. 스트럿 면 \(w_s = 500\sin 32.5° + 300\cos 32.5° = 521\) mm → \(2{,}795{,}000/(521 \times 500) = 10.7\) MPa ≤ 14.3 MPa(병 모양 \(\beta_s = 0.75\)) OK.</li>
+        <li><b>하중 절점(CCC).</b> 기둥 하중판 500 mm를 두 스트럿이 반씩 쓴다: \(w_s = 250\sin 32.5° + 247\cos 32.5° = 342\) mm → \(2{,}795{,}000/(342 \times 500) = 16.3\) MPa \(\gt\) 14.3 MPa <b>NG</b>. 경사 스트럿이 하중점에서 너무 좁다.</li>
+        <li><b>수정안(b = 600, 기둥 600 × 600).</b> \(w = 203\) mm, \(z = 1.549\) m, \(T = 2{,}325\) kN, \(\theta = 32.8°\), \(C = 2{,}766\) kN. 하중 절점 \(w_s = 300\sin 32.8° + 203\cos 32.8° = 333\) mm → 13.9 MPa ≤ 14.3 MPa <b>OK</b>. 지점 절점 7.99 MPa(지압판 600) OK.</li>
+        <li><b>타이.</b> \(A_s = 2{,}325{,}000/(0.75 \times 500) = 6{,}199\) mm² → 13-D25(6,587 mm², 3단 5 + 4 + 4, 타이 중심 약 150 mm). 타이는 지점 절점을 지나 갈고리나 정착판으로 정착한다(절점 영역 끝에서부터 정착 길이).</li>
+        <li><b>분산 철근.</b> 수직 \(0.0025 \times 600 = 1.5\) mm²/mm → 양면 D13 @ 160(1.58 mm²/mm), 수평도 같은 양. 이 철근이 병 모양 스트럿의 \(\beta_s = 0.75\)를 정당화한다(다음 시뮬레이터).</li>
+        <li><b>단면식과 비교.</b> 5장 식이면 \(\phi V_c = 0.75 \times \tfrac16\sqrt{30} \times 600 \times 1{,}650 = 677\) kN으로 \(V_u = 1{,}500\) kN에 크게 모자라 스터럽을 촘촘히 넣어야 한다. 실제로는 하중이 아치로 직접 가므로 스트럿–타이 모델이 경제적이고 하중 경로에 맞는 배근(강한 바닥 타이 + 분산 철근)을 준다. 단면 상한 \(\phi\,0.83\sqrt{f_{ck}}\,b d = 3{,}376\) kN ≥ 1,500 kN OK.</li>
+      </ol></div>
+    <div class="sim" id="sim-st-deep">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>깊은 보 STM 설계 검토</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="st-cv-deep" aria-label="깊은 보의 절점 영역, 스트럿 폭, 타이와 검토 결과"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">하중 P<sub>u</sub></i> <output id="st-dp-P-out"></output></span><input type="range" id="st-dp-P" min="500" max="6000" step="50" value="3000"></label>
+          <label class="ctrl"><span>경간 L <output id="st-dp-L-out"></output></span><input type="range" id="st-dp-L" min="2.0" max="8.0" step="0.1" value="4.8"></label>
+          <label class="ctrl"><span>깊이 h <output id="st-dp-h-out"></output></span><input type="range" id="st-dp-h" min="0.8" max="3.0" step="0.05" value="1.8"></label>
+          <label class="ctrl"><span>두께 b <output id="st-dp-b-out"></output></span><input type="range" id="st-dp-b" min="300" max="1000" step="10" value="500"></label>
+          <label class="ctrl"><span>하중판(기둥) 폭 <output id="st-dp-lt-out"></output></span><input type="range" id="st-dp-lt" min="200" max="1000" step="10" value="500"></label>
+          <label class="ctrl"><span>지점 지압판 폭 <output id="st-dp-lb-out"></output></span><input type="range" id="st-dp-lb" min="200" max="1000" step="10" value="500"></label>
+          <label class="ctrl"><span><i style="font-style:normal">f<sub>ck</sub></i> <output id="st-dp-fc-out"></output></span><input type="range" id="st-dp-fc" min="24" max="50" step="1" value="30"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">z · θ</span><span class="v" id="st-dp-o-z">—</span></div>
+        <div class="stat"><span class="k">T · A<sub>s</sub></span><span class="v" id="st-dp-o-T">—</span></div>
+        <div class="stat"><span class="k">C (경사 스트럿)</span><span class="v" id="st-dp-o-C">—</span></div>
+        <div class="stat"><span class="k">최대 이용률</span><span class="v" id="st-dp-o-u">—</span></div>
+      </div>
+      <ul class="st-chk" id="st-dp-chk"></ul>
+      <div class="sim-note">해볼 것: 기본값은 예제 14.1의 첫 시도(b 500, 기둥 500)로 하중 절점 스트럿 면이 불합격입니다 · b와 하중판을 600으로 바꾸면 통과합니다 · h를 줄이면 z가 작아져 T와 C가 커지고 θ가 25°에 가까워집니다 · L/h가 4를 넘으면 "깊은 보가 아님" 경고가 나옵니다 · 모델: 원리 14.3, 예제 14.1의 반복(CCC 절점 수평 스트럿 β<sub>n</sub> 1.0으로 w 결정), 타이 중심 150 mm(w<sub>t</sub> 300), 경사 스트럿 β<sub>s</sub> 0.75(분산 철근 가정), CCT β<sub>n</sub> 0.80, 스트럿 면 응력은 β<sub>s</sub>와 β<sub>n</sub> 중 작은 한계와 비교, φ 0.75.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="corbel">
+    <h2>코벨(내민 받침)</h2>
+    <div class="problem"><strong>기둥에서 짧게 내민 받침</strong>
+      <p>프리캐스트 보나 크레인 레일 보를 기둥에 얹는 짧은 내민 부재를 <span class="term">코벨</span><span class="en">(corbel, bracket)</span>이라 합니다. 하중이 기둥면에 아주 가까워(\(a_v \le d\)) 휨보다 하중이 기둥으로 비스듬히 바로 가는 작용이 지배합니다. 위쪽 철근이 타이, 하중점에서 기둥면 아래로 가는 압축대가 스트럿입니다.</p></div>
+    <figure class="diagram" id="fig-st-corbel">
+      <svg viewBox="0 0 860 300" role="img" aria-label="코벨의 스트럿–타이 모델, 주 인장 철근, 폐쇄 스터럽, 수평력">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(80,30)">
+          <rect x="0" y="0" width="140" height="250" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M140 70 L 330 70 L 330 130 L 140 190 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="250" y="58" width="60" height="12" style="fill:var(--accent-2)"/>
+          <line x1="280" y1="20" x2="280" y2="56" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#st-ah-ld)"/>
+          <text x="290" y="34" class="t-mono" style="fill:var(--accent-2)">V<tspan baseline-shift="sub" font-size="8">u</tspan></text>
+          <line x1="300" y1="64" x2="350" y2="64" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#st-ah-ld)"/>
+          <text x="356" y="68" class="t-mono" style="fill:var(--accent-2)">N<tspan baseline-shift="sub" font-size="8">uc</tspan> ≥ 0.2V<tspan baseline-shift="sub" font-size="8">u</tspan></text>
+          <line x1="40" y1="82" x2="320" y2="82" style="stroke:var(--tension);stroke-width:3"/>
+          <line x1="40" y1="82" x2="40" y2="140" style="stroke:var(--tension);stroke-width:3"/>
+          <line x1="320" y1="82" x2="320" y2="120" style="stroke:var(--tension);stroke-width:2"/>
+          <text x="6" y="74" class="t-mono" style="fill:var(--tension)">주 인장 철근 A<tspan baseline-shift="sub" font-size="8">sc</tspan></text>
+          <path d="M280 82 L 128 176" style="stroke:var(--compression);stroke-width:14;opacity:.3"/>
+          <path d="M280 82 L 128 176" style="stroke:var(--compression);stroke-width:2;stroke-dasharray:6 4"/>
+          <text x="200" y="150" class="t-mono" style="fill:var(--compression)">스트럿</text>
+          <g style="stroke:var(--accent);stroke-width:1.6"><path d="M160 100 L300 100 M160 116 L280 116 M160 132 L 250 132"/></g>
+          <text x="150" y="214" class="t-mono" style="fill:var(--accent)">폐쇄 스터럽 A<tspan baseline-shift="sub" font-size="8">h</tspan>(위 2/3 d)</text>
+          <line x1="140" y1="236" x2="280" y2="236" style="stroke:var(--text-dim)" marker-start="url(#st-ah-t)" marker-end="url(#st-ah-t)"/>
+          <text x="210" y="252" class="t-mono" text-anchor="middle">a<tspan baseline-shift="sub" font-size="8">v</tspan> ≤ d</text>
+          <line x1="350" y1="82" x2="350" y2="190" style="stroke:var(--text-dim)" marker-start="url(#st-ah-t)" marker-end="url(#st-ah-t)"/>
+          <text x="356" y="160" class="t-mono">d</text>
+        </g>
+        <g transform="translate(560,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">하중점 절점(CCT)의 평형</text>
+          <line x1="120" y1="40" x2="120" y2="110" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#st-ah-ld)"/>
+          <line x1="120" y1="110" x2="20" y2="110" style="stroke:var(--tension);stroke-width:3" marker-end="url(#st-ah-t)"/>
+          <line x1="120" y1="110" x2="60" y2="200" style="stroke:var(--compression);stroke-width:3" marker-end="url(#st-ah-c)"/>
+          <line x1="120" y1="110" x2="190" y2="110" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#st-ah-ld)"/>
+          <text x="128" y="70" class="t-mono">V<tspan baseline-shift="sub" font-size="8">u</tspan></text>
+          <text x="20" y="100" class="t-mono" style="fill:var(--tension)">T</text>
+          <text x="40" y="200" class="t-mono" style="fill:var(--compression)">C</text>
+          <text x="150" y="102" class="t-mono" style="fill:var(--accent-2)">N<tspan baseline-shift="sub" font-size="8">uc</tspan></text>
+          <text x="0" y="236" class="t-mono">T = V<tspan baseline-shift="sub" font-size="8">u</tspan>/tanθ + N<tspan baseline-shift="sub" font-size="8">uc</tspan>, C = V<tspan baseline-shift="sub" font-size="8">u</tspan>/sinθ</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-5.</b> 코벨의 스트럿–타이 모델. 하중점(지압판 아래)의 CCT 절점에서 연직 하중 \(V_u\)와 수평력 \(N_{uc}\)(건조 수축·크리프·온도로 생기는 마찰력, 최소 \(0.2V_u\) 형태)이 경사 스트럿과 위 타이로 나뉜다. 타이는 코벨 끝에서 용접 가로봉이나 갈고리로 하중판 바깥까지 정착하고, 기둥 안으로 충분히 정착한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 14.7 (코벨 설계, ACI 318 형태)</strong> \(a_v/d \le 1\), \(N_{uc} \le V_u\), 바깥 끝 깊이 \(\ge 0.5d\)일 때 단면식으로는
+      <div class="formula">$$A_{sc} \ge \max\!\Big(A_f + A_n,\ \tfrac23 A_{vf} + A_n,\ 0.04\tfrac{f_{ck}}{f_y} b d\Big), \quad A_h \ge 0.5(A_{sc} - A_n), \quad A_{vf} = \frac{V_u}{\phi f_y \mu},\ \mu = 1.4$$<div class="where">\(A_f\): 기둥면 모멘트 \(V_u a_v + N_{uc}(h - d)\)에 대한 휨 철근, \(A_n = N_{uc}/(\phi f_y)\), \(A_{vf}\): <span class="term">전단 마찰</span><span class="en">(shear friction)</span> 철근(일체 타설 μ = 1.4λ). 전단 마찰 상한 \(V_n \le \min(0.2f_{ck},\ 3.3 + 0.08f_{ck},\ 11)\,b d\)(MPa, 형태). 스트럿–타이 모델로 설계해도 된다. 현행 KDS 14 20 24를 확인할 것.</div></div></div>
+    <div class="sim" id="sim-st-corbel">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>코벨 설계: STM과 단면식</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="st-cv-cb" aria-label="코벨 단면, 스트럿과 타이, 철근량 비교 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">연직 하중 V<sub>u</sub></i> <output id="st-cb-V-out"></output></span><input type="range" id="st-cb-V" min="100" max="1500" step="10" value="400"></label>
+          <label class="ctrl"><span><i style="font-style:normal">하중 거리 a<sub>v</sub></i> <output id="st-cb-a-out"></output></span><input type="range" id="st-cb-a" min="50" max="700" step="10" value="200"></label>
+          <label class="ctrl"><span>기둥면 깊이 h <output id="st-cb-h-out"></output></span><input type="range" id="st-cb-h" min="300" max="900" step="10" value="500"></label>
+          <label class="ctrl"><span>폭 b <output id="st-cb-b-out"></output></span><input type="range" id="st-cb-b" min="250" max="800" step="10" value="400"></label>
+          <label class="ctrl"><span><i style="font-style:normal">수평력 N<sub>uc</sub>/V<sub>u</sub></i> <output id="st-cb-n-out"></output></span><input type="range" id="st-cb-n" min="0.2" max="1" step="0.05" value="0.2"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">a<sub>v</sub>/d · θ</span><span class="v" id="st-cb-o-ad">—</span></div>
+        <div class="stat"><span class="k">STM 타이 T · A<sub>s</sub></span><span class="v" id="st-cb-o-T">—</span></div>
+        <div class="stat"><span class="k">단면식 A<sub>sc</sub> · A<sub>h</sub></span><span class="v" id="st-cb-o-as">—</span></div>
+        <div class="stat"><span class="k">전단 마찰 상한</span><span class="v" id="st-cb-o-vn">—</span></div>
+      </div>
+      <div class="st-msg" id="st-cb-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(예제 14.2)에서 STM 타이 약 885 mm², 단면식 721 mm²로 비슷합니다 · a<sub>v</sub>를 키워 a<sub>v</sub>/d가 1을 넘으면 코벨이 아니라 캔틸레버 보로 설계해야 합니다 · N<sub>uc</sub>를 키우면 두 방법 모두 타이가 늘지만 STM은 그대로 더해집니다 · 모델(페이지 내, 교육용): STM 하중 절점 (a<sub>v</sub>, d), 아래 절점은 기둥 안 0.1d, 타이와의 연직 거리 z = 0.85d → T = V<sub>u</sub>(a<sub>v</sub> + 0.1d)/z + N<sub>uc</sub>, d = h − 40 mm, f<sub>ck</sub> 30, SD500, φ 0.75, 지압판 150 mm × b(CCT β<sub>n</sub> 0.80). 단면식은 원리 14.7(<code>CB.rc.asReq</code>로 A<sub>f</sub>).</div>
+    </div>
+    <div class="callout"><strong>예제 14.2 (코벨, 교육용)</strong> 기둥 400 × 400 mm에 붙은 코벨, \(b = 400\), 기둥면 깊이 \(h = 500\), \(d = 460\) mm, \(V_u = 400\) kN, \(a_v = 200\) mm, \(N_{uc} = 0.2V_u = 80\) kN.
+      <ol class="st-steps">
+        <li><b>적용 범위.</b> \(a_v/d = 0.43 \le 1\) OK, \(N_{uc} \le V_u\) OK.</li>
+        <li><b>단면식.</b> \(M_u = 400 \times 0.2 + 80 \times 0.04 = 83.2\) kN·m → \(A_f\) = asReq(83.2, 400, 460) = 436 mm². \(A_n = 80{,}000/(0.75 \times 500) = 213\) mm². \(A_{vf} = 400{,}000/(0.75 \times 500 \times 1.4) = 762\) mm². \(A_{sc} = \max(436 + 213,\ \tfrac23 \times 762 + 213,\ 0.04 \times \tfrac{30}{500} \times 400 \times 460) = \max(649, 721, 442) = 721\) mm². \(A_h = 0.5(721 - 213) = 254\) mm² → 폐쇄 스터럽 2-D10(4다리 285 mm²).</li>
+        <li><b>STM.</b> \(z = 0.85 \times 460 = 391\) mm, 수평 거리 \(200 + 46 = 246\) mm → \(\theta = \arctan(391/246) = 57.8°\). \(T = 400 \times 246/391 + 80 = 332\) kN → \(A_s = 332{,}000/(0.75 \times 500) = 885\) mm². \(C = 400/\sin 57.8° = 473\) kN.</li>
+        <li><b>선택.</b> 5-D16(993 mm²)이면 두 방법을 모두 만족한다. 하중판 150 × 400의 지압 \(400{,}000/60{,}000 = 6.7\) MPa ≤ 15.3 MPa OK. 전단 마찰 상한 \(0.75 \times 5.7 \times 400 \times 460 = 787\) kN ≥ 400 kN OK.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="openings">
+    <h2>개구부 주변의 하중 경로</h2>
+    <div class="problem"><strong>설비 덕트가 보를 뚫어야 한다면</strong>
+      <p>깊은 보나 벽에 설비용 구멍을 뚫으면 원래의 압축대가 끊깁니다. 힘은 구멍 위와 아래로 갈라져 돌아가고, 돌아가는 모서리마다 방향을 바꾸는 힘—곧 새 타이—이 필요합니다. 구멍 크기·위치에 따라 어떤 철근이 필요한지는 단면식으로는 알 수 없고, 하중 경로를 그려 보아야 합니다.</p></div>
+    <p>아래 시뮬레이터는 깊은 보(6 × 2.4 m, 가운데 하중)에 개구부를 두고, 배경에 유한 요소의 주응력 궤적을, 위에 우회하는 스트럿–타이 모델(<code>CB.truss</code>)을 겹쳐 보여 줍니다. 개구부 위(D)와 아래(E)의 우회 절점을 끌어 궤적과 맞춰 보세요. 인장(파랑)이 된 부재마다 철근이 필요합니다.</p>
+    <div class="sim" id="sim-st-open">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>개구부를 돌아가는 하중 경로</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="st-cv-open" aria-label="개구부가 있는 깊은 보의 주응력 궤적과 우회 트러스 모델"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>개구부 중심 x <output id="st-op-x-out"></output></span><input type="range" id="st-op-x" min="3.8" max="5.2" step="0.05" value="4.4"></label>
+          <label class="ctrl"><span>개구부 중심 y <output id="st-op-y-out"></output></span><input type="range" id="st-op-y" min="0.8" max="1.6" step="0.05" value="1.1"></label>
+          <label class="ctrl"><span>개구부 크기 <output id="st-op-s-out"></output></span><input type="range" id="st-op-s" min="0.3" max="0.9" step="0.05" value="0.6"></label>
+          <label class="ctrl"><span><i style="font-style:normal">하중 P<sub>u</sub></i> <output id="st-op-P-out"></output></span><input type="range" id="st-op-P" min="500" max="5000" step="50" value="2000"></label>
+          <div class="ctrl"><span>배경</span><div class="seg" id="st-op-bg"><button data-value="on" class="on">궤적 보기</button><button data-value="off">끄기</button></div></div>
+          <div class="btn-row"><button class="btn" id="st-op-reset">절점 자동 배치</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">위 경로 · 아래 경로 분담</span><span class="v" id="st-op-o-sh">—</span></div>
+        <div class="stat"><span class="k">최대 타이 힘</span><span class="v" id="st-op-o-T">—</span></div>
+        <div class="stat"><span class="k">타이 철근 합(SD500)</span><span class="v" id="st-op-o-As">—</span></div>
+      </div>
+      <div class="st-msg" id="st-op-msg"></div>
+      <div class="sim-note">해볼 것: 개구부를 아래로 내려 하중 경로(왼쪽 위 → 오른쪽 아래 압축 궤적) 한가운데에 두면 우회 부재 힘이 크게 늘어납니다 · 개구부를 위로 올려 경로에서 비키면 배경의 압축 궤적이 거의 바뀌지 않습니다 — 구멍은 압축 궤적을 피해 뚫는 것이 원칙 · D·E를 끌어 어느 부재가 인장(파랑)으로 바뀌는지 보세요: 그 자리에 구멍 둘레 보강근이 필요합니다 · 부재가 구멍을 지나면 빨간 경고가 나옵니다 · 모델(페이지 내, 교육용): 유한 요소는 B·D 영역 시뮬레이터와 같은 CST(개구부 요소 제거), 트러스는 절점 A(왼쪽 지점), B(오른쪽 지점), C(하중), D(구멍 위 오른쪽), E(구멍 아래 왼쪽), G(D 아래·E 높이), 부재 A–C, C–D, C–E, E–G, G–B, D–G(구멍 오른쪽 연직), D–B, E–B, A–B(정정), <code>CB.truss</code>. D·G에서 방향을 바꾸는 힘을 구멍 옆 연직 부재 D–G가 맡는다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="pile-cap">
+    <h2>말뚝 캡의 3차원 스트럿–타이 모델</h2>
+    <div class="problem"><strong>13장의 캡을 다시 풀면</strong>
+      <p>13장 예제 13.5의 C1 캡(3.8 × 3.8 × 1.4 m, PHC φ600 다섯 본)은 모서리 말뚝이 기둥 펀칭 둘레에 걸쳐 1방향 전단이 0이었습니다. 하중이 기둥에서 말뚝 머리로 비스듬히 바로 간다는 뜻입니다. 그 경로를 그대로 모델로 만들면 3차원 트러스가 됩니다: 기둥 아래 절점에서 모서리 말뚝 머리로 가는 네 개의 경사 스트럿, 가운데 말뚝으로 가는 연직 스트럿, 그리고 말뚝 머리를 잇는 바닥 타이.</p></div>
+    <figure class="diagram" id="fig-st-cap">
+      <svg viewBox="0 0 860 290" role="img" aria-label="말뚝 캡의 3차원 스트럿–타이 모델 단면과 평면, 타이 배치">
+        <rect x="10" y="10" width="840" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">대각선 단면</text>
+          <rect x="160" y="20" width="60" height="40" style="fill:var(--text-dim);opacity:.55"/>
+          <rect x="0" y="60" width="380" height="120" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:var(--bg-elev);stroke:var(--accent);stroke-width:1.4"><rect x="20" y="180" width="40" height="40"/><rect x="170" y="180" width="40" height="40"/><rect x="320" y="180" width="40" height="40"/></g>
+          <path d="M175 74 L 40 160 M205 74 L340 160 M190 74 L190 160" style="stroke:var(--compression);stroke-width:5;opacity:.6"/>
+          <line x1="40" y1="160" x2="340" y2="160" style="stroke:var(--tension);stroke-width:3"/>
+          <line x1="400" y1="74" x2="400" y2="160" style="stroke:var(--text-dim)" marker-start="url(#st-ah-t)" marker-end="url(#st-ah-t)"/><text x="406" y="122" class="t-mono">z</text>
+          <text x="228" y="50" class="t-mono" style="fill:var(--compression)">스트럿은 기둥 1/4점에서</text>
+          <text x="190" y="238" class="t-mono" text-anchor="middle">R<tspan baseline-shift="sub" font-size="8">u</tspan> ≈ 1,800–1,859 kN/본</text>
+        </g>
+        <g transform="translate(520,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">평면: 타이 배치 두 가지</text>
+          <rect x="10" y="20" width="130" height="130" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:none;stroke:var(--accent)"><circle cx="35" cy="45" r="11"/><circle cx="115" cy="45" r="11"/><circle cx="35" cy="125" r="11"/><circle cx="115" cy="125" r="11"/><circle cx="75" cy="85" r="11"/></g>
+          <path d="M35 45 L115 45 L115 125 L35 125 Z" style="fill:none;stroke:var(--tension);stroke-width:3"/>
+          <text x="75" y="172" class="t-mono" text-anchor="middle">말뚝 위 띠(테두리)</text>
+          <rect x="170" y="20" width="130" height="130" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:none;stroke:var(--accent)"><circle cx="195" cy="45" r="11"/><circle cx="275" cy="45" r="11"/><circle cx="195" cy="125" r="11"/><circle cx="275" cy="125" r="11"/><circle cx="235" cy="85" r="11"/></g>
+          <path d="M195 45 L275 125 M275 45 L195 125" style="stroke:var(--tension);stroke-width:3"/>
+          <text x="235" y="172" class="t-mono" text-anchor="middle">대각선</text>
+          <text x="155" y="206" class="t-mono" text-anchor="middle">실무는 말뚝 위 띠 + 고르게 분산</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-6.</b> 5본 캡의 3차원 스트럿–타이 모델. 경사 스트럿은 기둥 단면의 1/4점 근처에서 시작해 말뚝 머리로 내려가고, 말뚝 머리의 수평 성분은 말뚝을 잇는 타이가 받는다. 타이는 말뚝 위에 띠로 모아 두는 것이 모델에 충실하며, 그 사이에도 균열 제어용 철근을 고르게 둔다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-st-cap3d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>말뚝 캡 3D 스트럿–타이 모델</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="st-cv-cap" aria-label="말뚝 캡의 3차원 스트럿과 타이, 부재력"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>배치</span><div class="seg" id="st-cp-lay"><button data-value="5" class="on">5본(C1)</button><button data-value="4">4본</button></div></div>
+          <label class="ctrl"><span>캡 두께 h <output id="st-cp-h-out"></output></span><input type="range" id="st-cp-h" min="900" max="2500" step="50" value="1400"></label>
+          <label class="ctrl"><span><i style="font-style:normal">계수 축력 P<sub>u</sub></i> <output id="st-cp-P-out"></output></span><input type="range" id="st-cp-P" min="2000" max="14000" step="100" value="9000"></label>
+          <label class="ctrl"><span><i style="font-style:normal">계수 모멘트 M<sub>u</sub></i> <output id="st-cp-M-out"></output></span><input type="range" id="st-cp-M" min="0" max="2000" step="10" value="300"></label>
+          <div class="ctrl"><span>타이</span><div class="seg" id="st-cp-tie"><button data-value="edge" class="on">말뚝 위 띠</button><button data-value="diag">대각선</button></div></div>
+          <div class="btn-row"><button class="btn" id="st-cp-reset">시점 처음으로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">z · 스트럿 각</span><span class="v" id="st-cp-o-z">—</span></div>
+        <div class="stat"><span class="k">최대 스트럿 힘</span><span class="v" id="st-cp-o-C">—</span></div>
+        <div class="stat"><span class="k">타이 힘 · A<sub>s</sub>(한 띠)</span><span class="v" id="st-cp-o-T">—</span></div>
+        <div class="stat"><span class="k">한 방향 합: STM vs 단면</span><span class="v" id="st-cp-o-cmp">—</span></div>
+      </div>
+      <div class="st-msg" id="st-cp-msg"></div>
+      <div class="sim-note">해볼 것: 끌어서 돌려 보세요 · 기본값(C1, h 1.4 m)에서 한 띠의 타이 약 1,900 kN(As ≈ 5,070 mm²), 한 방향 합 약 10,100 mm²로 13장의 단면 설계(소요 6,452 mm², 최소 철근 8,512 mm²)보다 많습니다 · h를 키우면 z가 커져 타이가 줄고 스트럿이 가팔라집니다 · 4본 배치(2 × 2, 간격 1.8 m)와 비교해 보세요 · 모델(페이지 내, 교육용): 위 절점은 기둥 1/4점(±0.2 m)·캡 윗면 아래 0.15 m, 아래 절점은 말뚝 머리·바닥 위 0.2 m, z = h − 0.35 m, 말뚝 반력은 원리 13.10(강체 캡), 각 모서리 말뚝의 x·y 수평 성분을 그 방향 띠 타이가 받음(대각선 타이는 반경 방향 성분), φ 0.75, SD500. 단면 설계값은 <code>CB.rc.asReq</code>(기둥면, b = 캡 폭, d = h − 200).</div>
+    </div>
+    <div class="callout"><strong>예제 14.3 (C1 5본 캡의 STM, 13장 예제 13.5와 비교)</strong> \(h = 1{,}400\) mm, 최대 모서리 반력 \(R_u = 1{,}859\) kN.
+      <ol class="st-steps">
+        <li><b>기하.</b> 위 절점(기둥 1/4점) (±0.2, ±0.2) m, 캡 윗면 아래 0.15 m. 아래 절점 = 모서리 말뚝 머리 (±1.273, ±1.273) m, 바닥 위 0.2 m. \(z = 1.4 - 0.15 - 0.2 = 1.05\) m. 한 방향 수평 투영 1.073 m, 평면 대각 투영 \(\sqrt2 \times 1.073 = 1.517\) m → 스트럿 경사 \(\arctan(1.05/1.517) = 34.7°\) ≥ 25° OK.</li>
+        <li><b>스트럿.</b> 길이 \(\sqrt{1.073^2 + 1.073^2 + 1.05^2} = 1.845\) m → \(C = 1{,}859 \times 1.845/1.05 = 3{,}267\) kN.</li>
+        <li><b>타이(말뚝 위 띠).</b> 모서리 절점에서 x 방향 성분 \(1{,}859 \times 1.073/1.05 = 1{,}900\) kN → 한 띠 \(A_s = 1{,}900{,}000/(0.75 \times 500) = 5{,}066\) mm² → 10-D25(5,067 mm²)를 말뚝 위 폭 약 1.2 m에 모아 둔다. 한 방향 두 띠 합 약 10,130 mm².</li>
+        <li><b>절점.</b> 기둥 아래(CCC) \(9{,}000{,}000/640{,}000 = 14.1\) MPa ≤ \(0.75 \times 0.85 \times 1.0 \times 30 = 19.1\) MPa OK. 말뚝 머리(CCT) \(1{,}859{,}000/(\pi \times 300^2) = 6.6\) MPa ≤ 15.3 MPa OK.</li>
+        <li><b>비교.</b> 13장 단면 설계는 소요 6,452 mm²(최소 철근 지배로 8,512 mm², 17-D25 고르게)였다. STM의 한 방향 합 약 10,130 mm²가 약 1.57배 크다. 차이의 원인은 ① 팔 길이(STM \(z = 1.05\) m, 단면 \(jd \approx 1.16\) m), ② 모멘트 팔(STM은 기둥 1/4점까지 1.073 m, 단면은 기둥면까지 0.873 m), ③ φ(STM 0.75, 휨 0.85)다(1.10 × 1.23 × 1.13 ≈ 1.53). 두꺼운 캡에서 STM은 보수적이지만 철근을 <b>말뚝 위에 모아</b> 하중 경로에 맞춘다는 점이 다르다. 실무에서는 띠에 STM 타이를 두고 그 사이에 최소 철근을 고르게 두는 방식이 흔하다.</li>
+      </ol></div>
+    <div class="callout site"><strong>B-10의 D 영역들</strong> ① 매트 2.5 m 안의 C1 캡 부분: \(d \approx 2{,}300\) mm라 말뚝이 모두 펀칭 둘레 안에 있다(13장). \(z \approx 2.5 - 0.15 - 0.2 = 2.15\) m로 늘어 같은 모델의 타이 힘이 1,900 → 약 930 kN/띠로 절반이 되고, 매트 최소 철근(위·아래 D25 @ 250)과 겹쳐 대부분 감당된다(교육용). ② 지하 주차장에서 기둥을 빼는 전이보는 예제 14.1의 DB-1 같은 깊은 보가 된다. ③ 1층 기둥 C1과 G1 보의 접합부, 코어 벽의 문 개구부 둘레, 계단실 슬래브 단부도 D 영역이다. 모든 값은 교육용이며 실제 설계는 현행 KDS 14 20 24와 해석으로 확인한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="footings.html"><small>CH.13 · 기초</small>두꺼운 말뚝 캡<br><span>말뚝이 펀칭 둘레 안 → 3차원 STM.</span></a>
+      <a href="shear.html"><small>CH.05 · 전단과 사인장 균열</small>보 트러스와 아치<br><span>지점에서 d, 전단 경간비, 깊은 보 맛보기.</span></a>
+      <a href="development.html"><small>CH.07 · 정착과 이음</small>타이의 정착<br><span>절점 영역 끝에서부터 갈고리·정착판.</span></a>
+      <a href="walls-detailing.html"><small>CH.12 · 벽체와 내진 상세</small>연결보와 접합부<br><span>대각 철근, 접합부 전단의 스트럿 작용.</span></a>
+      <a href="prestressed.html"><small>CH.15 · 프리스트레스트 콘크리트</small>정착구 뒤의 쪼갬<br><span>긴장력이 퍼지는 정착부도 D 영역.</span></a>
+      <a href="../../mechanics/chapters/truss.html"><small>MechanicsBook</small>트러스 해석<br><span>절점법·직접 강성법으로 부재력.</span></a>
+      <a href="../../structure/chapters/long-span.html"><small>StructureBook</small>전이 구조와 장경간<br><span>기둥을 받는 전이보·전이 슬래브.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>평면 유지가 성립하는 B 영역과, 하중·지점·단면 변화·개구부 둘레 약 \(h\)의 D 영역을 구분한다(생브낭 원리). 깊은 보·코벨·말뚝 캡은 전체가 D 영역이다.</li>
+      <li>스트럿–타이 모델은 D 영역의 응력장을 스트럿(콘크리트 압축), 타이(철근), 절점(CCC·CCT·CTT)의 트러스로 바꾼다. 하한 정리에 따라 평형과 강도 조건을 만족하면 안전 측이다.</li>
+      <li>유효 강도 \(f_{ce} = 0.85\beta f_{ck}\), φ = 0.75. β<sub>s</sub>: 각기둥 1.0, 병 모양+철근 0.75, 철근 부족 0.60, 인장 영역 0.40. β<sub>n</sub>: CCC 1.0, CCT 0.80, CTT 0.60(ACI 318-14 형태, 현행 기준 확인).</li>
+      <li>확장 절점의 스트럿 면 폭 \(w_s = l_b\sin\theta + w_t\cos\theta\). 스트럿 응력은 β<sub>s</sub>와 β<sub>n</sub> 중 작은 한계로 검토한다.</li>
+      <li>병 모양 스트럿은 가로 인장(≈ \(F/4 \cdot (1 - a/b_{ef})\))으로 쪼개지므로 분산 철근(\(\sum\rho_i\sin\gamma_i \ge 0.003\) 형태)을 둔다. 좋은 모델은 하중 경로가 짧고 탄성 궤적과 비슷하며 스트럿–타이 각이 25° 이상이다.</li>
+      <li>깊은 보(\(l_n \le 4h\) 형태): DB-1(4.8 × 1.8 m, 3,000 kN) → z ≈ 1.55 m, T ≈ 2,330 kN(13-D25). 하중점 스트럿 면이 지배해 b·기둥을 500 → 600 mm로 키웠다. 단면식(φV<sub>c</sub> 677 kN)은 아치 작용을 모른다.</li>
+      <li>코벨(\(a_v/d \le 1\)): T = V<sub>u</sub>/tanθ + N<sub>uc</sub>(N<sub>uc</sub> ≥ 0.2V<sub>u</sub>), 단면식은 휨·전단 마찰·인장의 조합과 A<sub>h</sub> = 0.5(A<sub>sc</sub> − A<sub>n</sub>). 개구부는 압축 궤적을 피해 두고, 우회 경로의 인장 부재마다 보강근을 둔다.</li>
+      <li>C1 5본 캡의 3차원 STM: z = 1.05 m, 스트럿 3,267 kN(34.7°), 띠 타이 1,900 kN(10-D25/띠). 단면 설계보다 철근이 많지만 말뚝 위에 모으는 하중 경로를 준다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 깊이 h = 1.0 m인 보에서 집중 하중 바로 아래의 D 영역은 대략 어디까지인가?</p><div class="opts">
+        <button class="opt">하중점에서 0.1 m</button><button class="opt" data-correct>하중점 양쪽으로 약 1.0 m</button><button class="opt">보 전체</button><button class="opt">하중점에서 d/2</button>
+      </div><div class="quiz-exp">생브낭 원리에 따라 불연속의 영향은 약 부재 깊이 h만큼 떨어지면 사라진다. 그래서 D 영역을 불연속점 양쪽 약 h로 잡는다.</div></div>
+      <div class="quiz-q"><p>2. 타이 하나가 정착되는 지점 위의 절점은?</p><div class="opts">
+        <button class="opt">CCC, β<sub>n</sub> = 1.0</button><button class="opt" data-correct>CCT, β<sub>n</sub> = 0.80</button><button class="opt">CTT, β<sub>n</sub> = 0.60</button><button class="opt">TTT</button>
+      </div><div class="quiz-exp">지점 반력(압축)과 경사 스트럿(압축)이 바닥 타이 하나와 만난다. 타이의 부착·정착이 콘크리트를 덜 구속하므로 CCC보다 계수가 작다(ACI 318-14 형태).</div></div>
+      <div class="quiz-q"><p>3. f<sub>ck</sub> = 30 MPa, 분산 철근 조건을 만족하는 병 모양 스트럿의 설계 유효 강도 φf<sub>ce</sub>는?</p><div class="opts">
+        <button class="opt">25.5 MPa</button><button class="opt">19.1 MPa</button><button class="opt" data-correct>14.3 MPa</button><button class="opt">11.5 MPa</button>
+      </div><div class="quiz-exp">0.75 × 0.85 × 0.75 × 30 = 14.3 MPa. 19.1 MPa는 β = 1.0, 11.5 MPa는 β = 0.60일 때다.</div></div>
+      <div class="quiz-q"><p>4. 지압판 폭 400 mm, 타이 유효 높이 200 mm, 스트럿 각 θ = 45°인 확장 절점의 스트럿 면 폭은?</p><div class="opts">
+        <button class="opt">283 mm</button><button class="opt" data-correct>424 mm</button><button class="opt">600 mm</button><button class="opt">141 mm</button>
+      </div><div class="quiz-exp">w<sub>s</sub> = 400 sin45° + 200 cos45° = 283 + 141 = 424 mm.</div></div>
+      <div class="quiz-q"><p>5. 지점 중심 간 4 m, 가운데 하중 2,000 kN, 팔 길이 z = 1.0 m인 깊은 보의 타이 힘은?</p><div class="opts">
+        <button class="opt">1,000 kN</button><button class="opt" data-correct>2,000 kN</button><button class="opt">4,000 kN</button><button class="opt">500 kN</button>
+      </div><div class="quiz-exp">지점 절점에서 반력 1,000 kN, tanθ = z/(L/2) = 1.0/2.0 → T = R/tanθ = 1,000 × 2.0/1.0 = 2,000 kN. 같은 값이 M/z = (1,000 × 2.0)/1.0으로도 나온다.</div></div>
+      <div class="quiz-q"><p>6. 스트럿과 타이 사이의 각을 25° 이상으로 제한하는 이유로 가장 알맞은 것은?</p><div class="opts">
+        <button class="opt">철근 가공을 쉽게 하려고</button><button class="opt" data-correct>각이 작으면 타이 힘이 급격히 커지고 스트럿이 타이의 인장 변형·균열을 따라 약해지기 때문</button><button class="opt">트러스가 불안정해지기 때문</button><button class="opt">콘크리트 크리프를 줄이려고</button>
+      </div><div class="quiz-exp">T = R/tanθ이므로 θ가 작아지면 T가 빠르게 커진다. 또 스트럿이 인장 철근과 거의 나란하면 철근의 인장 변형에 따른 균열이 스트럿을 가로질러 압축 강도를 떨어뜨린다.</div></div>
+      <div class="quiz-q"><p>7. 코벨 설계에서 수평력 N<sub>uc</sub>을 최소 0.2V<sub>u</sub>로 잡는 이유는?</p><div class="opts">
+        <button class="opt">지진 하중을 넣기 위해</button><button class="opt" data-correct>얹힌 부재의 건조 수축·크리프·온도 변형이 받침면 마찰로 수평력을 만들기 때문</button><button class="opt">자중을 넣기 위해</button><button class="opt">전단 마찰 계수를 줄이기 위해</button>
+      </div><div class="quiz-exp">프리캐스트 보가 줄어들거나 늘면 지압면 마찰로 코벨을 잡아당긴다. 계산하지 않았더라도 최소 0.2V<sub>u</sub>를 인장으로 넣는다(ACI 318 형태).</div></div>
+      <div class="quiz-q"><p>8. 13장의 C1 캡을 STM으로 풀었을 때 단면 설계보다 타이 철근이 많이 나온 주된 이유가 아닌 것은?</p><div class="opts">
+        <button class="opt">팔 길이 z가 단면의 jd보다 작다</button><button class="opt">스트럿이 기둥면이 아니라 기둥 1/4점에서 시작해 모멘트 팔이 길다</button><button class="opt">STM의 φ(0.75)가 휨의 φ(0.85)보다 작다</button><button class="opt" data-correct>STM은 말뚝 반력을 두 배로 잡는다</button>
+      </div><div class="quiz-exp">반력은 두 방법이 같다(원리 13.10). 차이는 z(1.05 vs 약 1.16 m), 모멘트 팔(1.073 vs 0.873 m), φ(0.75 vs 0.85)에서 나오며 곱하면 약 1.5배다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const ST = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${ST.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  poly(ctx, pts, fill, stroke, width = 1.2, dash) {
+    ctx.save(); ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.stroke(); }
+    ctx.restore();
+  },
+  rect(ctx, x, y, w, h, fill, stroke, width = 1.2, dash) { ST.poly(ctx, [[x, y], [x + w, y], [x + w, y + h], [x, y + h]], fill, stroke, width, dash); },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = ST._c || (ST._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  k(v) { return isFinite(v) ? Math.round(v).toLocaleString("en-US").replace("-", "−") : "—"; },
+  msg(id, html, cls) { const el = document.getElementById(id); if (!el) return; el.innerHTML = html; el.className = "st-msg" + (cls ? " " + cls : ""); },
+  PHI: 0.75,
+  fce(beta, fck) { return 0.75 * 0.85 * beta * fck; },
+  /**
+   * 평면 응력 CST 유한 요소(페이지 내 모델). 직사각형 L × h, 깊이 방향 ny칸, 각 칸을 삼각형 둘로.
+   * o: { L, h, ny, loads: [{ x, w, P }](윗면, 아래 방향), supports: [{ x, w }](아랫면, 연직 구속), hole: { x0, x1, y0, y1 } }
+   * → { nx, ny, dx, dy, cell(i, j) → { sx, sy, txy } | null }
+   */
+  fe(o) {
+    const ny = o.ny || 12, nx = Math.max(4, Math.round((ny * o.L) / o.h)), dx = o.L / nx, dy = o.h / ny;
+    const NN = (nx + 1) * (ny + 1), id = (i, j) => i * (ny + 1) + j, n = 2 * NN, bw = 2 * (ny + 2) + 1;
+    const nu = 0.2, c = 1 / (1 - nu * nu), D = [[c, c * nu, 0], [c * nu, c, 0], [0, 0, (c * (1 - nu)) / 2]];
+    const K = Array.from({ length: n }, () => new Float64Array(bw + 1)), F = new Float64Array(n), used = new Uint8Array(NN);
+    const hole = o.hole, inHole = (x, y) => hole && x > hole.x0 && x < hole.x1 && y > hole.y0 && y < hole.y1;
+    const X = (q) => Math.floor(q / (ny + 1)) * dx, Y = (q) => (q % (ny + 1)) * dy, tris = [], cells = [];
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      if (inHole((i + 0.5) * dx, (j + 0.5) * dy)) { cells.push(null); continue; }
+      const a = id(i, j), b = id(i + 1, j), cc = id(i + 1, j + 1), d = id(i, j + 1);
+      const t2 = [[a, b, cc], [a, cc, d]].map((nd) => {
+        nd.forEach((q) => (used[q] = 1));
+        const [x1, x2, x3] = nd.map(X), [y1, y2, y3] = nd.map(Y), A2 = (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1);
+        const bb = [y2 - y3, y3 - y1, y1 - y2], cv = [x3 - x2, x1 - x3, x2 - x1];
+        const B = [[], [], []]; for (let k = 0; k < 3; k++) { B[0].push(bb[k] / A2, 0); B[1].push(0, cv[k] / A2); B[2].push(cv[k] / A2, bb[k] / A2); }
+        const DB = D.map((r) => B[0].map((_, m) => r[0] * B[0][m] + r[1] * B[1][m] + r[2] * B[2][m]));
+        const dof = nd.flatMap((q) => [2 * q, 2 * q + 1]), A = A2 / 2;
+        for (let p = 0; p < 6; p++) for (let q = 0; q < 6; q++) { const gi = dof[p], gj = dof[q]; if (gj < gi) continue; K[gi][gj - gi] += A * (B[0][p] * DB[0][q] + B[1][p] * DB[1][q] + B[2][p] * DB[2][q]); }
+        return { dof, DB };
+      });
+      tris.push(...t2); cells.push(t2);
+    }
+    const big = 1e10, fix = (d) => { K[d][0] += big; };
+    for (let q = 0; q < NN; q++) if (!used[q]) { fix(2 * q); fix(2 * q + 1); }
+    let fx = false;
+    (o.supports || []).forEach((s) => { let best = -1, bd = 1e9; for (let i = 0; i <= nx; i++) { const x = i * dx; if (Math.abs(x - s.x) <= s.w / 2 + 1e-9) { fix(2 * id(i, 0) + 1); if (Math.abs(x - s.x) < bd) { bd = Math.abs(x - s.x); best = i; } } } if (best < 0) { best = Math.round(s.x / dx); fix(2 * id(best, 0) + 1); } if (!fx) { fix(2 * id(best, 0)); fx = true; } });
+    (o.loads || []).forEach((l) => { const nodes = []; for (let i = 0; i <= nx; i++) if (Math.abs(i * dx - l.x) <= l.w / 2 + 1e-9) nodes.push(i); if (!nodes.length) nodes.push(Math.round(l.x / dx)); nodes.forEach((i) => (F[2 * id(i, ny) + 1] -= l.P / nodes.length)); });
+    // 띠 촐레스키(위 띠 저장)
+    for (let i = 0; i < n; i++) {
+      let s = K[i][0]; for (let k = Math.max(0, i - bw); k < i; k++) { const u = K[k][i - k]; s -= u * u; }
+      const dg = Math.sqrt(Math.max(s, 1e-30)); K[i][0] = dg;
+      for (let j = i + 1; j <= Math.min(n - 1, i + bw); j++) { let t = K[i][j - i]; for (let k = Math.max(0, j - bw); k < i; k++) t -= K[k][i - k] * K[k][j - k]; K[i][j - i] = t / dg; }
+    }
+    const y = new Float64Array(n), u = new Float64Array(n);
+    for (let i = 0; i < n; i++) { let s = F[i]; for (let k = Math.max(0, i - bw); k < i; k++) s -= K[k][i - k] * y[k]; y[i] = s / K[i][0]; }
+    for (let i = n - 1; i >= 0; i--) { let s = y[i]; for (let j = i + 1; j <= Math.min(n - 1, i + bw); j++) s -= K[i][j - i] * u[j]; u[i] = s / K[i][0]; }
+    const st = cells.map((t2) => { if (!t2) return null; const sg = [0, 0, 0]; t2.forEach((t) => t.DB.forEach((r, m) => { sg[m] += r.reduce((a, v, p) => a + v * u[t.dof[p]], 0) / 2; })); return { sx: sg[0], sy: sg[1], txy: sg[2] }; });
+    return { nx, ny, dx, dy, L: o.L, h: o.h, cell: (i, j) => st[i * ny + j] };
+  },
+  principal(s) { const m = (s.sx + s.sy) / 2, r = Math.hypot((s.sx - s.sy) / 2, s.txy), th = 0.5 * Math.atan2(2 * s.txy, s.sx - s.sy); return { s1: m + r, s2: m - r, th }; },
+  /** 궤적 그리기: X(x), Y(y) 화면 변환, mode "traj" | "comp" | "tens" */
+  drawTraj(ctx, R, X, Y, pal, mode = "traj", alpha = 1) {
+    let smax = 0; for (let i = 0; i < R.nx; i++) for (let j = 0; j < R.ny; j++) { const c = R.cell(i, j); if (c) { const p = ST.principal(c); smax = Math.max(smax, Math.abs(p.s1), Math.abs(p.s2)); } }
+    const len = Math.min(Math.abs(X(R.dx) - X(0)), Math.abs(Y(0) - Y(R.dy))) * 0.95;
+    for (let i = 0; i < R.nx; i++) for (let j = 0; j < R.ny; j++) {
+      const c = R.cell(i, j); if (!c) continue; const p = ST.principal(c), cx = X((i + 0.5) * R.dx), cy = Y((j + 0.5) * R.dy);
+      const seg = (s, ang, col) => { const l = (len * Math.sqrt(Math.abs(s) / smax)) / 2; if (l < 0.6) return; const ux = Math.cos(ang) * l, uy = -Math.sin(ang) * l; ST.line(ctx, [[cx - ux, cy - uy], [cx + ux, cy + uy]], col, 1.7); };
+      const comp = p.s2 < 0 ? [p.s2, p.th + Math.PI / 2] : null, tens = p.s1 > 0 ? [p.s1, p.th] : null;
+      if (comp && mode !== "tens") seg(comp[0], comp[1], ST.alpha(pal.compression, 0.85 * alpha));
+      if (tens && mode !== "comp") seg(tens[0], tens[1], ST.alpha(pal.tension, 0.85 * alpha));
+    }
+  },
+};
+
+/* ---------- 1. B·D 영역(유한 요소) ---------- */
+(function () {
+  const gL = CB.range("st-fe-L", (v) => v.toFixed(1), go), ga = CB.range("st-fe-a", (v) => v.toFixed(2), go), gx = CB.range("st-fe-x", (v) => v.toFixed(2), draw), view = CB.seg("st-fe-view", draw);
+  let R = null, dev = [], key = "";
+  function solve() {
+    const L = gL(), a = ga(), k = L + "|" + a; if (k === key) return; key = k;
+    R = ST.fe({ L, h: 1, ny: 12, loads: [{ x: a * L, w: 0.2, P: 1 }], supports: [{ x: 0.1, w: 0.2 }, { x: L - 0.1, w: 0.2 }] });
+    let gmax = 0; for (let i = 0; i < R.nx; i++) for (let j = 0; j < R.ny; j++) gmax = Math.max(gmax, Math.abs(R.cell(i, j).sx));
+    dev = []; for (let i = 0; i < R.nx; i++) {
+      const ys = [], ss = []; for (let j = 0; j < R.ny; j++) { ys.push((j + 0.5) * R.dy); ss.push(R.cell(i, j).sx); }
+      const n = ys.length, my = ys.reduce((p, v) => p + v, 0) / n, ms = ss.reduce((p, v) => p + v, 0) / n;
+      const sl = ys.reduce((p, y, q) => p + (y - my) * (ss[q] - ms), 0) / ys.reduce((p, y) => p + (y - my) ** 2, 0);
+      const rms = Math.sqrt(ss.reduce((p, s, q) => p + (s - (ms + sl * (ys[q] - my))) ** 2, 0) / n), mx = Math.max(...ss.map(Math.abs));
+      dev.push(mx < 0.04 * gmax ? 1 : rms / mx);
+    }
+  }
+  const cv = CB.canvas("#st-cv-fe", (ctx, W, H) => {
+    solve(); const pal = CB.palette(), L = gL(), sc = Math.min((W - 40) / L, (H - 60) / 1), ox = (W - L * sc) / 2, oy = (H + sc) / 2 + 6, X = (x) => ox + x * sc, Y = (y) => oy - y * sc;
+    for (let i = 0; i < R.nx; i++) if (dev[i] > 0.035) ST.rect(ctx, X(i * R.dx), Y(1), R.dx * sc + 0.5, sc, ST.alpha(pal.accent2, 0.14), null);
+    ST.rect(ctx, X(0), Y(1), L * sc, sc, null, pal.dim, 1.2);
+    ST.drawTraj(ctx, R, X, Y, pal, view());
+    [1, L - 1, ga() * L - 1, ga() * L + 1].filter((x) => x > 0 && x < L).forEach((x) => { ST.line(ctx, [[X(x), Y(1) - 8], [X(x), Y(1) + 2]], pal.accent2, 1.6); ST.line(ctx, [[X(x), Y(0) - 2], [X(x), Y(0) + 8]], pal.accent2, 1.6); });
+    ST.text(ctx, "▾ 생브낭 ±h", X(Math.min(L - 0.5, 1)) + 4, Y(0) + 16, pal.accent2, { size: 10.5, align: "left" });
+    ST.rect(ctx, X(0), Y(0), 0.2 * sc, 6, pal.accent2, null); ST.rect(ctx, X(L - 0.2), Y(0), 0.2 * sc, 6, pal.accent2, null);
+    ST.arrow(ctx, X(ga() * L), Y(1) - 26, X(ga() * L), Y(1) - 2, pal.accent2, 2.6, 9);
+    ST.line(ctx, [[X(gx() * L), Y(1) - 4], [X(gx() * L), Y(0) + 4]], pal.text, 1.4, [4, 3]);
+    ST.text(ctx, "h", X(0) - 10, Y(0.5), pal.dim, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.36), minHeight: 190, maxHeight: 340 });
+  const cv2 = CB.canvas("#st-cv-fe2", (ctx, W, H) => {
+    solve(); const pal = CB.palette(), L = gL(), a = ga() * L, x = gx() * L, i = Math.min(R.nx - 1, Math.max(0, Math.floor(x / R.dx)));
+    const xc = (i + 0.5) * R.dx;
+    const fe = []; for (let j = 0; j < R.ny; j++) fe.push([R.cell(i, j).sx, (j + 0.5) * R.dy]);
+    const n = fe.length, my = fe.reduce((p, q) => p + q[1], 0) / n, ms = fe.reduce((p, q) => p + q[0], 0) / n, sl = fe.reduce((p, q) => p + (q[1] - my) * (q[0] - ms), 0) / fe.reduce((p, q) => p + (q[1] - my) ** 2, 0);
+    const bt = [[ms + sl * (0 - my), 0], [ms + sl * (1 - my), 1]];
+    const mx = Math.max(1e-9, ...fe.map((p) => Math.abs(p[0])), ...bt.map((p) => Math.abs(p[0]))) * 1.15;
+    const C = CB.chart(ctx, { x: 60, y: 30, w: W - 80, h: H - 74 }, { x: [-mx, mx], y: [0, 1], xLabel: "σx (압축 −, 인장 +, 상대값)", yLabel: "y/h", xFmt: (v) => v.toFixed(1),
+      series: [{ data: fe.map(([s, y]) => [y, s]).sort((p, q) => p[0] - q[0]).map(([y, s]) => [s, y]), color: pal.accent, width: 2.4 }],
+      points: fe.map(([s, y]) => ({ x: s, y, color: pal.accent, r: 3 })) });
+    ST.line(ctx, bt.map(([s, y]) => [C.X(s), C.Y(y)]), pal.text, 1.6, [6, 4]);
+    ST.text(ctx, `x/L = ${(xc / L).toFixed(2)} · 직선 이탈 ${(dev[i] * 100).toFixed(0)} %`, W - 16, 40, dev[i] > 0.035 ? pal.accent2 : pal.ok, { align: "right", size: 11.5 });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.36), minHeight: 200, maxHeight: 300 });
+  function draw() {
+    cv.redraw(); cv2.redraw(); solve();
+    const frac = dev.filter((d) => d > 0.035).length / dev.length, i = Math.min(R.nx - 1, Math.floor((gx() * gL()) / R.dx));
+    CB.stat("st-fe-o-d", `${Math.round(frac * 100)} %`); CB.stat("st-fe-o-dev", `${(dev[i] * 100).toFixed(0)} %`); CB.stat("st-fe-o-n", `${R.nx * R.ny * 2}`);
+    ST.msg("st-fe-msg", frac > 0.8 ? `L/h = ${gL().toFixed(1)}: 보 거의 전체(${Math.round(frac * 100)} %)가 D 영역 — 깊은 보처럼 하중이 지점으로 바로 간다. 단면 설계 대신 스트럿–타이 모델.` : `L/h = ${gL().toFixed(1)}: 길이의 ${Math.round(frac * 100)} %가 D 영역(지점·하중 둘레). 나머지 B 영역에서는 평면 유지와 단면 해석이 맞는다.`, frac > 0.8 ? "" : "ok");
+  }
+  function go() { key = ""; draw(); }
+  draw();
+})();
+
+/* ---------- 2. 절점 영역 ---------- */
+(function () {
+  const type = CB.seg("st-nd-type", go), gR = CB.range("st-nd-R", (v) => ST.k(v) + " kN", go), gth = CB.range("st-nd-th", (v) => v.toFixed(1) + "°", go);
+  const glb = CB.range("st-nd-lb", (v) => v + " mm", go), gwt = CB.range("st-nd-wt", (v) => v + " mm", go), gb = CB.range("st-nd-b", (v) => v + " mm", go), bs = CB.seg("st-nd-bs", go);
+  function calc() {
+    const t = type(), R = gR(), th = (gth() * Math.PI) / 180, lb = glb(), wt = gwt(), b = gb(), bn = t === "CCC" ? 1 : t === "CCT" ? 0.8 : 0.6, bsv = +bs();
+    const C = R / Math.sin(th), T = R / Math.tan(th), ws = lb * Math.sin(th) + wt * Math.cos(th);
+    const fb = (R * 1000) / (lb * b), fs = (C * 1000) / (ws * b), fh = wt > 0 ? (T * 1000) / (wt * b) : Infinity;
+    const limN = ST.fce(bn, 30), limS = Math.min(ST.fce(bsv, 30), limN);
+    return { t, R, th, lb, wt, b, bn, bsv, C, T, ws, fb, fs, fh, limN, limS };
+  }
+  const cv = CB.canvas("#st-cv-node", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), sc = Math.min((W - 60) / 1500, (H - 60) / 1100), ox = W / 2 - 150 * sc, oy = H - 50, X = (x) => ox + x * sc, Y = (y) => oy - y * sc;
+    const s = Math.sin(r.th), c = Math.cos(r.th);
+    // 확장 절점: 지압판 (0..lb, y=0), 타이 높이 wt, 스트럿 면은 (lb,0)과 (0,wt)를 잇는 선에서 θ 방향으로 뻗음
+    const A = [0, r.wt], B = [r.lb, 0], dir = [c, s], L = 900;
+    ST.poly(ctx, [[X(A[0]), Y(A[1])], [X(B[0]), Y(B[1])], [X(B[0] + dir[0] * L), Y(B[1] + dir[1] * L)], [X(A[0] + dir[0] * L), Y(A[1] + dir[1] * L)]], ST.alpha(pal.compression, 0.2), pal.compression, 1.4);
+    ST.poly(ctx, [[X(0), Y(0)], [X(r.lb), Y(0)], [X(0), Y(r.wt)]], ST.alpha(pal.dim, 0.25), pal.dim, 1);
+    ST.rect(ctx, X(0), Y(0), r.lb * sc, 8, pal.accent2, null);
+    ST.arrow(ctx, X(r.lb / 2), Y(0) + 40, X(r.lb / 2), Y(0) + 10, pal.accent2, 2.4, 9);
+    ST.text(ctx, `R ${ST.k(r.R)} kN · ${r.fb.toFixed(1)} MPa`, X(r.lb / 2), Y(0) + 46, pal.accent2, { size: 11 });
+    if (r.t !== "CCC") { if (r.wt > 0) ST.rect(ctx, X(-600), Y(r.wt), (600 + r.lb * 0.5) * sc, r.wt * sc, ST.alpha(pal.tension, 0.12), null); ST.line(ctx, [[X(-620), Y(r.wt / 2)], [X(r.lb), Y(r.wt / 2)]], pal.tension, 3); ST.text(ctx, `T ${ST.k(r.T)} kN`, X(-560), Y(r.wt / 2) - 14, pal.tension, { align: "left", size: 11 }); }
+    else { ST.arrow(ctx, X(-620), Y(r.wt / 2), X(-10), Y(r.wt / 2), pal.compression, 3, 9); ST.text(ctx, `수평 압축 ${ST.k(r.T)} kN`, X(-600), Y(r.wt / 2) - 14, pal.compression, { align: "left", size: 11 }); }
+    if (r.t === "CTT") { ST.line(ctx, [[X(r.lb * 0.4), Y(-40)], [X(r.lb * 0.4), Y(1000)]], pal.tension, 2.4); ST.text(ctx, "두 번째 타이", X(r.lb * 0.4) + 8, Y(900), pal.tension, { align: "left", size: 11 }); }
+    const mid = [(A[0] + B[0]) / 2 + dir[0] * 600, (A[1] + B[1]) / 2 + dir[1] * 600];
+    ST.text(ctx, `C ${ST.k(r.C)} kN`, Math.min(X(mid[0]) + 10, W - 96), Math.max(14, Y(mid[1])), pal.compression, { align: "left", size: 11.5 });
+    ST.text(ctx, `ws ${ST.k(r.ws)} mm · ${r.fs.toFixed(1)} MPa`, X((A[0] + B[0]) / 2) + 16, Y((A[1] + B[1]) / 2) - 4, r.fs <= r.limS ? pal.ok : pal.bad, { align: "left", size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.62), minHeight: 300, maxHeight: 460 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("st-nd-o-f", `${ST.k(r.C)} · ${ST.k(r.T)} kN`); CB.stat("st-nd-o-ws", `${ST.k(r.ws)} mm`);
+    CB.stat("st-nd-o-b", `${r.fb.toFixed(1)} / ${r.limN.toFixed(1)} MPa`); CB.stat("st-nd-o-s", `${r.fs.toFixed(1)} / ${r.limS.toFixed(1)} MPa`);
+    const ang = gth() >= 25, ok = r.fb <= r.limN && r.fs <= r.limS && ang;
+    ST.msg("st-nd-msg", `${r.t} 절점(β<sub>n</sub> ${r.bn.toFixed(2)}): 지압면 ${r.fb.toFixed(1)} ≤ ${r.limN.toFixed(1)} MPa ${r.fb <= r.limN ? "OK" : "NG"}, 스트럿면 ${r.fs.toFixed(1)} ≤ ${r.limS.toFixed(1)} MPa(β<sub>s</sub> ${r.bsv}와 β<sub>n</sub> 중 작은 값) ${r.fs <= r.limS ? "OK" : "NG"}${ang ? "" : " · 스트럿–타이 각 25° 미만 NG"}.`, ok ? "ok" : "bad");
+  }
+  go();
+})();
+
+/* ---------- 3. 병 모양 스트럿 ---------- */
+(function () {
+  const gF = CB.range("st-bt-F", (v) => ST.k(v) + " kN", go), ga = CB.range("st-bt-a", (v) => v + " mm", go), gL = CB.range("st-bt-L", (v) => ST.k(v) + " mm", go), gb = CB.range("st-bt-b", (v) => v + " mm", go);
+  const bar = CB.seg("st-bt-bar", go), gs = CB.range("st-bt-s", (v) => v + " mm", go), gg = CB.range("st-bt-g", (v) => v.toFixed(1) + "°", go);
+  function calc() {
+    const F = gF(), a = ga(), Ls = gL(), b = gb(), s = gs(), g = (gg() * Math.PI) / 180, bef = a + Ls / 2, T = (F / 4) * (1 - a / bef);
+    const Ab = bar() === "0" ? 0 : CB.steel.BARS[bar()].A, rho = (2 * Ab) / (b * s), sum = rho * (Math.sin(g) + Math.cos(g)), beta = sum >= 0.003 ? 0.75 : 0.6;
+    const nh = (Ls / 2) * Math.sin(g) / s, nv = (Ls / 2) * Math.cos(g) / s, cap = (ST.PHI * 400 * 2 * Ab * (nh * Math.sin(g) + nv * Math.cos(g))) / 1000;
+    return { F, a, Ls, b, s, g, bef, T, Ab, rho, sum, beta, cap };
+  }
+  const cv = CB.canvas("#st-cv-bt", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), sc = Math.min((W - 80) / r.Ls, (H - 40) / Math.max(r.bef, 400) / 1.15), cx = W / 2, cy = H / 2, X = (x) => cx + (x - r.Ls / 2) * sc, Y = (y) => cy - y * sc;
+    const pts = [], pts2 = []; for (let k = 0; k <= 40; k++) { const x = (r.Ls * k) / 40, t = Math.sin((Math.PI * k) / 40), w = r.a / 2 + (r.bef - r.a) / 2 * t; pts.push([X(x), Y(w)]); pts2.push([X(x), Y(-w)]); }
+    ST.poly(ctx, [...pts, ...pts2.reverse()], ST.alpha(pal.compression, 0.18), pal.compression, 1.6);
+    ST.rect(ctx, X(0) - 8, Y(r.a / 2), 8, r.a * sc, pal.accent2, null); ST.rect(ctx, X(r.Ls), Y(r.a / 2), 8, r.a * sc, pal.accent2, null);
+    ST.arrow(ctx, X(0) - 50, cy, X(0) - 10, cy, pal.compression, 3, 10); ST.arrow(ctx, X(r.Ls) + 50, cy, X(r.Ls) + 10, cy, pal.compression, 3, 10);
+    if (r.Ab > 0) { const ss = r.s * sc, ang = r.g; ctx.save(); ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); pts.forEach((p) => ctx.lineTo(p[0], p[1])); pts2.forEach((p) => ctx.lineTo(p[0], p[1])); ctx.closePath(); ctx.clip();
+      const R = Math.hypot(W, H); ctx.translate(cx, cy); ctx.rotate(-(Math.PI / 2 - ang)); ctx.strokeStyle = ST.alpha(pal.tension, 0.55); ctx.lineWidth = 1.4;
+      for (let t = -R; t <= R; t += ss) { ctx.beginPath(); ctx.moveTo(t, -R); ctx.lineTo(t, R); ctx.stroke(); }
+      ctx.rotate(Math.PI / 2); for (let t = -R; t <= R; t += ss) { ctx.beginPath(); ctx.moveTo(t, -R); ctx.lineTo(t, R); ctx.stroke(); } ctx.restore(); }
+    [-1, 1].forEach((sg) => ST.arrow(ctx, cx, Y(sg * r.bef * 0.25), cx, Y(sg * (r.bef / 2 + 60)), pal.tension, 2.6, 9));
+    ST.text(ctx, `T ≈ ${ST.k(r.T)} kN`, cx + 10, Y(r.bef / 2 + 40), pal.tension, { align: "left", size: 11.5 });
+    ST.text(ctx, `bef ${ST.k(r.bef)}`, cx, Y(-r.bef / 2) + 14, pal.dim, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.5), minHeight: 240, maxHeight: 380 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("st-bt-o-bef", `${ST.k(r.bef)} mm`); CB.stat("st-bt-o-T", `${ST.k(r.T)} kN`); CB.stat("st-bt-o-r", r.sum.toFixed(4)); CB.stat("st-bt-o-bs", `${r.beta.toFixed(2)} · ${ST.k(r.cap)} kN`);
+    const ok = r.beta === 0.75 && r.cap >= r.T;
+    ST.msg("st-bt-msg", r.Ab === 0 ? `분산 철근이 없어 β<sub>s</sub> = 0.60: φf<sub>ce</sub> = ${ST.fce(0.6, 30).toFixed(1)} MPa로 낮춰 설계한다. 가로 인장 ${ST.k(r.T)} kN은 콘크리트 인장에 맡겨진다.` : `Σρ<sub>i</sub> sin γ<sub>i</sub> = ${r.sum.toFixed(4)} ${r.sum >= 0.003 ? "≥" : "&lt;"} 0.003 → β<sub>s</sub> = ${r.beta.toFixed(2)}. 가운데 L<sub>s</sub>/2 구간의 분산 철근이 받는 가로 인장 ${ST.k(r.cap)} kN ${r.cap >= r.T ? "≥" : "&lt;"} T ${ST.k(r.T)} kN.`, ok ? "ok" : r.Ab ? "bad" : "");
+  }
+  go();
+})();
+
+/* ---------- 4. 깊은 보 STM(끄는 절점, CB.truss) ---------- */
+(function () {
+  const H = 1.8, mode = CB.seg("st-tr-mode", reset), gP = CB.range("st-tr-P", (v) => ST.k(v) + " kN", upd), gL = CB.range("st-tr-L", (v) => v.toFixed(1) + " m", reset);
+  let res = null;
+  const pts = [];
+  function setup() {
+    const L = gL(), one = mode() === "one";
+    pts.length = 0;
+    pts.push({ x: 0, y: 0.15, color: CB.palette().tension, lock: "x", label: "타이", constrain: (p) => { p.y = CB.clamp(p.y, 0.05, 0.7); } });
+    if (one) pts.push({ x: L / 2, y: 1.7, color: CB.palette().accent2, lock: "x", constrain: (p) => { p.y = CB.clamp(p.y, pts[0].y + 0.2, H - 0.05); } });
+    else { pts.push({ x: L / 3, y: 1.7, color: CB.palette().accent2, lock: "x", constrain: (p) => { p.y = CB.clamp(p.y, pts[0].y + 0.2, H - 0.05); } }); pts.push({ x: (2 * L) / 3, y: 1.7, color: CB.palette().accent2, lock: "x", constrain: (p) => { p.y = CB.clamp(p.y, pts[0].y + 0.2, H - 0.05); } }); }
+  }
+  function solve() {
+    const L = gL(), P = gP(), yt = pts[0].y, one = mode() === "one";
+    let nodes, bars, loads;
+    if (one) { nodes = [[0, yt], [L, yt], [L / 2, pts[1].y]]; bars = [[0, 2], [2, 1], [0, 1]]; loads = [{ node: 2, fy: -P }]; }
+    else { nodes = [[0, yt], [L, yt], [L / 3, pts[1].y], [(2 * L) / 3, pts[2].y]]; bars = [[0, 2], [2, 3], [3, 1], [0, 1], [2, 1]]; loads = [{ node: 2, fy: -P / 2 }, { node: 3, fy: -P / 2 }]; }
+    const r = CB.truss({ nodes, bars, supports: { 0: "pin", 1: "roller" }, loads, EA: 1e6 });
+    res = { r, nodes, bars, L, P, one };
+    return res;
+  }
+  setup();
+  const api = CB.plane("#st-cv-truss", {
+    x: [-0.5, 5.3], cy: H / 2, aspect: 0.56, grid: false, axes: false, points: pts, maxHeight: 440, minHeight: 240,
+    draw(P) {
+      const pal = P.P, s = solve(), L = s.L, ctx = P.ctx;
+      pts.forEach((p, i) => (p.color = i ? pal.accent2 : pal.tension));
+      ST.rect(ctx, P.X(-0.25), P.Y(H), (L + 0.5) * P.unit, H * P.unit, ST.alpha(pal.dim, 0.12), pal.dim);
+      [0, L].forEach((x) => ST.rect(ctx, P.X(x - 0.25), P.Y(0), 0.5 * P.unit, 6, pal.accent2, null));
+      if (!s.r.ok) { ST.text(ctx, "불안정", P.X(L / 2), P.Y(H / 2), pal.bad, { size: 14 }); return; }
+      const Nmax = Math.max(...s.r.N.map(Math.abs));
+      s.bars.forEach(([i, j], m) => { const N = s.r.N[m], a = s.nodes[i], b = s.nodes[j], col = N < 0 ? pal.compression : pal.tension, w = Math.abs(N) < 1e-6 * Nmax ? 1 : 2 + 12 * Math.abs(N) / Nmax;
+        ST.line(ctx, [[P.X(a[0]), P.Y(a[1])], [P.X(b[0]), P.Y(b[1])]], Math.abs(N) < 1e-3 * Nmax ? pal.faint : ST.alpha(col, 0.75), w, Math.abs(N) < 1e-3 * Nmax ? [4, 4] : null);
+        const mx = (P.X(a[0]) + P.X(b[0])) / 2, my = (P.Y(a[1]) + P.Y(b[1])) / 2;
+        ST.text(ctx, Math.abs(N) < 1e-3 * Nmax ? "0" : ST.k(N), mx, my + (i === 0 && j === 1 ? 14 : -10), Math.abs(N) < 1e-3 * Nmax ? pal.faint : col, { size: 11 }); });
+      const ld = s.one ? [[L / 2, s.P]] : [[L / 3, s.P / 2], [(2 * L) / 3, s.P / 2]];
+      ld.forEach(([x, p]) => { ST.arrow(ctx, P.X(x), P.Y(H) - 30, P.X(x), P.Y(H) - 2, pal.accent2, 2.6, 9); ST.text(ctx, ST.k(p), P.X(x) + 8, P.Y(H) - 24, pal.accent2, { align: "left", size: 11 }); });
+    },
+    onDrag: () => upd(false),
+  });
+  function view() { const L = gL(), ar = api.P ? api.P.h / api.P.w : 0.56, span = Math.max(L + 1.0, (H + 1.0) / ar); api.view({ x: [L / 2 - span / 2, L / 2 + span / 2] }); }
+  function reset() { setup(); api.points = pts; view(); upd(); }
+  document.getElementById("st-tr-reset").addEventListener("click", reset);
+  function upd(redraw = true) {
+    if (redraw) api.redraw(); const s = res || solve(); if (!s.r.ok) return;
+    const z = (s.one ? pts[1].y : (pts[1].y + pts[2].y) / 2) - pts[0].y, xs = s.one ? s.L / 2 : s.L / 3, th = (Math.atan2(pts[1].y - pts[0].y, xs) * 180) / Math.PI;
+    const T = s.r.N[s.one ? 2 : 3], C = Math.max(...s.r.N.filter((n) => n < 0).map(Math.abs));
+    CB.stat("st-tr-o-z", `${z.toFixed(2)} m`); CB.stat("st-tr-o-th", `${th.toFixed(1)}°`); CB.stat("st-tr-o-T", `${ST.k(T)} kN · ${ST.k((T * 1000) / (0.75 * 500))} mm²`); CB.stat("st-tr-o-C", `${ST.k(C)} kN`);
+    const web = s.one ? 0 : s.r.N[4];
+    ST.msg("st-tr-msg", th < 25 ? `스트럿–타이 각 ${th.toFixed(1)}° &lt; 25° — 이 모델은 쓸 수 없다. 보통 보(5장의 보 트러스)로 보거나 깊이를 키운다.` : !s.one && Math.abs(web) > 1 ? `웹 대각 부재 ${ST.k(web)} kN(${web < 0 ? "압축" : "인장"}) — 두 윗 절점 높이가 다르면 하중 일부가 웹으로 흐른다.` : `L/h = ${(s.L / H).toFixed(2)}, θ = ${th.toFixed(1)}° ≥ 25° OK — 타이 ${ST.k(T)} kN, 같은 값이 M/z = ${ST.k((s.one ? (s.P / 2) * (s.L / 2) : (s.P / 2) * (s.L / 3)) / z)} kN.`, th < 25 ? "bad" : "ok");
+  }
+  setup(); api.points = pts; view(); upd();
+})();
+
+/* ---------- 5. 깊은 보 STM 설계 검토 ---------- */
+(function () {
+  const g = {}; [["P", (v) => ST.k(v) + " kN"], ["L", (v) => v.toFixed(1) + " m"], ["h", (v) => v.toFixed(2) + " m"], ["b", (v) => v + " mm"], ["lt", (v) => v + " mm"], ["lb", (v) => v + " mm"], ["fc", (v) => v + " MPa"]].forEach(([k, f]) => (g[k] = CB.range("st-dp-" + k, f, go)));
+  function calc() {
+    const P = g.P(), L = g.L(), h = g.h(), b = g.b(), lt = g.lt(), lb = g.lb(), fck = g.fc(), ut = 0.15, f = ST.fce(1, fck);
+    let z = h - ut - 0.15, w = 0, ok = true;
+    for (let i = 0; i < 60; i++) { const T = ((P / 2) * (L / 2)) / z; w = (T * 1000) / (f * b); z = h - ut - w / 2000; if (z < 0.2 * h) { ok = false; break; } }
+    const T = ((P / 2) * (L / 2)) / z, th = Math.atan(z / (L / 2)), C = P / 2 / Math.sin(th), s = Math.sin(th), c = Math.cos(th), wt = 2 * ut * 1000;
+    const wsB = lb * s + wt * c, wsT = (lt / 2) * s + w * c, sB = (C * 1000) / (wsB * b), sT = (C * 1000) / (wsT * b);
+    const lim = { B: Math.min(ST.fce(0.75, fck), ST.fce(0.8, fck)), T: Math.min(ST.fce(0.75, fck), ST.fce(1, fck)), brB: ST.fce(0.8, fck), brT: ST.fce(1, fck) };
+    const brB = (P / 2 * 1000) / (lb * b), brT = (P * 1000) / (lt * b), As = (T * 1000) / (0.75 * 500), nb = Math.ceil(As / CB.steel.BARS.D25.A);
+    return { P, L, h, b, lt, lb, fck, z, w, ok, T, th, C, wsB, wsT, sB, sT, lim, brB, brT, As, nb, wt };
+  }
+  const cv = CB.canvas("#st-cv-deep", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), sc = Math.min((W - 60) / (r.L + 0.8), (H - 70) / r.h), ox = (W - r.L * sc) / 2, oy = H - 34, X = (x) => ox + x * sc, Y = (y) => oy - y * sc;
+    ST.rect(ctx, X(-0.4), Y(r.h), (r.L + 0.8) * sc, r.h * sc, ST.alpha(pal.dim, 0.12), pal.dim);
+    if (!r.ok) { ST.text(ctx, "단면 부족: 윗 절점이 너무 깊다", W / 2, H / 2, pal.bad, { size: 13 }); return; }
+    const ytie = 0.15, ytop = r.h - r.w / 2000, s = Math.sin(r.th), c = Math.cos(r.th);
+    ST.rect(ctx, X(-0.4), Y(0.3), (r.L + 0.8) * sc, 0.3 * sc, ST.alpha(pal.tension, 0.12), null);
+    ST.line(ctx, [[X(-0.35), Y(ytie)], [X(r.L + 0.35), Y(ytie)]], pal.tension, 3);
+    ST.rect(ctx, X(r.L / 2 - r.lt / 2000), Y(r.h), (r.lt / 1000) * sc, (r.w / 1000) * sc, ST.alpha(pal.compression, 0.35), pal.compression);
+    [[0, 1], [r.L, -1]].forEach(([x0, sg]) => {
+      const a = [x0, ytie], b = [r.L / 2, ytop], wB = r.wsB / 1000, wT = r.wsT / 1000, nx = s, ny = c * -1;
+      const nrm = [-(b[1] - a[1]), (b[0] - a[0])], nl = Math.hypot(...nrm), u = [nrm[0] / nl, nrm[1] / nl];
+      ST.poly(ctx, [[X(a[0] + u[0] * wB / 2), Y(a[1] + u[1] * wB / 2)], [X(b[0] + u[0] * wT / 2), Y(b[1] + u[1] * wT / 2)], [X(b[0] - u[0] * wT / 2), Y(b[1] - u[1] * wT / 2)], [X(a[0] - u[0] * wB / 2), Y(a[1] - u[1] * wB / 2)]], ST.alpha(pal.compression, 0.2), ST.alpha(pal.compression, 0.7), 1);
+      ST.line(ctx, [[X(a[0]), Y(a[1])], [X(b[0]), Y(b[1])]], pal.compression, 1.4, [5, 4]);
+      ST.rect(ctx, X(x0 - r.lb / 2000), Y(0), (r.lb / 1000) * sc, 7, pal.accent2, null);
+    });
+    ST.arrow(ctx, X(r.L / 2), Y(r.h) - 30, X(r.L / 2), Y(r.h) - 2, pal.accent2, 2.6, 9);
+    ST.text(ctx, `T ${ST.k(r.T)} kN → ${r.nb}-D25`, X(r.L / 2), Y(ytie) + 22, pal.tension, { size: 11.5 });
+    ST.text(ctx, `C ${ST.k(r.C)} kN`, X(r.L / 4) - 10, Y((ytie + ytop) / 2), pal.compression, { size: 11.5, align: "right" });
+    ST.text(ctx, `θ ${(r.th * 180 / Math.PI).toFixed(1)}°`, X(0.9), Y(ytie) - 16, pal.text, { size: 11 });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.5), minHeight: 240, maxHeight: 380 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("st-dp-o-z", r.ok ? `${r.z.toFixed(3)} m · ${(r.th * 180 / Math.PI).toFixed(1)}°` : "—");
+    CB.stat("st-dp-o-T", r.ok ? `${ST.k(r.T)} kN · ${ST.k(r.As)} mm²` : "—"); CB.stat("st-dp-o-C", r.ok ? `${ST.k(r.C)} kN` : "—");
+    const rows = r.ok ? [
+      ["깊은 보 판정", r.L / r.h <= 4, `L/h = ${(r.L / r.h).toFixed(2)} ${r.L / r.h <= 4 ? "≤ 4 → 깊은 보" : "&gt; 4 → 보통 보로 보는 편이 낫다(참고)"}`, null],
+      ["스트럿–타이 각", r.th * 180 / Math.PI >= 25, `θ = ${(r.th * 180 / Math.PI).toFixed(1)}° ≥ 25°`, null],
+      ["지점 지압(CCT)", r.brB <= r.lim.brB, `${r.brB.toFixed(1)} ≤ ${r.lim.brB.toFixed(1)} MPa`, r.brB / r.lim.brB],
+      ["지점 스트럿면", r.sB <= r.lim.B, `w<sub>s</sub> = ${ST.k(r.wsB)} mm → ${r.sB.toFixed(1)} ≤ ${r.lim.B.toFixed(1)} MPa`, r.sB / r.lim.B],
+      ["하중점 지압(CCC)", r.brT <= r.lim.brT, `${r.brT.toFixed(1)} ≤ ${r.lim.brT.toFixed(1)} MPa`, r.brT / r.lim.brT],
+      ["하중점 스트럿면", r.sT <= r.lim.T, `w<sub>s</sub> = ${ST.k(r.wsT)} mm(하중판 반쪽 + 수평 스트럿 ${ST.k(r.w)}) → ${r.sT.toFixed(1)} ≤ ${r.lim.T.toFixed(1)} MPa`, r.sT / r.lim.T],
+      ["타이", true, `A<sub>s</sub> = ${ST.k(r.As)} mm² → ${r.nb}-D25(${ST.k(r.nb * CB.steel.BARS.D25.A)} mm²), 분산 철근 각 0.0025b = ${(0.0025 * r.b).toFixed(2)} mm²/mm`, null],
+    ] : [["단면", false, "반복이 수렴하지 않음 — 깊이·두께를 키운다", null]];
+    document.getElementById("st-dp-chk").innerHTML = rows.map(([k, ok, t]) => `<li class="${ok ? "ok" : "bad"}"><b>${k}</b> · ${t} ${ok ? "" : "<b style=\"color:var(--bad)\">NG</b>"}</li>`).join("");
+    const u = Math.max(...rows.map((x) => x[3] || 0)); CB.stat("st-dp-o-u", r.ok ? u.toFixed(2) : "—");
+  }
+  go();
+})();
+
+/* ---------- 6. 코벨 ---------- */
+(function () {
+  const gV = CB.range("st-cb-V", (v) => ST.k(v) + " kN", go), ga = CB.range("st-cb-a", (v) => v + " mm", go), gh = CB.range("st-cb-h", (v) => v + " mm", go), gb = CB.range("st-cb-b", (v) => v + " mm", go), gn = CB.range("st-cb-n", (v) => v.toFixed(2), go);
+  function calc() {
+    const V = gV(), av = ga(), h = gh(), b = gb(), d = h - 40, N = gn() * V, z = 0.85 * d, xh = av + 0.1 * d, th = Math.atan(z / xh);
+    const T = (V * xh) / z + N, AsS = (T * 1000) / (0.75 * 500), C = V / Math.sin(th);
+    const Mu = (V * av) / 1000 + (N * (h - d)) / 1000, Af = CB.rc.asReq(Mu, b, d, 30, 500), An = (N * 1000) / (0.75 * 500), Avf = (V * 1000) / (0.75 * 500 * 1.4);
+    const Asc = Math.max(Af + An, (2 / 3) * Avf + An, 0.04 * (30 / 500) * b * d), Ah = 0.5 * (Asc - An);
+    const vmax = Math.min(0.2 * 30, 3.3 + 0.08 * 30, 11), pVn = (0.75 * vmax * b * d) / 1000, brg = (V * 1000) / (150 * b), lim = ST.fce(0.8, 30);
+    return { V, av, h, b, d, N, z, xh, th, T, AsS, C, Mu, Af, An, Avf, Asc, Ah, pVn, brg, lim };
+  }
+  const cv = CB.canvas("#st-cv-cb", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(), wide = W >= 560, vw = wide ? W * 0.62 : W, vh = wide ? H : H * 0.66;
+    const sc = Math.min((vw - 60) / (400 + 760), (vh - 50) / 1500), ox = 20 + 400 * sc, oy = vh / 2 + (r.h * sc) / 2 - 10, X = (x) => ox + x * sc, Y = (y) => oy - y * sc;
+    ST.rect(ctx, X(-400), 6, 400 * sc, vh - 12, ST.alpha(pal.dim, 0.14), pal.dim);
+    const tip = Math.max(r.av + 150, 300), hEnd = Math.max(r.h * 0.5, r.h - tip * 0.6);
+    ST.poly(ctx, [[X(0), Y(r.h)], [X(tip), Y(r.h)], [X(tip), Y(r.h - hEnd)], [X(0), Y(0)]], ST.alpha(pal.dim, 0.14), pal.dim);
+    ST.rect(ctx, X(r.av - 75), Y(r.h) - 6, 150 * sc, 6, pal.accent2, null);
+    ST.arrow(ctx, X(r.av), Y(r.h) - 46, X(r.av), Y(r.h) - 8, pal.accent2, 2.6, 9); ST.arrow(ctx, X(r.av), Y(r.h) - 10, X(r.av) + 34, Y(r.h) - 10, pal.accent2, 2, 7);
+    ST.text(ctx, `Vu ${ST.k(r.V)}`, X(r.av) + 8, Y(r.h) - 40, pal.accent2, { align: "left", size: 11 });
+    ST.line(ctx, [[X(-330), Y(r.d)], [X(tip - 30), Y(r.d)]], pal.tension, 3); ST.line(ctx, [[X(-330), Y(r.d)], [X(-330), Y(r.d - 400)]], pal.tension, 3);
+    const A = [r.av, r.d], B = [-0.1 * r.d, r.d - r.z];
+    ST.line(ctx, [[X(A[0]), Y(A[1])], [X(B[0]), Y(B[1])]], ST.alpha(pal.compression, 0.5), 10); ST.line(ctx, [[X(A[0]), Y(A[1])], [X(B[0]), Y(B[1])]], pal.compression, 1.4, [5, 4]);
+    ST.text(ctx, `T ${ST.k(r.T)} kN`, X(-200), Y(r.d) - 12, pal.tension, { size: 11 });
+    ST.text(ctx, `C ${ST.k(r.C)} kN`, X((A[0] + B[0]) / 2) + 12, Y((A[1] + B[1]) / 2) + 12, pal.compression, { align: "left", size: 11 });
+    ST.text(ctx, `θ ${(r.th * 180 / Math.PI).toFixed(1)}°`, X(B[0]) + 30, Y(B[1]) - 6, pal.text, { align: "left", size: 11 });
+    const bx = wide ? { x: vw + 20, y: 30, w: W - vw - 40 } : { x: 20, y: vh + 20, w: W - 40 }, mx = Math.max(r.AsS, r.Asc) * 1.1;
+    [["STM 타이", r.AsS, pal.tension], ["단면식 A_sc", r.Asc, pal.accent], ["A_h(폐쇄 스터럽)", r.Ah, pal.accent2]].forEach(([k, v, col], i) => {
+      const y = bx.y + i * 46, w = (v / mx) * (bx.w - 70);
+      ST.text(ctx, k.replace("_", ""), bx.x, y, pal.text, { align: "left", size: 11.5 });
+      ctx.fillStyle = ST.alpha(col, 0.75); ctx.fillRect(bx.x, y + 10, Math.max(1, w), 14);
+      ST.text(ctx, `${ST.k(v)} mm²`, bx.x + w + 6, y + 17, col, { align: "left", size: 11 });
+    });
+  }, { aspect: (W) => (W < 560 ? 1.1 : 0.55), minHeight: 300, maxHeight: 480 });
+  function go() {
+    cv.redraw(); const r = calc();
+    CB.stat("st-cb-o-ad", `${(r.av / r.d).toFixed(2)} · ${(r.th * 180 / Math.PI).toFixed(1)}°`);
+    CB.stat("st-cb-o-T", `${ST.k(r.T)} kN · ${ST.k(r.AsS)} mm²`); CB.stat("st-cb-o-as", `${ST.k(r.Asc)} · ${ST.k(r.Ah)} mm²`); CB.stat("st-cb-o-vn", `${ST.k(r.pVn)} kN`);
+    const fail = [];
+    if (r.av / r.d > 1) fail.push("a<sub>v</sub>/d &gt; 1 → 코벨 규정 적용 불가(캔틸레버 보로 설계)");
+    if (r.V > r.pVn) fail.push(`V<sub>u</sub> &gt; 전단 마찰 상한 ${ST.k(r.pVn)} kN → 단면을 키운다`);
+    if (r.brg > r.lim) fail.push(`지압 ${r.brg.toFixed(1)} &gt; ${r.lim.toFixed(1)} MPa → 하중판을 키운다`);
+    if (!isFinite(r.Af)) fail.push("휨 단면 부족");
+    ST.msg("st-cb-msg", fail.length ? fail.join(" · ") : `OK: 주 인장 철근 max(STM ${ST.k(r.AsS)}, 단면식 ${ST.k(r.Asc)}) = ${ST.k(Math.max(r.AsS, r.Asc))} mm² 이상, 폐쇄 스터럽 ${ST.k(r.Ah)} mm² 이상(위 2/3 d), 지압 ${r.brg.toFixed(1)} MPa.`, fail.length ? "bad" : "ok");
+  }
+  go();
+})();
+
+/* ---------- 7. 개구부 주변 하중 경로 ---------- */
+(function () {
+  const L = 6, H = 2.4, gx = CB.range("st-op-x", (v) => v.toFixed(2) + " m", autoNodes), gy = CB.range("st-op-y", (v) => v.toFixed(2) + " m", autoNodes), gs = CB.range("st-op-s", (v) => v.toFixed(2) + " m", autoNodes);
+  const gP = CB.range("st-op-P", (v) => ST.k(v) + " kN", () => upd()), bg = CB.seg("st-op-bg", () => api.redraw());
+  let FE = null, feKey = "", res = null;
+  const pts = [{ x: 5, y: 1.8, label: "D" }, { x: 3.8, y: 0.6, label: "E" }];
+  const hole = () => { const x = gx(), y = gy(), s = gs(); return { x0: x - s / 2, x1: x + s / 2, y0: y - s / 2, y1: y + s / 2 }; };
+  function autoNodes() { const o = hole(); pts[0].x = Math.min(L - 0.3, o.x1 + 0.15); pts[0].y = Math.min(H - 0.15, o.y1 + 0.15); pts[1].x = Math.max(0.6, o.x0 - 0.15); pts[1].y = Math.max(0.3, o.y0 - 0.15); upd(); }
+  const crosses = (a, b, o) => { for (let k = 1; k < 40; k++) { const t = k / 40, x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t; if (x > o.x0 + 0.02 && x < o.x1 - 0.02 && y > o.y0 + 0.02 && y < o.y1 - 0.02) return true; } return false; };
+  function solve() {
+    const o = hole(), P = gP(), k = [o.x0, o.y0, o.x1, o.y1].join("|");
+    if (k !== feKey) { feKey = k; FE = ST.fe({ L, h: H, ny: 12, hole: o, loads: [{ x: 3, w: 0.4, P: 1 }], supports: [{ x: 0.2, w: 0.4 }, { x: L - 0.2, w: 0.4 }] }); }
+    const nodes = [[0.2, 0.15], [L - 0.2, 0.15], [3, H - 0.15], [pts[0].x, pts[0].y], [pts[1].x, pts[1].y], [pts[0].x, pts[1].y]];
+    const bars = [[0, 2], [2, 3], [2, 4], [4, 5], [5, 1], [3, 5], [3, 1], [4, 1], [0, 1]];
+    const r = CB.truss({ nodes, bars, supports: { 0: "pin", 1: "roller" }, loads: [{ node: 2, fy: -P }], EA: 1e6 });
+    const bad = bars.map(([i, j]) => crosses(nodes[i], nodes[j], o));
+    res = { nodes, bars, r, bad, o, P }; return res;
+  }
+  const api = CB.plane("#st-cv-open", {
+    x: [-0.3, L + 0.3], cy: H / 2, aspect: 0.56, grid: false, axes: false, points: pts, maxHeight: 460, minHeight: 230,
+    draw(Pl) {
+      const pal = Pl.P, ctx = Pl.ctx, s = solve(), X = Pl.X, Y = Pl.Y;
+      pts.forEach((p) => (p.color = pal.accent2));
+      ST.rect(ctx, X(0), Y(H), L * Pl.unit, H * Pl.unit, ST.alpha(pal.dim, 0.12), pal.dim);
+      if (bg() === "on") ST.drawTraj(ctx, FE, X, Y, pal, "traj", 0.5);
+      ST.rect(ctx, X(s.o.x0), Y(s.o.y1), (s.o.x1 - s.o.x0) * Pl.unit, (s.o.y1 - s.o.y0) * Pl.unit, pal.bg, pal.text, 1.4);
+      [0.2, L - 0.2].forEach((x) => ST.rect(ctx, X(x - 0.2), Y(0), 0.4 * Pl.unit, 6, pal.accent2, null));
+      ST.arrow(ctx, X(3), Y(H) - 30, X(3), Y(H) - 2, pal.accent2, 2.6, 9);
+      if (!s.r.ok) { ST.text(ctx, "트러스 불안정 — 절점을 옮기세요", X(L / 2), Y(H / 2), pal.bad, { size: 13 }); return; }
+      const Nmax = Math.max(...s.r.N.map(Math.abs));
+      s.bars.forEach(([i, j], m) => { const N = s.r.N[m], a = s.nodes[i], b = s.nodes[j], col = s.bad[m] ? pal.bad : N < 0 ? pal.compression : pal.tension;
+        ST.line(ctx, [[X(a[0]), Y(a[1])], [X(b[0]), Y(b[1])]], ST.alpha(col, 0.8), 1.5 + 9 * Math.abs(N) / Nmax, s.bad[m] ? [6, 4] : null);
+        ST.text(ctx, Math.abs(N) < 0.5 ? "0" : ST.k(N), (X(a[0]) + X(b[0])) / 2, (Y(a[1]) + Y(b[1])) / 2 - 9, col, { size: 10.5 }); });
+    },
+    onDrag: () => upd(false),
+  });
+  function upd(redraw = true) {
+    if (redraw) api.redraw(); const s = res || solve(); if (!s.r.ok) { ST.msg("st-op-msg", "트러스가 불안정합니다. D·E를 다른 곳으로 옮기세요.", "bad"); return; }
+    const vy = (m, i, j) => Math.abs(s.r.N[m] * (s.nodes[j][1] - s.nodes[i][1]) / Math.hypot(s.nodes[j][0] - s.nodes[i][0], s.nodes[j][1] - s.nodes[i][1]));
+    const up = vy(1, 2, 3), lo = vy(2, 2, 4), tot = up + lo || 1;
+    const ten = s.r.N.map((n, m) => (n > 0 ? n : 0)), Tmax = Math.max(...ten), As = ten.reduce((a, n) => a + (n * 1000) / (0.75 * 500), 0);
+    CB.stat("st-op-o-sh", `${Math.round((100 * up) / tot)} : ${Math.round((100 * lo) / tot)} %`); CB.stat("st-op-o-T", `${ST.k(Tmax)} kN`); CB.stat("st-op-o-As", `${ST.k(As)} mm²`);
+    const nm = ["A", "B", "C", "D", "E", "G"], nb = s.bad.filter(Boolean).length, tens = s.bars.map((b, m) => (s.r.N[m] > 1 && m !== 8 ? nm[b[0]] + "–" + nm[b[1]] : null)).filter(Boolean);
+    ST.msg("st-op-msg", nb ? `부재 ${nb}개가 개구부를 지난다(빨간 점선) — D·E를 구멍 밖으로 옮기세요.` : `바닥 타이 A–B 말고도 인장 부재 ${tens.length ? tens.join(", ") : "없음"}${tens.length ? " → 그 방향으로 개구부 둘레 보강근이 필요하다" : ""}. 오른쪽 하중은 위 경로 ${Math.round((100 * up) / tot)} %, 아래 경로 ${Math.round((100 * lo) / tot)} %로 나뉜다.`, nb ? "bad" : "ok");
+  }
+  document.getElementById("st-op-reset").addEventListener("click", autoNodes);
+  autoNodes();
+})();
+
+/* ---------- 8. 말뚝 캡 3D STM ---------- */
+(function () {
+  const lay = CB.seg("st-cp-lay", go), gh = CB.range("st-cp-h", (v) => ST.k(v) + " mm", go), gP = CB.range("st-cp-P", (v) => ST.k(v) + " kN", go), gM = CB.range("st-cp-M", (v) => ST.k(v) + " kN·m", go), tie = CB.seg("st-cp-tie", go);
+  const init = { yaw: -0.8, pitch: 0.42, dist: 11, target: [0, 0, -0.8] };
+  function calc() {
+    const five = lay() === "5", a = five ? 1.8 * 0.70711 : 0.9, W = Math.ceil((2 * a + 1.2) * 10 - 1e-9) / 10, h = gh() / 1000, z = h - 0.35, P = gP(), M = gM();
+    const piles = (five ? [[0, 0], [a, a], [a, -a], [-a, a], [-a, -a]] : [[a, a], [a, -a], [-a, a], [-a, -a]]).map(([x, y]) => ({ x, y }));
+    const n = piles.length, sx2 = piles.reduce((t, p) => t + p.x * p.x, 0);
+    piles.forEach((p) => { p.R = P / n + (M * p.x) / sx2; const hx = Math.abs(p.x) - 0.2, hy = Math.abs(p.y) - 0.2; p.c = p.x === 0 && p.y === 0; p.hx = p.c ? 0 : hx; p.hy = p.c ? 0 : hy; p.C = p.c ? p.R : (p.R * Math.hypot(hx, hy, z)) / z; p.H = p.c ? 0 : (p.R * hx) / z; p.Hr = p.c ? 0 : (p.R * Math.hypot(hx, hy)) / z; });
+    const cor = piles.filter((p) => !p.c), Tedge = Math.max(...cor.map((p) => p.H)), Tdiag = Math.max(...cor.map((p) => p.Hr));
+    const T = tie() === "edge" ? Tedge : Tdiag, As = (T * 1000) / (0.75 * 500), AsDir = tie() === "edge" ? 2 * As : (2 * Tdiag * Math.SQRT1_2 * 1000) / (0.75 * 500);
+    const Mu = cor.filter((p) => p.x > 0).reduce((t, p) => t + p.R * (p.x - 0.4), 0), dS = gh() - 200, Asec = CB.rc.asReq(Mu, W * 1000, dS, 30, 500), Amin = 0.0016 * W * 1000 * gh();
+    const ang = (Math.atan(z / Math.hypot(a - 0.2, a - 0.2)) * 180) / Math.PI, Cmax = Math.max(...cor.map((p) => p.C));
+    return { five, a, W, h, z, P, M, piles, T, As, AsDir, Mu, Asec, Amin, ang, Cmax };
+  }
+  const box = (x0, x1, y0, y1, z0, z1) => [[[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]]];
+  const orb = CB.orbit("#st-cv-cap", Object.assign({}, init, {
+    aspect: 0.7, minHeight: 300, maxHeight: 480,
+    draw(V) {
+      const pal = V.P, r = calc(), h = r.h, faces = [];
+      box(-r.W / 2, r.W / 2, -r.W / 2, r.W / 2, -h, 0).forEach((f) => faces.push({ f, fill: pal.dim, al: 0.08, st: ST.alpha(pal.dim, 0.6) }));
+      box(-0.4, 0.4, -0.4, 0.4, 0, 1.0).forEach((f) => faces.push({ f, fill: pal.text, al: 0.2, st: ST.alpha(pal.text, 0.7) }));
+      r.piles.forEach((p) => { const N = 8, R = 0.3, ring = (zz) => Array.from({ length: N }, (_, k) => [p.x + R * Math.cos((2 * Math.PI * k) / N), p.y + R * Math.sin((2 * Math.PI * k) / N), zz]), A = ring(-h + 0.1), B = ring(-h - 1.2); for (let k = 0; k < N; k++) faces.push({ f: [A[k], A[(k + 1) % N], B[(k + 1) % N], B[k]], fill: pal.accent, al: 0.25, st: null }); });
+      faces.sort((p, q) => V.depth(q.f) - V.depth(p.f)).forEach((o) => V.poly3(o.f, { fill: o.fill, fillAlpha: o.al, stroke: !!o.st, color: o.st || undefined, width: 1 }));
+      const zt = -0.15, zb = -h + 0.2, Cm = Math.max(...r.piles.map((p) => p.C));
+      r.piles.forEach((p) => { const top = p.c ? [0, 0, zt] : [Math.sign(p.x) * 0.2, Math.sign(p.y) * 0.2, zt]; V.line3(top, [p.x, p.y, zb], { color: pal.compression, width: 2 + 7 * p.C / Cm }); });
+      const cor = r.piles.filter((p) => !p.c), pick = (sx, sy) => cor.find((p) => Math.sign(p.x) === sx && Math.sign(p.y) === sy);
+      if (tie() === "edge") [[[1, 1], [1, -1]], [[-1, 1], [-1, -1]], [[1, 1], [-1, 1]], [[1, -1], [-1, -1]]].forEach(([u, v]) => { const p = pick(...u), q = pick(...v); V.line3([p.x, p.y, zb], [q.x, q.y, zb], { color: pal.tension, width: 3 }); });
+      else [[[1, 1], [-1, -1]], [[1, -1], [-1, 1]]].forEach(([u, v]) => { const p = pick(...u), q = pick(...v); V.line3([p.x, p.y, zb], [q.x, q.y, zb], { color: pal.tension, width: 3 }); });
+      const p0 = pick(1, -1); V.text3(`${ST.k(p0.C)} kN`, [(p0.x + 0.2) / 2, (p0.y - 0.2) / 2, (zt + zb) / 2], { color: pal.compression, size: 12, bold: true, dx: 14 });
+      V.text3(`T ${ST.k(r.T)} kN`, [p0.x, 0, zb], { color: pal.tension, size: 12, bold: true, dy: 16 });
+      r.piles.forEach((p) => V.text3(ST.k(p.R), [p.x, p.y, -h - 1.35], { color: pal.dim, size: 11 }));
+    },
+  }));
+  document.getElementById("st-cp-reset").addEventListener("click", () => orb.set(Object.assign({}, init)));
+  function go() {
+    orb.redraw(); const r = calc();
+    CB.stat("st-cp-o-z", `${r.z.toFixed(2)} m · ${r.ang.toFixed(1)}°`); CB.stat("st-cp-o-C", `${ST.k(r.Cmax)} kN`); CB.stat("st-cp-o-T", `${ST.k(r.T)} kN · ${ST.k(r.As)} mm²`);
+    CB.stat("st-cp-o-cmp", `${ST.k(r.AsDir)} vs ${ST.k(Math.max(r.Asec, r.Amin))} mm²`);
+    ST.msg("st-cp-msg", r.ang < 25 ? `스트럿 경사 ${r.ang.toFixed(1)}° &lt; 25° — 캡이 너무 얇다.` : `캡 ${r.W.toFixed(1)} m, z = ${r.z.toFixed(2)} m: STM 한 방향 합 ${ST.k(r.AsDir)} mm²(말뚝 위에 모음) vs 단면 설계 ${ST.k(r.Asec)} mm²(최소 ${ST.k(r.Amin)}). 비 ${(r.AsDir / Math.max(r.Asec, 1)).toFixed(2)}.`, r.ang < 25 ? "bad" : "ok");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

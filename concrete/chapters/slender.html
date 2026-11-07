@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>장주와 모멘트 확대 · ConcreteBook</title>
+<meta name="description" content="길어지면 약해진다. 세장비와 단주 한계(34 − 12M₁/M₂), 유효 길이와 정렬 도표, 비횡이동 골조의 모멘트 확대 δns와 Cm, 횡이동 골조의 δs와 안정 지수 Q, 반복 P–Δ 2차 해석, P–M 상관도 위 하중점 이동을 C1과 가상 장주로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .sc-stack { display: grid; grid-template-columns: 1fr; }
+  .sc-stack > div { position: relative; min-width: 0; }
+  .sc-stack > div + div { border-top: 1px solid var(--border); }
+  .sc-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .sc-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .sc-msg b { color: var(--text); }
+  .sc-msg.ok { color: var(--ok); font-weight: 600; }
+  .sc-msg.bad { color: var(--bad); font-weight: 600; }
+  .sc-msg.warn { color: var(--warn); font-weight: 600; }
+  .sc-tbl td, .sc-tbl th { font-variant-numeric: tabular-nums; }
+  .sc-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .sc-steps { margin: 6px 0 0; }
+  .sc-steps li { margin: 4px 0; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="concrete"></script>
+</head>
+<body data-chapter="slender">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="sc-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="sc-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="sc-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="sc-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 11</div>
+    <h1 data-no-glossary>장주와 모멘트 확대</h1>
+    <p class="lead">10장의 P–M 상관도는 "단면"의 강도였습니다. 기둥은 단면이 아니라 길이가 있는 부재입니다. 축력을 받는 기둥이 옆으로 조금 휘면 축력이 그 휜 거리만큼 편심을 더 만들고, 커진 모멘트가 기둥을 더 휘게 합니다. 짧고 굵은 기둥에서는 이 되먹임이 무시할 만하지만, 길고 가는 기둥에서는 같은 단면이 훨씬 작은 하중에서 무너집니다. 이 장은 그 경계인 <b>세장비</b>와 단주 한계, 골조의 강성이 정하는 <b>유효 길이</b>, 그리고 1차 해석 모멘트를 키워 2차 효과를 넣는 <b>모멘트 확대법</b>(비횡이동 δ<sub>ns</sub>, 횡이동 δ<sub>s</sub>)과 반복 P–Δ 2차 해석을 계산과 시뮬레이터로 따라갑니다. B-10의 기둥 C1(L<sub>u</sub> = 4.3 m)은 단주이지만, 같은 계산을 로비의 가늘고 긴 가상 기둥에 대면 강도가 눈에 띄게 줄어드는 것을 보게 됩니다.</p>
+    <ul class="objectives">
+      <li>세장비 \(kL_u/r\)을 계산하고, 비횡이동 골조의 단주 한계 \(34 - 12M_1/M_2\)(≤ 40)와 횡이동 골조의 한계 22로 단주·장주를 판정한다.</li>
+      <li>골조의 강성 비 \(\Psi\)로 유효 길이 계수 \(k\)를 정렬 도표 개념과 근사식으로 구하고, 비횡이동(0.5–1.0)과 횡이동(1.0 이상)의 차이를 좌굴 모드로 설명한다.</li>
+      <li>비횡이동 골조에서 \(EI = 0.4E_cI_g/(1+\beta_{dns})\), \(P_c\), \(C_m\), \(\delta_{ns}\)를 계산하고 최소 모멘트를 확인해 확대 모멘트 \(M_c\)를 구한다.</li>
+      <li>안정 지수 \(Q\)로 층의 횡이동 여부를 판정하고, \(\delta_s = 1/(1-Q)\)를 반복 P–Δ 2차 해석과 비교한다.</li>
+      <li>확대 모멘트가 P–M 상관도 위의 하중점을 오른쪽으로 옮겨 "재료 파괴"를 앞당기거나 "안정 파괴"로 바꾸는 모습을 설명하고, C1과 가상 장주를 검토한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>강해진 콘크리트, 가늘어진 기둥</b></div>
+      <div class="o-body"><p>콘크리트의 압축 강도가 20 MPa 안팎이던 시절의 기둥은 굵었습니다. 같은 축력을 버티려면 단면이 커야 했고, 굵은 기둥은 길이에 비해 짧아서 휨 변형으로 생기는 추가 모멘트가 거의 없었습니다. 기준도 오랫동안 기둥 길이에 따라 강도를 일정 비율로 깎는 간단한 "장주 저감 계수"로 충분하다고 보았습니다.</p>
+        <p>고강도 콘크리트와 고강도 철근이 쓰이면서 기둥이 가늘어졌고, 로비·주차장·공장처럼 층고가 높은 공간이 늘었습니다. 단면은 강한데 기둥 전체로는 휘기 쉬운 경우가 많아지자, 저감 계수 하나로는 하중 조건(한쪽으로 휘는지, S자로 휘는지)과 골조의 횡이동 여부를 구분할 수 없다는 한계가 드러났습니다. 미국 ACI 318이 1970년대 초 판(1971년판으로 알려짐, 확인)부터 오일러 좌굴 하중과 1차 모멘트를 결합한 <b>모멘트 확대법</b>을 쓰기 시작했고, 국내 기준(KDS 14 20 20 형태)도 같은 틀을 따릅니다. 오늘날에는 구조 해석 프로그램의 2차 해석(P–Δ)이 흔하지만, 그 결과가 맞는지 판단하는 눈은 여전히 이 장의 손계산에서 나옵니다.</p>
+        <div class="o-chain"><span>길이 · 단면 · 골조 강성</span><i>→</i><span class="tool">세장비 · 유효 길이 · δ<sub>ns</sub> · δ<sub>s</sub> · 2차 해석</span><i>→</i><span>확대 모멘트 · P–M 검토 · 단면 결정</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="short-long">
+    <h2>단주와 장주: 길이가 만드는 모멘트</h2>
+    <div class="problem"><strong>같은 단면, 같은 하중인데 왜 긴 기둥이 먼저 부서지나</strong>
+      <p>500 × 500 mm 기둥 두 개에 축력 3,000 kN과 기둥 끝 모멘트 150 kN·m가 똑같이 걸립니다. 하나는 길이 3 m, 하나는 7.5 m입니다. 10장의 P–M 상관도로 단면만 보면 두 기둥은 같은 점에 있고 둘 다 안전합니다. 그런데 7.5 m 기둥은 휘면서 축력의 편심이 커져 실제로는 단면 강도를 넘습니다. 이 차이를 언제부터 계산에 넣어야 할까요?</p></div>
+    <p>축력 \(P\)를 받는 기둥이 1차 모멘트(골조 해석 모멘트)로 \(\Delta\)만큼 휘면, 기둥 중간 단면에는 \(P\Delta\)라는 추가 모멘트가 생깁니다. 이것이 <span class="term">2차 효과</span><span class="en">(second-order effect)</span>입니다. 부재 하나의 휨에서 생기는 것을 <span class="term">P–δ 효과</span><span class="en">(P-small-delta effect)</span>, 층 전체가 옆으로 밀려 생기는 것을 <span class="term">P–Δ 효과</span><span class="en">(P-delta effect)</span>라 부르며, 둘 다 MechanicsBook <a href="../../mechanics/chapters/buckling.html#imperfection">13장의 초기 휨 증폭 1/(1 − P/P<sub>cr</sub>)</a>와 같은 되먹임입니다. 2차 효과를 무시해도 되는 짧은 기둥을 <span class="term">단주</span><span class="en">(short column)</span>, 무시하면 위험한 기둥을 <span class="term">장주</span><span class="en">(slender column)</span>라 합니다.</p>
+    <figure class="diagram" id="fig-sc-paths">
+      <svg viewBox="0 0 860 340" role="img" aria-label="P–M 상관도 위의 세 가지 하중 경로: 단주의 직선 경로, 장주의 휘는 경로와 재료 파괴, 아주 가는 기둥의 안정 파괴, 오른쪽에 휜 기둥의 추가 편심">
+        <rect x="10" y="10" width="840" height="320" rx="10" class="f-surface"/>
+        <g transform="translate(70,30)">
+          <line x1="0" y1="270" x2="440" y2="270" class="s-axis"/><line x1="0" y1="0" x2="0" y2="270" class="s-axis"/>
+          <text x="436" y="290" text-anchor="end" class="t-mono">M (kN·m)</text><text x="8" y="8" class="t-mono">P (kN, 압축 +)</text>
+          <path d="M0 20 C 120 22, 260 70, 330 150 C 360 190, 320 240, 230 270" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.6"/>
+          <text x="345" y="124" class="t-mono" style="fill:var(--accent)">단면 강도(φ 상관도)</text>
+          <line x1="0" y1="270" x2="190" y2="80" style="stroke:var(--text-dim);stroke-width:2;stroke-dasharray:5 4"/>
+          <circle cx="190" cy="80" r="5" style="fill:var(--text-dim)"/>
+          <text x="200" y="84" class="t-mono">① 단주: 직선 e = M/P</text>
+          <path d="M0 270 C 60 210, 150 150, 300 117" style="fill:none;stroke:var(--accent-2);stroke-width:2.6"/>
+          <circle cx="300" cy="117" r="6" style="fill:var(--accent-2)"/>
+          <text x="214" y="146" class="t-mono" style="fill:var(--accent-2)">② 장주: 휘며 도달</text>
+          <text x="214" y="160" class="t-mono" style="fill:var(--accent-2)">(재료 파괴, 하중 감소)</text>
+          <path d="M0 270 C 40 236, 100 200, 150 196 C 190 194, 220 205, 240 218" style="fill:none;stroke:var(--bad);stroke-width:2.6"/>
+          <circle cx="150" cy="196" r="6" style="fill:var(--bad)"/>
+          <text x="158" y="238" class="t-mono" style="fill:var(--bad)">③ 가는 기둥: 상관도 전</text>
+          <text x="158" y="252" class="t-mono" style="fill:var(--bad)">최대 하중(안정 파괴)</text>
+          <line x1="150" y1="196" x2="150" y2="270" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+        </g>
+        <g transform="translate(570,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">휜 기둥의 중간 단면</text>
+          <line x1="60" y1="30" x2="60" y2="260" style="stroke:var(--text-faint);stroke-dasharray:4 4"/>
+          <path d="M60 30 C 120 90, 120 200, 60 260" style="fill:none;stroke:var(--accent);stroke-width:12;stroke-linecap:round;opacity:.35"/>
+          <path d="M60 30 C 120 90, 120 200, 60 260" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <line x1="60" y1="2" x2="60" y2="26" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#sc-ah-ld)"/>
+          <text x="68" y="16" class="t-mono" style="fill:var(--accent-2)">P</text>
+          <line x1="60" y1="145" x2="104" y2="145" style="stroke:var(--bad);stroke-width:1.6" marker-start="url(#sc-ah-bad)" marker-end="url(#sc-ah-bad)"/>
+          <text x="80" y="138" text-anchor="middle" class="t-mono" style="fill:var(--bad)">Δ</text>
+          <text x="130" y="110" class="t-mono">1차: M₀ = P e</text>
+          <text x="130" y="130" class="t-mono" style="fill:var(--bad)">2차: M = P (e + Δ)</text>
+          <text x="130" y="150" class="t-mono">Δ가 M을 키우고</text>
+          <text x="130" y="168" class="t-mono">M이 Δ를 키운다</text>
+          <text x="130" y="200" class="t-dim">길수록, 가늘수록,</text>
+          <text x="130" y="218" class="t-dim">P가 P<tspan baseline-shift="sub" font-size="8">c</tspan>에 가까울수록 크다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-1.</b> 하중을 비례로 키울 때 기둥 중간 단면의 (M, P) 경로. ① 단주는 편심 e가 일정해 원점에서 나가는 직선을 따라 상관도에 닿는다(재료 파괴). ② 장주는 휨 변형 Δ가 편심을 키워 경로가 오른쪽으로 휘고, 같은 단면이 더 작은 축력에서 상관도에 닿는다. ③ 아주 가는 기둥은 상관도에 닿기 전에 하중이 최대가 되어 더 버티지 못한다(안정 파괴). 이 책의 상관도는 압축 P를 위 +, M을 오른쪽 +로 그린다.</figcaption>
+    </figure>
+    <p>그림의 ①·②처럼 단면이 상관도에 닿아 부서지는 것을 <span class="term">재료 파괴</span><span class="en">(material failure)</span>, ③처럼 단면 강도가 남아 있는데 휨 변형이 걷잡을 수 없이 커지는 것을 <span class="term">안정 파괴</span><span class="en">(stability failure)</span>라 합니다. 단주와 장주를 가르는 척도는 기둥의 휘기 쉬움, 곧 길이와 단면 <span class="term">회전 반경</span><span class="en">(radius of gyration)</span>의 비입니다.</p>
+    <div class="callout def"><strong>정의 11.1 (세장비)</strong> 기둥의 <span class="term">세장비</span><span class="en">(slenderness ratio)</span>는
+      <div class="formula">$$\lambda = \frac{k L_u}{r}, \qquad r = \sqrt{\frac{I_g}{A_g}} \approx \begin{cases} 0.30\,h & \text{직사각형(휨 방향 치수 } h\text{)} \\ 0.25\,D & \text{원형(지름 } D\text{)} \end{cases}$$<div class="where">\(L_u\): <span class="term">비지지 길이</span><span class="en">(unsupported length)</span> — 바닥판·보·기둥 머리 등 횡지지 사이의 순길이(B-10 1층: 층고 5.0 m − 보 춤 0.7 m = 4.3 m). \(k\): <span class="term">유효 길이 계수</span><span class="en">(effective length factor)</span>, 다음 절. 직사각형의 정확한 값은 \(h/\sqrt{12} = 0.289h\)이고 기준은 철근을 고려한 반올림으로 0.3h를 쓴다. <code>CB.rc.slender(k, Lu, h)</code>가 \(kL_u/(0.3h)\)이다.</div></div></div>
+    <p>2차 효과가 1차 모멘트를 몇 % 이상 키우면 무시할 수 없다고 보고, 기준은 그 경계를 세장비의 한계로 정했습니다(약 5 % 증가를 기준으로 만든 식으로 알려져 있다). 한계는 기둥이 어떻게 휘는지에 따라 다릅니다. 양 끝 모멘트가 기둥을 한쪽으로 휘게 하면(<span class="term">단곡률</span><span class="en">(single curvature)</span>) 최대 휨 변형이 최대 모멘트와 같은 곳(중간)에 겹쳐 불리하고, S자로 휘게 하면(<span class="term">복곡률</span><span class="en">(double curvature)</span>) 중간 모멘트가 작아 유리합니다.</p>
+    <div class="callout def"><strong>원리 11.2 (단주 한계, KDS 14 20 20 형태)</strong> 다음을 만족하면 세장 효과를 무시하고 단주로 설계할 수 있다.
+      <div class="formula">$$\text{비횡이동 골조: } \frac{kL_u}{r} \le 34 - 12\,\frac{M_1}{M_2} \le 40, \qquad \text{횡이동 골조: } \frac{kL_u}{r} \le 22$$<div class="where">\(M_2\): 기둥 양 끝 계수 모멘트 중 절댓값이 큰 것, \(M_1\): 작은 것. \(M_1/M_2\)는 <b>단곡률이면 +, 복곡률이면 −</b>(국내 기준 부호. ACI 318-14 이후 판은 부호를 반대로 정의해 \(34 + 12M_1/M_2\)로 쓴다 — 같은 식이다). 단곡률 \(M_1 = M_2\)이면 한계 22, 복곡률 \(M_1 = -M_2\)이면 46 → 상한 40. 세장비가 아주 크면(옛 기준 형태 \(kL_u/r \gt 100\)) 모멘트 확대법 대신 비선형 2차 해석을 쓴다(현행 기준 확인).</div></div></div>
+    <div class="sim" id="sim-sc-limit">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>세장비 판정기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sc-cv-limit" aria-label="M1/M2에 따른 단주 한계선과 현재 기둥의 세장비 점"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>골조</span><div class="seg" id="sc-lm-frame"><button data-value="ns" class="on">비횡이동</button><button data-value="s">횡이동</button></div></div>
+          <div class="ctrl"><span>단면</span><div class="seg" id="sc-lm-shape"><button data-value="rect" class="on">직사각형</button><button data-value="circ">원형</button></div></div>
+          <label class="ctrl"><span>유효 길이 계수 k <output id="sc-lm-k-out"></output></span><input type="range" id="sc-lm-k" min="0.5" max="2.5" step="0.01" value="1"></label>
+          <label class="ctrl"><span><i style="font-style:normal">비지지 길이 L<sub>u</sub></i> <output id="sc-lm-lu-out"></output></span><input type="range" id="sc-lm-lu" min="1" max="15" step="0.1" value="4.3"></label>
+          <label class="ctrl"><span>휨 방향 치수 h (D) <output id="sc-lm-h-out"></output></span><input type="range" id="sc-lm-h" min="200" max="1200" step="10" value="800"></label>
+          <label class="ctrl"><span><i style="font-style:normal">M<sub>1</sub>/M<sub>2</sub> (+ 단곡률)</i> <output id="sc-lm-m-out"></output></span><input type="range" id="sc-lm-m" min="-1" max="1" step="0.01" value="0.5"></label>
+          <div class="btn-row"><button class="btn" id="sc-lm-c1">C1 (B-10 1층)</button><button class="btn" id="sc-lm-s">가상 장주 C1-S</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">r</span><span class="v" id="sc-lm-r">—</span></div>
+        <div class="stat"><span class="k">kL<sub>u</sub>/r</span><span class="v" id="sc-lm-lam">—</span></div>
+        <div class="stat"><span class="k">단주 한계</span><span class="v" id="sc-lm-lim">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="sc-lm-ok">—</span></div>
+      </div>
+      <div class="sc-msg" id="sc-lm-msg"></div>
+      <div class="sim-note">해볼 것: C1(800 mm, 4.3 m, k = 1)은 세장비 17.9로 어느 경우에도 단주입니다 · 같은 C1이 횡이동 골조이고 k가 2를 넘으면(다음 절) 22를 넘어 장주가 됩니다 · M<sub>1</sub>/M<sub>2</sub>를 −1(복곡률)로 돌리면 한계가 40까지 올라가고, +1(단곡률)이면 22까지 내려갑니다 · 모델: 원리 11.2, r = 0.3h(직사각형)·0.25D(원형), CB.rc.slender. 판정 한계는 KDS 14 20 20 형태(현행 기준 확인).</div>
+    </div>
+    <div class="callout"><strong>예제 11.1 (C1은 단주인가)</strong> C1: 800 × 800 mm, \(L_u = 4.3\) m. 유효 길이 계수는 보수적으로 \(k = 1.0\)(다음 절의 계산은 0.90).
+      <ol class="sc-steps">
+        <li><b>회전 반경.</b> \(r = 0.3 \times 800 = 240\) mm.</li>
+        <li><b>세장비.</b> \(kL_u/r = 1.0 \times 4{,}300/240 = 17.9\).</li>
+        <li><b>한계.</b> 가장 불리한 단곡률(\(M_1/M_2 = +1\))에서도 비횡이동 한계 \(34 - 12 = 22\), 횡이동 한계도 22. \(17.9 \le 22\).</li>
+        <li><b>판정.</b> 어느 경우에도 <b>단주</b>. 10장의 단면 검토(\(P_u = 9{,}000\) kN, \(M_u = 300\) kN·m → \(\phi M_n \approx 1{,}144\) kN·m)로 충분하다.</li>
+      </ol>
+      C1이 단주인 것은 단면이 굵기(800 mm) 때문입니다. 같은 4.3 m라도 단면이 \(h \lt 4{,}300/(0.3 \times 22) = 652\) mm가 되면 단곡률 비횡이동 조건에서 장주가 됩니다.</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="effective-length">
+    <h2>유효 길이 계수와 골조 강성</h2>
+    <div class="problem"><strong>기둥 끝은 고정도 핀도 아니다</strong>
+      <p>MechanicsBook 13장의 유효 길이 계수(양단 핀 1.0, 양단 고정 0.5, 고정–자유 2.0)는 이상적인 지점의 값입니다. 골조의 기둥 끝은 위아래 기둥과 좌우 보에 연결되어 있어, 보가 강하면 고정에 가깝고 약하면 핀에 가깝습니다. 그리고 바닥이 옆으로 움직일 수 있는지(횡이동)가 k를 1보다 작게도, 크게도 만듭니다.</p></div>
+    <figure class="diagram" id="fig-sc-frames">
+      <svg viewBox="0 0 860 350" role="img" aria-label="비횡이동 골조와 횡이동 골조의 좌굴 모드 비교, 반곡점 사이 거리가 유효 길이 kL">
+        <rect x="10" y="10" width="840" height="330" rx="10" class="f-surface"/>
+        <g transform="translate(60,64)">
+          <text x="0" y="-26" class="t" style="font-weight:700">비횡이동(가새·코어 벽이 횡변위를 막음)</text>
+          <rect x="300" y="20" width="40" height="200" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="320" y="240" text-anchor="middle" class="t-mono">벽</text>
+          <path d="M20 20H300M20 220H300" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M80 20 C 105 70, 105 170, 80 220" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <path d="M220 20 C 245 70, 245 170, 220 220" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <path d="M80 20V220M220 20V220" style="stroke:var(--text-faint);stroke-dasharray:4 4"/>
+          <circle cx="86" cy="48" r="4" style="fill:var(--accent-2)"/><circle cx="86" cy="192" r="4" style="fill:var(--accent-2)"/>
+          <line x1="50" y1="48" x2="50" y2="192" style="stroke:var(--accent-2);stroke-width:1.6" marker-start="url(#sc-ah-ld)" marker-end="url(#sc-ah-ld)"/>
+          <text x="44" y="124" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">kL</text>
+          <text x="140" y="262" text-anchor="middle" class="t-mono" style="fill:var(--accent)">0.5 ≤ k ≤ 1.0</text>
+        </g>
+        <g transform="translate(470,64)">
+          <text x="0" y="-26" class="t" style="font-weight:700">횡이동(골조만으로 횡력 저항)</text>
+          <path d="M20 220H300" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M70 20H330" style="stroke:var(--text);stroke-width:4"/>
+          <path d="M60 220 C 64 150, 100 80, 100 20" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <path d="M220 220 C 224 150, 260 80, 260 20" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <path d="M60 20V220M220 20V220" style="stroke:var(--text-faint);stroke-dasharray:4 4"/>
+          <path d="M100 20 C 100 0, 98 -12, 95 -18" style="fill:none;stroke:var(--accent);stroke-width:1.4;stroke-dasharray:4 3"/>
+          <line x1="40" y1="-16" x2="40" y2="220" style="stroke:var(--accent-2);stroke-width:1.6" marker-start="url(#sc-ah-ld)" marker-end="url(#sc-ah-ld)"/>
+          <text x="34" y="110" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">kL</text>
+          <line x1="60" y1="8" x2="100" y2="8" style="stroke:var(--bad);stroke-width:1.6" marker-end="url(#sc-ah-bad)"/>
+          <text x="110" y="12" class="t-mono" style="fill:var(--bad)">Δ</text>
+          <text x="170" y="262" text-anchor="middle" class="t-mono" style="fill:var(--accent)">k ≥ 1.0 (보가 약하면 2를 넘는다)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-2.</b> 같은 기둥의 두 가지 좌굴 모드. 비횡이동 골조에서는 기둥 끝이 옆으로 움직이지 않으므로 반곡점(주황 점) 사이 거리 kL이 기둥 길이보다 짧다. 횡이동 골조에서는 기둥 꼭대기가 Δ만큼 밀리면서 휘고, 사인 곡선을 연장한 가상의 반곡점 사이 거리가 기둥보다 길다. 같은 기둥이 횡이동이면 좌굴 하중이 몇 분의 일로 준다.</figcaption>
+    </figure>
+    <p>바닥이 옆으로 거의 움직이지 않는 골조(벽·가새가 횡력을 받음)를 <span class="term">비횡이동 골조</span><span class="en">(nonsway frame)</span>, 기둥과 보의 휨으로만 횡력에 저항해 층이 옆으로 밀리는 골조를 <span class="term">횡이동 골조</span><span class="en">(sway frame)</span>라 합니다. 기둥 끝을 붙잡는 정도는 그 절점에 모이는 기둥들의 휨 강성과 보들의 휨 강성의 비로 나타냅니다.</p>
+    <div class="callout def"><strong>정의 11.3 (강성 비 Ψ와 정렬 도표)</strong> 기둥의 각 끝(A: 위, B: 아래)에서 <span class="term">강성 비</span><span class="en">(stiffness ratio)</span> Ψ는
+      <div class="formula">$$\Psi = \frac{\sum (EI/L)_{\text{기둥}}}{\sum (EI/L)_{\text{보}}}$$<div class="where">\(\Psi = 0\): 완전 고정(보가 무한히 강함), \(\Psi \to \infty\): 핀. 강성 산정에는 균열을 고려한 단면 2차 모멘트(아래 표)를 쓴다. 양 끝의 \(\Psi_A\), \(\Psi_B\)로 \(k\)를 읽는 그림이 <span class="term">정렬 도표</span><span class="en">(alignment chart)</span>다. 비횡이동·횡이동 도표는 각각 탄성 골조의 좌굴 방정식을 그린 것이며(쥴리언–로런스 도표로 알려짐), 이 책은 그 방정식을 직접 푼 값과 아래의 근사식을 함께 보인다.</div></div></div>
+    <figure class="diagram" id="fig-sc-psi">
+      <svg viewBox="0 0 860 260" role="img" aria-label="기둥 위끝 절점에 모이는 위아래 기둥과 좌우 보, 강성 비 Ψ 계산">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(60,30)">
+          <rect x="140" y="0" width="40" height="80" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <rect x="140" y="110" width="40" height="90" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.4"/>
+          <rect x="0" y="80" width="320" height="30" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <circle cx="160" cy="95" r="7" style="fill:var(--accent-2)"/>
+          <text x="194" y="40" class="t-mono">위 기둥 (EI/L)<tspan baseline-shift="sub" font-size="8">c,위</tspan></text>
+          <text x="194" y="160" class="t-mono" style="fill:var(--accent)">검토 기둥 (EI/L)<tspan baseline-shift="sub" font-size="8">c</tspan></text>
+          <text x="10" y="128" class="t-mono">보 (EI/L)<tspan baseline-shift="sub" font-size="8">b,좌</tspan></text>
+          <text x="232" y="128" class="t-mono">보 (EI/L)<tspan baseline-shift="sub" font-size="8">b,우</tspan></text>
+          <text x="174" y="92" class="t-mono" style="fill:var(--accent-2)">A</text>
+        </g>
+        <g transform="translate(440,40)">
+          <text x="0" y="10" class="t" style="font-weight:700">C1 위끝(2층 바닥) — 교육용</text>
+          <text x="0" y="38" class="t-mono">기둥: 0.70 E I<tspan baseline-shift="sub" font-size="8">c</tspan>(1/5.0 + 1/4.0 m)</text>
+          <text x="0" y="58" class="t-mono">   I<tspan baseline-shift="sub" font-size="8">c</tspan> = 800⁴/12 = 3.41 × 10¹⁰ mm⁴</text>
+          <text x="0" y="82" class="t-mono">보: 0.35 E I<tspan baseline-shift="sub" font-size="8">b</tspan> × 2/8.0 m</text>
+          <text x="0" y="102" class="t-mono">   I<tspan baseline-shift="sub" font-size="8">b</tspan> = 400 × 700³/12 = 1.14 × 10¹⁰ mm⁴</text>
+          <text x="0" y="132" class="t-mono" style="fill:var(--accent)">Ψ<tspan baseline-shift="sub" font-size="8">A</tspan> = 0.70·3.41·0.45 / (0.35·1.14·0.25) ≈ 10.7</text>
+          <text x="0" y="158" class="t-mono">아래끝(전면 기초 2.5 m): Ψ<tspan baseline-shift="sub" font-size="8">B</tspan> ≈ 1.0(실무 관행)</text>
+          <text x="0" y="190" class="t-dim">보가 기둥보다 훨씬 약하다(슬래브 무시) → 위끝은 핀에 가깝다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-3.</b> 강성 비 Ψ. 검토 기둥의 위끝 절점 A에 모이는 기둥들의 EI/L 합을 보들의 EI/L 합으로 나눈다. B-10의 C1은 800 mm로 굵고 G1은 균열 강성 0.35I<sub>g</sub>라 Ψ<sub>A</sub>가 10을 넘는다. 고정 기초도 완전 고정은 아니므로 실무에서는 Ψ = 0 대신 1.0 안팎을 쓰는 경우가 많다(교육용 관행, 기준 확인).</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="sc-tbl">
+      <thead><tr><th>부재</th><th>해석용 단면 2차 모멘트(KDS 14 20 10 · ACI 318 형태)</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td>기둥</td><td class="hl">0.70 I<sub>g</sub></td><td>축력이 균열을 늦춘다</td></tr>
+        <tr><td>벽체(균열 없음 / 균열)</td><td>0.70 I<sub>g</sub> / 0.35 I<sub>g</sub></td><td>코어 전단벽</td></tr>
+        <tr><td>보</td><td class="hl">0.35 I<sub>g</sub></td><td>휨 균열이 많다</td></tr>
+        <tr><td>플랫 플레이트·플랫 슬래브</td><td>0.25 I<sub>g</sub></td><td>9장</td></tr>
+      </tbody></table></div>
+    <p>계수 하중 해석에 이 값을 쓰는 이유는 강도 한계 근처의 실제 강성이 균열과 비탄성 때문에 총단면보다 훨씬 작기 때문입니다. 지속 횡하중(흙막이 등)이 있으면 강성을 \(1 + \beta_{ds}\)로 더 나눕니다. 정렬 도표 대신 쓸 수 있는 근사식은 다음과 같습니다(ACI 318 해설에 실린 형태, 교육용).</p>
+    <div class="callout def"><strong>원리 11.4 (유효 길이 계수 근사식)</strong>
+      <div class="formula">$$\text{비횡이동: } k = \min\!\big(0.7 + 0.05(\Psi_A + \Psi_B),\; 0.85 + 0.05\,\Psi_{min}\big) \le 1.0$$
+      $$\text{횡이동: } \Psi_m = \tfrac12(\Psi_A + \Psi_B), \quad k = \begin{cases} \dfrac{20 - \Psi_m}{20}\sqrt{1 + \Psi_m} & \Psi_m \lt 2 \\[6pt] 0.9\sqrt{1 + \Psi_m} & \Psi_m \ge 2 \end{cases}$$<div class="where">비횡이동은 항상 \(0.5 \le k \le 1.0\)이라 \(k = 1\)로 두면 보수적이다. 횡이동은 \(k \ge 1\)이며 위아래가 모두 핀에 가까우면(\(\Psi\) 큼) 매우 커진다. 근사식은 대체로 보수적이지만 \(\Psi_A\)와 \(\Psi_B\)가 크게 다르면 오차가 커진다(아래 시뮬레이터).</div></div></div>
+    <div class="sim" id="sim-sc-kfactor">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>정렬 도표와 근사식</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sc-stack">
+          <div><canvas id="sc-cv-kf-nomo" aria-label="Ψ_A, k, Ψ_B 세 눈금의 정렬 도표 개념도"></canvas><span class="sc-cap">정렬 도표 개념: Ψ<sub>A</sub> — k — Ψ<sub>B</sub></span></div>
+          <div><canvas id="sc-cv-kf-curve" aria-label="Ψ_A = Ψ_B일 때 k의 정해와 근사식 곡선"></canvas><span class="sc-cap">k(Ψ): 정해(실선) · 근사식(점선), Ψ<sub>A</sub> = Ψ<sub>B</sub></span></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>골조</span><div class="seg" id="sc-kf-frame"><button data-value="ns" class="on">비횡이동</button><button data-value="s">횡이동</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">위끝 Ψ<sub>A</sub> (로그)</i> <output id="sc-kf-a-out"></output></span><input type="range" id="sc-kf-a" min="-1" max="1.7" step="0.01" value="1.03"></label>
+          <label class="ctrl"><span><i style="font-style:normal">아래끝 Ψ<sub>B</sub> (로그)</i> <output id="sc-kf-b-out"></output></span><input type="range" id="sc-kf-b" min="-1" max="1.7" step="0.01" value="0"></label>
+          <label class="ctrl"><span><i style="font-style:normal">L<sub>u</sub> / h (세장비 계산용)</i> <output id="sc-kf-lh-out"></output></span><input type="range" id="sc-kf-lh" min="3" max="25" step="0.1" value="5.4"></label>
+          <div class="btn-row"><button class="btn" id="sc-kf-c1">B-10 C1 (10.7, 1.0)</button><button class="btn" id="sc-kf-eq">Ψ<sub>A</sub> = Ψ<sub>B</sub></button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">k 정해(좌굴 방정식)</span><span class="v" id="sc-kf-ke">—</span></div>
+        <div class="stat"><span class="k">k 근사식</span><span class="v" id="sc-kf-ka">—</span></div>
+        <div class="stat"><span class="k">근사 / 정해</span><span class="v" id="sc-kf-err">—</span></div>
+        <div class="stat"><span class="k">kL<sub>u</sub>/r · 판정(단곡률)</span><span class="v" id="sc-kf-lam">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: "B-10 C1"을 누르면 비횡이동 k ≈ 0.86(근사 0.90), 횡이동 k ≈ 1.92(근사 2.36)입니다. 같은 기둥이라도 횡이동 골조라면 세장비가 34로 뛰어 장주가 됩니다 · Ψ<sub>A</sub>, Ψ<sub>B</sub>를 모두 최소(고정)로 두면 비횡이동 0.5, 횡이동 1.0에 다가갑니다 · 모델: 비횡이동·횡이동 탄성 골조의 좌굴 방정식(정렬 도표의 바탕식, 페이지 내 수치 풀이)과 원리 11.4 근사식. L<sub>u</sub>/h = 5.4는 C1(4,300/800), r = 0.3h.</div>
+    </div>
+    <p>그림 11-2의 두 모드를 강성 비를 바꿔 가며 움직여 보면, k가 무엇의 길이인지 분명해집니다. <span class="term">반곡점</span><span class="en">(point of inflection)</span>(휨모멘트가 0인 점) 사이의 거리, 곧 양단 핀 기둥으로 바꿔 놓았을 때의 길이입니다.</p>
+    <div class="sim" id="sim-sc-modes">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>좌굴 모드: 비횡이동 vs 횡이동</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sc-cv-modes" aria-label="보로 붙잡힌 기둥의 좌굴 모드 애니메이션과 반곡점, 유효 길이"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>골조</span><div class="seg" id="sc-md-frame"><button data-value="ns" class="on">비횡이동</button><button data-value="s">횡이동</button><button data-value="both">나란히</button></div></div>
+          <label class="ctrl"><span>양 끝 강성 비 Ψ (로그) <output id="sc-md-psi-out"></output></span><input type="range" id="sc-md-psi" min="-1.3" max="1.7" step="0.01" value="0"></label>
+          <div class="btn-row"><button class="btn" id="sc-md-play">■ 정지</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">k (비횡이동)</span><span class="v" id="sc-md-kn">—</span></div>
+        <div class="stat"><span class="k">k (횡이동)</span><span class="v" id="sc-md-ks">—</span></div>
+        <div class="stat"><span class="k">P<sub>cr</sub> 비 (횡이동/비횡이동)</span><span class="v" id="sc-md-ratio">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: Ψ를 0.05(보가 아주 강함)로 내리면 비횡이동은 양단 고정(k → 0.5), 횡이동은 끝이 회전하지 않는 채 밀리는 모드(k → 1.0)가 됩니다 · Ψ를 50(보가 아주 약함)으로 올리면 비횡이동은 양단 핀(k → 1.0), 횡이동은 k가 6을 넘어 사실상 불안정합니다 · 주황 점이 반곡점, 점선은 사인 곡선의 연장입니다 · 모델: 양 끝 Ψ가 같은 대칭 골조의 좌굴 방정식 해와 모드 형상(비횡이동 cos, 횡이동 sin 모드), 변형은 과장. P<sub>cr</sub> ∝ 1/k².</div>
+    </div>
+    <div class="callout"><strong>예제 11.2 (C1의 유효 길이 계수)</strong> 그림 11-3의 \(\Psi_A = 10.7\), \(\Psi_B = 1.0\).
+      <ol class="sc-steps">
+        <li><b>비횡이동 근사.</b> \(0.7 + 0.05(10.7 + 1.0) = 1.29\), \(0.85 + 0.05 \times 1.0 = 0.90\) → \(k = 0.90\). 좌굴 방정식의 정해는 0.86.</li>
+        <li><b>세장비.</b> \(kL_u/r = 0.90 \times 4{,}300/240 = 16.1\) — 예제 11.1의 \(k = 1\)(17.9)보다 작다.</li>
+        <li><b>만약 횡이동이라면.</b> \(\Psi_m = 5.85 \ge 2\) → \(k = 0.9\sqrt{6.85} = 2.36\)(정해 1.92). \(kL_u/r = 42\)(정해 34) \(\gt 22\) → 장주가 된다.</li>
+      </ol>
+      C1이 단주인지는 "B-10이 비횡이동 골조인가"에 달려 있습니다. 그 판정이 4절의 안정 지수 Q입니다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="nonsway">
+    <h2>비횡이동 골조의 모멘트 확대</h2>
+    <div class="problem"><strong>2차 해석 없이 2차 모멘트를 구할 수 있을까</strong>
+      <p>MechanicsBook 13장에서 초기 휨이 있는 기둥의 최대 처짐은 1/(1 − P/P<sub>cr</sub>)배로 커졌습니다. 그렇다면 1차 해석 모멘트에 같은 꼴의 계수를 곱하면 될 것 같습니다. 남는 질문은 세 가지입니다. RC 기둥의 EI는 얼마인가(균열·크리프), P<sub>cr</sub>은 어떤 길이로 계산하는가(유효 길이), 그리고 양 끝 모멘트가 다르면 어떻게 하는가(C<sub>m</sub>).</p></div>
+    <p>비횡이동 골조의 기둥에서 2차 효과는 부재 안의 휨 변형(P–δ)에서만 생깁니다. 기둥 끝은 옆으로 움직이지 않으므로 끝 모멘트 자체는 1차 해석값 그대로이고, 커지는 것은 기둥 중간의 모멘트입니다. 기준의 <span class="term">모멘트 확대법</span><span class="en">(moment magnifier method)</span>은 이것을 하나의 계수로 나타냅니다.</p>
+    <div class="callout def"><strong>원리 11.5 (비횡이동 모멘트 확대, KDS 14 20 20 형태)</strong> 비횡이동 골조의 장주는 확대 모멘트 \(M_c\)로 설계한다.
+      <div class="formula">$$M_c = \delta_{ns}\,M_2, \qquad \delta_{ns} = \frac{C_m}{1 - \dfrac{P_u}{0.75\,P_c}} \ge 1.0, \qquad P_c = \frac{\pi^2 EI}{(kL_u)^2}$$
+      $$EI = \frac{0.4\,E_c I_g}{1 + \beta_{dns}} \quad\text{또는}\quad \frac{0.2\,E_c I_g + E_s I_{se}}{1 + \beta_{dns}}, \qquad C_m = 0.6 + 0.4\,\frac{M_1}{M_2}$$<div class="where">\(\delta_{ns}\): <span class="term">모멘트 확대 계수</span><span class="en">(moment magnification factor)</span>. \(P_c\): <span class="term">임계 좌굴 하중</span><span class="en">(critical buckling load)</span>. 0.75는 EI와 해석의 불확실성을 덮는 <span class="term">강성 감소 계수</span><span class="en">(stiffness reduction factor)</span> \(\phi_K\). \(\beta_{dns}\): <span class="term">지속 하중 비</span><span class="en">(sustained load ratio)</span>, 곧 최대 계수 축력 중 지속 하중이 차지하는 비(\(1.2D/(1.2D + 1.6L)\) 형태, B-10 ≈ 0.68) — <span class="term">크리프</span><span class="en">(creep)</span>로 지속 하중 아래 강성이 줄어드는 효과. \(C_m\): <span class="term">등가 모멘트 계수</span><span class="en">(equivalent moment factor)</span>, 단곡률 +, 기둥 사이에 횡하중이 있으면 1.0. 하한 0.4를 두는 판이 있어 이 책의 계산은 \(C_m \ge 0.4\)로 한다(현행 기준 확인). \(I_{se}\): 철근의 단면 중심축에 대한 2차 모멘트. <code>CB.rc.magnifier</code>가 첫째 EI 식이다.</div></div></div>
+    <p>0.4E<sub>c</sub>I<sub>g</sub>는 균열·비탄성·철근 기여를 한꺼번에 반영한 하한 성격의 값으로, 앞 절 표의 해석용 강성 0.70I<sub>g</sub>보다 작습니다. 강도 검토용 좌굴 하중은 보수적이어야 하기 때문입니다. C<sub>m</sub>은 양 끝 모멘트가 다른 기둥을 "같은 최대 2차 모멘트를 내는 균등 모멘트 기둥"으로 바꾸는 계수입니다.</p>
+    <figure class="diagram" id="fig-sc-curv">
+      <svg viewBox="0 0 860 300" role="img" aria-label="단곡률과 복곡률 기둥의 1차 모멘트도와 2차 모멘트도, Cm의 의미">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(70,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">단곡률 M₁/M₂ = +1 → C<tspan baseline-shift="sub" font-size="8">m</tspan> = 1.0</text>
+          <line x1="60" y1="20" x2="60" y2="220" style="stroke:var(--text);stroke-width:3"/>
+          <path d="M60 20 L150 20 L150 220 L60 220" style="fill:var(--accent-soft);stroke:var(--text-dim);stroke-dasharray:4 3"/>
+          <path d="M60 20 L150 20 C 200 80, 200 160, 150 220 L60 220" style="fill:none;stroke:var(--bad);stroke-width:2.4"/>
+          <text x="156" y="16" class="t-mono">M₂</text><text x="156" y="236" class="t-mono">M₁ = M₂</text>
+          <text x="196" y="124" class="t-mono" style="fill:var(--bad)">최대 2차 모멘트</text>
+          <text x="196" y="140" class="t-mono" style="fill:var(--bad)">기둥 중간</text>
+          <path d="M40 20 C 15 80, 15 160, 40 220" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <text x="12" y="124" class="t-mono" style="fill:var(--accent)">휨</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">복곡률 M₁/M₂ = −1 → C<tspan baseline-shift="sub" font-size="8">m</tspan> = 0.2(하한 0.4)</text>
+          <line x1="100" y1="20" x2="100" y2="220" style="stroke:var(--text);stroke-width:3"/>
+          <path d="M100 20 L190 20 L10 220 L100 220" style="fill:var(--accent-soft);stroke:var(--text-dim);stroke-dasharray:4 3"/>
+          <path d="M100 20 L190 20 C 170 60, 130 100, 100 120 C 70 140, 30 180, 10 220 L100 220" style="fill:none;stroke:var(--bad);stroke-width:2.4"/>
+          <text x="196" y="16" class="t-mono">M₂ (끝이 최대)</text><text x="0" y="238" class="t-mono">M₁ = −M₂</text>
+          <path d="M80 20 C 60 60, 60 90, 100 120 C 140 150, 140 180, 120 220" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <text x="210" y="110" class="t-mono">중간 모멘트가 작아</text>
+          <text x="210" y="126" class="t-mono">P–δ가 더해져도</text>
+          <text x="210" y="142" class="t-mono">끝 M₂를 넘기 어렵다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-4.</b> 1차 모멘트도(회색 점선 영역)와 2차 효과가 더해진 모멘트도(빨강). 단곡률에서는 휨 변형이 가장 큰 기둥 중간에 1차 모멘트도 최대라서 2차 모멘트가 그대로 더해진다(C<sub>m</sub> = 1). 복곡률에서는 기둥 중간의 1차 모멘트가 0에 가까워 2차 모멘트가 더해져도 최대값은 대개 끝의 M<sub>2</sub>다. 그래서 δ<sub>ns</sub> ≥ 1.0의 하한이 있다.</figcaption>
+    </figure>
+    <p>마지막으로, 1차 해석 모멘트가 아주 작은 기둥(거의 중심 축하중)도 시공 오차 때문에 편심이 0일 수 없습니다. 그래서 확대할 \(M_2\)에 하한을 둡니다.</p>
+    <div class="callout def"><strong>원리 11.6 (최소 모멘트)</strong> 비횡이동 장주의 \(M_2\)는 다음 <span class="term">최소 모멘트</span><span class="en">(minimum moment)</span> 이상으로 한다(KDS 14 20 20 형태).
+      <div class="formula">$$M_{2,min} = P_u\,(15 + 0.03h) \quad (\text{mm 단위의 편심})$$<div class="where">\(h\): 휨 방향 기둥 치수(mm). \(M_{2,min}\)이 지배하면 \(C_m = 1.0\)으로 하거나 실제 끝 모멘트 비로 정한다(기준 형태 확인). C1이라면 \(9{,}000 \times (15 + 24) = 351\) kN·m로 1차 모멘트 300 kN·m보다 크다 — C1은 단주라서 적용하지 않지만, 축력이 큰 기둥에서는 이 하한이 자주 지배한다는 것을 보여 준다.</div></div></div>
+    <div class="sim" id="sim-sc-magnifier">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>모멘트 확대 계산기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sc-stack">
+          <div><canvas id="sc-cv-mg-curve" aria-label="Pu/Pc에 따른 모멘트 확대 계수 곡선"></canvas><span class="sc-cap">δ<sub>ns</sub> = C<sub>m</sub>/(1 − P<sub>u</sub>/0.75P<sub>c</sub>)</span></div>
+          <div><canvas id="sc-cv-mg-col" aria-label="기둥 높이에 따른 1차 모멘트도와 2차 모멘트도"></canvas><span class="sc-cap">기둥 모멘트도: 1차(점선) · 2차 정해(실선)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">계수 축력 P<sub>u</sub></i> <output id="sc-mg-p-out"></output></span><input type="range" id="sc-mg-p" min="0" max="8000" step="50" value="3000"></label>
+          <label class="ctrl"><span><i style="font-style:normal">큰 끝 모멘트 M<sub>2</sub></i> <output id="sc-mg-m-out"></output></span><input type="range" id="sc-mg-m" min="0" max="400" step="5" value="150"></label>
+          <label class="ctrl"><span><i style="font-style:normal">작은 끝 모멘트 M<sub>1</sub> (+ 단곡률)</i> <output id="sc-mg-r-out"></output></span><input type="range" id="sc-mg-r" min="-400" max="400" step="5" value="100"></label>
+          <label class="ctrl"><span><i style="font-style:normal">비지지 길이 L<sub>u</sub></i> <output id="sc-mg-lu-out"></output></span><input type="range" id="sc-mg-lu" min="2" max="10" step="0.1" value="6"></label>
+          <label class="ctrl"><span>기둥 치수 h (정사각형) <output id="sc-mg-h-out"></output></span><input type="range" id="sc-mg-h" min="300" max="900" step="10" value="500"></label>
+          <label class="ctrl"><span><i style="font-style:normal">지속 하중 비 β<sub>dns</sub></i> <output id="sc-mg-b-out"></output></span><input type="range" id="sc-mg-b" min="0" max="1" step="0.01" value="0.68"></label>
+          <label class="check"><input type="checkbox" id="sc-mg-tr"><span>기둥 사이 횡하중 있음(C<sub>m</sub> = 1)</span></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">EI = 0.4E<sub>c</sub>I<sub>g</sub>/(1+β)</span><span class="v" id="sc-mg-ei">—</span></div>
+        <div class="stat"><span class="k">P<sub>c</sub> · P<sub>u</sub>/0.75P<sub>c</sub></span><span class="v" id="sc-mg-pc">—</span></div>
+        <div class="stat"><span class="k">C<sub>m</sub> · δ<sub>ns</sub></span><span class="v" id="sc-mg-d">—</span></div>
+        <div class="stat"><span class="k">M<sub>c</sub> (최소 모멘트 반영)</span><span class="v" id="sc-mg-mc">—</span></div>
+      </div>
+      <div class="sc-msg" id="sc-mg-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(가상 장주 C1-S, 500 mm, 6 m)에서 δ<sub>ns</sub> ≈ 1.51입니다 · L<sub>u</sub>를 7.5 m로 늘리면 2.6으로 뜁니다(분모가 0에 가까워지는 곡선의 오른쪽 끝) · M<sub>1</sub>을 −150 kN·m(복곡률, M<sub>1</sub>/M<sub>2</sub> = −1)로 돌리면 C<sub>m</sub>이 하한 0.4가 되어 δ<sub>ns</sub>가 1.0으로 묶입니다 — 아래 그림에서 2차 모멘트 최대가 끝에 있는 것을 확인하세요 · β<sub>dns</sub>를 0으로 하면(지속 하중 없음) EI가 1.68배 커집니다 · 모델: 원리 11.5–11.6, CB.rc.magnifier(f<sub>ck</sub> 30 MPa, E<sub>c</sub> = 27,515 MPa). 아래 그림의 2차 정해는 같은 EI로 푼 양단 모멘트 보–기둥의 닫힌 해 M(x) = M<sub>A</sub>cos λx + (M<sub>B</sub> − M<sub>A</sub>cos λL)/sin λL · sin λx, λ = √(P/EI)이며 0.75 계수는 없습니다.</div>
+    </div>
+    <div class="callout"><strong>예제 11.3 (가상 장주 C1-S의 확대 모멘트)</strong> B-10 로비에 층고를 두 배로 튼 곳이 있다고 하고, 그곳 기둥을 500 × 500 mm, 8-D25(ρ = 1.62 %), \(L_u = 6.0\) m, 비횡이동(코어 벽), \(k = 1.0\)(보수적)으로 가정한다(교육용 C1-S). \(P_u = 3{,}000\) kN, \(M_2 = 150\) kN·m, \(M_1 = 100\) kN·m(단곡률), \(\beta_{dns} = 0.68\).
+      <ol class="sc-steps">
+        <li><b>세장비.</b> \(kL_u/r = 6{,}000/150 = 40\). 한계 \(34 - 12 \times 100/150 = 26\) → <b>장주</b>.</li>
+        <li><b>EI.</b> \(I_g = 500^4/12 = 5.21 \times 10^9\) mm⁴, \(E_c = 27{,}515\) MPa → \(EI = 0.4 \times 27{,}515 \times 5.21 \times 10^9/1.68 = 3.41 \times 10^{13}\) N·mm².</li>
+        <li><b>임계 하중.</b> \(P_c = \pi^2 \times 3.41 \times 10^{13}/6{,}000^2 = 9.35 \times 10^6\) N = 9,350 kN. \(P_u/(0.75P_c) = 3{,}000/7{,}016 = 0.428\).</li>
+        <li><b>확대 계수.</b> \(C_m = 0.6 + 0.4 \times 0.667 = 0.867\), \(\delta_{ns} = 0.867/(1 - 0.428) = 1.51\).</li>
+        <li><b>최소 모멘트.</b> \(M_{2,min} = 3{,}000 \times (15 + 15)/1{,}000 = 90\) kN·m \(\lt 150\) → \(M_2 = 150\).</li>
+        <li><b>설계 모멘트.</b> \(M_c = 1.51 \times 150 = 227\) kN·m. 6절에서 P–M 상관도로 검토한다(\(P_u = 3{,}000\) kN에서 \(\phi M_n \approx 353\) kN·m → 합격).</li>
+      </ol>
+      같은 기둥을 \(L_u = 7.5\) m로 하면 \(P_c = 5{,}990\) kN, \(\delta_{ns} = 2.61\), \(M_c = 392\) kN·m로 단면 강도를 넘습니다. 길이 25 % 증가가 설계 모멘트를 73 % 키웠습니다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="sway">
+    <h2>횡이동 골조: 안정 지수 Q와 δ<sub>s</sub></h2>
+    <div class="problem"><strong>B-10은 비횡이동 골조인가</strong>
+      <p>예제 11.2에서 C1은 횡이동 골조라면 장주였습니다. 실제 건물에서 "완전히 막힌" 층도 "완전히 자유로운" 층도 없습니다. 코어 벽이 있어도 층은 조금 밀립니다. 기준은 그 밀림이 만드는 P–Δ 모멘트가 1차 모멘트에 비해 작으면 비횡이동으로 보게 합니다.</p></div>
+    <figure class="diagram" id="fig-sc-story">
+      <svg viewBox="0 0 860 280" role="img" aria-label="층의 연직 하중 합, 층 전단, 1차 층간 변위와 안정 지수 Q">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(80,50)">
+          <path d="M0 190H380" style="stroke:var(--text);stroke-width:3"/>
+          <path d="M40 190 L64 30 M190 190 L214 30 M340 190 L364 30" style="stroke:var(--accent);stroke-width:3"/>
+          <path d="M40 190V30M190 190V30M340 190V30" style="stroke:var(--text-faint);stroke-dasharray:4 4"/>
+          <path d="M30 30H390" style="stroke:var(--text);stroke-width:4"/>
+          <g style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#sc-ah-ld)"><line x1="64" y1="-14" x2="64" y2="24"/><line x1="214" y1="-14" x2="214" y2="24"/><line x1="364" y1="-14" x2="364" y2="24"/></g>
+          <text x="110" y="-20" class="t-mono" style="fill:var(--accent-2)">ΣP<tspan baseline-shift="sub" font-size="8">u</tspan> (층의 모든 기둥 축력 합)</text>
+          <line x1="-50" y1="30" x2="24" y2="30" style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#sc-ah-ld)"/>
+          <text x="-50" y="22" class="t-mono" style="fill:var(--accent-2)">V<tspan baseline-shift="sub" font-size="8">us</tspan></text>
+          <line x1="40" y1="16" x2="64" y2="16" style="stroke:var(--bad);stroke-width:1.6" marker-start="url(#sc-ah-bad)" marker-end="url(#sc-ah-bad)"/>
+          <text x="70" y="12" class="t-mono" style="fill:var(--bad)">Δ<tspan baseline-shift="sub" font-size="8">o</tspan></text>
+          <line x1="-14" y1="30" x2="-14" y2="190" style="stroke:var(--text-dim)" marker-start="url(#sc-ah-t)" marker-end="url(#sc-ah-t)"/><text x="-30" y="114" class="t-mono">l<tspan baseline-shift="sub" font-size="8">c</tspan></text>
+        </g>
+        <g transform="translate(520,60)">
+          <text x="0" y="0" class="t-mono">P–Δ 모멘트 = ΣP<tspan baseline-shift="sub" font-size="8">u</tspan> Δ<tspan baseline-shift="sub" font-size="8">o</tspan></text>
+          <text x="0" y="22" class="t-mono">1차 층 모멘트 = V<tspan baseline-shift="sub" font-size="8">us</tspan> l<tspan baseline-shift="sub" font-size="8">c</tspan></text>
+          <text x="0" y="50" class="t-mono" style="fill:var(--accent)">Q = ΣP<tspan baseline-shift="sub" font-size="8">u</tspan>Δ<tspan baseline-shift="sub" font-size="8">o</tspan> / (V<tspan baseline-shift="sub" font-size="8">us</tspan> l<tspan baseline-shift="sub" font-size="8">c</tspan>)</text>
+          <text x="0" y="78" class="t-mono">Q ≤ 0.05 → 비횡이동 층</text>
+          <text x="0" y="100" class="t-mono">Q &gt; 0.05 → 횡이동 층, δ<tspan baseline-shift="sub" font-size="8">s</tspan> = 1/(1 − Q)</text>
+          <text x="0" y="134" class="t-dim">StructureBook 4장의 안정 계수 θ와 같은 꼴</text>
+          <text x="0" y="152" class="t-dim">(θ는 사용 하중·C<tspan baseline-shift="sub" font-size="8">d</tspan>, Q는 계수 하중·균열 강성)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-5.</b> 층의 안정 지수. 계수 횡하중의 층 전단 V<sub>us</sub>가 만드는 1차 층간 변위 Δ<sub>o</sub>(해석용 균열 강성으로 계산)에, 그 층 모든 기둥의 계수 축력 합 ΣP<sub>u</sub>를 곱한 P–Δ 모멘트가 1차 층 모멘트 V<sub>us</sub>l<sub>c</sub>의 5 % 이하면 횡이동 효과를 무시할 수 있다. l<sub>c</sub>는 기둥 중심 사이 길이(층고).</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 11.7 (안정 지수와 횡이동 모멘트 확대, KDS 14 20 20 형태)</strong>
+      <div class="formula">$$Q = \frac{\sum P_u\,\Delta_o}{V_{us}\,l_c}, \qquad M_1 = M_{1ns} + \delta_s M_{1s}, \quad M_2 = M_{2ns} + \delta_s M_{2s}$$
+      $$\delta_s = \frac{1}{1 - Q} \ge 1 \;\;(\delta_s \le 1.5\text{일 때}), \qquad \text{또는}\quad \delta_s = \frac{1}{1 - \dfrac{\sum P_u}{0.75\sum P_c}} \ge 1$$<div class="where">\(Q\): <span class="term">안정 지수</span><span class="en">(stability index)</span>. \(M_{ns}\): 횡이동을 일으키지 않는 하중(대개 중력)의 1차 모멘트, \(M_s\): 횡이동을 일으키는 하중(풍·지진)의 1차 모멘트 — <span class="term">횡이동 모멘트 확대 계수</span><span class="en">(sway moment magnifier)</span> \(\delta_s\)는 \(M_s\)에만 곱한다. 둘째 식의 \(\sum P_c\)는 그 층 횡력 저항 기둥들의 \(P_c\) 합(횡이동 k 사용). \(\delta_s \gt 1.5\)이면 2차 해석을 쓴다. 횡이동 골조에서도 기둥 사이의 P–δ는 따로 남으므로, 그 기둥 자체가 장주이면 \(M_2\)에 다시 \(\delta_{ns}\)를 적용해 확인한다(기준 형태 확인).</div></div></div>
+    <div class="sim" id="sim-sc-sway">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>층의 안정 지수와 횡이동 확대</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sc-cv-sway" aria-label="Q에 따른 횡이동 확대 계수 곡선과 판정 구간, 층 그림"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">층 연직 하중 ΣP<sub>u</sub></i> <output id="sc-sw-p-out"></output></span><input type="range" id="sc-sw-p" min="10000" max="250000" step="1000" value="108000"></label>
+          <label class="ctrl"><span><i style="font-style:normal">층 전단 V<sub>us</sub></i> <output id="sc-sw-v-out"></output></span><input type="range" id="sc-sw-v" min="500" max="10000" step="5" value="4995"></label>
+          <label class="ctrl"><span>층 강성 K (로그, kN/m) <output id="sc-sw-k-out"></output></span><input type="range" id="sc-sw-k" min="4" max="6.5" step="0.001" value="6.079"></label>
+          <label class="ctrl"><span><i style="font-style:normal">기둥 길이 l<sub>c</sub></i> <output id="sc-sw-l-out"></output></span><input type="range" id="sc-sw-l" min="3" max="8" step="0.1" value="5"></label>
+          <label class="ctrl"><span><i style="font-style:normal">한 기둥의 M<sub>2ns</sub> · M<sub>2s</sub> 비</i> <output id="sc-sw-m-out"></output></span><input type="range" id="sc-sw-m" min="0" max="3" step="0.05" value="1"></label>
+          <div class="btn-row"><button class="btn" id="sc-sw-b10">B-10 1층(코어 포함)</button><button class="btn" id="sc-sw-fr">골조만(코어 없음)</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">Δ<sub>o</sub> = V<sub>us</sub>/K</span><span class="v" id="sc-sw-do">—</span></div>
+        <div class="stat"><span class="k">Q</span><span class="v" id="sc-sw-q">—</span></div>
+        <div class="stat"><span class="k">δ<sub>s</sub> = 1/(1 − Q)</span><span class="v" id="sc-sw-ds">—</span></div>
+        <div class="stat"><span class="k">기둥 M<sub>2</sub> = M<sub>ns</sub> + δ<sub>s</sub>M<sub>s</sub></span><span class="v" id="sc-sw-m2">—</span></div>
+      </div>
+      <div class="sc-msg" id="sc-sw-msg"></div>
+      <div class="sim-note">해볼 것: B-10 1층은 Q ≈ 0.018로 비횡이동입니다(강성을 절반으로 깎아도 0.036) · "골조만"을 누르면 코어 없이 골조 다섯 줄이 받는 경우(강성 약 1/25)로, Q가 0.4를 넘어 δ<sub>s</sub>가 1.5를 넘습니다 — 확대법을 쓸 수 없고 2차 해석이 필요합니다 · 마지막 슬라이더는 한 기둥의 중력 모멘트 M<sub>2ns</sub>를 횡하중 모멘트 M<sub>2s</sub> = 100 kN·m의 배수로 둡니다 · 모델: 원리 11.7, Δ<sub>o</sub> = V<sub>us</sub>/K(1차, 균열 강성이라고 가정). ΣP<sub>u</sub> = 108,000 kN은 C1 축력 9,000 kN × (평면 768 m²/기여 면적 64 m²)의 교육용 값, V<sub>us</sub>는 StructureBook 8장의 밑면 전단 4,995 kN, K = 1.2 × 10⁶ kN/m는 StructureBook 7장 동적 모형의 1층 강성.</div>
+    </div>
+    <div class="callout"><strong>예제 11.4 (B-10 1층의 안정 지수)</strong> Y 방향 지진 하중 조합. \(\sum P_u \approx 108{,}000\) kN(교육용), \(V_{us} = 4{,}995\) kN, \(l_c = 5.0\) m, 층 강성 \(K = 1.2 \times 10^6\) kN/m.
+      <ol class="sc-steps">
+        <li><b>1차 층간 변위.</b> \(\Delta_o = 4{,}995/(1.2 \times 10^6) = 0.00416\) m = 4.16 mm.</li>
+        <li><b>안정 지수.</b> \(Q = 108{,}000 \times 4.16/(4{,}995 \times 5{,}000) = 0.018 \le 0.05\).</li>
+        <li><b>강성 불확실성.</b> 해석 강성을 절반으로 보아도 \(Q = 0.036 \le 0.05\).</li>
+        <li><b>판정.</b> B-10 1층은 <b>비횡이동 층</b>. 따라서 C1의 \(k\)는 비횡이동 값(0.86–1.0)이고 예제 11.1–11.2대로 단주다.</li>
+      </ol>
+      이 결론을 지탱하는 것은 C1이 아니라 코어 전단벽입니다(StructureBook <a href="../../structure/chapters/walls.html#interaction">5장</a>: 1층 층 전단의 96 %를 코어가 받는다). 코어가 없다면 같은 기둥이 횡이동 골조의 장주가 됩니다. 12장에서 그 코어 벽을 검토합니다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="second-order">
+    <h2>2차 해석: 반복 P–Δ와 확대 계수의 비교</h2>
+    <div class="problem"><strong>확대 계수는 근사다. 정답은 무엇과 비교하나</strong>
+      <p>δ<sub>ns</sub>와 δ<sub>s</sub>는 손으로 쓸 수 있게 만든 근사식입니다. 해석 프로그램은 변형된 형상에서 평형을 다시 세우는 <span class="term">2차 해석</span><span class="en">(second-order analysis)</span>을 합니다. 그 가장 쉬운 방법은 1차 해석을 반복하는 <span class="term">반복 P–Δ 해석</span><span class="en">(iterative P-delta analysis)</span>입니다. 변위를 구하고, 그 변위에서 축력이 만드는 추가 모멘트를 가상의 수평력으로 바꾸어 다시 해석하고, 변위가 더 이상 변하지 않을 때까지 되풀이합니다.</p></div>
+    <figure class="diagram" id="fig-sc-iter">
+      <svg viewBox="0 0 860 250" role="img" aria-label="반복 P–Δ 해석의 흐름: 1차 변위, 가상 수평력, 재해석, 수렴과 등비급수">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g transform="translate(40,50)" class="t-mono">
+          <rect x="0" y="0" width="160" height="60" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <text x="80" y="26" text-anchor="middle">1차 해석</text><text x="80" y="44" text-anchor="middle">V → Δ₀</text>
+          <line x1="164" y1="30" x2="210" y2="30" style="stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#sc-ah-t)"/>
+          <rect x="214" y="0" width="190" height="60" rx="8" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <text x="309" y="26" text-anchor="middle">가상 수평력</text><text x="309" y="44" text-anchor="middle">H<tspan baseline-shift="sub" font-size="8">i</tspan> = ΣP·Δ<tspan baseline-shift="sub" font-size="8">i</tspan>/h</text>
+          <line x1="408" y1="30" x2="454" y2="30" style="stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#sc-ah-t)"/>
+          <rect x="458" y="0" width="170" height="60" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <text x="543" y="26" text-anchor="middle">재해석</text><text x="543" y="44" text-anchor="middle">V + H<tspan baseline-shift="sub" font-size="8">i</tspan> → Δ<tspan baseline-shift="sub" font-size="8">i+1</tspan></text>
+          <line x1="632" y1="30" x2="678" y2="30" style="stroke:var(--text-dim);stroke-width:1.6" marker-end="url(#sc-ah-t)"/>
+          <rect x="682" y="0" width="110" height="60" rx="8" style="fill:none;stroke:var(--ok)"/>
+          <text x="737" y="26" text-anchor="middle" style="fill:var(--ok)">수렴?</text><text x="737" y="44" text-anchor="middle" style="fill:var(--ok)">|ΔΔ| 작음</text>
+          <path d="M543 64 C 543 100, 309 100, 309 64" style="fill:none;stroke:var(--text-dim);stroke-width:1.4;stroke-dasharray:4 3" marker-end="url(#sc-ah-t)"/>
+          <text x="426" y="110" text-anchor="middle">아니면 반복</text>
+          <text x="0" y="150">탄성 층에서 Δ<tspan baseline-shift="sub" font-size="8">i+1</tspan> = Δ₀(1 + Q + Q² + … + Q<tspan baseline-shift="super" font-size="8">i+1</tspan>) → Δ₀/(1 − Q)</text>
+          <text x="0" y="172">Q ≥ 1이면 급수가 발산 → 층이 불안정(좌굴)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-6.</b> 반복 P–Δ 해석. 층 연직 하중 ΣP가 층간 변위 Δ에서 만드는 추가 모멘트 ΣPΔ를 같은 모멘트를 내는 가상 수평력 ΣPΔ/h로 바꾼다. 선형 탄성 층이면 반복의 합이 등비급수가 되어 정확히 δ<sub>s</sub> = 1/(1 − Q)가 된다. 기둥을 여러 요소로 나누어 같은 일을 요소마다 하면 부재 안의 P–δ까지 들어간다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 11.8 (2차 해석의 쓰임, 기준 형태)</strong> 모멘트 확대법 대신 재료 비선형·균열·크리프를 반영한 강성으로 2차 해석(P–Δ, 필요하면 P–δ)을 해도 된다. 이때 해석용 강성은 앞 절 표(기둥 0.70I<sub>g</sub>, 보 0.35I<sub>g</sub> 등)를 쓰고, 2차 효과를 포함한 모멘트가 1차 모멘트의 1.4배를 넘지 않도록 한다(넘으면 골조 강성을 키우도록 다시 계획, KDS 14 20 10 · ACI 318 형태, 현행 기준 확인). StructureBook <a href="../../structure/chapters/frames.html#p-delta">4장의 P–Δ와 안정 계수</a>가 같은 생각의 내진 설계판이다.</div>
+    <div class="sim" id="sim-sc-pdelta">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>2차 해석 비교: 반복 P–Δ(CB.frame) vs 확대 계수</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view sc-stack">
+          <div><canvas id="sc-cv-pd-frame" aria-label="골조 또는 기둥의 1차 변형과 2차 변형 그림"></canvas><span class="sc-cap">변형(과장): 1차(점선) · 2차(실선)</span></div>
+          <div><canvas id="sc-cv-pd-iter" aria-label="반복 횟수에 따른 변위 또는 모멘트의 수렴 곡선"></canvas><span class="sc-cap">반복에 따른 수렴</span></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>모형</span><div class="seg" id="sc-pd-mode"><button data-value="sway" class="on">횡이동 포털(P–Δ)</button><button data-value="ns">비횡이동 기둥(P–δ)</button></div></div>
+          <label class="ctrl"><span>기둥 하나의 축력 P <output id="sc-pd-p-out"></output></span><input type="range" id="sc-pd-p" min="0" max="12000" step="100" value="3000"></label>
+          <label class="ctrl"><span>기둥 길이 L <output id="sc-pd-l-out"></output></span><input type="range" id="sc-pd-l" min="3" max="10" step="0.1" value="6"></label>
+          <label class="ctrl"><span>기둥 치수 h <output id="sc-pd-h-out"></output></span><input type="range" id="sc-pd-h" min="300" max="900" step="10" value="500"></label>
+          <label class="ctrl"><span><i id="sc-pd-q-lab" style="font-style:normal">수평력 H</i> <output id="sc-pd-q-out"></output></span><input type="range" id="sc-pd-q" min="10" max="400" step="5" value="100"></label>
+          <div class="ctrl"><span>기둥 강성</span><div class="seg" id="sc-pd-ei"><button data-value="0.7" class="on">0.70E<sub>c</sub>I<sub>g</sub>(해석)</button><button data-value="0.24">0.4E<sub>c</sub>I<sub>g</sub>/1.68</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">1차</span><span class="v" id="sc-pd-1">—</span></div>
+        <div class="stat"><span class="k">2차(반복 수렴) · 반복 수</span><span class="v" id="sc-pd-2">—</span></div>
+        <div class="stat"><span class="k">해석 증폭 비</span><span class="v" id="sc-pd-amp">—</span></div>
+        <div class="stat"><span class="k">확대 계수 예측</span><span class="v" id="sc-pd-pred">—</span></div>
+      </div>
+      <div class="sc-msg" id="sc-pd-msg"></div>
+      <div class="sim-note">해볼 것: 포털에서 P를 올리면 해석 증폭이 1/(1 − Q)와 거의 같게 움직입니다(Q는 1차 변위로 계산). 둘의 작은 차이는 기둥 안의 P–δ와 보의 휨 때문입니다 · P를 계속 올려 좌굴 하중에 다가가면 반복이 느려지다가 발산합니다("불안정") · 비횡이동 기둥(양단 핀, 끝 모멘트 M<sub>1</sub> = 0.667M<sub>2</sub> 단곡률)으로 바꾸면 해석 최대 모멘트 / M<sub>2</sub>를 C<sub>m</sub>/(1 − P/P<sub>c</sub>)(같은 EI, 0.75 없음)와 비교합니다 · 모델: CB.frame(E<sub>c</sub> = 2.75 × 10⁷ kN/m², 기둥 8요소, 보 G1 0.35I<sub>g</sub> 경간 8 m, 기둥 밑 고정), 각 요소의 축력 P가 요소 양 끝 상대 변위에서 만드는 짝힘 P·Δu/L<sub>e</sub>를 가상 수평력으로 더해 반복(최대 60회, 수렴 판정 10⁻⁶).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="pm-path">
+    <h2>P–M 상관도 위에서 본 장주</h2>
+    <div class="problem"><strong>확대 모멘트로 무엇을 검토하나</strong>
+      <p><span class="term">확대 모멘트</span><span class="en">(magnified moment)</span> M<sub>c</sub>를 구했으면 할 일은 10장과 같습니다. 단면의 P–M 상관도에 (P<sub>u</sub>, M<sub>c</sub>) 점을 찍어 안쪽에 있는지 봅니다. 달라진 것은 점의 위치뿐입니다. 같은 축력에서 모멘트만 δ배가 되었으니 점은 <b>오른쪽으로 수평 이동</b>합니다.</p></div>
+    <p>그림 11-1의 하중 경로를 다시 보면, 하중을 비례로 키울 때 확대된 점들의 자취는 원점에서 나가는 곡선이 되고, 축력이 클수록 δ가 커져서 점점 오른쪽으로 눕습니다. 단주의 직선 경로와 이 곡선이 상관도와 만나는 두 점의 축력 차이가 "길이 때문에 잃은 강도"입니다. P<sub>u</sub>가 0.75P<sub>c</sub>에 다가가면 곡선은 수평에 가까워지고, 상관도의 어느 점에서 만나든 그 축력 근처가 한계입니다(안정 파괴에 가까움).</p>
+    <div class="sim" id="sim-sc-pm">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>상관도 위 하중점 이동</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sc-cv-pm" aria-label="P–M 상관도 위의 1차 하중점과 확대된 하중점, 비례 재하 경로"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>기둥</span><div class="seg" id="sc-pm-col"><button data-value="S" class="on">C1-S 500 · 8-D25</button><button data-value="C1">C1 800 · 16-D25</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">계수 축력 P<sub>u</sub></i> <output id="sc-pm-p-out"></output></span><input type="range" id="sc-pm-p" min="0" max="12000" step="50" value="3000"></label>
+          <label class="ctrl"><span><i style="font-style:normal">M<sub>2</sub> (1차)</i> <output id="sc-pm-m-out"></output></span><input type="range" id="sc-pm-m" min="0" max="800" step="5" value="150"></label>
+          <label class="ctrl"><span><i style="font-style:normal">작은 끝 모멘트 M<sub>1</sub> (+ 단곡률)</i> <output id="sc-pm-r-out"></output></span><input type="range" id="sc-pm-r" min="-800" max="800" step="5" value="100"></label>
+          <label class="ctrl"><span><i style="font-style:normal">비지지 길이 L<sub>u</sub></i> <output id="sc-pm-lu-out"></output></span><input type="range" id="sc-pm-lu" min="2" max="12" step="0.1" value="6"></label>
+          <label class="ctrl"><span>유효 길이 계수 k <output id="sc-pm-k-out"></output></span><input type="range" id="sc-pm-k" min="0.5" max="1" step="0.01" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">kL<sub>u</sub>/r · 판정</span><span class="v" id="sc-pm-lam">—</span></div>
+        <div class="stat"><span class="k">δ<sub>ns</sub> · M<sub>c</sub></span><span class="v" id="sc-pm-mc">—</span></div>
+        <div class="stat"><span class="k">P<sub>u</sub>에서 φM<sub>n</sub></span><span class="v" id="sc-pm-cap">—</span></div>
+        <div class="stat"><span class="k">M<sub>c</sub>/φM<sub>n</sub> · 판정</span><span class="v" id="sc-pm-ok">—</span></div>
+      </div>
+      <div class="sc-msg" id="sc-pm-msg"></div>
+      <div class="sim-note">해볼 것: 기본값 C1-S(6 m)는 1차 점(회색)이 확대된 점(주황)으로 1.5배 옮겨 가도 안쪽입니다 · L<sub>u</sub>를 7.5 m로 늘려 주황 점이 상관도 밖으로 나가는 것을 보세요 · 주황 곡선은 같은 편심(M<sub>2</sub>/P<sub>u</sub>)으로 하중을 0부터 키울 때의 확대 경로이고, 회색 직선은 단주로 볼 때의 경로입니다. 두 경로가 상관도와 만나는 축력 차이가 길이로 잃은 강도입니다 · C1으로 바꾸면 세장비 17.9의 단주라 확대 없이 검토합니다(참고로 계산한 δ는 1.11) · 모델: CB.rc.pm(직사각형 대칭 배근, 피복 40 · 띠철근 D13), CB.rc.magnifier(β<sub>dns</sub> = 0.68), C<sub>m</sub> ≥ 0.4, 최소 모멘트 P<sub>u</sub>(15 + 0.03h).</div>
+    </div>
+    <div class="callout"><strong>예제 11.5 (C1-S를 상관도로 검토)</strong> 예제 11.3의 C1-S(500 × 500, 8-D25, 피복 40, 띠철근 D13): \(P_0 = 8{,}300\) kN, \(\phi P_{n,max} = 4{,}315\) kN, 균형점 \(P_b \approx 2{,}450\) kN.
+      <ol class="sc-steps">
+        <li><b>설계 축력 위치.</b> \(P_u = 3{,}000\) kN은 \(\phi P_{n,max}\)보다 작고 균형점보다 조금 위(압축 지배 쪽)다.</li>
+        <li><b>그 축력의 강도.</b> 상관도에서 \(\phi P_n = 3{,}000\) kN의 \(\phi M_n \approx 353\) kN·m.</li>
+        <li><b>판정(L<sub>u</sub> = 6.0 m).</b> \(M_c = 227 \le 353\) → <b>합격</b>(사용률 0.64). 단주로 보았다면 150/353 = 0.42였다.</li>
+        <li><b>판정(L<sub>u</sub> = 7.5 m).</b> \(M_c = 392 \gt 353\) → <b>불합격</b>. 단면을 550 mm로 키우거나, 중간 높이에 횡지지 보를 두어 \(L_u\)를 줄이거나, 철근을 늘린다(철근은 \(P_c\)를 거의 바꾸지 못하므로 효과가 작다 — EI 첫째 식에 철근이 없다).</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="thin-column">
+    <h2>C1과 가늘어지는 기둥</h2>
+    <div class="problem"><strong>C1을 얼마나 가늘게 할 수 있을까</strong>
+      <p>고강도 콘크리트를 쓰면 C1의 단면을 줄일 수 있습니다. f<sub>ck</sub> = 60 MPa라면 600 × 600 mm로도 φP<sub>n,max</sub>가 9,000 kN을 넘습니다. 하지만 600 mm 기둥의 세장비는 4,300/180 = 23.9로 단곡률 단주 한계 22를 넘습니다. 장주가 된 기둥은 단면 강도에서 계산한 만큼의 하중을 버틸까요? C1의 편심(M/P = 300/9,000 = 33 mm)과 C1-S의 편심(150/3,000 = 50 mm)으로 확인해 봅니다.</p></div>
+    <div class="sim" id="sim-sc-thin">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>가늘어지는 기둥: 세장비와 강도 감소</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sc-cv-thin" aria-label="세장비에 따른 기둥 최대 계수 축력 비 곡선과 단주 한계"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>기둥 치수 h (정사각형) <output id="sc-th-h-out"></output></span><input type="range" id="sc-th-h" min="300" max="900" step="10" value="800"></label>
+          <label class="ctrl"><span><i style="font-style:normal">비지지 길이 L<sub>u</sub></i> <output id="sc-th-lu-out"></output></span><input type="range" id="sc-th-lu" min="2" max="15" step="0.1" value="4.3"></label>
+          <label class="ctrl"><span><i style="font-style:normal">편심 e = M<sub>2</sub>/P<sub>u</sub></i> <output id="sc-th-e-out"></output></span><input type="range" id="sc-th-e" min="0" max="300" step="1" value="33"></label>
+          <label class="ctrl"><span><i style="font-style:normal">콘크리트 f<sub>ck</sub></i> <output id="sc-th-f-out"></output></span><input type="range" id="sc-th-f" min="24" max="80" step="1" value="30"></label>
+          <label class="ctrl"><span><i style="font-style:normal">철근비 ρ<sub>g</sub></i> <output id="sc-th-r-out"></output></span><input type="range" id="sc-th-r" min="0.01" max="0.04" step="0.0001" value="0.0127"></label>
+          <label class="ctrl"><span><i style="font-style:normal">M<sub>1</sub>/M<sub>2</sub></i> <output id="sc-th-m-out"></output></span><input type="range" id="sc-th-m" min="-1" max="1" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">kL<sub>u</sub>/r (k = 1)</span><span class="v" id="sc-th-lam">—</span></div>
+        <div class="stat"><span class="k">단주로 본 최대 P<sub>u</sub></span><span class="v" id="sc-th-ps">—</span></div>
+        <div class="stat"><span class="k">장주 확대 반영 최대 P<sub>u</sub></span><span class="v" id="sc-th-pl">—</span></div>
+        <div class="stat"><span class="k">C1 축력 9,000 kN</span><span class="v" id="sc-th-ok">—</span></div>
+      </div>
+      <div class="sc-msg" id="sc-th-msg"></div>
+      <div class="sim-note">해볼 것: C1(800 mm, f<sub>ck</sub> 30, 4.3 m, e = 33 mm)은 단주이고 최대 P<sub>u</sub>는 φP<sub>n,max</sub> ≈ 10,540 kN에서 정해집니다 · f<sub>ck</sub>를 60으로 올리고 h를 600 mm로 줄이면 장주(23.9)가 되지만 최대 P<sub>u</sub>는 그대로입니다. 편심이 작아 확대된 모멘트도 상관도의 φP<sub>n,max</sub> 평탄부 안에 머물기 때문입니다. 그 상태로 L<sub>u</sub>를 6 m로 늘리면 약 5 % 줄어듭니다 · h 800, e를 100 mm로 키우고 L<sub>u</sub>를 9 m(두 층 높이)로 하면 18 % 줄어 9,000 kN을 못 받습니다 · 500 mm, e = 50 mm, M<sub>1</sub>/M<sub>2</sub> = 0.67, ρ = 1.62 %(C1-S)로 두면 6 m에서 17 %, 7.5 m에서 31 % 줄어듭니다 · 곡선은 현재 단면에서 L<sub>u</sub>를 1–15 m로 바꿀 때의 (최대 P<sub>u</sub>, 확대 반영)/(최대 P<sub>u</sub>, 단주) · 모델: CB.rc.pm(철근을 위·아래 각 3/8, 중간 2/8로 배치하는 단순화), CB.rc.magnifier(k = 1, β<sub>dns</sub> = 0.68), 최소 모멘트 P<sub>u</sub>(15 + 0.03h), 최대 P<sub>u</sub>는 이분법으로 확대 점이 φ 상관도에 닿는 축력. 비횡이동 골조 가정.</div>
+    </div>
+    <p>시뮬레이터의 곡선이 보여 주듯, 세장비가 단주 한계 근처일 때 강도 감소는 몇 % 수준이고, 편심이 작으면 φP<sub>n,max</sub> 상한이 먼저 걸려 거의 드러나지 않습니다. 그러나 세장비가 40–50을 넘고 편심이 h의 10 %를 넘으면 감소가 20–30 %로 급격해집니다. 이것이 기준이 "한계 이하면 무시"라는 단순한 규칙을 두면서도, 한계를 넘는 기둥에는 정밀한 확대 계산이나 2차 해석을 요구하는 이유입니다. 장주를 고치는 방법은 효과 순서로 ① 비지지 길이를 줄인다(중간 보·가새), ② 단면을 키운다(\(I_g \propto h^4\)), ③ 골조를 비횡이동으로 만든다(벽·가새), ④ 철근을 늘린다(강도는 늘지만 \(P_c\)는 거의 그대로)입니다.</p>
+    <figure class="diagram" id="fig-sc-flow">
+      <svg viewBox="0 0 860 330" role="img" aria-label="장주 설계 순서도: 횡이동 판정, 세장비 판정, 확대 계수, P–M 검토">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)" class="t-mono">
+          <rect x="0" y="0" width="150" height="54" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <text x="75" y="22" text-anchor="middle">1차 해석</text><text x="75" y="40" text-anchor="middle">P<tspan baseline-shift="sub" font-size="8">u</tspan>, M<tspan baseline-shift="sub" font-size="8">ns</tspan>, M<tspan baseline-shift="sub" font-size="8">s</tspan>, Δ<tspan baseline-shift="sub" font-size="8">o</tspan></text>
+          <line x1="154" y1="27" x2="190" y2="27" style="stroke:var(--text-dim);stroke-width:1.5" marker-end="url(#sc-ah-t)"/>
+          <rect x="194" y="0" width="150" height="54" rx="8" style="fill:none;stroke:var(--warn);stroke-dasharray:4 3"/>
+          <text x="269" y="22" text-anchor="middle">Q ≤ 0.05 ?</text><text x="269" y="40" text-anchor="middle">(원리 11.7)</text>
+          <line x1="348" y1="27" x2="384" y2="27" style="stroke:var(--text-dim);stroke-width:1.5" marker-end="url(#sc-ah-t)"/>
+          <text x="352" y="18">예</text>
+          <rect x="388" y="0" width="170" height="54" rx="8" style="fill:none;stroke:var(--warn);stroke-dasharray:4 3"/>
+          <text x="473" y="22" text-anchor="middle">kL<tspan baseline-shift="sub" font-size="8">u</tspan>/r ≤ 34 − 12M₁/M₂ ?</text><text x="473" y="40" text-anchor="middle">(k ≤ 1, 원리 11.2)</text>
+          <line x1="562" y1="27" x2="598" y2="27" style="stroke:var(--text-dim);stroke-width:1.5" marker-end="url(#sc-ah-t)"/>
+          <text x="566" y="18">예</text>
+          <rect x="602" y="0" width="190" height="54" rx="8" style="fill:none;stroke:var(--ok)"/>
+          <text x="697" y="22" text-anchor="middle" style="fill:var(--ok)">단주: M<tspan baseline-shift="sub" font-size="8">u</tspan> 그대로</text><text x="697" y="40" text-anchor="middle" style="fill:var(--ok)">10장 P–M 검토</text>
+          <line x1="269" y1="58" x2="269" y2="110" style="stroke:var(--text-dim);stroke-width:1.5" marker-end="url(#sc-ah-t)"/><text x="276" y="88">아니오</text>
+          <line x1="473" y1="58" x2="473" y2="110" style="stroke:var(--text-dim);stroke-width:1.5" marker-end="url(#sc-ah-t)"/><text x="480" y="88">아니오</text>
+          <rect x="164" y="114" width="210" height="64" rx="8" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <text x="269" y="136" text-anchor="middle">횡이동: kL<tspan baseline-shift="sub" font-size="8">u</tspan>/r ≤ 22면 단주</text><text x="269" y="154" text-anchor="middle">아니면 M<tspan baseline-shift="sub" font-size="8">ns</tspan> + δ<tspan baseline-shift="sub" font-size="8">s</tspan>M<tspan baseline-shift="sub" font-size="8">s</tspan></text><text x="269" y="170" text-anchor="middle">(δ<tspan baseline-shift="sub" font-size="8">s</tspan> &gt; 1.5 → 2차 해석)</text>
+          <rect x="388" y="114" width="210" height="64" rx="8" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <text x="493" y="136" text-anchor="middle">비횡이동 장주</text><text x="493" y="154" text-anchor="middle">EI, P<tspan baseline-shift="sub" font-size="8">c</tspan>, C<tspan baseline-shift="sub" font-size="8">m</tspan>, δ<tspan baseline-shift="sub" font-size="8">ns</tspan>, M<tspan baseline-shift="sub" font-size="8">2,min</tspan></text><text x="493" y="170" text-anchor="middle">M<tspan baseline-shift="sub" font-size="8">c</tspan> = δ<tspan baseline-shift="sub" font-size="8">ns</tspan>M₂</text>
+          <path d="M269 182 V200 H493 V182" style="fill:none;stroke:var(--text-dim);stroke-width:1.2"/>
+          <line x1="381" y1="200" x2="381" y2="222" style="stroke:var(--text-dim);stroke-width:1.5" marker-end="url(#sc-ah-t)"/>
+          <rect x="246" y="226" width="270" height="34" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <text x="381" y="248" text-anchor="middle">(P<tspan baseline-shift="sub" font-size="8">u</tspan>, M<tspan baseline-shift="sub" font-size="8">c</tspan>)로 P–M 검토 · 2차/1차 ≤ 1.4</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-7.</b> 장주 설계 순서(KDS 14 20 20 형태 요약). 먼저 층이 횡이동인지 정하고(Q), 그다음 기둥마다 세장비로 단주인지 본다. 장주면 확대 모멘트를 구해 10장과 같은 P–M 검토를 한다. 확대가 너무 크면(δ<sub>s</sub> &gt; 1.5, 2차/1차 &gt; 1.4) 계산을 다듬기보다 골조를 다시 계획한다.</figcaption>
+    </figure>
+    <div class="callout site"><strong>B-10 기둥 C1의 세장 검토(교육용)</strong> ① 1층 안정 지수 Q ≈ 0.018(강성 절반이어도 0.036) ≤ 0.05 → 비횡이동 층(코어 전단벽 덕분). ② C1 800 × 800, L<sub>u</sub> = 4.3 m, k = 0.90(근사, 정해 0.86; 보수적으로 1.0) → kL<sub>u</sub>/r = 16.1–17.9 ≤ 22 → 단주. ③ 따라서 10장의 단면 검토(P<sub>u</sub> 9,000 kN, M<sub>u</sub> 300 kN·m, φM<sub>n</sub> ≈ 1,144 kN·m)가 그대로 유효하다. ④ 참고로 확대법을 적용하면 δ<sub>ns</sub> = 1.11(C<sub>m</sub> = 1), 최소 모멘트 351 kN·m가 지배해 M<sub>c</sub> ≈ 390 kN·m로도 충분하다. ⑤ 로비 등에서 L<sub>u</sub>가 9 m 이상인 기둥이 생기면 장주 검토가 필요하다(위 시뮬레이터: 800 mm, 9 m에서 세장비 37.5). 모든 값은 학습용이며 실제 설계에는 현행 KDS 14 20 20과 구조 해석의 2차 효과를 적용해야 한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="columns.html"><small>CH.10 · 기둥과 P–M 상관도</small>단면 강도<br><span>확대 모멘트로 찍는 점의 바탕 곡선.</span></a>
+      <a href="walls-detailing.html"><small>CH.12 · 벽체와 내진 상세</small>골조를 비횡이동으로 만드는 벽<br><span>B-10 코어 전단벽의 휨·전단·경계 요소.</span></a>
+      <a href="case-study.html"><small>CH.16 · B-10 설계 실습</small>C1 층별 검토<br><span>세장비 판정과 P–M 검토를 층마다.</span></a>
+      <a href="../../mechanics/chapters/buckling.html#effective-length"><small>MechanicsBook · CH.13</small>오일러 좌굴과 유효 길이<br><span>P<sub>cr</sub> = π²EI/(KL)², 초기 휨 증폭.</span></a>
+      <a href="../../structure/chapters/frames.html#p-delta"><small>StructureBook · CH.04</small>P–Δ와 안정 계수 θ<br><span>층의 2차 효과, 내진 설계판.</span></a>
+      <a href="../../structure/chapters/modeling.html#elements"><small>StructureBook · CH.14</small>균열 강성 저감<br><span>해석 모델의 0.70I<sub>g</sub> · 0.35I<sub>g</sub>.</span></a>
+      <a href="../../materials/chapters/shrinkage.html#creep"><small>MaterialsBook · CH.08</small>크리프<br><span>β<sub>dns</sub>로 EI를 줄이는 이유.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>축력을 받는 기둥이 휘면 축력이 편심을 더 만들어(P–δ, P–Δ) 모멘트가 커진다. 이 2차 효과를 무시해도 되는 기둥이 단주, 아닌 기둥이 장주다.</li>
+      <li>세장비 kL<sub>u</sub>/r, r = 0.3h(직사각형)·0.25D(원형). 단주 한계: 비횡이동 34 − 12M<sub>1</sub>/M<sub>2</sub> ≤ 40(단곡률 +), 횡이동 22(KDS 14 20 20 형태).</li>
+      <li>유효 길이 계수는 절점의 강성 비 Ψ = Σ(EI/L)<sub>기둥</sub>/Σ(EI/L)<sub>보</sub>로 정한다(정렬 도표, 근사식). 비횡이동 0.5–1.0(k = 1 보수적), 횡이동 1.0 이상. 해석용 강성은 기둥 0.70I<sub>g</sub>, 보 0.35I<sub>g</sub>.</li>
+      <li>비횡이동 확대: M<sub>c</sub> = δ<sub>ns</sub>M<sub>2</sub>, δ<sub>ns</sub> = C<sub>m</sub>/(1 − P<sub>u</sub>/0.75P<sub>c</sub>) ≥ 1, P<sub>c</sub> = π²EI/(kL<sub>u</sub>)², EI = 0.4E<sub>c</sub>I<sub>g</sub>/(1 + β<sub>dns</sub>), C<sub>m</sub> = 0.6 + 0.4M<sub>1</sub>/M<sub>2</sub>. 최소 모멘트 P<sub>u</sub>(15 + 0.03h).</li>
+      <li>안정 지수 Q = ΣP<sub>u</sub>Δ<sub>o</sub>/(V<sub>us</sub>l<sub>c</sub>) ≤ 0.05면 비횡이동 층. 횡이동이면 M = M<sub>ns</sub> + δ<sub>s</sub>M<sub>s</sub>, δ<sub>s</sub> = 1/(1 − Q)(≤ 1.5일 때) 또는 ΣP<sub>c</sub> 식.</li>
+      <li>반복 P–Δ 해석의 합은 등비급수 1/(1 − Q)로 수렴해 δ<sub>s</sub>와 일치한다. 2차 모멘트가 1차의 1.4배를 넘으면 골조를 다시 계획한다.</li>
+      <li>확대 모멘트는 P–M 상관도의 하중점을 오른쪽으로 옮긴다. 비례 재하 경로가 휘어 상관도에 더 낮은 축력에서 닿고, 아주 가는 기둥은 상관도 전에 안정을 잃는다.</li>
+      <li>B-10: 코어 덕분에 1층 Q ≈ 0.018(비횡이동), C1 kL<sub>u</sub>/r ≈ 16–18 → 단주. 가상 장주 C1-S(500 mm, 6 m)는 δ<sub>ns</sub> = 1.51로 합격, 7.5 m에서는 2.61로 불합격.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 500 × 500 mm 직사각형 기둥, k = 1.0, L<sub>u</sub> = 5.0 m의 세장비는?</p><div class="opts">
+        <button class="opt">10.0</button><button class="opt">28.9</button><button class="opt" data-correct>33.3</button><button class="opt">40.0</button>
+      </div><div class="quiz-exp">r = 0.3 × 500 = 150 mm, kL<sub>u</sub>/r = 5,000/150 = 33.3. 정확한 회전 반경(h/√12 = 144 mm)을 쓰면 34.6이지만 기준 형태는 0.3h를 쓴다.</div></div>
+      <div class="quiz-q"><p>2. 비횡이동 골조의 기둥이 M<sub>1</sub> = −0.5M<sub>2</sub>(복곡률)로 휜다. 단주 한계는?</p><div class="opts">
+        <button class="opt">22</button><button class="opt">28</button><button class="opt">34</button><button class="opt" data-correct>40</button>
+      </div><div class="quiz-exp">34 − 12 × (−0.5) = 40. 상한도 40이므로 40. 복곡률이면 중간 모멘트가 작아 한계가 높다(국내 기준 부호: 단곡률 +).</div></div>
+      <div class="quiz-q"><p>3. C<sub>m</sub> = 1.0, P<sub>u</sub>/P<sub>c</sub> = 0.375일 때 δ<sub>ns</sub>는?</p><div class="opts">
+        <button class="opt">1.33</button><button class="opt">1.60</button><button class="opt" data-correct>2.00</button><button class="opt">2.67</button>
+      </div><div class="quiz-exp">P<sub>u</sub>/(0.75P<sub>c</sub>) = 0.375/0.75 = 0.5, δ<sub>ns</sub> = 1/(1 − 0.5) = 2.0. 0.75를 빼먹으면 1.6이 나온다.</div></div>
+      <div class="quiz-q"><p>4. 같은 기둥에서 EI = 0.4E<sub>c</sub>I<sub>g</sub>/(1 + β<sub>dns</sub>)의 분모가 커지는(β<sub>dns</sub>가 커지는) 이유는?</p><div class="opts">
+        <button class="opt">계수 활하중이 커서 강도가 커지므로</button><button class="opt" data-correct>지속 하중 아래 크리프로 휨 변형이 커져 유효 강성이 줄기 때문</button><button class="opt">철근이 항복하기 때문</button><button class="opt">온도 변화를 반영하기 위해</button>
+      </div><div class="quiz-exp">β<sub>dns</sub>는 계수 축력 중 지속 하중의 비다. 오래 걸리는 하중일수록 크리프로 처짐이 늘어 P–δ가 커지므로 강성을 줄여 P<sub>c</sub>를 낮춘다.</div></div>
+      <div class="quiz-q"><p>5. 어떤 층의 ΣP<sub>u</sub> = 60,000 kN, V<sub>us</sub> = 3,000 kN, 1차 층간 변위 Δ<sub>o</sub> = 12 mm, l<sub>c</sub> = 4.0 m이다. 판정은?</p><div class="opts">
+        <button class="opt">Q = 0.012, 비횡이동</button><button class="opt">Q = 0.05, 경계</button><button class="opt" data-correct>Q = 0.06, 횡이동(δ<sub>s</sub> ≈ 1.06)</button><button class="opt">Q = 0.24, 2차 해석 필수</button>
+      </div><div class="quiz-exp">Q = 60,000 × 12/(3,000 × 4,000) = 0.06 &gt; 0.05 → 횡이동 층. δ<sub>s</sub> = 1/(1 − 0.06) = 1.064 ≤ 1.5이므로 확대법을 쓸 수 있다.</div></div>
+      <div class="quiz-q"><p>6. P<sub>u</sub> = 2,000 kN, h = 500 mm인 비횡이동 장주의 최소 모멘트 M<sub>2,min</sub>은?</p><div class="opts">
+        <button class="opt">15 kN·m</button><button class="opt">30 kN·m</button><button class="opt" data-correct>60 kN·m</button><button class="opt">100 kN·m</button>
+      </div><div class="quiz-exp">M<sub>2,min</sub> = P<sub>u</sub>(15 + 0.03h) = 2,000 × (15 + 15) mm = 60,000 kN·mm = 60 kN·m.</div></div>
+      <div class="quiz-q"><p>7. 횡이동 골조의 유효 길이 계수에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">항상 0.5와 1.0 사이다</button><button class="opt">보 강성과 무관하게 2.0이다</button><button class="opt" data-correct>1.0 이상이며, 보가 약할수록(Ψ가 클수록) 커진다</button><button class="opt">기둥 철근이 많을수록 작아진다</button>
+      </div><div class="quiz-exp">횡이동 모드에서는 기둥 끝이 밀리므로 k ≥ 1. 보가 기둥 끝 회전을 덜 붙잡을수록(Ψ ↑) k가 커지고, 양 끝이 모두 핀에 가까우면 사실상 불안정하다.</div></div>
+      <div class="quiz-q"><p>8. 장주를 모멘트 확대법으로 검토할 때 P–M 상관도 위의 하중점은 1차 점 (P<sub>u</sub>, M<sub>2</sub>)에서 어떻게 옮겨 가는가?</p><div class="opts">
+        <button class="opt">같은 모멘트에서 위로(축력 증가)</button><button class="opt" data-correct>같은 축력에서 오른쪽으로(모멘트 δ배)</button><button class="opt">원점 방향으로(하중 감소)</button><button class="opt">상관도 자체가 δ배로 줄어든다</button>
+      </div><div class="quiz-exp">확대법은 축력은 그대로 두고 모멘트만 M<sub>c</sub> = δM<sub>2</sub>로 키운다. 단면 상관도는 바뀌지 않으며, 점이 오른쪽으로 옮겨 가 상관도 밖으로 나가면 불합격이다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const SC = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${SC.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = SC._c || (SC._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  msg(id, html, cls = "") { const m = document.getElementById(id); if (m) { m.className = "sc-msg" + (cls ? " " + cls : ""); m.innerHTML = html; } },
+  FCK: 30, FY: 500, BETA: 0.68,
+  Ec: CB.conc.Ec(30),
+  /** 정사각형 기둥, 면당 nface개 D25(피복 40, 띠철근 D13) → pm 층 */
+  colLayers(h, nface) {
+    const A = CB.steel.BARS.D25.A, d1 = 40 + 12.7 + 25.4 / 2, d2 = h - d1, L = [{ d: d1, As: nface * A }, { d: d2, As: nface * A }];
+    for (let i = 1; i <= nface - 2; i++) L.push({ d: d1 + ((d2 - d1) * i) / (nface - 1), As: 2 * A });
+    return L.sort((a, b) => a.d - b.d);
+  },
+  /** 단순화 배치: 위·아래 3/8, 중간 2/8 */
+  rhoLayers(h, As) { const d1 = 65.4; return [{ d: d1, As: (3 / 8) * As }, { d: h / 2, As: (2 / 8) * As }, { d: h - d1, As: (3 / 8) * As }]; },
+  /** φ 상관도에서 φPn = Pu인 φMn(위에서부터 첫 교차). Pu > φPn,max면 NaN */
+  phiMnAt(pm, Pu) {
+    if (Pu > pm.phiPnMax + 1e-9) return NaN;
+    const p = pm.pts;
+    for (let i = 0; i < p.length - 1; i++) { const a = p[i], b = p[i + 1]; if ((a.phiPn - Pu) * (b.phiPn - Pu) <= 0 && a.phiPn !== b.phiPn) { const t = (Pu - a.phiPn) / (b.phiPn - a.phiPn); return a.phiMn + t * (b.phiMn - a.phiMn); } }
+    return NaN;
+  },
+  /** 상관도 곡선 점들(φPn,max에서 자름) */
+  curve(pm, phi = true) { return pm.pts.filter((q) => q.Pn > -1e9).map((q) => phi ? [Math.max(0, q.phiMn), Math.min(q.phiPn, pm.phiPnMax)] : [Math.max(0, q.Mn), Math.min(q.Pn, pm.PnMax)]); },
+  Cm(r) { return Math.max(0.4, 0.6 + 0.4 * r); },
+  Mmin(Pu, h) { return (Pu * (15 + 0.03 * h)) / 1000; },
+  /** 정렬 도표의 좌굴 방정식(탄성 골조) */
+  root(f, lo, hi, n = 300) { let x0 = lo, f0 = f(lo); for (let i = 1; i <= n; i++) { const x1 = lo + ((hi - lo) * i) / n, f1 = f(x1); if (isFinite(f0) && isFinite(f1) && f0 * f1 <= 0) { let a = x0, b = x1, fa = f0; for (let j = 0; j < 60; j++) { const m = (a + b) / 2, fm = f(m); if (fa * fm <= 0) b = m; else { a = m; fa = fm; } } return (a + b) / 2; } x0 = x1; f0 = f1; } return NaN; },
+  kNon(a, b) { a = Math.max(a, 0.01); b = Math.max(b, 0.01); const f = (k) => { const u = Math.PI / k; return ((a * b) / 4) * u * u + ((a + b) / 2) * (1 - u / Math.tan(u)) + (2 * Math.tan(u / 2)) / u - 1; }; const k = SC.root(f, 0.5001, 0.99999); return isFinite(k) ? k : a + b > 1 ? 1 : 0.5; },
+  kSway(a, b) { a = Math.max(a, 0.01); b = Math.max(b, 0.01); const f = (k) => { const u = Math.PI / k; return (a * b * u * u - 36) / (6 * (a + b)) - u / Math.tan(u); }; const t = SC.root((t) => f(Math.exp(t)), 1e-7, Math.log(60), 500); return isFinite(t) ? Math.exp(t) : 60; },
+  kNonApprox(a, b) { return Math.min(1, 0.7 + 0.05 * (a + b), 0.85 + 0.05 * Math.min(a, b)); },
+  kSwayApprox(a, b) { const m = (a + b) / 2; return m < 2 ? ((20 - m) / 20) * Math.sqrt(1 + m) : 0.9 * Math.sqrt(1 + m); },
+};
+
+/* ---------- 1. 세장비 판정기 ---------- */
+(function () {
+  const fr = CB.seg("sc-lm-frame", go), sh = CB.seg("sc-lm-shape", go);
+  const gk = CB.range("sc-lm-k", (v) => v.toFixed(2), go), glu = CB.range("sc-lm-lu", (v) => v.toFixed(1) + " m", go), gh = CB.range("sc-lm-h", (v) => v + " mm", go), gm = CB.range("sc-lm-m", (v) => CB.num(v, 2), go);
+  document.getElementById("sc-lm-c1").onclick = () => { fr.set("ns", false); sh.set("rect", false); gk.set(1, false); glu.set(4.3, false); gh.set(800, false); gm.set(0.5, false); go(); };
+  document.getElementById("sc-lm-s").onclick = () => { fr.set("ns", false); sh.set("rect", false); gk.set(1, false); glu.set(6, false); gh.set(500, false); gm.set(0.67, false); go(); };
+  let S = {};
+  const lim = (m) => (fr() === "ns" ? Math.min(40, 34 - 12 * m) : 22);
+  const cv = CB.canvas("#sc-cv-limit", (ctx, W, H) => {
+    const P = CB.palette(), top = Math.max(60, S.lam * 1.15 || 0);
+    const d = []; for (let i = 0; i <= 100; i++) { const m = -1 + (2 * i) / 100; d.push([m, lim(m)]); }
+    const C = CB.chart(ctx, { x: 56, y: 16, w: W - 56 - 16, h: H - 16 - 46 }, { x: [-1, 1], y: [0, top], xLabel: "M₁/M₂ (+ 단곡률, − 복곡률)", yLabel: "kLu/r",
+      series: [{ data: d, color: P.warn, width: 2.4, dash: [6, 4], fill: SC.alpha(P.ok, 0.10) }],
+      hlines: top > 100 ? [{ y: 100, color: P.bad, label: "100: 2차 해석(옛 기준 형태)" }] : [],
+      points: [{ x: gm(), y: S.lam, color: S.ok ? P.ok : P.bad, r: 7 }] });
+    SC.text(ctx, "단주 영역", C.X(-0.75), C.Y(Math.min(10, lim(-0.75) / 2)), P.ok, { size: 12 });
+    SC.text(ctx, fr() === "ns" ? "34 − 12M₁/M₂ ≤ 40" : "횡이동 한계 22", C.X(0.3), C.Y(lim(0.3)) - 14, P.warn, { size: 11.5 });
+    const px = C.X(gm()), py = C.Y(Math.min(S.lam, top));
+    SC.text(ctx, `kLu/r = ${CB.num(S.lam, 1)}`, px + (px > W - 140 ? -10 : 10), py - 14, S.ok ? P.ok : P.bad, { size: 11.5, align: px > W - 140 ? "right" : "left" });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 360 });
+  function go() {
+    const r = sh() === "rect" ? 0.3 * gh() : 0.25 * gh(), lam = (gk() * glu() * 1000) / r, L = lim(gm()), ok = lam <= L;
+    S = { lam, ok };
+    CB.stat("sc-lm-r", CB.num(r, 0) + " mm"); CB.stat("sc-lm-lam", CB.num(lam, 1)); CB.stat("sc-lm-lim", CB.num(L, 1));
+    CB.stat("sc-lm-ok", ok ? `<span style="color:var(--ok)">단주</span>` : `<span style="color:var(--bad)">장주</span>`);
+    const hmax = (glu() * 1000 * gk()) / ((sh() === "rect" ? 0.3 : 0.25) * L);
+    if (ok) SC.msg("sc-lm-msg", `단주: 세장 효과를 무시하고 10장의 단면 검토로 설계합니다. 같은 길이에서 h가 <b>${CB.sig(hmax, 3)} mm</b>보다 작아지면 장주가 됩니다.`, "ok");
+    else SC.msg("sc-lm-msg", lam > 100 ? `kL<sub>u</sub>/r = ${CB.num(lam, 0)} &gt; 100: 모멘트 확대법의 적용 범위를 넘습니다(옛 기준 형태). 비선형 2차 해석을 하거나 단면·횡지지를 다시 계획하세요.` : `장주: ${fr() === "ns" ? "비횡이동 모멘트 확대 δ<sub>ns</sub>(3절)" : "횡이동 모멘트 확대 δ<sub>s</sub>(4절)"}를 적용해야 합니다. 단주가 되려면 h ≥ ${CB.sig(hmax, 3)} mm 또는 L<sub>u</sub> ≤ ${CB.num((L * r) / gk() / 1000, 2)} m.`, "bad");
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 2. 정렬 도표와 근사식 ---------- */
+(function () {
+  const fr = CB.seg("sc-kf-frame", go), fmt = (v) => CB.sig(Math.pow(10, v), 3);
+  const ga = CB.range("sc-kf-a", fmt, go), gb = CB.range("sc-kf-b", fmt, go), glh = CB.range("sc-kf-lh", (v) => v.toFixed(1), go);
+  document.getElementById("sc-kf-c1").onclick = () => { ga.set(Math.log10(10.7), false); gb.set(0, false); glh.set(5.4, false); go(); };
+  document.getElementById("sc-kf-eq").onclick = () => { gb.set(ga(), false); go(); };
+  let S = {};
+  const nomo = CB.canvas("#sc-cv-kf-nomo", (ctx, W, H) => {
+    const P = CB.palette(), ns = fr() === "ns", y0 = 52, y1 = H - 18, xs = [W * 0.18, W * 0.5, W * 0.82];
+    const lp = (v) => y0 + ((Math.log10(Math.max(0.1, Math.min(50, v))) - Math.log10(50)) / (Math.log10(0.1) - Math.log10(50))) * (y1 - y0);
+    const kr = ns ? [1, 0.5] : [6, 1], kp = (k) => y0 + ((Math.min(kr[0], Math.max(kr[1], k)) - kr[0]) / (kr[1] - kr[0])) * (y1 - y0);
+    ctx.strokeStyle = P.axis; ctx.lineWidth = 1.4;
+    xs.forEach((x) => { ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke(); });
+    [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50].forEach((v) => { [0, 2].forEach((i) => { const y = lp(v); ctx.beginPath(); ctx.moveTo(xs[i] - 5, y); ctx.lineTo(xs[i] + 5, y); ctx.stroke(); SC.text(ctx, String(v), xs[i] + (i === 0 ? -10 : 10), y, P.dim, { size: 10, align: i === 0 ? "right" : "left", bold: false }); }); });
+    const kt = ns ? [0.5, 0.6, 0.7, 0.8, 0.9, 1.0] : [1, 1.5, 2, 3, 4, 5, 6];
+    kt.forEach((k) => { const y = kp(k); ctx.beginPath(); ctx.moveTo(xs[1] - 5, y); ctx.lineTo(xs[1] + 5, y); ctx.stroke(); SC.text(ctx, k.toFixed(1), xs[1] + 10, y, P.dim, { size: 10, align: "left", bold: false }); });
+    SC.text(ctx, "ΨA", xs[0], 38, P.text, { size: 12 }); SC.text(ctx, ns ? "k (비횡이동)" : "k (횡이동)", xs[1], 38, P.accent, { size: 12 }); SC.text(ctx, "ΨB", xs[2], 38, P.text, { size: 12 });
+    const A = [xs[0], lp(S.a)], K = [xs[1], kp(S.ke)], B = [xs[2], lp(S.b)];
+    SC.line(ctx, [A, K, B], P.accent2, 2.2);
+    [A, B].forEach(([x, y]) => { ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill(); });
+    ctx.fillStyle = P.accent; ctx.beginPath(); ctx.arc(K[0], K[1], 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = P.warn; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(xs[1] - 12, kp(S.ka)); ctx.lineTo(xs[1] + 12, kp(S.ka)); ctx.stroke();
+    SC.text(ctx, `k = ${CB.num(S.ke, 2)}`, K[0] - 12, K[1] - 14, P.accent, { size: 11.5, align: "right" });
+    SC.text(ctx, `근사 ${CB.num(S.ka, 2)}`, xs[1] + 16, kp(S.ka) + 14, P.warn, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.44), minHeight: 240, maxHeight: 310 });
+  const crv = CB.canvas("#sc-cv-kf-curve", (ctx, W, H) => {
+    const P = CB.palette(), ns = fr() === "ns", ex = [], ap = [];
+    for (let i = 0; i <= 80; i++) { const v = Math.pow(10, -1 + (i / 80) * Math.log10(500)); ex.push([v, ns ? SC.kNon(v, v) : SC.kSway(v, v)]); ap.push([v, ns ? SC.kNonApprox(v, v) : SC.kSwayApprox(v, v)]); }
+    const pm = (S.a + S.b) / 2;
+    CB.chart(ctx, { x: 52, y: 26, w: W - 52 - 16, h: H - 26 - 44 }, { x: [0.1, 50], logX: true, y: ns ? [0.5, 1.05] : [1, 7], xLabel: "Ψ (양 끝 같음, 로그)", yLabel: "k", xFmt: (v) => String(v),
+      series: [{ data: ex, color: P.accent, width: 2.6 }, { data: ap, color: P.warn, width: 2, dash: [6, 4] }],
+      points: [{ x: Math.max(0.1, Math.min(50, pm)), y: S.ke, color: P.accent2, r: 6 }] });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.38), minHeight: 200, maxHeight: 280 });
+  function go() {
+    const a = Math.pow(10, ga()), b = Math.pow(10, gb()), ns = fr() === "ns";
+    const ke = ns ? SC.kNon(a, b) : SC.kSway(a, b), ka = ns ? SC.kNonApprox(a, b) : SC.kSwayApprox(a, b);
+    S = { a, b, ke, ka };
+    const lam = (ke * glh()) / 0.3;
+    CB.stat("sc-kf-ke", CB.num(ke, 3)); CB.stat("sc-kf-ka", CB.num(ka, 3)); CB.stat("sc-kf-err", CB.num(ka / ke, 2) + (ka >= ke ? " (안전 쪽)" : " (위험 쪽)"));
+    CB.stat("sc-kf-lam", `${CB.num(lam, 1)} · ${lam <= 22 ? '<span style="color:var(--ok)">단주</span>' : '<span style="color:var(--bad)">장주</span>'}`);
+    nomo.redraw(); crv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 3. 좌굴 모드 ---------- */
+(function () {
+  const fr = CB.seg("sc-md-frame", go), gp = CB.range("sc-md-psi", (v) => CB.sig(Math.pow(10, v), 3), go);
+  let t = 0, playing = true;
+  const S = {};
+  function drawOne(ctx, x0, w, top, bot, sway, k, psi, amp, P) {
+    if (!isFinite(k)) return;
+    const L = bot - top, n = 60, lam = Math.PI / (k * L);
+    // 모드 형상 y(s), s: 밑에서 위로 0..L
+    const f = sway ? (s) => Math.sin(lam * (s - L / 2)) + Math.sin(lam * L / 2) : (s) => Math.cos(lam * (s - L / 2)) - Math.cos(lam * L / 2);
+    let mx = 0; for (let i = 0; i <= n; i++) mx = Math.max(mx, Math.abs(f((L * i) / n)));
+    const sc = (w * 0.16 * amp) / (mx || 1), cx = x0 + w * 0.42;
+    const X = (s) => cx + f(s) * sc, Y = (s) => bot - s;
+    // 가상 연장(점선)
+    const ext = []; const s0 = sway ? L / 2 - k * L : -0.15 * L, s1 = sway ? L / 2 + k * L : 1.15 * L;
+    for (let i = 0; i <= 120; i++) { const s = s0 + ((s1 - s0) * i) / 120; if (Y(s) > 8 && Y(s) < bot + 40) ext.push([X(s), Y(s)]); }
+    SC.line(ctx, ext, SC.alpha(P.accent, 0.55), 1.4, [4, 4]);
+    SC.line(ctx, [[cx, top], [cx, bot]], P.faint, 1, [3, 3]);
+    // 보(두께는 강성 1/Ψ에 비례)
+    const bw = CB.clamp(10 / Math.sqrt(psi), 2, 14), sl0 = (f(0.001) - f(0)) / 0.001 * sc, slL = (f(L) - f(L - 0.001)) / 0.001 * sc;
+    const beam = (s, slope) => { const xc = X(s), yc = Y(s), a = Math.atan2(slope, 1), dx = Math.cos(a) * w * 0.22, dy = Math.sin(a) * w * 0.22; ctx.save(); ctx.strokeStyle = P.dim; ctx.lineWidth = bw; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(xc - dx, yc + dy); ctx.lineTo(xc + dx, yc - dy); ctx.stroke(); ctx.restore(); };
+    beam(0, -sl0); beam(L, -slL);
+    if (!sway) { const wx = x0 + w * 0.9; ctx.fillStyle = SC.alpha(P.dim, 0.35); ctx.fillRect(wx, top - 20, 10, bot - top + 40); [0, L].forEach((s) => SC.line(ctx, [[X(s), Y(s)], [wx, Y(s)]], P.ok, 1.6, [2, 3])); SC.text(ctx, "횡지지(벽)", wx + 5, top - 30, P.ok, { size: 10.5 }); }
+    const pts = []; for (let i = 0; i <= n; i++) { const s = (L * i) / n; pts.push([X(s), Y(s)]); }
+    SC.line(ctx, pts, P.accent, 4);
+    // 반곡점
+    const inf = sway ? [L / 2, L / 2 + k * L, L / 2 - k * L] : [L / 2 - (k * L) / 2, L / 2 + (k * L) / 2];
+    inf.forEach((s) => { if (Y(s) > 6 && Y(s) < H0 - 6) { ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(X(s), Y(s), 5, 0, Math.PI * 2); ctx.fill(); } });
+    const sa = sway ? L / 2 : L / 2 - (k * L) / 2, sb = sway ? L / 2 + k * L : L / 2 + (k * L) / 2, bx = x0 + 18;
+    const ya = Math.min(bot, Y(sa)), yb = Math.max(10, Y(sb));
+    ctx.save(); ctx.strokeStyle = P.accent2; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(bx, ya); ctx.lineTo(bx, yb); ctx.stroke(); ctx.restore();
+    SC.text(ctx, `kL = ${CB.num(k, 2)}L${Y(sb) < 10 ? " ↑" : ""}`, bx + 6, (ya + yb) / 2, P.accent2, { size: 11.5, align: "left" });
+    SC.text(ctx, sway ? "횡이동" : "비횡이동", x0 + w * 0.42, 18, P.text, { size: 12.5 });
+  }
+  let H0 = 300;
+  const cv = CB.canvas("#sc-cv-modes", (ctx, W, H) => {
+    H0 = H; const P = CB.palette(), m = fr(), psi = Math.pow(10, gp()), amp = 0.55 + 0.45 * Math.sin(t * 2.2), top = 54, bot = H - 46;
+    if (m === "both") { drawOne(ctx, 0, W / 2, top, bot, false, S.kn, psi, amp, P); drawOne(ctx, W / 2, W / 2, top, bot, true, S.ks, psi, amp, P); ctx.strokeStyle = P.border; ctx.beginPath(); ctx.moveTo(W / 2, 10); ctx.lineTo(W / 2, H - 10); ctx.stroke(); }
+    else drawOne(ctx, W * 0.15, W * 0.7, top, bot, m === "s", m === "s" ? S.ks : S.kn, psi, amp, P);
+    SC.text(ctx, `Ψ = ${CB.sig(psi, 3)} (양 끝)`, 12, H - 14, P.dim, { size: 11, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 1.05 : 0.6), minHeight: 300, maxHeight: 440 });
+  const btn = CB.playButton("sc-md-play", () => (playing = true), () => (playing = false));
+  btn.set(true);
+  CB.loop(cv.canvas, (dt) => { if (!playing) return; t += dt; cv.redraw(); });
+  function go() {
+    const psi = Math.pow(10, gp()); S.kn = SC.kNon(psi, psi); S.ks = SC.kSway(psi, psi);
+    CB.stat("sc-md-kn", CB.num(S.kn, 3)); CB.stat("sc-md-ks", S.ks >= 59 ? "&gt; 60(불안정)" : CB.num(S.ks, 3)); CB.stat("sc-md-ratio", CB.num((S.kn / S.ks) ** 2, 3));
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 4. 모멘트 확대 계산기 ---------- */
+(function () {
+  const gp = CB.range("sc-mg-p", (v) => (v >= 1000 ? CB.sig(v, 4) : CB.num(v, 0)) + " kN", go), gm = CB.range("sc-mg-m", (v) => v + " kN·m", go), gr = CB.range("sc-mg-r", (v) => v + " kN·m", go);
+  const glu = CB.range("sc-mg-lu", (v) => v.toFixed(1) + " m", go), gh = CB.range("sc-mg-h", (v) => v + " mm", go), gb = CB.range("sc-mg-b", (v) => v.toFixed(2), go), gt = CB.check("sc-mg-tr", go);
+  let S = null;
+  const cur = CB.canvas("#sc-cv-mg-curve", (ctx, W, H) => {
+    if (!S) return;
+    const P = CB.palette(), d = [], d1 = [];
+    for (let i = 0; i <= 200; i++) { const x = (0.745 * i) / 200; d.push([x, Math.max(1, S.Cm / (1 - x / 0.75))]); d1.push([x, 1 / (1 - x / 0.75)]); }
+    const x = Math.min(0.75, S.Pu / S.Pc), y = Math.min(5, S.delta);
+    CB.chart(ctx, { x: 52, y: 32, w: W - 52 - 16, h: H - 32 - 44 }, { x: [0, 0.8], y: [0, 5], xLabel: "Pu / Pc", yLabel: "δns",
+      series: [{ data: d1, color: P.faint, width: 1.4, dash: [5, 4] }, { data: d, color: P.accent, width: 2.6 }],
+      vlines: [{ x: 0.75, color: P.bad, label: "0.75Pc" }], hlines: [{ y: 1, color: P.faint }],
+      points: [{ x, y, color: isFinite(S.delta) ? P.accent2 : P.bad, r: 7 }] });
+  }, { aspect: (W) => (W < 520 ? 0.65 : 0.36), minHeight: 190, maxHeight: 260 });
+  const col = CB.canvas("#sc-cv-mg-col", (ctx, W, H) => {
+    if (!S) return;
+    const P = CB.palette(), L = S.Lu, MB = S.M2, MA = S.r * S.M2, f1 = [], f2 = [];
+    const lam = Math.sqrt(S.Pu / S.EIk), lL = lam * L;
+    for (let i = 0; i <= 80; i++) { const x = (L * i) / 80; f1.push([MA + ((MB - MA) * x) / L, x]); if (S.Pu > 0 && lL < Math.PI * 0.999) f2.push([MA * Math.cos(lam * x) + ((MB - MA * Math.cos(lL)) / Math.sin(lL)) * Math.sin(lam * x), x]); }
+    if (!(S.Pu > 0)) f1.forEach((p) => f2.push(p));
+    const all = f1.concat(f2).map((p) => p[0]), lo = Math.min(0, ...all), hi = Math.max(1, ...all), pad = (hi - lo) * 0.12;
+    const C = CB.chart(ctx, { x: 56, y: 32, w: W - 56 - 16, h: H - 32 - 44 }, { x: [lo - pad, hi + pad], y: [0, L], xLabel: "휨모멘트 (kN·m)", yLabel: "높이 (m)",
+      series: [{ data: f1, color: P.dim, width: 1.8, dash: [5, 4] }, { data: f2, color: P.bad, width: 2.6 }], vlines: [{ x: 0, color: P.axis, dash: [] }] });
+    if (f2.length) { let im = 0; f2.forEach((p, i) => { if (Math.abs(p[0]) > Math.abs(f2[im][0])) im = i; }); const q = f2[im]; ctx.fillStyle = P.bad; ctx.beginPath(); ctx.arc(C.X(q[0]), C.Y(q[1]), 5, 0, Math.PI * 2); ctx.fill(); SC.text(ctx, `최대 ${CB.num(Math.abs(q[0]), 0)}`, C.X(q[0]) + (C.X(q[0]) > W * 0.7 ? -8 : 8), C.Y(q[1]) - 12, P.bad, { size: 11, align: C.X(q[0]) > W * 0.7 ? "right" : "left" }); S.Mex = Math.abs(q[0]); }
+    else { SC.text(ctx, "P ≥ π²EI/L²: 이 EI로는 좌굴", W / 2, H / 2, P.bad, { size: 13 }); S.Mex = Infinity; }
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.42), minHeight: 230, maxHeight: 300 });
+  function go() {
+    const Pu = gp(), h = gh(), Lu = glu() * 1000, r = gm() > 0 ? CB.clamp(gr() / gm(), -1, 1) : 0, Ig = h ** 4 / 12, Cm = gt() ? 1 : SC.Cm(r);
+    const m = CB.rc.magnifier({ fck: SC.FCK, Ig, k: 1, Lu, Pu, Cm, betaD: gb() });
+    const Mmin = SC.Mmin(Pu, h), M2e = Math.max(gm(), Mmin), Mc = m.delta * M2e;
+    S = { Pu, Pc: m.Pc, Cm, delta: m.delta, M2: gm(), r, Lu: glu(), EIk: m.EI / 1e9 };
+    CB.stat("sc-mg-ei", CB.sig(m.EI / 1e9, 3) + " kN·m²"); CB.stat("sc-mg-pc", `${CB.sig(m.Pc, 4)} kN · ${CB.num(Pu / (0.75 * m.Pc), 3)}`);
+    CB.stat("sc-mg-d", `${CB.num(Cm, 3)} · ${isFinite(m.delta) ? CB.num(m.delta, 3) : '<span style="color:var(--bad)">발산</span>'}`);
+    CB.stat("sc-mg-mc", isFinite(Mc) ? CB.num(Mc, 0) + " kN·m" + (Mmin > gm() ? " (M<sub>2,min</sub>)" : "") : '<span style="color:var(--bad)">불안정</span>');
+    cur.redraw(); col.redraw();
+    const lam = Lu / (0.3 * h), lim = Math.min(40, 34 - 12 * r);
+    if (!isFinite(m.delta)) SC.msg("sc-mg-msg", `P<sub>u</sub> = ${CB.sig(Pu, 4)} kN ≥ 0.75P<sub>c</sub> = ${CB.sig(0.75 * m.Pc, 4)} kN: 확대 계수가 무한대입니다. 이 기둥은 이 축력을 받을 수 없습니다(단면 확대·L<sub>u</sub> 감소).`, "bad");
+    else {
+      const ex = S.Mex / gm(), th = Cm / (1 - Pu / m.Pc);
+      SC.msg("sc-mg-msg", `세장비 ${CB.num(lam, 1)} ${lam <= lim ? `≤ 한계 ${CB.num(lim, 1)}: <b>단주</b>라 확대가 필요 없습니다(참고 계산).` : `&gt; 한계 ${CB.num(lim, 1)}: <b>장주</b>, M<sub>c</sub> = ${CB.num(Mc, 0)} kN·m로 설계합니다.`} 같은 EI의 정해(아래 그림) 최대/M<sub>2</sub> = ${isFinite(ex) ? CB.num(ex, 3) : "—"}, 0.75 없는 C<sub>m</sub>/(1 − P/P<sub>c</sub>) = ${CB.num(Math.max(1, th), 3)}. 기준식은 0.75로 그보다 크게 잡습니다.`, lam <= lim ? "ok" : "");
+    }
+  }
+  go();
+})();
+
+/* ---------- 5. 안정 지수 Q ---------- */
+(function () {
+  const gp = CB.range("sc-sw-p", (v) => (v >= 1000 ? CB.sig(v, 4) : CB.num(v, 0)) + " kN", go), gv = CB.range("sc-sw-v", (v) => (v >= 1000 ? CB.sig(v, 4) : CB.num(v, 0)) + " kN", go), gk = CB.range("sc-sw-k", (v) => CB.sig(Math.pow(10, v), 3), go);
+  const gl = CB.range("sc-sw-l", (v) => v.toFixed(1) + " m", go), gm = CB.range("sc-sw-m", (v) => v.toFixed(2), go);
+  document.getElementById("sc-sw-b10").onclick = () => { gp.set(108000, false); gv.set(4995, false); gk.set(Math.log10(1.2e6), false); gl.set(5, false); go(); };
+  document.getElementById("sc-sw-fr").onclick = () => { gp.set(108000, false); gv.set(4995, false); gk.set(Math.log10(1.2e6 / 25), false); gl.set(5, false); go(); };
+  let S = {};
+  const cv = CB.canvas("#sc-cv-sway", (ctx, W, H) => {
+    const P = CB.palette(), d = []; for (let i = 0; i <= 200; i++) { const q = (0.7 * i) / 200; d.push([q, 1 / (1 - q)]); }
+    const narrow = W < 520, bx = narrow ? 52 : W * 0.36, C = CB.chart(ctx, { x: bx, y: 16, w: W - bx - 16, h: H - 16 - 46 }, { x: [0, 0.7], y: [1, 3.5], xLabel: "Q", yLabel: narrow ? "δs" : "",
+      bands: [{ x0: 0, x1: 0.05, color: SC.alpha(P.ok, 0.14) }],
+      series: [{ data: d, color: P.accent, width: 2.6 }], vlines: [{ x: 0.05, color: P.ok, label: "0.05" }], hlines: [{ y: 1.5, color: P.bad, label: "δs = 1.5 (이상은 2차 해석)" }],
+      points: [{ x: Math.min(0.7, S.Q), y: Math.min(3.5, isFinite(S.ds) ? S.ds : 3.5), color: S.Q <= 0.05 ? P.ok : S.ds <= 1.5 ? P.warn : P.bad, r: 7 }] });
+    if (!narrow) {
+      // 층 그림
+      const x0 = 60, y0 = H - 70, h = H - 140, w = bx - 120, sc = Math.min(40, 200 * S.Q + 4);
+      ctx.strokeStyle = P.text; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0 - 10, y0); ctx.lineTo(x0 + w + 10, y0); ctx.stroke();
+      ctx.strokeStyle = P.faint; ctx.setLineDash([4, 4]); ctx.lineWidth = 1; [0, w / 2, w].forEach((dx) => { ctx.beginPath(); ctx.moveTo(x0 + dx, y0); ctx.lineTo(x0 + dx, y0 - h); ctx.stroke(); }); ctx.setLineDash([]);
+      ctx.strokeStyle = P.accent; ctx.lineWidth = 3; [0, w / 2, w].forEach((dx) => { ctx.beginPath(); ctx.moveTo(x0 + dx, y0); ctx.bezierCurveTo(x0 + dx, y0 - h * 0.5, x0 + dx + sc, y0 - h * 0.5, x0 + dx + sc, y0 - h); ctx.stroke(); });
+      ctx.strokeStyle = P.text; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x0 + sc - 10, y0 - h); ctx.lineTo(x0 + w + sc + 10, y0 - h); ctx.stroke();
+      [0, w / 2, w].forEach((dx) => SC.arrow(ctx, x0 + dx + sc, y0 - h - 34, x0 + dx + sc, y0 - h - 4, P.accent2, 2));
+      SC.arrow(ctx, x0 - 26, y0 - h, x0 + sc - 12, y0 - h, P.accent2, 2.4);
+      SC.text(ctx, "ΣPu", x0 + w / 2 + sc, y0 - h - 44, P.accent2, { size: 11 }); SC.text(ctx, "Vus", x0 - 22, y0 - h - 12, P.accent2, { size: 11 });
+      SC.text(ctx, `Δo = ${CB.num(S.Do, 1)} mm`, x0 + w / 2, y0 + 18, P.bad, { size: 11 });
+    }
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.46), minHeight: 260, maxHeight: 360 });
+  function go() {
+    const P = gp(), V = gv(), K = Math.pow(10, gk()), lc = gl(), Do = (V / K) * 1000, Q = (P * Do) / (V * lc * 1000), ds = Q < 1 ? 1 / (1 - Q) : Infinity;
+    const Ms = 100, Mns = gm() * 100, M2 = Q <= 0.05 ? Mns + Ms : Mns + ds * Ms;
+    S = { Q, ds, Do };
+    CB.stat("sc-sw-do", CB.num(Do, 2) + " mm"); CB.stat("sc-sw-q", CB.num(Q, 3)); CB.stat("sc-sw-ds", isFinite(ds) ? CB.num(ds, 3) : "발산");
+    CB.stat("sc-sw-m2", Q <= 0.05 ? `${CB.num(Mns + Ms, 0)} kN·m (확대 없음)` : isFinite(ds) ? `${CB.num(Mns, 0)} + ${CB.num(ds, 2)}×100 = ${CB.num(M2, 0)} kN·m` : "—");
+    if (Q <= 0.05) SC.msg("sc-sw-msg", `Q = ${CB.num(Q, 3)} ≤ 0.05: <b>비횡이동 층</b>. 기둥의 k는 비횡이동 값(≤ 1)으로 두고, 장주라면 δ<sub>ns</sub>만 검토합니다. Q = ΣP<sub>u</sub>/(K l<sub>c</sub>)라서 V<sub>us</sub>의 크기와 무관하다는 것도 확인해 보세요.`, "ok");
+    else if (ds <= 1.5) SC.msg("sc-sw-msg", `Q = ${CB.num(Q, 3)} &gt; 0.05: <b>횡이동 층</b>. 횡하중 모멘트 M<sub>s</sub>에만 δ<sub>s</sub> = ${CB.num(ds, 3)}를 곱합니다.`, "warn");
+    else SC.msg("sc-sw-msg", `δ<sub>s</sub> = ${isFinite(ds) ? CB.num(ds, 2) : "∞"} &gt; 1.5: 1/(1 − Q) 식을 쓸 수 없습니다. 2차 해석을 하거나, 벽·가새로 층 강성을 키우세요(Q ≥ 1이면 층이 불안정).`, "bad");
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 6. 2차 해석 비교: 반복 P–Δ ---------- */
+(function () {
+  const mode = CB.seg("sc-pd-mode", () => { setMode(); go(); });
+  const gp = CB.range("sc-pd-p", (v) => (v >= 1000 ? CB.sig(v, 4) : CB.num(v, 0)) + " kN", go), gl = CB.range("sc-pd-l", (v) => v.toFixed(1) + " m", go), gh = CB.range("sc-pd-h", (v) => v + " mm", go);
+  const gq = CB.range("sc-pd-q", (v) => (mode() === "sway" ? v + " kN" : v + " kN·m"), go), gei = CB.seg("sc-pd-ei", go);
+  const E = 2.75e7, NSEG = 8, LB = 8, IB = 0.35 * (0.4 * 0.7 ** 3) / 12, R1 = 0.667;
+  function setMode() { document.getElementById("sc-pd-q-lab").innerHTML = mode() === "sway" ? "수평력 H (왼쪽 꼭대기)" : "끝 모멘트 M<sub>2</sub> (M<sub>1</sub> = 0.667M<sub>2</sub>)"; gq.set(gq(), false); }
+  let S = null;
+  function build(sway, L, I, A) {
+    const nodes = [], members = [], cols = [];
+    const addCol = (x) => { const base = nodes.length; for (let i = 0; i <= NSEG; i++) nodes.push([x, (L * i) / NSEG]); const ids = []; for (let i = 0; i < NSEG; i++) { ids.push(members.length); members.push({ i: base + i, j: base + i + 1, E, A, I }); } cols.push({ base, top: base + NSEG, ids }); };
+    addCol(0); if (sway) { addCol(LB); members.push({ i: cols[0].top, j: cols[1].top, E, A: 0.28, I: IB }); }
+    return { nodes, members, cols };
+  }
+  function run() {
+    const sway = mode() === "sway", P = gp(), L = gl(), h = gh() / 1000, I = +gei() * h ** 4 / 12, A = h * h, q = gq();
+    const M = build(sway, L, I, A);
+    const sup = {}; if (sway) { sup[M.cols[0].base] = "fixed"; sup[M.cols[1].base] = "fixed"; } else { sup[M.cols[0].base] = "pin"; sup[M.cols[0].top] = "rollerV"; }
+    const base = [];
+    M.cols.forEach((c) => base.push({ node: c.top, fx: 0, fy: -P, m: 0 }));
+    if (sway) base[0].fx = q; else { base.push({ node: M.cols[0].top, fx: 0, fy: 0, m: q }); base.push({ node: M.cols[0].base, fx: 0, fy: 0, m: -R1 * q }); }
+    const resp = (r) => { if (sway) return r.d[M.cols[0].top][0] * 1000; let mx = 0; M.cols[0].ids.forEach((m) => { mx = Math.max(mx, Math.abs(r.ends[m].M1), Math.abs(r.ends[m].M2)); }); return mx; };
+    let fict = [], r = null, hist = [], r1 = null, unstable = false, it = 0;
+    for (it = 0; it < 60; it++) {
+      r = CB.frame({ nodes: M.nodes, members: M.members, supports: sup, loads: base.concat(fict) });
+      if (!r.ok) { unstable = true; break; }
+      if (it === 0) r1 = r;
+      const v = resp(r); hist.push(v);
+      if (!isFinite(v) || Math.abs(v) > 1e3 * Math.abs(hist[0] || 1) + 1e6) { unstable = true; break; }
+      if (it > 0 && Math.abs(v - hist[it - 1]) <= 1e-6 * Math.max(1e-9, Math.abs(v))) break;
+      if (it > 6) { const d1 = hist[it] - hist[it - 1], d0 = hist[it - 1] - hist[it - 2]; if (d0 !== 0 && d1 / d0 >= 0.999 && d1 > 0) { unstable = true; break; } }
+      fict = [];
+      M.cols.forEach((c) => { for (let i = 0; i < NSEG; i++) { const a = c.base + i, b = a + 1, du = r.d[b][0] - r.d[a][0], Hs = (P * du) / (L / NSEG); fict.push({ node: b, fx: Hs, fy: 0, m: 0 }, { node: a, fx: -Hs, fy: 0, m: 0 }); } });
+    }
+    if (it >= 60) unstable = true;
+    const v1 = hist[0], v2 = hist[hist.length - 1];
+    let pred, predTxt;
+    const EI = E * I;
+    if (sway) { const Q = (2 * P * (v1 / 1000)) / (q * L); pred = Q < 1 ? 1 / (1 - Q) : Infinity; predTxt = `Q = ${CB.num(Q, 3)} → 1/(1 − Q) = ${isFinite(pred) ? CB.num(pred, 3) : "∞"}`; S = { sway, M, r1, r, hist, unstable, v1, v2, pred, P, L, Q, q }; }
+    else { const Pc = (Math.PI ** 2 * EI) / L ** 2, Cm = SC.Cm(R1); pred = P < Pc ? Math.max(1, Cm / (1 - P / Pc)) : Infinity; predTxt = `P<sub>c</sub> = ${CB.sig(Pc, 4)} kN, C<sub>m</sub>/(1 − P/P<sub>c</sub>) = ${isFinite(pred) ? CB.num(pred, 3) : "∞"}`; S = { sway, M, r1, r, hist, unstable, v1, v2, pred, P, L, Pc, q }; }
+    S.predTxt = predTxt; S.it = hist.length;
+  }
+  const fv = CB.canvas("#sc-cv-pd-frame", (ctx, W, H) => {
+    if (!S) return;
+    const P = CB.palette(), sway = S.sway, x0 = sway ? W * 0.12 : W * 0.3, sx = sway ? (W * 0.5) / LB : 0, top = 40, bot = H - 30, sy = (bot - top) / S.L;
+    const X = (x) => x0 + x * sx, Y = (y) => bot - y * sy;
+    const get = (r) => (r && r.ok ? r : null), r1 = get(S.r1), r2 = S.unstable ? null : get(S.r);
+    let dmax = 1e-12; [r1, r2].forEach((r) => r && r.d.forEach((d) => (dmax = Math.max(dmax, Math.abs(d[0])))));
+    const ex = (W * 0.14) / dmax;
+    const draw = (r, color, w, dash) => {
+      S.M.cols.forEach((c) => { const pts = []; for (let i = 0; i <= NSEG; i++) { const n = c.base + i, p = S.M.nodes[n]; pts.push([X(p[0]) + (r ? r.d[n][0] * ex : 0), Y(p[1])]); } SC.line(ctx, pts, color, w, dash); });
+      if (sway) { const a = S.M.cols[0].top, b = S.M.cols[1].top; SC.line(ctx, [[X(0) + (r ? r.d[a][0] * ex : 0), Y(S.L)], [X(LB) + (r ? r.d[b][0] * ex : 0), Y(S.L)]], color, w + 1, dash); }
+    };
+    draw(null, P.faint, 1.2, [3, 3]); if (r1) draw(r1, P.dim, 2, [6, 4]); if (r2) draw(r2, P.accent, 3);
+    ctx.fillStyle = P.dim; (sway ? [0, LB] : [0]).forEach((x) => ctx.fillRect(X(x) - 14, bot, 28, 5));
+    if (!sway) { ctx.fillRect(X(0) + 16, Y(S.L) - 8, 6, 16); }
+    (sway ? [0, LB] : [0]).forEach((x) => SC.arrow(ctx, X(x) + (r2 ? r2.d[S.M.cols[x ? 1 : 0].top][0] * ex : 0), Y(S.L) - 34, X(x) + (r2 ? r2.d[S.M.cols[x ? 1 : 0].top][0] * ex : 0), Y(S.L) - 4, P.accent2, 2));
+    if (sway) SC.arrow(ctx, X(0) - 50, Y(S.L), X(0) - 6, Y(S.L), P.accent2, 2.4);
+    if (!sway && r2) {
+      // 모멘트도(오른쪽)
+      const mx0 = W * 0.6, mw = W * 0.32; let mm = 1e-9; const seg = (r) => S.M.cols[0].ids.map((m) => [r.ends[m].M1, r.ends[m].M2]);
+      [r1, r2].forEach((r) => seg(r).forEach(([a, b]) => (mm = Math.max(mm, Math.abs(a), Math.abs(b)))));
+      const line = (r, color, w, dash) => { const pts = []; S.M.cols[0].ids.forEach((m, i) => { const e = r.ends[m]; pts.push([mx0 + (Math.abs(e.M1) / mm) * mw, Y((S.L * i) / NSEG)], [mx0 + (Math.abs(e.M2) / mm) * mw, Y((S.L * (i + 1)) / NSEG)]); }); SC.line(ctx, pts, color, w, dash); };
+      SC.line(ctx, [[mx0, top], [mx0, bot]], P.axis, 1.2); line(r1, P.dim, 1.8, [5, 4]); line(r2, P.bad, 2.6);
+      SC.text(ctx, "|M| 1차 · 2차", mx0 + mw / 2, top - 16, P.dim, { size: 11 });
+    }
+    if (S.unstable) SC.text(ctx, "불안정: 반복이 발산(좌굴 하중 초과)", W / 2, 20, P.bad, { size: 13 });
+    else SC.text(ctx, `변형 ×${CB.sig(ex / sy, 2)}`, W - 10, H - 12, P.dim, { size: 10.5, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.46), minHeight: 250, maxHeight: 340 });
+  const iv = CB.canvas("#sc-cv-pd-iter", (ctx, W, H) => {
+    if (!S) return;
+    const P = CB.palette(), d = S.hist.map((v, i) => [i, v]), target = S.v1 * S.pred, top = Math.max(...S.hist.filter(isFinite), isFinite(target) ? target : 0) * 1.15 || 1;
+    CB.chart(ctx, { x: 60, y: 26, w: W - 60 - 16, h: H - 26 - 44 }, { x: [0, Math.max(6, d.length)], y: [0, top], xLabel: "반복 횟수", yLabel: S.sway ? "꼭대기 Δ (mm)" : "최대 |M| (kN·m)",
+      series: [{ data: d, color: P.accent, width: 2.4 }], hlines: isFinite(target) ? [{ y: target, color: P.warn, label: "확대 계수 예측" }] : [],
+      points: d.map(([x, y]) => ({ x, y, color: P.accent, r: 3 })) });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.32), minHeight: 180, maxHeight: 240 });
+  function go() {
+    run();
+    const unit = S.sway ? " mm" : " kN·m", amp = S.v2 / S.v1;
+    CB.stat("sc-pd-1", (S.sway ? "Δ₀ = " : "M<sub>max</sub> = ") + CB.num(S.v1, S.sway ? 2 : 0) + unit);
+    CB.stat("sc-pd-2", S.unstable ? '<span style="color:var(--bad)">발산</span>' : `${CB.num(S.v2, S.sway ? 2 : 0)}${unit} · ${S.it - 1}회`);
+    CB.stat("sc-pd-amp", S.unstable ? "—" : CB.num(amp, 3)); CB.stat("sc-pd-pred", isFinite(S.pred) ? CB.num(S.pred, 3) : "∞");
+    if (S.unstable) SC.msg("sc-pd-msg", `반복이 수렴하지 않습니다: P = ${CB.sig(S.P, 4)} kN이 이 골조의 탄성 좌굴 하중을 넘었습니다. ${S.predTxt}.`, "bad");
+    else { const err = (amp / S.pred - 1) * 100; SC.msg("sc-pd-msg", `반복 2차 해석의 증폭 <b>${CB.num(amp, 3)}</b> vs ${S.predTxt} (차이 ${CB.num(err, 1)} %).${S.sway ? " 보의 휨과 기둥 안의 P–δ가 차이를 만듭니다." : " 같은 EI로 비교했으므로 차이는 C<sub>m</sub> 근사의 오차입니다."}${amp > 1.4 ? " 2차/1차가 1.4를 넘습니다 — 기준 형태로는 골조를 다시 계획할 정도입니다." : ""}`, amp > 1.4 ? "warn" : ""); }
+    fv.redraw(); iv.redraw();
+  }
+  setMode(); go();
+})();
+
+/* ---------- 7. 상관도 위 하중점 이동 ---------- */
+(function () {
+  const COLS = { S: { h: 500, nface: 3, Lu: 6, P: 3000, M: 150 }, C1: { h: 800, nface: 5, Lu: 4.3, P: 9000, M: 300 } };
+  const PM = {}; Object.keys(COLS).forEach((k) => (PM[k] = CB.rc.pm({ b: COLS[k].h, h: COLS[k].h, fck: SC.FCK, fy: SC.FY, layers: SC.colLayers(COLS[k].h, COLS[k].nface) })));
+  const col = CB.seg("sc-pm-col", (v) => { gp.set(COLS[v].P, false); gm.set(COLS[v].M, false); glu.set(COLS[v].Lu, false); gr.set(v === "S" ? 100 : 150, false); go(); });
+  const gp = CB.range("sc-pm-p", (v) => (v >= 1000 ? CB.sig(v, 4) : CB.num(v, 0)) + " kN", go), gm = CB.range("sc-pm-m", (v) => v + " kN·m", go), gr = CB.range("sc-pm-r", (v) => v + " kN·m", go);
+  const glu = CB.range("sc-pm-lu", (v) => v.toFixed(1) + " m", go), gk = CB.range("sc-pm-k", (v) => v.toFixed(2), go);
+  let S = null;
+  const mag = (c, P) => { const h = COLS[c].h, m = CB.rc.magnifier({ fck: SC.FCK, Ig: h ** 4 / 12, k: gk(), Lu: glu() * 1000, Pu: P, Cm: SC.Cm(S0r()), betaD: SC.BETA }); return m; };
+  const S0r = () => (gm() > 0 ? CB.clamp(gr() / gm(), -1, 1) : 0);
+  const cv = CB.canvas("#sc-cv-pm", (ctx, W, H) => {
+    if (!S) return;
+    const P = CB.palette(), pm = PM[S.c], cf = SC.curve(pm), cn = SC.curve(pm, false), mx = Math.max(...cn.map((p) => p[0])) * 1.25, my = pm.P0 * 1.06;
+    const path1 = [], path2 = [];
+    if (S.Pu > 0) { const e = S.M2 / S.Pu; for (let i = 0; i <= 120; i++) { const p = (pm.phiPnMax * i) / 120; path1.push([p * e, p]); if (!S.short) { const m = mag(S.c, p); if (!isFinite(m.delta)) break; path2.push([m.delta * Math.max(p * e, SC.Mmin(p, COLS[S.c].h)), p]); } } }
+    const C = CB.chart(ctx, { x: 64, y: 16, w: W - 64 - 16, h: H - 16 - 46 }, { x: [0, mx], y: [0, my], xLabel: "M (kN·m)", yLabel: "P (kN)",
+      series: [{ data: cn, color: P.faint, width: 1.4, dash: [5, 4] }, { data: cf, color: P.accent, width: 2.6, fill: SC.alpha(P.accent, 0.08) }, { data: path1, color: P.dim, width: 1.4, dash: [3, 4] }, { data: path2, color: P.accent2, width: 2, dash: [] }],
+      hlines: [{ y: pm.phiPnMax, color: P.warn, label: "φPn,max" }],
+      points: [{ x: pm.bal.phiMn, y: pm.bal.phiPn, color: P.warn, r: 4 }] });
+    const x1 = C.X(S.M2), y1 = C.Y(S.Pu), x2 = C.X(Math.min(mx, S.Mc)), ok = S.ok;
+    ctx.fillStyle = P.dim; ctx.beginPath(); ctx.arc(x1, y1, 6, 0, Math.PI * 2); ctx.fill();
+    if (!S.short && isFinite(S.Mc)) { SC.arrow(ctx, x1 + 6, y1, x2 - 6, y1, ok ? P.accent2 : P.bad, 2.2); ctx.fillStyle = ok ? P.accent2 : P.bad; ctx.beginPath(); ctx.arc(x2, y1, 7, 0, Math.PI * 2); ctx.fill(); SC.text(ctx, `Mc = ${CB.num(S.Mc, 0)}`, x2 + (x2 > W - 120 ? -10 : 10), y1 + 16, ok ? P.accent2 : P.bad, { size: 11.5, align: x2 > W - 120 ? "right" : "left" }); }
+    SC.text(ctx, S.short ? "단주: 1차 점으로 검토" : "1차 점", x1 - 8, y1 + 16, P.dim, { size: 11, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.58), minHeight: 300, maxHeight: 440 });
+  function go() {
+    const c = col(), h = COLS[c].h, pm = PM[c], Pu = gp(), M2 = gm(), r = S0r();
+    const lam = CB.rc.slender(gk(), glu() * 1000, h), lim = Math.min(40, 34 - 12 * r), short = lam <= lim;
+    const m = mag(c, Pu), M2e = Math.max(M2, SC.Mmin(Pu, h)), Mc = short ? M2 : m.delta * M2e, cap = SC.phiMnAt(pm, Pu), ok = isFinite(cap) && isFinite(Mc) && Mc <= cap;
+    S = { c, Pu, M2, Mc, short, ok, lam };
+    CB.stat("sc-pm-lam", `${CB.num(lam, 1)} · ${short ? '<span style="color:var(--ok)">단주</span>' : '<span style="color:var(--warn)">장주</span>'}`);
+    CB.stat("sc-pm-mc", short ? `(${isFinite(m.delta) ? CB.num(m.delta, 2) : "∞"}) · ${CB.num(Mc, 0)} kN·m` : `${isFinite(m.delta) ? CB.num(m.delta, 3) : "∞"} · ${isFinite(Mc) ? CB.num(Mc, 0) + " kN·m" : "불안정"}`);
+    CB.stat("sc-pm-cap", isFinite(cap) ? CB.num(cap, 0) + " kN·m" : '<span style="color:var(--bad)">φP<sub>n,max</sub> 초과</span>');
+    CB.stat("sc-pm-ok", isFinite(cap) && isFinite(Mc) ? `${CB.num(Mc / cap, 2)} · ${ok ? '<span style="color:var(--ok)">합격</span>' : '<span style="color:var(--bad)">불합격</span>'}` : '<span style="color:var(--bad)">불합격</span>');
+    if (!isFinite(Mc)) SC.msg("sc-pm-msg", `P<sub>u</sub> ≥ 0.75P<sub>c</sub>: 확대 계수가 무한대입니다. 길이를 줄이거나 단면을 키워야 합니다.`, "bad");
+    else if (!isFinite(cap)) SC.msg("sc-pm-msg", `P<sub>u</sub>가 φP<sub>n,max</sub> = ${CB.sig(pm.phiPnMax, 4)} kN를 넘습니다. 단면 부족.`, "bad");
+    else SC.msg("sc-pm-msg", ok ? `안쪽: M<sub>c</sub> ${CB.num(Mc, 0)} ≤ φM<sub>n</sub> ${CB.num(cap, 0)} kN·m.${short ? " 단주이므로 확대 없이 판정했습니다." : ` 단주로 보았다면 사용률 ${CB.num(M2 / cap, 2)}였습니다.`}` : `바깥: M<sub>c</sub> ${CB.num(Mc, 0)} &gt; φM<sub>n</sub> ${CB.num(cap, 0)} kN·m. ${short ? "단면을 키우거나 철근을 늘리세요." : "L<sub>u</sub>를 줄이거나(횡지지) 단면을 키우는 것이 철근을 늘리는 것보다 효과적입니다."}`, ok ? "ok" : "bad");
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 8. 가늘어지는 기둥 ---------- */
+(function () {
+  const gh = CB.range("sc-th-h", (v) => v + " mm", calc), glu = CB.range("sc-th-lu", (v) => v.toFixed(1) + " m", go), ge = CB.range("sc-th-e", (v) => v + " mm", go);
+  const gr = CB.range("sc-th-r", (v) => (v * 100).toFixed(2) + " %", calc), gm = CB.range("sc-th-m", (v) => CB.num(v, 2), go), gf = CB.range("sc-th-f", (v) => v + " MPa", calc);
+  let pm = null, S = null, h = 800;
+  function calc() { h = gh(); pm = CB.rc.pm({ b: h, h, fck: gf(), fy: SC.FY, layers: SC.rhoLayers(h, gr() * h * h) }); go(); }
+  function pmax(Lu, slender) {
+    const e = ge(), Ig = h ** 4 / 12, Cm = SC.Cm(gm());
+    const inside = (P) => { const cap = SC.phiMnAt(pm, P); if (!isFinite(cap)) return false; let M = (P * e) / 1000; if (slender) { const m = CB.rc.magnifier({ fck: gf(), Ig, k: 1, Lu: Lu * 1000, Pu: P, Cm, betaD: SC.BETA }); if (!isFinite(m.delta)) return false; M = m.delta * Math.max(M, SC.Mmin(P, h)); } return M <= cap + 1e-9; };
+    if (inside(pm.phiPnMax)) return pm.phiPnMax;
+    let lo = 0, hi = pm.phiPnMax; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (inside(m)) lo = m; else hi = m; } return lo;
+  }
+  const cv = CB.canvas("#sc-cv-thin", (ctx, W, H) => {
+    if (!S) return;
+    const P = CB.palette(), d = [], lim = Math.min(40, 34 - 12 * gm());
+    for (let i = 0; i <= 50; i++) { const Lu = 1 + (14 * i) / 50, lam = (Lu * 1000) / (0.3 * h); d.push([lam, pmax(Lu, true) / S.ps]); }
+    const xm = Math.max(...d.map((p) => p[0])), C = CB.chart(ctx, { x: 56, y: 16, w: W - 56 - 16, h: H - 16 - 46 }, { x: [0, xm], y: [0, 1.08], xLabel: "kLu/r (k = 1)", yLabel: "최대 Pu (장주) / (단주)",
+      bands: [{ x0: 0, x1: Math.min(xm, lim), color: SC.alpha(P.ok, 0.10) }],
+      series: [{ data: d, color: P.accent, width: 2.6 }], vlines: [{ x: lim, color: P.warn, label: "단주 한계" }], hlines: [{ y: 1, color: P.faint }],
+      points: [{ x: S.lam, y: S.pl / S.ps, color: S.lam <= lim ? P.ok : P.accent2, r: 7 }] });
+    SC.text(ctx, `h = ${h} mm`, C.X(xm) - 6, C.Y(1.02), P.dim, { size: 11, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.48), minHeight: 260, maxHeight: 360 });
+  function go() {
+    const Lu = glu(), lam = (Lu * 1000) / (0.3 * h), lim = Math.min(40, 34 - 12 * gm()), ps = pmax(Lu, false), pl = pmax(Lu, true), code = lam <= lim ? ps : pl;
+    S = { lam, ps, pl };
+    CB.stat("sc-th-lam", `${CB.num(lam, 1)} ${lam <= lim ? "(단주)" : "(장주)"}`); CB.stat("sc-th-ps", CB.sig(ps, 4) + " kN"); CB.stat("sc-th-pl", `${CB.sig(pl, 4)} kN (${CB.num((pl / ps) * 100, 0)} %)`);
+    CB.stat("sc-th-ok", code >= 9000 ? '<span style="color:var(--ok)">받을 수 있음</span>' : '<span style="color:var(--bad)">부족</span>');
+    SC.msg("sc-th-msg", lam <= lim ? `세장비 ${CB.num(lam, 1)} ≤ ${CB.num(lim, 1)}: 단주. 기준상 최대 P<sub>u</sub> ${CB.sig(ps, 4)} kN(확대를 넣으면 ${CB.sig(pl, 4)} kN — 한계 아래에서 무시한 몫).` : `세장비 ${CB.num(lam, 1)} &gt; ${CB.num(lim, 1)}: 장주. 길이 때문에 최대 P<sub>u</sub>가 ${CB.num((1 - pl / ps) * 100, 0)} % 줄어 ${CB.sig(pl, 4)} kN입니다.`, code >= 9000 ? "ok" : "bad");
+    cv.redraw();
+  }
+  calc();
+})();
+</script>
+</body>
+</html>

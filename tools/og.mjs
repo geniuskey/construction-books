@@ -1,5 +1,5 @@
 // Copyright (c) 2026 geniuskey and ConstructionBooks contributors. MIT. Based on the MathBooks og renderer.
-// Render the 1200×630 share images: og.png (shelf home), mechanics/, materials/, geotech/ and structure/og.png.
+// Render the 1200×630 share images: og.png (shelf home), mechanics/, materials/, geotech/, structure/ and concrete/og.png.
 // Usage: node tools/og.mjs   (rerun after books, chapters or simulators change). Needs Playwright.
 // Covers use the same shelf.css and covers.js as the home page; stats are counted like shared/js/shelf.js.
 import { chromium } from 'playwright';
@@ -41,6 +41,11 @@ sandbox3.window = sandbox3;
 vm.createContext(sandbox3);
 vm.runInContext(read('structure/js/common.js'), sandbox3);
 CB.dyn = sandbox3.CB.dyn;
+const sandbox4 = { ...sandbox, document: { ...sandbox.document, currentScript: { src: 'http://x/concrete/js/common.js' } } };
+sandbox4.window = sandbox4;
+vm.createContext(sandbox4);
+vm.runInContext(read('concrete/js/common.js'), sandbox4);
+CB.rc = sandbox4.CB.rc;
 
 const base = `
   html, body { margin:0; width:1200px; height:630px; overflow:hidden; }
@@ -235,9 +240,45 @@ const strPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><sty
   <div class="art">${strArt}</div>
 </body></html>`;
 
+// ConcreteBook: the C1 column P–M interaction diagram (16-D25) with the design load point, beside the G1 section.
+const rcArt = (() => {
+  let s = '';
+  const R = CB.rc, bar = CB.steel.BARS.D25.A, dc = 800 - 65.7, sp = (dc - 65.7) / 4;
+  const L = [{ d: 65.7, As: 5 * bar }, { d: 65.7 + sp, As: 2 * bar }, { d: 65.7 + 2 * sp, As: 2 * bar }, { d: 65.7 + 3 * sp, As: 2 * bar }, { d: dc, As: 5 * bar }];
+  const pm = R.pm({ b: 800, h: 800, fck: 30, fy: 500, layers: L });
+  const X = (m) => 80 + (m / 3000) * 430, Y = (p) => 500 - (p / 22000) * 400;
+  s += `<line x1="80" y1="${Y(0)}" x2="540" y2="${Y(0)}" stroke="#4a5670" stroke-width="2"/><line x1="80" y1="${Y(0)}" x2="80" y2="50" stroke="#4a5670" stroke-width="2"/>`;
+  let dn = '', dd = '';
+  pm.pts.filter((p) => p.Pn >= 0).forEach((p, i) => { dn += (i ? 'L' : 'M') + X(Math.max(0, p.Mn)).toFixed(1) + ' ' + Y(p.Pn).toFixed(1); dd += (i ? 'L' : 'M') + X(Math.max(0, p.phiMn)).toFixed(1) + ' ' + Y(Math.min(p.phiPn, pm.phiPnMax)).toFixed(1); });
+  s += `<path d="${dn}" fill="none" stroke="#8b95a7" stroke-width="3" stroke-dasharray="6 5"/><path d="${dd}" fill="none" stroke="#a9b4c8" stroke-width="5" stroke-linejoin="round"/>`;
+  s += `<circle cx="${X(pm.bal.Mn)}" cy="${Y(pm.bal.Pn)}" r="7" fill="#f5b93a"/><text x="${X(pm.bal.Mn) + 12}" y="${Y(pm.bal.Pn) + 6}" fill="#f5b93a" font-family="monospace" font-size="16">균형점</text>`;
+  s += `<circle cx="${X(300)}" cy="${Y(9000)}" r="9" fill="#ffa94d"/><text x="${X(300) + 14}" y="${Y(9000) - 8}" fill="#ffa94d" font-family="monospace" font-size="18" font-weight="700">C1 (300, 9,000)</text>`;
+  s += `<text x="300" y="530" text-anchor="middle" fill="#cfd6e4" font-family="monospace" font-size="17">M (kN·m) · P (kN)</text><text x="96" y="62" fill="#cfd6e4" font-size="17" font-weight="700">C1 800 × 800 · 16-D25 P–M 상관도</text>`;
+  // small G1 section inset
+  const gx = 470, gy = 70, sc = 0.11;
+  s += `<rect x="${gx}" y="${gy}" width="${400 * sc}" height="${700 * sc}" fill="#3a4250" stroke="#cfd6e4" stroke-width="2"/>`;
+  for (let i = 0; i < 4; i++) s += `<circle cx="${gx + (60 + i * 93) * sc}" cy="${gy + 640 * sc}" r="4" fill="#5b8cff"/>`;
+  s += `<rect x="${gx}" y="${gy}" width="${400 * sc}" height="${80 * sc}" fill="rgba(255,95,87,.55)"/><text x="${gx + 200 * sc}" y="${gy + 700 * sc + 22}" text-anchor="middle" fill="#cfd6e4" font-family="monospace" font-size="14">G1 4-D25</text>`;
+  return `<svg viewBox="0 0 600 600" width="600" height="600"><defs><clipPath id="c5"><rect x="20" y="20" width="560" height="560" rx="28"/></clipPath></defs><rect x="20" y="20" width="560" height="560" rx="28" fill="#0f1625" stroke="#26324a"/><g clip-path="url(#c5)">${s}</g></svg>`;
+})();
+const concrete = books.find((b) => b.id === 'concretebook');
+const rcPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>${read('shelf.css')}</style><style>${base}
+  .art { position:absolute; right:40px; top:15px; }
+</style></head><body>
+  <div class="left">
+    <div class="brand">${read('concrete/favicon.svg')}<span>ConcreteBook</span></div>
+    <div class="eyebrow">INTERACTIVE REINFORCED CONCRETE</div>
+    <h1>인장은 철근이,<br><span class="soft">압축은</span><br><span class="warm">콘크리트가</span></h1>
+    <p class="lead">휨과 전단, 정착과 처짐, 기둥 P–M 상관도,<br>내진 상세와 PSC를 직접 설계하는 철근콘크리트.</p>
+    <div class="stats"><span><b>4</b>부</span><span><b>16</b>개 장</span><span><b>${Math.floor(concrete.simulators / 10) * 10}+</b>시뮬레이터</span></div>
+  </div>
+  <div class="url">construction.euiyun.com/concrete/</div>
+  <div class="art">${rcArt}</div>
+</body></html>`;
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
-for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png'], [strPage, 'structure/og.png']]) {
+for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png'], [strPage, 'structure/og.png'], [rcPage, 'concrete/og.png']]) {
   await page.setContent(html, { waitUntil: 'networkidle' });
   await page.addScriptTag({ content: read('shared/js/covers.js') });
   await page.evaluate(async () => {
@@ -247,4 +288,4 @@ for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [m
   await page.screenshot({ path: join(root, out) });
 }
 await browser.close();
-console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators}, structure/og.png: ${structure.simulators} simulators`);
+console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators}, structure/og.png: ${structure.simulators}, concrete/og.png: ${concrete.simulators} simulators`);

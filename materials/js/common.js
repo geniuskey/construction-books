@@ -1441,7 +1441,7 @@
     /** 설계용 포물선–직선 곡선의 매개변수 { n, eco, ecu } [KDS 14 20 20 형태] */
     pr(fck) {
       if (fck <= 40) return { n: 2, eco: 0.002, ecu: 0.0033 };
-      return { n: 1.2 + 1.5 * Math.pow((100 - Math.min(fck, 90)) / 60, 4), eco: 0.002 + (fck - 40) / 1e5, ecu: 0.0033 - (fck - 40) / 1e5 };
+      return { n: Math.min(2, 1.2 + 1.5 * Math.pow((100 - Math.min(fck, 90)) / 60, 4)), eco: 0.002 + (fck - 40) / 1e5, ecu: 0.0033 - (fck - 40) / 1e5 };
     },
     /**
      * 콘크리트 압축 응력–변형률(압축 +).

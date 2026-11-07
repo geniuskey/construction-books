@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>비틀림 · ConcreteBook</title>
+<meta name="description" content="비틀리는 보. 평형 비틀림과 적합 비틀림, 박벽관 유추와 전단 흐름 τ = T/(2A₀t), 균열 비틀림 모멘트와 무시 한계, 입체 트러스의 폐쇄 스터럽과 종방향 철근, 전단과의 조합·단면 한계, 135° 갈고리 상세, B-10 가장자리 보 설계를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .to-stack { display: grid; grid-template-columns: 1fr; }
+  .to-stack > div { position: relative; min-width: 0; }
+  .to-stack > div + div { border-top: 1px solid var(--border); }
+  .to-cap { position: absolute; left: 10px; top: 8px; font: 600 11.5px var(--mono); color: var(--text-dim); pointer-events: none; background: color-mix(in srgb, var(--canvas-bg) 75%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .to-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .to-msg b { color: var(--text); }
+  .to-msg.ok { color: var(--ok); font-weight: 600; }
+  .to-msg.bad { color: var(--bad); font-weight: 600; }
+  .to-steps { margin: 6px 0 0; }
+  .to-steps li { margin: 4px 0; }
+  ol.to-calc { margin: 0; padding: 12px 18px 12px 40px; font-size: 14px; line-height: 1.75; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); overflow-wrap: anywhere; }
+  ol.to-calc li { margin: 2px 0; }
+  ol.to-calc b { color: var(--text); }
+  ol.to-calc .bad { color: var(--bad); font-weight: 600; }
+  ol.to-calc .ok { color: var(--ok); font-weight: 600; }
+  .to-tbl td, .to-tbl th { font-variant-numeric: tabular-nums; }
+  .to-tbl td.hl { color: var(--accent); font-weight: 700; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="concrete"></script>
+</head>
+<body data-chapter="torsion">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="to-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="to-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--tension)"/></marker>
+      <marker id="to-ah-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--compression)"/></marker>
+      <marker id="to-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="to-ah-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="to-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 06</div>
+    <h1 data-no-glossary>비틀림</h1>
+    <p class="lead">건물 바깥 둘레의 보는 한쪽에만 슬래브가 붙어 있습니다. 슬래브 끝이 내려가며 돌려고 하면 그 보는 축을 중심으로 비틀립니다. 비틀림은 보의 네 면 모두에 전단을 만들고, 콘크리트는 나선 모양으로 갈라집니다. 이 장은 비틀림이 생기는 곳과 그 성격(평형 비틀림·적합 비틀림)을 가르고, 얇은 관의 전단 흐름 \(\tau = T/(2A_0t)\)에서 균열 비틀림 모멘트와 무시 한계를 끌어낸 뒤, 균열 후 보를 <b>입체 트러스</b>로 보아 폐쇄 스터럽 \(A_t/s\)와 종방향 철근 \(A_l\)을 유도합니다. 전단과의 조합, 단면 한계, 135° 갈고리 상세를 거쳐 B-10 가장자리 보를 설계합니다.</p>
+    <ul class="objectives">
+      <li>비틀림이 생기는 구조(가장자리 보, 캔틸레버 차양, 곡선 보, 편심 하중)를 알아보고 평형 비틀림과 적합 비틀림을 구별한다.</li>
+      <li>박벽관의 전단 흐름 \(q = T/(2A_0)\)로 비틀림 전단응력을 계산하고, 꽉 찬 단면을 등가관으로 바꾸는 방법을 설명한다.</li>
+      <li>균열 비틀림 모멘트 \(T_{cr} = \tfrac13\lambda\sqrt{f_{ck}}\,A_{cp}^2/p_{cp}\)와 비틀림을 무시할 수 있는 한계(\(T_{cr}/4\) 형태)를 계산한다.</li>
+      <li>입체 트러스 모형에서 \(A_t/s = T_n/(2A_0f_{yt}\cot\theta)\)와 \(A_l = (A_t/s)p_h(f_{yt}/f_y)\cot^2\theta\)를 유도하고 \(\theta\)의 영향을 설명한다.</li>
+      <li>전단과 비틀림을 함께 받는 단면의 스터럽 \((A_v + 2A_t)/s\), 단면 크기 한계, 최소 철근·간격 규정을 적용한다.</li>
+      <li>폐쇄 스터럽과 135° 갈고리, 모서리 종철근이 필요한 이유를 설명하고 B-10 가장자리 보의 비틀림 철근을 설계한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>모서리부터 떨어져 나가는 보</b></div>
+      <div class="o-body"><p>1960년대까지 많은 나라의 기준은 철근콘크리트 보의 비틀림을 거의 다루지 않았습니다. 비틀림 실험을 해 보니 문제는 분명했습니다. 비틀린 보는 네 면을 따라 나선형 균열이 생기고, 그 뒤 하중을 받는 콘크리트 압축 띠가 모서리에서 방향을 바꾸며 바깥으로 밀어내 <b>모서리 피복이 통째로 떨어져 나갔습니다</b>. 위가 열린 U형 스터럽이나 90° 갈고리는 그 순간 풀려 버렸습니다.</p>
+        <p>1960–70년대 스위스의 람페르트(P. Lampert)와 튀를리만(B. Thürlimann), 캐나다의 콜린스(M. P. Collins)와 미첼(D. Mitchell), 미국의 슈(T. T. C. Hsu) 등의 연구가 균열 후 보를 <b>속이 빈 관 속의 입체 트러스</b>로 보는 모형을 정립했고, 1995년 ACI 318이 이 박벽관–입체 트러스 모형으로 비틀림 설계를 바꾸었습니다. 국내 KDS 14 20 22도 같은 틀을 씁니다. 그 모형이 요구하는 것이 이 장의 핵심입니다: <b>닫힌 스터럽, 모서리마다 종철근, 135° 갈고리</b>.</p>
+        <div class="o-chain"><span>가장자리 보 · 차양 · 곡선 보</span><i>→</i><span class="tool">박벽관 q = T/2A₀ · T<sub>cr</sub> · 입체 트러스 A<sub>t</sub>/s, A<sub>l</sub></span><i>→</i><span>폐쇄 스터럽 · 단면 한계 · B-10 가장자리 보</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="where">
+    <h2>비틀림이 생기는 곳</h2>
+    <div class="problem"><strong>보의 축을 돌리는 힘은 어디서 오나</strong>
+      <p>하중이 보의 <span class="term">전단 중심</span><span class="en">(shear center)</span>(직사각형이면 도심)을 지나지 않으면 보는 휨과 함께 비틀립니다. 건물에서는 생각보다 흔합니다.</p></div>
+    <figure class="diagram" id="fig-to-where">
+      <svg viewBox="0 0 860 300" role="img" aria-label="비틀림이 생기는 네 가지 경우: 가장자리 보, 캔틸레버 차양, 곡선 보, 편심 받침">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">① 가장자리 보</text>
+          <rect x="20" y="40" width="60" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="80" y="40" width="110" height="30" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M150 34 A 50 50 0 0 0 60 30" style="fill:none;stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#to-ah-ld)"/>
+          <text x="140" y="96" class="t-mono" style="fill:var(--accent-2)">슬래브 끝</text>
+          <text x="140" y="112" class="t-mono" style="fill:var(--accent-2)">부모멘트</text>
+          <path d="M28 168 A 22 10 0 1 0 72 168" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#to-ah-bad)"/>
+          <text x="50" y="200" text-anchor="middle" class="t-mono" style="fill:var(--bad)">T(적합)</text>
+        </g>
+        <g transform="translate(240,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">② 캔틸레버 차양</text>
+          <rect x="20" y="40" width="60" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="80" y="40" width="100" height="24" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.4" marker-end="url(#to-ah-ld)"><line x1="100" y1="18" x2="100" y2="38"/><line x1="130" y1="18" x2="130" y2="38"/><line x1="160" y1="18" x2="160" y2="38"/></g>
+          <text x="130" y="92" text-anchor="middle" class="t-mono">지지할 다른 길 없음</text>
+          <path d="M28 168 A 22 10 0 1 0 72 168" style="fill:none;stroke:var(--bad);stroke-width:2" marker-end="url(#to-ah-bad)"/>
+          <text x="50" y="200" text-anchor="middle" class="t-mono" style="fill:var(--bad)">T(평형)</text>
+        </g>
+        <g transform="translate(450,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">③ 곡선 보(평면)</text>
+          <path d="M20 160 A 150 150 0 0 1 170 40" style="fill:none;stroke:var(--accent);stroke-width:14;opacity:.35"/>
+          <path d="M20 160 A 150 150 0 0 1 170 40" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <rect x="12" y="152" width="16" height="16" style="fill:var(--text-dim)"/><rect x="162" y="32" width="16" height="16" style="fill:var(--text-dim)"/>
+          <line x1="20" y1="160" x2="170" y2="40" style="stroke:var(--text-faint);stroke-dasharray:4 3"/>
+          <text x="140" y="140" class="t-mono">하중 합력이</text><text x="140" y="156" class="t-mono">지점 연결선 밖</text>
+          <text x="90" y="200" text-anchor="middle" class="t-mono" style="fill:var(--bad)">T(평형)</text>
+        </g>
+        <g transform="translate(660,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">④ 편심 받침</text>
+          <rect x="40" y="40" width="60" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M100 100 L140 100 L140 120 L100 140 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="112" y="76" width="56" height="24" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <line x1="140" y1="50" x2="140" y2="74" style="stroke:var(--accent-2);stroke-width:2.2" marker-end="url(#to-ah-ld)"/>
+          <text x="140" y="44" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">작은보 반력</text>
+          <line x1="70" y1="160" x2="140" y2="160" style="stroke:var(--text-dim)" marker-start="url(#to-ah-dim)" marker-end="url(#to-ah-dim)"/><text x="105" y="176" text-anchor="middle" class="t-mono">e</text>
+          <text x="70" y="200" text-anchor="middle" class="t-mono" style="fill:var(--bad)">T = Pe</text>
+        </g>
+        <text x="430" y="270" text-anchor="middle" class="t-dim">①은 보가 비틀리며 슬래브 끝 모멘트를 일부 놓아 버릴 수 있다 · ②–④는 비틀림이 없으면 평형이 깨진다</text>
+      </svg>
+      <figcaption><b>그림 6-1.</b> 철근콘크리트 건물에서 비틀림이 생기는 대표적인 경우(단면·평면 개략). ① 바깥 둘레의 가장자리 보는 슬래브 끝의 부모멘트를 받아 비틀린다. ② 캔틸레버 차양·발코니를 받치는 보, ③ 평면이 휜 보, ④ 한쪽 받침에 작은보·프리캐스트 보가 얹힌 보도 비틀림을 받는다.</figcaption>
+    </figure>
+    <p><span class="term">비틀림</span><span class="en">(torsion)</span>은 보 단면의 네 면 모두에 전단응력을 만듭니다. 콘크리트가 갈라지기 전에는 단면 바깥 둘레를 도는 전단응력이 지배하고(MechanicsBook 10장의 원형 축과 같은 이유로 가운데 재료는 거의 일하지 않음), 갈라진 뒤에는 바깥 껍질 속의 철근과 콘크리트 스트럿이 관 모양의 트러스로 버팁니다. 그래서 비틀림 설계는 단면을 <b>속이 빈 관</b>으로 보는 데서 시작합니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="equilibrium-compatibility">
+    <h2>평형 비틀림과 적합 비틀림</h2>
+    <div class="problem"><strong>비틀림을 꼭 다 받아야 하나</strong>
+      <p>차양을 받치는 보가 비틀림을 버티지 못하면 차양은 떨어집니다. 그런데 가장자리 보가 비틀림 균열로 부드러워지면, 슬래브는 끝을 덜 붙잡힌 채로 다른 쪽(내부 지점·경간 중앙)에 모멘트를 더 실어 평형을 유지합니다. 같은 비틀림이라도 성격이 다릅니다.</p></div>
+    <div class="callout def"><strong>정의 6.1 (평형 비틀림과 적합 비틀림)</strong> 평형을 유지하는 데 비틀림 저항이 반드시 필요한 경우를 <span class="term">평형 비틀림</span><span class="en">(equilibrium torsion)</span>이라 한다(정정 구조의 비틀림: 차양, 곡선 보, 편심 받침). 부재의 비틀림 강성 때문에 생기지만 균열로 강성이 줄면 내력이 재분배되어 작아지는 경우를 <span class="term">적합 비틀림</span><span class="en">(compatibility torsion)</span>이라 한다(부정정 구조의 비틀림: 슬래브를 받는 가장자리 보). 적합 비틀림이면 설계 비틀림을 균열 비틀림 수준 \(\phi T_{cr}\)까지 낮추고 인접 부재를 재분배된 내력으로 설계할 수 있다(KDS 14 20 22 형태, 기준 확인).</div>
+    <figure class="diagram" id="fig-to-ec">
+      <svg viewBox="0 0 860 300" role="img" aria-label="평형 비틀림의 차양 모멘트는 강성과 무관하고 적합 비틀림의 슬래브 끝 모멘트는 가장자리 보 균열로 줄어 재분배된다">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">평형 비틀림: 차양</text>
+          <rect x="0" y="40" width="40" height="70" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="40" y="40" width="250" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M40 130 L40 200 C 120 196, 220 160, 290 130" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.2"/>
+          <line x1="40" y1="130" x2="290" y2="130" class="s-axis"/>
+          <text x="48" y="222" class="t-mono" style="fill:var(--accent)">m = w c²/2 — 보 강성과 무관</text>
+          <path d="M40 58 L290 70" style="stroke:var(--bad);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <text x="180" y="94" class="t-mono" style="fill:var(--bad)">균열 → 회전·처짐만 커짐</text>
+        </g>
+        <g transform="translate(450,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">적합 비틀림: 슬래브 끝</text>
+          <rect x="0" y="40" width="40" height="70" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="40" y="40" width="320" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="340" y="58" width="20" height="52" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <line x1="40" y1="150" x2="360" y2="150" class="s-axis"/>
+          <path d="M40 150 L40 108 C 90 150, 140 190, 200 196 C 260 196, 320 160, 360 110 L360 150" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+          <path d="M40 150 L40 136 C 90 172, 140 204, 200 210 C 260 210, 320 170, 360 98 L360 150" style="fill:none;stroke:var(--accent-2);stroke-width:2.2;stroke-dasharray:7 4"/>
+          <text x="60" y="126" class="t-mono" style="fill:var(--accent)">균열 전</text>
+          <text x="48" y="226" class="t-mono" style="fill:var(--accent-2)">균열 후: 끝 모멘트 ↓, 중앙·내부 지점 ↑</text>
+          <text x="200" y="244" text-anchor="middle" class="t-dim">휨모멘트도(부모멘트 위, 개략)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-2.</b> 평형 비틀림과 적합 비틀림. 차양의 모멘트 \(wc^2/2\)는 받치는 보의 비틀림 강성과 상관없이 정해지므로 보가 그 비틀림을 모두 받아야 한다. 슬래브 끝의 모멘트는 가장자리 보의 비틀림 강성이 줄면 작아지고, 그만큼 슬래브의 경간 중앙·내부 지점 모멘트가 커진다(점선).</figcaption>
+    </figure>
+    <div class="sim" id="sim-to-compat">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>평형 vs 적합 비틀림: 가장자리 보 강성과 슬래브 모멘트</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view to-stack">
+          <div><canvas id="to-cv-cp-m" aria-label="슬래브 띠의 휨모멘트도, 균열 전 비교"></canvas><span class="to-cap">슬래브 띠 m (kN·m/m)</span></div>
+          <div><canvas id="to-cv-cp-t" aria-label="가장자리 보의 비틀림 모멘트도와 φTcr, φTth"></canvas><span class="to-cap">가장자리 보 T (kN·m)</span></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>경우</span><div class="seg" id="to-cp-case"><button data-value="compat" class="on">슬래브 끝(적합)</button><button data-value="equil">차양 2 m(평형)</button></div></div>
+          <label class="ctrl"><span>가장자리 보 비틀림 강성 배율 <output id="to-cp-k-out"></output></span><input type="range" id="to-cp-k" min="0.02" max="1" step="0.01" value="1"></label>
+          <div class="btn-row"><button class="btn" id="to-cp-uncr">균열 전(1.0)</button><button class="btn" id="to-cp-cr">균열 후(0.1)</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">보에 걸리는 m</span><span class="v" id="to-cp-m">—</span></div>
+        <div class="stat"><span class="k">기둥면 T</span><span class="v" id="to-cp-T">—</span></div>
+        <div class="stat"><span class="k">T / φT<sub>cr</sub></span><span class="v" id="to-cp-r">—</span></div>
+        <div class="stat"><span class="k">설계 T<sub>u</sub></span><span class="v" id="to-cp-tu">—</span></div>
+      </div>
+      <div class="to-msg" id="to-cp-msg"></div>
+      <div class="sim-note">해볼 것: 슬래브 끝(적합)에서 균열 전 강성이면 기둥면 비틀림이 φT<sub>cr</sub>의 세 배 이상으로 계산됩니다. 그러면 보는 갈라지고, "균열 후(0.1)"로 바꾸면 비틀림이 약 1/4로 줄고 슬래브 경간 모멘트가 늘어납니다. 이것이 적합 비틀림을 φT<sub>cr</sub>로 낮춰 설계해도 되는 이유입니다 · 차양(평형)으로 바꾸면 강성을 아무리 줄여도 비틀림이 그대로이고 끝 처짐만 커집니다 · 모델(교육용): 슬래브를 폭 1 m 띠(경간 8 m, 두께 210 mm, w<sub>u</sub> 11.8 kN/m², 먼 끝 고정)로 보고 CB.beam으로 풉니다. 가장자리 보(400 × 700, 순경간 7.2 m, 양 끝 기둥에서 비틀림 고정)는 띠 끝의 회전 스프링 k = 12GC/l<sub>n</sub>²로 둡니다(G = E<sub>c</sub>/2.4, C = (1 − 0.63x/y)x³y/3). 1방향 띠는 2방향 슬래브가 직교 방향 보로 나눠 주는 효과를 무시하므로 값이 크게 나옵니다(경향을 보는 모형). T<sub>cr</sub>은 원리 6.3(직사각형 단면).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="thin-tube">
+    <h2>균열 전: 박벽관 유추</h2>
+    <div class="problem"><strong>직사각형 단면의 비틀림 응력을 어떻게 계산하나</strong>
+      <p>원형 축의 \(\tau = Tr/J\)는 직사각형에 맞지 않습니다(<a href="../../mechanics/chapters/transformation.html#torsion">MechanicsBook 10장</a>). 정확한 탄성해는 복잡하지만, 비틀림 응력이 바깥 둘레에 몰린다는 사실을 쓰면 단면을 얇은 관으로 바꿔 간단히 계산할 수 있습니다(<span class="term">박벽관 유추</span><span class="en">(thin-walled tube analogy)</span>).</p></div>
+    <figure class="diagram" id="fig-to-tube">
+      <svg viewBox="0 0 860 320" role="img" aria-label="얇은 벽 관의 전단 흐름, 벽 중심선이 둘러싼 넓이 A0, 각 벽의 전단력">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <rect x="0" y="0" width="200" height="240" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.4"/>
+          <rect x="30" y="30" width="140" height="180" style="fill:var(--surface);stroke:var(--text-dim);stroke-width:1.2"/>
+          <rect x="15" y="15" width="170" height="210" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6;stroke-dasharray:7 4"/>
+          <g style="stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#to-ah-ld)"><line x1="60" y1="15" x2="130" y2="15"/><line x1="185" y1="60" x2="185" y2="170"/><line x1="140" y1="225" x2="70" y2="225"/><line x1="15" y1="180" x2="15" y2="70"/></g>
+          <text x="100" y="125" text-anchor="middle" class="t-mono" style="fill:var(--accent)">A₀</text>
+          <text x="100" y="142" text-anchor="middle" class="t-mono">(벽 중심선이 둘러싼 넓이)</text>
+          <line x1="200" y1="250" x2="230" y2="250" style="stroke:var(--text-dim)"/><text x="244" y="254" class="t-mono">t</text>
+          <line x1="170" y1="244" x2="200" y2="244" style="stroke:var(--text-dim)" marker-start="url(#to-ah-dim)" marker-end="url(#to-ah-dim)"/>
+          <text x="96" y="-8" class="t-mono" style="fill:var(--accent-2)">q = τt</text>
+        </g>
+        <g transform="translate(360,40)">
+          <text x="0" y="10" class="t" style="font-weight:700">한 바퀴 도는 전단 흐름 q는 일정하다</text>
+          <text x="0" y="40" class="t-dim">벽 두께가 바뀌어도 q = τt가 같다(벽 조각의 축 방향 평형)</text>
+          <text x="0" y="74" class="t" style="font-weight:700">각 벽의 전단력과 비틀림</text>
+          <text x="0" y="100" class="t-mono">V₁ = q·y₀ (세로 벽), V₂ = q·x₀ (가로 벽)</text>
+          <text x="0" y="122" class="t-mono">T = 2V₁(x₀/2) + 2V₂(y₀/2) = 2q·x₀y₀ = 2qA₀</text>
+          <text x="0" y="158" class="t" style="font-weight:700">그래서</text>
+          <text x="0" y="186" class="t-mono" style="fill:var(--accent);font-size:14px">q = T/(2A₀),  τ = T/(2A₀t)</text>
+          <text x="0" y="222" class="t-dim">A₀는 벽 바깥 넓이가 아니라 벽 두께 가운데 선이 둘러싼 넓이.</text>
+          <text x="0" y="242" class="t-dim">모양에 상관없이 성립한다(브레트 공식).</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-3.</b> 얇은 벽 닫힌 관의 비틀림. 전단 흐름 \(q\)(단위 길이당 전단력)는 둘레를 따라 일정하고, 각 벽의 전단력이 만드는 우력의 합이 비틀림 모멘트다. 직사각형 관에서 \(T = 2qx_0y_0 = 2qA_0\).</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.2 (박벽관의 전단 흐름)</strong> 벽 두께 \(t\)가 얇은 닫힌 단면이 비틀림 \(T\)를 받으면
+      <div class="formula">$$q = \tau t = \frac{T}{2A_0}, \qquad \tau = \frac{T}{2A_0 t}$$<div class="where">\(q\): <span class="term">전단 흐름</span><span class="en">(shear flow)</span>(N/mm), \(A_0\): 벽 중심선이 둘러싼 넓이. 꽉 찬 단면은 바깥 둘레를 따라 두께 \(t\)의 <span class="term">등가 박벽관</span><span class="en">(equivalent thin-walled tube)</span>으로 바꾼다. 균열 전에는 \(t = \tfrac34 A_{cp}/p_{cp}\), \(A_0 = \tfrac23A_{cp}\)(\(A_{cp}\): 바깥 둘레가 둘러싼 넓이, \(p_{cp}\): 바깥 둘레 길이), 균열 후에는 \(A_0 = 0.85A_{oh}\)(\(A_{oh}\): 가장 바깥 폐쇄 스터럽 중심선이 둘러싼 넓이)로 둔다(KDS 14 20 22·ACI 318 형태).</div></div></div>
+    <div class="callout"><strong>예제 6.1 (중공 상자와 꽉 찬 단면)</strong> 바깥 400 × 700 mm, \(T\) = 50 kN·m.
+      <ol class="to-steps">
+        <li><b>벽 두께 100 mm의 상자.</b> 중심선 300 × 600 → \(A_0 = 180{,}000\) mm². \(q = 50\times10^6/(2\times180{,}000) = 138.9\) N/mm, \(\tau = 1.39\) MPa. 세로 벽의 전단력 \(V_1 = 138.9 \times 600 = 83.3\) kN, 가로 벽 \(41.7\) kN. 검산: \(83.3 \times 0.3 + 41.7 \times 0.6 = 50\) kN·m ✓.</li>
+        <li><b>꽉 찬 단면(등가관).</b> \(A_{cp} = 280{,}000\) mm², \(p_{cp} = 2{,}200\) mm → \(t = 0.75 \times 280{,}000/2{,}200 = 95.5\) mm, \(A_0 = \tfrac23 A_{cp} = 186{,}700\) mm². \(\tau = 50\times10^6/(2 \times 186{,}700 \times 95.5) = 1.40\) MPa.</li>
+        <li><b>비교.</b> 탄성 해석의 근사식 \(\tau_{max} \approx T(3 + 1.8x/y)/(x^2y)\)(\(x\): 짧은 변)은 1.80 MPa로 더 크다. 기준의 등가관 값은 균열 직전의 비선형 재분배와 실험을 반영해 보정된 것이다.</li>
+      </ol></div>
+    <div class="sim" id="sim-to-tube">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>박벽관의 전단 흐름</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="to-cv-tube" aria-label="단면의 등가관 벽과 전단 흐름 화살표, 벽마다 전단력"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>단면</span><div class="seg" id="to-tb-shape"><button data-value="solid" class="on">꽉 찬(균열 전)</button><button data-value="box">중공 상자</button><button data-value="crk">균열 후(스터럽)</button></div></div>
+          <label class="ctrl"><span>폭 b <output id="to-tb-b-out"></output></span><input type="range" id="to-tb-b" min="250" max="800" step="10" value="400"></label>
+          <label class="ctrl"><span>높이 h <output id="to-tb-h-out"></output></span><input type="range" id="to-tb-h" min="300" max="1200" step="10" value="700"></label>
+          <label class="ctrl"><span>상자 벽 두께 t <output id="to-tb-t-out"></output></span><input type="range" id="to-tb-t" min="60" max="200" step="5" value="100"></label>
+          <label class="ctrl"><span>비틀림 T <output id="to-tb-T-out"></output></span><input type="range" id="to-tb-T" min="0" max="150" step="1" value="50"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">A₀ · t</span><span class="v" id="to-tb-a0">—</span></div>
+        <div class="stat"><span class="k">q = T/(2A₀)</span><span class="v" id="to-tb-q">—</span></div>
+        <div class="stat"><span class="k">τ = q/t</span><span class="v" id="to-tb-tau">—</span></div>
+        <div class="stat"><span class="k">벽 전단력 V₁ · V₂</span><span class="v" id="to-tb-v">—</span></div>
+      </div>
+      <div class="to-msg" id="to-tb-msg"></div>
+      <div class="sim-note">해볼 것: 같은 바깥 크기에서 "꽉 찬"과 "중공 상자"(t 100)의 τ가 거의 같습니다. 가운데 콘크리트는 비틀림에 거의 쓸모가 없습니다 · "균열 후"는 A₀ = 0.85A<sub>oh</sub>, t = A<sub>oh</sub>/p<sub>h</sub>로 단면 한계(원리 6.6)의 비틀림 응력과 같은 값입니다 · 폭을 줄이면 A₀가 작아져 τ가 빠르게 커집니다 · 모델: 원리 6.2. 꽉 찬 단면은 t = 0.75A<sub>cp</sub>/p<sub>cp</sub>, 중심선 A₀ = (b − t)(h − t). 스터럽 중심선은 피복 40 mm + D13/2. 흐름 화살표는 반시계(T +).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="cracking">
+    <h2>균열 비틀림 모멘트와 무시 한계</h2>
+    <div class="problem"><strong>작은 비틀림까지 다 설계해야 하나</strong>
+      <p>대부분의 보는 조금씩 비틀립니다. 균열을 일으키지 못하는 작은 비틀림은 휨·전단 설계에 거의 영향이 없으므로 무시하고 싶습니다. 그러려면 균열이 생기는 비틀림의 크기를 알아야 합니다.</p></div>
+    <p>등가관의 벽은 순수 전단 상태이므로 주인장 응력은 \(\tau\)와 같고 방향은 45°입니다(MechanicsBook 10장). 주인장 응력이 콘크리트의 인장강도 약 \(\tfrac13\lambda\sqrt{f_{ck}}\)에 이를 때 나선형 균열이 생긴다고 보면, \(\tau = T/(2A_0t)\)에 \(A_0 = \tfrac23A_{cp}\), \(t = \tfrac34A_{cp}/p_{cp}\)를 넣어 다음을 얻습니다.</p>
+    <div class="callout def"><strong>원리 6.3 (균열 비틀림 모멘트와 무시 한계, KDS 14 20 22 형태)</strong>
+      <div class="formula">$$T_{cr} = \frac13\lambda\sqrt{f_{ck}}\;\frac{A_{cp}^2}{p_{cp}}, \qquad T_u \lt \phi T_{th} = \phi\,\frac{\lambda\sqrt{f_{ck}}}{12}\,\frac{A_{cp}^2}{p_{cp}} = \phi\,\frac{T_{cr}}{4} \;\Rightarrow\; \text{비틀림 무시}$$<div class="where">\(T_{cr}\): <span class="term">균열 비틀림 모멘트</span><span class="en">(cracking torque)</span>. \(T_{th}\): 비틀림을 무시할 수 있는 <span class="term">문턱 비틀림</span><span class="en">(threshold torsion)</span>. \(T_{cr}/4\)인 이유는 전단·휨과 함께 작용하면 훨씬 작은 비틀림에서도 균열이 생기기 때문이다(상호작용이 원형에 가깝다고 보면 \(T = T_{cr}/4\)에서 전단강도 감소가 약 3 %). 슬래브와 일체인 보(T형·L형)는 바깥 둘레에 플랜지를 넣을 수 있되, 플랜지 내민 길이는 \(h_w - h_f\)와 \(4h_f\) 중 작은 값 이하로 하고, 플랜지를 넣어 \(A_{cp}^2/p_{cp}\)가 줄면 넣지 않는다(형태, 기준 확인). φ = 0.75.</div></div></div>
+    <div class="callout"><strong>예제 6.2 (가장자리 보의 T<sub>cr</sub>과 문턱)</strong> 400 × 700 mm, \(f_{ck}\) = 30 MPa, 보통 콘크리트.
+      <ol class="to-steps">
+        <li><b>직사각형만.</b> \(A_{cp} = 280{,}000\) mm², \(p_{cp} = 2{,}200\) mm, \(A_{cp}^2/p_{cp} = 3.564\times10^7\) mm³. \(T_{cr} = \tfrac13 \times 5.477 \times 3.564\times10^7 = 65.1\) kN·m, \(\phi T_{th} = 0.75 \times 65.1/4 = \) <b>12.2 kN·m</b>.</li>
+        <li><b>슬래브 플랜지 포함(L형).</b> 슬래브 210 mm, 내민 길이 \(\min(700 - 210,\ 4 \times 210) = 490\) mm. \(A_{cp} = 280{,}000 + 490 \times 210 = 382{,}900\) mm², \(p_{cp} = 2{,}200 + 2 \times 490 = 3{,}180\) mm, \(A_{cp}^2/p_{cp} = 4.610\times10^7\)(늘어남 → 포함 가능). \(T_{cr} = 84.2\) kN·m, \(\phi T_{th} = 15.8\) kN·m.</li>
+        <li><b>의미.</b> 계수 비틀림이 12–16 kN·m보다 작으면 이 보는 비틀림을 무시하고 휨·전단만 설계한다. 예제 6.4의 \(T_u\) = 44 kN·m는 문턱을 넘는다.</li>
+      </ol></div>
+    <div class="sim" id="sim-to-tcr">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>균열 비틀림 모멘트와 무시 한계</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view to-stack">
+          <div><canvas id="to-cv-tcr-s" aria-label="보 단면과 포함하는 플랜지, 등가관"></canvas></div>
+          <div><canvas id="to-cv-tcr-b" aria-label="계수 비틀림과 φTth, φTcr 막대 비교"></canvas></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">폭 b<sub>w</sub></i> <output id="to-tc-b-out"></output></span><input type="range" id="to-tc-b" min="250" max="800" step="10" value="400"></label>
+          <label class="ctrl"><span>높이 h <output id="to-tc-h-out"></output></span><input type="range" id="to-tc-h" min="300" max="1200" step="10" value="700"></label>
+          <div class="ctrl"><span>슬래브 플랜지</span><div class="seg" id="to-tc-fl"><button data-value="0" class="on">없음</button><button data-value="1">한쪽(L형)</button><button data-value="2">양쪽(T형)</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">슬래브 두께 h<sub>f</sub></i> <output id="to-tc-hf-out"></output></span><input type="range" id="to-tc-hf" min="120" max="300" step="10" value="210"></label>
+          <label class="ctrl"><span><i style="font-style:normal">f<sub>ck</sub></i> <output id="to-tc-f-out"></output></span><input type="range" id="to-tc-f" min="21" max="60" step="1" value="30"></label>
+          <label class="ctrl"><span><i style="font-style:normal">계수 비틀림 T<sub>u</sub></i> <output id="to-tc-tu-out"></output></span><input type="range" id="to-tc-tu" min="0" max="150" step="1" value="44"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">A<sub>cp</sub> · p<sub>cp</sub></span><span class="v" id="to-tc-a">—</span></div>
+        <div class="stat"><span class="k">T<sub>cr</sub></span><span class="v" id="to-tc-tcr">—</span></div>
+        <div class="stat"><span class="k">φT<sub>th</sub> = φT<sub>cr</sub>/4</span><span class="v" id="to-tc-th">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="to-tc-j">—</span></div>
+      </div>
+      <div class="to-msg" id="to-tc-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(400 × 700, T<sub>u</sub> 44 kN·m)은 문턱 12.2 kN·m를 넘어 비틀림 설계가 필요합니다 · 플랜지를 "한쪽"으로 하면 A<sub>cp</sub>²/p<sub>cp</sub>가 커져 문턱이 15.8 kN·m가 됩니다 · 보를 300 × 1,000으로 바꾸면 넓이는 비슷해도 둘레가 길어 T<sub>cr</sub>이 줄어듭니다 — 비틀림에는 넓적한 단면이 유리합니다 · 높이가 작고 슬래브가 두꺼우면 플랜지를 넣을 때 오히려 A<sub>cp</sub>²/p<sub>cp</sub>가 줄 수 있고, 그때는 플랜지를 빼고 계산합니다 · 모델: 원리 6.3, φ = 0.75, λ = 1.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="space-truss">
+    <h2>균열 후: 입체 트러스 모형</h2>
+    <div class="problem"><strong>갈라진 관은 무엇으로 버티나</strong>
+      <p>비틀림 균열은 네 면을 따라 나선으로 돕니다(<span class="term">나선 균열</span><span class="en">(spiral crack)</span>). 균열 사이의 콘크리트 띠가 압축을 받고, 균열을 가로지르는 철근이 당겨집니다. 5장의 트러스 모형을 관의 네 벽에 하나씩 세우면(<span class="term">입체 트러스 모형</span><span class="en">(space truss model)</span>), 비틀림 철근을 계산하는 식이 그대로 나옵니다.</p></div>
+    <figure class="diagram" id="fig-to-spiral">
+      <svg viewBox="0 0 860 320" role="img" aria-label="비틀림을 받는 보의 나선 균열과 입체 트러스: 폐쇄 스터럽, 모서리 종철근, 경사 콘크리트 스트럿">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <path d="M110 130 L590 130 L590 270 L110 270 Z" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.4"/>
+        <path d="M110 130 L170 80 L650 80 L590 130 Z" style="fill:var(--surface);stroke:var(--text-dim);stroke-width:1.4"/>
+        <path d="M590 130 L650 80 L650 220 L590 270 Z" style="fill:var(--surface);stroke:var(--text-dim);stroke-width:1.4"/>
+        <g style="fill:none;stroke:var(--accent);stroke-width:2"><path d="M180 270 L180 130 L240 80"/><path d="M260 270 L260 130 L320 80"/><path d="M340 270 L340 130 L400 80"/><path d="M420 270 L420 130 L480 80"/><path d="M500 270 L500 130 L560 80"/></g>
+        <g style="stroke:var(--tension);stroke-width:4"><line x1="118" y1="262" x2="584" y2="262"/><line x1="118" y1="138" x2="584" y2="138"/><line x1="170" y1="88" x2="640" y2="88"/></g>
+        <g style="fill:none;stroke:var(--text);stroke-width:2.2"><path d="M150 270 L270 130 L320 88"/><path d="M290 270 L410 130 L460 88"/><path d="M430 270 L550 130 L590 96"/></g>
+        <g style="fill:none;stroke:var(--compression);stroke-width:3;stroke-dasharray:8 5;opacity:.85"><path d="M200 266 L300 140"/><path d="M340 266 L440 140"/></g>
+        <path d="M690 175 A 26 60 0 1 1 690 176" style="fill:none;stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#to-ah-ld)"/>
+        <text x="730" y="180" class="t-mono" style="fill:var(--accent-2)">T</text>
+        <path d="M70 175 A 26 60 0 1 0 70 176" style="fill:none;stroke:var(--accent-2);stroke-width:2.4" marker-end="url(#to-ah-ld)"/>
+        <text x="40" y="180" class="t-mono" style="fill:var(--accent-2)">T</text>
+        <text x="350" y="298" text-anchor="middle" class="t-mono">진한 선: 나선 균열 · 빨강 점선: 콘크리트 스트럿(θ) · 청회: 폐쇄 스터럽 · 파랑: 종철근</text>
+        <text x="660" y="70" class="t-mono" style="fill:var(--tension)">모서리마다 종철근</text>
+        <text x="200" y="60" class="t-mono" style="fill:var(--accent)">스터럽은 네 면 모두에서 인장 → 닫혀야 한다</text>
+      </svg>
+      <figcaption><b>그림 6-4.</b> 비틀림 균열 뒤의 입체 트러스(개략). 균열은 네 면을 따라 나선으로 돌고(앞면에서 ／이면 윗면에서도 같은 방향으로 이어진다), 균열 사이의 콘크리트 띠가 스트럿, 스터럽의 네 다리와 모서리 종철근이 타이가 된다. 스터럽의 모든 다리가 당겨지므로 닫혀 있어야 하고, 스트럿이 방향을 바꾸는 모서리에 종철근이 있어야 한다.</figcaption>
+    </figure>
+    <p>관의 한 벽(높이 \(y_i\))을 경사각 \(\theta\)의 균열을 따라 잘라 봅니다(그림 6-5). 벽의 전단력은 \(V_i = q\,y_i\)이고, 균열을 가로지르는 스터럽은 \(y_i\cot\theta/s\)개이며 각각 \(A_t f_{yt}\)로 당깁니다. 연직 평형과 수평 평형에서</p>
+    <div class="formula">$$q\,y_i = \frac{A_t f_{yt}\,y_i\cot\theta}{s}\;\Rightarrow\; q = \frac{A_t f_{yt}\cot\theta}{s}, \qquad N_i = V_i\cot\theta \;\Rightarrow\; \sum N_i = q\,p_0\cot\theta = A_l f_y$$</div>
+    <figure class="diagram" id="fig-to-wall">
+      <svg viewBox="0 0 860 300" role="img" aria-label="관의 한 벽을 경사 균열로 자른 자유물체도: 스터럽 힘, 벽 전단력, 스트럿 압축, 종방향 힘">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,50)">
+          <rect x="0" y="0" width="380" height="180" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M100 180 L280 0" style="stroke:var(--text);stroke-width:2.4;stroke-dasharray:8 4"/>
+          <g style="stroke:var(--compression);stroke-width:2;opacity:.6"><line x1="20" y1="180" x2="200" y2="0"/><line x1="60" y1="180" x2="240" y2="0"/><line x1="140" y1="180" x2="320" y2="0"/><line x1="180" y1="180" x2="360" y2="0"/></g>
+          <g style="stroke:var(--accent);stroke-width:2.6"><line x1="130" y1="0" x2="130" y2="180"/><line x1="170" y1="0" x2="170" y2="180"/><line x1="210" y1="0" x2="210" y2="180"/><line x1="250" y1="0" x2="250" y2="180"/></g>
+          <g style="fill:var(--bad)"><circle cx="130" cy="150" r="4.5"/><circle cx="170" cy="110" r="4.5"/><circle cx="210" cy="70" r="4.5"/><circle cx="250" cy="30" r="4.5"/></g>
+          <line x1="100" y1="200" x2="280" y2="200" style="stroke:var(--text-dim)" marker-start="url(#to-ah-dim)" marker-end="url(#to-ah-dim)"/>
+          <text x="190" y="218" text-anchor="middle" class="t-mono">y<tspan baseline-shift="sub" font-size="8">i</tspan> cot θ (스터럽 y<tspan baseline-shift="sub" font-size="8">i</tspan>cotθ/s개)</text>
+          <line x1="-14" y1="0" x2="-14" y2="180" style="stroke:var(--text-dim)" marker-start="url(#to-ah-dim)" marker-end="url(#to-ah-dim)"/>
+          <text x="-20" y="95" text-anchor="end" class="t-mono">y<tspan baseline-shift="sub" font-size="8">i</tspan></text>
+          <text x="40" y="200" class="t-mono" style="fill:var(--compression)">스트럿</text>
+        </g>
+        <g transform="translate(500,50)">
+          <text x="0" y="10" class="t" style="font-weight:700">벽 하나의 평형</text>
+          <text x="0" y="40" class="t-mono">연직: V<tspan baseline-shift="sub" font-size="8">i</tspan> = q·y<tspan baseline-shift="sub" font-size="8">i</tspan> = (A<tspan baseline-shift="sub" font-size="8">t</tspan>f<tspan baseline-shift="sub" font-size="8">yt</tspan>/s)·y<tspan baseline-shift="sub" font-size="8">i</tspan> cot θ</text>
+          <text x="0" y="66" class="t-mono">스트럿: D<tspan baseline-shift="sub" font-size="8">i</tspan> = V<tspan baseline-shift="sub" font-size="8">i</tspan>/sin θ</text>
+          <text x="0" y="92" class="t-mono">축 방향: N<tspan baseline-shift="sub" font-size="8">i</tspan> = V<tspan baseline-shift="sub" font-size="8">i</tspan> cot θ (종철근이 받음)</text>
+          <text x="0" y="128" class="t" style="font-weight:700">네 벽을 더하면</text>
+          <text x="0" y="156" class="t-mono" style="fill:var(--accent)">T = 2A₀q = 2A₀A<tspan baseline-shift="sub" font-size="8">t</tspan>f<tspan baseline-shift="sub" font-size="8">yt</tspan>cot θ/s</text>
+          <text x="0" y="182" class="t-mono" style="fill:var(--tension)">A<tspan baseline-shift="sub" font-size="8">l</tspan>f<tspan baseline-shift="sub" font-size="8">y</tspan> = Σ N<tspan baseline-shift="sub" font-size="8">i</tspan> = q·p₀·cot θ</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-5.</b> 관의 한 벽을 경사 균열(점선)로 자른 자유물체도. 균열을 가로지르는 스터럽(빨간 점)의 힘이 벽의 전단력 \(q\,y_i\)를 받고, 스트럿의 축 방향 성분 \(V_i\cot\theta\)는 종철근이 받는다. 비틀림에서는 전단과 달리 네 벽 모두가 같은 방향으로 돌아가므로, 종방향 힘이 단면 전체에 고르게 생긴다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.4 (비틀림 철근, KDS 14 20 22·ACI 318 형태)</strong> \(T_u \le \phi T_n\), φ = 0.75에서
+      <div class="formula">$$T_n = \frac{2A_0A_t f_{yt}}{s}\cot\theta \;\Rightarrow\; \frac{A_t}{s} = \frac{T_n}{2A_0 f_{yt}\cot\theta}, \qquad A_l = \frac{A_t}{s}\,p_h\Big(\frac{f_{yt}}{f_y}\Big)\cot^2\theta$$<div class="where">\(A_t\): 폐쇄 스터럽 <b>한 다리</b>의 단면적, \(A_0 = 0.85A_{oh}\), \(p_h\): 가장 바깥 폐쇄 스터럽 중심선의 둘레, \(A_l\): <span class="term">비틀림 종방향 철근</span><span class="en">(longitudinal torsion reinforcement)</span> 전체 단면적. \(\theta\)(<span class="term">스트럿 각</span><span class="en">(strut angle)</span>)는 30–60° 사이에서 정하며 프리스트레스가 없는 부재는 45°를 쓸 수 있다. 45°이고 \(f_{yt} = f_y\)이면 스터럽 체적과 종철근 체적이 같다.</div></div></div>
+    <div class="callout deep"><strong>람페르트의 일반해</strong> 위 두 식에서 \(\cot\theta\)를 소거하면 \(T_n = 2A_0\sqrt{(A_tf_{yt}/s)(A_lf_y/p_h)}\), \(\tan^2\theta = (A_tf_{yt}/s)/(A_lf_y/p_h)\)이다. 스터럽과 종철근이 모두 항복하면 균열 각은 두 철근의 "강도 비"가 정한다. 한쪽이 지나치게 많으면 \(\theta\)가 30–60°를 벗어나 균열이 넓어지고 스트럿이 먼저 부서질 수 있어 기준이 각도를 제한한다. 스터럽과 종철근의 변형률로부터 균열 후 비틀림 강성 \(K_{cr} \approx 4E_sA_0^2/\big[p_0(s/A_t + p_0/A_l)\big]\)(콘크리트 스트럿 변형 무시, 교육용)도 얻는다. 7절의 시뮬레이터가 이 식을 쓴다.</div>
+    <div class="sim" id="sim-to-truss">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>입체 트러스: θ가 스터럽과 종철근을 나눈다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view to-stack">
+          <div><canvas id="to-cv-st-w" aria-label="관의 한 벽을 펼친 그림: 스트럿 각도와 스터럽 간격, 종철근 굵기"></canvas></div>
+          <div><canvas id="to-cv-st-c" aria-label="스트럿 각에 따른 스터럽·종철근·전체 철근 체적 곡선"></canvas><span class="to-cap">단위 길이당 철근 체적 (mm³/mm)</span></div>
+        </div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>스트럿 각 θ <output id="to-st-th-out"></output></span><input type="range" id="to-st-th" min="25" max="65" step="0.5" value="45"></label>
+          <label class="ctrl"><span><i style="font-style:normal">공칭 비틀림 T<sub>n</sub></i> <output id="to-st-tn-out"></output></span><input type="range" id="to-st-tn" min="10" max="150" step="1" value="59"></label>
+          <div class="ctrl"><span><i style="font-style:normal">f<sub>yt</sub> / f<sub>y</sub></i></span><div class="seg" id="to-st-fy"><button data-value="400/500" class="on">400/500</button><button data-value="500/500">500/500</button><button data-value="400/400">400/400</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">A<sub>t</sub>/s</span><span class="v" id="to-st-at">—</span></div>
+        <div class="stat"><span class="k">A<sub>l</sub></span><span class="v" id="to-st-al">—</span></div>
+        <div class="stat"><span class="k">D13 한 다리 간격</span><span class="v" id="to-st-s">—</span></div>
+        <div class="stat"><span class="k">전체 철근 체적(45° 대비)</span><span class="v" id="to-st-v">—</span></div>
+      </div>
+      <div class="to-msg" id="to-st-msg"></div>
+      <div class="sim-note">해볼 것: θ를 30°로 줄이면 스터럽은 tan 30°/tan 45° = 0.58배로 줄지만 종철근은 cot 30° = 1.73배로 늘어납니다 · f<sub>yt</sub>/f<sub>y</sub> = 400/500이면 전체 철근이 가장 적은 각은 tan²θ = f<sub>yt</sub>/f<sub>y</sub>, 곧 약 41.8°입니다 · 30–60° 바깥(빨간 띠)은 기준이 허용하지 않습니다 · 모델: 원리 6.4, B-10 가장자리 보의 A₀ = 0.85A<sub>oh</sub> = 158,600 mm², p<sub>h</sub> = 1,829 mm(400 × 700, 피복 40, D13). 스터럽 체적 = (A<sub>t</sub>/s)·p<sub>h</sub>, 종철근 체적 = A<sub>l</sub>(단위 길이당). 기본 T<sub>n</sub> = 44/0.75 ≈ 59 kN·m.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="behavior">
+    <h2>비틀림 거동과 최소 철근</h2>
+    <div class="problem"><strong>철근이 너무 적으면 균열과 동시에 끝난다</strong>
+      <p>비틀림 균열이 생기는 순간 콘크리트가 받던 비틀림이 철근으로 넘어갑니다. 철근이 그 힘을 받을 만큼 있으면 보는 균열 뒤에도 비틀림을 더 받으며 크게 비틀리고(연성), 모자라면 균열과 거의 동시에 끊어집니다. 휨의 최소 철근(3장)과 같은 논리이고, 이것이 <span class="term">최소 비틀림 철근</span><span class="en">(minimum torsion reinforcement)</span>의 근거입니다.</p></div>
+    <p>비틀림 모멘트–<span class="term">비틀림각</span><span class="en">(angle of twist)</span> 곡선은 세 구간으로 나뉩니다. 균열 전에는 콘크리트 단면의 <span class="term">비틀림 강성</span><span class="en">(torsional stiffness)</span> \(GC\)로 단단하게 버티고, \(T_{cr}\)에서 나선 균열이 생기면 강성이 균열 전의 수 % 수준으로 뚝 떨어지며, 그 뒤 스터럽이나 종철근이 항복하는 \(T_n\)까지 철근이 강성을 정합니다. <b>개방형 스터럽</b>은 균열 뒤 모서리 피복이 떨어지면 끝이 풀려 관의 둘레 인장(전단 흐름)을 이어 주지 못합니다.</p>
+    <div class="sim" id="sim-to-tt">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>비틀림 모멘트–비틀림각: 철근량과 스터럽 형태(교육용)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="to-cv-tt" aria-label="비틀림 모멘트와 단위 길이당 비틀림각 곡선, 균열 비틀림과 공칭 비틀림강도"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>폐쇄 스터럽 D13 간격 s <output id="to-tt-s-out"></output></span><input type="range" id="to-tt-s" min="75" max="450" step="5" value="200"></label>
+          <label class="ctrl"><span><i style="font-style:normal">종방향 철근 A<sub>l</sub></i> <output id="to-tt-al-out"></output></span><input type="range" id="to-tt-al" min="200" max="4000" step="20" value="1000"></label>
+          <div class="ctrl"><span>스터럽 형태</span><div class="seg" id="to-tt-type"><button data-value="closed" class="on">폐쇄 135°</button><button data-value="open">U형 + 덮개 90°</button></div></div>
+          <div class="btn-row"><button class="btn" id="to-tt-min">철근 아주 적게</button><button class="btn" id="to-tt-b10">B-10 설계값</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">T<sub>cr</sub></span><span class="v" id="to-tt-tcr">—</span></div>
+        <div class="stat"><span class="k">T<sub>n</sub>(람페르트) · θ</span><span class="v" id="to-tt-tn">—</span></div>
+        <div class="stat"><span class="k">T<sub>n</sub>(기준 45°)</span><span class="v" id="to-tt-tc">—</span></div>
+        <div class="stat"><span class="k">K<sub>cr</sub>/GC</span><span class="v" id="to-tt-k">—</span></div>
+      </div>
+      <div class="to-msg" id="to-tt-msg"></div>
+      <div class="sim-note">해볼 것: "철근 아주 적게"를 누르면 T<sub>n</sub> &lt; T<sub>cr</sub>이 되어 균열과 함께 비틀림이 떨어집니다(취성) · 스터럽만 촘촘히(75 mm) 하고 종철근을 줄이면 θ가 30° 아래로 내려가 종철근이 먼저 항복하고, 기준식(45°)은 람페르트 값보다 작게 나옵니다 · "U형 + 덮개"로 바꾸면 피복 박리 뒤 곡선이 꺾여 떨어집니다 · 모델(교육용 개념 곡선): 400 × 700 mm, f<sub>ck</sub> 30, D13(f<sub>yt</sub> 400), 종철근 f<sub>y</sub> 500. 균열 전 강성 GC(C = (1 − 0.63x/y)x³y/3, G = E<sub>c</sub>/2.4), T<sub>cr</sub>은 원리 6.3, 균열 후 강성은 람페르트형 K<sub>cr</sub>(스트럿 변형 무시), 항복 뒤 소성 구간, 개방형은 0.7T<sub>n</sub>에서 박리·풀림으로 가정한 곡선입니다.</div>
+    </div>
+    <div class="callout def"><strong>원리 6.5 (비틀림 철근의 최소량·간격·범위, KDS 14 20 22·ACI 318 형태)</strong>
+      <ol>
+        <li><b>최소 횡방향 철근.</b> \((A_v + 2A_t) \ge \max(0.0625\sqrt{f_{ck}},\ 0.35)\,b_w s/f_{yt}\).</li>
+        <li><b>최소 종방향 철근.</b> \(A_{l,min} = \dfrac{0.42\sqrt{f_{ck}}\,A_{cp}}{f_y} - \dfrac{A_t}{s}\,p_h\dfrac{f_{yt}}{f_y}\), 이때 \(A_t/s \ge 0.175b_w/f_{yt}\).</li>
+        <li><b>간격.</b> 폐쇄 스터럽 \(s \le \min(p_h/8,\ 300\text{ mm})\). 종철근은 스터럽 안쪽 둘레를 따라 300 mm 이하 간격으로 고르게 두고, 모서리마다 적어도 하나, 지름은 \(0.042s\)와 D10 이상.</li>
+        <li><b>범위.</b> 이론상 필요한 단면에서 \(b_t + d\) 이상 더 연장한다. 위험 단면은 지점면에서 \(d\)(철근콘크리트).</li>
+      </ol>
+      모든 수치는 형태이며 현행 기준을 확인한다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="combined">
+    <h2>전단과 비틀림의 조합, 단면 한계</h2>
+    <div class="problem"><strong>같은 스터럽이 전단과 비틀림을 함께 받는다</strong>
+      <p>실제 보는 비틀림만 받지 않습니다. 가장자리 보는 슬래브의 하중으로 전단을, 슬래브 끝 모멘트로 비틀림을 함께 받습니다. 두 효과는 한쪽 옆면에서는 더해지고 반대쪽에서는 빠집니다. 설계는 더해지는 쪽에 맞춥니다.</p></div>
+    <figure class="diagram" id="fig-to-comb">
+      <svg viewBox="0 0 860 280" role="img" aria-label="전단에 의한 응력과 비틀림 전단 흐름이 한쪽 옆면에서는 더해지고 반대쪽에서는 빠지는 모습">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <text x="70" y="0" text-anchor="middle" class="t" style="font-weight:700">전단 V</text>
+          <rect x="0" y="20" width="140" height="180" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="stroke:var(--accent-2);stroke-width:2.6" marker-end="url(#to-ah-ld)"><line x1="14" y1="50" x2="14" y2="170"/><line x1="126" y1="50" x2="126" y2="170"/></g>
+          <text x="70" y="226" text-anchor="middle" class="t-mono">두 옆면에 V/2씩</text>
+        </g>
+        <text x="245" y="135" text-anchor="middle" class="t" style="font-size:22px">+</text>
+        <g transform="translate(300,40)">
+          <text x="70" y="0" text-anchor="middle" class="t" style="font-weight:700">비틀림 T</text>
+          <rect x="0" y="20" width="140" height="180" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="stroke:var(--tension);stroke-width:2.6" marker-end="url(#to-ah-t)"><line x1="126" y1="50" x2="126" y2="170"/><line x1="100" y1="186" x2="40" y2="186"/><line x1="14" y1="170" x2="14" y2="50"/><line x1="40" y1="34" x2="100" y2="34"/></g>
+          <text x="70" y="226" text-anchor="middle" class="t-mono">네 면을 도는 q</text>
+        </g>
+        <text x="485" y="135" text-anchor="middle" class="t" style="font-size:22px">=</text>
+        <g transform="translate(540,40)">
+          <text x="70" y="0" text-anchor="middle" class="t" style="font-weight:700">합</text>
+          <rect x="0" y="20" width="140" height="180" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="126" y1="36" x2="126" y2="186" style="stroke:var(--bad);stroke-width:4.4" marker-end="url(#to-ah-bad)"/>
+          <line x1="14" y1="100" x2="14" y2="120" style="stroke:var(--accent);stroke-width:2.2" marker-end="url(#to-ah-acc)"/>
+          <g style="stroke:var(--tension);stroke-width:2" marker-end="url(#to-ah-t)"><line x1="100" y1="186" x2="40" y2="186"/><line x1="40" y1="34" x2="100" y2="34"/></g>
+          <text x="150" y="110" class="t-mono" style="fill:var(--bad)">더해지는 면</text>
+          <text x="150" y="126" class="t-mono" style="fill:var(--bad)">→ 설계 기준</text>
+          <text x="70" y="226" text-anchor="middle" class="t-mono">반대 면은 거의 상쇄</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-6.</b> 전단과 비틀림의 조합. 전단은 두 옆면에 같은 방향으로, 비틀림은 단면 둘레를 돌며 작용하므로 한쪽 옆면에서 두 응력이 더해진다. 그 면의 스터럽 한 다리가 \(A_v/(2s) + A_t/s\)를 맡아야 하므로, 두 다리 스터럽 기준으로 \((A_v + 2A_t)/s\)가 필요하다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 6.6 (조합 설계와 단면 크기 한계, KDS 14 20 22·ACI 318 형태)</strong>
+      <div class="formula">$$\frac{A_v + 2A_t}{s} = \frac{A_v}{s} + 2\,\frac{A_t}{s}, \qquad \sqrt{\Big(\frac{V_u}{b_w d}\Big)^2 + \Big(\frac{T_u\,p_h}{1.7A_{oh}^2}\Big)^2} \le \phi\Big(\frac{V_c}{b_w d} + \frac23\sqrt{f_{ck}}\Big)$$<div class="where">왼쪽: 두 다리 스터럽의 필요량(\(A_v\)는 두 다리 합, \(A_t\)는 한 다리). 오른쪽: 꽉 찬 단면의 <span class="term">단면 크기 한계</span><span class="en">(cross-sectional limit)</span>. 왼쪽 둘째 항은 원리 6.2의 균열 후 비틀림 응력 \(T_u/(2 \cdot 0.85A_{oh}\cdot A_{oh}/p_h)\)이다. 스트럿 콘크리트의 압괴와 사용 하중 균열 폭을 제한한다. 속 빈 단면은 두 응력이 같은 벽에서 그대로 더해지므로 제곱합 대신 단순 합을 쓴다. 종방향 철근 \(A_l\)은 휨 철근에 더하며(위·아래·옆면에 나눠), 휨 압축 측에서는 압축력만큼 줄일 수 있다(형태). 비틀림을 고려하면 \(V_c\)는 그대로 쓴다(KDS 형태).</div></div></div>
+    <div class="callout"><strong>예제 6.3 (단면 한계 때문에 단면을 키우는 경우)</strong> \(V_u\) = 150 kN, \(T_u\) = 40 kN·m, \(f_{ck}\) = 30 MPa, 피복 40 mm, D13 스터럽.
+      <ol class="to-steps">
+        <li><b>300 × 500 mm.</b> \(d = 434\), 스터럽 중심선 207.3 × 407.3 → \(A_{oh} = 84{,}430\) mm², \(p_h = 1{,}229\) mm. \(V_u/(b_wd) = 1.15\), \(T_up_h/(1.7A_{oh}^2) = 40\times10^6 \times 1{,}229/(1.7 \times 84{,}430^2) = 4.06\) MPa → \(\sqrt{1.15^2 + 4.06^2} = 4.22\) MPa \(\gt\) 한계 \(0.75(0.913 + 3.651) = 3.42\) MPa ✗. 철근으로는 해결되지 않는다.</li>
+        <li><b>350 × 600 mm.</b> \(d = 534\), \(A_{oh} = 257.3 \times 507.3 = 130{,}500\) mm², \(p_h = 1{,}529\) mm. 비틀림 응력 2.11 MPa, 전단 0.80 MPa → 2.26 MPa ≤ 3.42 ✓(이용률 0.66).</li>
+        <li><b>교훈.</b> 비틀림 응력은 \(A_{oh}^2\)에 반비례하므로 단면을 조금 키워도 크게 준다. 비틀림이 큰 보는 폭을 넉넉하게 잡는다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="detailing">
+    <h2>비틀림 상세: 닫힌 고리와 모서리 철근</h2>
+    <div class="problem"><strong>계산이 맞아도 상세가 틀리면 버티지 못한다</strong>
+      <p>입체 트러스의 스트럿은 모서리에서 방향을 바꿉니다. 방향을 바꾸는 압축력은 바깥으로 미는 힘을 만들고, 그 힘이 모서리 피복을 밀어냅니다(<span class="term">피복 박리</span><span class="en">(cover spalling)</span>). 스터럽과 종철근의 배치가 이 힘을 받아 주어야 합니다.</p></div>
+    <figure class="diagram" id="fig-to-detail">
+      <svg viewBox="0 0 860 360" role="img" aria-label="비틀림 상세: 135도 갈고리 폐쇄 스터럽, 모서리 종철근, Aoh와 ph, 모서리 피복 박리, 잘못된 U형 스터럽">
+        <rect x="10" y="10" width="840" height="340" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">좋은 상세</text>
+          <rect x="10" y="20" width="170" height="240" rx="3" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="34" y="44" width="122" height="192" style="fill:var(--accent-soft);stroke:none"/>
+          <rect x="34" y="44" width="122" height="192" rx="6" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <path d="M44 44 L70 70 M34 54 L60 80" style="stroke:var(--accent);stroke-width:3"/>
+          <g style="fill:var(--tension)"><circle cx="46" cy="56" r="7"/><circle cx="144" cy="56" r="7"/><circle cx="46" cy="224" r="7"/><circle cx="144" cy="224" r="7"/><circle cx="46" cy="140" r="6"/><circle cx="144" cy="140" r="6"/><circle cx="95" cy="224" r="7"/><circle cx="95" cy="56" r="6"/></g>
+          <text x="95" y="150" text-anchor="middle" class="t-mono" style="fill:var(--accent)">A<tspan baseline-shift="sub" font-size="8">oh</tspan></text>
+          <text x="95" y="282" text-anchor="middle" class="t-mono">135° 갈고리 · 모서리 종철근</text>
+          <text x="95" y="298" text-anchor="middle" class="t-mono">p<tspan baseline-shift="sub" font-size="8">h</tspan> = 스터럽 중심선 둘레</text>
+        </g>
+        <g transform="translate(300,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">모서리에서 일어나는 일</text>
+          <rect x="10" y="20" width="200" height="200" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M150 20 L210 20 L210 80 Z" style="fill:var(--bad);opacity:.25"/>
+          <path d="M150 20 L210 80" style="stroke:var(--bad);stroke-width:2;stroke-dasharray:5 3"/>
+          <rect x="34" y="44" width="152" height="152" rx="6" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+          <circle cx="174" cy="56" r="8" style="fill:var(--tension)"/>
+          <line x1="70" y1="56" x2="160" y2="56" style="stroke:var(--compression);stroke-width:3" marker-end="url(#to-ah-c)"/>
+          <line x1="174" y1="150" x2="174" y2="70" style="stroke:var(--compression);stroke-width:3" marker-end="url(#to-ah-c)"/>
+          <line x1="186" y1="44" x2="222" y2="10" style="stroke:var(--bad);stroke-width:2.4" marker-end="url(#to-ah-bad)"/>
+          <text x="110" y="240" text-anchor="middle" class="t-mono">스트럿이 꺾이는 모서리:</text>
+          <text x="110" y="256" text-anchor="middle" class="t-mono" style="fill:var(--bad)">바깥으로 미는 힘 → 피복 박리</text>
+          <text x="110" y="272" text-anchor="middle" class="t-mono">종철근이 받쳐 주고 스터럽이 묶는다</text>
+        </g>
+        <g transform="translate(580,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">나쁜 상세</text>
+          <rect x="10" y="20" width="170" height="240" rx="3" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M34 50 L34 236 L156 236 L156 50" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <path d="M28 44 L162 44" style="stroke:var(--accent);stroke-width:2.4"/>
+          <path d="M28 44 L28 30 M162 44 L162 58" style="stroke:var(--bad);stroke-width:2.4"/>
+          <g style="fill:var(--tension)"><circle cx="46" cy="224" r="7"/><circle cx="144" cy="224" r="7"/><circle cx="46" cy="56" r="6"/><circle cx="144" cy="56" r="6"/></g>
+          <text x="95" y="140" text-anchor="middle" class="t-mono" style="fill:var(--bad)">옆면 중간 철근 없음</text>
+          <text x="95" y="282" text-anchor="middle" class="t-mono" style="fill:var(--bad)">U형 + 90° 덮개: 박리 뒤 풀림</text>
+          <text x="95" y="298" text-anchor="middle" class="t-mono">전단에는 되지만 비틀림에는 ✗</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-7.</b> 비틀림 상세. 왼쪽: 가장 바깥 폐쇄 스터럽(135° 갈고리)의 중심선이 \(A_{oh}\)와 \(p_h\)를 정하고, 종철근은 모서리마다 하나 이상, 둘레를 따라 300 mm 이하 간격으로 둔다. 가운데: 두 벽의 스트럿이 모서리에서 만나 바깥으로 미는 힘이 피복을 떼어 낸다. 오른쪽: U형 스터럽과 90° 덮개 철근은 그때 풀려 둘레의 인장을 잇지 못한다.</figcaption>
+    </figure>
+    <ul>
+      <li><b>폐쇄 스터럽.</b> 비틀림 스터럽은 단면을 완전히 감싸는 <span class="term">폐쇄 스터럽</span><span class="en">(closed stirrup)</span>이어야 하며, 끝은 135° 표준 갈고리로 종철근을 감아 코어 콘크리트에 정착한다. 슬래브와 일체인 쪽(L형 보의 슬래브 쪽)은 슬래브가 피복 박리를 막아 주므로 90° 갈고리를 허용하는 형태의 규정이 있다(기준 확인).</li>
+      <li><b>모서리 종철근.</b> 스트럿이 방향을 바꾸는 곳마다 종철근이 있어야 스트럿 힘이 철근에 걸린다. 단면 높이가 크면 옆면 중간에도 둔다(300 mm 간격).</li>
+      <li><b>정착.</b> 종철근은 지점면에서 항복 강도를 낼 만큼 정착한다. 비틀림은 지점까지 줄지 않으므로 가장자리 보의 주근은 기둥 안으로 갈고리 정착하는 경우가 많다(7장).</li>
+      <li><b>스터럽 지름과 간격.</b> \(s \le p_h/8\)은 균열 하나가 스터럽 사이로 빠져나가지 않도록, 그리고 종철근의 좌굴을 막도록 정한 것이다.</li>
+    </ul>
+    <div class="sim" id="sim-to-3d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>폐쇄 스터럽 상세 3D</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="to-cv-3d" aria-label="보 구간의 3차원 배근: 폐쇄 스터럽, 135도 갈고리, 모서리 종철근, 나선 균열"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>스터럽</span><div class="seg" id="to-3d-type"><button data-value="closed" class="on">폐쇄 135°</button><button data-value="open">U형 + 덮개 90°</button></div></div>
+          <label class="ctrl"><span>간격 s <output id="to-3d-s-out"></output></span><input type="range" id="to-3d-s" min="100" max="300" step="25" value="200"></label>
+          <div class="ctrl"><span>나선 균열</span><div class="seg" id="to-3d-crk"><button data-value="on" class="on">보기</button><button data-value="off">숨김</button></div></div>
+          <div class="ctrl"><span>모서리 피복</span><div class="seg" id="to-3d-sp"><button data-value="off" class="on">온전</button><button data-value="on">박리</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">3 m 구간 스터럽</span><span class="v" id="to-3d-n">—</span></div>
+        <div class="stat"><span class="k">s ≤ p<sub>h</sub>/8</span><span class="v" id="to-3d-sm">—</span></div>
+        <div class="stat"><span class="k">종철근</span><span class="v" id="to-3d-l">—</span></div>
+        <div class="stat"><span class="k">비틀림 유효</span><span class="v" id="to-3d-ok">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 끌어서 돌려 보세요 · 나선 균열이 네 면을 돌며 이어지는 것과, 각 균열을 스터럽의 네 다리가 모두 가로지르는 것을 확인하세요 · "박리"를 켜고 스터럽을 U형으로 바꾸면 덮개 철근의 90° 끝이 빠져나와(빨강) 위쪽 다리의 인장이 끊깁니다 · 간격을 250 mm 이상으로 하면 p<sub>h</sub>/8 = 229 mm를 넘습니다 · 모델: B-10 가장자리 보 400 × 700 mm, 피복 40 mm, D13 스터럽, 종철근 6-D13(모서리 4 + 옆면 2) — 예제 6.4의 상세. 깊이 방향은 실제 비율, 균열은 45°.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="b10-edge">
+    <h2>B-10 가장자리 보의 비틀림 설계</h2>
+    <div class="problem"><strong>바깥 둘레의 보는 슬래브 끝을 붙잡는다</strong>
+      <p>B-10의 바깥 둘레 보, 곧 <span class="term">가장자리 보</span><span class="en">(spandrel beam)</span>(이 장에서는 G1과 같은 400 × 700 mm로 가정)는 한쪽에만 210 mm 슬래브가 붙어 있습니다. 슬래브 끝의 부모멘트가 보를 비틀고, 그 비틀림은 양 끝 기둥으로 전달됩니다. 슬래브의 <span class="term">직접 설계법</span><span class="en">(direct design method)</span>(StructureBook 3장) 값으로 비틀림을 추정하고 설계해 봅니다.</p></div>
+    <figure class="diagram" id="fig-to-b10">
+      <svg viewBox="0 0 860 340" role="img" aria-label="B-10 모서리 경간 평면의 가장자리 보, 슬래브 끝 부모멘트, 가장자리 보의 비틀림 모멘트도">
+        <rect x="10" y="10" width="840" height="320" rx="10" class="f-surface"/>
+        <g transform="translate(80,30)">
+          <rect x="0" y="0" width="560" height="150" style="fill:var(--surface);stroke:var(--border)"/>
+          <rect x="0" y="130" width="560" height="22" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <rect x="-14" y="124" width="28" height="34" style="fill:var(--text-dim)"/><rect x="546" y="124" width="28" height="34" style="fill:var(--text-dim)"/>
+          <g style="stroke:var(--accent-2);stroke-width:1.8;fill:none" marker-end="url(#to-ah-ld)"><path d="M90 122 A 16 16 0 0 0 90 98"/><path d="M170 122 A 16 16 0 0 0 170 98"/><path d="M250 122 A 16 16 0 0 0 250 98"/><path d="M330 122 A 16 16 0 0 0 330 98"/><path d="M410 122 A 16 16 0 0 0 410 98"/><path d="M490 122 A 16 16 0 0 0 490 98"/></g>
+          <text x="280" y="60" text-anchor="middle" class="t-mono">2방향 슬래브 210 mm (8 × 8 m), w<tspan baseline-shift="sub" font-size="8">u</tspan> = 11.8 kN/m²</text>
+          <text x="280" y="84" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">슬래브 끝 부모멘트 m ≈ 12.2 kN·m/m</text>
+          <text x="280" y="170" text-anchor="middle" class="t-mono" style="fill:var(--accent)">가장자리 보 400 × 700 (순경간 7.2 m)</text>
+          <text x="590" y="146" class="t-mono">기둥</text>
+        </g>
+        <g transform="translate(80,215)">
+          <line x1="14" y1="50" x2="546" y2="50" class="s-axis"/>
+          <path d="M14 50 L14 0 L546 100 L546 50" style="fill:var(--accent-2-soft);stroke:none"/>
+          <path d="M14 0 L546 100" style="fill:none;stroke:var(--accent-2);stroke-width:2.6"/>
+          <line x1="14" y1="36" x2="546" y2="36" style="stroke:var(--warn);stroke-dasharray:5 4"/><line x1="14" y1="64" x2="546" y2="64" style="stroke:var(--warn);stroke-dasharray:5 4"/>
+          <text x="22" y="-4" class="t-mono" style="fill:var(--accent-2)">+44 kN·m(기둥면)</text>
+          <text x="538" y="114" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">−44 kN·m</text>
+          <text x="560" y="40" class="t-mono" style="fill:var(--warn)">φT<tspan baseline-shift="sub" font-size="8">th</tspan> 12.2</text>
+          <text x="420" y="24" text-anchor="middle" class="t-mono">T(x) = m(l<tspan baseline-shift="sub" font-size="8">n</tspan>/2 − x)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-8.</b> B-10 바깥 둘레 경간(평면)과 가장자리 보의 비틀림. 슬래브 끝 부모멘트를 보 길이를 따라 고르게 받는다고 보면(보수적), 비틀림은 경간 중앙에서 0, 기둥면에서 \(m\,l_n/2\)로 직선 분포한다. 문턱 \(\phi T_{th}\)(점선)를 넘는 구간이 경간의 대부분이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 6.4 (B-10 가장자리 보 설계, 교육용)</strong> 400 × 700 mm, \(f_{ck}\) 30, 종철근 SD500, 스터럽 SD400 D13, 피복 40 mm, \(d\) = 634 mm(1단).
+      <ol class="to-steps">
+        <li><b>슬래브 끝 모멘트(페이지 안 추정).</b> 직접 설계법의 전체 정적 모멘트 \(M_0 = w_ul_2l_n^2/8 = 11.8 \times 8 \times 7.2^2/8 = 612\) kN·m(StructureBook 3장). 모든 지지선에 보가 있는 2방향 슬래브의 바깥 끝 부모멘트 계수 0.16(직접 설계법 형태, 기준 확인) → \(0.16 \times 612 = 98\) kN·m. 이 중 상당 부분은 기둥으로 직접 들어가는 직교 보가 받지만, 보수적으로 전부를 가장자리 보 8 m에 고르게 실으면 \(m = 98/8 = 12.2\) kN·m/m.</li>
+        <li><b>비틀림.</b> 기둥면 \(T_u = m\,l_n/2 = 12.2 \times 3.6 = \) <b>44 kN·m</b>(위험 단면 \(d\)에서는 36.6 kN·m — 여기서는 기둥면 값을 그대로 쓴다). 적합 비틀림이지만 \(\phi T_{cr} = 0.75 \times 65.1 = 48.8\) kN·m \(\gt 44\)이므로 감소할 여지가 없다.</li>
+        <li><b>전단.</b> 보가 받는 하중: 슬래브 절반 폭 \(11.8 \times 4 = 47.2\), 자중 \(1.2 \times 0.4 \times 0.49 \times 24 = 5.6\), 외장(교육용) 2.8 → 55.6 kN/m. 기둥면 \(V_u = 55.6 \times 3.6 = \) <b>200 kN</b>.</li>
+        <li><b>문턱.</b> \(\phi T_{th} = 12.2\) kN·m(직사각형), 15.8 kN·m(L형) \(\lt 44\) → 비틀림 설계 필요.</li>
+        <li><b>단면 성질.</b> 스터럽 중심선 \(x_0 = 400 - 2(40 + 6.35) = 307.3\), \(y_0 = 607.3\) mm → \(A_{oh} = 186{,}600\) mm², \(p_h = 1{,}829\) mm, \(A_0 = 0.85A_{oh} = 158{,}600\) mm².</li>
+        <li><b>단면 한계.</b> \(V_u/(b_wd) = 200{,}000/(400 \times 634) = 0.79\), \(T_up_h/(1.7A_{oh}^2) = 44\times10^6 \times 1{,}829/(1.7 \times 186{,}600^2) = 1.36\) MPa → \(\sqrt{0.79^2 + 1.36^2} = 1.57 \le 0.75(0.913 + 3.651) = 3.42\) MPa ✓(0.46).</li>
+        <li><b>비틀림 스터럽.</b> \(A_t/s = (44/0.75)\times10^6/(2 \times 158{,}600 \times 400 \times 1) = 0.462\) mm²/mm(한 다리).</li>
+        <li><b>전단 스터럽.</b> \(V_c = \tfrac16\sqrt{30} \times 400 \times 634 = 231.5\) kN, \(\phi V_c = 173.6 \lt 200\) → \(V_s = 200/0.75 - 231.5 = 35.2\) kN, \(A_v/s = 35{,}200/(400 \times 634) = 0.139\) mm²/mm(두 다리).</li>
+        <li><b>합치기.</b> \((A_v + 2A_t)/s = 0.139 + 0.925 = 1.063\) mm²/mm ≥ 최소 0.35 ✓. D13 폐쇄 스터럽(두 다리 253.4 mm²) → \(s \le 253.4/1.063 = 238\) mm, \(p_h/8 = 229\) mm, 300 mm → @225도 되지만 여유와 시공 간격을 고려해 <b>D13 @200</b>(1.267 mm²/mm).</li>
+        <li><b>종철근.</b> \(A_l = 0.4623 \times 1{,}829 \times (400/500) = 677\) mm². \(A_{l,min} = 0.42\sqrt{30} \times 280{,}000/500 - 677 = 1{,}288 - 677 \approx 612\) mm² → \(A_l\) = 677 mm². 스터럽 안쪽에 6개(모서리 4 + 옆면 중간 2, 간격 ≤ 300 mm) → 한 개 113 mm² 이상 → D13(126.7 mm², 지름 ≥ 0.042 × 200 = 8.4 mm ✓). 위·아래 모서리의 몫(약 225 mm²씩)은 휨 철근에 더하고 옆면에 2-D13.</li>
+        <li><b>범위.</b> \(T_u \gt \phi T_{th}\)인 구간은 기둥면에서 약 2.6 m까지, 여기에 \(b_t + d = 1.03\) m를 더하면 경간 중앙(3.6 m)에 이른다 → <b>전 경간</b>에 D13 @200 폐쇄 스터럽.</li>
+      </ol></div>
+    <div class="sim" id="sim-to-design">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>비틀림 + 전단 설계기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="to-cv-dg" aria-label="설계된 단면: 폐쇄 스터럽, 종철근 배치, 단면 한계 이용률 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">폭 b<sub>w</sub></i> <output id="to-dg-b-out"></output></span><input type="range" id="to-dg-b" min="250" max="800" step="10" value="400"></label>
+          <label class="ctrl"><span>높이 h <output id="to-dg-h-out"></output></span><input type="range" id="to-dg-h" min="350" max="1200" step="10" value="700"></label>
+          <label class="ctrl"><span><i style="font-style:normal">계수 비틀림 T<sub>u</sub></i> <output id="to-dg-t-out"></output></span><input type="range" id="to-dg-t" min="0" max="200" step="1" value="44"></label>
+          <label class="ctrl"><span><i style="font-style:normal">계수 전단력 V<sub>u</sub></i> <output id="to-dg-v-out"></output></span><input type="range" id="to-dg-v" min="0" max="800" step="5" value="200"></label>
+          <div class="ctrl"><span>스터럽</span><div class="seg" id="to-dg-sb"><button data-value="D10">D10</button><button data-value="D13" class="on">D13</button><button data-value="D16">D16</button></div></div>
+          <div class="ctrl"><span>비틀림 종철근</span><div class="seg" id="to-dg-lb"><button data-value="D13" class="on">D13</button><button data-value="D16">D16</button><button data-value="D19">D19</button><button data-value="D22">D22</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">단면 한계 이용률</span><span class="v" id="to-dg-lim">—</span></div>
+        <div class="stat"><span class="k">(A<sub>v</sub> + 2A<sub>t</sub>)/s</span><span class="v" id="to-dg-av">—</span></div>
+        <div class="stat"><span class="k">폐쇄 스터럽</span><span class="v" id="to-dg-s">—</span></div>
+        <div class="stat"><span class="k">A<sub>l</sub> · 배치</span><span class="v" id="to-dg-al">—</span></div>
+      </div>
+      <ol class="to-calc" id="to-dg-steps"></ol>
+      <div class="sim-note">해볼 것: 기본값은 예제 6.4입니다. 계산 간격은 @225(예제는 여유를 두어 @200), A<sub>l</sub> 677 mm² → 6-D13 · T<sub>u</sub>를 10 kN·m로 낮추면 문턱 아래라 비틀림을 무시하고 전단만 설계합니다 · T<sub>u</sub>를 120 kN·m로 올리면 스터럽이 촘촘해지고, 160 kN·m 근처에서 단면 한계를 넘습니다. 그때 폭을 500 mm로 키워 보세요 · h를 1,000 mm로 키우면 옆면 중간 종철근이 늘어납니다(간격 ≤ 300 mm) · 모델: 원리 6.3–6.6, 피복 40 mm, d = h − 66 mm, θ = 45°, f<sub>y</sub> 500 · f<sub>yt</sub> 400 MPa, f<sub>ck</sub> 30. 스터럽 간격은 25 mm 단위로 내림(하한 50). 종철근 수는 스터럽 안쪽 둘레를 300 mm 이하 간격으로 나눈 값입니다.</div>
+    </div>
+    <div class="callout site"><strong>B-10 가장자리 보: T<sub>u</sub> ≈ 44 kN·m, D13 @200 폐쇄 스터럽 + A<sub>l</sub> 677 mm²</strong> 슬래브 끝 부모멘트(직접 설계법 0.16M₀ = 98 kN·m, 보수적으로 보 전체에 분포)에서 기둥면 \(T_u\) ≈ 44 kN·m, \(V_u\) ≈ 200 kN. 문턱 12.2 kN·m를 넘으므로 비틀림 설계: \(A_t/s\) = 0.462, \(A_v/s\) = 0.139 → D13 폐쇄 스터럽 @200(\(p_h/8\) = 229 mm), \(A_l\) = 677 mm²(모서리 4 + 옆면 2, 위·아래 몫은 휨 철근에 더함), 단면 한계 이용률 0.46. 적합 비틀림이지만 \(T_u \lt \phi T_{cr}\)(48.8)이라 감소하지 않았다. 직교 보가 받는 몫을 빼면 실제 비틀림은 더 작다. 내부 G1(5장)은 양쪽에 슬래브가 있어 양쪽 슬래브 끝 모멘트가 대부분 상쇄되므로(패턴 하중의 불균형 몫은 작다) 비틀림을 무시한다. 교육용 계산이며 실제 설계는 현행 KDS 14 20 22와 해석 모델의 비틀림 강성 가정(균열 강성)을 따른다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="shear.html"><small>CH.05 · 전단과 사인장 균열</small>스터럽 설계와 트러스 모형<br><span>V<sub>c</sub>, V<sub>s</sub> = A<sub>v</sub>f<sub>yt</sub>d/s, 위험 단면 d.</span></a>
+      <a href="development.html"><small>CH.07 · 정착과 이음</small>종철근과 스터럽 갈고리의 정착<br><span>기둥 안 갈고리 정착, 135° 표준 갈고리.</span></a>
+      <a href="slabs.html"><small>CH.09 · 슬래브</small>가장자리 보와 슬래브 끝 모멘트<br><span>직접 설계법 계수, 비틀림 강성 β<sub>t</sub>.</span></a>
+      <a href="walls-detailing.html"><small>CH.12 · 벽체와 내진 상세</small>후프와 135° 갈고리<br><span>구속과 모서리 피복 박리.</span></a>
+      <a href="strut-tie.html"><small>CH.14 · 스트럿–타이 모델</small>코벨·편심 받침<br><span>평형 비틀림을 만드는 받침의 STM.</span></a>
+      <a href="case-study.html"><small>CH.16 · B-10 설계 실습</small>둘레 보 검토 체크리스트<br><span>비틀림 문턱, 폐쇄 스터럽, A<sub>l</sub>.</span></a>
+      <a href="../../mechanics/chapters/transformation.html#torsion"><small>MechanicsBook · CH.10</small>원형 축과 박벽 단면의 비틀림<br><span>τ = Tr/J, 열린 단면 vs 닫힌 단면.</span></a>
+      <a href="../../structure/chapters/modeling.html"><small>StructureBook · CH.14</small>해석 모델의 비틀림 강성<br><span>균열 강성과 적합 비틀림의 재분배.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>비틀림은 가장자리 보, 캔틸레버 차양, 곡선 보, 편심 받침에서 생긴다. 평형에 꼭 필요하면 평형 비틀림(전부 설계), 강성 때문에 생겨 균열로 재분배되면 적합 비틀림(φT<sub>cr</sub>까지 감소 가능, 형태).</li>
+      <li>박벽관: q = T/(2A₀), τ = T/(2A₀t). A₀는 벽 중심선이 둘러싼 넓이. 꽉 찬 단면은 균열 전 t = 0.75A<sub>cp</sub>/p<sub>cp</sub>, A₀ = (2/3)A<sub>cp</sub>, 균열 후 A₀ = 0.85A<sub>oh</sub>.</li>
+      <li>T<sub>cr</sub> = (1/3)λ√f<sub>ck</sub>A<sub>cp</sub>²/p<sub>cp</sub>, T<sub>u</sub> &lt; φT<sub>cr</sub>/4이면 무시. 400 × 700: T<sub>cr</sub> 65.1, 문턱 12.2 kN·m(L형 플랜지 포함 15.8).</li>
+      <li>입체 트러스: A<sub>t</sub>/s = T<sub>n</sub>/(2A₀f<sub>yt</sub>cotθ), A<sub>l</sub> = (A<sub>t</sub>/s)p<sub>h</sub>(f<sub>yt</sub>/f<sub>y</sub>)cot²θ, θ = 30–60°(보통 45°). θ가 작으면 스터럽 ↓ 종철근 ↑.</li>
+      <li>철근이 T<sub>cr</sub>을 넘겨받지 못하면 균열과 함께 파괴된다 → 최소 (A<sub>v</sub> + 2A<sub>t</sub>), A<sub>l,min</sub> = 0.42√f<sub>ck</sub>A<sub>cp</sub>/f<sub>y</sub> − (A<sub>t</sub>/s)p<sub>h</sub>f<sub>yt</sub>/f<sub>y</sub>, s ≤ min(p<sub>h</sub>/8, 300 mm).</li>
+      <li>조합: 두 다리 스터럽에 (A<sub>v</sub> + 2A<sub>t</sub>)/s. 단면 한계 √[(V<sub>u</sub>/b<sub>w</sub>d)² + (T<sub>u</sub>p<sub>h</sub>/1.7A<sub>oh</sub>²)²] ≤ φ(V<sub>c</sub>/b<sub>w</sub>d + (2/3)√f<sub>ck</sub>). 비틀림 응력은 A<sub>oh</sub>²에 반비례하므로 폭을 넉넉히.</li>
+      <li>상세: 135° 갈고리 폐쇄 스터럽, 모서리마다 종철근, 둘레 간격 ≤ 300 mm, 지름 ≥ 0.042s. 스트럿이 꺾이는 모서리의 피복이 먼저 떨어지므로 U형·90° 덮개는 비틀림에 쓰지 않는다.</li>
+      <li>B-10 가장자리 보: T<sub>u</sub> ≈ 44 kN·m, V<sub>u</sub> ≈ 200 kN → D13 @200 폐쇄 스터럽(전 경간), A<sub>l</sub> = 677 mm²(6-D13 배치), 단면 한계 0.46. 모든 수치는 KDS 14 20 22 형태의 교육용 계산.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 벽 중심선이 둘러싼 넓이 A₀ = 150,000 mm², 벽 두께 100 mm인 관에 T = 60 kN·m. 전단응력은?</p><div class="opts">
+        <button class="opt">1.0 MPa</button><button class="opt" data-correct>2.0 MPa</button><button class="opt">4.0 MPa</button><button class="opt">0.4 MPa</button>
+      </div><div class="quiz-exp">q = T/(2A₀) = 60 × 10⁶/(2 × 150,000) = 200 N/mm, τ = q/t = 200/100 = 2.0 MPa.</div></div>
+      <div class="quiz-q"><p>2. 300 × 600 mm, f<sub>ck</sub> = 25 MPa 직사각형 보의 비틀림 무시 한계 φT<sub>th</sub>는(φ = 0.75)?</p><div class="opts">
+        <button class="opt" data-correct>약 5.6 kN·m</button><button class="opt">약 7.5 kN·m</button><button class="opt">약 22.5 kN·m</button><button class="opt">약 30 kN·m</button>
+      </div><div class="quiz-exp">A<sub>cp</sub> = 180,000, p<sub>cp</sub> = 1,800 → A<sub>cp</sub>²/p<sub>cp</sub> = 1.8 × 10⁷ mm³. T<sub>cr</sub> = (1/3) × 5 × 1.8 × 10⁷ = 30 kN·m, φT<sub>th</sub> = 0.75 × 30/4 = 5.6 kN·m.</div></div>
+      <div class="quiz-q"><p>3. 설계 비틀림을 φT<sub>cr</sub>까지 줄여 설계할 수 있는 경우는?</p><div class="opts">
+        <button class="opt">캔틸레버 차양을 받치는 보</button><button class="opt">한쪽에 프리캐스트 보가 얹힌 보</button><button class="opt" data-correct>연속 슬래브의 끝을 받치는 가장자리 보</button><button class="opt">평면이 휜 곡선 보</button>
+      </div><div class="quiz-exp">가장자리 보의 비틀림은 슬래브 끝 회전을 구속해서 생기는 적합 비틀림이다. 보가 균열로 부드러워지면 슬래브가 모멘트를 재분배하므로 줄여 설계할 수 있다(인접 부재는 재분배 내력으로 설계). 나머지는 평형 비틀림이다.</div></div>
+      <div class="quiz-q"><p>4. T<sub>n</sub> = 80 kN·m, A₀ = 160,000 mm², f<sub>yt</sub> = 400 MPa, θ = 45°일 때 A<sub>t</sub>/s는?</p><div class="opts">
+        <button class="opt">0.31 mm²/mm</button><button class="opt" data-correct>0.63 mm²/mm</button><button class="opt">1.25 mm²/mm</button><button class="opt">2.50 mm²/mm</button>
+      </div><div class="quiz-exp">A<sub>t</sub>/s = T<sub>n</sub>/(2A₀f<sub>yt</sub>cotθ) = 80 × 10⁶/(2 × 160,000 × 400 × 1) = 0.625 mm²/mm(한 다리).</div></div>
+      <div class="quiz-q"><p>5. 비틀림 스터럽을 폐쇄형으로 하고 끝을 135° 갈고리로 하는 주된 이유는?</p><div class="opts">
+        <button class="opt">콘크리트 타설을 쉽게 하려고</button><button class="opt" data-correct>비틀림은 네 면 모두에서 스터럽을 당기고, 모서리 피복이 떨어져도 갈고리가 코어에 정착되어 있어야 하므로</button><button class="opt">휨강도를 키우려고</button><button class="opt">철근량을 줄이려고</button>
+      </div><div class="quiz-exp">전단 흐름은 단면 둘레를 돈다. 스터럽이 열려 있으면 위쪽 다리의 인장이 이어지지 않고, 스트럿이 모서리에서 꺾이며 피복을 밀어내면 90° 갈고리는 풀린다.</div></div>
+      <div class="quiz-q"><p>6. 입체 트러스에서 스트럿 각 θ를 45°에서 30°로 바꾸면(같은 T<sub>n</sub>)?</p><div class="opts">
+        <button class="opt">스터럽과 종철근이 모두 준다</button><button class="opt" data-correct>스터럽은 약 0.58배로 줄고 종철근은 약 1.73배로 는다</button><button class="opt">스터럽은 늘고 종철근은 준다</button><button class="opt">변화 없다</button>
+      </div><div class="quiz-exp">A<sub>t</sub>/s ∝ 1/cotθ = tanθ, A<sub>l</sub> ∝ (A<sub>t</sub>/s)cot²θ ∝ cotθ. tan 30° = 0.577, cot 30° = 1.732.</div></div>
+      <div class="quiz-q"><p>7. 두 다리 스터럽으로 A<sub>v</sub>/s = 0.30 mm²/mm(전단), A<sub>t</sub>/s = 0.40 mm²/mm(비틀림)가 필요하다. 스터럽 두 다리 합의 필요량은?</p><div class="opts">
+        <button class="opt">0.70 mm²/mm</button><button class="opt">0.80 mm²/mm</button><button class="opt" data-correct>1.10 mm²/mm</button><button class="opt">1.40 mm²/mm</button>
+      </div><div class="quiz-exp">A<sub>v</sub>는 두 다리 합, A<sub>t</sub>는 한 다리이므로 (A<sub>v</sub> + 2A<sub>t</sub>)/s = 0.30 + 2 × 0.40 = 1.10 mm²/mm. D13 두 다리(253.4 mm²)면 s ≤ 230 mm.</div></div>
+      <div class="quiz-q"><p>8. 비틀림·전단 단면 크기 한계를 넘었을 때 가장 효과적인 조치는?</p><div class="opts">
+        <button class="opt">스터럽 간격을 줄인다</button><button class="opt">종철근을 늘린다</button><button class="opt" data-correct>단면(특히 폭)을 키운다</button><button class="opt">스터럽 강도를 높인다</button>
+      </div><div class="quiz-exp">단면 한계는 스트럿 콘크리트의 압괴를 막는 조건이라 철근으로 해결되지 않는다. 비틀림 응력이 T<sub>u</sub>p<sub>h</sub>/(1.7A<sub>oh</sub>²)로 A<sub>oh</sub>²에 반비례하므로 단면을 키우는 것이 가장 효과적이다(예제 6.3).</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const TO = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${TO.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = TO._c || (TO._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  msg(id, cls, html) { const m = document.getElementById(id); m.className = "to-msg" + (cls ? " " + cls : ""); m.innerHTML = html; },
+  A(bar) { return CB.steel.BARS[bar].A; },
+  db(bar) { return CB.steel.BARS[bar].d; },
+  /** 균열 비틀림 모멘트 (kN·m): Acp mm², pcp mm */
+  Tcr(Acp, pcp, fck = 30, lam = 1) { return ((lam * Math.sqrt(fck)) / 3) * (Acp * Acp) / pcp / 1e6; },
+  /** 직사각형 비틀림 상수 C (mm⁴), ACI 형태 (1 − 0.63x/y)x³y/3 */
+  C(b, h) { const x = Math.min(b, h), y = Math.max(b, h); return ((1 - (0.63 * x) / y) * x ** 3 * y) / 3; },
+  /** 스터럽 중심선 성질: 피복 40, 스터럽 지름 */
+  oh(b, h, sb = "D13", cover = 40) { const c = cover + TO.db(sb) / 2, x0 = b - 2 * c, y0 = h - 2 * c; return { x0, y0, Aoh: x0 * y0, ph: 2 * (x0 + y0), A0: 0.85 * x0 * y0, c }; },
+  PHI: 0.75, FCK: 30, FY: 500, FYT: 400,
+};
+TO.Ec = CB.conc.Ec(TO.FCK); TO.G = TO.Ec / 2.4;
+
+/* ---------- 1. 평형 vs 적합 비틀림 ---------- */
+(function () {
+  const cs = CB.seg("to-cp-case", go), gk = CB.range("to-cp-k", (v) => "× " + v.toFixed(2), go);
+  document.getElementById("to-cp-uncr").addEventListener("click", () => gk.set(1));
+  document.getElementById("to-cp-cr").addEventListener("click", () => gk.set(0.1));
+  const Ls = 8, w = 11.8, EI = TO.Ec * 1e3 * (0.21 ** 3 / 12), ln = 7.2, GC = TO.G * 1e3 * TO.C(400, 700) * 1e-12, cl = 2;
+  const Tcr = TO.Tcr(400 * 700, 2 * 1100), pTcr = TO.PHI * Tcr, pTth = pTcr / 4;
+  let R = null;
+  const kt = (f) => (12 * GC * f) / (ln * ln);
+  function solve(f, kind) {
+    if (kind === "compat") { const B = CB.beam({ L: Ls, EI, supports: [{ x: 0, type: "spring", k: 1e9, kr: kt(f) }, { x: Ls, type: "fixed" }], loads: [{ type: "udl", w, a: 0, b: Ls }] }); return { B, m: Math.abs(B.at(1e-6, 1).M), L: Ls }; }
+    const B = CB.beam({ L: cl, EI, supports: [{ x: 0, type: "spring", k: 1e9, kr: kt(f) }], loads: [{ type: "udl", w, a: 0, b: cl }] });
+    return { B, m: Math.abs(B.at(1e-6, 1).M), L: cl, tip: Math.abs(B.at(cl, -1).v) * 1000 };
+  }
+  function calc() { const k = cs(), cur = solve(gk(), k), ref = solve(1, k), T = (cur.m * ln) / 2; R = { k, cur, ref, T, Tu: k === "compat" ? Math.min(T, Math.max(pTcr, 0)) : T }; }
+  const cm = CB.canvas("#to-cv-cp-m", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), L = R.cur.L, a = R.cur.B.sample(160).map((p) => [p.x, p.M]), b = R.ref.B.sample(160).map((p) => [p.x, p.M]);
+    const ys = [...a, ...b].map((p) => p[1]), lo = Math.min(...ys) * 1.15, hi = Math.max(0, ...ys) * 1.15 + 5;
+    CB.chart(ctx, { x: 54, y: 26, w: W - 54 - 16, h: H - 26 - 44 }, { x: [0, L], y: [lo, hi], xLabel: R.k === "compat" ? "가장자리 보에서 거리 (m)" : "차양 길이 방향 (m)", yLabel: "m", yFmt: (v) => CB.num(v, 0),
+      series: [{ data: b, color: pal.faint, width: 1.6, dash: [6, 4] }, { data: a, color: pal.accent, width: 2.6 }], hlines: [{ y: 0, color: pal.axis, dash: [] }],
+      points: [{ x: 0, y: -R.cur.m, color: pal.accent2, r: 5 }] });
+    TO.text(ctx, "실선: 현재 강성 · 점선: 균열 전", W - 18, 34, pal.dim, { size: 10.5, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.34), minHeight: 190, maxHeight: 250 });
+  const ct = CB.canvas("#to-cv-cp-t", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), T = R.T, top = Math.max(T, pTcr) * 1.2, d = [[0, T], [ln, -T]];
+    CB.chart(ctx, { x: 54, y: 26, w: W - 54 - 16, h: H - 26 - 44 }, { x: [0, ln], y: [-top, top], xLabel: "가장자리 보 기둥면에서 거리 (m)", yLabel: "T", yFmt: (v) => CB.num(v, 0),
+      series: [{ data: d, color: pal.accent2, width: 2.6 }, R.k === "compat" && T > pTcr ? { data: [[0, pTcr], [ln, -pTcr]], color: pal.accent2, width: 1.4, dash: [6, 4] } : { data: [] }],
+      hlines: [{ y: pTcr, color: pal.warn, label: "φTcr" }, { y: -pTcr, color: pal.warn }, { y: pTth, color: pal.faint }, { y: -pTth, color: pal.faint }] });
+  }, { aspect: (W) => (W < 520 ? 0.55 : 0.3), minHeight: 170, maxHeight: 230 });
+  function go() {
+    calc(); cm.redraw(); ct.redraw();
+    CB.stat("to-cp-m", `${CB.num(R.cur.m, 1)} kN·m/m`); CB.stat("to-cp-T", `${CB.num(R.T, 1)} kN·m`);
+    CB.stat("to-cp-r", CB.num(R.T / pTcr, 2)); CB.stat("to-cp-tu", `${CB.num(R.Tu, 1)} kN·m`);
+    if (R.k === "compat") {
+      const cracked = R.T > Tcr;
+      TO.msg("to-cp-msg", cracked ? "bad" : "", cracked ? `이 강성이면 T = ${CB.num(R.T, 0)} kN·m &gt; T<sub>cr</sub> = ${CB.num(Tcr, 1)} kN·m: 보에 나선 균열이 생겨 비틀림 강성이 크게 떨어집니다. 실제로는 이 비틀림까지 가지 못하고 슬래브가 모멘트를 재분배합니다. "균열 후(0.1)"를 눌러 보세요.` : `T = ${CB.num(R.T, 1)} kN·m ≤ T<sub>cr</sub>: 균열 후 강성과 맞는 상태입니다. 슬래브 끝 모멘트 ${CB.num(R.cur.m, 1)} kN·m/m(균열 전 ${CB.num(R.ref.m, 1)}), 줄어든 몫은 경간·내부 지점으로 옮겨 갔습니다. 적합 비틀림이므로 설계 T<sub>u</sub>는 min(T, φT<sub>cr</sub>) = ${CB.num(R.Tu, 1)} kN·m.`);
+    } else {
+      TO.msg("to-cp-msg", R.T > pTcr ? "bad" : "", `평형 비틀림: 차양 모멘트 m = w c²/2 = ${CB.num(R.cur.m, 1)} kN·m/m는 강성과 무관합니다. 기둥면 T = ${CB.num(R.T, 1)} kN·m를 <b>모두</b> 설계해야 하며, 강성이 줄면 차양 끝 처짐만 ${CB.num(R.ref.tip, 1)} → ${CB.num(R.cur.tip, 1)} mm로 커집니다.`);
+    }
+  }
+  go();
+})();
+
+/* ---------- 2. 박벽관 전단 흐름 ---------- */
+(function () {
+  const shape = CB.seg("to-tb-shape", go), gb = CB.range("to-tb-b", (v) => v + " mm", go), gh = CB.range("to-tb-h", (v) => v + " mm", go), gt = CB.range("to-tb-t", (v) => v + " mm", go), gT = CB.range("to-tb-T", (v) => v + " kN·m", go);
+  let S = null, ph = 0;
+  function calc() {
+    const b = gb(), h = gh(), T = gT(), sh = shape();
+    let t, x0, y0, A0, off;
+    if (sh === "solid") { t = (0.75 * b * h) / (2 * (b + h)); x0 = b - t; y0 = h - t; A0 = x0 * y0; off = t / 2; }
+    else if (sh === "box") { t = Math.min(gt(), b / 2 - 20, h / 2 - 20); x0 = b - t; y0 = h - t; A0 = x0 * y0; off = t / 2; }
+    else { const o = TO.oh(b, h); x0 = o.x0; y0 = o.y0; A0 = o.A0; t = o.Aoh / o.ph; off = o.c; }
+    const q = (T * 1e6) / (2 * A0), tau = q / t, x = Math.min(b, h), y = Math.max(b, h), tauE = (T * 1e6 * (3 + (1.8 * x) / y)) / (x * x * y);
+    S = { b, h, T, sh, t, x0, y0, A0, off, q, tau, tauE, V1: (q * y0) / 1000, V2: (q * x0) / 1000 };
+  }
+  const cv = CB.canvas("#to-cv-tube", (ctx, W, H) => {
+    if (!S) return;
+    const pal = CB.palette(), narrow = W < 520, sc = Math.min((narrow ? W - 60 : W * 0.55) / S.b, (H - 70) / S.h), bw = S.b * sc, bh = S.h * sc, x0 = narrow ? (W - bw) / 2 : W * 0.3 - bw / 2, y0 = (H - bh) / 2;
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(x0, y0, bw, bh); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.2; ctx.strokeRect(x0, y0, bw, bh);
+    const tp = S.t * sc;
+    if (S.sh === "box") { ctx.fillStyle = pal.bg; ctx.fillRect(x0 + tp, y0 + tp, bw - 2 * tp, bh - 2 * tp); ctx.strokeRect(x0 + tp, y0 + tp, bw - 2 * tp, bh - 2 * tp); }
+    if (S.sh !== "crk") { ctx.save(); ctx.fillStyle = TO.alpha(pal.accent, 0.16); ctx.beginPath(); ctx.rect(x0, y0, bw, bh); ctx.rect(x0 + tp, y0 + tp, bw - 2 * tp, bh - 2 * tp); ctx.fill("evenodd"); ctx.restore(); }
+    else { const o = S.off * sc; ctx.strokeStyle = pal.accent; ctx.lineWidth = 3; ctx.strokeRect(x0 + o, y0 + o, bw - 2 * o, bh - 2 * o); ctx.fillStyle = TO.alpha(pal.accent, 0.1); ctx.fillRect(x0 + o, y0 + o, bw - 2 * o, bh - 2 * o); [[o, o], [bw - o, o], [o, bh - o], [bw - o, bh - o]].forEach(([a, c]) => { ctx.fillStyle = pal.tension; ctx.beginPath(); ctx.arc(x0 + a + (a < bw / 2 ? 8 : -8), y0 + c + (c < bh / 2 ? 8 : -8), 5, 0, 2 * Math.PI); ctx.fill(); }); }
+    const o = S.sh === "crk" ? S.off * sc : (S.t / 2) * sc, cx0 = x0 + o, cy0 = y0 + o, cw = bw - 2 * o, chh = bh - 2 * o, P = 2 * (cw + chh);
+    TO.line(ctx, [[cx0, cy0], [cx0 + cw, cy0], [cx0 + cw, cy0 + chh], [cx0, cy0 + chh], [cx0, cy0]], pal.accent, 1.4, [6, 4]);
+    const at = (u) => { u = ((u % P) + P) % P; if (u < chh) return [cx0 + cw, cy0 + chh - u, 0, -1]; u -= chh; if (u < cw) return [cx0 + cw - u, cy0, -1, 0]; u -= cw; if (u < chh) return [cx0, cy0 + u, 0, 1]; u -= chh; return [cx0 + u, cy0 + chh, 1, 0]; };
+    const n = Math.max(8, Math.round(P / 42)), len = Math.min(18, P / n * 0.55);
+    if (S.T > 0) for (let i = 0; i < n; i++) { const [x, y, dx, dy] = at((i / n) * P + ph * P); TO.arrow(ctx, x - dx * len / 2, y - dy * len / 2, x + dx * len / 2, y + dy * len / 2, pal.accent2, 2, 6); }
+    TO.text(ctx, "A₀", x0 + bw / 2, y0 + bh / 2, pal.accent, { size: 13 });
+    const tx = narrow ? W / 2 : W * 0.62, ty = narrow ? y0 + bh + 18 : H * 0.3, al = narrow ? "center" : "left";
+    if (!narrow) {
+      TO.text(ctx, `V₁ = q·y₀ = ${CB.num(S.V1, 1)} kN`, tx, ty, pal.accent2, { size: 11.5, align: al });
+      TO.text(ctx, `V₂ = q·x₀ = ${CB.num(S.V2, 1)} kN`, tx, ty + 22, pal.accent2, { size: 11.5, align: al });
+      TO.text(ctx, `x₀ × y₀ = ${CB.num(S.x0, 0)} × ${CB.num(S.y0, 0)} mm`, tx, ty + 50, pal.dim, { size: 11, align: al, bold: false });
+      TO.text(ctx, S.sh === "solid" ? "등가관 t = 0.75Acp/pcp" : S.sh === "box" ? "중공 상자 벽" : "A₀ = 0.85Aoh (스터럽 중심선)", tx, ty + 72, pal.dim, { size: 11, align: al, bold: false });
+    }
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.5), minHeight: 260, maxHeight: 380 });
+  CB.loop(document.getElementById("sim-to-tube"), (dt) => { ph = (ph + dt * 0.04 * Math.min(2, 0.3 + gT() / 50)) % 1; cv.redraw(); });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("to-tb-a0", `${CB.sig(S.A0, 4)} mm² · ${CB.num(S.t, 1)} mm`); CB.stat("to-tb-q", `${CB.num(S.q, 1)} N/mm`);
+    CB.stat("to-tb-tau", `${CB.num(S.tau, 2)} MPa`); CB.stat("to-tb-v", `${CB.num(S.V1, 1)} · ${CB.num(S.V2, 1)} kN`);
+    const fct = (Math.sqrt(TO.FCK)) / 3;
+    TO.msg("to-tb-msg", S.sh !== "crk" && S.tau > fct ? "bad" : "", S.sh === "crk" ? `균열 후 등가관: A₀ = 0.85A<sub>oh</sub>, t = A<sub>oh</sub>/p<sub>h</sub> = ${CB.num(S.t, 0)} mm. τ = ${CB.num(S.tau, 2)} MPa는 원리 6.6의 비틀림 응력 T<sub>u</sub>p<sub>h</sub>/(1.7A<sub>oh</sub>²)와 같은 값입니다.` : `τ = ${CB.num(S.tau, 2)} MPa ${S.tau > fct ? "&gt;" : "≤"} 균열 기준 (1/3)√f<sub>ck</sub> = ${CB.num(fct, 2)} MPa${S.sh === "solid" ? ` · 탄성 근사 τ<sub>max</sub> = ${CB.num(S.tauE, 2)} MPa` : ""}. ${S.tau > fct ? "나선 균열이 생깁니다." : "균열 전입니다."}`);
+  }
+  go();
+})();
+
+/* ---------- 3. 균열 비틀림과 문턱 ---------- */
+(function () {
+  const gb = CB.range("to-tc-b", (v) => v + " mm", go), gh = CB.range("to-tc-h", (v) => v + " mm", go), fl = CB.seg("to-tc-fl", go), ghf = CB.range("to-tc-hf", (v) => v + " mm", go), gf = CB.range("to-tc-f", (v) => v + " MPa", go), gtu = CB.range("to-tc-tu", (v) => v + " kN·m", go);
+  let S = null;
+  function calc() {
+    const b = gb(), h = gh(), n = +fl(), hf = Math.min(ghf(), h - 50), o = Math.max(0, Math.min(h - hf, 4 * hf)), fck = gf();
+    const A1 = b * h, p1 = 2 * (b + h), A2 = A1 + n * o * hf, p2 = p1 + 2 * n * o, r1 = (A1 * A1) / p1, r2 = (A2 * A2) / p2, use = n > 0 && r2 > r1;
+    const Acp = use ? A2 : A1, pcp = use ? p2 : p1, Tcr = TO.Tcr(Acp, pcp, fck), th = (TO.PHI * Tcr) / 4;
+    S = { b, h, n, hf, o, use, Acp, pcp, Tcr, th, pTcr: TO.PHI * Tcr, Tu: gtu(), dropped: n > 0 && !use };
+  }
+  const cs = CB.canvas("#to-cv-tcr-s", (ctx, W, H) => {
+    if (!S) return;
+    const pal = CB.palette(), totW = S.b + 2 * S.o, sc = Math.min((W - 40) / Math.max(totW, S.b), (H - 30) / S.h), cx = W / 2, yt = 14;
+    const X = (x) => cx + x * sc, Y = (y) => yt + y * sc;
+    const fc = S.use ? TO.alpha(pal.accent, 0.25) : TO.alpha(pal.faint, 0.15);
+    if (S.n >= 1) { ctx.fillStyle = fc; ctx.fillRect(X(S.b / 2), Y(0), S.o * sc, S.hf * sc); ctx.strokeStyle = S.use ? pal.accent : pal.faint; ctx.setLineDash(S.use ? [] : [4, 3]); ctx.strokeRect(X(S.b / 2), Y(0), S.o * sc, S.hf * sc); ctx.setLineDash([]); }
+    if (S.n === 2) { ctx.fillStyle = fc; ctx.fillRect(X(-S.b / 2 - S.o), Y(0), S.o * sc, S.hf * sc); ctx.strokeStyle = S.use ? pal.accent : pal.faint; ctx.setLineDash(S.use ? [] : [4, 3]); ctx.strokeRect(X(-S.b / 2 - S.o), Y(0), S.o * sc, S.hf * sc); ctx.setLineDash([]); }
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(X(-S.b / 2), Y(0), S.b * sc, S.h * sc); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.2; ctx.strokeRect(X(-S.b / 2), Y(0), S.b * sc, S.h * sc);
+    const t = (0.75 * S.Acp) / S.pcp, tp = t * sc;
+    ctx.save(); ctx.fillStyle = TO.alpha(pal.accent2, 0.18); ctx.beginPath(); ctx.rect(X(-S.b / 2), Y(0), S.b * sc, S.h * sc); ctx.rect(X(-S.b / 2) + tp, Y(0) + tp, S.b * sc - 2 * tp, S.h * sc - 2 * tp); ctx.fill("evenodd"); ctx.restore();
+    if (S.n > 0) TO.text(ctx, S.use ? `플랜지 포함(내민 ${CB.num(S.o, 0)} mm)` : "플랜지 제외(A²/p 감소)", X(S.b / 2) + 6, Y(S.hf) + 14, S.use ? pal.accent : pal.dim, { size: 10.5, align: "left", bold: false });
+    TO.text(ctx, `등가관 t = ${CB.num(t, 0)} mm`, X(0), Y(S.h / 2), pal.accent2, { size: 10.5 });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.36), minHeight: 190, maxHeight: 260 });
+  const cbv = CB.canvas("#to-cv-tcr-b", (ctx, W, H) => {
+    if (!S) return;
+    const pal = CB.palette(), rows = [["φT_th", S.th, pal.warn], ["φT_cr", S.pTcr, pal.accent], ["T_u", S.Tu, S.Tu > S.th ? pal.bad : pal.ok]], top = Math.max(S.pTcr, S.Tu, 1) * 1.15, x0 = 70, x1 = W - 70, rh = (H - 20) / 3;
+    rows.forEach(([k, v, c], i) => { const y = 10 + i * rh, wv = ((x1 - x0) * v) / top; ctx.fillStyle = TO.alpha(c, 0.75); ctx.fillRect(x0, y + rh * 0.2, wv, rh * 0.6); TO.text(ctx, k.replace("_", ""), x0 - 8, y + rh / 2, c, { size: 11, align: "right" }); TO.text(ctx, `${CB.num(v, 1)} kN·m`, x0 + wv + 6, y + rh / 2, pal.text, { size: 11, align: "left" }); });
+  }, { aspect: (W) => (W < 520 ? 0.35 : 0.18), minHeight: 100, maxHeight: 130 });
+  function go() {
+    calc(); cs.redraw(); cbv.redraw();
+    CB.stat("to-tc-a", `${CB.sig(S.Acp, 4)} mm² · ${CB.sig(S.pcp, 4)} mm`); CB.stat("to-tc-tcr", `${CB.num(S.Tcr, 1)} kN·m`); CB.stat("to-tc-th", `${CB.num(S.th, 1)} kN·m`);
+    const ign = S.Tu <= S.th;
+    CB.stat("to-tc-j", ign ? "비틀림 무시" : "비틀림 설계");
+    TO.msg("to-tc-msg", ign ? "ok" : "bad", ign ? `T<sub>u</sub> = ${S.Tu} kN·m ≤ φT<sub>th</sub> = ${CB.num(S.th, 1)} kN·m: 비틀림을 무시하고 휨·전단만 설계합니다.` : `T<sub>u</sub> = ${S.Tu} kN·m &gt; φT<sub>th</sub>: 폐쇄 스터럽과 종철근으로 비틀림을 설계합니다(원리 6.4–6.6).${S.Tu > S.pTcr ? ` 적합 비틀림이라면 설계 비틀림을 φT<sub>cr</sub> = ${CB.num(S.pTcr, 1)} kN·m까지 낮출 수 있습니다(형태).` : ""}${S.dropped ? " 플랜지를 넣으면 A<sub>cp</sub>²/p<sub>cp</sub>가 줄어 제외했습니다." : ""}`);
+  }
+  go();
+})();
+
+/* ---------- 4. 입체 트러스 θ ---------- */
+(function () {
+  const gth = CB.range("to-st-th", (v) => v.toFixed(1) + "°", go), gtn = CB.range("to-st-tn", (v) => v + " kN·m", go), gfy = CB.seg("to-st-fy", go);
+  const O = TO.oh(400, 700), A0 = O.A0, ph = O.ph, rad = Math.PI / 180;
+  let S = null;
+  const amt = (th, Tn, fyt, fy) => { const ct = 1 / Math.tan(th), at = (Tn * 1e6) / (2 * A0 * fyt * ct), al = at * ph * (fyt / fy) * ct * ct; return { at, al, vs: at * ph, vl: al, tot: at * ph + al }; };
+  function calc() { const [fyt, fy] = gfy().split("/").map(Number), th = gth() * rad, Tn = gtn(); const a = amt(th, Tn, fyt, fy), b = amt(45 * rad, Tn, fyt, fy); S = { fyt, fy, th, Tn, a, b, s: TO.A("D13") / a.at }; }
+  const wv = CB.canvas("#to-cv-st-w", (ctx, W, H) => {
+    if (!S) return;
+    const pal = CB.palette(), len = 1800, ht = O.y0, sc = Math.min((W - 40) / len, (H - 40) / ht), x0 = (W - len * sc) / 2, y0 = (H - ht * sc) / 2, X = (x) => x0 + x * sc, Y = (y) => y0 + (ht - y) * sc;
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(X(0), Y(ht), len * sc, ht * sc); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1; ctx.strokeRect(X(0), Y(ht), len * sc, ht * sc);
+    ctx.save(); ctx.beginPath(); ctx.rect(X(0), Y(ht), len * sc, ht * sc); ctx.clip();
+    const ct = 1 / Math.tan(S.th), sp = 160;
+    for (let x = -ht * ct; x < len; x += sp) TO.line(ctx, [[X(x), Y(0)], [X(x + ht * ct), Y(ht)]], TO.alpha(pal.compression, 0.7), 2, [8, 4]);
+    for (let x = S.s / 2; x < len; x += S.s) TO.line(ctx, [[X(x), Y(0)], [X(x), Y(ht)]], pal.accent, 1.8);
+    ctx.restore();
+    const lw = 2 + 8 * Math.min(1, S.a.al / 2500);
+    TO.line(ctx, [[X(0), Y(0)], [X(len), Y(0)]], pal.tension, lw); TO.line(ctx, [[X(0), Y(ht)], [X(len), Y(ht)]], pal.tension, lw);
+    TO.text(ctx, `θ = ${CB.num(gth(), 1)}° · 스터럽 @${CB.num(S.s, 0)} mm · A_l ${CB.num(S.a.al, 0)} mm²`, W / 2, 12, pal.dim, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.5 : 0.3), minHeight: 150, maxHeight: 220 });
+  const cc = CB.canvas("#to-cv-st-c", (ctx, W, H) => {
+    if (!S) return;
+    const pal = CB.palette(), a = [], b = [], c = [];
+    for (let t = 25; t <= 65.001; t += 0.5) { const r = amt(t * rad, S.Tn, S.fyt, S.fy); a.push([t, r.vs]); b.push([t, r.vl]); c.push([t, r.tot]); }
+    const top = Math.max(...c.map((p) => p[1])) * 1.1;
+    CB.chart(ctx, { x: 58, y: 26, w: W - 58 - 16, h: H - 26 - 44 }, { x: [25, 65], y: [0, top], xLabel: "스트럿 각 θ (°)", yLabel: "mm³/mm", yFmt: (v) => CB.sig(Math.round(v), 4).replace(/\.0+$/, ""),
+      bands: [{ x0: 25, x1: 30, color: TO.alpha(pal.bad, 0.1) }, { x0: 60, x1: 65, color: TO.alpha(pal.bad, 0.1) }],
+      series: [{ data: a, color: pal.accent, width: 2.2 }, { data: b, color: pal.tension, width: 2.2 }, { data: c, color: pal.text, width: 2.6, dash: [6, 3] }],
+      vlines: [{ x: 45, color: pal.faint, label: "45°" }], points: [{ x: gth(), y: S.a.tot, color: pal.accent2, r: 6 }] });
+    TO.text(ctx, "스터럽(청회) · 종철근(파랑) · 합(점선)", W - 18, 34, pal.dim, { size: 10.5, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.34), minHeight: 190, maxHeight: 260 });
+  function go() {
+    calc(); wv.redraw(); cc.redraw();
+    CB.stat("to-st-at", `${CB.num(S.a.at, 3)} mm²/mm <small>(45°: ${CB.num(S.b.at, 3)})</small>`);
+    CB.stat("to-st-al", `${CB.sig(S.a.al, 3)} mm² <small>(45°: ${CB.sig(S.b.al, 3)})</small>`);
+    CB.stat("to-st-s", `@${CB.num(S.s, 0)} mm`);
+    CB.stat("to-st-v", `× ${CB.num(S.a.tot / S.b.tot, 3)}`);
+    const opt = Math.atan(Math.sqrt(S.fyt / S.fy)) / rad, d = gth(), bad = d < 30 || d > 60;
+    TO.msg("to-st-msg", bad ? "bad" : "", bad ? `θ = ${CB.num(d, 1)}°는 허용 범위(30–60°) 밖입니다. 균열이 넓어지고 스트럿 압괴 위험이 커집니다.` : `철근 총량이 가장 적은 각은 tan²θ = f<sub>yt</sub>/f<sub>y</sub> → ${CB.num(opt, 1)}°. 지금 각에서 스터럽 체적 ${CB.sig(S.a.vs, 3)}, 종철근 ${CB.sig(S.a.vl, 3)} mm³/mm. 기준은 단순하게 45°를 쓸 수 있게 합니다.`);
+  }
+  go();
+})();
+
+/* ---------- 5. 비틀림 모멘트–비틀림각 ---------- */
+(function () {
+  const gs = CB.range("to-tt-s", (v) => v + " mm", go), gal = CB.range("to-tt-al", (v) => CB.sig(v, 4).replace(/\.0+$/, "") + " mm²", go), ty = CB.seg("to-tt-type", go);
+  document.getElementById("to-tt-min").addEventListener("click", () => { gs.set(450, false); gal.set(300, false); go(); });
+  document.getElementById("to-tt-b10").addEventListener("click", () => { gs.set(200, false); gal.set(760, false); go(); });
+  const b = 400, h = 700, O = TO.oh(b, h), At = TO.A("D13"), Es = CB.rc.Es, GC = (TO.G * TO.C(b, h)) / 1e9, Tcr = TO.Tcr(b * h, 2 * (b + h));
+  let S = null;
+  function calc() {
+    const s = gs(), Al = gal(), qt = (At * TO.FYT) / s, ql = (Al * TO.FY) / O.ph, TnL = (2 * O.A0 * Math.sqrt(qt * ql)) / 1e6, th = Math.atan(Math.sqrt(qt / ql)), Tc = (2 * O.A0 * Math.min(qt, ql)) / 1e6;
+    const Kcr = (4 * Es * O.A0 ** 2) / (O.ph * (s / At + O.ph / Al)) / 1e9, pcr = Tcr / GC, pts = [[0, 0], [pcr, Tcr]], open = ty() === "open";
+    if (TnL > Tcr) {
+      const p2 = Tcr / Kcr; pts.push([p2, Tcr]);
+      if (open) { const Tp = Math.max(Tcr * 1.02, 0.7 * TnL); pts.push([Tp / Kcr, Tp], [(Tp / Kcr) * 1.12, 0.25 * Tcr]); }
+      else { pts.push([TnL / Kcr, TnL], [(TnL / Kcr) * 3, TnL]); }
+    } else { const pe = Math.max(pcr * 1.3, TnL / Kcr); pts.push([pcr * 1.04, TnL], [pe, TnL], [pe * 1.15, 0.15 * TnL]); }
+    S = { s, Al, TnL, th, Tc, Kcr, pcr, pts, open, ratio: Kcr / GC };
+  }
+  const cv = CB.canvas("#to-cv-tt", (ctx, W, H) => {
+    if (!S) return;
+    const pal = CB.palette(), d = S.pts.map(([p, t]) => [p * 1000, t]), xm = Math.max(...d.map((p) => p[0])) * 1.08, ym = Math.max(Tcr, S.TnL) * 1.25;
+    CB.chart(ctx, { x: 58, y: 18, w: W - 58 - 16, h: H - 18 - 46 }, { x: [0, xm], y: [0, ym], xLabel: "단위 길이당 비틀림각 ψ (mrad/m)", yLabel: "T (kN·m)", yFmt: (v) => CB.num(v, 0), xFmt: (v) => CB.sig(Math.round(v), 3),
+      series: [{ data: d, color: S.open ? pal.bad : pal.accent, width: 2.8 }], hlines: [{ y: Tcr, color: pal.warn, label: "Tcr" }, { y: S.TnL, color: pal.ok, label: "Tn" }, { y: 44, color: pal.accent2, label: "Tu (B-10)" }] });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 250, maxHeight: 340 });
+  function go() {
+    calc(); cv.redraw();
+    CB.stat("to-tt-tcr", `${CB.num(Tcr, 1)} kN·m`); CB.stat("to-tt-tn", `${CB.num(S.TnL, 1)} kN·m · ${CB.num((S.th * 180) / Math.PI, 1)}°`);
+    CB.stat("to-tt-tc", `${CB.num(S.Tc, 1)} kN·m`); CB.stat("to-tt-k", `${CB.num(S.ratio * 100, 1)} %`);
+    const thd = (S.th * 180) / Math.PI;
+    let cls = "ok", m;
+    if (S.TnL <= Tcr) { cls = "bad"; m = `T<sub>n</sub> = ${CB.num(S.TnL, 1)} &lt; T<sub>cr</sub> = ${CB.num(Tcr, 1)} kN·m: 균열이 생기는 순간 철근이 콘크리트의 몫을 넘겨받지 못해 비틀림이 떨어집니다(취성). 최소 비틀림 철근 규정(원리 6.5)이 막으려는 상황입니다.`; }
+    else if (S.open) { cls = "bad"; m = `U형 + 90° 덮개: 균열 뒤 피복이 떨어지면 덮개 끝이 풀려 둘레 인장이 끊깁니다(교육용 가정: 0.7T<sub>n</sub>에서 박리). 계산상 T<sub>n</sub>을 낼 수 없습니다.`; }
+    else { cls = thd < 30 || thd > 60 ? "" : "ok"; m = `균열 뒤 강성이 균열 전의 ${CB.num(S.ratio * 100, 1)} %로 떨어지고 T<sub>n</sub> = ${CB.num(S.TnL, 1)} kN·m(θ = ${CB.num(thd, 1)}°)까지 버틴 뒤 철근이 항복합니다.${thd < 30 || thd > 60 ? " θ가 30–60° 밖이므로 기준식(45°)을 따르면 약한 쪽 철근이 강도를 정합니다." : ""} φT<sub>n</sub>(45°) = ${CB.num(0.75 * S.Tc, 1)} kN·m ${0.75 * S.Tc >= 44 ? "≥" : "&lt;"} T<sub>u</sub> 44.`; }
+    TO.msg("to-tt-msg", cls, m);
+  }
+  go();
+})();
+
+/* ---------- 6. 폐쇄 스터럽 상세 3D ---------- */
+(function () {
+  const ty = CB.seg("to-3d-type", go), gs = CB.range("to-3d-s", (v) => v + " mm", go), cr = CB.seg("to-3d-crk", go), sp = CB.seg("to-3d-sp", go);
+  const L = 3, B = 0.4, Hh = 0.7, c = 0.04 + 0.00635, yb = B / 2 - c, zb0 = c, zb1 = Hh - c, lo = 0.04 + 0.0127 + 0.0064;
+  const bars = [[-(B / 2 - lo), lo], [B / 2 - lo, lo], [-(B / 2 - lo), Hh - lo], [B / 2 - lo, Hh - lo], [-(B / 2 - lo), Hh / 2], [B / 2 - lo, Hh / 2]];
+  const V3 = CB.orbit("#to-cv-3d", { yaw: -0.85, pitch: 0.38, dist: 4.4, target: [L / 2, 0, Hh / 2], aspect: 0.6, minHeight: 260, maxHeight: 440, spin: 0.12, draw(V) {
+    const P = V.P, s = gs() / 1000, open = ty() === "open", spall = sp() === "on";
+    const faces = [
+      [[0, -B / 2, 0], [L, -B / 2, 0], [L, -B / 2, Hh], [0, -B / 2, Hh]], [[0, B / 2, 0], [L, B / 2, 0], [L, B / 2, Hh], [0, B / 2, Hh]],
+      [[0, -B / 2, Hh], [L, -B / 2, Hh], [L, B / 2, Hh], [0, B / 2, Hh]], [[0, -B / 2, 0], [L, -B / 2, 0], [L, B / 2, 0], [0, B / 2, 0]],
+      [[0, -B / 2, 0], [0, B / 2, 0], [0, B / 2, Hh], [0, -B / 2, Hh]], [[L, -B / 2, 0], [L, B / 2, 0], [L, B / 2, Hh], [L, -B / 2, Hh]],
+    ].sort((a, b) => V.depth(b) - V.depth(a));
+    faces.forEach((f) => V.poly3(f, { fill: CB.color("surface-2"), fillAlpha: 0.22, color: P.faint, width: 1 }));
+    bars.forEach(([y, z]) => V.line3([0.02, y, z], [L - 0.02, y, z], { color: P.tension, width: 3.2 }));
+    for (let x = 0.05; x <= L - 0.02; x += s) {
+      const k = Math.round((x - 0.05) / s) % 2 === 0 ? -1 : 1, st = { color: P.accent, width: 2 };
+      if (!open) {
+        V.line3([x, -yb, zb0], [x, yb, zb0], st); V.line3([x, yb, zb0], [x, yb, zb1], st); V.line3([x, yb, zb1], [x, -yb, zb1], st); V.line3([x, -yb, zb1], [x, -yb, zb0], st);
+        const cy = k * yb; V.line3([x, cy, zb1], [x + 0.004, cy - k * 0.07, zb1 - 0.07], { color: P.accent, width: 2.2 }); V.line3([x + 0.008, cy, zb1], [x + 0.012, cy - k * 0.07, zb1 - 0.07], { color: P.accent, width: 2.2 });
+      } else {
+        V.line3([x, -yb, zb1], [x, -yb, zb0], st); V.line3([x, -yb, zb0], [x, yb, zb0], st); V.line3([x, yb, zb0], [x, yb, zb1], st);
+        const pop = spall ? 0.05 : 0, col = spall ? P.bad : P.accent;
+        V.line3([x, -yb - 0.02 - pop, zb1 + pop * 0.6], [x, yb + 0.02 + pop, zb1 + pop * 0.6], { color: col, width: 2 });
+        V.line3([x, -yb - 0.02 - pop, zb1 + pop * 0.6], [x, -yb - 0.02 - pop * 1.6, zb1 - 0.05 + pop], { color: col, width: 2 });
+        V.line3([x, yb + 0.02 + pop, zb1 + pop * 0.6], [x, yb + 0.02 + pop * 1.6, zb1 - 0.05 + pop], { color: col, width: 2 });
+      }
+    }
+    if (spall) [[-1, 1], [1, 1]].forEach(([sy]) => V.poly3([[0, sy * B / 2, Hh], [L, sy * B / 2, Hh], [L, sy * (B / 2 - 0.07), Hh], [0, sy * (B / 2 - 0.07), Hh]], { fill: P.bad, fillAlpha: 0.3, color: P.bad, width: 1 }));
+    if (cr() === "on") {
+      const seg = [[0, [-B / 2, 0], [-B / 2, Hh]], [Hh, [-B / 2, Hh], [B / 2, Hh]], [B, [B / 2, Hh], [B / 2, 0]], [Hh, [B / 2, 0], [-B / 2, 0]]];
+      [0.15, 1.25].forEach((x0) => {
+        let x = x0;
+        seg.forEach(([_, a, b], i) => { const dl = i % 2 === 0 ? Hh : B, xa = x, xb = x + dl; const A = [xa, a[0], a[1]], Bq = [xb, b[0], b[1]]; if (xa < L) { const tcl = Math.min(1, (L - xa) / dl); V.line3(A, [xa + dl * tcl, a[0] + (b[0] - a[0]) * tcl, a[1] + (b[1] - a[1]) * tcl], { color: P.text, width: 2 }); } x = xb; });
+      });
+    }
+    V.text3("폐쇄 스터럽 + 모서리 종철근", [L / 2, 0, Hh + 0.42], { color: P.dim, size: 11 });
+  } });
+  function go() {
+    V3.redraw();
+    const s = gs(), n = Math.floor((3000 - 50) / s) + 1, phv = TO.oh(400, 700).ph / 8, open = ty() === "open";
+    CB.stat("to-3d-n", `${n}개`); CB.stat("to-3d-sm", `${s} ${s <= phv ? "≤" : "&gt;"} ${CB.num(phv, 0)} mm ${s <= phv ? "✓" : "✗"}`);
+    CB.stat("to-3d-l", "6-D13(모서리 4 + 옆면 2)"); CB.stat("to-3d-ok", open ? (sp() === "on" ? "✗ 풀림" : "✗ 기준 불허") : "✓ 폐쇄형");
+  }
+  go();
+})();
+
+/* ---------- 7. 비틀림 + 전단 설계기 ---------- */
+(function () {
+  const gb = CB.range("to-dg-b", (v) => v + " mm", go), gh = CB.range("to-dg-h", (v) => v + " mm", go), gt = CB.range("to-dg-t", (v) => v + " kN·m", go), gv = CB.range("to-dg-v", (v) => v + " kN", go), sb = CB.seg("to-dg-sb", go), lb = CB.seg("to-dg-lb", go);
+  const fck = TO.FCK, fy = TO.FY, fyt = TO.FYT, phi = TO.PHI;
+  let D = null;
+  function calc() {
+    const b = gb(), h = gh(), Tu = gt(), Vu = gv(), d = h - 66, O = TO.oh(b, h, sb()), Acp = b * h, pcp = 2 * (b + h), Tcr = TO.Tcr(Acp, pcp, fck), th = (phi * Tcr) / 4, tor = Tu > th;
+    const Vc = CB.rc.Vc(fck, b, d), vV = (Vu * 1e3) / (b * d), vT = tor ? (Tu * 1e6 * O.ph) / (1.7 * O.Aoh ** 2) : 0, lhs = Math.hypot(vV, vT), rhs = phi * ((Vc * 1e3) / (b * d) + (2 / 3) * Math.sqrt(fck)), ratio = lhs / rhs;
+    const At_s = tor ? (Tu * 1e6) / phi / (2 * O.A0 * fyt) : 0, Vs = Math.max(0, Vu / phi - Vc), Av_s = (Vs * 1e3) / (fyt * d);
+    const minR = (Math.max(0.0625 * Math.sqrt(fck), 0.35) * b) / fyt, needMin = tor || Vu > 0.5 * phi * Vc, req = Math.max(Av_s + 2 * At_s, needMin ? minR : 0);
+    const Av2 = 2 * TO.A(sb()), sStr = req > 0 ? Av2 / req : Infinity, sV = Vs > (Math.sqrt(fck) * b * d) / 3 / 1000 ? Math.min(d / 4, 300) : Math.min(d / 2, 600), sT = tor ? Math.min(O.ph / 8, 300) : Infinity;
+    const sCalc = Math.min(sStr, sV, sT), s = Math.max(50, Math.floor(sCalc / 25) * 25);
+    const Al = tor ? At_s * O.ph * (fyt / fy) : 0, Almin = tor ? Math.max(0, (0.42 * Math.sqrt(fck) * Acp) / fy - Math.max(At_s, (0.175 * b) / fyt) * O.ph * (fyt / fy)) : 0, Alr = Math.max(Al, Almin);
+    const dl = TO.db(lb()), ds = TO.db(sb()), xb = O.x0 - (ds + dl), yb = O.y0 - (ds + dl), nx = Math.max(1, Math.ceil(xb / 300)), ny = Math.max(1, Math.ceil(yb / 300)), nB = 2 * (nx + ny), per = Alr / nB, okBar = TO.A(lb()) >= per - 1e-9 && dl >= Math.max(0.042 * s, 9.5);
+    D = { b, h, d, Tu, Vu, O, Acp, pcp, Tcr, th, tor, Vc, vV, vT, lhs, rhs, ratio, At_s, Vs, Av_s, minR, req, s, sCalc, sV, sT, Al, Almin, Alr, nx, ny, nB, per, okBar, dl, ds, xb, yb };
+  }
+  const cv = CB.canvas("#to-cv-dg", (ctx, W, H) => {
+    if (!D) return;
+    const pal = CB.palette(), narrow = W < 520, aw = narrow ? W - 40 : W * 0.48, sc = Math.min(aw / D.b, (H - (narrow ? 110 : 40)) / D.h), bw = D.b * sc, bh = D.h * sc, x0 = narrow ? (W - bw) / 2 : 30 + (aw - bw) / 2, y0 = 18;
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(x0, y0, bw, bh); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.2; ctx.strokeRect(x0, y0, bw, bh);
+    const c = D.O.c * sc, sx = x0 + c, sy = y0 + c, sw = D.O.x0 * sc, shh = D.O.y0 * sc;
+    if (D.tor) { ctx.fillStyle = TO.alpha(pal.accent, 0.12); ctx.fillRect(sx, sy, sw, shh); }
+    ctx.strokeStyle = pal.accent; ctx.lineWidth = Math.max(2, D.ds * sc); ctx.strokeRect(sx, sy, sw, shh);
+    TO.line(ctx, [[sx + 4, sy], [sx + 16, sy + 12]], pal.accent, Math.max(2, D.ds * sc)); TO.line(ctx, [[sx, sy + 4], [sx + 12, sy + 16]], pal.accent, Math.max(2, D.ds * sc));
+    const r = Math.max(3, (D.dl * sc) / 2), off = (D.ds / 2 + D.dl / 2) * sc, bx0 = sx + off, by0 = sy + off, bxw = D.xb * sc, byh = D.yb * sc;
+    if (D.tor) {
+      const pts = []; for (let i = 0; i < D.nx; i++) { pts.push([bx0 + (bxw * i) / D.nx, by0]); pts.push([bx0 + bxw - (bxw * i) / D.nx, by0 + byh]); } for (let j = 0; j < D.ny; j++) { pts.push([bx0 + bxw, by0 + (byh * j) / D.ny]); pts.push([bx0, by0 + byh - (byh * j) / D.ny]); }
+      pts.forEach(([x, y]) => { ctx.fillStyle = D.okBar ? pal.tension : pal.bad; ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill(); });
+    } else { [[bx0, by0], [bx0 + bxw, by0], [bx0, by0 + byh], [bx0 + bxw, by0 + byh]].forEach(([x, y]) => { ctx.fillStyle = TO.alpha(pal.tension, 0.5); ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill(); }); }
+    TO.text(ctx, D.tor ? `A_oh ${CB.sig(D.O.Aoh, 3)} mm²` : "비틀림 무시", x0 + bw / 2, y0 + bh / 2, pal.accent, { size: 10.5 });
+    const gx = narrow ? 40 : W * 0.56, gy = narrow ? y0 + bh + 26 : 40, gw = narrow ? W - 80 : W * 0.4, rows = [["단면 한계", D.ratio, 1], ["스터럽 소요/제공", D.req > 0 ? D.req / ((2 * TO.A(sb())) / D.s) : 0, 1]];
+    rows.forEach(([k, v], i) => { const y = gy + i * (narrow ? 34 : 56), wv = gw * Math.min(1.25, v) / 1.25; ctx.fillStyle = TO.alpha(pal.border, 0.6); ctx.fillRect(gx, y + 10, gw, 12); ctx.fillStyle = v > 1 ? pal.bad : pal.ok; ctx.fillRect(gx, y + 10, wv, 12); TO.line(ctx, [[gx + gw / 1.25, y + 6], [gx + gw / 1.25, y + 26]], pal.warn, 1.6, [3, 2]); TO.text(ctx, `${k} ${CB.num(v, 2)}`, gx, y + 1, pal.dim, { size: 10.5, align: "left", bold: false }); });
+  }, { aspect: (W) => (W < 520 ? 1.25 : 0.55), minHeight: 300, maxHeight: 420 });
+  function go() {
+    calc(); cv.redraw();
+    const over = D.ratio > 1;
+    CB.stat("to-dg-lim", `${CB.num(D.ratio, 2)} ${over ? "✗" : "✓"}`);
+    CB.stat("to-dg-av", `${CB.num(D.req, 3)} mm²/mm`);
+    CB.stat("to-dg-s", over ? "단면 부족" : `${sb()} @${D.s}`);
+    CB.stat("to-dg-al", D.tor ? `${CB.sig(D.Alr, 3)} mm² · ${D.nB}-${lb()}${D.okBar ? "" : " ✗"}` : "—");
+    const L = [];
+    L.push(`<b>문턱</b>: T<sub>cr</sub> = ${CB.num(D.Tcr, 1)} kN·m, φT<sub>th</sub> = ${CB.num(D.th, 1)} kN·m → ${D.tor ? `T<sub>u</sub> ${D.Tu} &gt; 문턱: 비틀림 설계` : `T<sub>u</sub> ${D.Tu} ≤ 문턱: 비틀림 무시`}`);
+    if (D.tor) L.push(`<b>단면</b>: A<sub>oh</sub> = ${CB.sig(D.O.Aoh, 4)} mm², p<sub>h</sub> = ${CB.num(D.O.ph, 0)} mm, A₀ = ${CB.sig(D.O.A0, 4)} mm²`);
+    L.push(`<b>단면 한계</b>: √(${CB.num(D.vV, 2)}² + ${CB.num(D.vT, 2)}²) = ${CB.num(D.lhs, 2)} ${over ? "&gt;" : "≤"} ${CB.num(D.rhs, 2)} MPa <span class="${over ? "bad" : "ok"}">${over ? "✗ 단면을 키울 것" : "✓"}</span>`);
+    L.push(`<b>스터럽</b>: A<sub>t</sub>/s = ${CB.num(D.At_s, 3)}, A<sub>v</sub>/s = ${CB.num(D.Av_s, 3)}(V<sub>c</sub> ${CB.num(D.Vc, 1)} kN) → (A<sub>v</sub> + 2A<sub>t</sub>)/s = ${CB.num(D.req, 3)} mm²/mm(최소 ${CB.num(D.minR, 3)})`);
+    L.push(`<b>간격</b>: 강도 ${isFinite(D.sCalc) ? CB.num(Math.min((2 * TO.A(sb())) / Math.max(D.req, 1e-9), 9999), 0) : "∞"}, 전단 상한 ${CB.num(D.sV, 0)}${D.tor ? `, p<sub>h</sub>/8 ${CB.num(D.sT, 0)}` : ""} → <b>@${D.s}</b>`);
+    if (D.tor) L.push(`<b>종철근</b>: A<sub>l</sub> = ${CB.num(D.Al, 0)}, A<sub>l,min</sub> = ${CB.num(D.Almin, 0)} → ${CB.num(D.Alr, 0)} mm², ${D.nB}개(둘레 간격 ≤ 300) × ${CB.num(D.per, 0)} mm² → ${lb()}(${CB.num(TO.A(lb()), 1)} mm²) <span class="${D.okBar ? "ok" : "bad"}">${D.okBar ? "✓" : "✗ 더 굵게"}</span>`);
+    document.getElementById("to-dg-steps").innerHTML = L.map((x) => `<li>${x}</li>`).join("");
+  }
+  go();
+})();
+</script>
+</body>
+</html>

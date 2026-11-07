@@ -1,0 +1,1004 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>처짐과 균열 · ConcreteBook</title>
+<meta name="description" content="쓸 만한 보를 만드는 계산. 균열 환산 단면과 균열 모멘트, 브랜슨 유효 단면 2차 모멘트, 즉시·장기 처짐, 처짐 제한과 최소 두께, 균열 폭과 철근 간격 제한, 수축·온도 철근, G1의 처짐·균열 검토를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .sv-tbl td, .sv-tbl th { font-variant-numeric: tabular-nums; }
+  .sv-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .sv-steps { margin: 6px 0 0; }
+  .sv-steps li { margin: 4px 0; }
+  .sv-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .sv-msg b { color: var(--text); }
+  .sv-msg.ok { color: var(--ok); font-weight: 600; }
+  .sv-msg.bad { color: var(--bad); font-weight: 600; }
+  .sv-msg.warn { color: var(--warn); font-weight: 600; }
+  svg .sv-conc { fill: var(--surface-2); stroke: var(--text-dim); stroke-width: 1.2; }
+  svg .sv-bar { fill: var(--tension); }
+  svg .sv-cbar { fill: var(--compression); }
+  svg .sv-comp { fill: var(--compression); fill-opacity: .28; stroke: var(--compression); stroke-width: 1.4; }
+  svg .sv-ten { fill: var(--tension); fill-opacity: .22; stroke: var(--tension); stroke-width: 1.4; }
+  svg .sv-crk { stroke: var(--text-dim); stroke-width: 1.4; fill: none; }
+  svg .sv-dim { stroke: var(--text-faint); stroke-width: 1; fill: none; }
+  svg .sv-warn { stroke: var(--warn); stroke-width: 1.4; stroke-dasharray: 5 4; fill: none; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="concrete"></script>
+</head>
+<body data-chapter="serviceability">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="sv-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="sv-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="sv-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 08</div>
+    <h1 data-no-glossary>처짐과 균열</h1>
+    <p class="lead">3장과 4장에서 G1은 계수 하중의 모멘트를 넉넉히 견디도록 설계되었습니다. 그런데 강도가 충분한 보도 사용하는 동안 너무 처지면 칸막이벽이 갈라지고 문이 끼며 바닥이 기울어 보이고, 균열이 넓으면 물과 염화물이 철근까지 들어갑니다. 이 장은 계수 하중이 아니라 <b>사용 하중</b>에서 보가 어떻게 행동하는지를 계산합니다. 균열이 생긴 단면을 환산 단면으로 풀어 중립축과 균열 단면 2차 모멘트를 구하고, 균열 전과 후 사이를 잇는 브랜슨의 유효 단면 2차 모멘트로 즉시 처짐을, 크리프와 수축이 키우는 장기 처짐을 계수 λ<sub>Δ</sub>로 구한 다음, 균열 폭을 철근 간격으로 제어하는 방법과 수축·온도 철근까지 G1(사용 하중 정모멘트 <b>350 kN·m</b>)을 따라 검토합니다.</p>
+    <ul class="objectives">
+      <li>강도 한계상태와 사용성 한계상태를 구별하고, 사용성 검토에 쓰는 하중(사용 하중, 지속 하중)과 단면 상태(균열 전·후)를 설명한다.</li>
+      <li>탄성계수비 \(n = E_s/E_c\)로 균열 환산 단면을 만들고, 중립축 깊이 \(kd\)와 균열 단면 2차 모멘트 \(I_{cr}\), 사용 하중의 철근 응력 \(f_s\)를 계산한다.</li>
+      <li>균열 모멘트 \(M_{cr} = f_r I_g / y_t\)와 브랜슨 유효 단면 2차 모멘트 \(I_e\)로 즉시 처짐을 구하고, 연속보에서 \(I_e\)를 평균하는 이유를 설명한다.</li>
+      <li>장기 처짐 계수 \(\lambda_\Delta = \xi/(1 + 50\rho')\)로 크리프·수축 처짐을 더하고, 처짐 제한(ℓ/360, ℓ/480, ℓ/240 형태)과 최소 두께 표로 판정한다.</li>
+      <li>균열 폭을 정하는 인자(철근 응력, 피복, 철근 간격)를 설명하고, 철근 간격 제한 \(s_{max}\)와 교육용 균열 폭 식(거게리–러츠 형태)으로 검토한다.</li>
+      <li>수축·온도 철근량과 간격을 정하고, G1의 처짐·균열 검토를 처음부터 끝까지 수행한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>강해질수록 더 처지는 보</b></div>
+      <div class="o-body"><p>20세기 중반까지 철근콘크리트 보는 허용 응력 설계로 만들어졌고, 철근 응력을 낮게 묶어 두었기 때문에 단면이 두꺼웠습니다. 처짐은 거의 문제가 되지 않았습니다. 그런데 강도 설계법이 자리 잡고 항복강도가 높은 철근과 고강도 콘크리트가 쓰이자 같은 하중을 더 얇은 단면이 견디게 되었습니다. 강도는 충분했지만 강성은 단면 춤의 세제곱으로 줄어드니, 바닥이 눈에 띄게 처지고 그 위의 조적 칸막이벽과 마감이 갈라지는 사례가 늘었습니다.</p>
+        <p>문제는 철근콘크리트의 강성이 하나의 숫자가 아니라는 데 있었습니다. 균열 전에는 콘크리트 단면 전체가 일하지만, 균열이 생기면 인장 쪽 콘크리트가 빠져 강성이 절반 이하로 떨어집니다. 그 사이를 잇는 실용식이 1960년대 브랜슨(D. E. Branson)의 <b>유효 단면 2차 모멘트</b>였고, ACI 318이 1971년판에서 이를 받아들인 뒤 여러 나라 기준이 같은 형태를 썼습니다(ACI 318-19는 다른 형태로 바꾸었다 — 이 장 심화 참고). 시간이 지나며 크리프와 수축이 처짐을 두 배 가까이 키운다는 것도 계수로 정리되었습니다. 오늘날 기준은 이 계산을 하거나, 계산 없이도 충분한 최소 두께를 지키라고 요구합니다.</p>
+        <div class="o-chain"><span>사용 하중 · 균열 · 시간</span><i>→</i><span class="tool">환산 단면 · I<sub>e</sub> · λ<sub>Δ</sub> · s<sub>max</sub></span><i>→</i><span>처짐 · 균열 폭 · 판정</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="limit-states">
+    <h2>사용성 한계상태: 강도 다음의 질문</h2>
+    <div class="problem"><strong>φM<sub>n</sub> = 503 kN·m인 보가 왜 다시 검토를 받는가</strong>
+      <p>G1의 정모멘트 단면(4-D25)은 φM<sub>n</sub> ≈ 503 kN·m로 계수 모멘트 460 kN·m를 견딥니다(3장). 하지만 이 판정은 "보가 부서지지 않는가"에 대한 답일 뿐입니다. 평소의 하중(사용 하중 정모멘트 약 350 kN·m)에서 보가 얼마나 처지는지, 균열이 얼마나 넓은지는 전혀 다른 계산이 필요합니다.</p></div>
+    <p>구조물이 강도를 잃는 상태를 강도(극한) 한계상태라 한다면, 무너지지는 않지만 쓰기에 불편하거나 내구성을 잃는 상태를 <span class="term">사용성</span><span class="en">(serviceability)</span> 한계상태라 합니다. 대표적인 것이 지나친 처짐, 넓은 균열, 진동입니다(진동은 StructureBook <a href="../../structure/chapters/serviceability.html#floor-vibration">15장</a>). 사용성 검토는 하중 계수를 곱하지 않은 <span class="term">사용 하중</span><span class="en">(service load)</span>으로 하고, 시간에 따라 자라는 처짐은 오래 머무는 <span class="term">지속 하중</span><span class="en">(sustained load)</span>으로 계산합니다. G1의 사용 하중은 \(w_D = 56.7\) kN/m, \(w_L = 20\) kN/m, 합 76.7 kN/m입니다(구조역학 표).</p>
+    <figure class="diagram" id="fig-sv-stages">
+      <svg viewBox="0 0 860 330" role="img" aria-label="철근콘크리트 보의 모멘트–처짐 곡선과 균열 모멘트, 사용 하중, 항복, 극한 단계">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(90,30)">
+          <line x1="0" y1="250" x2="520" y2="250" class="s-axis"/><line x1="0" y1="0" x2="0" y2="250" class="s-axis"/>
+          <text x="516" y="270" text-anchor="end" class="t-mono">처짐 Δ</text><text x="8" y="8" class="t-mono">모멘트 M</text>
+          <line x1="0" y1="250" x2="70" y2="10" style="stroke:var(--text-faint);stroke-dasharray:4 4"/>
+          <text x="74" y="18" class="t-mono">E<tspan baseline-shift="sub" font-size="8">c</tspan>I<tspan baseline-shift="sub" font-size="8">g</tspan></text>
+          <line x1="0" y1="250" x2="330" y2="40" style="stroke:var(--text-faint);stroke-dasharray:4 4"/>
+          <text x="206" y="156" class="t-mono">E<tspan baseline-shift="sub" font-size="8">c</tspan>I<tspan baseline-shift="sub" font-size="8">cr</tspan></text>
+          <path d="M0 250 L24 168 C 40 160, 70 150, 110 128 C 170 96, 230 70, 270 54 L 330 46 C 380 42, 440 40, 500 38" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <circle cx="24" cy="168" r="5" style="fill:var(--warn)"/><text x="32" y="184" class="t-mono" style="fill:var(--warn)">M<tspan baseline-shift="sub" font-size="8">cr</tspan> 113</text>
+          <circle cx="160" cy="102" r="6" style="fill:var(--accent-2)"/><text x="168" y="120" class="t-mono" style="fill:var(--accent-2)">사용 M<tspan baseline-shift="sub" font-size="8">a</tspan> 350</text>
+          <circle cx="270" cy="54" r="5" style="fill:var(--tension)"/><text x="262" y="76" class="t-mono" style="fill:var(--tension)">항복 M<tspan baseline-shift="sub" font-size="8">y</tspan></text>
+          <circle cx="500" cy="38" r="5" style="fill:var(--bad)"/><text x="500" y="26" text-anchor="end" class="t-mono" style="fill:var(--bad)">극한 M<tspan baseline-shift="sub" font-size="8">n</tspan> 592</text>
+          <line x1="160" y1="102" x2="160" y2="250" style="stroke:var(--accent-2);stroke-dasharray:3 3"/>
+          <rect x="0" y="258" width="24" height="10" style="fill:var(--ok);opacity:.6"/><rect x="24" y="258" width="246" height="10" style="fill:var(--accent);opacity:.35"/><rect x="270" y="258" width="230" height="10" style="fill:var(--bad);opacity:.3"/>
+        </g>
+        <g transform="translate(640,48)" class="t-dim">
+          <text x="0" y="0" class="t" style="font-weight:700">단계</text>
+          <rect x="0" y="14" width="12" height="12" style="fill:var(--ok);opacity:.6"/><text x="20" y="25">① 균열 전: I<tspan baseline-shift="sub" font-size="8">g</tspan>로 일함</text>
+          <rect x="0" y="40" width="12" height="12" style="fill:var(--accent);opacity:.35"/><text x="20" y="51">② 균열 후 탄성</text>
+          <text x="20" y="69">   사용 하중이 여기에 있다</text>
+          <text x="20" y="87">   → 이 장의 계산</text>
+          <rect x="0" y="104" width="12" height="12" style="fill:var(--bad);opacity:.3"/><text x="20" y="115">③ 항복 → 극한</text>
+          <text x="20" y="133">   강도 설계(3장)</text>
+          <text x="0" y="170" class="t-mono">G1 정모멘트 단면, 4-D25</text>
+          <text x="0" y="188" class="t-mono">M<tspan baseline-shift="sub" font-size="8">a</tspan>/M<tspan baseline-shift="sub" font-size="8">cr</tspan> ≈ 3.1, M<tspan baseline-shift="sub" font-size="8">a</tspan>/M<tspan baseline-shift="sub" font-size="8">n</tspan> ≈ 0.59</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-1.</b> 철근콘크리트 보의 모멘트–처짐 곡선(개념도, 가로축 눈금은 과장). 균열 모멘트 \(M_{cr}\)까지는 전 단면 강성 \(E_cI_g\)로, 균열이 퍼진 뒤에는 균열 단면 강성 \(E_cI_{cr}\)에 가까워진다. 사용 하중 모멘트는 보통 \(M_{cr}\)보다 훨씬 크고 항복보다는 작은 ② 구간에 있으므로, 사용성 검토는 "균열은 있되 재료는 탄성"인 단면으로 한다. G1의 값(\(M_n\) = 592, \(\varphi M_n\) = 503 kN·m)은 3장의 결과다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 8.1 (사용성 한계상태와 사용 하중)</strong> <span class="term">사용성</span> 한계상태는 구조물이 무너지지 않더라도 기능·외관·내구성을 해치는 상태(과도한 처짐, 균열 폭, 진동)다. 검토는 하중 계수 1.0의 사용 하중 조합(예: \(D + L\))으로 하고, 크리프·수축이 키우는 장기 처짐은 지속 하중(고정 하중과 오래 머무는 활하중의 일부)으로 계산한다. 단면은 콘크리트와 철근 모두 탄성이라고 보되, 인장 쪽 콘크리트의 균열을 고려한다.</div>
+    <p>그림 8-1의 ② 구간에서 단면은 두 가지 극단 사이에 있습니다. 균열이 한 번도 생기지 않은 단면(전 단면 \(I_g\))과, 모든 단면이 균열 단면(\(I_{cr}\))인 보입니다. 실제 보는 균열 사이의 콘크리트가 여전히 인장을 조금 나눠 받으므로(<span class="term">인장 강화</span><span class="en">(tension stiffening)</span>) 그 중간쯤에 있습니다. 이 장의 첫 과제는 \(I_{cr}\)을 계산하는 것입니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="cracked-section">
+    <h2>균열 단면 해석: 환산 단면</h2>
+    <div class="problem"><strong>철근과 콘크리트가 한 단면에 섞여 있을 때 I는 무엇인가</strong>
+      <p>구조역학의 휨 공식 σ = My/I는 한 재료로 된 단면을 위한 식입니다. G1의 단면에는 탄성계수가 약 7배 다른 두 재료가 들어 있고, 인장 쪽 콘크리트는 금이 가 있습니다. 이 단면을 "한 재료로 된 가상의 단면"으로 바꿀 수 있다면 구조역학의 식을 그대로 쓸 수 있습니다.</p></div>
+    <p>평면 유지 가정에서 같은 높이의 철근과 콘크리트는 변형률이 같습니다(부착, <a href="development.html">7장</a>). 그러면 철근의 응력은 같은 자리 콘크리트 응력의 \(E_s/E_c\)배이고, 철근 면적 \(A_s\)가 내는 힘은 콘크리트 면적 \(nA_s\)가 내는 힘과 같습니다. 이렇게 철근을 \(n\)배 넓은 콘크리트로 바꾼 단면을 <span class="term">환산 단면</span><span class="en">(transformed section)</span>이라 합니다(MechanicsBook <a href="../../mechanics/chapters/bending.html">9장</a>의 합성 단면과 같은 생각).</p>
+    <div class="callout def"><strong>정의 8.2 (탄성계수비)</strong> <span class="term">탄성계수비</span><span class="en">(modular ratio)</span> \(n = E_s/E_c\). 이 책의 재료는 \(E_s = 200{,}000\) MPa, \(E_c = 0.077\,m_c^{1.5}\sqrt[3]{f_{cm}}\)(\(m_c = 2{,}300\) kg/m³, \(f_{cm} = f_{ck} + 4\) MPa, KDS 14 20 10 형태)이므로 \(f_{ck} = 30\) MPa에서 \(E_c = 27{,}515\) MPa, \(n = 7.27\)이다. 압축 철근은 그 자리의 콘크리트를 빼야 하므로 \((n - 1)A_s'\)로 환산한다.</div>
+    <figure class="diagram" id="fig-sv-transformed">
+      <svg viewBox="0 0 860 340" role="img" aria-label="실제 단면, 균열 전 환산 단면, 균열 후 환산 단면과 응력 분포">
+        <rect x="10" y="10" width="840" height="320" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="60" y="-8" text-anchor="middle" class="t" style="font-weight:700">(a) 실제 단면</text>
+          <rect x="0" y="0" width="120" height="210" class="sv-conc"/>
+          <g class="sv-cbar"><circle cx="22" cy="20" r="6"/><circle cx="98" cy="20" r="6"/></g>
+          <g class="sv-bar"><circle cx="22" cy="190" r="7"/><circle cx="47" cy="190" r="7"/><circle cx="73" cy="190" r="7"/><circle cx="98" cy="190" r="7"/></g>
+          <text x="60" y="236" text-anchor="middle" class="t-mono">b = 400, h = 700</text>
+          <text x="60" y="252" text-anchor="middle" class="t-mono">A<tspan baseline-shift="sub" font-size="8">s</tspan> 4-D25, A<tspan baseline-shift="sub" font-size="8">s</tspan>′ 2-D25</text>
+        </g>
+        <g transform="translate(250,40)">
+          <text x="70" y="-8" text-anchor="middle" class="t" style="font-weight:700">(b) 균열 전 환산 단면</text>
+          <rect x="10" y="0" width="120" height="210" class="sv-conc"/>
+          <rect x="-12" y="16" width="22" height="8" class="sv-comp"/><rect x="130" y="16" width="22" height="8" class="sv-comp"/>
+          <rect x="-30" y="185" width="40" height="10" class="sv-ten"/><rect x="130" y="185" width="40" height="10" class="sv-ten"/>
+          <line x1="0" y1="108" x2="140" y2="108" class="sv-warn"/>
+          <text x="70" y="236" text-anchor="middle" class="t-mono">철근 → (n − 1)A<tspan baseline-shift="sub" font-size="8">s</tspan> 날개</text>
+          <text x="70" y="252" text-anchor="middle" class="t-mono">중립축 ≈ h/2 (I<tspan baseline-shift="sub" font-size="8">g</tspan> 근사)</text>
+        </g>
+        <g transform="translate(470,40)">
+          <text x="110" y="-8" text-anchor="middle" class="t" style="font-weight:700">(c) 균열 후 환산 단면과 응력</text>
+          <rect x="10" y="0" width="120" height="56" class="sv-comp"/>
+          <rect x="10" y="56" width="120" height="154" style="fill:none;stroke:var(--text-faint);stroke-dasharray:4 3"/>
+          <path d="M35 210 L40 160 L33 120 L38 70 M70 210 L66 150 L72 96 L68 64 M105 210 L110 170 L103 110 L107 70" class="sv-crk"/>
+          <rect x="-22" y="16" width="32" height="8" class="sv-comp"/><rect x="130" y="16" width="32" height="8" class="sv-comp"/>
+          <rect x="-40" y="185" width="220" height="10" class="sv-ten"/>
+          <line x1="0" y1="56" x2="190" y2="56" class="sv-warn"/>
+          <text x="194" y="60" class="t-mono" style="fill:var(--warn)">중립축</text>
+          <line x1="18" y1="2" x2="18" y2="54" class="sv-dim"/><text x="24" y="32" class="t-mono">kd</text>
+          <path d="M230 0 L290 0 L230 56 Z" class="sv-comp"/>
+          <line x1="230" y1="0" x2="230" y2="210" class="s-axis"/>
+          <line x1="230" y1="190" x2="320" y2="190" style="stroke:var(--tension);stroke-width:3" marker-end="url(#sv-ah-t)"/>
+          <text x="294" y="-4" class="t-mono" style="fill:var(--compression)">f<tspan baseline-shift="sub" font-size="8">c</tspan></text>
+          <text x="326" y="186" class="t-mono" style="fill:var(--tension)">f<tspan baseline-shift="sub" font-size="8">s</tspan>/n</text>
+          <text x="70" y="236" text-anchor="middle" class="t-mono">인장 콘크리트 무시, A<tspan baseline-shift="sub" font-size="8">s</tspan> → nA<tspan baseline-shift="sub" font-size="8">s</tspan></text>
+          <text x="70" y="252" text-anchor="middle" class="t-mono">G1: kd = 174 mm, I<tspan baseline-shift="sub" font-size="8">cr</tspan> = 0.34 I<tspan baseline-shift="sub" font-size="8">g</tspan></text>
+        </g>
+        <text x="430" y="312" text-anchor="middle" class="t-dim">빨강: 압축을 받는 환산 면적 · 파랑: 인장 철근의 환산 면적 · 점선: 중립축</text>
+      </svg>
+      <figcaption><b>그림 8-2.</b> 환산 단면. (a) G1 정모멘트 단면. (b) 균열 전에는 콘크리트 전체가 일하고 철근은 \((n-1)A_s\)만큼 날개를 더한다. 철근 효과가 작아 보통 전 단면 \(I_g = bh^3/12\)로 근사한다. (c) 균열 후에는 중립축 아래 콘크리트를 버리고 인장 철근을 \(nA_s\)로 바꾼다. 응력은 중립축에서 0인 직선이고, 철근 응력은 그 자리의 환산 응력에 \(n\)을 곱한 값이다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 8.3 (균열 단면의 중립축과 균열 단면 2차 모멘트)</strong> 폭 \(b\)의 직사각형 단면에서 인장 콘크리트를 무시한 <span class="term">균열 단면</span><span class="en">(cracked section)</span>의 중립축에 대한 1차 모멘트가 0이 되는 깊이 \(kd\)를 찾고, <span class="term">균열 단면 2차 모멘트</span><span class="en">(cracked moment of inertia)</span> \(I_{cr}\)을 계산한다.
+      <div class="formula">$$\frac{b\,(kd)^2}{2} + (n-1)A_s'\,(kd - d') = nA_s\,(d - kd)$$
+      $$I_{cr} = \frac{b\,(kd)^3}{3} + nA_s\,(d - kd)^2 + (n-1)A_s'\,(kd - d')^2$$<div class="where">\(d\): 인장 철근 도심까지 유효 깊이, \(d'\): 압축 연단에서 압축 철근까지. 압축 철근이 없으면 \(k = \sqrt{2\rho n + (\rho n)^2} - \rho n\), \(\rho = A_s/(bd)\). 사용 하중 \(M_a\)에서 콘크리트 연단 응력 \(f_c = M_a\,kd/I_{cr}\), 철근 응력 \(f_s = n M_a (d - kd)/I_{cr}\) — 압축 철근이 없으면 \(f_s \approx M_a/(A_s\,jd)\), \(j = 1 - k/3\). <code>CB.rc.crack</code>가 이 식이다.</div></div></div>
+    <p>원리 8.3은 3장의 강도 계산과 출발점이 같지만 결과는 다릅니다. 강도 계산에서는 콘크리트가 등가 직사각형 응력 블록(\(\eta 0.85 f_{ck}\))으로 소성하고 철근은 항복하지만, 사용 하중에서는 두 재료가 모두 탄성이라 콘크리트 응력이 삼각형입니다. 그래서 같은 단면의 중립축 깊이도 다릅니다(G1: 강도 계산 c = 124 mm, 사용 하중 kd = 182 mm).</p>
+    <div class="callout"><strong>예제 8.1 (G1 정모멘트 단면의 균열 단면)</strong> b = 400 mm, h = 700 mm, 하단 4-D25(\(A_s = 2{,}027\) mm², 1단 배근 d = 634 mm), \(f_{ck} = 30\) MPa, n = 7.27. 먼저 압축 철근을 무시한다.
+      <ol class="sv-steps">
+        <li><b>철근비와 k.</b> \(\rho = 2{,}027/(400 \times 634) = 0.00799\), \(\rho n = 0.0581\). \(k = \sqrt{2(0.0581) + 0.0581^2} - 0.0581 = 0.288\), \(kd = 182.4\) mm.</li>
+        <li><b>균열 단면 2차 모멘트.</b> \(I_{cr} = 400(182.4)^3/3 + 7.27 \times 2{,}027 \times (634 - 182.4)^2 = 0.809 \times 10^9 + 3.005 \times 10^9 = 3.81 \times 10^9\) mm⁴. 전 단면 \(I_g = 400 \times 700^3/12 = 11.43 \times 10^9\) mm⁴의 33 %.</li>
+        <li><b>압축 철근을 넣으면.</b> 중앙부 위쪽으로 이어지는 2-D25(\(d' = 66\) mm)를 \((n-1)A_s'\)로 넣으면 \(kd = 174.4\) mm, \(I_{cr} = 3.89 \times 10^9\) mm⁴(2 % 증가). 압축 철근은 즉시 처짐보다 장기 처짐(크리프)에서 효과가 크다.</li>
+        <li><b>사용 하중의 응력.</b> \(M_a = 350\) kN·m에서 \(jd = 634 - 182.4/3 = 573\) mm, \(f_s = 350 \times 10^6/(2{,}027 \times 573) = 301\) MPa(\(\tfrac23 f_y = 333\) MPa보다 약간 작다), \(f_c = 350 \times 10^6 \times 182.4/3.81 \times 10^9 = 16.7\) MPa(\(0.56 f_{ck}\)).</li>
+      </ol></div>
+    <div class="sim" id="sim-sv-crack">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>균열 단면 계산기: 환산 단면과 응력</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-crack" aria-label="G1 단면의 환산 단면, 중립축, 응력 분포"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시</span><div class="seg" id="sv-cr-pre"><button data-value="pos" class="on">G1 정 4-D25</button><button data-value="old">앞 권 7-D25</button><button data-value="neg">G1 부 6-D25</button></div></div>
+          <label class="ctrl"><span>인장 철근 D25 개수 <output id="sv-cr-n-out"></output></span><input type="range" id="sv-cr-n" min="2" max="10" step="1" value="4"></label>
+          <label class="ctrl"><span>압축 철근 D25 개수 <output id="sv-cr-nc-out"></output></span><input type="range" id="sv-cr-nc" min="0" max="6" step="1" value="2"></label>
+          <label class="ctrl"><span>유효 깊이 d <output id="sv-cr-d-out"></output></span><input type="range" id="sv-cr-d" min="560" max="650" step="1" value="634"></label>
+          <label class="ctrl"><span><i style="font-style:normal">f<sub>ck</sub></i> <output id="sv-cr-fck-out"></output></span><input type="range" id="sv-cr-fck" min="21" max="60" step="1" value="30"></label>
+          <label class="ctrl"><span><i style="font-style:normal">사용 모멘트 M<sub>a</sub></i> <output id="sv-cr-ma-out"></output></span><input type="range" id="sv-cr-ma" min="0" max="600" step="5" value="350"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">n · kd</span><span class="v" id="sv-cr-kd">—</span></div>
+        <div class="stat"><span class="k">I<sub>cr</sub> (I<sub>cr</sub>/I<sub>g</sub>)</span><span class="v" id="sv-cr-icr">—</span></div>
+        <div class="stat"><span class="k">M<sub>cr</sub></span><span class="v" id="sv-cr-mcr">—</span></div>
+        <div class="stat"><span class="k">f<sub>c</sub> · f<sub>s</sub></span><span class="v" id="sv-cr-fs">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-cr-msg">—</div>
+      <div class="sim-note">해볼 것: "앞 권 7-D25"(2단 배근, d = 610 mm)를 누르면 CONTRIBUTING 표의 값 kd ≈ 223 mm, I<sub>cr</sub> ≈ 5.3 × 10⁹ mm⁴이 나옵니다. 연속보로 설계한 4-D25는 철근이 적어 I<sub>cr</sub>이 약 30 % 작습니다 · M<sub>a</sub>를 M<sub>cr</sub>(약 113 kN·m) 아래로 내리면 균열 전 단면(I<sub>g</sub>)의 응력으로 바뀝니다 · 철근 개수를 늘리면 kd가 깊어지고 f<sub>s</sub>가 줄어듭니다. 균열 폭(뒤 절)은 f<sub>s</sub>에 비례합니다 · 모델: 원리 8.3, <code>CB.rc.crack</code>, 직사각형 단면(슬래브 무시), 압축 철근 d′ = 66 mm. "G1 부"는 위아래를 뒤집어 인장을 아래에 그립니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="cracking-moment">
+    <h2>균열 모멘트</h2>
+    <div class="problem"><strong>G1은 언제 처음 금이 가는가</strong>
+      <p>사용 하중 350 kN·m에서 G1에 균열이 있다는 것은 거의 확실합니다. 그렇다면 처음 균열이 생기는 모멘트는 얼마이고, 그 값이 사용 모멘트에 비해 얼마나 작은지가 처짐 계산의 출발점이 됩니다.</p></div>
+    <p>균열 전 단면은 전 단면이 탄성으로 일하므로 인장 연단의 응력은 \(M y_t/I_g\)입니다. 이 응력이 콘크리트의 휨인장강도, 곧 <span class="term">파괴계수</span><span class="en">(modulus of rupture)</span> \(f_r\)에 이르면 첫 휨 균열이 생깁니다. MaterialsBook <a href="../../materials/chapters/strength.html">5장</a>에서 본 것처럼 \(f_r\)은 압축강도의 제곱근에 비례합니다.</p>
+    <div class="callout def"><strong>원리 8.4 (균열 모멘트)</strong> <span class="term">균열 모멘트</span><span class="en">(cracking moment)</span>는
+      <div class="formula">$$M_{cr} = \frac{f_r\, I_g}{y_t}, \qquad f_r = 0.63\,\lambda\sqrt{f_{ck}}$$<div class="where">\(I_g\): 철근을 무시한 전 단면 2차 모멘트, \(y_t\): 도심에서 인장 연단까지 거리(직사각형 h/2), \(\lambda\): 경량 콘크리트 계수(보통 1.0). \(f_r\) 식은 KDS 14 20 30 형태(현행 기준 확인). T형 보에서 부모멘트(플랜지 인장)의 \(y_t\)는 작아져 \(M_{cr}\)이 크게 나온다.</div></div></div>
+    <p>G1: \(f_r = 0.63\sqrt{30} = 3.45\) MPa, \(M_{cr} = 3.45 \times 11.43 \times 10^9 / 350 = 112.7 \times 10^6\) N·mm = <b>113 kN·m</b>. 사용 모멘트 350 kN·m의 1/3도 안 됩니다. 실제 보에서는 건조 수축이 구속되어 생긴 인장 응력이 미리 걸려 있으므로 첫 균열은 이보다 더 일찍 오기도 합니다(MaterialsBook <a href="../../materials/chapters/shrinkage.html#restraint">8장</a>). 3장의 최소 철근 규정이 \(M_{cr}\)과 관계있는 것도 같은 이유입니다. 철근이 너무 적으면 균열이 생기는 순간 철근이 그 힘을 받아내지 못하고 끊어집니다(<a href="flexure.html">3장</a>).</p>
+    <div class="callout tip"><strong>사용 하중에서 균열은 정상이다</strong> 보통의 RC 보는 사용 하중에서 \(M_a/M_{cr}\)이 2–4입니다. 균열이 없다는 것은 콘크리트 단면이 지나치게 크거나 프리스트레스가 들어 있다는 뜻입니다(<a href="prestressed.html">15장</a>). 사용성 설계의 목표는 균열을 없애는 것이 아니라, 균열을 가늘게 여러 개로 나누고 그 강성 저하를 처짐 계산에 넣는 것입니다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="effective-inertia">
+    <h2>유효 단면 2차 모멘트</h2>
+    <div class="problem"><strong>I<sub>g</sub>도 I<sub>cr</sub>도 아닌 보</strong>
+      <p>G1을 \(I_g\)로 계산하면 처짐이 너무 작고, \(I_{cr}\)로 계산하면 너무 큽니다. 균열은 모멘트가 큰 가운데 부분에만 있고, 균열과 균열 사이의 콘크리트는 아직 인장을 나눠 받습니다. 보 전체를 대표하는 하나의 강성을 어떻게 정할까요?</p></div>
+    <p>브랜슨은 많은 보 실험의 처짐을 맞추는 실용식을 제안했습니다. \(M_a\)가 \(M_{cr}\)에 가까우면 \(I_g\)에 가깝고, \(M_a\)가 커질수록 \(I_{cr}\)에 다가가도록 \((M_{cr}/M_a)^3\)으로 두 값을 섞는 것입니다. 지수 3은 보 전체의 평균 강성을 나타내도록 실험에 맞춘 값이고, 한 단면의 강성을 나타낼 때는 4를 쓰기도 했습니다.</p>
+    <div class="callout def"><strong>원리 8.5 (브랜슨 유효 단면 2차 모멘트)</strong> <span class="term">유효 단면 2차 모멘트</span><span class="en">(effective moment of inertia)</span>
+      <div class="formula">$$I_e = \left(\frac{M_{cr}}{M_a}\right)^3 I_g + \left[1 - \left(\frac{M_{cr}}{M_a}\right)^3\right] I_{cr} \;\le\; I_g$$<div class="where">\(M_a\): 처짐을 계산하는 하중 단계의 최대 사용 모멘트, \(M_a \le M_{cr}\)이면 \(I_e = I_g\). KDS 14 20 30(ACI 318-14까지) 형태, 현행 기준 확인. <code>CB.rc.Ie</code>가 이 식이다. 연속보는 정·부모멘트 단면의 \(I_e\)를 평균한다(원리 8.6).</div></div></div>
+    <figure class="diagram" id="fig-sv-ie">
+      <svg viewBox="0 0 860 320" role="img" aria-label="Ma/Mcr에 따른 Ie/Ig 곡선, Icr/Ig 하한, G1 값">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(90,30)">
+          <line x1="0" y1="240" x2="600" y2="240" class="s-axis"/><line x1="0" y1="0" x2="0" y2="240" class="s-axis"/>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="258">0</text><text x="120" y="258">1</text><text x="240" y="258">2</text><text x="360" y="258">3</text><text x="480" y="258">4</text><text x="600" y="258">5</text></g>
+          <text x="596" y="276" text-anchor="end" class="t-mono">M<tspan baseline-shift="sub" font-size="8">a</tspan> / M<tspan baseline-shift="sub" font-size="8">cr</tspan></text>
+          <g class="t-mono" text-anchor="end"><text x="-6" y="244">0</text><text x="-6" y="124">0.5</text><text x="-6" y="4">1.0</text></g>
+          <text x="8" y="-6" class="t-mono">I<tspan baseline-shift="sub" font-size="8">e</tspan> / I<tspan baseline-shift="sub" font-size="8">g</tspan></text>
+          <line x1="0" y1="160" x2="600" y2="160" style="stroke:var(--warn);stroke-dasharray:5 4"/>
+          <text x="596" y="178" text-anchor="end" class="t-mono" style="fill:var(--warn)">I<tspan baseline-shift="sub" font-size="8">cr</tspan>/I<tspan baseline-shift="sub" font-size="8">g</tspan> = 0.33 (4-D25)</text>
+          <path d="M0 0 L120 0 L132 40 L144 68 L156 88 L168 102 L180 113 L204 128 L228 137 L264 146 L300 151 L360 155 L420 157 L480 158 L540 159 L600 160" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <path d="M80 0 L84 38 L90 72 L96 92 L108 115 L120 127 L132 135 L144 140 L168 147 L192 150 L228 154 L264 156 L312 157 L360 158 L420 159 L480 159 L540 160 L600 160" style="fill:none;stroke:var(--accent-2);stroke-width:2;stroke-dasharray:6 4"/>
+          <circle cx="373" cy="150" r="6" style="fill:var(--accent)"/>
+          <text x="380" y="128" class="t-mono" style="fill:var(--accent)">G1: M<tspan baseline-shift="sub" font-size="8">a</tspan>/M<tspan baseline-shift="sub" font-size="8">cr</tspan> = 3.1 → I<tspan baseline-shift="sub" font-size="8">e</tspan>/I<tspan baseline-shift="sub" font-size="8">g</tspan> = 0.36</text>
+          <text x="170" y="40" class="t-mono" style="fill:var(--accent)">브랜슨 (지수 3)</text>
+          <text x="12" y="205" class="t-mono" style="fill:var(--accent-2)">점선: ACI 318-19 형태(비숍, 2/3 M<tspan baseline-shift="sub" font-size="8">cr</tspan>부터 감소)</text>
+          <text x="30" y="20" class="t-mono">균열 전 I<tspan baseline-shift="sub" font-size="8">e</tspan> = I<tspan baseline-shift="sub" font-size="8">g</tspan></text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-3.</b> 유효 단면 2차 모멘트의 변화(\(I_{cr}/I_g = 0.33\)). \(M_a/M_{cr}\)이 1을 넘으면 \(I_e\)는 빠르게 떨어져 \(M_a/M_{cr} \approx 3\)에서 이미 \(I_{cr}\)에 가깝다. 점선은 ACI 318-19가 채택한 비숍(Bischoff) 형태로, 철근비가 작은 보에서 브랜슨 식이 강성을 과대평가하는 것을 고친 식이다(이 책은 KDS 형태인 브랜슨 식을 기본으로 쓴다).</figcaption>
+    </figure>
+    <div class="callout deep"><strong>심화: 브랜슨 식의 한계와 ACI 318-19</strong> 브랜슨 식은 철근비가 1 % 안팎인 보의 실험에 맞춘 식이라, \(I_g/I_{cr}\)이 큰(철근이 적은) 보나 FRP 보강 보에서는 강성을 과대평가해 처짐을 작게 낸다는 지적이 있었다. 비숍은 균열 단면과 비균열 단면의 유연도(1/EI)를 섞는 식 \(I_e = I_{cr}/[1 - \gamma(M_{cr}/M_a)^2(1 - I_{cr}/I_g)]\)을 제안했고, ACI 318-19는 수축 구속 등을 고려해 \(M_{cr}\) 대신 \(\tfrac23 M_{cr}\)을 넣은 형태를 채택했다(\(\gamma = 1\)). 그림 8-3의 점선이 이 형태다. G1(\(M_a/M_{cr} = 3.1\))에서는 두 식의 차이가 약 3 %로 작지만, \(M_a/M_{cr}\)이 1.5–2인 슬래브에서는 30 % 이상 차이 날 수 있다. 국내 기준의 현행 식은 KDS 14 20 30을 확인할 것.</div>
+    <div class="sim" id="sim-sv-ie">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>I<sub>e</sub> 곡선: 균열이 강성을 얼마나 빼앗나</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-ie" aria-label="Ma/Mcr에 따른 Ie/Ig 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><i style="font-style:normal">M<sub>a</sub>/M<sub>cr</sub></i> <output id="sv-ie-r-out"></output></span><input type="range" id="sv-ie-r" min="0.5" max="6" step="0.05" value="3.1"></label>
+          <label class="ctrl"><span><i style="font-style:normal">I<sub>cr</sub>/I<sub>g</sub></i> <output id="sv-ie-c-out"></output></span><input type="range" id="sv-ie-c" min="0.05" max="0.7" step="0.01" value="0.33"></label>
+          <div class="ctrl"><span>브랜슨 지수 m</span><div class="seg" id="sv-ie-m"><button data-value="3" class="on">3 (보 전체)</button><button data-value="4">4 (단면)</button></div></div>
+          <div class="ctrl"><span>비교 곡선</span><div class="seg" id="sv-ie-b"><button data-value="on" class="on">ACI 318-19 형태</button><button data-value="off">끔</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">(M<sub>cr</sub>/M<sub>a</sub>)<sup>m</sup></span><span class="v" id="sv-ie-w">—</span></div>
+        <div class="stat"><span class="k">I<sub>e</sub>/I<sub>g</sub> 브랜슨</span><span class="v" id="sv-ie-br">—</span></div>
+        <div class="stat"><span class="k">I<sub>e</sub>/I<sub>g</sub> 318-19 형태</span><span class="v" id="sv-ie-bi">—</span></div>
+        <div class="stat"><span class="k">처짐 비(I<sub>g</sub> 대비)</span><span class="v" id="sv-ie-dr">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: G1(M<sub>a</sub>/M<sub>cr</sub> = 3.1, I<sub>cr</sub>/I<sub>g</sub> = 0.33)에서 처짐은 I<sub>g</sub>로 계산한 값의 약 2.8배입니다 · I<sub>cr</sub>/I<sub>g</sub>를 0.1로 줄이고(철근이 적은 슬래브) M<sub>a</sub>/M<sub>cr</sub>을 1.5 근처에 두면 두 식이 크게 갈립니다 · 지수를 4로 바꾸면 곡선이 더 빨리 I<sub>cr</sub>로 내려갑니다 · 모델: 원리 8.5와 심화의 ACI 318-19 형태(2/3 M<sub>cr</sub>). 처짐 비 = I<sub>g</sub>/I<sub>e</sub>(같은 하중·경간).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="immediate">
+    <h2>즉시 처짐</h2>
+    <div class="problem"><strong>G1 내부 경간은 사용 하중에서 몇 mm 처지는가</strong>
+      <p>I<sub>e</sub>를 알면 구조역학의 처짐 계산(MechanicsBook <a href="../../mechanics/chapters/deflection.html">11장</a>)에 \(E_cI_e\)를 넣기만 하면 됩니다. 그런데 연속보는 경간 가운데(정모멘트)와 지점(부모멘트)의 단면과 철근이 다르고, 모멘트는 하중 배치에 따라 달라집니다. 어떤 \(I_e\)를, 어떤 하중 배치에 써야 할까요?</p></div>
+    <p>하중을 싣는 순간 생기는 탄성 처짐을 <span class="term">즉시 처짐</span><span class="en">(immediate deflection)</span>이라 합니다. 하중이 커질수록 \(M_a\)가 커지고 \(I_e\)가 줄어드니, 하중–처짐 관계는 직선이 아닙니다. 그래서 활하중 처짐은 "활하중만의 처짐"을 따로 계산하지 않고, \(D + L\)의 처짐에서 \(D\)의 처짐을 빼서 구합니다(각각 그 하중 단계의 \(I_e\)로).</p>
+    <div class="callout def"><strong>원리 8.6 (연속보의 유효 단면 2차 모멘트와 즉시 처짐)</strong> 연속보에서는 정모멘트 단면과 부모멘트 단면의 \(I_e\)를 평균한다. 양 끝이 연속인 경간은 ACI 435 형태로
+      <div class="formula">$$I_{e,avg} = 0.70\,I_{e,m} + 0.15\,(I_{e,1} + I_{e,2}), \qquad \Delta_L = \Delta_{D+L} - \Delta_D$$<div class="where">\(I_{e,m}\): 경간 중앙 단면, \(I_{e,1}\), \(I_{e,2}\): 양 지점 단면. 한 끝만 연속이면 \(0.85I_{e,m} + 0.15I_{e,cont}\) 형태. 기준은 단순 평균도 허용한다(KDS·ACI 형태, 현행 기준 확인). 처짐은 \(E_cI_{e,avg}\)인 보로 탄성 해석해 구한다. 하중 단계마다 \(M_a\)가 다르므로 \(I_e\)도 다시 계산한다.</div></div></div>
+    <figure class="diagram" id="fig-sv-span">
+      <svg viewBox="0 0 860 330" role="img" aria-label="G1 내부 경간 모형: 등분포 하중과 지점 부모멘트, 휨모멘트도, 유효 단면 2차 모멘트 가중치 구간">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(110,40)">
+          <g style="stroke:var(--accent-2);stroke-width:1.6">
+            <line x1="0" y1="20" x2="600" y2="20"/>
+            <line x1="0" y1="20" x2="0" y2="44" marker-end="url(#sv-ah-ld)"/><line x1="75" y1="20" x2="75" y2="44" marker-end="url(#sv-ah-ld)"/><line x1="150" y1="20" x2="150" y2="44" marker-end="url(#sv-ah-ld)"/><line x1="225" y1="20" x2="225" y2="44" marker-end="url(#sv-ah-ld)"/><line x1="300" y1="20" x2="300" y2="44" marker-end="url(#sv-ah-ld)"/><line x1="375" y1="20" x2="375" y2="44" marker-end="url(#sv-ah-ld)"/><line x1="450" y1="20" x2="450" y2="44" marker-end="url(#sv-ah-ld)"/><line x1="525" y1="20" x2="525" y2="44" marker-end="url(#sv-ah-ld)"/><line x1="600" y1="20" x2="600" y2="44" marker-end="url(#sv-ah-ld)"/>
+          </g>
+          <text x="300" y="12" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">사용 하중 w = 76.7 kN/m</text>
+          <rect x="0" y="48" width="600" height="22" class="sv-conc"/>
+          <path d="M-6 76 L6 76 L0 66 Z M594 76 L606 76 L600 66 Z" style="fill:var(--text-dim)"/>
+          <path d="M-20 40 A 22 22 0 0 0 -20 80" style="fill:none;stroke:var(--accent-2);stroke-width:2" marker-end="url(#sv-ah-ld)"/>
+          <path d="M620 40 A 22 22 0 0 1 620 80" style="fill:none;stroke:var(--accent-2);stroke-width:2" marker-end="url(#sv-ah-ld)"/>
+          <text x="-30" y="100" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">M<tspan baseline-shift="sub" font-size="8">e</tspan> 264</text>
+          <text x="630" y="100" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">M<tspan baseline-shift="sub" font-size="8">e</tspan> 264</text>
+          <line x1="0" y1="170" x2="600" y2="170" class="s-axis"/>
+          <path d="M0 170 L0 232 C 60 190, 110 150, 150 128 C 220 96, 260 88, 300 88 C 340 88, 380 96, 450 128 C 490 150, 540 190, 600 232 L600 170 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="300" y="80" text-anchor="middle" class="t-mono" style="fill:var(--accent)">M<tspan baseline-shift="sub" font-size="8">a</tspan><tspan baseline-shift="super" font-size="8">+</tspan> = 350 kN·m</text>
+          <text x="40" y="250" class="t-mono" style="fill:var(--accent)">−264</text><text x="560" y="250" class="t-mono" style="fill:var(--accent)">−264</text>
+          <g class="t-mono" text-anchor="middle">
+            <rect x="0" y="262" width="90" height="16" style="fill:var(--tension);opacity:.25"/><text x="45" y="274">0.15 I<tspan baseline-shift="sub" font-size="8">e,1</tspan></text>
+            <rect x="90" y="262" width="420" height="16" style="fill:var(--accent);opacity:.25"/><text x="300" y="274">0.70 I<tspan baseline-shift="sub" font-size="8">e,m</tspan> (4-D25 단면)</text>
+            <rect x="510" y="262" width="90" height="16" style="fill:var(--tension);opacity:.25"/><text x="555" y="274">0.15 I<tspan baseline-shift="sub" font-size="8">e,2</tspan></text>
+          </g>
+          <text x="300" y="160" text-anchor="middle" class="t-dim">휨모멘트도(새깅 +, 위로 그림) · 경간 L = 8 m</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-4.</b> 이 장의 G1 내부 경간 처짐 모형(교육용). 경간 8 m 단순 지지 보에 사용 하중과 양 끝 부모멘트 \(M_e\)를 함께 주어, 중앙 정모멘트가 G1의 사용 정모멘트 \(M_a^+ = 350\) kN·m(= 계수 460 × 76.7/100)가 되게 했다(\(M_e = 3.44\,w\), 76.7 kN/m에서 264 kN·m). 이는 이웃 경간의 활하중이 빠져 이 경간의 정모멘트가 가장 커지는 배치에 해당한다. 아래 띠는 원리 8.6의 \(I_e\) 가중치.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 8.2 (G1 내부 경간의 즉시 처짐)</strong> 그림 8-4의 모형. \(E_c = 27{,}515\) MPa, \(I_g = 11.43 \times 10^9\) mm⁴, \(M_{cr} = 112.7\) kN·m. 중앙 단면 4-D25(+ 압축 2-D25): \(I_{cr} = 3.89 \times 10^9\). 지점 단면 6-D25(d = 610, 압축 4-D25): \(I_{cr} = 5.01 \times 10^9\) mm⁴.
+      <ol class="sv-steps">
+        <li><b>고정 하중 단계(\(w_D\) = 56.7 kN/m).</b> \(M^+ = 258.7\), \(M_e = 194.9\) kN·m. \(I_{e,m} = 4.52 \times 10^9\), \(I_{e,s} = 6.25 \times 10^9\), \(I_{e,avg} = 0.70(4.52) + 0.30(6.25) = 5.04 \times 10^9\) mm⁴ → \(E_cI_e = 1.39 \times 10^5\) kN·m². <code>CB.beam</code>로 중앙 처짐 \(\Delta_D = 10.6\) mm.</li>
+        <li><b>사용 하중 단계(76.7 kN/m).</b> \(M^+ = 350\), \(M_e = 263.6\) kN·m. \(I_{e,m} = 4.15 \times 10^9\), \(I_{e,s} = 5.51 \times 10^9\), \(I_{e,avg} = 4.56 \times 10^9\) mm⁴ → \(E_cI_e = 1.25 \times 10^5\) kN·m², \(\Delta_{D+L} = 15.8\) mm.</li>
+        <li><b>활하중 즉시 처짐.</b> \(\Delta_L = 15.8 - 10.6 = 5.2\) mm \(\le\) ℓ/360 = 22.2 mm. <b>합격.</b></li>
+        <li><b>균열의 영향.</b> 같은 모형을 \(I_g\)로 계산하면 \(\Delta_{D+L} = 6.3\) mm. 균열이 즉시 처짐을 2.5배로 키웠다.</li>
+      </ol></div>
+    <div class="sim" id="sim-sv-ld">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>하중–처짐 곡선: 균열 전 강성에서 균열 후 강성으로</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-ld" aria-label="G1의 하중–처짐 곡선과 Ig, Icr 직선, 처짐 형상"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>등분포 하중 w <output id="sv-ld-w-out"></output></span><input type="range" id="sv-ld-w" min="0" max="110" step="0.1" value="76.7"></label>
+          <div class="ctrl"><span>경간 모형</span><div class="seg" id="sv-ld-sup"><button data-value="cont" class="on">연속 내부</button><button data-value="ss">단순보</button></div></div>
+          <div class="ctrl"><span><i style="font-style:normal">I<sub>e</sub> 평균</i></span><div class="seg" id="sv-ld-avg"><button data-value="w" class="on">0.70/0.30</button><button data-value="m">중앙만</button></div></div>
+          <div class="ctrl"><span>하단 철근 D25</span><div class="seg" id="sv-ld-nb"><button data-value="4" class="on">4개</button><button data-value="5">5개</button><button data-value="7">7개</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">M<sub>a</sub> (중앙)</span><span class="v" id="sv-ld-ma">—</span></div>
+        <div class="stat"><span class="k">I<sub>e,avg</sub>/I<sub>g</sub></span><span class="v" id="sv-ld-ie">—</span></div>
+        <div class="stat"><span class="k">중앙 처짐 Δ</span><span class="v" id="sv-ld-d">—</span></div>
+        <div class="stat"><span class="k">Δ<sub>L</sub> (D+L − D)</span><span class="v" id="sv-ld-dl">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: w를 0에서 천천히 올리면 중앙 모멘트가 M<sub>cr</sub>에 이르는 약 25 kN/m 부근에서 곡선이 꺾여 E<sub>c</sub>I<sub>g</sub> 직선을 떠납니다 · 기본값(76.7 kN/m)에서 예제 8.2의 15.8 mm를 확인하고 "단순보"로 바꿔 보세요. 지점 모멘트가 없으면 M<sub>a</sub> = wL²/8 = 614 kN·m로 커지고 처짐은 약 2.4배(38 mm)가 됩니다 · 하단 철근을 7개로 늘리면 I<sub>cr</sub>이 커져 처짐이 줄어듭니다. 처짐이 문제일 때 철근을 늘리는 것도 한 방법입니다 · 모델: 그림 8-4, 원리 8.5–8.6, <code>CB.beam</code>(EI = E<sub>c</sub>I<sub>e,avg</sub>), 지점 단면 6-D25 고정, 직사각형 단면(슬래브 무시). 하중을 줄일 때도 같은 곡선을 따른다고 보는 단조 근사입니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="long-term">
+    <h2>장기 처짐</h2>
+    <div class="problem"><strong>준공 5년 뒤 G1은 얼마나 더 처져 있을까</strong>
+      <p>고정 하중은 건물이 서 있는 내내 G1 위에 있습니다. 그 하중 아래에서 콘크리트는 크리프로 천천히 더 줄어들고, 건조 수축은 압축 쪽 콘크리트를 줄여 곡률을 더 키웁니다. MaterialsBook <a href="../../materials/chapters/shrinkage.html#creep">8장</a>에서 크리프 계수가 2 안팎이라는 것을 보았습니다. 처짐도 그만큼 자랄까요?</p></div>
+    <p>크리프는 압축을 받는 콘크리트에서만 일어납니다. 철근은 크리프가 없으므로, 압축 쪽에 철근이 있으면 콘크리트가 줄어드는 것을 붙잡아 곡률 증가를 줄입니다. 기준은 이 효과를 하나의 계수로 정리했습니다. 시간에 따른 계수 \(\xi\)를 압축 철근비로 줄여, 지속 하중의 즉시 처짐에 곱하면 추가 장기 처짐이 됩니다(MaterialsBook <a href="../../materials/chapters/shrinkage.html#long-term">8장 장기 처짐</a>의 유효 탄성계수법과 비교).</p>
+    <div class="callout def"><strong>원리 8.7 (장기 처짐 계수)</strong> 지속 하중의 즉시 처짐 \(\Delta_{i,sus}\)에 대해 크리프와 건조 수축에 의한 추가 <span class="term">장기 처짐</span><span class="en">(long-term deflection)</span>은
+      <div class="formula">$$\Delta_{lt} = \lambda_\Delta\, \Delta_{i,sus}, \qquad \lambda_\Delta = \frac{\xi}{1 + 50\rho'}$$<div class="where">\(\xi\): <span class="term">시간 경과 계수</span><span class="en">(time-dependent factor)</span> — 3개월 1.0, 6개월 1.2, 1년 1.4, 5년 이상 2.0. \(\rho' = A_s'/(bd)\): 압축 철근비(단순·연속보는 경간 중앙, 캔틸레버는 지점 단면). \(\lambda_\Delta\)는 <span class="term">장기 처짐 계수</span><span class="en">(long-term deflection multiplier)</span>. KDS 14 20 30 형태, 현행 기준 확인. <code>CB.rc.lambdaD</code>가 이 식이다.</div></div></div>
+    <figure class="diagram" id="fig-sv-time">
+      <svg viewBox="0 0 860 310" role="img" aria-label="시간 경과 계수 xi의 표 값과 압축 철근비에 따른 장기 처짐 계수">
+        <rect x="10" y="10" width="840" height="290" rx="10" class="f-surface"/>
+        <g transform="translate(90,30)">
+          <line x1="0" y1="220" x2="560" y2="220" class="s-axis"/><line x1="0" y1="0" x2="0" y2="220" class="s-axis"/>
+          <g class="t-mono" text-anchor="middle"><text x="0" y="238">0</text><text x="28" y="238">3</text><text x="56" y="238">6</text><text x="112" y="238">12</text><text x="224" y="238">24</text><text x="336" y="238">36</text><text x="560" y="238">60 개월</text></g>
+          <g class="t-mono" text-anchor="end"><text x="-6" y="224">0</text><text x="-6" y="169">0.5</text><text x="-6" y="114">1.0</text><text x="-6" y="59">1.5</text><text x="-6" y="4">2.0</text></g>
+          <text x="8" y="-6" class="t-mono">ξ, λ<tspan baseline-shift="sub" font-size="8">Δ</tspan></text>
+          <polyline points="0,220 28,110 56,88 112,66 560,0" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <polyline points="0,220 28,128 56,110 112,92 560,37" style="fill:none;stroke:var(--accent-2);stroke-width:2.2;stroke-dasharray:6 4"/>
+          <polyline points="0,220 28,147 56,132 112,117 560,73" style="fill:none;stroke:var(--tension);stroke-width:2.2;stroke-dasharray:2 4"/>
+          <g style="fill:var(--accent)"><circle cx="28" cy="110" r="5"/><circle cx="56" cy="88" r="5"/><circle cx="112" cy="66" r="5"/><circle cx="560" cy="0" r="5"/></g>
+          <g class="t-mono" style="fill:var(--accent)"><text x="34" y="104">1.0</text><text x="62" y="82">1.2</text><text x="118" y="60">1.4</text><text x="540" y="14" text-anchor="end">2.0</text></g>
+          <text x="330" y="74" class="t-mono" style="fill:var(--accent)">ρ′ = 0: λ<tspan baseline-shift="sub" font-size="8">Δ</tspan> = ξ</text>
+          <text x="330" y="116" class="t-mono" style="fill:var(--accent-2)">ρ′ = 0.004 (G1 중앙): ÷ 1.20</text>
+          <text x="330" y="150" class="t-mono" style="fill:var(--tension)">ρ′ = 0.010: ÷ 1.50</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-5.</b> 시간 경과 계수 \(\xi\)의 표 값(점)과 압축 철근비에 따른 \(\lambda_\Delta\). 표 값 사이는 직선으로 이었다(교육용 보간, 기준의 곡선 그림은 현행 기준 확인). 장기 처짐의 절반이 첫 3개월에 생기고, 5년 뒤에는 즉시 처짐의 두 배가 더해진다. 압축 철근은 이 증가를 크게 줄인다.</figcaption>
+    </figure>
+    <p>처짐 제한에서 중요한 것은 "칸막이벽이나 마감이 붙은 뒤에 생기는 처짐"입니다. 벽을 세우기 전에 생긴 처짐은 벽에 해를 주지 않습니다. 그래서 기준은 손상되기 쉬운 비구조 요소를 받치는 바닥에 대해 \(\Delta_{after} = \lambda_\Delta \Delta_{i,sus} + \Delta_{i,L}\)(설치 뒤의 장기 처짐 + 활하중 즉시 처짐)을 제한합니다. 엄밀히는 벽을 세우기 전에 일어난 장기 처짐을 빼야 하지만, 이 책은 보수적으로 전부 넣습니다.</p>
+    <div class="callout"><strong>예제 8.3 (G1의 장기 처짐)</strong> 예제 8.2에서 \(\Delta_D = 10.6\) mm, \(\Delta_L = 5.2\) mm. 지속 하중은 고정 하중만으로 본다(업무시설, 교육용 가정). 경간 중앙 압축 철근 2-D25.
+      <ol class="sv-steps">
+        <li><b>압축 철근비.</b> \(\rho' = 1{,}013/(400 \times 634) = 0.0040\).</li>
+        <li><b>장기 처짐 계수(5년 이상).</b> \(\lambda_\Delta = 2.0/(1 + 50 \times 0.0040) = 2.0/1.20 = 1.67\).</li>
+        <li><b>설치 뒤 처짐.</b> \(\Delta_{after} = 1.67 \times 10.6 + 5.2 = 22.9\) mm.</li>
+        <li><b>판정.</b> 손상되기 쉬운 칸막이를 받친다면 ℓ/480 = 16.7 mm → <b>불합격</b>. 손상 우려가 없는 마감이면 ℓ/240 = 33.3 mm → 합격. 전체 처짐 \(\Delta_D + \Delta_L + \lambda_\Delta \Delta_D = 33.5\) mm(ℓ/239).</li>
+      </ol></div>
+    <div class="callout site"><strong>G1 처짐: 왜 StructureBook의 7.2 mm와 다른가</strong> StructureBook 15장 <a href="../../structure/chapters/serviceability.html#deflection">예제 15.1</a>은 G1을 4경간 연속보로 보고 <b>모든 경간에 같은 하중</b>을 실어, \(I_e = 0.5I_g\)(가정), 지속 활하중 30 %, \(\rho' = 0\)으로 설치 뒤 처짐 7.2 mm(ℓ/480 합격)를 얻었다. 이 장의 모형(예제 8.2–8.3)은 세 가지가 다르다. ① 이웃 경간의 활하중을 빼 이 경간의 정모멘트가 가장 큰 배치(\(M_a^+ = 350\) kN·m, 모든 경간 재하 때 178 kN·m의 약 2배)를 썼고, ② \(I_e\)를 철근량에서 계산해 0.40 \(I_g\)(D+L 단계 평균)로 더 작게 얻었으며, ③ 슬래브를 무시한 직사각형 단면이다. ①·②가 처짐을 키우고 ③이 크게 과대평가한다. G1 위의 210 mm 슬래브를 플랜지로 넣은 T형 단면(<a href="t-beam.html">4장</a>)은 \(I_g\)가 약 두 배이고 정모멘트 균열 단면의 중립축이 플랜지 안에 들어가 \(I_{cr}\)도 커진다. 실제 설계라면 T형 단면과 골조 해석으로 다시 계산해 ℓ/480을 확인하고, 모자라면 압축 철근을 늘리거나(\(\rho'\) = 0.01이면 \(\lambda_\Delta\) = 1.33) 칸막이를 처짐을 흡수하는 상세로 바꾼다(<a href="case-study.html">16장</a>에서 마무리).</div>
+    <div class="sim" id="sim-sv-long">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>장기 처짐 시간 곡선</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-long" aria-label="시간에 따른 G1 처짐 증가와 처짐 제한선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>압축 철근비 ρ′ <output id="sv-lt-rho-out"></output></span><input type="range" id="sv-lt-rho" min="0" max="0.02" step="0.0005" value="0.004"></label>
+          <label class="ctrl"><span>지속 활하중 비율 <output id="sv-lt-sus-out"></output></span><input type="range" id="sv-lt-sus" min="0" max="1" step="0.05" value="0"></label>
+          <label class="ctrl"><span>칸막이 설치 시점 <output id="sv-lt-t0-out"></output></span><input type="range" id="sv-lt-t0" min="0" max="12" step="0.5" value="0"></label>
+          <div class="ctrl"><span>비구조 요소</span><div class="seg" id="sv-lt-lim"><button data-value="480" class="on">손상 우려 ℓ/480</button><button data-value="240">우려 없음 ℓ/240</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">λ<sub>Δ</sub> (5년)</span><span class="v" id="sv-lt-lam">—</span></div>
+        <div class="stat"><span class="k">Δ<sub>i,sus</sub> · Δ<sub>i,L</sub></span><span class="v" id="sv-lt-di">—</span></div>
+        <div class="stat"><span class="k">설치 뒤 처짐</span><span class="v" id="sv-lt-da">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="sv-lt-j">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(ρ′ = 0.004, 고정 하중만 지속)에서 예제 8.3의 22.9 mm와 ℓ/480 불합격을 확인하세요 · ρ′를 0.012 정도로 올리면 몇 mm까지 줄어드나요? · 칸막이를 준공 6개월 뒤에 세운다고 하면 그 전에 일어난 장기 처짐(ξ = 1.2분)을 빼고 판정합니다 · 지속 활하중 비율을 올리면 Δ<sub>i,sus</sub>가 커집니다(StructureBook 예제는 30 %) · 모델: 원리 8.7, ξ 표 값 사이 직선 보간(교육용), 즉시 처짐은 예제 8.2 모형(<code>CB.beam</code>, 4-D25, I<sub>e</sub> 0.70/0.30 평균)으로 매번 다시 계산.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="limits">
+    <h2>처짐 제한과 최소 두께</h2>
+    <div class="problem"><strong>모든 보와 슬래브의 처짐을 계산해야 할까</strong>
+      <p>B-10의 한 층에는 큰보와 슬래브 구획이 수십 개 있습니다. 하나하나 I<sub>e</sub>와 λ<sub>Δ</sub>를 계산하는 대신, "이 정도 두께면 처짐을 계산하지 않아도 된다"는 경험적 기준이 있다면 설계 초기 단면을 정할 때도 편할 것입니다.</p></div>
+    <p><span class="term">처짐 한계</span><span class="en">(deflection limit)</span>는 무엇이 손상되는지에 따라 다릅니다. 아래 표는 기준의 최대 허용 처짐 형태입니다(KDS 14 20 30·ACI 318 형태, 현행 기준 확인). ℓ은 경간입니다.</p>
+    <div class="table-wrap"><table class="sv-tbl">
+      <thead><tr><th>부재의 형태</th><th>검토할 처짐</th><th>한계</th><th>G1(ℓ = 8 m)</th></tr></thead>
+      <tbody>
+        <tr><td>손상되기 쉬운 비구조 요소를 받치지 않는 평지붕</td><td>활하중 즉시 처짐</td><td>ℓ/180</td><td>44.4 mm</td></tr>
+        <tr><td>손상되기 쉬운 비구조 요소를 받치지 않는 바닥</td><td>활하중 즉시 처짐</td><td>ℓ/360</td><td class="hl">22.2 mm</td></tr>
+        <tr><td>손상되기 쉬운 비구조 요소를 받치거나 붙은 지붕·바닥</td><td>비구조 요소 설치 뒤의 전체 처짐(장기 + 추가 활하중 즉시)</td><td>ℓ/480</td><td class="hl">16.7 mm</td></tr>
+        <tr><td>손상 우려가 없는 비구조 요소를 받치거나 붙은 지붕·바닥</td><td>같음</td><td>ℓ/240</td><td>33.3 mm</td></tr>
+      </tbody></table></div>
+    <p>처짐 계산을 생략할 수 있는 두께가 <span class="term">최소 두께</span><span class="en">(minimum thickness)</span>입니다. 손상되기 쉬운 칸막이를 받치지 않는 1방향 부재에 대해 기준은 지지 조건별로 경간의 몇 분의 일을 정해 둡니다. 연속일수록 끝이 구속되어 처짐이 작으므로 더 얇아도 됩니다.</p>
+    <div class="callout def"><strong>원리 8.8 (처짐을 계산하지 않는 경우의 최소 두께)</strong> 보통 콘크리트, \(f_y = 400\) MPa, 손상되기 쉬운 비구조 요소를 받치지 않는 1방향 부재의 최소 두께 h<sub>min</sub>:
+      <div class="table-wrap"><table class="sv-tbl">
+        <thead><tr><th>부재</th><th>단순 지지</th><th>1단 연속</th><th>양단 연속</th><th>캔틸레버</th></tr></thead>
+        <tbody>
+          <tr><td>1방향 슬래브(속 찬)</td><td>ℓ/20</td><td>ℓ/24</td><td>ℓ/28</td><td>ℓ/10</td></tr>
+          <tr><td>보·리브가 있는 1방향 슬래브</td><td>ℓ/16</td><td>ℓ/18.5</td><td>ℓ/21</td><td>ℓ/8</td></tr>
+        </tbody></table></div>
+      <div class="where">\(f_y \ne 400\) MPa이면 \((0.43 + f_y/700)\)을 곱한다(KDS 14 20 30 형태, ACI는 0.4 + f<sub>y</sub>/700). 경량 콘크리트는 따로 보정한다. 이 표를 만족하지 않거나 칸막이를 받치는 부재는 처짐을 계산해 앞 표로 판정한다. 2방향 슬래브의 최소 두께는 <a href="slabs.html">9장</a>. 현행 기준 확인.</div></div>
+    <p>G1(양단 연속, ℓ = 8 m, SD500): \(h_{min} = 8{,}000/21 \times (0.43 + 500/700) = 381 \times 1.144 = 436\) mm \(\lt\) 700 mm. 두께 기준으로는 처짐 계산이 필요 없는 보입니다. 그런데 예제 8.3에서 ℓ/480을 넘었습니다. 모순이 아닙니다. 최소 두께 표는 <b>손상되기 쉬운 칸막이를 받치지 않는</b> 부재에만 쓰는 것이고, 칸막이를 받친다면 처음부터 계산으로 판정해야 합니다.</p>
+    <div class="sim" id="sim-sv-hmin">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>최소 두께 검토</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-hmin" aria-label="지지 조건별 최소 두께 막대와 부재 입면"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>부재</span><div class="seg" id="sv-hm-mem"><button data-value="beam" class="on">보</button><button data-value="slab">1방향 슬래브</button></div></div>
+          <div class="ctrl"><span>지지 조건</span><div class="seg" id="sv-hm-sup"><button data-value="ss">단순</button><button data-value="one">1단 연속</button><button data-value="both" class="on">양단 연속</button><button data-value="cant">캔틸레버</button></div></div>
+          <label class="ctrl"><span>경간 ℓ <output id="sv-hm-L-out"></output></span><input type="range" id="sv-hm-L" min="1.5" max="14" step="0.1" value="8"></label>
+          <div class="ctrl"><span><i style="font-style:normal">f<sub>y</sub></i></span><div class="seg" id="sv-hm-fy"><button data-value="300">300</button><button data-value="400">400</button><button data-value="500" class="on">500</button><button data-value="600">600</button></div></div>
+          <label class="ctrl"><span>실제 두께 h <output id="sv-hm-h-out"></output></span><input type="range" id="sv-hm-h" min="100" max="1200" step="10" value="700"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">계수(ℓ/·)</span><span class="v" id="sv-hm-c">—</span></div>
+        <div class="stat"><span class="k">f<sub>y</sub> 보정</span><span class="v" id="sv-hm-f">—</span></div>
+        <div class="stat"><span class="k">h<sub>min</sub></span><span class="v" id="sv-hm-hm">—</span></div>
+        <div class="stat"><span class="k">h / h<sub>min</sub></span><span class="v" id="sv-hm-r">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-hm-msg">—</div>
+      <div class="sim-note">해볼 것: G1(보, 양단 연속, 8 m, SD500)의 h<sub>min</sub> 436 mm를 확인하세요 · 같은 G1을 단순보로 바꾸면 572 mm, 캔틸레버면 1,144 mm입니다 · B-10 슬래브 210 mm를 1방향 슬래브 양단 연속 8 m로 보면 h<sub>min</sub>이 훨씬 커서 모자랍니다. B-10 슬래브는 2방향이라 9장의 다른 표를 씁니다 · 모델: 원리 8.8(KDS 14 20 30 형태, 현행 기준 확인), 보통 콘크리트.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="crack-width">
+    <h2>균열 폭: 무엇이 폭을 정하나</h2>
+    <div class="problem"><strong>같은 철근량인데 균열 폭이 두 배 다르다</strong>
+      <p>G1 하단에 2,027 mm²의 철근을 넣는 방법은 여러 가지입니다. D25 4개, D16 11개, D32 3개. 강도는 거의 같지만, 보 바닥에 생기는 균열은 철근을 어떻게 나눠 넣었는지에 따라 굵고 드문 균열이 되기도, 가늘고 촘촘한 균열이 되기도 합니다.</p></div>
+    <p>휨 균열이 생기면 그 자리의 콘크리트 인장은 0이 되고 철근이 모든 인장을 받습니다. 균열에서 멀어질수록 부착(<a href="development.html">7장</a>)으로 철근의 힘이 콘크리트로 다시 넘어가, 어느 거리에서 콘크리트 응력이 다시 파괴계수에 이르면 새 균열이 생깁니다. 그 거리가 <span class="term">균열 간격</span><span class="en">(crack spacing)</span>을 정합니다. <span class="term">균열 폭</span><span class="en">(crack width)</span>은 대략 균열 간격 동안 철근과 콘크리트가 늘어난 길이의 차이입니다.</p>
+    <figure class="diagram" id="fig-sv-cracks">
+      <svg viewBox="0 0 860 330" role="img" aria-label="보 바닥의 균열 간격과 균열 사이 철근 응력, 콘크리트 인장 응력 분포">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(80,36)">
+          <rect x="0" y="0" width="700" height="90" class="sv-conc"/>
+          <line x1="0" y1="72" x2="700" y2="72" style="stroke:var(--tension);stroke-width:4"/>
+          <path d="M100 90 L104 60 L98 30 M260 90 L256 52 L262 24 M420 90 L425 56 L419 22 M580 90 L576 58 L581 28" class="sv-crk" style="stroke-width:2"/>
+          <g class="t-mono" text-anchor="middle"><text x="180" y="108">s<tspan baseline-shift="sub" font-size="8">r</tspan></text><text x="340" y="108">s<tspan baseline-shift="sub" font-size="8">r</tspan></text><text x="500" y="108">s<tspan baseline-shift="sub" font-size="8">r</tspan></text></g>
+          <line x1="104" y1="100" x2="256" y2="100" class="sv-dim"/><line x1="264" y1="100" x2="416" y2="100" class="sv-dim"/><line x1="424" y1="100" x2="576" y2="100" class="sv-dim"/>
+          <text x="-6" y="76" text-anchor="end" class="t-mono" style="fill:var(--tension)">철근</text>
+          <line x1="0" y1="200" x2="700" y2="200" class="s-axis"/>
+          <path d="M20 160 Q 60 182 100 136 Q 180 186 260 136 Q 340 186 420 136 Q 500 186 580 136 Q 640 182 680 160" style="fill:none;stroke:var(--tension);stroke-width:2.6"/>
+          <line x1="0" y1="136" x2="700" y2="136" style="stroke:var(--tension);stroke-dasharray:3 3;opacity:.6"/>
+          <text x="704" y="140" class="t-mono" style="fill:var(--tension)">f<tspan baseline-shift="sub" font-size="8">s</tspan> (균열 단면)</text>
+          <text x="704" y="166" class="t-mono" style="fill:var(--tension)">f<tspan baseline-shift="sub" font-size="8">s,평균</tspan></text>
+          <line x1="0" y1="166" x2="700" y2="166" style="stroke:var(--tension);opacity:.35"/>
+          <path d="M20 250 Q 60 232 100 270 Q 180 222 260 270 Q 340 222 420 270 Q 500 222 580 270 Q 640 232 680 250" style="fill:none;stroke:var(--text-dim);stroke-width:2.2"/>
+          <line x1="0" y1="270" x2="700" y2="270" class="s-axis"/>
+          <text x="-6" y="246" text-anchor="end" class="t-mono">σ<tspan baseline-shift="sub" font-size="8">ct</tspan></text>
+          <text x="-6" y="160" text-anchor="end" class="t-mono">f<tspan baseline-shift="sub" font-size="8">s</tspan></text>
+          <text x="350" y="290" text-anchor="middle" class="t-dim">균열 사이 콘크리트가 받는 인장(인장 강화) — 균열에서 0, 가운데서 최대</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-6.</b> 휨 균열 사이의 힘 전달(개념도). 철근 응력은 균열 단면에서 가장 크고(원리 8.3의 \(f_s\)), 균열 사이에서는 부착으로 콘크리트가 인장을 나눠 받아 줄어든다. 균열 폭은 \(w \approx s_r(\varepsilon_{sm} - \varepsilon_{cm})\), 곧 간격 \(s_r\)과 철근의 평균 변형률에 비례한다. 콘크리트가 균열 사이에서 강성을 보태는 효과가 인장 강화이고, 브랜슨 식이 \(I_{cr}\)보다 큰 \(I_e\)를 주는 이유다.</figcaption>
+    </figure>
+    <p>실험에서 균열 폭을 키우는 인자는 세 가지로 정리됩니다. ① 사용 하중의 철근 응력 \(f_s\): 폭은 거의 \(f_s\)에 비례합니다. 고강도 철근으로 철근량을 줄이면 \(f_s\)가 올라가 균열이 넓어집니다. ② 피복 두께: 균열은 철근 자리에서 가장 좁고 표면으로 갈수록 벌어지므로, 피복이 두꺼우면 표면 폭이 커집니다. ③ 철근 하나가 맡는 콘크리트 면적: 같은 철근량을 가는 철근 여러 개로 나누면 균열이 촘촘해지고 하나하나가 가늘어집니다.</p>
+    <div class="callout def"><strong>원리 8.9 (거게리–러츠 형태의 균열 폭, 교육용)</strong> 거게리(P. Gergely)와 러츠(L. A. Lutz)가 1968년 실험 자료를 통계로 정리한 최대 표면 균열 폭(ACI 318-95 균열 제어 규정의 배경식 형태, SI 단위):
+      <div class="formula">$$w_{max} \approx 0.011\,\beta\, f_s \sqrt[3]{d_c A} \times 10^{-3}\ \text{mm}, \qquad \beta = \frac{h - kd}{d - kd}, \quad A = \frac{2 d_c\, b}{N}$$<div class="where">\(f_s\): 사용 하중 철근 응력(MPa), \(d_c\): 인장 연단에서 가장 가까운 철근 중심까지(mm), \(A\): 철근 하나가 맡는 <span class="term">유효 인장 면적</span><span class="en">(effective tension area)</span>(철근 도심 대칭 높이 \(2d_c\) × 폭 / 철근 수 \(N\)), \(\beta\): 철근 위치의 변형률을 표면으로 확대하는 비. ACI 318-95는 \(z = f_s\sqrt[3]{d_cA}\)를 실내 30 MN/m, 실외 25 MN/m 이하로 제한했다(형태). 현행 KDS·ACI는 이 식 대신 원리 8.10의 간격 제한을 쓴다. 이 식은 영향 인자를 보기 위한 교육용이다.</div></div></div>
+    <div class="sim" id="sim-sv-gl">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>균열 폭 영향 인자: 같은 철근량을 어떻게 나눌까</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-gl" aria-label="철근 응력에 따른 균열 폭 그래프와 단면의 유효 인장 면적"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span><i style="font-style:normal">철근 호칭(A<sub>s</sub> ≈ 2,027 mm² 유지)</i></span><div class="seg" id="sv-gl-bar"><button data-value="D16">D16</button><button data-value="D19">D19</button><button data-value="D22">D22</button><button data-value="D25" class="on">D25</button><button data-value="D29">D29</button><button data-value="D32">D32</button></div></div>
+          <label class="ctrl"><span><i style="font-style:normal">사용 철근 응력 f<sub>s</sub></i> <output id="sv-gl-fs-out"></output></span><input type="range" id="sv-gl-fs" min="100" max="450" step="5" value="300"></label>
+          <label class="ctrl"><span>피복(스터럽 바깥) <output id="sv-gl-cv-out"></output></span><input type="range" id="sv-gl-cv" min="20" max="90" step="1" value="40"></label>
+          <label class="ctrl"><span>β <output id="sv-gl-b-out"></output></span><input type="range" id="sv-gl-b" min="1.0" max="1.4" step="0.01" value="1.15"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">철근 수 N · d<sub>c</sub></span><span class="v" id="sv-gl-n">—</span></div>
+        <div class="stat"><span class="k">유효 인장 면적 A</span><span class="v" id="sv-gl-a">—</span></div>
+        <div class="stat"><span class="k">z = f<sub>s</sub>∛(d<sub>c</sub>A)</span><span class="v" id="sv-gl-z">—</span></div>
+        <div class="stat"><span class="k">w<sub>max</sub> (교육용)</span><span class="v" id="sv-gl-w">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: G1(D25 4개, 피복 40, f<sub>s</sub> = 300 MPa)에서 w ≈ 0.36 mm, z ≈ 28.5 MN/m(실내 한계 30 이하)를 확인하세요 · 같은 철근량을 D16으로 나누면 몇 개가 되고 폭은 얼마나 줄어드나요? D32로 모으면? · 피복을 40 → 70 mm로 늘리면 내구성은 좋아지지만 표면 균열 폭은 커집니다. 기준이 피복이 두꺼운 부재에 폭 제한을 무조건 적용하지 않는 이유입니다 · 모델: 원리 8.9(거게리–러츠 형태, SI, 교육용), 폭 b = 400 mm, 스터럽 D13, 철근은 한 단(폭에 다 안 들어가면 2단으로 그림, d<sub>c</sub>는 아랫단 기준).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="crack-control">
+    <h2>균열 제어: 철근 간격 제한</h2>
+    <div class="problem"><strong>균열 폭을 계산하지 않고 제어하는 법</strong>
+      <p>균열 폭은 흩어짐이 큰 양이어서 같은 보에서도 균열마다 두 배씩 다릅니다. 기준은 폭을 정밀하게 계산하게 하는 대신, 철근 응력과 피복에 따라 인장 철근 간격의 상한을 두어 "굵은 철근을 듬성듬성" 넣는 것을 막습니다.</p></div>
+    <div class="callout def"><strong>원리 8.10 (균열 제어를 위한 철근 간격)</strong> 휨 인장 연단에 가장 가까운 철근의 중심 간격 \(s\)는
+      <div class="formula">$$s \le 375\,\frac{\kappa_{cr}}{f_s} - 2.5\,c_c \quad\text{그리고}\quad s \le 300\,\frac{\kappa_{cr}}{f_s}$$<div class="where">\(f_s\): <span class="term">사용 하중 철근 응력</span><span class="en">(service steel stress)</span>(MPa, 근사로 \(\tfrac23 f_y\)), \(c_c\): 인장 철근 표면에서 콘크리트 표면까지 최소 두께(스터럽이 있으면 피복 + 스터럽 지름), \(\kappa_{cr}\): 건조 환경 280, 그 밖의 환경 210. KDS 14 20 30 형태(ACI 318의 380·280/f<sub>s</sub> 식과 같은 꼴), 현행 기준 확인. <code>CB.rc.sMax</code>가 이 식이다. 이 규정은 <span class="term">균열 제어</span><span class="en">(crack control)</span>를 위한 것이고, 수조처럼 엄격한 구조물은 따로 균열 폭을 계산해 노출 환경별 허용 폭과 비교한다.</div></div></div>
+    <figure class="diagram" id="fig-sv-spacing">
+      <svg viewBox="0 0 860 300" role="img" aria-label="보 단면 아래쪽의 피복 두께, cc, 철근 중심 간격 s, dc와 유효 인장 면적">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(110,30)">
+          <rect x="0" y="0" width="400" height="220" class="sv-conc"/>
+          <rect x="40" y="0" width="320" height="180" rx="10" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+          <rect x="0" y="137" width="400" height="83" style="fill:var(--tension);opacity:.12"/>
+          <line x1="133" y1="137" x2="133" y2="220" style="stroke:var(--tension);stroke-dasharray:3 3"/><line x1="267" y1="137" x2="267" y2="220" style="stroke:var(--tension);stroke-dasharray:3 3"/>
+          <g class="sv-bar"><circle cx="66" cy="152" r="13"/><circle cx="155" cy="152" r="13"/><circle cx="245" cy="152" r="13"/><circle cx="334" cy="152" r="13"/></g>
+          <line x1="66" y1="120" x2="155" y2="120" class="sv-dim"/><line x1="66" y1="114" x2="66" y2="126" class="sv-dim"/><line x1="155" y1="114" x2="155" y2="126" class="sv-dim"/>
+          <text x="110" y="112" text-anchor="middle" class="t-mono">s = 89.5</text>
+          <line x1="420" y1="165" x2="420" y2="220" class="sv-dim"/><line x1="414" y1="165" x2="426" y2="165" class="sv-dim"/><line x1="414" y1="220" x2="426" y2="220" class="sv-dim"/>
+          <text x="430" y="196" class="t-mono">c<tspan baseline-shift="sub" font-size="8">c</tspan> = 40 + 13 = 53</text>
+          <line x1="460" y1="152" x2="460" y2="220" class="sv-dim"/><line x1="454" y1="152" x2="466" y2="152" class="sv-dim"/>
+          <text x="470" y="160" class="t-mono">d<tspan baseline-shift="sub" font-size="8">c</tspan> = 65.4</text>
+          <line x1="-14" y1="180" x2="-14" y2="220" class="sv-dim"/><text x="-18" y="204" text-anchor="end" class="t-mono">피복 40</text>
+          <text x="200" y="250" text-anchor="middle" class="t-dim">파란 띠: 높이 2d<tspan baseline-shift="sub" font-size="8">c</tspan>의 유효 인장 면적, 점선으로 철근 하나씩 A = 2d<tspan baseline-shift="sub" font-size="8">c</tspan>b/N</text>
+          <text x="200" y="-6" text-anchor="middle" class="t-mono">G1 하단 4-D25 · 스터럽 D13(주황)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-7.</b> 균열 제어에 쓰는 치수. \(c_c\)는 철근 <b>표면</b>까지의 최소 두께(피복 + 스터럽 지름), \(d_c\)는 철근 <b>중심</b>까지, \(s\)는 인장 연단에 가장 가까운 철근의 중심 간격이다. G1의 중심 간격은 \((400 - 2 \times 53 - 25.4)/3 = 89.5\) mm. 피복 두께 자체는 내구성과 정착이 정한다(MaterialsBook 9장, <a href="development.html">7장</a>).</figcaption>
+    </figure>
+    <p>원리 8.10의 첫 식은 피복이 두꺼울수록 간격을 좁히라는 것이고, 둘째 식은 피복이 얇아도 넘을 수 없는 상한입니다. \(f_s\)가 클수록 둘 다 작아집니다. 여기서 <span class="term">피복 두께</span><span class="en">(concrete cover)</span>는 철근(스터럽 포함) 바깥 표면에서 콘크리트 표면까지의 거리로, 내구성(부식)과 내화, 부착을 위해 노출 조건별 최솟값이 정해져 있습니다. 보 춤이 큰 보(h가 900 mm를 넘는 형태)는 옆면에도 균열이 생기므로 인장 연단에서 h/2까지 옆면에 <span class="term">표피 철근</span><span class="en">(skin reinforcement)</span>을 같은 간격 규정으로 배치합니다(KDS 형태, 현행 기준 확인). G1(h = 700 mm)은 해당하지 않습니다.</p>
+    <div class="callout"><strong>예제 8.4 (G1의 균열 제어 간격)</strong> 하단 4-D25, 피복 40 mm, 스터럽 D13, SD500, 실내(건조 환경).
+      <ol class="sv-steps">
+        <li><b>철근 응력.</b> 근사 \(f_s = \tfrac23 \times 500 = 333\) MPa(예제 8.1의 계산값 301 MPa를 써도 된다).</li>
+        <li><b>c<sub>c</sub>.</b> 40 + 12.7 ≈ 53 mm.</li>
+        <li><b>간격 상한.</b> \(375 \times 280/333 - 2.5 \times 53 = 315 - 132 = 183\) mm, \(300 \times 280/333 = 252\) mm → \(s_{max} = 183\) mm.</li>
+        <li><b>판정.</b> 실제 중심 간격 89.5 mm \(\le\) 183 mm. <b>합격.</b> 습윤 환경(\(\kappa_{cr}\) = 210)이면 \(s_{max}\) = 104 mm로 줄지만 여전히 합격.</li>
+      </ol></div>
+    <div class="sim" id="sim-sv-smax">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>균열 간격 검토기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-smax" aria-label="보 단면의 철근 배치와 간격 상한 판정"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>보 폭 b <output id="sv-sm-b-out"></output></span><input type="range" id="sv-sm-b" min="250" max="800" step="10" value="400"></label>
+          <label class="ctrl"><span>한 단 철근 수 <output id="sv-sm-n-out"></output></span><input type="range" id="sv-sm-n" min="2" max="8" step="1" value="4"></label>
+          <div class="ctrl"><span>호칭</span><div class="seg" id="sv-sm-bar"><button data-value="D19">D19</button><button data-value="D22">D22</button><button data-value="D25" class="on">D25</button><button data-value="D29">D29</button><button data-value="D32">D32</button></div></div>
+          <label class="ctrl"><span>피복 <output id="sv-sm-cv-out"></output></span><input type="range" id="sv-sm-cv" min="20" max="100" step="1" value="40"></label>
+          <label class="ctrl"><span><i style="font-style:normal">f<sub>s</sub></i> <output id="sv-sm-fs-out"></output></span><input type="range" id="sv-sm-fs" min="150" max="450" step="1" value="333"></label>
+          <div class="ctrl"><span>환경</span><div class="seg" id="sv-sm-env"><button data-value="dry" class="on">건조(280)</button><button data-value="wet">그 밖(210)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">c<sub>c</sub></span><span class="v" id="sv-sm-cc">—</span></div>
+        <div class="stat"><span class="k">실제 간격 s</span><span class="v" id="sv-sm-s">—</span></div>
+        <div class="stat"><span class="k">s<sub>max</sub></span><span class="v" id="sv-sm-smax">—</span></div>
+        <div class="stat"><span class="k">순간격</span><span class="v" id="sv-sm-cl">—</span></div>
+      </div>
+      <div class="sv-msg" id="sv-sm-msg">—</div>
+      <div class="sim-note">해볼 것: G1 기본값에서 s ≈ 90 mm ≤ s<sub>max</sub> ≈ 184 mm를 확인하세요(c<sub>c</sub> = 40 + 12.7 = 52.7 mm로 계산해 예제 8.4의 반올림 값과 1 mm 다릅니다) · 보 폭을 800 mm로 넓히고 철근을 2개로 줄이면 간격이 상한을 넘습니다. 넓은 보는 철근 수를 늘려야 합니다 · 피복을 늘리면 첫 식이 지배해 s<sub>max</sub>가 줄어듭니다 · 철근 수를 늘려 순간격이 25 mm나 d<sub>b</sub>보다 작아지면 콘크리트가 채워지지 않습니다(3장, MaterialsBook 11장) · 모델: 원리 8.10(<code>CB.rc.sMax</code>, KDS 형태), 스터럽 D13, 한 단 배근.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="shrinkage-temperature">
+    <h2>수축·온도 철근</h2>
+    <div class="problem"><strong>하중이 없는 방향에도 철근이 필요한 이유</strong>
+      <p>1방향 슬래브는 짧은 방향으로만 휨을 받으니, 긴 방향에는 철근이 필요 없어 보입니다. 하지만 콘크리트는 마르면서 줄어들고(건조 수축), 계절마다 늘었다 줄었다 합니다. 보와 벽에 붙들린 슬래브는 마음대로 줄어들지 못해 인장을 받고, 철근이 없으면 몇 개의 넓은 균열로 갈라집니다.</p></div>
+    <p>구속된 수축이 만드는 인장 응력은 하중과 상관없이 생깁니다(MaterialsBook <a href="../../materials/chapters/shrinkage.html#restraint">8장</a>). 철근은 균열을 막지는 못하지만, 한 균열이 크게 벌어지기 전에 철근이 힘을 받아 이웃에 새 균열을 만들게 하여 <b>많은 가는 균열</b>로 나눕니다. 이 목적의 철근을 <span class="term">수축·온도 철근</span><span class="en">(shrinkage and temperature reinforcement)</span>이라 합니다.</p>
+    <figure class="diagram" id="fig-sv-shrink">
+      <svg viewBox="0 0 860 300" role="img" aria-label="구속된 슬래브의 수축 균열: 철근이 없을 때 넓은 균열 몇 개, 수축·온도 철근이 있을 때 가는 균열 여러 개">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <text x="0" y="-8" class="t" style="font-weight:700">(a) 수축·온도 철근 없음</text>
+          <rect x="0" y="0" width="16" height="70" style="fill:var(--text-dim)"/><rect x="724" y="0" width="16" height="70" style="fill:var(--text-dim)"/>
+          <rect x="16" y="20" width="708" height="30" class="sv-conc"/>
+          <path d="M250 20 L254 50 M520 20 L516 50" style="stroke:var(--bad);stroke-width:5"/>
+          <text x="252" y="70" text-anchor="middle" class="t-mono" style="fill:var(--bad)">w ≈ 1–2 mm</text><text x="518" y="70" text-anchor="middle" class="t-mono" style="fill:var(--bad)">넓은 균열</text>
+          <line x1="40" y1="8" x2="130" y2="8" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#sv-ah-ld)"/><line x1="700" y1="8" x2="610" y2="8" style="stroke:var(--accent-2);stroke-width:2" marker-end="url(#sv-ah-ld)"/>
+          <text x="370" y="12" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">수축하려는 변형 ← 구속 →</text>
+        </g>
+        <g transform="translate(60,170)">
+          <text x="0" y="-8" class="t" style="font-weight:700">(b) 수축·온도 철근 ρ ≥ 0.0020 형태</text>
+          <rect x="0" y="0" width="16" height="70" style="fill:var(--text-dim)"/><rect x="724" y="0" width="16" height="70" style="fill:var(--text-dim)"/>
+          <rect x="16" y="20" width="708" height="30" class="sv-conc"/>
+          <line x1="16" y1="35" x2="724" y2="35" style="stroke:var(--tension);stroke-width:3"/>
+          <path d="M90 20 L91 50 M170 20 L169 50 M250 20 L251 50 M330 20 L329 50 M410 20 L411 50 M490 20 L489 50 M570 20 L571 50 M650 20 L649 50" class="sv-crk"/>
+          <text x="370" y="70" text-anchor="middle" class="t-mono" style="fill:var(--tension)">같은 전체 수축을 여러 개의 가는 균열(0.1–0.3 mm 형태)로 나눈다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 8-8.</b> 구속된 슬래브의 수축 균열(개념도, 폭은 교육용 크기 감각). 전체 수축량은 같아도 철근이 균열을 여러 개로 나누어 하나하나의 폭을 줄인다. 철근량이 너무 적으면 첫 균열에서 철근이 항복해 (a)와 같아지므로 최소 철근비가 있다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 8.11 (수축·온도 철근의 최소량과 간격)</strong> 휨 철근에 직각 방향(1방향 슬래브의 긴 방향 등)으로, 콘크리트 전체 단면적에 대한 철근비
+      <div class="formula">$$\rho \ge 0.0020\ (f_y \le 400\ \text{MPa}), \qquad \rho \ge 0.0020 \times \frac{400}{f_y} \ge 0.0014\ (f_y \gt 400\ \text{MPa})$$<div class="where">간격은 슬래브 두께의 5배와 450 mm 중 작은 값 이하. KDS 14 20 50·70 형태(ACI 318-19는 모든 강종에 0.0018로 바꾸었다), 현행 기준 확인. 지하 외벽·매스 콘크리트처럼 구속이 강하면 이 최소량보다 더 넣는다.</div></div></div>
+    <div class="sim" id="sim-sv-ts">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>수축·온도 철근 간격 정하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sv-cv-ts" aria-label="슬래브 1 m 폭의 수축·온도 철근 배치와 요구량"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>슬래브 두께 h <output id="sv-ts-h-out"></output></span><input type="range" id="sv-ts-h" min="100" max="400" step="5" value="210"></label>
+          <div class="ctrl"><span><i style="font-style:normal">f<sub>y</sub></i></span><div class="seg" id="sv-ts-fy"><button data-value="300">300</button><button data-value="400" class="on">400</button><button data-value="500">500</button><button data-value="600">600</button></div></div>
+          <div class="ctrl"><span>호칭</span><div class="seg" id="sv-ts-bar"><button data-value="D10" class="on">D10</button><button data-value="D13">D13</button><button data-value="D16">D16</button></div></div>
+          <div class="ctrl"><span>간격 맞춤</span><div class="seg" id="sv-ts-rd"><button data-value="10">10 mm</button><button data-value="50" class="on">50 mm</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최소 ρ</span><span class="v" id="sv-ts-rho">—</span></div>
+        <div class="stat"><span class="k">소요 A<sub>s</sub> (1 m당)</span><span class="v" id="sv-ts-as">—</span></div>
+        <div class="stat"><span class="k">간격 상한 min(5h, 450)</span><span class="v" id="sv-ts-smax">—</span></div>
+        <div class="stat"><span class="k">선택</span><span class="v" id="sv-ts-pick">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: B-10 슬래브(210 mm, SD400)를 D10으로 배근하면 소요 420 mm²/m → D10 @150(476 mm²/m)입니다. D13이면 @300 · SD500으로 바꾸면 비율이 0.0016으로 줄어듭니다. 고강도 철근은 같은 균열을 더 적은 양으로 나눌 수 있다고 본 것입니다 · 두께를 400 mm로 키우면 철근이 크게 늘어납니다. 두꺼운 슬래브와 벽은 양면에 나누어 둡니다 · 모델: 원리 8.11(KDS 형태, 교육용). 간격은 소요량을 만족하는 값을 맞춤 단위로 내림해 정합니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="g1-check">
+    <h2>G1의 사용성 검토 정리</h2>
+    <p>지금까지의 계산을 한 장으로 모읍니다. 강도 설계(<a href="flexure.html">3장</a>·<a href="t-beam.html">4장</a>)에서 정한 단면과 철근을 그대로 두고, 사용 하중에서 처짐과 균열을 확인하는 것이 순서입니다.</p>
+    <div class="table-wrap"><table class="sv-tbl">
+      <thead><tr><th>항목</th><th>식</th><th>G1 값</th><th>판정</th></tr></thead>
+      <tbody>
+        <tr><td>균열 모멘트</td><td>f<sub>r</sub>I<sub>g</sub>/y<sub>t</sub></td><td>113 kN·m (M<sub>a</sub>/M<sub>cr</sub> = 3.1)</td><td>사용 하중에서 균열</td></tr>
+        <tr><td>균열 단면(정, 4-D25)</td><td>원리 8.3</td><td>kd = 182 mm, I<sub>cr</sub> = 3.81 × 10⁹ (압축 철근 포함 3.89 × 10⁹)</td><td>—</td></tr>
+        <tr><td>유효 I(정, M<sub>a</sub> 350)</td><td>원리 8.5</td><td>I<sub>e</sub> = 4.1 × 10⁹ mm⁴ (0.36 I<sub>g</sub>)</td><td>—</td></tr>
+        <tr><td>활하중 즉시 처짐</td><td>Δ<sub>D+L</sub> − Δ<sub>D</sub></td><td>15.8 − 10.6 = 5.2 mm</td><td class="hl">≤ ℓ/360 = 22.2 합격</td></tr>
+        <tr><td>설치 뒤 처짐</td><td>λ<sub>Δ</sub>Δ<sub>D</sub> + Δ<sub>L</sub></td><td>1.67 × 10.6 + 5.2 = 22.9 mm</td><td>ℓ/480 불합격 · ℓ/240 합격</td></tr>
+        <tr><td>최소 두께</td><td>ℓ/21 × 1.144</td><td>436 mm ≤ 700 mm</td><td>합격(칸막이 없을 때)</td></tr>
+        <tr><td>균열 제어 간격</td><td>원리 8.10</td><td>s = 89.5 ≤ s<sub>max</sub> = 183 mm</td><td class="hl">합격</td></tr>
+        <tr><td>균열 폭(교육용)</td><td>원리 8.9</td><td>w ≈ 0.36 mm, z = 28.6 MN/m</td><td>실내 형태 한계 이내</td></tr>
+      </tbody></table></div>
+    <div class="callout site"><strong>G1 사용성 요약과 앞 권 값과의 관계</strong> CONTRIBUTING 표의 균열·처짐 값(kd ≈ 223 mm, I<sub>cr</sub> ≈ 5.3 × 10⁹, I<sub>e</sub> ≈ 5.6 × 10⁹ mm⁴)은 앞 권들의 단순보 근사 배근인 <b>7-D25(2단, d = 610 mm)</b>로 계산한 값이다. 이 장의 계산기(sim-sv-crack, "앞 권 7-D25")가 같은 값(223 mm, 5.34 × 10⁹, M<sub>a</sub> 350에서 5.54 × 10⁹)을 재현한다. 연속보로 설계한 4-D25는 철근이 적어 I<sub>cr</sub>이 3.81 × 10⁹로 약 30 % 작고, 그만큼 처짐이 크다. 강도에서 아낀 철근이 사용성에서 비용으로 돌아오는 전형적인 예이며, 실제 G1은 슬래브와 일체인 T형 단면이라 이 직사각형 계산보다 훨씬 덜 처진다. 칸막이를 받치는 바닥이면 T형 단면 재계산과 압축 철근 보강을 <a href="case-study.html">16장</a>의 설계 실습에서 마무리한다. 균열 제어는 여유가 크다(s = 89.5 ≤ 183 mm). 이 책의 계수와 계산은 학습용이며 실제 설계에는 현행 KDS 14 20 30 등을 적용해야 한다.</div>
+    <div class="callout warn"><strong>흔한 실수</strong> ① 사용성 검토에 계수 하중(460 kN·m)을 쓰는 것 — 사용 하중(350)으로 한다. ② 활하중 처짐을 \(I_e\)(D+L)로 활하중만 실어 계산하는 것 — 비선형이므로 \(\Delta_{D+L} - \Delta_D\)로 구한다. ③ 장기 처짐 계수를 전체 하중 처짐에 곱하는 것 — 지속 하중 처짐에만 곱한다. ④ 최소 두께를 만족했으니 칸막이를 받치는 보도 처짐 계산이 필요 없다고 보는 것. ⑤ 균열 간격 검토의 \(c_c\)를 철근 중심까지로 재는 것 — 표면까지다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="flexure.html"><small>CH.03 · 단철근 보의 휨</small>강도로 정한 단면과 철근<br><span>G1 4-D25, φM<sub>n</sub> 503 kN·m, 최소 철근과 M<sub>cr</sub>.</span></a>
+      <a href="t-beam.html"><small>CH.04 · 복철근 보와 T형 보</small>압축 철근과 플랜지<br><span>ρ′가 장기 처짐을, 플랜지가 I<sub>g</sub>를 바꾼다.</span></a>
+      <a href="development.html"><small>CH.07 · 정착과 이음</small>부착이 균열 간격을 정한다<br><span>부착 응력과 인장 강화, 철근 응력 전달.</span></a>
+      <a href="slabs.html"><small>CH.09 · 슬래브</small>슬래브 최소 두께와 수축·온도 철근<br><span>210 mm 2방향 슬래브의 처짐과 배근 간격.</span></a>
+      <a href="prestressed.html"><small>CH.15 · 프리스트레스트 콘크리트</small>균열을 없애고 솟음을 준다<br><span>사용 하중에서 비균열 단면, 캠버.</span></a>
+      <a href="case-study.html"><small>CH.16 · B-10 설계 실습</small>G1 사용성 마무리<br><span>T형 단면 재계산, 칸막이 상세.</span></a>
+      <a href="../../structure/chapters/serviceability.html"><small>StructureBook · CH.15</small>사용성 설계<br><span>처짐 제한, 균열 폭, 바닥 진동, 기둥 축소.</span></a>
+      <a href="../../materials/chapters/shrinkage.html"><small>MaterialsBook · CH.08</small>수축과 크리프<br><span>크리프 계수, 유효 탄성계수, 구속 균열.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>사용성 검토는 사용 하중(하중 계수 1.0)으로 하고, 장기 처짐은 지속 하중으로 계산한다. 사용 하중에서 RC 보는 보통 균열 후 탄성 상태다(G1: M<sub>a</sub>/M<sub>cr</sub> ≈ 3.1).</li>
+      <li>환산 단면: n = E<sub>s</sub>/E<sub>c</sub>(G1 7.27). 균열 단면 중립축 b(kd)²/2 = nA<sub>s</sub>(d − kd), I<sub>cr</sub> = b(kd)³/3 + nA<sub>s</sub>(d − kd)². G1 4-D25: kd 182 mm, I<sub>cr</sub> 3.81 × 10⁹ mm⁴(0.33 I<sub>g</sub>), f<sub>s</sub> ≈ 301 MPa.</li>
+      <li>M<sub>cr</sub> = f<sub>r</sub>I<sub>g</sub>/y<sub>t</sub>, f<sub>r</sub> = 0.63λ√f<sub>ck</sub>. G1 113 kN·m.</li>
+      <li>브랜슨 I<sub>e</sub> = (M<sub>cr</sub>/M<sub>a</sub>)³I<sub>g</sub> + [1 − (M<sub>cr</sub>/M<sub>a</sub>)³]I<sub>cr</sub> ≤ I<sub>g</sub>. 연속보는 0.70I<sub>e,m</sub> + 0.15(I<sub>e,1</sub> + I<sub>e,2</sub>) 형태로 평균. ACI 318-19는 2/3M<sub>cr</sub>을 쓰는 다른 형태로 바꾸었다.</li>
+      <li>활하중 처짐 = Δ<sub>D+L</sub> − Δ<sub>D</sub>(하중 단계마다 I<sub>e</sub>). 장기 추가 처짐 = λ<sub>Δ</sub>Δ<sub>i,sus</sub>, λ<sub>Δ</sub> = ξ/(1 + 50ρ′), ξ = 1.0 · 1.2 · 1.4 · 2.0(3개월 · 6개월 · 1년 · 5년 이상).</li>
+      <li>처짐 한계 ℓ/180(지붕)·ℓ/360(바닥, 활하중)·ℓ/480(손상 우려 비구조 요소, 설치 뒤)·ℓ/240. 최소 두께(보 ℓ/16 · 18.5 · 21 · 8, 슬래브 ℓ/20 · 24 · 28 · 10, × (0.43 + f<sub>y</sub>/700))는 칸막이를 받치지 않는 부재에만.</li>
+      <li>균열 폭은 f<sub>s</sub>, 피복, 철근 하나가 맡는 면적이 정한다. 같은 철근량이면 가는 철근을 촘촘히. 기준은 간격 s ≤ min(375κ<sub>cr</sub>/f<sub>s</sub> − 2.5c<sub>c</sub>, 300κ<sub>cr</sub>/f<sub>s</sub>)로 제어한다(G1 89.5 ≤ 183 mm).</li>
+      <li>수축·온도 철근 ρ ≥ 0.0020(f<sub>y</sub> ≤ 400), 0.0020 × 400/f<sub>y</sub> ≥ 0.0014, 간격 ≤ 5h, 450 mm(형태). G1의 설치 뒤 처짐 22.9 mm는 직사각형 단면 기준으로 ℓ/480을 넘어, T형 단면 재계산과 ρ′ 보강을 16장에서 다룬다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. E<sub>s</sub> = 200,000 MPa, E<sub>c</sub> = 25,000 MPa일 때 균열 환산 단면에서 인장 철근 A<sub>s</sub> = 1,500 mm²의 환산 면적은?</p><div class="opts">
+        <button class="opt">1,500 mm²</button><button class="opt">10,500 mm²</button><button class="opt" data-correct>12,000 mm²</button><button class="opt">13,500 mm²</button>
+      </div><div class="quiz-exp">n = 200,000/25,000 = 8, nA<sub>s</sub> = 12,000 mm². 압축 철근이라면 그 자리의 콘크리트를 빼서 (n − 1)A<sub>s</sub>′ = 10,500 mm²로 환산한다.</div></div>
+      <div class="quiz-q"><p>2. b = 300 mm, h = 600 mm 보(f<sub>r</sub> = 3.45 MPa)의 균열 모멘트에 가장 가까운 값은?</p><div class="opts">
+        <button class="opt">31 kN·m</button><button class="opt" data-correct>62 kN·m</button><button class="opt">124 kN·m</button><button class="opt">186 kN·m</button>
+      </div><div class="quiz-exp">I<sub>g</sub> = 300 × 600³/12 = 5.4 × 10⁹ mm⁴, y<sub>t</sub> = 300 mm, M<sub>cr</sub> = 3.45 × 5.4 × 10⁹/300 = 62.1 × 10⁶ N·mm = 62 kN·m. (= f<sub>r</sub>bh²/6)</div></div>
+      <div class="quiz-q"><p>3. M<sub>a</sub> = 2M<sub>cr</sub>, I<sub>cr</sub> = 0.4I<sub>g</sub>일 때 브랜슨 식의 I<sub>e</sub>/I<sub>g</sub>는?</p><div class="opts">
+        <button class="opt">0.40</button><button class="opt" data-correct>0.475</button><button class="opt">0.55</button><button class="opt">0.70</button>
+      </div><div class="quiz-exp">(M<sub>cr</sub>/M<sub>a</sub>)³ = 1/8 = 0.125. I<sub>e</sub>/I<sub>g</sub> = 0.125 × 1 + 0.875 × 0.4 = 0.475.</div></div>
+      <div class="quiz-q"><p>4. 활하중 즉시 처짐을 "D + L 단계의 I<sub>e</sub>로 활하중만 실어 계산"하지 않고 Δ<sub>D+L</sub> − Δ<sub>D</sub>로 구하는 이유는?</p><div class="opts">
+        <button class="opt">계산이 더 쉬워서</button><button class="opt" data-correct>균열 때문에 하중–처짐 관계가 비선형이어서 중첩이 성립하지 않기 때문에</button><button class="opt">활하중이 지속 하중이기 때문에</button><button class="opt">장기 처짐을 포함시키기 위해</button>
+      </div><div class="quiz-exp">I<sub>e</sub>가 하중 단계(M<sub>a</sub>)마다 다르므로 처짐은 하중에 비례하지 않는다. 고정 하중으로 이미 균열이 생긴 상태에서 활하중이 더해질 때의 처짐 증가분이 활하중 처짐이다.</div></div>
+      <div class="quiz-q"><p>5. 지속 하중의 즉시 처짐이 12 mm, 압축 철근비 ρ′ = 0.010인 보의 5년 뒤 추가 장기 처짐은?</p><div class="opts">
+        <button class="opt">12 mm</button><button class="opt" data-correct>16 mm</button><button class="opt">24 mm</button><button class="opt">36 mm</button>
+      </div><div class="quiz-exp">λ<sub>Δ</sub> = 2.0/(1 + 50 × 0.010) = 1.33, 추가 처짐 1.33 × 12 = 16 mm. 압축 철근이 없으면 24 mm다.</div></div>
+      <div class="quiz-q"><p>6. 처짐을 계산하지 않는 1방향 슬래브(양단 연속, ℓ = 4.2 m, f<sub>y</sub> = 400 MPa)의 최소 두께는?</p><div class="opts">
+        <button class="opt" data-correct>150 mm</button><button class="opt">175 mm</button><button class="opt">200 mm</button><button class="opt">263 mm</button>
+      </div><div class="quiz-exp">속 찬 1방향 슬래브 양단 연속은 ℓ/28 = 4,200/28 = 150 mm. f<sub>y</sub> = 400 MPa이므로 보정 없음. (보라면 ℓ/21 = 200 mm.)</div></div>
+      <div class="quiz-q"><p>7. 같은 인장 철근량을 D32 3개 대신 D19 8개로 바꿀 때 균열에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">철근 응력이 크게 줄어 균열이 없어진다</button><button class="opt">균열 수와 폭이 모두 커진다</button><button class="opt" data-correct>균열은 촘촘해지지만 하나하나의 폭이 줄어든다</button><button class="opt">피복이 두꺼워져 폭이 커진다</button>
+      </div><div class="quiz-exp">철근량이 같으면 f<sub>s</sub>는 거의 같다. 철근 하나가 맡는 유효 인장 면적 A = 2d<sub>c</sub>b/N이 줄고 부착 둘레가 늘어 균열 간격이 줄고, 그만큼 폭이 가늘어진다(원리 8.9, 시뮬레이터 sim-sv-gl).</div></div>
+      <div class="quiz-q"><p>8. 건조 환경(κ<sub>cr</sub> = 280), f<sub>s</sub> = 280 MPa, c<sub>c</sub> = 50 mm일 때 균열 제어 철근 간격 상한 s<sub>max</sub>는?</p><div class="opts">
+        <button class="opt">125 mm</button><button class="opt" data-correct>250 mm</button><button class="opt">300 mm</button><button class="opt">375 mm</button>
+      </div><div class="quiz-exp">375 × 280/280 − 2.5 × 50 = 375 − 125 = 250 mm, 300 × 280/280 = 300 mm → 작은 값 250 mm.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const SV = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${SV.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath();
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); ctx.restore();
+  },
+  arrow(ctx, x0, y0, x1, y1, color, width = 2, head = 8) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, h = Math.min(head, L * 0.6);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * h * 0.7, y1 - uy * h * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45); ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = SV._c || (SV._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  circle(ctx, x, y, r, fill) { ctx.save(); ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, r), 0, Math.PI * 2); ctx.fill(); ctx.restore(); },
+  msg(id, html, cls) { const el = document.getElementById(id); if (!el) return; el.innerHTML = html; el.className = "sv-msg" + (cls ? " " + cls : ""); },
+  bar(name) { return CB.steel.BARS[name]; },
+  G: CB.rc.REF.G1, Ab: CB.steel.BARS.D25.A, L: 8, wD: 56.7, wL: 20,
+  K: 263.6 / 76.7,           // 지점 모멘트 / w (사용 정모멘트 350 kN·m가 되게, 교육용)
+  Ec: CB.conc.Ec(30),
+  /** G1 정모멘트(중앙) 단면: 하단 nb-D25, 상단 2-D25 압축 */
+  secPos(nb = 4) { const d = nb <= 5 ? 634 : 610; return CB.rc.crack({ b: 400, h: 700, d, As: nb * SV.Ab, d2: 66, As2: 2 * SV.Ab, fck: 30 }); },
+  /** G1 지점 단면: 상단 6-D25(인장, d 610), 하단 4-D25 압축 */
+  secNeg: CB.rc.crack({ b: 400, h: 700, d: 610, As: 6 * 506.7, d2: 66, As2: 4 * 506.7, fck: 30 }),
+  /** 교육용 내부 경간 모형: 단순 지지 + 양 끝 부모멘트 Me = K w. → { v (mm, 아래 +), Mp, Me, Iav, Iep, Ien, beam } */
+  span(w, o = {}) {
+    const cp = o.cp || SV.secPos(o.nb || 4), cn = SV.secNeg, cont = o.mode !== "ss";
+    const Me = cont ? SV.K * w : 0, Mp = (w * SV.L * SV.L) / 8 - Me;
+    const Iep = o.I ? o.I : CB.rc.Ie(cp.Mcr, Mp, cp.Ig, cp.Icr), Ien = o.I ? o.I : CB.rc.Ie(cn.Mcr, Me, cn.Ig, cn.Icr);
+    const Iav = o.I ? o.I : cont && o.avg !== "m" ? 0.7 * Iep + 0.3 * Ien : Iep;
+    if (w <= 0) return { v: 0, Mp: 0, Me: 0, Iav, Iep, Ien, beam: null, cp };
+    const EI = SV.Ec * Iav * 1e-9;
+    const loads = [{ type: "udl", w, a: 0, b: SV.L }];
+    if (cont) loads.push({ type: "moment", M: Me, a: 0 }, { type: "moment", M: -Me, a: SV.L });
+    const beam = CB.beam({ L: SV.L, EI, supports: [{ x: 0, type: "pin" }, { x: SV.L, type: "roller" }], loads });
+    return { v: -beam.at(SV.L / 2).v * 1000, Mp, Me, Iav, Iep, Ien, beam, cp };
+  },
+};
+
+/* ---------- 1. 균열 단면 계산기 ---------- */
+(function () {
+  const PRE = { pos: [4, 2, 634, 350], old: [7, 0, 610, 350], neg: [6, 4, 610, 490] };
+  const pre = CB.seg("sv-cr-pre", (v) => { const p = PRE[v]; gn.set(p[0], false); gnc.set(p[1], false); gd.set(p[2], false); gma.set(p[3], false); gf.set(30, false); go(); });
+  const gn = CB.range("sv-cr-n", (v) => v + "개", go), gnc = CB.range("sv-cr-nc", (v) => v + "개", go), gd = CB.range("sv-cr-d", (v) => v + " mm", go);
+  const gf = CB.range("sv-cr-fck", (v) => v + " MPa", go), gma = CB.range("sv-cr-ma", (v) => v + " kN·m", go);
+  let R = null;
+  function calc() {
+    const n = gn(), nc = gnc(), d = gd(), fck = gf(), Ma = gma(), Ab = SV.Ab;
+    const c = CB.rc.crack({ b: 400, h: 700, d, As: n * Ab, d2: 66, As2: nc * Ab, fck });
+    const cracked = Ma > c.Mcr, M = Ma * 1e6;
+    let fc, fs, fsc, yNA;
+    if (cracked) { fc = (M * c.kd) / c.Icr; fs = (c.n * M * (d - c.kd)) / c.Icr; fsc = (c.n * M * (c.kd - 66)) / c.Icr; yNA = c.kd; }
+    else { fc = (M * 350) / c.Ig; fs = (c.n * M * (d - 350)) / c.Ig; fsc = (c.n * M * (350 - 66)) / c.Ig; yNA = 350; }
+    const ft = cracked ? 0 : (M * 350) / c.Ig;
+    return { n, nc, d, fck, Ma, c, cracked, fc, fs, fsc, ft, yNA };
+  }
+  const cv = CB.canvas("#sv-cv-crack", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), r = R, top = 34, Hs = H - top - 34, s = Hs / 700;
+    const narrow = W < 460, bw = 400 * s, x0 = narrow ? 30 : Math.max(30, W * 0.12), y0 = top;
+    // 단면
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(x0, y0, bw, 700 * s);
+    if (r.cracked) { ctx.fillStyle = SV.alpha(pal.bg, 0.55); ctx.fillRect(x0, y0 + r.yNA * s, bw, (700 - r.yNA) * s);
+      ctx.save(); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.2; [0.2, 0.5, 0.8].forEach((f, i) => { const xx = x0 + bw * f; ctx.beginPath(); ctx.moveTo(xx, y0 + 700 * s); ctx.lineTo(xx + (i - 1) * 3, y0 + (700 - (700 - r.yNA) * 0.85) * s); ctx.stroke(); }); ctx.restore(); }
+    ctx.fillStyle = SV.alpha(pal.compression, 0.22); ctx.fillRect(x0, y0, bw, r.yNA * s);
+    ctx.strokeStyle = pal.dim; ctx.lineWidth = 1.2; ctx.strokeRect(x0, y0, bw, 700 * s);
+    const rb = Math.max(2.5, 12.7 * s), place = (cnt, y) => { const cl = 53 + 12.7; for (let i = 0; i < cnt; i++) { const xx = cnt === 1 ? 200 : cl + ((400 - 2 * cl) * i) / (cnt - 1); SV.circle(ctx, x0 + xx * s, y0 + y * s, rb, y < r.yNA ? pal.compression : pal.tension); } };
+    const n1 = Math.min(5, r.n), n2 = r.n - n1, y1 = r.d + (n2 * 50.4) / r.n; place(n1, y1); if (n2) place(n2, y1 - 50.4);
+    if (r.nc) place(r.nc, 66);
+    SV.line(ctx, [[x0 - 10, y0 + r.yNA * s], [x0 + bw + 10, y0 + r.yNA * s]], pal.warn, 1.6, [5, 4]);
+    SV.text(ctx, (r.cracked ? "kd = " : "y = ") + CB.num(r.yNA, 0), x0 + bw / 2, y0 + r.yNA * s - 10, pal.warn, { size: 11 });
+    SV.text(ctx, pre() === "neg" ? "부모멘트 단면(뒤집어 그림)" : "단면 400 × 700", x0 + bw / 2, 14, pal.dim, { size: 11, bold: false });
+    // 응력도: 축 오른쪽 압축, 왼쪽 인장(환산 응력 fs/n)
+    const sx0 = x0 + bw + (narrow ? 26 : 50), sw = W - sx0 - (narrow ? 14 : 40), sx = sx0 + sw * 0.45, fmax = Math.max(r.fc, r.fs / r.n, r.ft, 1);
+    const k = (sw * 0.45) / fmax;
+    SV.line(ctx, [[sx, y0], [sx, y0 + 700 * s]], pal.axis, 1.2);
+    ctx.fillStyle = SV.alpha(pal.compression, 0.3); ctx.beginPath(); ctx.moveTo(sx, y0); ctx.lineTo(sx + r.fc * k, y0); ctx.lineTo(sx, y0 + r.yNA * s); ctx.closePath(); ctx.fill();
+    SV.line(ctx, [[sx + r.fc * k, y0], [sx, y0 + r.yNA * s]], pal.compression, 2);
+    if (!r.cracked) { ctx.fillStyle = SV.alpha(pal.tension, 0.25); ctx.beginPath(); ctx.moveTo(sx, y0 + 350 * s); ctx.lineTo(sx - r.ft * k, y0 + 700 * s); ctx.lineTo(sx, y0 + 700 * s); ctx.closePath(); ctx.fill(); SV.line(ctx, [[sx, y0 + 350 * s], [sx - r.ft * k, y0 + 700 * s]], pal.tension, 2); }
+    else SV.line(ctx, [[sx, y0 + r.yNA * s], [sx - (r.fs / r.n) * k, y0 + r.d * s]], pal.tension, 1.2, [3, 3]);
+    const xa = sx - Math.max(8, (r.fs / r.n) * k);
+    SV.arrow(ctx, sx, y0 + r.d * s, xa, y0 + r.d * s, pal.tension, 3, 8);
+    SV.text(ctx, `fc ${CB.num(r.fc, 1)}`, sx + r.fc * k, y0 - 10, pal.compression, { size: 11, align: "right" });
+    SV.text(ctx, `fs = ${CB.num(r.fs, 0)} MPa`, sx + 6, y0 + r.d * s + 14, pal.tension, { size: 11, align: "left" });
+    SV.text(ctx, "fs/n", xa, y0 + r.d * s - 12, pal.tension, { size: 10.5, align: "left", bold: false });
+    SV.text(ctx, "← 인장 · 압축 →", sx, y0 + 700 * s + 14, pal.faint, { size: 10, bold: false });
+    SV.text(ctx, r.cracked ? "균열 단면(인장 콘크리트 무시)" : "균열 전(전 단면)", sx0 + sw / 2, 14, pal.dim, { size: 11, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.62), minHeight: 300, maxHeight: 440 });
+  function go() {
+    R = calc(); cv.redraw(); const r = R, c = r.c;
+    CB.stat("sv-cr-kd", `${CB.num(c.n, 2)} · ${CB.num(c.kd, 1)} mm`);
+    CB.stat("sv-cr-icr", `${CB.num(c.Icr / 1e9, 2)}×10⁹ (${CB.num(c.Icr / c.Ig, 2)})`);
+    CB.stat("sv-cr-mcr", `${CB.num(c.Mcr, 1)} kN·m`);
+    CB.stat("sv-cr-fs", `${CB.num(r.fc, 1)} · ${CB.num(r.fs, 0)} MPa`);
+    const Ie = CB.rc.Ie(c.Mcr, r.Ma, c.Ig, c.Icr);
+    if (r.fs >= 500) SV.msg("sv-cr-msg", `<b>사용 하중에서 철근이 항복합니다(f<sub>s</sub> ≥ f<sub>y</sub>).</b> 단면 부족 — 철근을 늘리거나 단면을 키우세요.`, "bad");
+    else if (!r.cracked) SV.msg("sv-cr-msg", `M<sub>a</sub> ${r.Ma} ≤ M<sub>cr</sub> ${CB.num(c.Mcr, 0)} kN·m — 균열 전입니다. 인장 연단 응력 ${CB.num(r.ft, 2)} MPa ≤ f<sub>r</sub> ${CB.num(c.fr, 2)} MPa, I<sub>e</sub> = I<sub>g</sub>.`, "ok");
+    else SV.msg("sv-cr-msg", `균열 단면: f<sub>c</sub> = ${CB.num(r.fc, 1)} MPa(${CB.num(r.fc / r.fck, 2)} f<sub>ck</sub>${r.fc > 0.6 * r.fck ? ", 삼각형 응력 가정이 약해지는 영역" : ""}), f<sub>s</sub> = ${CB.num(r.fs, 0)} MPa(⅔f<sub>y</sub> = 333과 비교), 압축 철근 ${r.nc ? CB.num(r.fsc, 0) + " MPa" : "없음"}. 브랜슨 I<sub>e</sub> = ${CB.num(Ie / 1e9, 2)}×10⁹ mm⁴(${CB.num(Ie / c.Ig, 2)} I<sub>g</sub>).`, r.fc > 0.6 * r.fck ? "warn" : "");
+  }
+  go();
+})();
+
+/* ---------- 2. Ie 곡선 ---------- */
+(function () {
+  const gr = CB.range("sv-ie-r", (v) => v.toFixed(2), go), gc = CB.range("sv-ie-c", (v) => v.toFixed(2), go), gm = CB.seg("sv-ie-m", go), gb = CB.seg("sv-ie-b", go);
+  const br = (r, c, m) => (r <= 1 ? 1 : Math.min(1, Math.pow(1 / r, m) + (1 - Math.pow(1 / r, m)) * c));
+  const bi = (r, c) => { const k = 2 / 3 / r; return r <= 2 / 3 ? 1 : Math.min(1, c / (1 - k * k * (1 - c))); };
+  const cv = CB.canvas("#sv-cv-ie", (ctx, W, H) => {
+    const pal = CB.palette(), c = gc(), m = +gm(), r = gr(), A = [], B = [];
+    for (let i = 0; i <= 300; i++) { const x = 0.3 + (5.7 * i) / 300; A.push([x, br(x, c, m)]); B.push([x, bi(x, c)]); }
+    const series = [{ data: A, color: pal.accent, width: 2.8 }]; if (gb() === "on") series.push({ data: B, color: pal.accent2, width: 2, dash: [6, 4] });
+    const pts = [{ x: r, y: br(r, c, m), color: pal.accent, r: 6 }]; if (gb() === "on") pts.push({ x: r, y: bi(r, c), color: pal.accent2, r: 5 });
+    const C = CB.chart(ctx, { x: 54, y: 16, w: W - 54 - 16, h: H - 16 - 46 }, { x: [0, 6], y: [0, 1.05], xLabel: "Ma / Mcr", yLabel: "Ie / Ig", series,
+      hlines: [{ y: c, color: pal.warn, label: "Icr/Ig" }], vlines: [{ x: 1, color: pal.faint, label: "균열" }, { x: r, color: pal.dim, dash: [2, 3] }], points: pts });
+    SV.text(ctx, "G1", C.X(3.1), C.Y(1.0) + 4, pal.faint, { size: 10.5, bold: false });
+    SV.line(ctx, [[C.X(3.1), C.Y(1.0) + 12], [C.X(3.1), C.Y(0.9)]], pal.faint, 1, [2, 2]);
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.5), minHeight: 260, maxHeight: 360 });
+  function go() {
+    cv.redraw(); const c = gc(), m = +gm(), r = gr(), b = br(r, c, m), s = bi(r, c);
+    CB.stat("sv-ie-w", r <= 1 ? "1 (균열 전)" : CB.num(Math.pow(1 / r, m), 3));
+    CB.stat("sv-ie-br", CB.num(b, 3)); CB.stat("sv-ie-bi", gb() === "on" ? CB.num(s, 3) : "—");
+    CB.stat("sv-ie-dr", `× ${CB.num(1 / b, 2)}${gb() === "on" ? " · × " + CB.num(1 / s, 2) : ""}`);
+  }
+  go();
+})();
+
+/* ---------- 3. 하중–처짐 곡선 ---------- */
+(function () {
+  const gw = CB.range("sv-ld-w", (v) => v.toFixed(1) + " kN/m", go), gs = CB.seg("sv-ld-sup", go), ga = CB.seg("sv-ld-avg", go), gnb = CB.seg("sv-ld-nb", go);
+  let cur = null, curve = [], lines = null, key = "";
+  function build() {
+    const k = gs() + ga() + gnb(); if (k === key) return; key = k;
+    const o = { mode: gs(), avg: ga(), nb: +gnb() }; o.cp = SV.secPos(o.nb); curve = [];
+    for (let w = 0; w <= 110.01; w += 1.25) curve.push([SV.span(w, o).v, w]);
+    const ug = SV.span(1, { ...o, I: o.cp.Ig }).v, Icr = gs() === "ss" || ga() === "m" ? o.cp.Icr : 0.7 * o.cp.Icr + 0.3 * SV.secNeg.Icr, uc = SV.span(1, { ...o, I: Icr }).v;
+    lines = { ug, uc, wcr: o.cp.Mcr / (gs() === "ss" ? 8 : 8 - SV.K) };
+  }
+  const cv = CB.canvas("#sv-cv-ld", (ctx, W, H) => {
+    if (!cur) return; const pal = CB.palette(), xmax = Math.max(20, ...curve.map((p) => p[0])) * 1.08;
+    const C = CB.chart(ctx, { x: 54, y: 16, w: W - 54 - 18, h: H - 16 - 46 }, { x: [0, xmax], y: [0, 115], xLabel: "중앙 처짐 Δ (mm)", yLabel: "w (kN/m)",
+      series: [{ data: [[0, 0], [115 * lines.ug, 115]], color: pal.faint, width: 1.4, dash: [5, 4] }, { data: [[0, 0], [115 * lines.uc, 115]], color: pal.warn, width: 1.4, dash: [5, 4] }, { data: curve, color: pal.accent, width: 3 }],
+      hlines: [{ y: 76.7, color: pal.accent2, label: "D + L 76.7" }, { y: 56.7, color: pal.faint, label: "D 56.7" }, { y: lines.wcr, color: pal.ok, label: "Mcr 도달", dash: [2, 3] }],
+      vlines: [{ x: 8000 / 360, color: pal.bad, label: "ℓ/360", dash: [3, 3] }],
+      points: [{ x: cur.v, y: gw(), color: pal.accent2, r: 6 }] });
+    const yl = Math.min(112, Math.max(30, 12 / lines.ug)) ; SV.text(ctx, "EcIg", C.X(yl * lines.ug) + 6, C.Y(yl) + 2, pal.faint, { size: 10.5, align: "left" });
+    const yc = Math.min(112, (xmax * 0.9) / lines.uc); SV.text(ctx, "EcIcr", C.X(yc * lines.uc) + 6, C.Y(yc) + 10, pal.warn, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.55), minHeight: 280, maxHeight: 380 });
+  function go() {
+    build(); const o = { mode: gs(), avg: ga(), nb: +gnb() }; cur = SV.span(gw(), o); cv.redraw();
+    const Ig = cur.cp.Ig, dD = SV.span(56.7, o).v, dDL = SV.span(76.7, o).v;
+    CB.stat("sv-ld-ma", `${CB.num(cur.Mp, 0)} kN·m${gw() > 0 ? (cur.Mp > cur.cp.Mcr ? " (균열)" : " (균열 전)") : ""}`);
+    CB.stat("sv-ld-ie", CB.num(cur.Iav / Ig, 3)); CB.stat("sv-ld-d", `${CB.num(cur.v, 1)} mm (ℓ/${cur.v > 0.01 ? CB.sig(8000 / cur.v, 3) : "∞"})`);
+    CB.stat("sv-ld-dl", `${CB.num(dDL - dD, 1)} mm ${dDL - dD <= 8000 / 360 ? "≤" : ">"} 22.2`);
+  }
+  go();
+})();
+
+/* ---------- 4. 장기 처짐 시간 곡선 ---------- */
+(function () {
+  const grho = CB.range("sv-lt-rho", (v) => v.toFixed(4), go), gsus = CB.range("sv-lt-sus", (v) => Math.round(v * 100) + " %", go), gt0 = CB.range("sv-lt-t0", (v) => v.toFixed(1) + " 개월", go), glim = CB.seg("sv-lt-lim", go);
+  const XI = [[0, 0], [3, 1], [6, 1.2], [12, 1.4], [60, 2]];
+  const xi = (t) => { if (t >= 60) return 2; for (let i = 1; i < XI.length; i++) if (t <= XI[i][0]) return CB.lerp(XI[i - 1][1], XI[i][1], (t - XI[i - 1][0]) / (XI[i][0] - XI[i - 1][0])); return 2; };
+  let S = null;
+  const cv = CB.canvas("#sv-cv-long", (ctx, W, H) => {
+    if (!S) return; const pal = CB.palette(), lam = (t) => xi(t) / (1 + 50 * grho());
+    const A = [], B = []; for (let t = 0; t <= 72; t += 0.5) { A.push([t, S.dsus * (1 + lam(t))]); B.push([t, S.dsus * (1 + lam(t)) + S.dL]); }
+    const t0 = gt0(), base = S.dsus * (1 + lam(t0)), lim = 8000 / +glim(), top = Math.max(B[B.length - 1][1], base + lim) * 1.15;
+    const C = CB.chart(ctx, { x: 54, y: 16, w: W - 54 - 18, h: H - 16 - 46 }, { x: [0, 72], y: [0, top], xLabel: "시간 (개월)", yLabel: "처짐 (mm)",
+      series: [{ data: A, color: pal.accent, width: 2.8 }, { data: B, color: pal.accent2, width: 2.2, dash: [6, 4] }],
+      hlines: [{ y: base + lim, color: S.ok ? pal.ok : pal.bad }],
+      vlines: [{ x: t0, color: pal.dim, label: "칸막이 설치", dash: [3, 3] }],
+      points: [{ x: t0, y: base, color: pal.dim, r: 4 }, { x: 72, y: B[B.length - 1][1], color: S.ok ? pal.ok : pal.bad, r: 6 }] });
+    const xA = C.X(70) - 4; SV.arrow(ctx, xA, C.Y(base), xA, C.Y(B[B.length - 1][1]) + 2, S.ok ? pal.ok : pal.bad, 2, 7);
+    SV.text(ctx, `${CB.num(S.after, 1)} mm`, xA - 6, (C.Y(base) + C.Y(B[B.length - 1][1])) / 2, S.ok ? pal.ok : pal.bad, { size: 11.5, align: "right" });
+    SV.text(ctx, `한계: 설치 시점 처짐 + ℓ/${glim()}`, C.X(6), C.Y(base + lim) - 10, S.ok ? pal.ok : pal.bad, { size: 10.5, align: "left" });
+    SV.text(ctx, "지속 하중", C.X(40), C.Y(A[80][1]) + 12, pal.accent, { size: 10.5, bold: false });
+    SV.text(ctx, "+ 활하중", C.X(40), C.Y(B[80][1]) - 12, pal.accent2, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.52), minHeight: 270, maxHeight: 370 });
+  function go() {
+    const ws = SV.wD + gsus() * SV.wL, dsus = SV.span(ws).v, dDL = SV.span(SV.wD + SV.wL).v, dL = dDL - dsus;
+    const lam5 = 2 / (1 + 50 * grho()), lam0 = xi(gt0()) / (1 + 50 * grho()), after = (lam5 - lam0) * dsus + dL, lim = 8000 / +glim();
+    S = { dsus, dL, after, ok: after <= lim }; cv.redraw();
+    CB.stat("sv-lt-lam", CB.num(lam5, 2)); CB.stat("sv-lt-di", `${CB.num(dsus, 1)} · ${CB.num(dL, 1)} mm`);
+    CB.stat("sv-lt-da", `${CB.num(after, 1)} mm`); CB.stat("sv-lt-j", `${S.ok ? "합격" : "불합격"} ≤ ${CB.num(lim, 1)}`);
+    document.getElementById("sv-lt-j").style.color = S.ok ? "var(--ok)" : "var(--bad)";
+  }
+  go();
+})();
+
+/* ---------- 5. 최소 두께 ---------- */
+(function () {
+  const T = { beam: { ss: 16, one: 18.5, both: 21, cant: 8 }, slab: { ss: 20, one: 24, both: 28, cant: 10 } }, NAME = { ss: "단순", one: "1단 연속", both: "양단 연속", cant: "캔틸레버" };
+  const gm = CB.seg("sv-hm-mem", go), gs = CB.seg("sv-hm-sup", go), gL = CB.range("sv-hm-L", (v) => v.toFixed(1) + " m", go), gfy = CB.seg("sv-hm-fy", go), gh = CB.range("sv-hm-h", (v) => v + " mm", go);
+  const fac = () => (+gfy() === 400 ? 1 : 0.43 + +gfy() / 700);
+  const cv = CB.canvas("#sv-cv-hmin", (ctx, W, H) => {
+    const pal = CB.palette(), keys = ["ss", "one", "both", "cant"], vals = keys.map((k) => (gL() * 1000 / T[gm()][k]) * fac());
+    const top = Math.max(gh(), ...vals) * 1.18, x0 = 54, y0 = 20, w = W - x0 - 16, h = H - y0 - 54, Y = (v) => y0 + h - (v / top) * h;
+    CB.chart(ctx, { x: x0, y: y0, w, h }, { x: [0, 4], y: [0, top], xTicks: [], yLabel: "두께 (mm)", hlines: [{ y: gh(), color: pal.accent2, label: `실제 h = ${gh()} mm`, dash: [] }] });
+    keys.forEach((k, i) => {
+      const bx = x0 + (w / 4) * i + w / 16, bwid = w / 8, on = k === gs(), v = vals[i];
+      ctx.fillStyle = on ? SV.alpha(v <= gh() ? pal.ok : pal.bad, 0.55) : SV.alpha(pal.dim, 0.22); ctx.fillRect(bx, Y(v), bwid, Y(0) - Y(v));
+      ctx.strokeStyle = on ? (v <= gh() ? pal.ok : pal.bad) : pal.faint; ctx.lineWidth = on ? 2 : 1; ctx.strokeRect(bx, Y(v), bwid, Y(0) - Y(v));
+      SV.text(ctx, CB.num(v, 0), bx + bwid / 2, Y(v) - 10, on ? pal.text : pal.dim, { size: 11 });
+      SV.text(ctx, NAME[k], bx + bwid / 2, Y(0) + 14, on ? pal.text : pal.dim, { size: W < 420 ? 9.5 : 11, bold: on });
+      SV.text(ctx, `ℓ/${T[gm()][k]}`, bx + bwid / 2, Y(0) + 30, pal.faint, { size: 10, bold: false });
+    });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 350 });
+  function go() {
+    cv.redraw(); const c = T[gm()][gs()], f = fac(), hm = (gL() * 1000 / c) * f, r = gh() / hm;
+    CB.stat("sv-hm-c", "ℓ/" + c); CB.stat("sv-hm-f", "× " + CB.num(f, 3)); CB.stat("sv-hm-hm", CB.num(hm, 0) + " mm"); CB.stat("sv-hm-r", CB.num(r, 2));
+    if (r >= 1) SV.msg("sv-hm-msg", `h = ${gh()} mm ≥ h<sub>min</sub> = ${CB.num(hm, 0)} mm — <b>처짐 계산을 생략할 수 있습니다</b>(손상되기 쉬운 칸막이를 받치지 않는 경우에 한함).`, "ok");
+    else SV.msg("sv-hm-msg", `h = ${gh()} mm &lt; h<sub>min</sub> = ${CB.num(hm, 0)} mm — 처짐을 계산해 처짐 한계 표로 판정해야 합니다. 두께를 ${CB.num(hm, 0)} mm 이상으로 키우면 계산을 생략할 수 있습니다.`, "bad");
+  }
+  go();
+})();
+
+/* ---------- 6. 균열 폭(거게리–러츠 형태) ---------- */
+(function () {
+  const As0 = 4 * SV.Ab, b = 400, st = 12.7;
+  const gbar = CB.seg("sv-gl-bar", go), gfs = CB.range("sv-gl-fs", (v) => v + " MPa", go), gcv = CB.range("sv-gl-cv", (v) => v + " mm", go), gb = CB.range("sv-gl-b", (v) => v.toFixed(2), go);
+  function calc(bar, cv, fs, beta) {
+    const B = SV.bar(bar), N = Math.max(2, Math.ceil(As0 / B.A - 1e-6)), clear = Math.max(25, B.d), per = Math.max(2, Math.floor((b - 2 * (cv + st) - B.d) / (B.d + clear)) + 1);
+    const n1 = Math.min(N, per), n2 = N - n1, dc = cv + st + B.d / 2, yb = (n1 * dc + n2 * (dc + B.d + 25)) / N, A = (2 * yb * b) / N;
+    const z = fs * Math.cbrt(dc * A), w = 0.011 * beta * z * 1e-3;
+    return { B, N, n1, n2, dc, yb, A, z, w };
+  }
+  const cv = CB.canvas("#sv-cv-gl", (ctx, W, H) => {
+    const pal = CB.palette(), r = calc(gbar(), gcv(), gfs(), gb()), narrow = W < 520;
+    // 단면(아래쪽 일부)
+    const sw = narrow ? W - 40 : W * 0.34, sh = narrow ? H * 0.34 : H - 60, sx = 20, sy = narrow ? 14 : 30, depth = 260, s = Math.min(sw / b, sh / depth);
+    const X = (x) => sx + x * s, Yb = (y) => sy + (depth - y) * s;
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(X(0), Yb(depth), b * s, depth * s);
+    ctx.fillStyle = SV.alpha(pal.tension, 0.16); ctx.fillRect(X(0), Yb(2 * r.yb), b * s, 2 * r.yb * s);
+    ctx.strokeStyle = pal.accent; ctx.lineWidth = 2; ctx.strokeRect(X(gcv() + st / 2), Yb(depth), (b - 2 * gcv() - st) * s, (depth - gcv() - st / 2) * s);
+    const row = (cnt, y) => { const cl = gcv() + st + r.B.d / 2; for (let i = 0; i < cnt; i++) SV.circle(ctx, X(cnt === 1 ? b / 2 : cl + ((b - 2 * cl) * i) / (cnt - 1)), Yb(y), (r.B.d / 2) * s, pal.tension); };
+    row(r.n1, r.dc); if (r.n2) row(r.n2, r.dc + r.B.d + 25);
+    ctx.strokeStyle = pal.dim; ctx.lineWidth = 1; ctx.strokeRect(X(0), Yb(depth), b * s, depth * s);
+    SV.text(ctx, `${r.N}-${gbar()} · 유효 인장 면적 2ȳ×b`, X(b / 2), Yb(depth) + (narrow ? 12 : -14), pal.dim, { size: 10.5, bold: false });
+    // 그래프
+    const gx = narrow ? 54 : sx + b * s + 64, gy = narrow ? sy + depth * s + 26 : 16, gw = W - gx - 16, gh = H - gy - 46, D = [], D2 = [], D3 = [];
+    for (let f = 0; f <= 450; f += 10) { D.push([f, calc(gbar(), gcv(), f, gb()).w]); D2.push([f, calc("D16", gcv(), f, gb()).w]); D3.push([f, calc("D32", gcv(), f, gb()).w]); }
+    const C = CB.chart(ctx, { x: gx, y: gy, w: gw, h: gh }, { x: [0, 450], y: [0, 0.7], xLabel: "fs (MPa)",
+      series: [{ data: D2, color: pal.faint, width: 1.2, dash: [3, 3] }, { data: D3, color: pal.faint, width: 1.2, dash: [7, 3] }, { data: D, color: pal.accent, width: 2.8 }],
+      hlines: [{ y: 0.4, color: pal.warn, label: "0.4" }, { y: 0.3, color: pal.ok, label: "0.3" }], points: [{ x: gfs(), y: r.w, color: pal.accent2, r: 6 }] });
+    SV.text(ctx, "w (mm)", gx + 4, gy + 6, pal.dim, { size: 11, align: "left", bold: false });
+    SV.text(ctx, "D16", C.X(440), C.Y(D2[44][1]) + 10, pal.faint, { size: 10, align: "right", bold: false });
+    SV.text(ctx, "D32", C.X(440), C.Y(D3[44][1]) - 10, pal.faint, { size: 10, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 1.15 : 0.5), minHeight: 300, maxHeight: 420 });
+  function go() {
+    cv.redraw(); const r = calc(gbar(), gcv(), gfs(), gb());
+    CB.stat("sv-gl-n", `${r.N}개${r.n2 ? "(2단)" : ""} · ${CB.num(r.dc, 1)} mm`); CB.stat("sv-gl-a", `${CB.sig(r.A, 3)} mm²`);
+    CB.stat("sv-gl-z", `${CB.num(r.z / 1000, 1)} MN/m ${r.z / 1000 <= 30 ? "≤ 30" : "> 30"}`); CB.stat("sv-gl-w", `${CB.num(r.w, 2)} mm`);
+  }
+  go();
+})();
+
+/* ---------- 7. 균열 간격 검토기 ---------- */
+(function () {
+  const st = 12.7;
+  const gb = CB.range("sv-sm-b", (v) => v + " mm", go), gn = CB.range("sv-sm-n", (v) => v + "개", go), gbar = CB.seg("sv-sm-bar", go), gcv = CB.range("sv-sm-cv", (v) => v + " mm", go), gfs = CB.range("sv-sm-fs", (v) => v + " MPa", go), genv = CB.seg("sv-sm-env", go);
+  let R = null;
+  function calc() {
+    const b = gb(), n = gn(), B = SV.bar(gbar()), cc = gcv() + st, s = (b - 2 * cc - B.d) / (n - 1), smax = CB.rc.sMax(gfs(), cc, genv() === "dry");
+    const clear = s - B.d, need = Math.max(25, B.d);
+    return { b, n, B, cc, s, smax, clear, need, fits: clear >= need, ok: s <= smax && smax > 0 };
+  }
+  const cv = CB.canvas("#sv-cv-smax", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), r = R, depth = 220, s = Math.min((W - 40) / r.b, (H - 70) / depth), x0 = (W - r.b * s) / 2, y0 = 20;
+    const X = (x) => x0 + x * s, Y = (y) => y0 + (depth - y) * s;
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(X(0), Y(depth), r.b * s, depth * s);
+    ctx.strokeStyle = pal.accent; ctx.lineWidth = Math.max(1.5, st * s * 0.5); ctx.strokeRect(X(gcv() + st / 2), Y(depth), (r.b - 2 * gcv() - st) * s, (depth - gcv() - st / 2) * s);
+    const yc = r.cc + r.B.d / 2, xs = []; for (let i = 0; i < r.n; i++) xs.push(r.cc + r.B.d / 2 + r.s * i);
+    xs.forEach((x) => SV.circle(ctx, X(x), Y(yc), (r.B.d / 2) * s, r.fits ? pal.tension : pal.bad));
+    ctx.strokeStyle = pal.dim; ctx.lineWidth = 1; ctx.strokeRect(X(0), Y(depth), r.b * s, depth * s);
+    // 실제 간격 치수
+    const yd = Y(yc + r.B.d / 2) - 14;
+    SV.line(ctx, [[X(xs[0]), yd], [X(xs[1]), yd]], pal.text, 1.2); SV.line(ctx, [[X(xs[0]), yd - 5], [X(xs[0]), yd + 5]], pal.text, 1.2); SV.line(ctx, [[X(xs[1]), yd - 5], [X(xs[1]), yd + 5]], pal.text, 1.2);
+    SV.text(ctx, `s = ${CB.num(r.s, 1)}`, (X(xs[0]) + X(xs[1])) / 2, yd - 12, pal.text, { size: 11 });
+    // s_max 막대(바닥 아래)
+    const yb = Y(0) + 22, smx = Math.max(0, r.smax), x1 = Math.min(X(xs[0] + smx), W - 6);
+    SV.line(ctx, [[X(xs[0]), yb], [x1, yb]], r.ok ? pal.ok : pal.bad, 3); SV.line(ctx, [[X(xs[0]), yb - 6], [X(xs[0]), yb + 6]], r.ok ? pal.ok : pal.bad, 2);
+    if (X(xs[0] + smx) <= W - 6) SV.line(ctx, [[x1, yb - 6], [x1, yb + 6]], r.ok ? pal.ok : pal.bad, 2);
+    SV.text(ctx, `smax = ${CB.num(r.smax, 0)} mm`, Math.min(x1, W - 70), yb + 16, r.ok ? pal.ok : pal.bad, { size: 11, align: "center" });
+    // cc 치수
+    SV.line(ctx, [[X(r.b) + 8, Y(0)], [X(r.b) + 8, Y(r.cc)]], pal.dim, 1); SV.text(ctx, `cc ${CB.num(r.cc, 0)}`, X(r.b) + 4, Y(r.cc) - 10, pal.dim, { size: 10.5, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.48), minHeight: 250, maxHeight: 340 });
+  function go() {
+    R = calc(); cv.redraw(); const r = R;
+    CB.stat("sv-sm-cc", CB.num(r.cc, 1) + " mm"); CB.stat("sv-sm-s", CB.num(r.s, 1) + " mm"); CB.stat("sv-sm-smax", r.smax > 0 ? CB.num(r.smax, 0) + " mm" : "0 (불가)"); CB.stat("sv-sm-cl", `${CB.num(r.clear, 1)} mm`);
+    if (!r.fits) SV.msg("sv-sm-msg", `순간격 ${CB.num(r.clear, 1)} mm &lt; ${CB.num(r.need, 1)} mm(25 mm와 d<sub>b</sub> 중 큰 값) — <b>철근이 한 단에 들어가지 않습니다.</b> 철근 수를 줄이고 2단으로 배치하거나 폭을 넓히세요.`, "bad");
+    else if (r.smax <= 0) SV.msg("sv-sm-msg", `피복이 너무 두꺼워 첫 식이 0 이하입니다(c<sub>c</sub> = ${CB.num(r.cc, 0)} mm). 이런 부재는 균열 폭을 따로 검토하거나 피복 안쪽에 표면 철근망을 둡니다(교육용 판단).`, "bad");
+    else if (r.ok) SV.msg("sv-sm-msg", `s = ${CB.num(r.s, 1)} mm ≤ s<sub>max</sub> = ${CB.num(r.smax, 0)} mm — <b>합격</b>. 간격 여유 ${CB.num(r.smax / r.s, 2)}배.`, "ok");
+    else SV.msg("sv-sm-msg", `s = ${CB.num(r.s, 1)} mm &gt; s<sub>max</sub> = ${CB.num(r.smax, 0)} mm — <b>불합격</b>. 같은 철근량을 더 가는 철근 여러 개로 나누거나 f<sub>s</sub>를 낮추세요(철근량 증가).`, "bad");
+  }
+  go();
+})();
+
+/* ---------- 8. 수축·온도 철근 ---------- */
+(function () {
+  const gh = CB.range("sv-ts-h", (v) => v + " mm", go), gfy = CB.seg("sv-ts-fy", go), gbar = CB.seg("sv-ts-bar", go), grd = CB.seg("sv-ts-rd", go);
+  let R = null;
+  function calc() {
+    const h = gh(), fy = +gfy(), B = SV.bar(gbar()), rho = fy <= 400 ? 0.002 : Math.max(0.0014, (0.002 * 400) / fy), As = rho * 1000 * h, smax = Math.min(5 * h, 450), sreq = (B.A * 1000) / As, rd = +grd();
+    const s = Math.max(rd, Math.floor(Math.min(smax, sreq) / rd) * rd), Asp = (B.A * 1000) / s;
+    return { h, fy, B, rho, As, smax, sreq, s, Asp, gov: sreq < smax ? "소요량" : "최대 간격" };
+  }
+  const cv = CB.canvas("#sv-cv-ts", (ctx, W, H) => {
+    if (!R) return; const pal = CB.palette(), r = R, m = 24, w = W - 2 * m, s = w / 1000;
+    // 평면 1 m
+    const py = 30, ph = Math.max(70, H * 0.42);
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(m, py, w, ph); ctx.strokeStyle = pal.dim; ctx.lineWidth = 1; ctx.strokeRect(m, py, w, ph);
+    for (let x = r.s / 2; x < 1000; x += r.s) SV.line(ctx, [[m + x * s, py + 4], [m + x * s, py + ph - 4]], pal.tension, Math.max(1.5, r.B.d * s));
+    SV.text(ctx, `평면 1 m 폭: ${gbar()} @${r.s} (${CB.num(r.Asp, 0)} mm²/m)`, m + w / 2, py - 14, pal.text, { size: 11.5 });
+    // 단면
+    const sy = py + ph + 34, sh = Math.max(24, Math.min(H - sy - 30, r.h * s * 1.2)), k = sh / r.h;
+    ctx.fillStyle = CB.color("surface-2"); ctx.fillRect(m, sy, w, sh); ctx.strokeRect(m, sy, w, sh);
+    for (let x = r.s / 2; x < 1000; x += r.s) SV.circle(ctx, m + x * s, sy + sh / 2, Math.max(2, (r.B.d / 2) * k), pal.tension);
+    SV.text(ctx, `단면 h = ${r.h} mm (철근은 두께 가운데에 그림)`, m + w / 2, sy + sh + 14, pal.dim, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.7 : 0.42), minHeight: 230, maxHeight: 320 });
+  function go() {
+    R = calc(); cv.redraw(); const r = R;
+    CB.stat("sv-ts-rho", CB.num(r.rho, 4)); CB.stat("sv-ts-as", `${CB.num(r.As, 0)} mm²/m`); CB.stat("sv-ts-smax", `${CB.num(r.smax, 0)} mm`);
+    CB.stat("sv-ts-pick", `${gbar()} @${r.s} (${r.gov})`);
+  }
+  go();
+})();
+</script>
+</body>
+</html>

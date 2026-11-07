@@ -1,0 +1,1346 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>슬래브 · ConcreteBook</title>
+<meta name="description" content="넓은 판에 철근을 깐다. 1방향 슬래브의 단위 폭 설계와 근사 모멘트 계수, 최소 두께, 수축·온도 철근과 최대 간격, 직접 설계법 띠 모멘트로 정하는 2방향 슬래브 배근, 뚫림 전단 보강과 개구부, B-10 210 mm 슬래브 배근도를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .sl-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .sl-msg b { color: var(--text); }
+  .sl-msg.ok { color: var(--ok); }
+  .sl-msg.bad { color: var(--bad); }
+  .sl-msg.ok b, .sl-msg.bad b { color: inherit; }
+  .sl-tbl td, .sl-tbl th { font-variant-numeric: tabular-nums; }
+  .sl-tbl td.num { text-align: right; font-family: var(--mono); font-size: 13.5px; white-space: nowrap; }
+  .sl-tbl td.hl { color: var(--accent); font-weight: 700; }
+  .sl-steps { margin: 6px 0 0; }
+  .sl-steps li { margin: 4px 0; }
+  #sl-cv-open { touch-action: none; }
+  #sl-cv-plan { cursor: crosshair; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="concrete"></script>
+</head>
+<body data-chapter="slabs">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="sl-ah-ld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="sl-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="sl-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 09</div>
+    <h1 data-no-glossary>슬래브</h1>
+    <p class="lead">보와 기둥은 선이지만 바닥은 면입니다. 건물 콘크리트의 절반 안팎이 들어가는 이 얇은 판은 하중을 두 방향으로 나르고, 철근도 한 방향이 아니라 격자로 깝니다. StructureBook 3장은 바닥이 어떻게 휘는지, 직접 설계법으로 모멘트가 어디에 얼마나 생기는지를 구했습니다. 이 장은 그 모멘트를 <b>철근</b>으로 바꿉니다. 판에서 폭 1 m 띠를 잘라 3장의 보처럼 설계하고, 모멘트가 작아도 반드시 넣어야 하는 수축·온도 철근과 간격 제한이 언제 설계를 지배하는지 보고, 기둥 둘레의 뚫림 전단에 전단 보강과 개구부를 더해 검토한 뒤, 기준 건물 B-10의 210 mm 슬래브에 <b>D13 철근을 몇 mm 간격으로</b> 깔지 배근도로 정합니다.</p>
+    <ul class="objectives">
+      <li>슬래브의 형식(1방향·2방향·플랫 플레이트·플랫 슬래브·와플)과 하중 경로를 구분하고, 폭 1 m 단위 폭 보로 설계하는 이유를 설명한다.</li>
+      <li>연속 1방향 슬래브의 근사 모멘트 계수를 쓰는 조건과 근거를 해석 결과와 비교하고, 계수로 구한 모멘트에서 철근 간격을 정한다.</li>
+      <li>처짐 최소 두께, 수축·온도 철근비 \(\rho_{st}\), 최대 간격(위험 단면 \(2h\)·300 mm 형태)을 적용해 어느 규정이 지배하는지 판단한다.</li>
+      <li>직접 설계법의 주열대·중간대 모멘트를 폭 1 m당 모멘트로 바꿔 2방향 슬래브의 상·하단 철근을 고르고, 철근 층 순서와 유효 깊이 차이를 반영한다.</li>
+      <li>뚫림 전단에 스터럽·스터드 레일·전단 머리를 더할 때의 강도 식(ACI 318 형태)과 보강 구간 바깥 임계 둘레를 검토하고, 개구부가 임계 둘레를 줄이는 양을 계산한다.</li>
+      <li>B-10 210 mm 슬래브의 배근(하단 D13@300, 상단 D13@250, 교육용)을 평면도로 그리고 철근 물량을 어림한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 계산이 없었다면</small><b>1997년 울버햄프턴, 새벽에 뚫린 주차장 바닥</b></div>
+      <div class="o-body"><p>1997년 3월 영국 울버햄프턴의 파이퍼스 로(Piper's Row) 주차장에서 1960년대에 지은 보 없는 바닥(플랫 슬래브)의 최상층 일부가 새벽에 내려앉았습니다. 이용객이 거의 없는 시간이라 다친 사람은 없었습니다. 판은 기둥 주위에서 원뿔 모양으로 뚫려 떨어졌고, 조사에서는 수십 년 동안 물과 제빙염, 동결 융해로 열화한 콘크리트와 설계와 다른 철근 상태가 기둥 둘레의 전단 강도를 깎아 먹었다는 점이 지적되었습니다(세부 원인은 조사 보고 확인).</p>
+        <p>이 사고가 슬래브 설계자에게 남긴 교훈은 단순합니다. 얇은 판에서는 <b>유효 깊이 몇 mm</b>가 강도를 바꿉니다. 두께 200 mm 판에서 상부 철근이 10 mm 내려앉으면 유효 깊이가 6 % 줄고, 휨강도와 뚫림 전단 강도가 함께 줄어듭니다. 그래서 슬래브 설계는 폭 1 m 띠의 휨에서 끝나지 않고, 철근을 몇 층 어느 순서로 깔지, 간격을 얼마 이하로 할지, 기둥 둘레를 어떻게 보강할지까지 정해야 끝납니다.</p>
+        <div class="o-chain"><span>바닥 모멘트 · 기둥 반력</span><i>→</i><span class="tool">폭 1 m 단면 · 최소 철근 · 간격 · 임계 둘레</span><i>→</i><span>D13 @ 간격 · 전단 보강 · 배근도</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="types">
+    <h2>슬래브의 종류와 하중 경로</h2>
+    <div class="problem"><strong>같은 8 × 8 m 구획을 덮는 다섯 가지 판</strong>
+      <p>B-10의 한 구획(8 × 8 m)을 덮는 방법은 여럿입니다. 보를 촘촘히 넣어 판을 얇게 할 수도, 보를 없애고 판을 두껍게 할 수도 있습니다. 판의 형식이 정해지면 하중이 기둥까지 가는 길이 정해지고, 그 길이 곧 철근이 놓일 자리입니다.</p></div>
+    <figure class="diagram" id="fig-sl-types">
+      <svg viewBox="0 0 860 330" role="img" aria-label="1방향 슬래브, 보가 있는 2방향 슬래브, 플랫 플레이트, 플랫 슬래브, 와플 슬래브의 평면과 단면">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g class="t" text-anchor="middle" style="font-weight:700"><text x="94" y="38">1방향 슬래브</text><text x="262" y="38">2방향 슬래브(보)</text><text x="430" y="38">플랫 플레이트</text><text x="598" y="38">플랫 슬래브</text><text x="766" y="38">와플 슬래브</text></g>
+        <!-- plans -->
+        <g style="fill:var(--surface-2);stroke:var(--border)"><rect x="34" y="52" width="120" height="120"/><rect x="202" y="52" width="120" height="120"/><rect x="370" y="52" width="120" height="120"/><rect x="538" y="52" width="120" height="120"/><rect x="706" y="52" width="120" height="120"/></g>
+        <g style="stroke:var(--text-dim);stroke-width:5"><line x1="34" y1="52" x2="154" y2="52"/><line x1="34" y1="92" x2="154" y2="92"/><line x1="34" y1="132" x2="154" y2="132"/><line x1="34" y1="172" x2="154" y2="172"/>
+          <line x1="202" y1="52" x2="322" y2="52"/><line x1="202" y1="172" x2="322" y2="172"/><line x1="202" y1="52" x2="202" y2="172"/><line x1="322" y1="52" x2="322" y2="172"/></g>
+        <g style="fill:var(--text)"><rect x="29" y="47" width="10" height="10"/><rect x="149" y="47" width="10" height="10"/><rect x="29" y="167" width="10" height="10"/><rect x="149" y="167" width="10" height="10"/>
+          <rect x="197" y="47" width="10" height="10"/><rect x="317" y="47" width="10" height="10"/><rect x="197" y="167" width="10" height="10"/><rect x="317" y="167" width="10" height="10"/>
+          <rect x="365" y="47" width="10" height="10"/><rect x="485" y="47" width="10" height="10"/><rect x="365" y="167" width="10" height="10"/><rect x="485" y="167" width="10" height="10"/>
+          <rect x="533" y="47" width="10" height="10"/><rect x="653" y="47" width="10" height="10"/><rect x="533" y="167" width="10" height="10"/><rect x="653" y="167" width="10" height="10"/>
+          <rect x="701" y="47" width="10" height="10"/><rect x="821" y="47" width="10" height="10"/><rect x="701" y="167" width="10" height="10"/><rect x="821" y="167" width="10" height="10"/></g>
+        <g style="fill:none;stroke:var(--text-dim);stroke-dasharray:3 2"><rect x="520" y="34" width="40" height="40"/><rect x="636" y="34" width="40" height="40"/><rect x="520" y="150" width="40" height="40"/><rect x="636" y="150" width="40" height="40"/></g>
+        <g style="stroke:var(--border);stroke-width:4"><line x1="730" y1="52" x2="730" y2="172"/><line x1="754" y1="52" x2="754" y2="172"/><line x1="778" y1="52" x2="778" y2="172"/><line x1="802" y1="52" x2="802" y2="172"/><line x1="706" y1="76" x2="826" y2="76"/><line x1="706" y1="100" x2="826" y2="100"/><line x1="706" y1="124" x2="826" y2="124"/><line x1="706" y1="148" x2="826" y2="148"/></g>
+        <g style="stroke:var(--accent);stroke-width:2.2" marker-end="url(#sl-ah-acc)" marker-start="url(#sl-ah-acc)"><line x1="94" y1="98" x2="94" y2="126"/><line x1="230" y1="112" x2="294" y2="112"/><line x1="262" y1="80" x2="262" y2="144"/><line x1="398" y1="112" x2="462" y2="112"/><line x1="430" y1="80" x2="430" y2="144"/><line x1="566" y1="112" x2="630" y2="112"/><line x1="598" y1="80" x2="598" y2="144"/></g>
+        <!-- sections -->
+        <g transform="translate(0,200)">
+          <g style="fill:var(--surface-2);stroke:var(--text-dim)">
+            <path d="M28 10h132v8h-8v22h-12v-22h-34v22h-12v-22h-34v22h-12v-22h-20z"/>
+            <path d="M196 10h132v10h-10v30h-14v-30h-84v30h-14v-30h-10z"/>
+            <rect x="364" y="10" width="132" height="14"/>
+            <path d="M532 10h132v12h-22v8h-18v-8h-52v8h-18v-8h-22z"/>
+            <path d="M700 10h132v6h-6v20h-8v-20h-16v20h-8v-20h-16v20h-8v-20h-16v20h-8v-20h-16v20h-8v-20h-10z"/>
+          </g>
+          <g style="fill:var(--text-dim)"><rect x="200" y="50" width="6" height="40"/><rect x="318" y="50" width="6" height="40"/><rect x="368" y="24" width="10" height="66"/><rect x="482" y="24" width="10" height="66"/><rect x="545" y="30" width="10" height="60"/><rect x="641" y="30" width="10" height="60"/><rect x="704" y="36" width="8" height="54"/><rect x="820" y="36" width="8" height="54"/></g>
+          <g style="fill:none;stroke:var(--text-dim)"><path d="M534 30l11 10M563 30l-8 10M633 30l8 10M662 30l-11 10"/></g>
+          <g class="t-mono" text-anchor="middle"><text x="94" y="70">작은보 간격 ≈ 2.7 m</text><text x="94" y="84">판 ≈ 130 mm</text><text x="262" y="70">네 변 보, 판 210</text><text x="430" y="104">보 없음, 판만</text><text x="598" y="104">드롭 패널·기둥 머리</text><text x="766" y="104">격자 리브</text></g>
+          <g class="t-dim" text-anchor="middle"><text x="94" y="112">단변 한 방향으로</text><text x="262" y="112">두 방향 → 보 → 기둥</text><text x="430" y="118">두 방향 → 기둥</text><text x="598" y="118">뚫림 전단 대책</text><text x="766" y="118">긴 경간, 가볍게</text></g>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-1.</b> 슬래브 형식의 평면(위)과 단면(아래). 1방향 슬래브는 평행한 보 사이 단변 방향으로만, 2방향 슬래브는 두 방향으로 휘어 보로, 플랫 플레이트는 보 없이 바로 기둥으로 하중을 보낸다. 플랫 슬래브의 드롭 패널(점선 사각형)과 기둥 머리는 기둥 둘레의 깊이와 둘레를 키워 뚫림 전단을 막고, 와플 슬래브는 리브 사이 콘크리트를 비워 자중을 줄인다. 치수는 B-10 구획을 덮는다고 할 때의 감각(교육용).</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 9.1 (슬래브의 형식)</strong> 장변/단변 경간비가 2 이상이거나 두 대변으로만 지지되어 하중을 단변 방향으로 나르는 판을 <span class="term">1방향 슬래브</span><span class="en">(one-way slab)</span>, 네 변의 보나 기둥 줄로 지지되고 경간비가 2보다 작아 두 방향으로 휘는 판을 <span class="term">2방향 슬래브</span><span class="en">(two-way slab)</span>라 한다(판별과 하중 분담은 <a href="../../structure/chapters/floors.html#one-two-way">StructureBook 3장</a>). 보 없이 기둥이 판을 직접 받치면 <span class="term">플랫 플레이트</span><span class="en">(flat plate)</span>, 여기에 기둥 둘레를 두껍게 한 <span class="term">드롭 패널</span><span class="en">(drop panel)</span>이나 기둥 위를 넓힌 기둥 머리를 더하면 <span class="term">플랫 슬래브</span><span class="en">(flat slab)</span>, 두 방향 리브를 격자로 둔 판을 <span class="term">와플 슬래브</span><span class="en">(waffle slab)</span>라 한다.</div>
+    <p>형식마다 설계의 중심이 다릅니다. 1방향 슬래브는 "폭 1 m 보"의 휨 설계가 거의 전부이고, 2방향 슬래브는 두 방향 휨 철근을 겹쳐 까는 법과 모멘트를 폭 방향으로 나누는 법이 핵심입니다. 플랫 플레이트와 플랫 슬래브는 휨보다 기둥 둘레의 <b>뚫림 전단</b>이 두께를 정하는 경우가 많습니다. 이 장은 이 순서를 따라갑니다. 어느 형식이든 판은 휨 철근이 적게 들어가는 부재라서(철근비 0.2–0.6 % 안팎) 응력 블록이 아주 얕고 인장 지배 단면이 되기 쉽습니다. 3장의 단철근 보 식이 그대로 통하는 이유입니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="one-way">
+    <h2>1방향 슬래브: 폭 1 m 보</h2>
+    <div class="problem"><strong>폭이 8 m인 보를 설계한다면</strong>
+      <p>1방향 슬래브는 한 방향으로만 휘므로 결국 폭이 아주 넓은 보입니다. 그런데 폭 8 m 보에 "D10 몇 개"라고 철근을 정하는 것은 어색합니다. 판은 어디를 잘라도 같은 띠의 반복이니, 대표 띠 하나를 정해 철근을 "간격"으로 말하는 편이 자연스럽습니다.</p></div>
+    <figure class="diagram" id="fig-sl-strip">
+      <svg viewBox="0 0 860 320" role="img" aria-label="1방향 슬래브에서 잘라 낸 폭 1 m 띠와 그 단면의 주철근, 수축 온도 철근, 피복, 유효 깊이">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <!-- slab perspective -->
+        <g transform="translate(40,40)">
+          <path d="M0 120 L120 40 L400 40 L280 120 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M0 120 L280 120 L280 136 L0 136 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M280 120 L400 40 L400 56 L280 136 Z" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <path d="M100 120 L220 40 L260 40 L140 120 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <path d="M100 120 L140 120 L140 136 L100 136 Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <g style="stroke:var(--text);stroke-width:6"><line x1="-6" y1="140" x2="286" y2="140"/></g>
+          <g style="stroke:var(--text);stroke-width:6"><line x1="114" y1="44" x2="406" y2="44" style="opacity:.55"/></g>
+          <line x1="300" y1="128" x2="414" y2="52" style="stroke:var(--accent-2);stroke-width:2" marker-start="url(#sl-ah-ld)" marker-end="url(#sl-ah-ld)"/>
+          <text x="364" y="112" class="t-mono" style="fill:var(--accent-2)">경간 ℓ</text>
+          <text x="364" y="126" class="t-mono" style="fill:var(--accent-2)">(지지 보 사이)</text>
+          <text x="140" y="166" text-anchor="middle" class="t-mono">앞·뒤 검은 선 = 지지 보</text>
+          <text x="186" y="28" text-anchor="middle" class="t-mono" style="fill:var(--accent)">폭 b = 1,000 mm 띠</text>
+          <text x="200" y="212" text-anchor="middle" class="t-dim">띠마다 같은 하중, 같은 모멘트 → 대표 띠 하나를 보로 설계</text>
+        </g>
+        <!-- section of strip -->
+        <g transform="translate(470,70)">
+          <text x="170" y="-18" text-anchor="middle" class="t" style="font-weight:700">띠의 단면(경간에 직각으로 자름)</text>
+          <rect x="0" y="0" width="340" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="8" y1="78" x2="332" y2="78" style="stroke:var(--accent);stroke-width:3"/>
+          <g style="fill:var(--tension)"><circle cx="34" cy="88" r="6"/><circle cx="102" cy="88" r="6"/><circle cx="170" cy="88" r="6"/><circle cx="238" cy="88" r="6"/><circle cx="306" cy="88" r="6"/></g>
+          <line x1="102" y1="128" x2="170" y2="128" style="stroke:var(--text-dim)" marker-start="url(#sl-ah-t)" marker-end="url(#sl-ah-t)"/>
+          <text x="136" y="146" text-anchor="middle" class="t-mono">간격 s</text>
+          <line x1="356" y1="0" x2="356" y2="88" style="stroke:var(--text-dim)" marker-start="url(#sl-ah-t)" marker-end="url(#sl-ah-t)"/>
+          <text x="362" y="48" class="t-mono">d</text>
+          <line x1="-14" y1="0" x2="-14" y2="110" style="stroke:var(--text-dim)" marker-start="url(#sl-ah-t)" marker-end="url(#sl-ah-t)"/>
+          <text x="-20" y="58" text-anchor="end" class="t-mono">h</text>
+          <line x1="250" y1="94" x2="250" y2="110" style="stroke:var(--warn);stroke-width:1.4"/>
+          <text x="256" y="106" class="t-mono" style="fill:var(--warn)">피복 20</text>
+          <text x="0" y="176" class="t-mono" style="fill:var(--tension)">● 주철근(경간 방향, 단면에서 점) A<tspan baseline-shift="sub" font-size="8">s</tspan> = A<tspan baseline-shift="sub" font-size="8">b</tspan> × 1,000/s</text>
+          <text x="0" y="196" class="t-mono" style="fill:var(--accent)">━ 수축·온도 철근(직각 방향, 주철근 안쪽)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-2.</b> 1방향 슬래브의 단위 폭 띠. 왼쪽: 경간 방향(지지 보에 직각)으로 폭 1 m 띠를 잘라 보처럼 설계한다. 오른쪽: 그 띠의 단면. 주철근은 경간 방향으로 놓여 단면에 점으로 보이고, 그 안쪽에 직각 방향의 수축·온도 철근이 놓인다. 정 모멘트 구간에서는 주철근이 아래, 지점의 부 모멘트 구간에서는 위에 있다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 9.2 (단위 폭 설계)</strong> 1방향 슬래브는 경간 방향의 <span class="term">단위 폭</span><span class="en">(unit width)</span> \(b = 1{,}000\) mm 띠를 직사각형 단철근 보로 보고 3장의 식으로 설계한다. 호칭 단면적 \(A_b\)인 철근을 간격 \(s\)로 깔면 폭 1 m당 철근량과 그 역은
+      <div class="formula">$$A_s = \frac{1{,}000\,A_b}{s}\ \ (\text{mm}^2/\text{m}), \qquad s = \frac{1{,}000\,A_b}{A_{s,\text{req}}} \;\;\to\;\; \text{시공 단위(25 mm)로 내림}$$<div class="where">모멘트는 kN·m/m(폭 1 m당), 하중은 면 하중 kN/m²를 폭 1 m에 실은 선 하중 kN/m. 단면 성질도 폭 1 m 기준이다. \(d = h - \text{피복} - d_b/2\)(한 층) 또는 두 층이면 안쪽 층에서 \(d_b\)를 더 뺀다. 슬래브의 피복은 실내 건조 환경에서 20 mm 형태(MaterialsBook 11장, 현행 KDS 14 20 50 확인).</div></div></div>
+    <p>판은 폭이 넓고 철근이 적어 응력 블록 깊이 \(a\)가 10–20 mm 정도밖에 안 됩니다. 그래서 \(\varepsilon_t\)는 거의 언제나 0.005를 훨씬 넘는 인장 지배 단면이고 \(\phi = 0.85\)입니다. 대신 판에는 보와 다른 걱정이 셋 있습니다. 처짐(두께), 모멘트가 작은 곳의 균열(최소 철근과 간격), 그리고 전단 철근을 넣기 어렵다는 점입니다. 1방향 슬래브의 전단은 보통 \(\phi V_c\)만으로 충분하지만(아래 예제), 플랫 플레이트의 뚫림 전단은 사정이 다릅니다.</p>
+    <div class="callout def"><strong>정의 9.3 (처짐을 검토하지 않아도 되는 최소 두께)</strong> 처짐을 계산하지 않으려면 슬래브의 두께를 아래 값 이상으로 한다(<span class="term">최소 두께</span><span class="en">(minimum thickness)</span>, KDS 14 20 30 / ACI 318 형태, 보통 중량 콘크리트, 처짐에 손상될 칸막이를 받치지 않는 부재, 현행 기준 확인).
+      <div class="formula">$$h_{\min} = \frac{\ell}{20}\ (\text{단순 지지}),\quad \frac{\ell}{24}\ (\text{일단 연속}),\quad \frac{\ell}{28}\ (\text{양단 연속}),\quad \frac{\ell}{10}\ (\text{캔틸레버}) \;\;\times \left(0.43 + \frac{f_y}{700}\right)$$<div class="where">1방향 슬래브, \(\ell\)은 경간(mm). 괄호는 \(f_y \ne 400\) MPa일 때의 보정(SD500이면 1.144). 2방향 슬래브는 보 강성 \(\alpha_{fm}\)에 따라 \(\ell_n(0.8 + f_y/1400)/(36 + 9\beta)\) 같은 식이나 보 없는 판의 표(\(\ell_n/33\) 안팎)를 쓴다. 이보다 얇게 하려면 8장의 방법으로 처짐을 계산해 한계와 비교한다.</div></div></div>
+    <div class="sim" id="sim-sl-thick">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>처짐 최소 두께 표 탐색</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sl-cv-thick" aria-label="경간에 따른 최소 두께 곡선과 현재 두께"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>형식</span><div class="seg" id="sl-th-type"><button data-value="one" class="on">1방향</button><button data-value="beam">2방향(보)</button><button data-value="flat">보 없는 판</button></div></div>
+          <div class="ctrl" id="sl-th-sup-c"><span>지지 조건</span><div class="seg" id="sl-th-sup"><button data-value="ss">단순</button><button data-value="one" class="on">일단 연속</button><button data-value="both">양단 연속</button><button data-value="cant">캔틸레버</button></div></div>
+          <label class="ctrl"><span><span id="sl-th-Llab">경간 ℓ</span> <output id="sl-th-L-out"></output></span><input type="range" id="sl-th-L" min="2" max="12" step="0.01" value="2.67"></label>
+          <div class="ctrl"><span><span>철근 f<sub>y</sub> (MPa)</span></span><div class="seg" id="sl-th-fy"><button data-value="300">300</button><button data-value="400">400</button><button data-value="500" class="on">500</button><button data-value="600">600</button></div></div>
+          <label class="ctrl" id="sl-th-af-c"><span><span>보 강성 평균 α<sub>fm</sub></span> <output id="sl-th-af-out"></output></span><input type="range" id="sl-th-af" min="0" max="5" step="0.05" value="3.1"></label>
+          <label class="ctrl" id="sl-th-beta-c"><span>장단변비 β <output id="sl-th-beta-out"></output></span><input type="range" id="sl-th-beta" min="1" max="2" step="0.05" value="1"></label>
+          <div class="ctrl" id="sl-th-pan-c"><span>패널 위치</span><div class="seg" id="sl-th-pan"><button data-value="int" class="on">내부</button><button data-value="edgeb">외부·가장자리 보</button><button data-value="ext">외부·보 없음</button></div></div>
+          <label class="check" id="sl-th-drop-c"><input type="checkbox" id="sl-th-drop"> 드롭 패널</label>
+          <label class="ctrl"><span>실제 두께 h <output id="sl-th-h-out"></output></span><input type="range" id="sl-th-h" min="100" max="400" step="10" value="130"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최소 두께 h<sub>min</sub></span><span class="v" id="sl-th-o-h">—</span></div>
+        <div class="stat"><span class="k">적용 식</span><span class="v" id="sl-th-o-eq" style="font-size:13px">—</span></div>
+        <div class="stat"><span class="k">h / h<sub>min</sub></span><span class="v" id="sl-th-o-r">—</span></div>
+      </div>
+      <div class="sl-msg" id="sl-th-msg"></div>
+      <div class="sim-note">해볼 것: 1방향 일단 연속, ℓ = 2.7 m이면 130 mm로 통과합니다(예제 9.1의 B-10 1방향 변형안) · 같은 경간을 캔틸레버로 바꾸면 두께가 2.4배로 뜁니다 · 2방향(보)에서 α<sub>fm</sub>을 0.2 아래로 내리면 보 없는 판의 표로 넘어가 B-10(ℓ<sub>n</sub> 7.6 m)의 최소 두께가 195 → 242 mm로 커집니다 · 모델: 정의 9.3(KDS 14 20 30 / ACI 318 형태, 보 없는 판은 ACI 표의 f<sub>y</sub> 280·420·520 MPa 값을 직선 보간, 600 MPa는 외삽). 교육용이며 현행 기준을 확인할 것.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="coefficients">
+    <h2>연속 1방향 슬래브의 근사 모멘트 계수</h2>
+    <div class="problem"><strong>경간이 열 개인 연속 슬래브를 매번 해석해야 할까</strong>
+      <p>1방향 슬래브는 작은보 위로 수십 경간이 이어집니다. 활하중이 어느 경간에 올라가느냐에 따라 모멘트가 달라지므로, 정직하게 하려면 패턴 재하를 바꿔 가며 연속보를 여러 번 풀어야 합니다. 경간이 고르고 하중이 등분포라면 그 결과를 계수 몇 개로 요약할 수 있습니다.</p></div>
+    <div class="callout def"><strong>원리 9.4 (근사 모멘트·전단 계수)</strong> 다음 조건을 모두 만족하는 연속 보와 1방향 슬래브는 계수 하중 \(w_u\)와 <span class="term">순경간</span><span class="en">(clear span)</span> \(\ell_n\)으로 \(M_u = C_m w_u \ell_n^2\), \(V_u = C_v w_u \ell_n/2\)를 쓸 수 있다(<span class="term">근사 모멘트 계수</span><span class="en">(approximate moment coefficient)</span>, KDS 14 20 10 / ACI 318 형태, 현행 기준 확인). 조건: 2경간 이상, 인접 경간 차이가 짧은 경간의 20 % 이하, 등분포 하중, 활하중 ≤ 3 × 고정하중, 단면 일정.
+      <div class="formula">$$C_m:\quad \underbrace{-\tfrac{1}{24}}_{\text{외단(테두리 보)}}\;\; \underbrace{+\tfrac{1}{14}}_{\text{단부 경간}}\;\; \underbrace{-\tfrac{1}{10}}_{\text{첫 내부 지점}}\;\; \underbrace{+\tfrac{1}{16}}_{\text{내부 경간}}\;\; \underbrace{-\tfrac{1}{11}}_{\text{내부 지점}}$$<div class="where">외단이 기둥과 일체면 \(-1/16\), 외단이 벽 위 단순 지지(구속 없음)면 단부 경간 \(+1/11\)이고 외단 0. 2경간뿐이면 첫 내부 지점 \(-1/9\). 경간 3 m 이하 슬래브는 모든 지점 면에서 \(-1/12\)로 할 수 있다. 부 모멘트는 지점 <b>면</b>의 값이고, 이때 \(\ell_n\)은 인접 두 순경간의 평균이다. 전단은 단부 경간의 첫 내부 지점 면에서 \(C_v = 1.15\), 그 밖 1.0.</div></div></div>
+    <figure class="diagram" id="fig-sl-coef">
+      <svg viewBox="0 0 860 280" role="img" aria-label="연속 1방향 슬래브의 지점과 경간에 붙는 근사 모멘트 계수와 휨모멘트도의 개형">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(60,0)">
+          <rect x="0" y="92" width="740" height="12" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <g style="fill:var(--text-dim)"><rect x="-8" y="104" width="16" height="34"/><rect x="177" y="104" width="16" height="34"/><rect x="362" y="104" width="16" height="34"/><rect x="547" y="104" width="16" height="34"/><rect x="732" y="104" width="16" height="34"/></g>
+          <text x="0" y="156" text-anchor="middle" class="t-mono">테두리 보</text><text x="185" y="156" text-anchor="middle" class="t-mono">작은보</text><text x="370" y="156" text-anchor="middle" class="t-mono">작은보</text><text x="555" y="156" text-anchor="middle" class="t-mono">작은보</text><text x="740" y="156" text-anchor="middle" class="t-mono">⋯ 대칭</text>
+          <path d="M0 98 C 30 92, 40 78, 0 84" style="fill:none"/>
+          <path d="M0 98 Q 10 84 18 90 Q 80 180 150 110 Q 170 70 185 54 Q 200 70 222 110 Q 277 165 333 110 Q 352 76 370 60 Q 388 76 407 110 Q 462 165 518 110 Q 537 76 555 60 Q 573 76 592 110 Q 647 165 703 110 Q 722 76 740 60" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+          <line x1="0" y1="98" x2="740" y2="98" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          <g class="t-mono" text-anchor="middle" style="fill:var(--accent);font-weight:700">
+            <text x="10" y="70">−1/24</text><text x="80" y="200">+1/14</text><text x="185" y="44">−1/10</text><text x="277" y="190">+1/16</text><text x="370" y="50">−1/11</text><text x="462" y="190">+1/16</text><text x="555" y="50">−1/11</text><text x="647" y="190">+1/16</text>
+          </g>
+          <line x1="8" y1="226" x2="177" y2="226" style="stroke:var(--accent-2);stroke-width:1.6" marker-start="url(#sl-ah-ld)" marker-end="url(#sl-ah-ld)"/>
+          <text x="92" y="244" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">순경간 ℓ<tspan baseline-shift="sub" font-size="8">n</tspan>(지지 면 사이)</text>
+          <text x="470" y="236" text-anchor="middle" class="t-dim">M<tspan baseline-shift="sub" font-size="8">u</tspan> = C<tspan baseline-shift="sub" font-size="8">m</tspan> w<tspan baseline-shift="sub" font-size="8">u</tspan> ℓ<tspan baseline-shift="sub" font-size="8">n</tspan>² · 휨모멘트도는 인장 측(정 모멘트 아래)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-3.</b> 연속 1방향 슬래브의 근사 모멘트 계수(외단이 테두리 보와 일체, 3경간 이상인 경우). 계수는 하나의 재하 경우가 아니라 패턴 재하의 <b>포락선</b>을 근사한 값이라, 지점 부 모멘트와 경간 정 모멘트의 계수를 더하면 \(1/8\)보다 크다(예: 내부 경간 1/16 + 1/11 = 0.153 &gt; 0.125).</figcaption>
+    </figure>
+    <p>계수가 정적 모멘트 \(1/8\)보다 "많아" 보이는 것은 오류가 아니라 <span class="term">패턴 재하</span><span class="en">(pattern loading)</span> 때문입니다. 지점 부 모멘트가 최대가 되는 재하(이웃 두 경간에 활하중)와 경간 정 모멘트가 최대가 되는 재하(한 칸 건너 활하중)는 다르므로, 각 위치의 최댓값을 따로 모은 포락선은 어느 한 재하 경우보다 큽니다. 아래 시뮬레이터는 같은 슬래브를 <code>CB.beam</code>으로 패턴 재하마다 풀어 포락선을 그리고, 계수 값을 점으로 겹칩니다.</p>
+    <div class="sim" id="sim-sl-coef">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>모멘트 계수 vs 연속보 해석</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sl-cv-coef" aria-label="연속 슬래브의 패턴 재하 휨모멘트 포락선과 근사 계수 점"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>경간 수</span><div class="seg" id="sl-cf-n"><button data-value="2">2</button><button data-value="3">3</button><button data-value="4" class="on">4</button><button data-value="5">5</button></div></div>
+          <div class="ctrl"><span>해석 경간</span><div class="seg" id="sl-cf-span"><button data-value="ln" class="on">순경간 ℓ<sub>n</sub></button><button data-value="cc">중심 간 ℓ</button></div></div>
+          <div class="ctrl"><span>외단 지지</span><div class="seg" id="sl-cf-ext"><button data-value="sp" class="on">테두리 보</button><button data-value="col">기둥</button><button data-value="un">단순(벽)</button></div></div>
+          <label class="ctrl"><span>경간 ℓ(중심 간) <output id="sl-cf-L-out"></output></span><input type="range" id="sl-cf-L" min="2" max="6" step="0.01" value="2.67"></label>
+          <label class="ctrl"><span>고정하중 D <output id="sl-cf-D-out"></output></span><input type="range" id="sl-cf-D" min="2" max="10" step="0.1" value="4.6"></label>
+          <label class="ctrl"><span>활하중 L <output id="sl-cf-LL-out"></output></span><input type="range" id="sl-cf-LL" min="0" max="15" step="0.5" value="2.5"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">첫 내부 지점(면): 계수 · 해석</span><span class="v" id="sl-cf-o-neg">—</span></div>
+        <div class="stat"><span class="k">단부 경간 정: 계수 · 해석</span><span class="v" id="sl-cf-o-pos">—</span></div>
+        <div class="stat"><span class="k">내부 경간 정: 계수 · 해석</span><span class="v" id="sl-cf-o-ipos">—</span></div>
+        <div class="stat"><span class="k">L / D</span><span class="v" id="sl-cf-o-ld">—</span></div>
+      </div>
+      <div class="sl-msg" id="sl-cf-msg"></div>
+      <div class="sim-note">해볼 것: 경간 수를 2로 바꾸면 첫 내부 지점 계수가 1/10 → 1/9로 커지는 이유가 보입니다(2경간은 지점이 하나라 더 큰 부 모멘트) · 활하중을 고정하중의 3배 이상으로 키우면 해석값이 계수를 넘기 시작합니다(적용 조건 L ≤ 3D) · 외단을 "단순(벽)"으로 하면 외단 부 모멘트가 0이 되고 단부 경간 계수가 1/11로 커집니다 · 해석 경간을 "중심 간"으로 바꾸면 해석 정 모멘트가 계수보다 25 % 안팎 커집니다 — 계수는 순경간 ℓ<sub>n</sub>과 지점 면 값으로 정의되었고, 지지 보 폭과 약간의 소성 재분배를 경험적으로 담고 있기 때문입니다 · 모델: 폭 1 m 띠의 연속보(<code>CB.beam</code>), 내부 지점은 회전 자유 핀, 외단은 회전 스프링(테두리 보 0.5 × 4EI/ℓ, 기둥 2 × 4EI/ℓ, 단순은 핀 — 교육용 가정). 1.2D는 모든 경간, 1.6L은 전 경간·홀수·짝수·지점별 인접 2경간 + 한 칸 건너 재하의 포락선. 중심 간 해석의 부 모멘트는 지점 면(작은보 폭 300 mm의 절반)에서 읽는다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="one-way-design">
+    <h2>1방향 슬래브 설계와 간격 규정</h2>
+    <div class="problem"><strong>모멘트는 작은데 철근은 왜 그만큼 넣어야 하나</strong>
+      <p>B-10의 구획에 작은보 두 줄을 더해 1방향 슬래브로 바꾸면, 경간 2.67 m짜리 판의 모멘트는 폭 1 m당 5 kN·m 남짓입니다. 3장의 식으로 철근을 구하면 D10을 50 cm 넘는 간격으로 깔아도 될 것 같지만, 그렇게 지은 바닥은 금이 가고 처집니다. 철근량을 정하는 것은 모멘트만이 아닙니다.</p></div>
+    <div class="callout def"><strong>정의 9.5 (슬래브 주철근의 최대 간격)</strong> 1방향 슬래브 주철근의 중심 간격은 최대 휨모멘트가 생기는 <b>위험 단면</b>에서 슬래브 두께의 2배와 300 mm 중 작은 값 이하, 그 밖의 단면에서 두께의 3배와 450 mm 중 작은 값 이하로 한다(<span class="term">최대 간격</span><span class="en">(maximum bar spacing)</span>, KDS 14 20 70 형태, 현행 기준 확인). 2방향 슬래브의 위험 단면도 \(2h\)·300 mm 형태다. 이와 별도로 8장의 균열 제어 간격 \(s \le \min(375\kappa/f_s - 2.5c_c,\ 300\kappa/f_s)\)(<code>CB.rc.sMax</code>)도 확인한다.</div>
+    <p>간격 제한에는 두 가지 이유가 있습니다. 하중이 판의 한 점에 집중될 때 철근 사이 콘크리트가 혼자 버티지 않도록 철근이 하중을 옆으로 나눠 줄 만큼 촘촘해야 하고, 균열이 철근 사이에서 넓게 벌어지지 않아야 합니다. 최소 철근량은 다음 절의 <b>수축·온도 철근비</b>가 정합니다. 1방향 슬래브의 휨 철근도 이 값보다 적을 수 없습니다(보의 \(A_{s,\min}\) 식 대신, KDS·ACI 형태). 결국 모멘트가 작은 슬래브의 철근은 "강도 → 최소 철근 → 간격" 세 값 가운데 가장 엄한 것이 정합니다.</p>
+    <div class="callout"><strong>예제 9.1 (B-10 1방향 변형안: 130 mm 판)</strong> B-10의 8 m 구획에 작은보(폭 300 mm) 두 줄을 더해 경간 \(\ell = 8/3 = 2.67\) m의 연속 1방향 슬래브를 만든다. \(h = 130\) mm, 마감 1.5 kN/m², 활하중 2.5 kN/m², D10(SD500), 피복 20 mm, 외단은 테두리 보(교육용).
+      <ol class="sl-steps">
+        <li><b>두께.</b> 단부 경간(일단 연속) \(h_{\min} = 2{,}667/24 \times 1.144 = 127\) mm ≤ 130 ✓, 내부 경간 \(2{,}667/28 \times 1.144 = 109\) mm ✓.</li>
+        <li><b>하중.</b> \(D = 24 \times 0.13 + 1.5 = 4.62\) kN/m², \(w_u = 1.2 \times 4.62 + 1.6 \times 2.5 = 9.54\) kN/m², \(\ell_n = 2.667 - 0.30 = 2.37\) m. L/D = 0.54 ≤ 3이므로 계수 사용 가능.</li>
+        <li><b>모멘트(kN·m/m).</b> \(w_u\ell_n^2 = 53.5\): 외단 \(53.5/24 = 2.23\), 단부 경간 \(53.5/14 = 3.82\), 첫 내부 지점 \(53.5/10 = 5.35\), 내부 경간 \(53.5/16 = 3.34\), 내부 지점 \(53.5/11 = 4.86\).</li>
+        <li><b>강도로 본 철근.</b> \(d = 130 - 20 - 9.5/2 = 105\) mm. 가장 큰 5.35 kN·m/m에서 <code>asReq</code> → \(A_s = 121\) mm²/m.</li>
+        <li><b>최소 철근.</b> \(\rho_{st} = 0.0020 \times 400/500 = 0.0016\) → \(0.0016 \times 1{,}000 \times 130 = 208\) mm²/m. 강도 소요(121)보다 크므로 <b>최소 철근이 지배</b>한다. D10이면 \(s = 1{,}000 \times 71.3/208 = 343\) mm.</li>
+        <li><b>간격.</b> 위험 단면 \(\min(2h, 300) = 260\) mm → <b>D10@250</b>(285 mm²/m). \(\phi M_n = 12.4\) kN·m/m ≥ 5.35 ✓, \(\varepsilon_t \gg 0.005\).</li>
+        <li><b>전단.</b> \(V_u = 1.15 \times 9.54 \times 2.37/2 = 13.0\) kN/m, \(\phi V_c = 0.75 \times \tfrac16\sqrt{30} \times 1{,}000 \times 105 = 72\) kN/m ✓ — 슬래브는 스터럽 없이 통과한다.</li>
+        <li><b>직각 방향.</b> 수축·온도 철근 208 mm²/m, 간격 ≤ \(\min(5h, 450) = 450\) → D10@300(238 mm²/m).</li>
+      </ol>
+      강도는 소요의 두 배를 넘지만 이 철근을 줄일 수는 없습니다. 판의 철근은 강도보다 <b>규정</b>이 정하는 경우가 흔하고, 그래서 판의 두께를 1 cm 줄이면 철근도 함께 줄어듭니다.</div>
+    <div class="sim" id="sim-sl-oneway">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>1방향 슬래브 설계기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sl-cv-oneway" aria-label="연속 슬래브의 위치 표시와 폭 1 m 단면의 철근 배치"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>경간 ℓ(중심 간) <output id="sl-ow-L-out"></output></span><input type="range" id="sl-ow-L" min="2" max="6" step="0.01" value="2.67"></label>
+          <label class="ctrl"><span>두께 h <output id="sl-ow-h-out"></output></span><input type="range" id="sl-ow-h" min="100" max="300" step="10" value="130"></label>
+          <label class="ctrl"><span>마감·설비 <output id="sl-ow-sd-out"></output></span><input type="range" id="sl-ow-sd" min="0.5" max="4" step="0.1" value="1.5"></label>
+          <label class="ctrl"><span>활하중 L <output id="sl-ow-LL-out"></output></span><input type="range" id="sl-ow-LL" min="1" max="12" step="0.5" value="2.5"></label>
+          <div class="ctrl"><span>검토 위치</span><div class="seg" id="sl-ow-pos"><button data-value="ext">외단</button><button data-value="endp">단부 정</button><button data-value="fint" class="on">첫 내부</button><button data-value="intp">내부 정</button><button data-value="intn">내부 지점</button></div></div>
+          <div class="ctrl"><span>철근</span><div class="seg" id="sl-ow-bar"><button data-value="D10" class="on">D10</button><button data-value="D13">D13</button><button data-value="D16">D16</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">w<sub>u</sub> · 계수 · M<sub>u</sub></span><span class="v" id="sl-ow-o-m">—</span></div>
+        <div class="stat"><span class="k">A<sub>s</sub> 소요 · 최소</span><span class="v" id="sl-ow-o-as">—</span></div>
+        <div class="stat"><span class="k">간격(지배 규정)</span><span class="v" id="sl-ow-o-s">—</span></div>
+        <div class="stat"><span class="k">φM<sub>n</sub> · ε<sub>t</sub></span><span class="v" id="sl-ow-o-phi">—</span></div>
+        <div class="stat"><span class="k">V<sub>u</sub> / φV<sub>c</sub></span><span class="v" id="sl-ow-o-v">—</span></div>
+      </div>
+      <div class="sl-msg" id="sl-ow-msg"></div>
+      <div class="sim-note">해볼 것: 기본값은 예제 9.1입니다 · 활하중을 서고 수준(7.5 kN/m² 이상)으로 키우면 첫 내부 지점에서 강도가 최소 철근을 넘어 지배하기 시작합니다 · 경간을 5 m로 늘리면 두께 130 mm는 처짐 최소 두께에 걸립니다 · 두께를 키우면 강도 소요는 줄지만 최소 철근(0.0016bh)은 늘어나는 역설을 보세요 · 모델: 원리 9.2·9.4, 정의 9.5, 작은보 폭 300 mm, 외단 테두리 보, 3경간 이상 연속, 피복 20 mm, f<sub>ck</sub> 30·f<sub>y</sub> 500 MPa, <code>CB.rc.asReq</code>·<code>flexure</code>·<code>Vc</code>. 간격은 25 mm 단위로 내린다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="shrinkage">
+    <h2>수축·온도 철근</h2>
+    <div class="problem"><strong>하중이 없는 방향에 철근을 까는 이유</strong>
+      <p>1방향 슬래브의 장변 방향에는 휨모멘트가 거의 없습니다. 그런데도 그 방향에 철근을 깔지 않은 판은 몇 달 뒤 경간 방향과 나란한 균열이 일정한 간격으로 생깁니다. 콘크리트는 마르면서 줄어들고(MaterialsBook 8장), 낮과 밤, 여름과 겨울의 온도에 따라 늘고 줄어드는데, 보와 벽에 붙잡힌 판은 마음대로 줄어들지 못하기 때문입니다.</p></div>
+    <p>구속된 판이 수축 변형률 \(\varepsilon_{sh} \approx 400\text{–}800 \times 10^{-6}\)만큼 줄어들려 하면, 구속이 완전할 때 그만큼의 인장 변형률이 생깁니다. 콘크리트의 인장 균열 변형률은 \(f_r/E_c \approx 3.45/27{,}500 = 125 \times 10^{-6}\) 정도라서, 판은 반드시 갈라집니다. 철근은 균열을 막지 못하지만 균열이 한 곳에 크게 벌어지지 않고 여러 곳에 가늘게 나뉘도록 붙잡습니다. 그 일을 하려면 균열이 생기는 순간 콘크리트가 내려놓는 인장력을 철근이 항복하지 않고 받아야 합니다. 이것이 <span class="term">수축·온도 철근</span><span class="en">(shrinkage and temperature reinforcement)</span>의 최소량입니다.</p>
+    <div class="callout def"><strong>원리 9.6 (수축·온도 철근비)</strong> 수축·온도 철근의 단면적은 콘크리트 전체 단면적(폭 × 두께)에 대해 다음 비 이상, 간격은 두께의 5배와 450 mm 중 작은 값 이하로 한다(KDS 14 20 50 / ACI 318 형태, 현행 기준 확인).
+      <div class="formula">$$\rho_{st} = \begin{cases} 0.0020 & f_y \le 400\ \text{MPa} \\[3pt] 0.0020 \times \dfrac{400}{f_y} \;\ge\; 0.0014 & f_y \gt 400\ \text{MPa} \end{cases}, \qquad A_{s,st} = \rho_{st}\,b\,h$$<div class="where">\(b = 1{,}000\) mm. 강도가 높은 철근은 같은 인장력을 더 적은 단면적으로 받으므로 \(400/f_y\)로 줄이되, 철근이 너무 적어 균열 폭이 커지지 않게 0.0014를 하한으로 둔다. 1방향 슬래브의 주철근, 2방향 슬래브 두 방향 철근의 최솟값도 이 비다. 수축·온도 철근은 1방향 슬래브 주철근에 직각으로 두고, 주철근 위치를 잡아 주는 <span class="term">배력 철근</span><span class="en">(distribution reinforcement)</span>의 역할도 한다.</div></div></div>
+    <div class="sim" id="sim-sl-shrink">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>수축·온도 철근 간격</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sl-cv-shrink" aria-label="두께에 따른 수축 온도 철근 간격의 세 한계와 지배값"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>슬래브 두께 h <output id="sl-sh-h-out"></output></span><input type="range" id="sl-sh-h" min="100" max="400" step="10" value="210"></label>
+          <div class="ctrl"><span><span>철근 f<sub>y</sub> (MPa)</span></span><div class="seg" id="sl-sh-fy"><button data-value="300">300</button><button data-value="400">400</button><button data-value="500" class="on">500</button><button data-value="600">600</button></div></div>
+          <div class="ctrl"><span>철근</span><div class="seg" id="sl-sh-bar"><button data-value="D10">D10</button><button data-value="D13" class="on">D13</button><button data-value="D16">D16</button></div></div>
+          <div class="ctrl"><span>배치</span><div class="seg" id="sl-sh-lay"><button data-value="1" class="on">한 면</button><button data-value="2">양면(두꺼운 판)</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">ρ<sub>st</sub></span><span class="v" id="sl-sh-o-rho">—</span></div>
+        <div class="stat"><span class="k">A<sub>s,st</sub> (mm²/m)</span><span class="v" id="sl-sh-o-as">—</span></div>
+        <div class="stat"><span class="k">간격 한계: 면적 · 5h · 450</span><span class="v" id="sl-sh-o-lim">—</span></div>
+        <div class="stat"><span class="k">선택</span><span class="v" id="sl-sh-o-s">—</span></div>
+      </div>
+      <div class="sl-msg" id="sl-sh-msg"></div>
+      <div class="sim-note">해볼 것: B-10 210 mm 판(SD500)은 336 mm²/m로 D13@375가 면적으로는 되지만, 2방향 판의 위험 단면 간격(2h·300 mm) 때문에 실제 배근은 @300이 됩니다(예제 9.3) · f<sub>y</sub>를 600으로 올려도 0.0014 하한 때문에 철근이 더 줄지 않습니다 · 두께 300 mm 이상은 양면에 나눠 까는 실무가 흔합니다(전체 면적은 같고 한 면당 절반) · 모델: 원리 9.6, 간격은 25 mm 단위로 내림.</div>
+    </div>
+    <div class="callout"><strong>예제 9.2 (210 mm 판의 최소 철근)</strong> \(h = 210\) mm, SD500, D13.
+      <ol class="sl-steps">
+        <li>\(\rho_{st} = 0.0020 \times 400/500 = 0.0016\) ≥ 0.0014 → \(A_{s,st} = 0.0016 \times 1{,}000 \times 210 = 336\) mm²/m.</li>
+        <li>면적으로 본 간격 \(1{,}000 \times 126.7/336 = 377\) mm, \(5h = 1{,}050\), 450 mm → 수축·온도 철근만이라면 D13@375.</li>
+        <li>2방향 슬래브에서는 이 철근이 휨 주철근이기도 하므로 위험 단면 간격 \(\min(2h, 300) = 300\) mm가 지배 → <b>D13@300</b>(422 mm²/m). 같은 판을 SD400 철근으로 하면 \(\rho_{st} = 0.0020\), 420 mm²/m가 필요해 D13@300(422)이 겨우 맞는다.</li>
+      </ol></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="two-way">
+    <h2>2방향 슬래브: 띠 모멘트에서 철근 간격으로</h2>
+    <div class="problem"><strong>398 kN·m를 D13 간격으로 바꾸기</strong>
+      <p>StructureBook 3장의 직접 설계법은 B-10 내부 구획의 정적 모멘트 \(M_0 = 612\) kN·m를 지점 부 모멘트 398, 경간 정 모멘트 214 kN·m로 나누고, 다시 주열대·중간대·보로 나눴습니다. 설계대 하나에 대한 이 "합계 모멘트"를 판의 철근으로 바꾸려면 각 띠의 폭으로 나눠 폭 1 m당 모멘트로 만들어야 합니다.</p></div>
+    <p><span class="term">직접 설계법</span><span class="en">(direct design method)</span>의 순서는 <a href="../../structure/chapters/floors.html#two-way-moments">StructureBook 3장</a>에서 자세히 다뤘으므로 여기서는 결과만 씁니다. 설계대 한 경간의 <span class="term">정적 모멘트</span><span class="en">(total static moment)</span> \(M_0 = w_u\ell_2\ell_n^2/8\)를 부·정 모멘트로 나누고(내부 경간 0.65·0.35), 각각을 기둥 중심선 양쪽 \(0.25\min(\ell_1,\ell_2)\) 폭의 <span class="term">주열대</span><span class="en">(column strip)</span>와 나머지 <span class="term">중간대</span><span class="en">(middle strip)</span>로 나눕니다(\(\ell_2/\ell_1 = 1\), 보 강성 \(\alpha_{f1}\ell_2/\ell_1 \ge 1\)이면 주열대 75 %, 그중 85 %는 보). 이 장의 일은 그다음입니다.</p>
+    <div class="callout def"><strong>원리 9.7 (띠 모멘트 → 폭 1 m당 철근)</strong> 띠의 설계 모멘트 \(M_{\text{strip}}\)(kN·m)을 띠 폭 \(w_{\text{strip}}\)(m)으로 나눠 폭 1 m당 모멘트 \(m_u = M_{\text{strip}}/w_{\text{strip}}\)를 만들고, 원리 9.2로 \(A_s\)와 간격을 정한다. 철근량은
+      <div class="formula">$$A_s = \max\!\left[A_{s,\text{req}}(m_u),\;\; \rho_{st}\,b\,h\right],\qquad s \le \min(2h,\ 300\ \text{mm})\ \ (\text{위험 단면})$$<div class="where">주열대 폭 \(= 0.5\min(\ell_1,\ell_2)\)(기둥선 양쪽 반쪽 띠의 합), 중간대 폭 \(= \ell_2 - \)주열대 폭. 보가 있으면 주열대 모멘트의 일부(\(\alpha_{f1}\ell_2/\ell_1 \ge 1\)에서 85 %)는 보가 받으므로 판의 주열대에는 나머지만 남는다. 두 방향 철근이 겹치므로 안쪽 층의 \(d\)는 바깥 층보다 철근 지름만큼 작다.</div></div></div>
+    <figure class="diagram" id="fig-sl-strips">
+      <svg viewBox="0 0 860 340" role="img" aria-label="B-10 내부 구획의 주열대와 중간대 폭, 띠 모멘트와 폭 1 m당 모멘트">
+        <rect x="10" y="10" width="840" height="320" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="0" y="0" width="260" height="260" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <rect x="0" y="0" width="260" height="65" style="fill:color-mix(in srgb, var(--accent) 16%, transparent)"/>
+          <rect x="0" y="195" width="260" height="65" style="fill:color-mix(in srgb, var(--accent) 16%, transparent)"/>
+          <rect x="0" y="65" width="260" height="130" style="fill:color-mix(in srgb, var(--accent-2) 14%, transparent)"/>
+          <g style="stroke:var(--text-dim);stroke-width:7"><line x1="0" y1="0" x2="260" y2="0"/><line x1="0" y1="260" x2="260" y2="260"/><line x1="0" y1="0" x2="0" y2="260"/><line x1="260" y1="0" x2="260" y2="260"/></g>
+          <g style="fill:var(--text)"><rect x="-13" y="-13" width="26" height="26"/><rect x="247" y="-13" width="26" height="26"/><rect x="-13" y="247" width="26" height="26"/><rect x="247" y="247" width="26" height="26"/></g>
+          <g class="t-mono" text-anchor="middle"><text x="130" y="36" style="fill:var(--accent)">주열대 반쪽 2 m</text><text x="130" y="134" style="fill:var(--accent-2)">중간대 4 m</text><text x="130" y="232" style="fill:var(--accent)">주열대 반쪽 2 m</text></g>
+          <line x1="20" y1="280" x2="240" y2="280" style="stroke:var(--text-dim)" marker-start="url(#sl-ah-t)" marker-end="url(#sl-ah-t)"/>
+          <text x="130" y="296" text-anchor="middle" class="t-mono">ℓ₁ = 8 m(설계 방향 →), ℓ<tspan baseline-shift="sub" font-size="8">n</tspan> = 7.2 m</text>
+          <line x1="280" y1="0" x2="280" y2="260" style="stroke:var(--text-dim)" marker-start="url(#sl-ah-t)" marker-end="url(#sl-ah-t)"/>
+          <text x="290" y="134" class="t-mono">ℓ₂ = 8 m</text>
+        </g>
+        <g transform="translate(400,40)">
+          <text x="0" y="6" class="t" style="font-weight:700">B-10 내부 구획(M₀ = 612 kN·m)</text>
+          <g class="t-mono">
+            <text x="0" y="36">부 모멘트 0.65M₀ = 398</text><text x="230" y="36">정 모멘트 0.35M₀ = 214</text>
+            <text x="0" y="62" style="fill:var(--accent)">주열대 75 % = 298</text><text x="230" y="62" style="fill:var(--accent)">주열대 75 % = 161</text>
+            <text x="12" y="84" style="fill:var(--text-dim)">└ 보 G1 85 % = 254</text><text x="242" y="84" style="fill:var(--text-dim)">└ 보 G1 85 % = 137</text>
+            <text x="12" y="106" style="fill:var(--accent)">└ 판 45 ÷ 4 m = 11.2/m</text><text x="242" y="106" style="fill:var(--accent)">└ 판 24 ÷ 4 m = 6.0/m</text>
+            <text x="0" y="134" style="fill:var(--accent-2)">중간대 100 ÷ 4 m = 25.0/m</text><text x="230" y="134" style="fill:var(--accent-2)">중간대 54 ÷ 4 m = 13.4/m</text>
+          </g>
+          <line x1="0" y1="152" x2="440" y2="152" style="stroke:var(--border)"/>
+          <g class="t-mono">
+            <text x="0" y="176">A<tspan baseline-shift="sub" font-size="8">s,req</tspan>(d 171): 156 · 351 mm²/m</text><text x="230" y="176">A<tspan baseline-shift="sub" font-size="8">s,req</tspan>: 83 · 188 mm²/m</text>
+            <text x="0" y="200">최소 0.0016bh = 336 mm²/m</text><text x="230" y="200">최소 336 mm²/m 지배</text>
+            <text x="0" y="226" style="fill:var(--ok);font-weight:700">상단 D13@250 (507)</text><text x="230" y="226" style="fill:var(--ok);font-weight:700">하단 D13@300 (422)</text>
+          </g>
+          <text x="0" y="262" class="t-dim">중간대 상단만 강도가 최소를 넘는다 — 나머지는 모두 최소 철근·간격이 정한다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-4.</b> B-10 내부 구획의 띠 모멘트를 폭 1 m당 모멘트와 철근으로 바꾸기. 주열대(파랑 계열)는 기둥선 양쪽 2 m씩, 중간대(주황 계열)는 가운데 4 m다. 보가 주열대 모멘트의 85 %를 가져가므로 판의 주열대는 오히려 중간대보다 모멘트가 작다. 상단은 균열 제어 간격(약 250 mm, 8장)을 함께 고려해 @250으로 했다(교육용).</figcaption>
+    </figure>
+    <div class="sim" id="sim-sl-ddm">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>2방향 슬래브 띠 모멘트와 철근 간격</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sl-cv-ddm" aria-label="외단·정·내단 위치별 주열대와 중간대의 폭 1 m당 모멘트 막대와 철근 간격"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>형식</span><div class="seg" id="sl-dd-beam"><button data-value="beam" class="on">보 있음(α ≥ 1)</button><button data-value="flat">플랫 플레이트</button></div></div>
+          <div class="ctrl"><span>경간</span><div class="seg" id="sl-dd-span"><button data-value="int" class="on">내부 경간</button><button data-value="end">단부 경간</button></div></div>
+          <label class="ctrl"><span>ℓ₁(설계 방향) <output id="sl-dd-l1-out"></output></span><input type="range" id="sl-dd-l1" min="5" max="11" step="0.1" value="8"></label>
+          <label class="ctrl"><span>ℓ₂(직각 방향) <output id="sl-dd-l2-out"></output></span><input type="range" id="sl-dd-l2" min="5" max="11" step="0.1" value="8"></label>
+          <label class="ctrl"><span>두께 h <output id="sl-dd-h-out"></output></span><input type="range" id="sl-dd-h" min="150" max="350" step="10" value="210"></label>
+          <label class="ctrl"><span>활하중 L <output id="sl-dd-LL-out"></output></span><input type="range" id="sl-dd-LL" min="1" max="12" step="0.5" value="2.5"></label>
+          <div class="ctrl"><span>철근</span><div class="seg" id="sl-dd-bar"><button data-value="D10">D10</button><button data-value="D13" class="on">D13</button><button data-value="D16">D16</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">w<sub>u</sub> · ℓ<sub>n</sub> · M₀</span><span class="v" id="sl-dd-o-m0">—</span></div>
+        <div class="stat"><span class="k">주열대 폭 · 중간대 폭</span><span class="v" id="sl-dd-o-w">—</span></div>
+        <div class="stat"><span class="k">최대 m<sub>u</sub>(판)</span><span class="v" id="sl-dd-o-mx">—</span></div>
+        <div class="stat"><span class="k">강도가 지배하는 띠</span><span class="v" id="sl-dd-o-gov">—</span></div>
+      </div>
+      <div class="sl-msg" id="sl-dd-msg"></div>
+      <div class="sim-note">해볼 것: 기본값은 B-10 내부 구획(그림 9-4)입니다 · "플랫 플레이트"로 바꾸면 보가 받던 몫이 판의 주열대로 와서 주열대 상단이 D13@100 안팎까지 촘촘해집니다(그래서 보 없는 판은 두꺼워진다) · ℓ₂/ℓ₁을 1.5로 만들면 주열대 비율이 75 → 60 %로 줄고 중간대가 더 일합니다 · 단부 경간은 정 모멘트 계수가 0.57로 커집니다 · 모델: 직접 설계법(ACI 318 형태, StructureBook 3장 원리 3.3·3.4), D = 24h + 1.5 kN/m², w<sub>u</sub> = 1.2D + 1.6L, 기둥 800 mm, ℓ<sub>n</sub> = ℓ₁ − 0.8 m(≥ 0.65ℓ₁), 보 있음은 α<sub>f1</sub>ℓ₂/ℓ₁ ≥ 1·가장자리 보 β<sub>t</sub> ≥ 2.5 가정, 플랫 플레이트 단부는 가장자리 보 없음. d는 안쪽 층(h − 20 − 1.5d<sub>b</sub>). 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 9.3 (B-10 내부 구획의 배근)</strong> \(h = 210\) mm, D13(SD500), 피복 20 mm, 그림 9-4의 띠 모멘트.
+      <ol class="sl-steps">
+        <li><b>유효 깊이.</b> 바깥 층 \(d = 210 - 20 - 6.4 = 184\) mm, 안쪽 층 \(171\) mm. 정사각 구획이라 두 방향 모멘트가 같으므로 두 방향 모두 안쪽 층 \(d = 171\) mm로 설계한다(안전 측).</li>
+        <li><b>강도 소요(mm²/m).</b> 주열대 판 부 11.2 → 156, 정 6.0 → 83, 중간대 부 25.0 → 351, 정 13.4 → 188.</li>
+        <li><b>최소.</b> 336 mm²/m(예제 9.2). 중간대 부 모멘트(351)만 최소를 넘는다.</li>
+        <li><b>하단.</b> 모든 띠 최소 지배 → D13@300(422 mm²/m, \(\phi M_n = 29.9\) kN·m/m ≥ 13.4 ✓). 간격 300 = \(\min(2h, 300)\) ✓.</li>
+        <li><b>상단(보 위).</b> 중간대 351 → D13@300(422)이 강도로는 충분(\(\phi M_n = 29.9 \ge 25.0\) ✓)하지만, 8장의 균열 제어 간격 \(s_{\max} = \min(375 \times 280/333 - 2.5 \times 20,\ 300 \times 280/333) = 252\) mm(\(f_s = \tfrac23 f_y\))를 지키려고 <b>D13@250</b>(507 mm²/m, \(\phi M_n = 35.8\))으로 한다. 균열 제어 간격을 2방향 슬래브에 어떻게 적용하는지는 현행 기준을 확인할 것.</li>
+      </ol>
+      두 방향 하단 D13@300, 보 위 상단 D13@250. 강도가 설계를 지배한 곳은 중간대 상단 한 곳뿐이고, 나머지는 모두 최소 철근과 간격 규정이 정했습니다. B-10의 바닥 철근은 "모멘트"가 아니라 "두께"가 정한다고 말할 수 있습니다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="detailing">
+    <h2>2방향 슬래브의 상세: 층 순서, 절단, 모서리</h2>
+    <div class="problem"><strong>철근 길이는 어디까지</strong>
+      <p>폭 1 m당 철근량을 정했다고 배근이 끝나지는 않습니다. 두 방향 철근 가운데 어느 쪽을 바깥에 둘지, 보 위 상단 철근을 얼마나 길게 뻗을지, 바깥 모서리에서 판이 들리려는 힘을 어떻게 잡을지가 남았습니다.</p></div>
+    <figure class="diagram" id="fig-sl-detail">
+      <svg viewBox="0 0 860 300" role="img" aria-label="보 위 슬래브 단면의 상단 철근 연장 길이, 하단 철근의 연속, 두 방향 철근 층 순서와 유효 깊이">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,50)">
+          <rect x="0" y="40" width="780" height="42" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="370" y="82" width="40" height="90" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="390" y="190" text-anchor="middle" class="t-mono">보 G1(폭 400)</text>
+          <line x1="150" y1="50" x2="630" y2="50" style="stroke:var(--accent);stroke-width:3"/>
+          <line x1="10" y1="72" x2="770" y2="72" style="stroke:var(--tension);stroke-width:3"/>
+          <g style="fill:var(--tension)"><circle cx="40" cy="66" r="3"/><circle cx="100" cy="66" r="3"/><circle cx="160" cy="66" r="3"/><circle cx="220" cy="66" r="3"/><circle cx="280" cy="66" r="3"/><circle cx="340" cy="66" r="3"/><circle cx="440" cy="66" r="3"/><circle cx="500" cy="66" r="3"/><circle cx="560" cy="66" r="3"/><circle cx="620" cy="66" r="3"/><circle cx="680" cy="66" r="3"/><circle cx="740" cy="66" r="3"/></g>
+          <g style="fill:var(--accent)"><circle cx="180" cy="56" r="3"/><circle cx="240" cy="56" r="3"/><circle cx="300" cy="56" r="3"/><circle cx="360" cy="56" r="3"/><circle cx="420" cy="56" r="3"/><circle cx="480" cy="56" r="3"/><circle cx="540" cy="56" r="3"/><circle cx="600" cy="56" r="3"/></g>
+          <line x1="150" y1="24" x2="370" y2="24" style="stroke:var(--accent);stroke-width:1.4" marker-start="url(#sl-ah-acc)" marker-end="url(#sl-ah-acc)"/>
+          <line x1="410" y1="24" x2="630" y2="24" style="stroke:var(--accent);stroke-width:1.4" marker-start="url(#sl-ah-acc)" marker-end="url(#sl-ah-acc)"/>
+          <text x="260" y="16" text-anchor="middle" class="t-mono" style="fill:var(--accent)">≥ 0.30ℓ<tspan baseline-shift="sub" font-size="8">n</tspan> ≈ 2.2 m(보 면부터)</text>
+          <text x="520" y="16" text-anchor="middle" class="t-mono" style="fill:var(--accent)">≥ 0.30ℓ<tspan baseline-shift="sub" font-size="8">n</tspan></text>
+          <text x="10" y="104" class="t-mono" style="fill:var(--tension)">하단: 보 위를 지나 연속(또는 보 안에 정착)</text>
+          <text x="560" y="104" class="t-mono" style="fill:var(--accent)">상단: 보 위 부 모멘트 구간</text>
+        </g>
+        <g transform="translate(560,190)">
+          <text x="0" y="0" class="t" style="font-weight:700">층 순서(단면 확대)</text>
+          <rect x="0" y="12" width="250" height="66" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <line x1="6" y1="56" x2="244" y2="56" style="stroke:var(--tension);stroke-width:2.6"/>
+          <g style="fill:var(--tension)"><circle cx="30" cy="65" r="5"/><circle cx="90" cy="65" r="5"/><circle cx="150" cy="65" r="5"/><circle cx="210" cy="65" r="5"/></g>
+          <text x="0" y="96" class="t-mono">● 바깥 층(단변·주 방향) d ≈ 184</text>
+          <text x="0" y="110" class="t-mono">━ 안쪽 층 d ≈ 171 (13 mm 작다)</text>
+        </g>
+        <g transform="translate(60,200)">
+          <text x="0" y="0" class="t" style="font-weight:700">바깥 모서리 보강(보 있는 판, ACI 형태)</text>
+          <rect x="0" y="12" width="90" height="70" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="0" y="12" width="32" height="32" style="fill:color-mix(in srgb, var(--accent-2) 30%, transparent);stroke:var(--accent-2)"/>
+          <line x1="0" y1="12" x2="32" y2="44" style="stroke:var(--accent-2);stroke-width:2"/>
+          <text x="104" y="34" class="t-mono">모서리에서 ℓ/5 범위 상·하단</text>
+          <text x="104" y="50" class="t-mono">판이 들리며 비틀리는 모멘트에 대응</text>
+          <text x="104" y="66" class="t-mono">단위 폭 철근량 = 최대 정 모멘트 철근</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-5.</b> 2방향 슬래브 상세. 위: 보 위 상단 철근은 부 모멘트가 사라지는 곳보다 충분히 멀리, 보 없는 판의 최소 연장 형태로는 보 면에서 \(0.30\ell_n\) 안팎까지 뻗는다(ACI 318 플랫 슬래브 형태, 보가 있는 판은 절단점 계산 — 7장). 하단 철근은 지지 보 위를 지나 이어지게 한다. 오른쪽 아래: 두 방향 철근이 겹치는 층 순서. 왼쪽 아래: 보로 지지된 판의 바깥 모서리 보강.</figcaption>
+    </figure>
+    <ul>
+      <li><b>층 순서.</b> 모멘트가 큰 방향(직사각 구획의 단변 방향)의 철근을 바깥 층에 두어 \(d\)를 키운다. 정사각 구획은 어느 쪽이든 안쪽 층 \(d\)로 두 방향을 설계하는 편이 간단하다. 상단과 하단 모두 같은 원리다.</li>
+      <li><b>절단과 정착.</b> 상단 철근은 부 모멘트 구간을 덮고 정착 길이만큼 더 뻗어야 한다(7장). 보 없는 판에서는 기준이 주열대·중간대별 최소 연장 길이(상단 \(0.30\ell_n\)·\(0.22\ell_n\) 형태)를 그림으로 준다(ACI 318 형태, 현행 기준 확인). 바깥 지점의 상단 철근은 테두리 보 안에 갈고리로 정착한다.</li>
+      <li><b>구조 일체성 철근.</b> 보 없는 판에서는 주열대 하단 철근 일부(두 가닥 이상 형태)를 기둥 코어를 지나 연속시킨다. 뚫림 전단으로 판이 기둥에서 떨어져도 이 <span class="term">구조 일체성 철근</span><span class="en">(structural integrity reinforcement)</span>이 판을 매달아 연쇄 붕괴를 막는다(StructureBook 3장의 삼풍백화점 노트, 16장).</li>
+      <li><b>바깥 모서리.</b> 보로 지지된 판(\(\alpha_f \gt 1\))의 바깥 모서리는 하중을 받으면 들리려 하고, 판이 비틀려 모서리 상단에 대각선 균열, 하단에 직각 방향 균열이 생긴다. 그래서 모서리에서 긴 경간의 1/5 범위에 상·하단 <span class="term">모서리 보강 철근</span><span class="en">(corner reinforcement)</span>을 최대 정 모멘트 철근량만큼 둔다(ACI 318 형태).</li>
+      <li><b>받침(스페이서).</b> 상단 철근은 사람이 밟고 다니며 처지기 쉽다. 받침 간격과 높이가 \(d\)를 지키는 시공 상세이며, 이 장 첫머리의 주차장 사고가 보여 주듯 강도의 일부다.</li>
+    </ul>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="plan">
+    <h2>B-10 슬래브 배근 평면도</h2>
+    <div class="problem"><strong>철근은 결국 도면 한 장으로 간다</strong>
+      <p>현장의 철근공이 보는 것은 모멘트가 아니라 배근 평면도입니다. 어느 구획의 어느 층에 무슨 철근을 몇 mm 간격으로, 어디서 어디까지 까는지가 한 장에 담겨야 합니다. B-10의 모서리 구획 하나를 포함한 3 × 2 구획으로 그려 봅시다.</p></div>
+    <figure class="diagram" id="fig-sl-plan">
+      <svg viewBox="0 0 860 360" role="img" aria-label="B-10 기준층 모서리 부근 슬래브 배근 평면도: 하단 두 방향 D13@300, 보 위 상단 D13@250, 모서리 보강">
+        <rect x="10" y="10" width="840" height="340" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="0" y="0" width="480" height="280" style="fill:var(--surface-2)"/>
+          <g style="stroke:var(--tension);stroke-width:1;opacity:.5">
+            <line x1="0" y1="20" x2="480" y2="20"/><line x1="0" y1="40" x2="480" y2="40"/><line x1="0" y1="60" x2="480" y2="60"/><line x1="0" y1="80" x2="480" y2="80"/><line x1="0" y1="100" x2="480" y2="100"/><line x1="0" y1="120" x2="480" y2="120"/><line x1="0" y1="160" x2="480" y2="160"/><line x1="0" y1="180" x2="480" y2="180"/><line x1="0" y1="200" x2="480" y2="200"/><line x1="0" y1="220" x2="480" y2="220"/><line x1="0" y1="240" x2="480" y2="240"/><line x1="0" y1="260" x2="480" y2="260"/>
+            <line x1="20" y1="0" x2="20" y2="280"/><line x1="40" y1="0" x2="40" y2="280"/><line x1="60" y1="0" x2="60" y2="280"/><line x1="80" y1="0" x2="80" y2="280"/><line x1="100" y1="0" x2="100" y2="280"/><line x1="120" y1="0" x2="120" y2="280"/><line x1="140" y1="0" x2="140" y2="280"/><line x1="180" y1="0" x2="180" y2="280"/><line x1="200" y1="0" x2="200" y2="280"/><line x1="220" y1="0" x2="220" y2="280"/><line x1="240" y1="0" x2="240" y2="280"/><line x1="260" y1="0" x2="260" y2="280"/><line x1="280" y1="0" x2="280" y2="280"/><line x1="300" y1="0" x2="300" y2="280"/><line x1="340" y1="0" x2="340" y2="280"/><line x1="360" y1="0" x2="360" y2="280"/><line x1="380" y1="0" x2="380" y2="280"/><line x1="400" y1="0" x2="400" y2="280"/><line x1="420" y1="0" x2="420" y2="280"/><line x1="440" y1="0" x2="440" y2="280"/><line x1="460" y1="0" x2="460" y2="280"/>
+          </g>
+          <g style="fill:color-mix(in srgb, var(--accent) 22%, transparent);stroke:var(--accent)">
+            <rect x="0" y="-6" width="480" height="40"/><rect x="0" y="124" width="480" height="72"/>
+            <rect x="-6" y="0" width="40" height="280"/><rect x="124" y="0" width="72" height="280"/><rect x="284" y="0" width="72" height="280"/><rect x="444" y="0" width="42" height="280"/>
+          </g>
+          <g style="stroke:var(--text-dim);stroke-width:6"><line x1="0" y1="0" x2="480" y2="0"/><line x1="0" y1="160" x2="480" y2="160"/><line x1="0" y1="0" x2="0" y2="280"/><line x1="160" y1="0" x2="160" y2="280"/><line x1="320" y1="0" x2="320" y2="280"/><line x1="480" y1="0" x2="480" y2="280"/></g>
+          <g style="fill:var(--text)"><rect x="-8" y="-8" width="16" height="16"/><rect x="152" y="-8" width="16" height="16"/><rect x="312" y="-8" width="16" height="16"/><rect x="472" y="-8" width="16" height="16"/><rect x="-8" y="152" width="16" height="16"/><rect x="152" y="152" width="16" height="16"/><rect x="312" y="152" width="16" height="16"/><rect x="472" y="152" width="16" height="16"/></g>
+          <rect x="0" y="0" width="32" height="32" style="fill:color-mix(in srgb, var(--accent-2) 35%, transparent);stroke:var(--accent-2);stroke-width:1.5"/>
+          <path d="M480 0 l8 20 l-16 20 l16 20 l-16 20" style="fill:none;stroke:var(--text-faint)"/>
+          <path d="M0 280 l20 8 l20 -16 l20 16 l20 -16" style="fill:none;stroke:var(--text-faint)"/>
+          <g class="t-mono" text-anchor="middle"><text x="80" y="300">8,000</text><text x="240" y="300">8,000</text><text x="400" y="300">8,000 ⋯</text></g>
+          <text x="80" y="80" text-anchor="middle" class="t-mono" style="fill:var(--text)">모서리 구획</text>
+          <text x="240" y="80" text-anchor="middle" class="t-mono" style="fill:var(--text)">가장자리 구획</text>
+          <text x="240" y="228" text-anchor="middle" class="t-mono" style="fill:var(--text)">내부 구획</text>
+        </g>
+        <g transform="translate(560,50)">
+          <text x="0" y="0" class="t" style="font-weight:700">범례(B-10, h = 210, 교육용)</text>
+          <line x1="0" y1="24" x2="30" y2="24" style="stroke:var(--tension);stroke-width:2"/><text x="38" y="28" class="t-mono">하단 D13@300 두 방향(전 구획)</text>
+          <rect x="0" y="42" width="30" height="14" style="fill:color-mix(in srgb, var(--accent) 22%, transparent);stroke:var(--accent)"/><text x="38" y="54" class="t-mono">상단 D13@250(보 위, 양쪽 2.2 m)</text>
+          <rect x="0" y="68" width="30" height="14" style="fill:color-mix(in srgb, var(--accent-2) 35%, transparent);stroke:var(--accent-2)"/><text x="38" y="80" class="t-mono">모서리 보강 1.6 × 1.6 m 상·하단</text>
+          <line x1="0" y1="102" x2="30" y2="102" style="stroke:var(--text-dim);stroke-width:6"/><text x="38" y="106" class="t-mono">G1 400 × 700, 기둥 800</text>
+          <text x="0" y="140" class="t-mono">외단 상단: 테두리 보 안 90° 갈고리 정착</text>
+          <text x="0" y="160" class="t-mono">하단: 보 위에서 겹침 이음 또는 연속</text>
+          <text x="0" y="180" class="t-mono">바깥 층 = X 방향, 안쪽 층 = Y 방향</text>
+          <text x="0" y="200" class="t-mono">철근 물량 ≈ 12 kg/m²(판만)</text>
+          <text x="0" y="240" class="t-dim">상단 띠 폭은 실제 길이의 축척</text>
+          <text x="0" y="258" class="t-dim">(보 면 + 0.30ℓ<tspan baseline-shift="sub" font-size="8">n</tspan> ≈ 2.2 m씩)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-6.</b> B-10 기준층 모서리 부근 슬래브 배근 평면도(교육용). 하단 철근(가는 파란 선, 실제보다 성글게 그림)은 모든 구획에 두 방향으로 깔고, 보 위에는 상단 철근 띠(청회색)를 보 양쪽으로 약 2.2 m씩 깐다. 건물 바깥 모서리에는 모서리 보강(주황)을 둔다. 지그재그 선은 도면이 그 방향으로 계속됨을 뜻한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-sl-plan">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-10 슬래브 배근 평면도 검토</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sl-cv-plan" aria-label="3 × 2 구획 슬래브 배근 평면도, 구획별 판정 색"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>보기</span><div class="seg" id="sl-pl-lay"><button data-value="bot">하단</button><button data-value="top">상단</button><button data-value="both" class="on">둘 다</button></div></div>
+          <div class="ctrl"><span>철근</span><div class="seg" id="sl-pl-bar"><button data-value="D10">D10</button><button data-value="D13" class="on">D13</button><button data-value="D16">D16</button></div></div>
+          <label class="ctrl"><span>하단 간격 <output id="sl-pl-sb-out"></output></span><input type="range" id="sl-pl-sb" min="100" max="450" step="25" value="300"></label>
+          <label class="ctrl"><span>상단 간격 <output id="sl-pl-st-out"></output></span><input type="range" id="sl-pl-st" min="100" max="450" step="25" value="250"></label>
+          <label class="ctrl"><span>활하중 L <output id="sl-pl-LL-out"></output></span><input type="range" id="sl-pl-LL" min="1" max="10" step="0.5" value="2.5"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">하단 최대 이용률</span><span class="v" id="sl-pl-o-b">—</span></div>
+        <div class="stat"><span class="k">상단 최대 이용률</span><span class="v" id="sl-pl-o-t">—</span></div>
+        <div class="stat"><span class="k">최소 철근 · 간격</span><span class="v" id="sl-pl-o-rule">—</span></div>
+        <div class="stat"><span class="k">철근 물량(판)</span><span class="v" id="sl-pl-o-kg">—</span></div>
+        <div class="stat"><span class="k">짚은 곳</span><span class="v" id="sl-pl-o-pt" style="font-size:13px">평면을 누르세요</span></div>
+      </div>
+      <div class="sl-msg" id="sl-pl-msg"></div>
+      <div class="sim-note">해볼 것: 평면 위를 눌러 그 자리의 소요 모멘트와 강도를 읽어 보세요(모서리·가장자리·내부 구획의 값이 다릅니다) · 하단 간격을 350으로 넓히면 강도는 남아도 간격 규정(2h·300 mm)과 최소 철근이 걸립니다 · 상단을 D10@250으로 바꾸면 첫 내부 보 위 중간대(m<sub>u</sub> ≈ 27 kN·m/m)가 먼저 불합격 · 활하중을 5 kN/m²로 올리면 상단 간격을 줄여야 합니다 · 모델: 각 구획·방향을 직접 설계법(ACI 318 형태)으로 풀어 X·Y 방향 폭 1 m당 모멘트를 구하고(단부 경간 계수 0.16·0.57·0.70, 내부 0.65·0.35, 주열대 75 %·보 85 %), 하단 X는 바깥 층 d, Y는 안쪽 층 d, 상단은 두 방향 모두 안쪽 층 d(안전 측). 상단 연장 0.30ℓ<sub>n</sub>. 물량은 도면 영역의 판 철근만(겹침·갈고리 제외), 교육용.</div>
+    </div>
+    <div class="callout site"><strong>B-10 슬래브 배근(교육용 결론)</strong> h = 210 mm, f<sub>ck</sub> 30 MPa, D13 SD500, 피복 20 mm. 하단: 모든 구획 두 방향 <b>D13@300</b>(422 mm²/m) — 최소 철근 0.0016bh = 336 mm²/m와 간격 2h·300 mm가 지배. 상단: 보 위 양쪽 약 2.2 m <b>D13@250</b>(507 mm²/m) — 첫 내부 보 위 중간대 m<sub>u</sub> ≈ 27 kN·m/m(단부 경간 0.70M₀)와 균열 제어 간격이 지배, 외단 상단은 테두리 보에 갈고리 정착. 건물 바깥 모서리 1.6 × 1.6 m 상·하단 보강. 판 철근은 약 12 kg/m²(하단 6.6 + 상단 5.7, 겹침·갈고리 제외)로, 기준층 한 장(약 1,000 m², 교육용 가정)에 약 12 t이다. 강도로만 정한다면 하단은 D13@450도 버티지만 규정이 허락하지 않는다. 16장에서 G1·C1과 함께 물량을 다시 집계한다.</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="punching">
+    <h2>뚫림 전단과 전단 보강</h2>
+    <div class="problem"><strong>판을 두껍게 하지 않고 기둥 둘레를 강하게</strong>
+      <p>B-10을 보 없는 플랫 플레이트로 바꾸면 210 mm 판은 활하중 2.5 kN/m²에서 뚫림 전단을 겨우 통과합니다(StructureBook 3장 예제 3.3). 같은 바닥에 서고(활하중 5 kN/m²)를 들이면 불합격입니다. 판 전체를 두껍게 하는 대신 기둥 둘레에만 철물을 넣어 해결할 수 있을까요?</p></div>
+    <p><span class="term">뚫림 전단</span><span class="en">(punching shear)</span>은 기둥 면에서 \(d/2\) 떨어진 <span class="term">임계 둘레</span><span class="en">(critical perimeter)</span> \(b_0\)에서 검토합니다(정의와 강도 식 \(v_c = \min[0.33,\ 0.17(1 + 2/\beta_c),\ 0.083(\alpha_s d/b_0 + 2)]\lambda\sqrt{f_{ck}}\)는 <a href="../../structure/chapters/floors.html#flat-plate">StructureBook 3장 원리 3.6</a>, ACI 318 형태). 현행 KDS 14 20 22의 2방향 전단 강도 식은 이와 형태가 다르므로 실제 설계에는 현행 기준을 쓰고, 이 장은 개념과 크기 감각을 위해 ACI 형태를 씁니다. 여기서 더할 것은 강도가 모자랄 때의 대책입니다.</p>
+    <figure class="diagram" id="fig-sl-punchrf">
+      <svg viewBox="0 0 860 330" role="img" aria-label="뚫림 전단 보강의 세 가지: 스터럽, 스터드 레일, 전단 머리와 보강 구간 바깥 임계 둘레">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g class="t" text-anchor="middle" style="font-weight:700"><text x="150" y="38">스터럽(폐쇄형)</text><text x="430" y="38">스터드 레일</text><text x="710" y="38">전단 머리</text></g>
+        <g transform="translate(40,60)">
+          <rect x="0" y="0" width="220" height="44" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="90" y="44" width="40" height="50" style="fill:var(--text-dim)"/>
+          <g style="fill:none;stroke:var(--accent);stroke-width:1.6"><rect x="140" y="6" width="12" height="32"/><rect x="164" y="6" width="12" height="32"/><rect x="188" y="6" width="12" height="32"/><rect x="68" y="6" width="12" height="32"/><rect x="44" y="6" width="12" height="32"/><rect x="20" y="6" width="12" height="32"/></g>
+          <path d="M130 44 L 190 0" style="stroke:var(--bad);stroke-width:1.6;stroke-dasharray:4 3"/>
+          <text x="110" y="116" text-anchor="middle" class="t-mono">d ≥ 150 mm, d ≥ 16d<tspan baseline-shift="sub" font-size="8">b</tspan>(형태)</text>
+          <text x="110" y="132" text-anchor="middle" class="t-mono">v<tspan baseline-shift="sub" font-size="8">c</tspan> ≤ 0.17√f<tspan baseline-shift="sub" font-size="8">ck</tspan>, v<tspan baseline-shift="sub" font-size="8">n</tspan> ≤ 0.50√f<tspan baseline-shift="sub" font-size="8">ck</tspan></text>
+        </g>
+        <g transform="translate(320,60)">
+          <rect x="0" y="0" width="220" height="44" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="90" y="44" width="40" height="50" style="fill:var(--text-dim)"/>
+          <line x1="134" y1="40" x2="214" y2="40" style="stroke:var(--accent);stroke-width:3"/><line x1="6" y1="40" x2="86" y2="40" style="stroke:var(--accent);stroke-width:3"/>
+          <g style="stroke:var(--accent);stroke-width:2.4"><line x1="146" y1="40" x2="146" y2="8"/><line x1="172" y1="40" x2="172" y2="8"/><line x1="198" y1="40" x2="198" y2="8"/><line x1="74" y1="40" x2="74" y2="8"/><line x1="48" y1="40" x2="48" y2="8"/><line x1="22" y1="40" x2="22" y2="8"/></g>
+          <g style="fill:var(--accent)"><rect x="140" y="5" width="12" height="4"/><rect x="166" y="5" width="12" height="4"/><rect x="192" y="5" width="12" height="4"/><rect x="68" y="5" width="12" height="4"/><rect x="42" y="5" width="12" height="4"/><rect x="16" y="5" width="12" height="4"/></g>
+          <path d="M130 44 L 190 0" style="stroke:var(--bad);stroke-width:1.6;stroke-dasharray:4 3"/>
+          <text x="110" y="116" text-anchor="middle" class="t-mono">머리 달린 스터드, 첫 줄 ≤ d/2</text>
+          <text x="110" y="132" text-anchor="middle" class="t-mono">v<tspan baseline-shift="sub" font-size="8">c</tspan> ≤ 0.25√f<tspan baseline-shift="sub" font-size="8">ck</tspan>, v<tspan baseline-shift="sub" font-size="8">n</tspan> ≤ 0.66√f<tspan baseline-shift="sub" font-size="8">ck</tspan></text>
+        </g>
+        <g transform="translate(600,60)">
+          <rect x="0" y="0" width="220" height="44" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="90" y="44" width="40" height="50" style="fill:var(--text-dim)"/>
+          <rect x="30" y="24" width="160" height="10" style="fill:var(--accent)"/>
+          <text x="110" y="116" text-anchor="middle" class="t-mono">강재 I형 단면을 십자로 묻음</text>
+          <text x="110" y="132" text-anchor="middle" class="t-mono">임계 둘레를 팔 끝까지 밀어냄</text>
+        </g>
+        <!-- plan of stud rails with outer perimeter -->
+        <g transform="translate(330,212)">
+          <rect x="-12" y="-12" width="24" height="24" style="fill:var(--text-dim)"/>
+          <rect x="-22" y="-22" width="44" height="44" style="fill:none;stroke:var(--warn);stroke-dasharray:4 3;stroke-width:1.5"/>
+          <g style="stroke:var(--accent);stroke-width:2"><line x1="-12" y1="-12" x2="-12" y2="-80"/><line x1="12" y1="-12" x2="12" y2="-80" style="opacity:0"/></g>
+          <g style="stroke:var(--accent);stroke-width:2">
+            <line x1="-12" y1="12" x2="-12" y2="72"/><line x1="12" y1="12" x2="12" y2="72"/><line x1="-12" y1="-12" x2="-12" y2="-72" style="display:none"/>
+            <line x1="12" y1="-12" x2="12" y2="-72"/><line x1="12" y1="-12" x2="72" y2="-12"/><line x1="12" y1="12" x2="72" y2="12"/><line x1="-12" y1="-12" x2="-72" y2="-12"/><line x1="-12" y1="12" x2="-72" y2="12"/>
+          </g>
+          <polygon points="-12,-84 12,-84 84,-12 84,12 12,84 -12,84 -84,12 -84,-12" style="fill:none;stroke:var(--accent-2);stroke-dasharray:5 3;stroke-width:1.6"/>
+          <text x="100" y="-40" class="t-mono" style="fill:var(--accent-2)">바깥 임계 둘레(마지막 스터드 + d/2)</text>
+          <text x="100" y="-24" class="t-mono" style="fill:var(--accent-2)">v<tspan baseline-shift="sub" font-size="8">u</tspan> ≤ φ0.17√f<tspan baseline-shift="sub" font-size="8">ck</tspan>(보강 없음과 같은 판)</text>
+          <text x="100" y="0" class="t-mono" style="fill:var(--warn)">기둥 면 d/2 둘레: φ(v<tspan baseline-shift="sub" font-size="8">c</tspan> + v<tspan baseline-shift="sub" font-size="8">s</tspan>)</text>
+          <text x="-100" y="-40" text-anchor="end" class="t-mono">평면(스터드 레일 8줄)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-7.</b> 뚫림 전단 보강. 위: 스터럽, 머리 달린 스터드를 띠강판에 줄지어 붙인 스터드 레일, 강재를 십자로 묻는 전단 머리. 붉은 점선은 보강이 없을 때의 경사 균열로, 보강재는 이 균열을 가로질러야 한다. 아래: 스터드 레일 평면과 두 개의 검토 단면. 기둥 면 둘레에서는 콘크리트와 보강재가 함께, 보강 구간 바깥의 팔각형 둘레에서는 콘크리트 혼자 버텨야 한다(ACI 318 형태, 교육용).</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 9.8 (전단 보강이 있는 판의 뚫림 전단, ACI 318 형태)</strong> 기둥 면 \(d/2\) 둘레에서
+      <div class="formula">$$v_u \le \phi\,(v_c + v_s),\qquad v_s = \frac{A_v f_{yt}}{b_0\,s},\qquad \phi = 0.75$$<div class="where">\(A_v\): 기둥 둘레와 닮은 한 줄의 보강재 단면적 합(한 둘레 위 모든 다리·스터드), \(s\): 줄 간격(기둥 면과 나란한 둘레 사이 거리). 보강이 있으면 콘크리트 몫을 줄여 스터럽 \(v_c \le 0.17\lambda\sqrt{f_{ck}}\)·\(v_n \le 0.50\sqrt{f_{ck}}\), 머리 달린 <span class="term">스터드 레일</span><span class="en">(stud rail)</span> \(v_c \le 0.25\lambda\sqrt{f_{ck}}\)·\(v_n \le 0.66\sqrt{f_{ck}}\)로 한다. 스터드는 첫 줄을 기둥 면에서 \(d/2\) 이내, 줄 간격을 \(0.75d\)(\(v_u\)가 크면 \(0.5d\)) 이하로 하고 \(A_v f_{yt}/(b_0 s) \ge 0.17\sqrt{f_{ck}}\) 형태의 하한을 둔다. 마지막 줄에서 \(d/2\) 떨어진 바깥 둘레에서는 \(v_u \le \phi\,0.17\lambda\sqrt{f_{ck}}\). <span class="term">전단 머리</span><span class="en">(shear head)</span>는 강재 팔이 임계 둘레를 바깥으로 밀어내는 방식으로 별도 규정을 따른다. 모든 값은 현행 기준 확인.</div></div></div>
+    <p>보강의 원리는 5장의 스터럽과 같습니다. 경사 균열을 가로지르는 철물이 균열 면을 붙잡아 콘크리트가 혼자 받던 전단을 나눠 받습니다. 다른 점은 둘이 있습니다. 판은 얇아서 스터럽의 갈고리가 정착할 깊이가 모자라기 쉽고(그래서 \(d \ge 150\) mm 같은 조건이 있다), 보강을 끝낸 바깥에서 다시 한 번 뚫릴 수 있습니다. 바깥 둘레는 기둥에서 멀어 길이가 길지만 콘크리트 혼자 버티므로, 보강 구간의 길이는 이 바깥 검토가 정합니다.</p>
+    <div class="sim" id="sim-sl-punch">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>뚫림 전단 검토와 전단 보강</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sl-cv-punch" aria-label="기둥 주위 평면의 임계 둘레와 스터드 레일, 응력 비교 막대"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>기둥 위치</span><div class="seg" id="sl-pu-loc"><button data-value="int" class="on">내부</button><button data-value="edge">가장자리</button><button data-value="corner">모서리</button></div></div>
+          <label class="ctrl"><span>기둥 c × c <output id="sl-pu-c-out"></output></span><input type="range" id="sl-pu-c" min="300" max="1000" step="50" value="800"></label>
+          <label class="ctrl"><span>판 두께 h <output id="sl-pu-h-out"></output></span><input type="range" id="sl-pu-h" min="150" max="350" step="10" value="210"></label>
+          <label class="ctrl"><span>활하중 L <output id="sl-pu-LL-out"></output></span><input type="range" id="sl-pu-LL" min="1" max="12" step="0.5" value="5"></label>
+          <label class="ctrl"><span><span>불균형 모멘트 M<sub>u</sub>(내부)</span> <output id="sl-pu-M-out"></output></span><input type="range" id="sl-pu-M" min="0" max="300" step="10" value="0"></label>
+          <div class="ctrl"><span>전단 보강</span><div class="seg" id="sl-pu-rf"><button data-value="none">없음</button><button data-value="stir">스터럽</button><button data-value="stud" class="on">스터드 레일</button></div></div>
+          <div class="ctrl"><span>면당 줄 · 지름</span><div class="seg" id="sl-pu-nr"><button data-value="2">2줄</button><button data-value="3" class="on">3줄</button><button data-value="4">4줄</button></div><div class="seg" id="sl-pu-db" style="margin-top:6px"><button data-value="10">10</button><button data-value="12" class="on">12</button><button data-value="16">16 mm</button></div></div>
+          <label class="ctrl"><span>줄 간격 s <output id="sl-pu-s-out"></output></span><input type="range" id="sl-pu-s" min="50" max="200" step="5" value="125"></label>
+          <label class="ctrl"><span>줄 수 n <output id="sl-pu-n-out"></output></span><input type="range" id="sl-pu-n" min="1" max="14" step="1" value="7"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">d · b₀ · V<sub>u</sub></span><span class="v" id="sl-pu-o-b0">—</span></div>
+        <div class="stat"><span class="k">v<sub>u</sub> (MPa)</span><span class="v" id="sl-pu-o-vu">—</span></div>
+        <div class="stat"><span class="k">φv<sub>c</sub>(무보강)</span><span class="v" id="sl-pu-o-vc">—</span></div>
+        <div class="stat"><span class="k">φ(v<sub>c</sub> + v<sub>s</sub>) · 상한</span><span class="v" id="sl-pu-o-vn">—</span></div>
+        <div class="stat"><span class="k">바깥 둘레 v<sub>u</sub> / φv<sub>c</sub></span><span class="v" id="sl-pu-o-out">—</span></div>
+      </div>
+      <div class="sl-msg" id="sl-pu-msg"></div>
+      <div class="sim-note">해볼 것: 기본값은 예제 9.4(서고 5 kN/m², 210 mm 플랫 플레이트)입니다 · 보강을 "없음"으로 하면 v<sub>u</sub> 1.46 &gt; φv<sub>c</sub> 1.29로 불합격 · 줄 수를 5로 줄이면 기둥 면은 통과해도 바깥 둘레가 걸립니다 · 스터럽으로 바꾸면 콘크리트 몫이 0.17√f<sub>ck</sub>로 줄어 같은 철물로는 모자랍니다 · 판을 250 mm로 키우면 보강 없이 통과 · 모델: 원리 9.8과 StructureBook 원리 3.6(ACI 318 형태), f<sub>ck</sub> 30 MPa, d = h − 35 mm, D = 24h + 1.5 kN/m², w<sub>u</sub> = 1.2D + 1.6L, 경간 8 × 8 m, 기여 면적 내부 ℓ²·가장자리 ℓ²/2·모서리 ℓ²/4(판 끝 = 기둥 바깥면), 불균형 모멘트는 내부 기둥만 γ<sub>v</sub> = 0.4. 스터드 f<sub>yt</sub> = 350 MPa, 스터럽 D10·D13 SD400(지름 버튼 10·12 → D10, 16 → D13, 다리 2개/줄로 셈). 바깥 둘레는 모서리 레일 끝을 잇는 팔각형 4c + 4√2·e, e = d/2 + (n − 1)s + d/2. 보강 설계는 내부 기둥만 다룬다. 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 9.4 (서고를 들인 플랫 플레이트의 스터드 레일)</strong> B-10을 210 mm 플랫 플레이트로 바꾸고 활하중 5 kN/m²(서고 수준, 교육용)을 싣는다. 내부 기둥 800 × 800, \(d = 175\) mm.
+      <ol class="sl-steps">
+        <li><b>소요.</b> \(w_u = 1.2 \times 6.54 + 1.6 \times 5 = 15.85\) kN/m², \(V_u = 15.85 \times (64 - 0.975^2) = 999\) kN, \(b_0 = 4 \times 975 = 3{,}900\) mm, \(v_u = 999{,}000/(3{,}900 \times 175) = 1.46\) MPa.</li>
+        <li><b>무보강.</b> \(\phi v_c = 0.75 \times 1.73 = 1.29\) MPa &lt; 1.46 → <b>불합격</b>. 두께를 250 mm로 키우는 대신 스터드 레일을 쓴다.</li>
+        <li><b>상한.</b> \(\phi \times 0.66\sqrt{30} = 2.71\) MPa ≥ 1.46 ✓ — 보강으로 해결 가능한 범위.</li>
+        <li><b>소요 \(v_s\).</b> \(v_c = 0.25\sqrt{30} = 1.37\) MPa, \(v_s \ge 1.46/0.75 - 1.37 = 0.58\) MPa. 하한 \(0.17\sqrt{30} = 0.93\) MPa가 더 크므로 \(v_s \ge 0.93\) MPa.</li>
+        <li><b>스터드.</b> 줄 간격 \(s \le 0.75d = 131\) → 125 mm. \(A_v \ge 0.93 \times 3{,}900 \times 125/350 = 1{,}296\) mm²/줄 → 면당 3줄(12개 레일) × φ12(113 mm²) = 1,357 mm² ✓, \(v_s = 0.97\) MPa, \(\phi(v_c + v_s) = 1.76\) MPa ≥ 1.46 ✓.</li>
+        <li><b>바깥 둘레.</b> 마지막 줄에서 \(d/2\) 떨어진 팔각형 둘레 \(b_{0,\text{out}} = 4c + 4\sqrt2\,e\), \(e = 87.5 + (n-1) \times 125 + 87.5\). 둘레 안쪽 면적 \(c^2 + 4ce + 2e^2\)의 하중을 빼고 \(v_u \le \phi\,0.17\sqrt{30} = 0.70\) MPa를 확인한다. n = 6이면 e = 800 mm, \(V = 943\) kN, \(b_{0,\text{out}} = 7{,}726\) mm, \(v_u = 0.70\) MPa로 이용률 1.00(한계). 여유를 두어 <b>n = 7줄</b>(e = 925 mm, \(b_{0,\text{out}} = 8{,}433\) mm, 이용률 0.90) ✓.</li>
+      </ol>
+      레일 12개에 스터드 7개씩, 기둥 하나에 스터드 84개입니다. 판 전체를 40 mm 두껍게 하면 층마다 콘크리트 약 40 m³(1,000 m² 기준)와 그 자중이 늘어나므로, 기둥 둘레에만 철물을 넣는 쪽이 대개 경제적입니다.</div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="openings">
+    <h2>슬래브 개구부</h2>
+    <div class="problem"><strong>설비 덕트가 기둥 옆을 지나간다면</strong>
+      <p>설비 배관과 덕트, 계단과 엘리베이터는 바닥에 구멍을 냅니다. 설비 설계자는 수직 배관을 기둥 옆에 붙이고 싶어 하지만, 그곳은 판의 모멘트와 전단이 가장 큰 곳입니다. 구멍의 크기와 위치에 따라 무엇이 얼마나 약해질까요?</p></div>
+    <figure class="diagram" id="fig-sl-open">
+      <svg viewBox="0 0 860 320" role="img" aria-label="기둥 근처 개구부와 기둥 중심에서 그은 접선이 잘라 내는 임계 둘레의 무효 구간, 띠 교차 영역별 허용 개구부">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(180,160)">
+          <rect x="-120" y="-120" width="240" height="240" style="fill:var(--surface-2)"/>
+          <rect x="-40" y="-40" width="80" height="80" style="fill:var(--text-dim)"/>
+          <rect x="-58" y="-58" width="116" height="116" style="fill:none;stroke:var(--warn);stroke-width:2;stroke-dasharray:5 3"/>
+          <rect x="62" y="-30" width="44" height="60" style="fill:var(--canvas-bg);stroke:var(--text);stroke-width:1.5"/>
+          <line x1="0" y1="0" x2="62" y2="-30" style="stroke:var(--bad);stroke-width:1.4"/><line x1="0" y1="0" x2="62" y2="30" style="stroke:var(--bad);stroke-width:1.4"/>
+          <line x1="58" y1="-28" x2="58" y2="28" style="stroke:var(--bad);stroke-width:5"/>
+          <text x="84" y="50" text-anchor="middle" class="t-mono">개구부</text>
+          <text x="0" y="-130" text-anchor="middle" class="t-mono" style="fill:var(--warn)">임계 둘레 b₀(d/2)</text>
+          <text x="66" y="-46" class="t-mono" style="fill:var(--bad)">무효 구간</text>
+          <text x="0" y="140" text-anchor="middle" class="t-dim">기둥 면에서 4h 이내면 접선이 자른 부분을 b₀에서 뺀다</text>
+        </g>
+        <g transform="translate(400,40)">
+          <text x="0" y="6" class="t" style="font-weight:700">띠 교차 영역별 개구부(보 없는 판, ACI 318 형태)</text>
+          <rect x="0" y="24" width="240" height="240" style="fill:color-mix(in srgb, var(--accent-2) 12%, transparent);stroke:var(--border)"/>
+          <rect x="0" y="24" width="60" height="240" style="fill:color-mix(in srgb, var(--accent) 16%, transparent)"/><rect x="180" y="24" width="60" height="240" style="fill:color-mix(in srgb, var(--accent) 16%, transparent)"/>
+          <rect x="0" y="24" width="240" height="60" style="fill:color-mix(in srgb, var(--accent) 16%, transparent)"/><rect x="0" y="204" width="240" height="60" style="fill:color-mix(in srgb, var(--accent) 16%, transparent)"/>
+          <g style="fill:var(--text)"><rect x="-8" y="16" width="16" height="16"/><rect x="232" y="16" width="16" height="16"/><rect x="-8" y="256" width="16" height="16"/><rect x="232" y="256" width="16" height="16"/></g>
+          <g class="t-mono" text-anchor="middle"><text x="30" y="58" style="fill:var(--bad)">①</text><text x="120" y="58" style="fill:var(--warn)">②</text><text x="120" y="148" style="fill:var(--ok)">③</text><text x="30" y="148" style="fill:var(--warn)">②</text></g>
+          <g class="t-mono"><text x="262" y="60" style="fill:var(--bad)">① 주열대 ∩ 주열대: 개구부 ≤ 띠 폭의 1/8</text><text x="262" y="80">   (B-10: 4,000/8 = 500 mm)</text>
+            <text x="262" y="120" style="fill:var(--warn)">② 주열대 ∩ 중간대: 어느 띠든</text><text x="262" y="140">   끊기는 철근 ≤ 1/4</text>
+            <text x="262" y="180" style="fill:var(--ok)">③ 중간대 ∩ 중간대: 크기 제한 없음</text>
+            <text x="262" y="220">공통: 끊긴 철근량을 개구부 양옆에 보충</text><text x="262" y="240">뚫림 전단 검토(임계 둘레 감소)</text></g>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-8.</b> 개구부. 왼쪽: 기둥 근처(기둥 면에서 \(4h\) 이내 형태) 개구부는 기둥 중심에서 개구부 모서리로 그은 두 접선 사이의 임계 둘레를 무효로 한다(ACI 318-19 형태, 이전 판은 \(10h\)). 오른쪽: 보 없는 판에서 띠가 교차하는 영역별로 허용되는 개구부 크기(형태, 현행 기준 확인). 기둥 둘레 ①이 가장 엄하고, 판 가운데 ③은 철근만 보충하면 된다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 9.9 (개구부와 임계 둘레)</strong> 집중 하중이나 반력 면에서 \(4h\) 이내(ACI 318-19 형태; KDS와 이전 ACI 판의 \(10h\) 형태도 있다 — 현행 기준 확인)에 개구부가 있으면, 하중 면의 도심에서 개구부 경계로 그은 두 접선 사이에 드는 임계 둘레 부분을 <b>무효</b>로 하여 \(b_0\)에서 뺀다. 휨에 대해서는 개구부로 끊긴 철근과 같은 양을 개구부 양옆에 보충한다. 보로 지지된 판은 해석으로 강도와 처짐을 확인하면 어떤 개구부든 둘 수 있다.</div>
+    <div class="sim" id="sim-sl-open">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>개구부를 끌어 놓기: 임계 둘레의 무효 구간</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="sl-cv-open" aria-label="기둥 주위 평면에서 끌 수 있는 개구부와 임계 둘레의 무효 구간"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>개구부 가로 a <output id="sl-op-a-out"></output></span><input type="range" id="sl-op-a" min="100" max="1500" step="50" value="400"></label>
+          <label class="ctrl"><span>개구부 세로 b <output id="sl-op-b-out"></output></span><input type="range" id="sl-op-b" min="100" max="1500" step="50" value="500"></label>
+          <div class="ctrl"><span>기준 형태</span><div class="seg" id="sl-op-rule"><button data-value="4" class="on">4h(ACI 318-19)</button><button data-value="10">10h(이전 판)</button></div></div>
+          <div class="btn-row"><button class="btn" id="sl-op-near">기둥 옆(300 mm)</button><button class="btn" id="sl-op-mid">중간대로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기둥 면까지 거리</span><span class="v" id="sl-op-o-dist">—</span></div>
+        <div class="stat"><span class="k">무효 구간 · 유효 b₀</span><span class="v" id="sl-op-o-b0">—</span></div>
+        <div class="stat"><span class="k">v<sub>u</sub> / φv<sub>c</sub></span><span class="v" id="sl-op-o-r">—</span></div>
+        <div class="stat"><span class="k">띠 영역 · 허용</span><span class="v" id="sl-op-o-zone">—</span></div>
+      </div>
+      <div class="sl-msg" id="sl-op-msg"></div>
+      <div class="sim-note">해볼 것: 개구부를 끌어 기둥에 붙여 보세요 · 기둥 옆 300 mm에 400 × 500 개구부를 두면 b₀가 약 9 % 줄어도 통과하지만(b₀/d가 작아지면 v<sub>c</sub> 셋째 식이 조금 커진다), 세로 b를 1,200 mm로 키우면 b₀가 21 % 줄어 불합격 · 같은 개구부를 대각선 방향(기둥 모서리 쪽)에 두면 무효 구간이 훨씬 짧습니다 · 중간대로 옮기면 뚫림 전단과 무관해지고 철근 보충만 남습니다 · 모델: B-10 플랫 플레이트 변형안(h 210, d 175, 기둥 800, V<sub>u</sub> = 747 kN, 내부 기둥), 원리 9.9의 접선 규칙, v<sub>c</sub>는 StructureBook 원리 3.6(ACI 형태)을 유효 b₀로 다시 계산. 띠 영역은 주열대 폭 4 m(기둥선 ±2 m). 교육용.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 11 -->
+  <section id="b10">
+    <h2>B-10 210 mm 슬래브 정리</h2>
+    <p>이 장의 결과를 한 표에 모읍니다. 값은 모두 교육용 가정과 ACI 318·KDS 형태의 식에서 나왔으며, 실제 설계에는 현행 기준을 적용해야 합니다.</p>
+    <div class="table-wrap"><table class="sl-tbl">
+      <thead><tr><th>검토</th><th>계산</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td>두께</td><td>보 있는 2방향 판 h<sub>min</sub> = 7,600 × 1.157/45(StructureBook 3장)</td><td class="num">195 ≤ 210 mm</td></tr>
+        <tr><td>최소 철근</td><td>ρ<sub>st</sub> = 0.0016(SD500) × 1,000 × 210</td><td class="num">336 mm²/m</td></tr>
+        <tr><td>하단(전 구획)</td><td>최대 m<sub>u</sub> ≈ 22 kN·m/m(단부 경간 중간대) &lt; 최소 철근 강도, 간격 2h·300</td><td class="num hl">D13@300</td></tr>
+        <tr><td>상단(보 위)</td><td>m<sub>u</sub> ≈ 27 kN·m/m(첫 내부 보, 중간대), 균열 제어 간격 252 mm</td><td class="num hl">D13@250</td></tr>
+        <tr><td>모서리</td><td>바깥 모서리 ℓ/5 = 1.6 m 범위 상·하단</td><td class="num">D13@300 보강</td></tr>
+        <tr><td>뚫림 전단</td><td>사방에 보 → 기둥 반력은 보가 전달</td><td>지배하지 않음</td></tr>
+        <tr><td>플랫 플레이트 변형</td><td>L 2.5: v<sub>u</sub> 1.09 ≤ 1.29 MPa / L 5: 1.46 → 스터드 레일 12 × 7</td><td>예제 9.4</td></tr>
+        <tr><td>1방향 변형(작은보 2줄)</td><td>h 130, 최소 철근 지배</td><td class="num">D10@250 / D10@300</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout site"><strong>바닥 철근은 무엇이 정하나</strong> B-10 기준층 바닥(약 1,000 m², 교육용)의 판 철근은 약 12 t이다. 큰보 G1·기둥 C1과 합친 층당 물량은 16장에서 집계한다. 판 철근은 거의 전부 최소 철근과 간격 규정에서 나왔으므로, 바닥 물량을 줄이는 길은 철근 계산이 아니라 <b>판 두께</b>(최소 철근 0.0016bh)와 <b>보 배치</b>에 있다. 반대로 두께를 줄이면 처짐 최소 두께(195 mm)와 차음·내화 요구에 걸린다. StructureBook 3장의 "210 mm는 어디서 왔나"와 이 장의 배근이 한 결정의 두 면이다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 계산이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="../../structure/chapters/floors.html"><small>StructureBook · CH.03</small>바닥 구조<br><span>판별, 직접 설계법의 M₀ 분배, 뚫림 전단 기본, 처짐과 진동.</span></a>
+      <a href="flexure.html"><small>CH.03 · 단철근 직사각형 보의 휨</small>폭 1 m 보<br><span>asReq·flexure로 소요 철근과 φM<sub>n</sub>을 구한다.</span></a>
+      <a href="shear.html"><small>CH.05 · 전단과 사인장 균열</small>V<sub>c</sub>와 스터럽<br><span>1방향 전단은 φV<sub>c</sub>, 뚫림 전단 보강은 같은 트러스 원리.</span></a>
+      <a href="development.html"><small>CH.07 · 정착과 이음</small>상단 철근의 절단과 정착<br><span>부 모멘트 구간 + 정착 길이, 테두리 보 안 갈고리.</span></a>
+      <a href="serviceability.html"><small>CH.08 · 처짐과 균열</small>최소 두께와 균열 간격<br><span>h<sub>min</sub>보다 얇으면 처짐을 계산하고, s<sub>max</sub>로 균열을 제어한다.</span></a>
+      <a href="footings.html"><small>CH.13 · 기초</small>기초판의 뚫림 전단<br><span>같은 임계 둘레를 기둥·말뚝 둘레에 쓴다.</span></a>
+      <a href="case-study.html"><small>CH.16 · B-10 설계 실습</small>바닥 배근과 물량<br><span>G1·C1과 함께 층당 철근을 집계한다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>슬래브는 폭 1 m 띠를 단철근 보로 설계하고 철근을 간격으로 말한다: A<sub>s</sub> = 1,000A<sub>b</sub>/s(mm²/m). 판은 철근비가 작아 거의 언제나 인장 지배(φ = 0.85)다.</li>
+      <li>연속 1방향 슬래브는 조건(2경간 이상, 경간 차 20 % 이하, 등분포, L ≤ 3D)을 만족하면 근사 계수 −1/24, +1/14, −1/10, +1/16, −1/11(형태)로 M<sub>u</sub> = C<sub>m</sub>w<sub>u</sub>ℓ<sub>n</sub>²를 쓴다. 계수는 패턴 재하의 포락선이라 합이 1/8을 넘는다.</li>
+      <li>처짐을 계산하지 않으려면 h ≥ ℓ/20·24·28·10 × (0.43 + f<sub>y</sub>/700)(1방향 형태). 2방향은 α<sub>fm</sub>에 따른 식이나 보 없는 판의 표를 쓴다.</li>
+      <li>수축·온도 철근비 ρ<sub>st</sub> = 0.0020(f<sub>y</sub> ≤ 400), 0.0020 × 400/f<sub>y</sub> ≥ 0.0014, 간격 ≤ 5h·450 mm. 슬래브 주철근의 최소량도 이 값이고, 위험 단면 간격은 2h·300 mm 이하(형태).</li>
+      <li>2방향 슬래브는 직접 설계법의 띠 모멘트를 띠 폭으로 나눠 폭 1 m당 모멘트로 바꾼다. 보가 주열대 모멘트의 85 %를 받는 B-10에서는 판의 철근 대부분을 최소 철근·간격이 정한다: 하단 D13@300, 상단 D13@250.</li>
+      <li>상세: 모멘트가 큰 방향을 바깥 층에, 상단 철근은 부 모멘트 구간 + 정착(보 없는 판 0.30ℓ<sub>n</sub> 형태), 보 없는 판은 기둥을 지나는 구조 일체성 철근, 보 있는 판의 바깥 모서리는 ℓ/5 범위 보강.</li>
+      <li>뚫림 전단 보강: v<sub>u</sub> ≤ φ(v<sub>c</sub> + v<sub>s</sub>), v<sub>s</sub> = A<sub>v</sub>f<sub>yt</sub>/(b₀s). 스터럽은 v<sub>c</sub> 0.17·상한 0.50√f<sub>ck</sub>, 스터드 레일은 0.25·0.66√f<sub>ck</sub>(ACI 형태). 보강 구간 바깥 둘레에서 φ0.17√f<sub>ck</sub>를 다시 검토해 레일 길이를 정한다.</li>
+      <li>기둥 근처 개구부는 기둥 중심에서 그은 접선 사이의 임계 둘레를 무효로 한다(4h 이내 형태). 주열대끼리 교차하는 곳의 개구부가 가장 엄하고, 중간대끼리는 철근 보충만 한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 폭 1 m당 소요 철근량이 400 mm²/m일 때 D13(126.7 mm²)의 최대 간격(25 mm 단위 내림)은?</p><div class="opts">
+        <button class="opt">250 mm</button><button class="opt" data-correct>300 mm</button><button class="opt">325 mm</button><button class="opt">400 mm</button>
+      </div><div class="quiz-exp">s = 1,000 × 126.7/400 = 317 mm → 25 mm 단위로 내려 300 mm(422 mm²/m). 위험 단면 간격 한계 min(2h, 300)도 함께 확인한다.</div></div>
+      <div class="quiz-q"><p>2. SD500 철근으로 두께 200 mm 슬래브의 수축·온도 철근량(폭 1 m당)은?</p><div class="opts">
+        <button class="opt">280 mm²/m</button><button class="opt" data-correct>320 mm²/m</button><button class="opt">400 mm²/m</button><button class="opt">500 mm²/m</button>
+      </div><div class="quiz-exp">ρ<sub>st</sub> = 0.0020 × 400/500 = 0.0016(≥ 0.0014), A<sub>s</sub> = 0.0016 × 1,000 × 200 = 320 mm²/m.</div></div>
+      <div class="quiz-q"><p>3. 연속 1방향 슬래브 내부 경간의 계수 +1/16과 내부 지점의 −1/11을 더하면 1/8보다 크다. 그 이유는?</p><div class="opts">
+        <button class="opt">계수에 안전율 1.2가 들어 있어서</button><button class="opt" data-correct>각 위치의 최댓값을 서로 다른 활하중 패턴에서 모은 포락선이라서</button><button class="opt">순경간 대신 중심 간 경간을 써서</button><button class="opt">지점 침하를 고려해서</button>
+      </div><div class="quiz-exp">지점 부 모멘트가 최대인 재하(이웃 두 경간 재하)와 경간 정 모멘트가 최대인 재하(한 칸 건너)는 다르다. 한 재하 경우 안에서는 정적 모멘트 관계가 지켜진다.</div></div>
+      <div class="quiz-q"><p>4. SD500 철근, 양단 연속 1방향 슬래브 경간 3.5 m의 처짐 최소 두께(형태)는?</p><div class="opts">
+        <button class="opt">125 mm</button><button class="opt" data-correct>143 mm</button><button class="opt">167 mm</button><button class="opt">200 mm</button>
+      </div><div class="quiz-exp">h = 3,500/28 × (0.43 + 500/700) = 125 × 1.144 = 143 mm. 철근 강도가 높으면 같은 철근비에서 사용 응력과 처짐이 커지므로 두께를 키운다.</div></div>
+      <div class="quiz-q"><p>5. B-10 내부 구획(M₀ = 612 kN·m)에서 판의 주열대 부 모멘트가 중간대보다 작은 이유는?</p><div class="opts">
+        <button class="opt">주열대가 중간대보다 좁아서</button><button class="opt">부 모멘트가 중간대에 몰리는 것이 판의 성질이라서</button><button class="opt" data-correct>보 G1이 주열대 모멘트의 85 %를 받아 가서</button><button class="opt">주열대 철근이 바깥 층이라서</button>
+      </div><div class="quiz-exp">주열대 298 kN·m 가운데 보가 254, 판이 45 kN·m(폭 4 m → 11 kN·m/m)를 받는다. 중간대는 100 kN·m(25 kN·m/m)를 판 혼자 받는다. 보 없는 판이면 주열대 판이 298 kN·m를 모두 받는다.</div></div>
+      <div class="quiz-q"><p>6. 스터드 레일로 보강한 판에서 콘크리트 몫 v<sub>c</sub>(ACI 형태)와, 보강이 끝난 바깥 둘레에서 검토하는 강도는?</p><div class="opts">
+        <button class="opt">0.33√f<sub>ck</sub> / 0.33√f<sub>ck</sub></button><button class="opt" data-correct>0.25√f<sub>ck</sub> / 0.17√f<sub>ck</sub></button><button class="opt">0.17√f<sub>ck</sub> / 0.25√f<sub>ck</sub></button><button class="opt">0.66√f<sub>ck</sub> / 0.50√f<sub>ck</sub></button>
+      </div><div class="quiz-exp">보강이 있는 둘레에서는 균열이 열린 상태라 콘크리트 몫을 줄여 0.25√f<sub>ck</sub>(스터럽은 0.17)로 하고, 바깥 둘레에서는 보강 없이 콘크리트 혼자 0.17√f<sub>ck</sub>로 버텨야 한다. 0.66은 스터드 보강의 상한이다.</div></div>
+      <div class="quiz-q"><p>7. 같은 크기의 개구부를 기둥 옆(면 중앙 앞)과 기둥 모서리 대각선 방향에 둘 때 임계 둘레의 무효 구간은?</p><div class="opts">
+        <button class="opt">위치와 무관하게 개구부 폭과 같다</button><button class="opt" data-correct>면 중앙 앞이 더 길다</button><button class="opt">대각선 방향이 더 길다</button><button class="opt">둘 다 0이다</button>
+      </div><div class="quiz-exp">무효 구간은 기둥 중심에서 개구부로 그은 두 접선 사이의 각도로 정해진다. 면 앞에 있으면 접선이 정사각 둘레의 긴 직선 부분을 자르지만, 대각선 방향에서는 같은 각도가 모서리 부근의 짧은 구간만 자른다(시뮬레이터로 확인).</div></div>
+      <div class="quiz-q"><p>8. B-10 슬래브의 하단 철근이 강도로는 D13@450으로 충분한데도 D13@300으로 정해진 직접적인 이유는?</p><div class="opts">
+        <button class="opt">처짐 계산 결과</button><button class="opt">뚫림 전단 때문에</button><button class="opt" data-correct>최소 철근(0.0016bh = 336 mm²/m)과 위험 단면 간격(2h·300 mm) 규정</button><button class="opt">철근 정착 길이 때문에</button>
+      </div><div class="quiz-exp">D13@450은 282 mm²/m로 최소 철근 336에 모자라고 간격 300 mm도 넘는다. 판의 철근은 강도보다 규정이 정하는 경우가 흔하다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미 ---------- */
+const SL = {
+  mono() { return getComputedStyle(document.body).getPropertyValue("--mono"); },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${SL.mono()}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    ctx.lineWidth = 3.5; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, pts, color, width = 2, dash) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
+    pts.forEach(([x, y]) => { if (!isFinite(x) || !isFinite(y)) { on = false; return; } on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  },
+  alpha(c, a) { const ctx = SL._c || (SL._c = document.createElement("canvas").getContext("2d")); ctx.fillStyle = c; const h = ctx.fillStyle; if (h[0] === "#") { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; } return h.replace(/rgba?\(([^)]+)\)/, (m, s) => `rgba(${s.split(",").slice(0, 3).join(",")},${a})`); },
+  msg(id, cls, html) { const m = document.getElementById(id); if (!m) return; m.className = "sl-msg" + (cls ? " " + cls : ""); m.innerHTML = html; },
+  show(id, on) { const el = document.getElementById(id); if (el) el.hidden = !on; },
+  BAR: CB.steel.BARS, FCK: 30, FY: 500,
+  /** 수축·온도 철근비(KDS/ACI 형태) */
+  rhoST(fy) { return fy <= 400 ? 0.002 : Math.max(0.0014, (0.002 * 400) / fy); },
+  /** 면 하중(kN/m²): D = 24h + 마감, w_u = 1.2D + 1.6L */
+  wu(hmm, sd, L) { return 1.2 * (24 * hmm / 1000 + sd) + 1.6 * L; },
+  /** 소요 As(mm²/m)와 한계 간격(mm)에서 25 mm 단위로 내린 간격 */
+  spacing(Ab, As, sLim) { const s = Math.min((1000 * Ab) / Math.max(As, 1e-9), sLim); return Math.floor(s / 25) * 25; },
+  /** 폭 1 m 단면 φMn (kN·m/m) */
+  phiMn(h, d, As) { return CB.rc.flexure({ b: 1000, h, fck: SL.FCK, fy: SL.FY, layers: [{ d, As }] }); },
+};
+
+/* ---------- 1. 처짐 최소 두께 ---------- */
+(function () {
+  const DEN1 = { ss: 20, one: 24, both: 28, cant: 10 }, NAME1 = { ss: "단순", one: "일단 연속", both: "양단 연속", cant: "캔틸레버" };
+  const type = CB.seg("sl-th-type", go), sup = CB.seg("sl-th-sup", go), fyS = CB.seg("sl-th-fy", go), pan = CB.seg("sl-th-pan", go);
+  const gL = CB.range("sl-th-L", (v) => v.toFixed(1) + " m", go), gaf = CB.range("sl-th-af", (v) => v.toFixed(2), go), gb = CB.range("sl-th-beta", (v) => v.toFixed(2), go), gh = CB.range("sl-th-h", (v) => v + " mm", go);
+  const drop = CB.check("sl-th-drop", go);
+  function flatDen(fy, panel, dp) {
+    const F = [280, 420, 520], T = dp ? { ext: [36, 33, 31], edgeb: [40, 36, 34], int: [40, 36, 34] } : { ext: [33, 30, 28], edgeb: [36, 33, 31], int: [36, 33, 31] };
+    const t = T[panel], i = fy <= 420 ? 0 : 1, r = (fy - F[i]) / (F[i + 1] - F[i]);
+    return t[i] + r * (t[i + 1] - t[i]);
+  }
+  function hmin(L, o) {
+    const fy = o.fy, Lmm = L * 1000;
+    if (o.type === "one") return { h: (Lmm / DEN1[o.sup]) * (0.43 + fy / 700), eq: `ℓ/${DEN1[o.sup]} × (0.43 + f<sub>y</sub>/700)` };
+    if (o.type === "beam" && o.af > 0.2) {
+      const k = 0.8 + fy / 1400;
+      if (o.af > 2) return { h: Math.max(90, (Lmm * k) / (36 + 9 * o.beta)), eq: "ℓ<sub>n</sub>(0.8 + f<sub>y</sub>/1400)/(36 + 9β) ≥ 90" };
+      return { h: Math.max(125, (Lmm * k) / (36 + 5 * o.beta * (o.af - 0.2))), eq: "ℓ<sub>n</sub>(0.8 + f<sub>y</sub>/1400)/(36 + 5β(α<sub>fm</sub> − 0.2)) ≥ 125" };
+    }
+    const dn = flatDen(fy, o.type === "beam" ? "int" : o.panel, o.drop), fl = o.drop ? 100 : 125;
+    return { h: Math.max(fl, Lmm / dn), eq: `ℓ<sub>n</sub>/${CB.num(dn, 1)} ≥ ${fl}` + (o.type === "beam" ? "(α<sub>fm</sub> ≤ 0.2: 보 없는 판 표)" : "") };
+  }
+  const opts = (over = {}) => Object.assign({ type: type(), sup: sup(), fy: +fyS(), af: gaf(), beta: gb(), panel: pan(), drop: drop() }, over);
+  const cv = CB.canvas("#sl-cv-thick", (ctx, W, H) => {
+    const pal = CB.palette(), o = opts(), xs = [];
+    for (let L = 2; L <= 12.0001; L += 0.1) xs.push(L);
+    const series = [];
+    if (o.type === "one") Object.keys(DEN1).forEach((k) => series.push({ data: xs.map((L) => [L, hmin(L, opts({ sup: k })).h]), color: k === o.sup ? pal.accent : pal.faint, width: k === o.sup ? 2.8 : 1.3 }));
+    else {
+      series.push({ data: xs.map((L) => [L, hmin(L, opts({ drop: !o.drop })).h]), color: pal.faint, width: 1.3, dash: [5, 4] });
+      series.push({ data: xs.map((L) => [L, hmin(L, o).h]), color: pal.accent, width: 2.8 });
+    }
+    const cur = hmin(gL(), o).h, h = gh(), ok = h >= cur - 0.01;
+    const top = Math.max(420, ...series.map((s) => Math.max(...s.data.map((p) => p[1])))) * 1.02;
+    const C = CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 }, { x: [2, 12], y: [0, Math.min(top, 1300)], xLabel: o.type === "one" ? "경간 ℓ (m)" : "순경간 ℓn (m)", yLabel: "최소 두께 (mm)",
+      series, hlines: [{ y: h, color: ok ? pal.ok : pal.bad, label: `h = ${h} mm`, dash: [6, 4] }], points: [{ x: gL(), y: cur, color: ok ? pal.ok : pal.bad, r: 6 }] });
+    if (o.type === "one") Object.keys(DEN1).forEach((k) => { const L = 11.2, y = hmin(L, opts({ sup: k })).h; if (y < Math.min(top, 1300) * 0.97) SL.text(ctx, NAME1[k], C.X(L), C.Y(y) - 10, k === o.sup ? pal.accent : pal.dim, { size: 10.5, bold: k === o.sup }); });
+    else SL.text(ctx, o.drop ? "점선: 드롭 패널 없음" : "점선: 드롭 패널 있음", C.X(4.6), C.Y(Math.min(top, 1300)) + 14, pal.dim, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.82 : 0.5), minHeight: 260, maxHeight: 360 });
+  function go() {
+    const o = opts();
+    SL.show("sl-th-sup-c", o.type === "one"); SL.show("sl-th-af-c", o.type === "beam"); SL.show("sl-th-beta-c", o.type === "beam");
+    SL.show("sl-th-pan-c", o.type === "flat"); SL.show("sl-th-drop-c", o.type !== "one");
+    document.getElementById("sl-th-Llab").textContent = o.type === "one" ? "경간 ℓ" : "순경간 ℓn";
+    const r = hmin(gL(), o), h = gh();
+    CB.stat("sl-th-o-h", CB.num(r.h, 0) + " mm"); CB.stat("sl-th-o-eq", r.eq); CB.stat("sl-th-o-r", CB.num(h / r.h, 2));
+    if (h >= r.h - 0.01) SL.msg("sl-th-msg", "ok", `h = ${h} mm ≥ h<sub>min</sub> = ${CB.num(r.h, 0)} mm: 처짐 계산을 생략할 수 있는 두께입니다(여유 ${CB.num(h - r.h, 0)} mm).`);
+    else SL.msg("sl-th-msg", "bad", `h = ${h} mm &lt; h<sub>min</sub> = ${CB.num(r.h, 0)} mm: 두께를 ${Math.ceil(r.h / 10) * 10} mm 이상으로 키우거나, 8장의 방법으로 즉시·장기 처짐을 계산해 한계를 만족함을 보여야 합니다.`);
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 2. 모멘트 계수 vs 해석 ---------- */
+(function () {
+  const BW = 0.3;
+  const gn = CB.seg("sl-cf-n", go), ext = CB.seg("sl-cf-ext", go), spanMode = CB.seg("sl-cf-span", go);
+  const gL = CB.range("sl-cf-L", (v) => v.toFixed(2) + " m", go), gD = CB.range("sl-cf-D", (v) => v.toFixed(1) + " kN/m²", go), gLL = CB.range("sl-cf-LL", (v) => v.toFixed(1) + " kN/m²", go);
+  let S = null;
+  function analyze() {
+    const n = +gn(), lc = gL(), cc = spanMode() === "cc", l = cc ? lc : lc - BW, Lt = n * l, wd = 1.2 * gD(), wl = 1.6 * gLL(), EI = 1e4, e0 = ext();
+    const krf = e0 === "sp" ? 0.5 : e0 === "col" ? 2 : 0, half = cc ? BW / 2 : 0;
+    const sup = []; for (let i = 0; i <= n; i++) sup.push((i === 0 || i === n) && krf > 0 ? { x: i * l, type: "spring", k: 1e9, kr: (krf * 4 * EI) / l } : { x: i * l, type: i === 0 ? "pin" : "roller" });
+    const all = Array(n).fill(1), combos = [all, all.map((_, i) => (i % 2 === 0 ? 1 : 0)), all.map((_, i) => (i % 2 === 1 ? 1 : 0))];
+    for (let j = 1; j < n; j++) combos.push(all.map((_, i) => (i <= j - 1 ? (j - 1 - i) % 2 === 0 : (i - j) % 2 === 0) ? 1 : 0));
+    let env = null, allLoaded = null;
+    combos.forEach((cmb, ci) => {
+      const loads = [{ type: "udl", w: wd, a: 0, b: Lt }];
+      cmb.forEach((on, i) => { if (on && wl > 0) loads.push({ type: "udl", w: wl, a: i * l, b: (i + 1) * l }); });
+      const b = CB.beam({ L: Lt, supports: sup, loads, EI });
+      if (!b.ok) return;
+      const s = b.sample(60 * n);
+      if (!env) env = s.map((p) => ({ x: p.x, max: p.M, min: p.M }));
+      else s.forEach((p, k) => { if (env[k]) { env[k].max = Math.max(env[k].max, p.M); env[k].min = Math.min(env[k].min, p.M); } });
+      if (ci === 0) allLoaded = s;
+    });
+    const wu = wd + wl, ln = lc - BW, q = wu * ln * ln, e = e0;
+    const C = [];
+    const extC = e === "sp" ? -1 / 24 : e === "col" ? -1 / 16 : 0, endP = e === "un" ? 1 / 11 : 1 / 14, firstN = n === 2 ? -1 / 9 : -1 / 10;
+    for (let i = 0; i <= n; i++) {
+      const x = i * l, edge = i === 0 || i === n, first = i === 1 || i === n - 1;
+      const c = edge ? extC : first ? firstN : -1 / 11, lab = edge ? (e === "sp" ? "−1/24" : e === "col" ? "−1/16" : "0") : first ? (n === 2 ? "−1/9" : "−1/10") : "−1/11";
+      C.push({ x: i === 0 ? x + half : i === n ? x - half : x, M: c * q, lab, xs: [i === 0 ? null : x - half, i === n ? null : x + half].filter((v) => v != null) });
+    }
+    for (let i = 0; i < n; i++) { const endSpan = i === 0 || i === n - 1, c = endSpan ? endP : 1 / 16; C.push({ x: endSpan ? (i === 0 ? 0.42 * l : (n - 0.42) * l) : (i + 0.5) * l, M: c * q, lab: endSpan ? (e === "un" ? "+1/11" : "+1/14") : "+1/16", pos: true, span: i }); }
+    S = { n, l, Lt, env, allLoaded, C, q, wu, ln, cc };
+  }
+  const envAt = (x, key) => { let best = null, bd = 1e9; S.env.forEach((p) => { const d = Math.abs(p.x - x); if (d < bd) { bd = d; best = p; } }); return best ? best[key] : NaN; };
+  const spanMax = (i) => S.env.filter((p) => p.x >= i * S.l && p.x <= (i + 1) * S.l).reduce((m, p) => Math.max(m, p.max), -1e9);
+  const cv = CB.canvas("#sl-cv-coef", (ctx, W, H) => {
+    if (!S || !S.env) return;
+    const pal = CB.palette(), mx = Math.max(...S.env.map((p) => p.max), ...S.C.filter((c) => c.pos).map((c) => c.M)) * 1.2, mn = Math.min(...S.env.map((p) => p.min), ...S.C.map((c) => c.M)) * 1.2;
+    const C = CB.chart(ctx, { x: 58, y: 16, w: W - 58 - 16, h: H - 16 - 46 }, { x: [0, S.Lt], y: [-mx, -mn], yLabel: "M (kN·m/m), 정 모멘트 아래", yFmt: (v) => CB.num(-v, 0),
+      series: [{ data: S.env.map((p) => [p.x, -p.max]), color: pal.accent, width: 2.2, fill: SL.alpha(pal.accent, 0.1) }, { data: S.env.map((p) => [p.x, -p.min]), color: pal.accent, width: 2.2, fill: SL.alpha(pal.accent, 0.1) }, { data: S.allLoaded.map((p) => [p.x, -p.M]), color: pal.dim, width: 1.2, dash: [5, 4] }],
+      hlines: [{ y: 0, color: pal.axis, dash: [] }] });
+    for (let i = 0; i <= S.n; i++) { const X = C.X(i * S.l), Y = C.Y(0); ctx.fillStyle = pal.dim; ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(X - 6, Y + 9); ctx.lineTo(X + 6, Y + 9); ctx.closePath(); ctx.fill(); }
+    const narrow = W < 520;
+    S.C.forEach((c) => {
+      const X = C.X(c.x), Y = C.Y(-c.M);
+      ctx.fillStyle = pal.accent2; ctx.beginPath(); ctx.arc(X, Y, 5, 0, Math.PI * 2); ctx.fill();
+      if (!narrow || c.pos || Math.abs(c.M) > 0) SL.text(ctx, c.lab, X, Y + (c.pos ? 14 : -13), pal.accent2, { size: narrow ? 9.5 : 11 });
+    });
+    SL.text(ctx, "x (m) · 실선: 패턴 재하 포락선 · 점선: 전 경간 재하 · 점: 계수", C.box.x + C.box.w / 2, H - 12, pal.dim, { size: narrow ? 9.5 : 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 270, maxHeight: 360 });
+  function go() {
+    analyze();
+    if (!S.env) { SL.msg("sl-cf-msg", "bad", "해석 실패"); return; }
+    const fi = S.C[1], fiAn = -envAt(fi.xs[0], "min"), fiC = -fi.M;
+    const ep = S.C.find((c) => c.pos && c.span === 0), epAn = spanMax(0);
+    const ip = S.C.find((c) => c.pos && c.span === 1 && S.n > 2), ipAn = S.n > 2 ? spanMax(1) : NaN;
+    CB.stat("sl-cf-o-neg", `${CB.num(fiC, 2)} · ${CB.num(fiAn, 2)}`);
+    CB.stat("sl-cf-o-pos", `${CB.num(ep.M, 2)} · ${CB.num(epAn, 2)}`);
+    CB.stat("sl-cf-o-ipos", ip ? `${CB.num(ip.M, 2)} · ${CB.num(ipAn, 2)}` : "— (2경간)");
+    const ld = gLL() / gD(); CB.stat("sl-cf-o-ld", CB.num(ld, 2) + (ld > 3 ? " &gt; 3" : " ≤ 3"));
+    const r1 = fiAn / fiC, r2 = epAn / ep.M;
+    if (ld > 3) SL.msg("sl-cf-msg", "bad", `L/D = ${CB.num(ld, 2)} &gt; 3: 근사 계수의 적용 조건 밖입니다. 해석/계수 비가 첫 내부 지점 ${CB.num(r1, 2)}, 단부 경간 ${CB.num(r2, 2)} — 연속보 해석으로 설계하세요.`);
+    else if (Math.max(r1, r2) > 1.05) SL.msg("sl-cf-msg", "", `해석/계수 비: 첫 내부 지점 ${CB.num(r1, 2)}, 단부 경간 ${CB.num(r2, 2)}. ${S.cc ? "중심 간 경간으로 푼 탄성 해석은 ℓ² 차이(약 (ℓ/ℓ<sub>n</sub>)²)만큼 계수보다 큽니다. 계수는 순경간과 지점 면 값으로 정의되었고 지지 보 폭과 약간의 재분배를 담고 있습니다." : "외단 구속이 약하거나(단순) 경간 수가 적으면 해석이 계수를 조금 넘을 수 있습니다. 계수는 경험적 근사이며 조건 안에서 쓴다."}`);
+    else SL.msg("sl-cf-msg", "ok", `해석/계수 비: 첫 내부 지점 ${CB.num(r1, 2)}, 단부 경간 ${CB.num(r2, 2)} — 계수가 패턴 재하 포락선을 안전 측으로 덮습니다.`);
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 3. 1방향 슬래브 설계기 ---------- */
+(function () {
+  const POS = { ext: { c: 1 / 24, lab: "−1/24", neg: true, x: 0.02 }, endp: { c: 1 / 14, lab: "+1/14", neg: false, x: 0.42 }, fint: { c: 1 / 10, lab: "−1/10", neg: true, x: 1 }, intp: { c: 1 / 16, lab: "+1/16", neg: false, x: 1.5 }, intn: { c: 1 / 11, lab: "−1/11", neg: true, x: 2 } };
+  const gL = CB.range("sl-ow-L", (v) => v.toFixed(2) + " m", go), gh = CB.range("sl-ow-h", (v) => v + " mm", go), gsd = CB.range("sl-ow-sd", (v) => v.toFixed(1) + " kN/m²", go), gLL = CB.range("sl-ow-LL", (v) => v.toFixed(1) + " kN/m²", go);
+  const pos = CB.seg("sl-ow-pos", go), bar = CB.seg("sl-ow-bar", go);
+  let R = null;
+  function calc() {
+    const l = gL(), h = gh(), P = POS[pos()], B = SL.BAR[bar()], ln = l - 0.3, wu = SL.wu(h, gsd(), gLL()), Mu = P.c * wu * ln * ln;
+    const d = h - 20 - B.d / 2, req = CB.rc.asReq(Mu, 1000, d, SL.FCK, SL.FY), Amin = SL.rhoST(SL.FY) * 1000 * h;
+    const sLim = Math.min(2 * h, 300), need = isFinite(req) ? Math.max(req, Amin) : NaN;
+    const s = isFinite(need) ? SL.spacing(B.A, need, sLim) : NaN, As = isFinite(s) && s > 0 ? (1000 * B.A) / s : NaN;
+    const f = isFinite(As) ? SL.phiMn(h, d, As) : null;
+    const gov = !isFinite(req) ? "단면 부족" : (1000 * B.A) / need > sLim ? `간격 ${sLim}` : req >= Amin ? "강도" : "최소 철근";
+    const endSpan = pos() === "ext" || pos() === "endp" || pos() === "fint", Vu = (pos() === "fint" ? 1.15 : 1) * wu * ln / 2, phiVc = 0.75 * CB.rc.Vc(SL.FCK, 1000, d);
+    const hmin = (l * 1000 / (endSpan ? 24 : 28)) * (0.43 + SL.FY / 700);
+    R = { l, h, P, B, ln, wu, Mu, d, req, Amin, sLim, s, As, f, gov, Vu, phiVc, hmin };
+  }
+  const cv = CB.canvas("#sl-cv-oneway", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), conc = CB.color("surface-2");
+    // 위: 연속 슬래브 띠(3경간 + 대칭)
+    const top = 18, x0 = 30, x1 = W - 30, sp = (x1 - x0) / 3.2, yS = top + 34;
+    ctx.fillStyle = conc; ctx.strokeStyle = pal.dim; ctx.lineWidth = 1; ctx.fillRect(x0, yS, x1 - x0, 8); ctx.strokeRect(x0, yS, x1 - x0, 8);
+    for (let i = 0; i <= 3; i++) { ctx.fillStyle = pal.dim; ctx.fillRect(x0 + i * sp - 5, yS + 8, 10, 18); }
+    const mp = [], NEG = [0.042, 0.1, 0.091, 0.091];
+    for (let k = 0; k <= 160; k++) {
+      const t = (k / 160) * 3.2, i = Math.min(3, Math.floor(t)), u = t - i, mR = i < 3 ? NEG[i + 1] : 0.091;
+      const m = 0.4 * u * (1 - u) * (i === 0 ? 1.05 : 0.85) - NEG[i] * (1 - u) - mR * u;
+      mp.push([x0 + t * sp, yS + 4 + m * 220]);
+    }
+    SL.line(ctx, mp.filter((p) => p[0] <= x1), SL.alpha(pal.accent, 0.8), 1.8);
+    const px = x0 + R.P.x * sp, py = yS + (R.P.neg ? -12 : 26);
+    ctx.fillStyle = pal.accent2; ctx.beginPath(); ctx.arc(px, R.P.neg ? yS - 4 : yS + 22, 6, 0, Math.PI * 2); ctx.fill();
+    SL.text(ctx, `${R.P.lab} → Mu = ${CB.num(R.Mu, 2)} kN·m/m`, CB.clamp(px, 120, W - 120), R.P.neg ? top + 4 : yS + 42, pal.accent2, { size: 11.5 });
+    // 아래: 폭 1 m 단면
+    const by = yS + 66, bh = H - by - 40, sc = Math.min((W - 80) / 1000, bh / Math.max(R.h, 150) * 0.9), bw = 1000 * sc, hh = R.h * sc, bx = (W - bw) / 2, cy = by + (bh - hh) / 2 + 6;
+    ctx.fillStyle = conc; ctx.fillRect(bx, cy, bw, hh); ctx.strokeStyle = pal.dim; ctx.strokeRect(bx, cy, bw, hh);
+    const yBar = R.P.neg ? cy + (20 + R.B.d / 2) * sc : cy + hh - (20 + R.B.d / 2) * sc, yDist = R.P.neg ? yBar + (R.B.d / 2 + 5) * sc : yBar - (R.B.d / 2 + 5) * sc;
+    ctx.strokeStyle = pal.accent; ctx.lineWidth = Math.max(2, 10 * sc); ctx.beginPath(); ctx.moveTo(bx + 4, yDist); ctx.lineTo(bx + bw - 4, yDist); ctx.stroke();
+    if (isFinite(R.s) && R.s > 0) {
+      const n = Math.floor(1000 / R.s); ctx.fillStyle = pal.tension;
+      for (let k = 0; k <= n; k++) { const x = bx + (R.s / 2 + k * R.s) * sc; if (x > bx + bw - 2) break; ctx.beginPath(); ctx.arc(x, yBar, Math.max(2.5, (R.B.d / 2) * sc), 0, Math.PI * 2); ctx.fill(); }
+      SL.text(ctx, `${bar()} @ ${R.s}  (As = ${CB.num(R.As, 0)} mm²/m)`, W / 2, cy + hh + 18, pal.tension, { size: 11.5 });
+    } else SL.text(ctx, "단면 부족: 두께를 키우세요", W / 2, cy + hh + 18, pal.bad, { size: 12 });
+    SL.text(ctx, `b = 1,000 · h = ${R.h} · d = ${CB.num(R.d, 0)} mm`, W / 2, cy - 12, pal.dim, { size: 11, bold: false });
+    SL.text(ctx, R.P.neg ? "부 모멘트: 상단 철근" : "정 모멘트: 하단 철근", bx + 4, cy - 12, pal.dim, { size: 10.5, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.52), minHeight: 280, maxHeight: 380 });
+  function go() {
+    calc();
+    CB.stat("sl-ow-o-m", `${CB.num(R.wu, 2)} · ${R.P.lab} · ${CB.num(R.Mu, 2)}`);
+    CB.stat("sl-ow-o-as", `${isFinite(R.req) ? CB.num(R.req, 0) : "—"} · ${CB.num(R.Amin, 0)}`);
+    CB.stat("sl-ow-o-s", isFinite(R.s) ? `${R.s} · ${R.gov.replace(/ \d+$/, "")}` : "—");
+    CB.stat("sl-ow-o-phi", R.f ? `${CB.num(R.f.phiMn, 1)} · ${CB.num(R.f.et * 1000, 1)}‰` : "—");
+    CB.stat("sl-ow-o-v", CB.num(R.Vu / R.phiVc, 2));
+    const thinOk = R.h >= R.hmin - 0.5;
+    if (!isFinite(R.req)) SL.msg("sl-ow-msg", "bad", `M<sub>u</sub> = ${CB.num(R.Mu, 1)} kN·m/m는 이 두께(d = ${CB.num(R.d, 0)} mm)의 단철근 단면으로 받을 수 없습니다(단면 부족). 두께를 키우세요.`);
+    else if (R.s < 75) SL.msg("sl-ow-msg", "bad", `소요 간격이 ${R.s} mm로 너무 촘촘합니다. 철근 호칭을 키우거나 두께를 늘리세요.`);
+    else {
+      const ok = R.f && R.f.phiMn >= R.Mu && R.Vu <= R.phiVc && thinOk;
+      SL.msg("sl-ow-msg", ok ? "ok" : "bad", `${bar()}@${R.s}: φM<sub>n</sub> = ${CB.num(R.f.phiMn, 1)} ≥ M<sub>u</sub> = ${CB.num(R.Mu, 2)} kN·m/m, 지배 규정은 <b>${R.gov}</b>. 전단 V<sub>u</sub>/φV<sub>c</sub> = ${CB.num(R.Vu / R.phiVc, 2)}${R.Vu > R.phiVc ? "(전단 부족 — 두께 증가)" : ""}. 처짐 최소 두께 ${CB.num(R.hmin, 0)} mm ${thinOk ? "≤" : "&gt;"} h = ${R.h} mm${thinOk ? "" : " — 처짐 계산 필요"}.`);
+    }
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 4. 수축·온도 철근 ---------- */
+(function () {
+  const gh = CB.range("sl-sh-h", (v) => v + " mm", go), fyS = CB.seg("sl-sh-fy", go), bar = CB.seg("sl-sh-bar", go), lay = CB.seg("sl-sh-lay", go);
+  const lim = (h, fy, B, nl) => { const As = (SL.rhoST(fy) * 1000 * h) / nl; return { As, sA: (1000 * B.A) / As, s5: 5 * h, s450: 450 }; };
+  const cv = CB.canvas("#sl-cv-shrink", (ctx, W, H) => {
+    const pal = CB.palette(), fy = +fyS(), B = SL.BAR[bar()], nl = +lay(), hs = [];
+    for (let h = 100; h <= 400; h += 5) hs.push(h);
+    const C = CB.chart(ctx, { x: 58, y: 14, w: W - 58 - 16, h: H - 14 - 46 }, { x: [100, 400], y: [0, 1200], xLabel: "슬래브 두께 h (mm)", yLabel: "철근 간격 한계 (mm)",
+      series: [{ data: hs.map((h) => [h, lim(h, fy, B, nl).sA]), color: pal.tension, width: 2.2 }, { data: hs.map((h) => [h, 5 * h]), color: pal.faint, width: 1.6, dash: [5, 4] }, { data: hs.map((h) => [h, 450]), color: pal.faint, width: 1.6, dash: [2, 3] },
+        { data: hs.map((h) => { const L = lim(h, fy, B, nl); return [h, Math.min(L.sA, L.s5, L.s450)]; }), color: pal.accent, width: 3.2 }],
+      vlines: [{ x: gh(), color: pal.accent2, label: "" }] });
+    const L = lim(gh(), fy, B, nl), s = Math.min(L.sA, L.s5, L.s450);
+    ctx.fillStyle = pal.accent2; ctx.beginPath(); ctx.arc(C.X(gh()), C.Y(s), 6, 0, Math.PI * 2); ctx.fill();
+    SL.text(ctx, `면적: ${bar()} 1,000Ab/As`, C.X(118), C.Y(Math.min(1150, lim(118, fy, B, nl).sA)) + 2, pal.tension, { size: 10.5, align: "left" });
+    SL.text(ctx, "5h", C.X(212), C.Y(1060), pal.dim, { size: 10.5 }); SL.text(ctx, "450 mm", C.X(380), C.Y(450) - 11, pal.dim, { size: 10.5 });
+    SL.text(ctx, "굵은 선: 지배값", W - 22, 26, pal.accent, { size: 10.5, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.82 : 0.48), minHeight: 250, maxHeight: 340 });
+  function go() {
+    const fy = +fyS(), B = SL.BAR[bar()], nl = +lay(), h = gh(), L = lim(h, fy, B, nl), s = Math.floor(Math.min(L.sA, L.s5, L.s450) / 25) * 25;
+    const gov = L.sA <= Math.min(L.s5, L.s450) ? "면적" : L.s5 < L.s450 ? "5h" : "450 mm";
+    CB.stat("sl-sh-o-rho", CB.num(SL.rhoST(fy), 4)); CB.stat("sl-sh-o-as", CB.num(L.As * nl, 0) + (nl > 1 ? ` (면당 ${CB.num(L.As, 0)})` : ""));
+    CB.stat("sl-sh-o-lim", `${CB.num(L.sA, 0)} · ${L.s5} · 450`); CB.stat("sl-sh-o-s", `${bar()}@${s}${nl > 1 ? " 양면" : ""}`);
+    const prov = (1000 * B.A) / s;
+    if (s < 100) SL.msg("sl-sh-msg", "bad", `간격 ${s} mm는 너무 촘촘합니다. 굵은 철근이나 양면 배치를 고려하세요.`);
+    else SL.msg("sl-sh-msg", "ok", `${bar()}@${s}${nl > 1 ? "(양면)" : ""}: ${CB.num(prov * nl, 0)} mm²/m ≥ ${CB.num(L.As * nl, 0)} mm²/m. 지배: <b>${gov}</b>. ${fy > 400 && SL.rhoST(fy) === 0.0014 ? "f<sub>y</sub>가 높아도 하한 0.0014가 걸렸습니다." : ""} 2방향 슬래브의 주철근이라면 위험 단면 간격 min(2h, 300) = ${Math.min(2 * h, 300)} mm도 지켜야 합니다.`);
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 공통: 직접 설계법(ACI 318 형태) ---------- */
+SL.ddm = function (o) {
+  // o: { l1, l2 (m), c (m), h (mm), sd, L, beams (bool), span: "int" | "end", bar }
+  const wu = SL.wu(o.h, o.sd ?? 1.5, o.L), ln = Math.max(0.65 * o.l1, o.l1 - o.c), M0 = (wu * o.l2 * ln * ln) / 8, r = o.l2 / o.l1;
+  const coef = o.span === "int" ? { ext: 0.65, pos: 0.35, int: 0.65 } : o.beams ? { ext: 0.16, pos: 0.57, int: 0.7 } : { ext: 0.26, pos: 0.52, int: 0.7 };
+  const fr = (x) => (x <= 0.5 ? 0.9 : x <= 1 ? 0.9 - 0.3 * (x - 0.5) : x <= 2 ? 0.75 - 0.3 * (x - 1) : 0.45);
+  const cs = o.beams ? { ext: fr(r), pos: fr(r), int: fr(r) } : { ext: o.span === "int" ? 0.75 : 1.0, pos: 0.6, int: 0.75 };
+  const beamSh = o.beams ? 0.85 : 0, csW = 0.5 * Math.min(o.l1, o.l2), msW = o.l2 - csW;
+  const out = {};
+  ["ext", "pos", "int"].forEach((k) => {
+    const M = coef[k] * M0, Mcs = cs[k] * M, Mb = beamSh * Mcs, Mcss = Mcs - Mb, Mms = M - Mcs;
+    out[k] = { M, Mb, cs: Mcss / csW, ms: Mms / msW };
+  });
+  return { wu, ln, M0, csW, msW, coef, cs, m: out };
+};
+/** 폭 1 m당 모멘트 → 철근(As 소요, 최소, 간격, φMn) */
+SL.design = function (mu, h, d, barName, sLim) {
+  const B = SL.BAR[barName], req = mu > 0 ? CB.rc.asReq(mu, 1000, d, SL.FCK, SL.FY) : 0, Amin = SL.rhoST(SL.FY) * 1000 * h;
+  if (!isFinite(req)) return { ok: false, req: NaN, Amin, s: NaN, gov: "단면 부족" };
+  const need = Math.max(req, Amin), s = SL.spacing(B.A, need, sLim), As = s > 0 ? (1000 * B.A) / s : NaN;
+  const f = isFinite(As) ? SL.phiMn(h, d, As) : null;
+  return { ok: !!f && f.phiMn >= mu && s >= 75, req, Amin, s, As, phiMn: f ? f.phiMn : NaN, gov: req >= Amin ? "강도" : (1000 * B.A) / need > sLim ? "간격" : "최소" };
+};
+
+/* ---------- 5. 2방향 띠 모멘트 → 철근 ---------- */
+(function () {
+  const beam = CB.seg("sl-dd-beam", go), span = CB.seg("sl-dd-span", go), bar = CB.seg("sl-dd-bar", go);
+  const gl1 = CB.range("sl-dd-l1", (v) => v.toFixed(1) + " m", go), gl2 = CB.range("sl-dd-l2", (v) => v.toFixed(1) + " m", go), gh = CB.range("sl-dd-h", (v) => v + " mm", go), gLL = CB.range("sl-dd-LL", (v) => v.toFixed(1) + " kN/m²", go);
+  let R = null;
+  function calc() {
+    const h = gh(), B = SL.BAR[bar()], d = h - 20 - 1.5 * B.d, sLim = Math.min(2 * h, 300);
+    const D = SL.ddm({ l1: gl1(), l2: gl2(), c: 0.8, h, L: gLL(), beams: beam() === "beam", span: span() });
+    const keys = span() === "int" ? ["ext", "pos"] : ["ext", "pos", "int"];
+    const G = keys.map((k) => ({ k, lab: span() === "int" ? (k === "ext" ? "지점 부(양단)" : "경간 정") : { ext: "외단 부", pos: "경간 정", int: "내단 부" }[k], m: D.m[k],
+      cs: SL.design(D.m[k].cs, h, d, bar(), sLim), ms: SL.design(D.m[k].ms, h, d, bar(), sLim), top: k !== "pos" }));
+    const phiMin = SL.phiMn(h, d, SL.rhoST(SL.FY) * 1000 * h).phiMn;
+    R = { h, d, D, G, phiMin, sLim };
+  }
+  const cv = CB.canvas("#sl-cv-ddm", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), vals = R.G.flatMap((g) => [g.m.cs, g.m.ms]), top = Math.max(R.phiMin * 1.25, ...vals) * 1.18;
+    const C = CB.chart(ctx, { x: 58, y: 20, w: W - 58 - 16, h: H - 20 - 70 }, { x: [0, R.G.length], y: [0, top], xTicks: [], yLabel: "m_u (kN·m/m)",
+      hlines: [{ y: R.phiMin, color: pal.warn, label: "최소 철근의 φMn", dash: [5, 4] }] });
+    const gw = C.box.w / R.G.length, bw = Math.min(46, gw * 0.3);
+    R.G.forEach((g, i) => {
+      const cx = C.box.x + gw * (i + 0.5);
+      [["cs", pal.accent, -1], ["ms", pal.accent2, 1]].forEach(([key, col, side]) => {
+        const v = g.m[key], dz = g[key], x = cx + side * (bw * 0.6) - bw / 2, y = C.Y(v);
+        ctx.fillStyle = SL.alpha(col, dz.gov === "강도" ? 0.85 : 0.4); ctx.fillRect(x, y, bw, C.Y(0) - y);
+        ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.strokeRect(x, y, bw, C.Y(0) - y);
+        SL.text(ctx, CB.num(v, 1), x + bw / 2, y - 9, col, { size: 10.5 });
+        SL.text(ctx, isFinite(dz.s) ? `@${dz.s}` : "부족", x + bw / 2, C.Y(0) + 14, dz.ok ? col : pal.bad, { size: 10.5 });
+      });
+      SL.text(ctx, g.lab + (g.top ? "(상단)" : "(하단)"), cx, C.Y(0) + 32, pal.text, { size: 11, bold: false });
+      if (g.m.Mb > 0) SL.text(ctx, `보 ${CB.num(g.m.Mb, 0)} kN·m`, cx, C.Y(0) + 48, pal.dim, { size: 10, bold: false });
+    });
+    SL.text(ctx, "■ 주열대 판  ■ 중간대 (진한 색 = 강도 지배)", W - 18, 12, pal.dim, { size: 10.5, align: "right", bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.9 : 0.52), minHeight: 300, maxHeight: 380 });
+  function go() {
+    calc();
+    const D = R.D;
+    CB.stat("sl-dd-o-m0", `${CB.num(D.wu, 2)} · ${CB.num(D.ln, 2)} m · ${CB.num(D.M0, 0)} kN·m`);
+    CB.stat("sl-dd-o-w", `${CB.num(D.csW, 2)} · ${CB.num(D.msW, 2)} m`);
+    const mx = Math.max(...R.G.flatMap((g) => [g.m.cs, g.m.ms])); CB.stat("sl-dd-o-mx", CB.num(mx, 1) + " kN·m/m");
+    const gov = R.G.flatMap((g) => [["주열대", g, g.cs], ["중간대", g, g.ms]]).filter((x) => x[2].gov === "강도").map((x) => `${x[0]} ${x[1].lab}`);
+    CB.stat("sl-dd-o-gov", gov.length ? gov.join(", ") : "없음(전부 최소·간격)");
+    const bad = R.G.flatMap((g) => [g.cs, g.ms]).filter((z) => !z.ok);
+    if (bad.length) SL.msg("sl-dd-msg", "bad", `${bad.some((z) => z.gov === "단면 부족") ? "단면 부족이 있습니다 — 두께를 키우세요." : "간격이 75 mm 아래로 내려가는 띠가 있습니다 — 굵은 철근이나 두꺼운 판이 필요합니다."}`);
+    else {
+      const s = R.G.map((g) => `${g.lab}: 주열대 ${bar()}@${g.cs.s}, 중간대 @${g.ms.s}`).join(" / ");
+      SL.msg("sl-dd-msg", "ok", `${s}. 최소 철근 ${CB.num(SL.rhoST(SL.FY) * 1000 * R.h, 0)} mm²/m(φM<sub>n</sub> ${CB.num(R.phiMin, 1)} kN·m/m)보다 작은 모멘트는 모두 최소·간격(${R.sLim} mm)이 정합니다.`);
+    }
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 6. B-10 배근 평면도 ---------- */
+(function () {
+  const NX = 3, NY = 2, L = 8, BWm = 0.4, H = 210;
+  const lay = CB.seg("sl-pl-lay", draw), bar = CB.seg("sl-pl-bar", go);
+  const gsb = CB.range("sl-pl-sb", (v) => v + " mm", go), gst = CB.range("sl-pl-st", (v) => v + " mm", go), gLL = CB.range("sl-pl-LL", (v) => v.toFixed(1) + " kN/m²", go);
+  let R = null, pick = null, geo = null;
+  // 방향별 경간: index 0 = 단부 경간(외단), 나머지 내부
+  const spanOf = (i) => (i === 0 ? "end" : "int");
+  function calc() {
+    const B = SL.BAR[bar()], dX = H - 20 - B.d / 2, dY = dX - B.d, sb = gsb(), st = gst();
+    const D = { end: SL.ddm({ l1: L, l2: L, c: 0.8, h: H, L: gLL(), beams: true, span: "end" }), int: SL.ddm({ l1: L, l2: L, c: 0.8, h: H, L: gLL(), beams: true, span: "int" }) };
+    const Asb = (1000 * B.A) / sb, Ast = (1000 * B.A) / st;
+    const capBX = SL.phiMn(H, dX, Asb).phiMn, capBY = SL.phiMn(H, dY, Asb).phiMn, capT = SL.phiMn(H, dY, Ast).phiMn; // 상단도 안쪽 층 d로(안전 측)
+    // 상단: 지지선 k의 부 모멘트(폭 1 m당). k = 0 외단, k = 1 단부 경간 안쪽(0.70)과 내부 경간(0.65) 중 큰 값, k ≥ 2 내부
+    const supAt = (k) => (k === 0 ? D.end.m.ext : k === 1 ? { cs: Math.max(D.end.m.int.cs, D.int.m.ext.cs), ms: Math.max(D.end.m.int.ms, D.int.m.ext.ms) } : D.int.m.ext);
+    const topX = [], topY = [];
+    for (let k = 0; k <= NX; k++) topX.push(supAt(k));
+    for (let k = 0; k <= NY; k++) topY.push(supAt(k));
+    const posX = (i) => D[spanOf(i)].m.pos, posY = (j) => D[spanOf(j)].m.pos;
+    let ub = 0, ut = 0;
+    for (let i = 0; i < NX; i++) ub = Math.max(ub, posX(i).ms / capBX, posX(i).cs / capBX);
+    for (let j = 0; j < NY; j++) ub = Math.max(ub, posY(j).ms / capBY, posY(j).cs / capBY);
+    topX.concat(topY).forEach((t) => (ut = Math.max(ut, t.ms / capT, t.cs / capT)));
+    const Amin = SL.rhoST(SL.FY) * 1000 * H, sLim = Math.min(2 * H, 300);
+    const ruleB = Asb >= Amin - 0.5 && sb <= sLim, ruleT = Ast >= Amin - 0.5 && st <= sLim;
+    // 물량: 하단 두 방향 전면 + 상단 띠(보 양쪽 0.3ℓn + 보 폭)
+    const area = NX * L * NY * L, topLen = 2 * 0.3 * 7.2 + BWm;
+    const kgBot = 2 * B.m * (1000 / sb), lines = (NX + 0.5) * NY * L + (NY + 0.5) * NX * L, kgTop = (lines * (1000 / st) * topLen * B.m) / area;
+    R = { B, dX, dY, sb, st, D, capBX, capBY, capT, topX, topY, posX, posY, ub, ut, ruleB, ruleT, Amin, sLim, kg: kgBot + kgTop };
+  }
+  const cv = CB.canvas("#sl-cv-plan", (ctx, W, Hc) => {
+    if (!R) return;
+    const pal = CB.palette(), conc = CB.color("surface-2"), m = 26, sc = Math.min((W - 2 * m) / (NX * L + 0.8), (Hc - 2 * m) / (NY * L + 0.8)), ox = m + 6, oy = m;
+    const X = (x) => ox + x * sc, Y = (y) => oy + y * sc; geo = { X, Y, sc, ox, oy };
+    ctx.fillStyle = conc; ctx.fillRect(X(0), Y(0), NX * L * sc, NY * L * sc);
+    const lv = lay();
+    // 판정 색(하단): 구획별 최대 이용률
+    for (let i = 0; i < NX; i++) for (let j = 0; j < NY; j++) {
+      const u = Math.max(R.posX(i).ms, R.posX(i).cs) / R.capBX, v = Math.max(R.posY(j).ms, R.posY(j).cs) / R.capBY;
+      if (lv !== "top" && (Math.max(u, v) > 1 || !R.ruleB)) { ctx.fillStyle = SL.alpha(pal.bad, 0.18); ctx.fillRect(X(i * L), Y(j * L), L * sc, L * sc); }
+    }
+    if (lv !== "top") {
+      const step = R.sb / 1000, every = Math.max(1, Math.ceil(3 / (step * sc)));
+      ctx.strokeStyle = SL.alpha(pal.tension, 0.55); ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let k = 0, y = step / 2; y < NY * L; y += step, k++) if (k % every === 0) { ctx.moveTo(X(0), Y(y)); ctx.lineTo(X(NX * L), Y(y)); }
+      for (let k = 0, x = step / 2; x < NX * L; x += step, k++) if (k % every === 0) { ctx.moveTo(X(x), Y(0)); ctx.lineTo(X(x), Y(NY * L)); }
+      ctx.stroke();
+    }
+    if (lv !== "bot") {
+      const ext = 0.3 * 7.2 + BWm / 2;
+      const band = (x0, y0, w, h, bad) => { ctx.fillStyle = SL.alpha(bad ? pal.bad : pal.accent, bad ? 0.35 : 0.22); ctx.fillRect(X(x0), Y(y0), w * sc, h * sc); ctx.strokeStyle = bad ? pal.bad : pal.accent; ctx.lineWidth = 1; ctx.strokeRect(X(x0), Y(y0), w * sc, h * sc); };
+      for (let k = 0; k <= NX; k++) { const t = R.topX[k], bad = Math.max(t.cs, t.ms) > R.capT || !R.ruleT, x0 = Math.max(0, k * L - ext), x1 = Math.min(NX * L, k * L + ext); band(x0, 0, x1 - x0, NY * L, bad); }
+      for (let k = 0; k <= NY; k++) { const t = R.topY[k], bad = Math.max(t.cs, t.ms) > R.capT || !R.ruleT, y0 = Math.max(0, k * L - ext), y1 = Math.min(NY * L, k * L + ext); band(0, y0, NX * L, y1 - y0, bad); }
+      ctx.fillStyle = SL.alpha(pal.accent2, 0.45); ctx.fillRect(X(0), Y(0), 1.6 * sc, 1.6 * sc); ctx.strokeStyle = pal.accent2; ctx.strokeRect(X(0), Y(0), 1.6 * sc, 1.6 * sc);
+    }
+    ctx.strokeStyle = pal.dim; ctx.lineWidth = Math.max(3, BWm * sc);
+    ctx.beginPath(); for (let i = 0; i <= NX; i++) { ctx.moveTo(X(i * L), Y(0)); ctx.lineTo(X(i * L), Y(NY * L)); } for (let j = 0; j <= NY; j++) { ctx.moveTo(X(0), Y(j * L)); ctx.lineTo(X(NX * L), Y(j * L)); } ctx.stroke();
+    ctx.fillStyle = pal.text; for (let i = 0; i <= NX; i++) for (let j = 0; j <= NY; j++) ctx.fillRect(X(i * L) - 0.4 * sc, Y(j * L) - 0.4 * sc, 0.8 * sc, 0.8 * sc);
+    ctx.strokeStyle = pal.faint; ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let y = 0; y < NY * L; y += 2) { ctx.moveTo(X(NX * L) + 6, Y(y)); ctx.lineTo(X(NX * L) + 12, Y(y + 1)); ctx.lineTo(X(NX * L) + 6, Y(y + 2)); }
+    for (let x = 0; x < NX * L; x += 2) { ctx.moveTo(X(x), Y(NY * L) + 6); ctx.lineTo(X(x + 1), Y(NY * L) + 12); ctx.lineTo(X(x + 2), Y(NY * L) + 6); }
+    ctx.stroke();
+    SL.text(ctx, "건물 바깥 →", X(0) - 4, Y(0) - 12, pal.dim, { size: 10.5, align: "left", bold: false });
+    SL.text(ctx, "X", X(NX * L) - 10, Y(0) - 12, pal.dim, { size: 10.5 });
+    if (pick) { ctx.strokeStyle = pal.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(pick.x), Y(pick.y), 7, 0, Math.PI * 2); ctx.stroke(); }
+  }, { aspect: (W) => (W < 520 ? 0.78 : 0.62), minHeight: 260, maxHeight: 460 });
+  function describe(x, y) {
+    const i = CB.clamp(Math.floor(x / L), 0, NX - 1), j = CB.clamp(Math.floor(y / L), 0, NY - 1), lx = x - i * L, ly = y - j * L;
+    const inCsY = Math.min(ly, L - ly) < 2, inCsX = Math.min(lx, L - lx) < 2;
+    const mx = inCsY ? R.posX(i).cs : R.posX(i).ms, my = inCsX ? R.posY(j).cs : R.posY(j).ms;
+    const kx = Math.round(x / L), ky = Math.round(y / L), nearX = Math.abs(x - kx * L) < 0.3 * 7.2 + 0.2, nearY = Math.abs(y - ky * L) < 0.3 * 7.2 + 0.2;
+    let s = `구획(${i + 1},${j + 1}) ${i === 0 || j === 0 ? (i === 0 && j === 0 ? "모서리" : "가장자리") : "내부"} · 하단 X ${CB.num(mx, 1)}/${CB.num(R.capBX, 1)}, Y ${CB.num(my, 1)}/${CB.num(R.capBY, 1)}`;
+    if (nearX) { const t = R.topX[kx]; s += ` · 상단(X 지지선 ${kx}) ${CB.num(inCsY ? t.cs : t.ms, 1)}/${CB.num(R.capT, 1)}`; }
+    if (nearY) { const t = R.topY[ky]; s += ` · 상단(Y 지지선 ${ky}) ${CB.num(inCsX ? t.cs : t.ms, 1)}/${CB.num(R.capT, 1)}`; }
+    return s + " kN·m/m";
+  }
+  cv.canvas.addEventListener("pointerdown", (e) => {
+    if (!geo) return; const r = cv.canvas.getBoundingClientRect(), x = (e.clientX - r.left - geo.ox) / geo.sc, y = (e.clientY - r.top - geo.oy) / geo.sc;
+    if (x < 0 || y < 0 || x > NX * L || y > NY * L) return;
+    pick = { x, y }; CB.stat("sl-pl-o-pt", describe(x, y)); cv.redraw();
+  });
+  function draw() { cv.redraw(); }
+  function go() {
+    calc();
+    CB.stat("sl-pl-o-b", CB.num(R.ub, 2)); CB.stat("sl-pl-o-t", CB.num(R.ut, 2));
+    CB.stat("sl-pl-o-rule", `${R.ruleB ? "하단 ✓" : "하단 ✗"} · ${R.ruleT ? "상단 ✓" : "상단 ✗"}`);
+    CB.stat("sl-pl-o-kg", CB.num(R.kg, 1) + " kg/m²");
+    if (pick) CB.stat("sl-pl-o-pt", describe(pick.x, pick.y));
+    const Asb = (1000 * R.B.A) / R.sb, Ast = (1000 * R.B.A) / R.st, issues = [];
+    if (R.ub > 1) issues.push(`하단 강도 부족(이용률 ${CB.num(R.ub, 2)})`);
+    if (R.ut > 1) issues.push(`상단 강도 부족(이용률 ${CB.num(R.ut, 2)})`);
+    if (Asb < R.Amin - 0.5) issues.push(`하단 ${CB.num(Asb, 0)} &lt; 최소 ${CB.num(R.Amin, 0)} mm²/m`);
+    if (Ast < R.Amin - 0.5) issues.push(`상단 ${CB.num(Ast, 0)} &lt; 최소 ${CB.num(R.Amin, 0)} mm²/m`);
+    if (R.sb > R.sLim || R.st > R.sLim) issues.push(`간격 &gt; min(2h, 300) = ${R.sLim} mm`);
+    if (issues.length) SL.msg("sl-pl-msg", "bad", "불합격: " + issues.join(" · ") + ". 붉은 영역을 보세요.");
+    else SL.msg("sl-pl-msg", "ok", `합격: 하단 ${bar()}@${R.sb}(${CB.num(Asb, 0)} mm²/m), 상단 ${bar()}@${R.st}(${CB.num(Ast, 0)} mm²/m). 최대 이용률 하단 ${CB.num(R.ub, 2)}, 상단 ${CB.num(R.ut, 2)} — 하단은 강도에 여유가 많아 규정이 지배합니다.`);
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 7. 뚫림 전단과 전단 보강 ---------- */
+(function () {
+  const loc = CB.seg("sl-pu-loc", go), rf = CB.seg("sl-pu-rf", go), nr = CB.seg("sl-pu-nr", go), dbS = CB.seg("sl-pu-db", go);
+  const gc = CB.range("sl-pu-c", (v) => v + " mm", go), gh = CB.range("sl-pu-h", (v) => v + " mm", go), gLL = CB.range("sl-pu-LL", (v) => v.toFixed(1) + " kN/m²", go), gM = CB.range("sl-pu-M", (v) => v + " kN·m", go);
+  const gs = CB.range("sl-pu-s", (v) => v + " mm", go), gn = CB.range("sl-pu-n", (v) => v + " 줄", go);
+  const FYT = { stud: 350, stir: 400 }, SPAN = 8;
+  let R = null;
+  function calc() {
+    const c = gc(), h = gh(), d = h - 35, sq = Math.sqrt(SL.FCK), lc = loc(), wu = SL.wu(h, 1.5, gLL());
+    const b0 = lc === "int" ? 4 * (c + d) : lc === "edge" ? 2 * (c + d / 2) + (c + d) : 2 * (c + d / 2);
+    const as = lc === "int" ? 40 : lc === "edge" ? 30 : 20, At = lc === "int" ? SPAN * SPAN : lc === "edge" ? (SPAN * SPAN) / 2 : (SPAN * SPAN) / 4;
+    const Ac = lc === "int" ? ((c + d) / 1000) ** 2 : lc === "edge" ? ((c + d / 2) * (c + d)) / 1e6 : ((c + d / 2) / 1000) ** 2;
+    const Vu = wu * (At - Ac), vc = Math.min(0.33, 0.17 * 3, 0.083 * ((as * d) / b0 + 2)) * sq;
+    const b1 = c + d, Jc = (d * b1 ** 3) / 6 + (b1 * d ** 3) / 6 + (d * b1 * b1 * b1) / 2, vM = lc === "int" ? (0.4 * gM() * 1e6 * (b1 / 2)) / Jc : 0;
+    const vu = (Vu * 1e3) / (b0 * d) + vM;
+    const kind = rf(), useRf = kind !== "none" && lc === "int";
+    let vcR = vc, vs = 0, vnMax = Infinity, sMax = Infinity, Av = 0, out = null, vsMinOk = true, depthOk = true, barName = "";
+    if (useRf) {
+      const s = gs(), n = gn(), rails = 4 * +nr(), dia = +dbS();
+      if (kind === "stud") { Av = rails * (Math.PI * dia * dia) / 4; vcR = Math.min(vc, 0.25 * sq); vnMax = 0.66 * sq; sMax = vu <= 0.75 * 0.5 * sq ? 0.75 * d : 0.5 * d; }
+      else { barName = dia >= 16 ? "D13" : "D10"; Av = rails * 2 * SL.BAR[barName].A; vcR = Math.min(vc, 0.17 * sq); vnMax = 0.5 * sq; sMax = 0.5 * d; depthOk = d >= 150 && d >= 16 * SL.BAR[barName].d; }
+      vs = (Av * FYT[kind]) / (b0 * s);
+      if (kind === "stud") vsMinOk = vs >= 0.17 * sq - 1e-9;
+      const e = d / 2 + (n - 1) * s + d / 2, b0o = 4 * c + 4 * Math.SQRT2 * e, Aco = (c / 1000) ** 2 + 4 * (c / 1000) * (e / 1000) + 2 * (e / 1000) ** 2;
+      const Vo = wu * (At - Aco), vo = (Vo * 1e3) / (b0o * d);
+      out = { e, b0o, vo, cap: 0.75 * 0.17 * sq, s, n, rails, dia, sOk: s <= sMax + 1e-9 };
+    }
+    const phiVn = useRf ? 0.75 * Math.min(vcR + vs, vnMax) : 0.75 * vc;
+    R = { c, h, d, sq, lc, wu, b0, Vu, vc, vu, vM, kind, useRf, vcR, vs, vnMax, phiVn, out, Av, vsMinOk, depthOk, barName, sMax };
+  }
+  const cv = CB.canvas("#sl-cv-punch", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), conc = CB.color("surface-2"), wide = W >= 520;
+    const pw = wide ? W * 0.6 : W, ph = wide ? H : H * 0.62, cx0 = pw / 2, cy0 = ph / 2;
+    const ext = R.out ? R.c / 2 + R.out.e + 120 : R.c / 2 + R.d + 400, sc = (Math.min(pw, ph) / 2 - 16) / ext;
+    const P = (x, y) => [cx0 + x * sc, cy0 - y * sc];
+    ctx.fillStyle = conc; ctx.fillRect(4, 4, pw - 8, ph - 8);
+    const hc = R.c / 2, r = hc + R.d / 2;
+    // 판 끝(가장자리/모서리): 기둥 바깥면이 판 끝
+    if (R.lc !== "int") { ctx.fillStyle = pal.bg; const [ex] = P(-hc, 0); ctx.fillRect(4, 4, ex - 4, ph - 8); if (R.lc === "corner") { const [, ey] = P(0, hc); ctx.fillRect(4, 4, pw - 8, ey - 4); } }
+    const [qx, qy] = P(-hc, hc); ctx.fillStyle = pal.dim; ctx.fillRect(qx, qy, R.c * sc, R.c * sc);
+    // 임계 둘레
+    ctx.strokeStyle = pal.warn; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath();
+    if (R.lc === "int") { const [a, b] = P(-r, r); ctx.rect(a, b, 2 * r * sc, 2 * r * sc); }
+    else if (R.lc === "edge") { const p1 = P(-hc, r), p2 = P(r, r), p3 = P(r, -r), p4 = P(-hc, -r); ctx.moveTo(...p1); ctx.lineTo(...p2); ctx.lineTo(...p3); ctx.lineTo(...p4); }
+    else { const p1 = P(-hc, -r), p2 = P(r, -r), p3 = P(r, hc); ctx.moveTo(...p1); ctx.lineTo(...p2); ctx.lineTo(...p3); }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (R.out) {
+      const o = R.out, s0 = R.d / 2;
+      ctx.strokeStyle = pal.accent; ctx.lineWidth = 2;
+      const per = +nr(), offs = []; for (let k = 0; k < per; k++) offs.push(per === 1 ? 0 : -hc + (2 * hc * k) / (per - 1));
+      for (let side = 0; side < 4; side++) offs.forEach((t) => {
+        const dir = [[1, 0], [0, 1], [-1, 0], [0, -1]][side], nrm = [[0, 1], [-1, 0], [0, -1], [1, 0]][side];
+        const sx = dir[0] * hc + nrm[0] * t, sy = dir[1] * hc + nrm[1] * t, L = s0 + (o.n - 1) * o.s;
+        const a = P(sx, sy), b = P(sx + dir[0] * L, sy + dir[1] * L); ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke();
+        ctx.fillStyle = pal.accent; for (let k = 0; k < o.n; k++) { const q = P(sx + dir[0] * (s0 + k * o.s), sy + dir[1] * (s0 + k * o.s)); ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(2, 3), 0, Math.PI * 2); ctx.fill(); }
+      });
+      const e = o.e, pts = [[-hc, hc + e], [hc, hc + e], [hc + e, hc], [hc + e, -hc], [hc, -hc - e], [-hc, -hc - e], [-hc - e, -hc], [-hc - e, hc]];
+      ctx.strokeStyle = o.vo <= o.cap ? pal.accent2 : pal.bad; ctx.setLineDash([7, 4]); ctx.lineWidth = 1.8; ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(...P(...p)) : ctx.moveTo(...P(...p)))); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+    }
+    SL.text(ctx, `b₀ = ${CB.num(R.b0, 0)} mm (d/2)`, cx0, 16, pal.warn, { size: 11 });
+    if (R.out) SL.text(ctx, `바깥 b₀ = ${CB.num(R.out.b0o, 0)} mm`, cx0, ph - 14, R.out.vo <= R.out.cap ? pal.accent2 : pal.bad, { size: 11 });
+    // 막대
+    const bx = wide ? pw + 10 : 10, by = wide ? 30 : ph + 18, bw = wide ? W - pw - 26 : W - 20, bh = wide ? H - 70 : H - ph - 50;
+    const items = [["vu", R.vu, pal.accent2], ["φvc", 0.75 * R.vc, pal.dim]];
+    if (R.useRf) items.push(["φ(vc+vs)", R.phiVn, pal.accent]);
+    const vmax = Math.max(...items.map((x) => x[1]), 0.75 * (R.useRf ? R.vnMax : R.vc)) * 1.2, gap = bw / items.length;
+    items.forEach(([lab, v, col], i) => {
+      const x = bx + gap * i + gap * 0.18, w = gap * 0.64, yb = by + bh, yt = yb - (v / vmax) * bh;
+      ctx.fillStyle = SL.alpha(col, 0.75); ctx.fillRect(x, yt, w, yb - yt);
+      SL.text(ctx, CB.num(v, 2), x + w / 2, yt - 9, col, { size: 10.5 }); SL.text(ctx, lab, x + w / 2, yb + 12, pal.text, { size: 10.5, bold: false });
+    });
+    if (R.useRf && isFinite(R.vnMax)) { const y = by + bh - ((0.75 * R.vnMax) / vmax) * bh; ctx.strokeStyle = pal.warn; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(bx, y); ctx.lineTo(bx + bw, y); ctx.stroke(); ctx.setLineDash([]); SL.text(ctx, "상한 φvn,max", bx + bw - 2, y - 8, pal.warn, { size: 10, align: "right", bold: false }); }
+    SL.text(ctx, "MPa", bx + 2, by - 14, pal.dim, { size: 10, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 1.25 : 0.62), minHeight: 300, maxHeight: 470 });
+  function go() {
+    calc();
+    ["sl-pu-nr", "sl-pu-s", "sl-pu-n"].forEach((id) => { document.getElementById(id).closest(".ctrl").hidden = R.kind === "none"; });
+    CB.stat("sl-pu-o-b0", `${CB.num(R.d, 0)} · ${CB.num(R.b0, 0)} · ${CB.num(R.Vu, 0)} kN`);
+    CB.stat("sl-pu-o-vu", CB.num(R.vu, 2) + (R.vM > 0 ? ` (M ${CB.num(R.vM, 2)})` : ""));
+    CB.stat("sl-pu-o-vc", CB.num(0.75 * R.vc, 2));
+    CB.stat("sl-pu-o-vn", R.useRf ? `${CB.num(R.phiVn, 2)} · ${CB.num(0.75 * R.vnMax, 2)}` : "—");
+    CB.stat("sl-pu-o-out", R.out ? CB.num(R.out.vo / R.out.cap, 2) : "—");
+    const base = R.vu <= 0.75 * R.vc;
+    if (R.kind !== "none" && R.lc !== "int") { SL.msg("sl-pu-msg", base ? "ok" : "bad", `${R.lc === "edge" ? "가장자리" : "모서리"} 기둥: v<sub>u</sub> = ${CB.num(R.vu, 2)} ${base ? "≤" : "&gt;"} φv<sub>c</sub> = ${CB.num(0.75 * R.vc, 2)} MPa. 이 모형은 가장자리·모서리 기둥의 보강 설계와 불균형 모멘트를 다루지 않습니다(판정만). 실제로는 판 끝 불균형 모멘트가 커서 더 불리합니다.`); cv.redraw(); return; }
+    if (!R.useRf) {
+      SL.msg("sl-pu-msg", base ? "ok" : "bad", base ? `합격: v<sub>u</sub> = ${CB.num(R.vu, 2)} ≤ φv<sub>c</sub> = ${CB.num(0.75 * R.vc, 2)} MPa(이용률 ${CB.num(R.vu / (0.75 * R.vc), 2)}). 보강이 필요 없습니다.` : `불합격: v<sub>u</sub> = ${CB.num(R.vu, 2)} &gt; φv<sub>c</sub> = ${CB.num(0.75 * R.vc, 2)} MPa. 두께를 키우거나 드롭 패널, 전단 보강(스터드 레일)을 쓰세요.`);
+      cv.redraw(); return;
+    }
+    const o = R.out, issues = [];
+    if (R.vu > 0.75 * R.vnMax) issues.push(`v<sub>u</sub>가 상한 φv<sub>n,max</sub> = ${CB.num(0.75 * R.vnMax, 2)} MPa를 넘습니다 — 보강으로 해결할 수 없어 두께나 기둥을 키워야 합니다`);
+    if (R.vu > R.phiVn) issues.push(`기둥 면: φ(v<sub>c</sub> + v<sub>s</sub>) = ${CB.num(R.phiVn, 2)} &lt; v<sub>u</sub> — 줄 수(면당)·지름을 키우거나 간격을 줄이세요`);
+    if (!o.sOk) issues.push(`줄 간격 ${o.s} &gt; ${CB.num(R.sMax, 0)} mm(${R.kind === "stud" ? "0.75d 또는 0.5d" : "d/2"})`);
+    if (!R.vsMinOk) issues.push(`스터드 v<sub>s</sub> = ${CB.num(R.vs, 2)} &lt; 하한 0.17√f<sub>ck</sub> = ${CB.num(0.17 * R.sq, 2)} MPa`);
+    if (!R.depthOk) issues.push(`스터럽은 d ≥ 150 mm, d ≥ 16d<sub>b</sub>가 필요합니다(d = ${CB.num(R.d, 0)} mm)`);
+    if (o.vo > o.cap) issues.push(`바깥 둘레: v<sub>u</sub> = ${CB.num(o.vo, 2)} &gt; φ0.17√f<sub>ck</sub> = ${CB.num(o.cap, 2)} MPa — 줄 수 n을 늘려 보강 구간을 넓히세요`);
+    if (issues.length) SL.msg("sl-pu-msg", "bad", "불합격: " + issues.join(" · ") + ".");
+    else SL.msg("sl-pu-msg", "ok", `합격: ${R.kind === "stud" ? `스터드 φ${o.dia}` : `스터럽 ${R.barName}(2다리)`} × 레일 ${o.rails}개 × ${o.n}줄 @${o.s}. A<sub>v</sub> = ${CB.num(R.Av, 0)} mm²/줄, v<sub>s</sub> = ${CB.num(R.vs, 2)} MPa, φ(v<sub>c</sub> + v<sub>s</sub>) = ${CB.num(R.phiVn, 2)} ≥ v<sub>u</sub> = ${CB.num(R.vu, 2)} MPa, 바깥 둘레 이용률 ${CB.num(o.vo / o.cap, 2)}. 기둥 하나에 철물 ${o.rails * o.n}개.`);
+    cv.redraw();
+  }
+  go();
+})();
+
+/* ---------- 8. 개구부 ---------- */
+(function () {
+  const C = 800, Hs = 210, D = 175, VU = 747, r = (C + D) / 2, sq = Math.sqrt(SL.FCK);
+  const ga = CB.range("sl-op-a", (v) => v + " mm", go), gb = CB.range("sl-op-b", (v) => v + " mm", go), rule = CB.seg("sl-op-rule", go);
+  let op = { x: C / 2 + 300, y: -250 }; // 개구부 왼쪽 아래 모서리(mm)
+  let R = null, geo = null;
+  const rect = () => ({ x0: op.x, y0: op.y, x1: op.x + ga(), y1: op.y + gb() });
+  document.getElementById("sl-op-near").addEventListener("click", () => { op = { x: C / 2 + 300, y: -gb() / 2 }; go(); });
+  document.getElementById("sl-op-mid").addEventListener("click", () => { op = { x: 4000 - ga() / 2, y: 4000 - gb() / 2 }; go(); });
+  function calc() {
+    const q = rect(), dx = Math.max(q.x0 - C / 2, -C / 2 - q.x1, 0), dy = Math.max(q.y0 - C / 2, -C / 2 - q.y1, 0), dist = Math.hypot(dx, dy);
+    const overlapCol = q.x0 < C / 2 && q.x1 > -C / 2 && q.y0 < C / 2 && q.y1 > -C / 2;
+    const near = dist <= +rule() * Hs;
+    let lost = 0, seg = [];
+    if (!overlapCol && near) {
+      const cxm = (q.x0 + q.x1) / 2, cym = (q.y0 + q.y1) / 2, th0 = Math.atan2(cym, cxm);
+      const ang = [[q.x0, q.y0], [q.x1, q.y0], [q.x1, q.y1], [q.x0, q.y1]].map(([x, y]) => { let a = Math.atan2(y, x) - th0; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; });
+      const amin = Math.min(...ang), amax = Math.max(...ang), N = 1600, per = 8 * r;
+      let run = null;
+      for (let k = 0; k < N; k++) {
+        const t = ((k + 0.5) / N) * per, side = Math.floor(t / (2 * r)), u = t - side * 2 * r - r;
+        const [px, py] = [[r, u], [-u, r], [-r, -u], [u, -r]][side];
+        let a = Math.atan2(py, px) - th0; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI;
+        const inside = a >= amin && a <= amax;
+        if (inside) { lost += per / N; if (!run) { run = [[px, py]]; seg.push(run); } else run.push([px, py]); } else run = null;
+      }
+    }
+    const b0 = 8 * r, b0e = Math.max(1, b0 - lost), vc = Math.min(0.33, 0.51, 0.083 * ((40 * D) / b0e + 2)) * sq, vu = (VU * 1e3) / (b0e * D);
+    // 띠 영역(주열대 = 기둥선 ±2 m)
+    const inCS = (a0, a1) => a0 < 2000 && a1 > -2000;
+    const csx = inCS(q.y0, q.y1), csy = inCS(q.x0, q.x1), msx = q.y1 > 2000 || q.y0 < -2000, msy = q.x1 > 2000 || q.x0 < -2000;
+    let zone, allow, zoneOk;
+    if (csx && csy) { zone = "① 주열대 ∩ 주열대"; allow = "≤ 500 mm(띠 폭 1/8)"; zoneOk = Math.max(ga(), gb()) <= 500; }
+    else if ((csx && msy) || (csy && msx)) { zone = "② 주열대 ∩ 중간대"; allow = "끊기는 철근 ≤ 1/4"; zoneOk = Math.max(ga(), gb()) <= 1000; }
+    else { zone = "③ 중간대 ∩ 중간대"; allow = "제한 없음(보충)"; zoneOk = true; }
+    R = { q, dist, overlapCol, near, lost, seg, b0, b0e, vc, vu, ok: vu <= 0.75 * vc, zone, allow, zoneOk };
+  }
+  const cv = CB.canvas("#sl-cv-open", (ctx, W, H) => {
+    if (!R) return;
+    const pal = CB.palette(), conc = CB.color("surface-2"), x0 = -1800, x1 = 4800, y0 = -1800, y1 = 4800, sc = Math.min((W - 20) / (x1 - x0), (H - 20) / (y1 - y0));
+    const ox = (W - (x1 - x0) * sc) / 2, oy = (H - (y1 - y0) * sc) / 2;
+    const P = (x, y) => [ox + (x - x0) * sc, oy + (y1 - y) * sc]; geo = { P, sc, ox, oy, x0, y1 };
+    ctx.fillStyle = conc; ctx.fillRect(...P(x0, y1), (x1 - x0) * sc, (y1 - y0) * sc);
+    ctx.fillStyle = SL.alpha(pal.accent, 0.1); ctx.fillRect(...P(x0, 2000), (x1 - x0) * sc, 4000 * sc); ctx.fillRect(...P(-2000, y1), 4000 * sc, (y1 - y0) * sc);
+    SL.text(ctx, "주열대", P(3900, 0)[0], P(0, 1700)[1], pal.accent, { size: 10.5, bold: false }); SL.text(ctx, "중간대", P(3900, 0)[0], P(0, 4400)[1], pal.accent2, { size: 10.5, bold: false });
+    ctx.strokeStyle = pal.faint; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(...P(0, y0)); ctx.lineTo(...P(0, y1)); ctx.moveTo(...P(x0, 0)); ctx.lineTo(...P(x1, 0)); ctx.stroke(); ctx.setLineDash([]);
+    // 4h(10h) 범위
+    const lim = +rule() * Hs; ctx.strokeStyle = SL.alpha(pal.warn, 0.6); ctx.setLineDash([2, 3]); ctx.strokeRect(...P(-C / 2 - lim, C / 2 + lim), (C + 2 * lim) * sc, (C + 2 * lim) * sc); ctx.setLineDash([]);
+    ctx.fillStyle = pal.dim; ctx.fillRect(...P(-C / 2, C / 2), C * sc, C * sc);
+    ctx.strokeStyle = pal.warn; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(...P(-r, r), 2 * r * sc, 2 * r * sc); ctx.setLineDash([]);
+    R.seg.forEach((run) => SL.line(ctx, run.map((p) => P(p[0], p[1])), pal.bad, 5));
+    const q = R.q;
+    if (R.near && !R.overlapCol) { ctx.strokeStyle = SL.alpha(pal.bad, 0.7); ctx.lineWidth = 1.2; const th0 = Math.atan2((q.y0 + q.y1) / 2, (q.x0 + q.x1) / 2); let best = [null, null], am = [1e9, -1e9];
+      [[q.x0, q.y0], [q.x1, q.y0], [q.x1, q.y1], [q.x0, q.y1]].forEach((p) => { let a = Math.atan2(p[1], p[0]) - th0; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; if (a < am[0]) { am[0] = a; best[0] = p; } if (a > am[1]) { am[1] = a; best[1] = p; } });
+      best.forEach((p) => { ctx.beginPath(); ctx.moveTo(...P(0, 0)); ctx.lineTo(...P(p[0], p[1])); ctx.stroke(); }); }
+    ctx.fillStyle = pal.bg; ctx.strokeStyle = R.overlapCol ? pal.bad : pal.text; ctx.lineWidth = 1.6;
+    ctx.fillRect(...P(q.x0, q.y1), (q.x1 - q.x0) * sc, (q.y1 - q.y0) * sc); ctx.strokeRect(...P(q.x0, q.y1), (q.x1 - q.x0) * sc, (q.y1 - q.y0) * sc);
+    SL.text(ctx, "개구부(끌기)", P((q.x0 + q.x1) / 2, 0)[0], P(0, (q.y0 + q.y1) / 2)[1], pal.text, { size: 10.5 });
+    SL.text(ctx, `${+rule()}h 범위`, P(-C / 2 - lim, 0)[0] + 4, P(0, -C / 2 - lim)[1] + 12, pal.warn, { size: 10, align: "left", bold: false });
+  }, { aspect: (W) => (W < 520 ? 1 : 0.7), minHeight: 300, maxHeight: 470 });
+  let drag = null;
+  const toMM = (e) => { const b = cv.canvas.getBoundingClientRect(), px = e.clientX - b.left, py = e.clientY - b.top; return [geo.x0 + (px - geo.ox) / geo.sc, geo.y1 - (py - geo.oy) / geo.sc]; };
+  cv.canvas.addEventListener("pointerdown", (e) => { if (!geo) return; const [x, y] = toMM(e), q = rect(); if (x >= q.x0 - 150 && x <= q.x1 + 150 && y >= q.y0 - 150 && y <= q.y1 + 150) { drag = [x - op.x, y - op.y]; cv.canvas.setPointerCapture(e.pointerId); e.preventDefault(); } });
+  cv.canvas.addEventListener("pointermove", (e) => { if (!drag) return; const [x, y] = toMM(e); op = { x: CB.clamp(Math.round((x - drag[0]) / 50) * 50, -1800, 4800 - ga()), y: CB.clamp(Math.round((y - drag[1]) / 50) * 50, -1800, 4800 - gb()) }; go(); });
+  const up = () => (drag = null); cv.canvas.addEventListener("pointerup", up); cv.canvas.addEventListener("pointercancel", up);
+  function go() {
+    op.x = CB.clamp(op.x, -1800, 4800 - ga()); op.y = CB.clamp(op.y, -1800, 4800 - gb());
+    calc();
+    CB.stat("sl-op-o-dist", R.overlapCol ? "기둥과 겹침" : CB.num(R.dist, 0) + " mm" + (R.near ? ` ≤ ${+rule()}h` : ` &gt; ${+rule()}h`));
+    CB.stat("sl-op-o-b0", `${CB.num(R.lost, 0)} · ${CB.num(R.b0e, 0)} mm`);
+    CB.stat("sl-op-o-r", CB.num(R.vu / (0.75 * R.vc), 2));
+    CB.stat("sl-op-o-zone", `${R.zone} · ${R.allow}`);
+    if (R.overlapCol) SL.msg("sl-op-msg", "bad", "개구부가 기둥과 겹칩니다. 기둥 단면을 뚫을 수는 없습니다 — 옮기세요.");
+    else {
+      const pun = R.ok ? `뚫림 전단 합격(v<sub>u</sub> = ${CB.num(R.vu, 2)} ≤ φv<sub>c</sub> = ${CB.num(0.75 * R.vc, 2)} MPa)` : `뚫림 전단 불합격(v<sub>u</sub> = ${CB.num(R.vu, 2)} &gt; φv<sub>c</sub> = ${CB.num(0.75 * R.vc, 2)} MPa)`;
+      const zn = R.zoneOk ? "띠 영역 허용 범위 안" : "띠 영역 허용 크기 초과";
+      SL.msg("sl-op-msg", R.ok && R.zoneOk ? "ok" : "bad", `${R.near ? `임계 둘레 ${CB.num(R.lost, 0)} mm(${CB.num((100 * R.lost) / R.b0, 0)} %)가 무효` : "기둥에서 충분히 멀어 임계 둘레 감소 없음"} → ${pun}. ${zn}(${R.zone}). 끊긴 철근만큼 개구부 양옆에 보충합니다.`);
+    }
+    cv.redraw();
+  }
+  go();
+})();
+</script>
+</body>
+</html>
