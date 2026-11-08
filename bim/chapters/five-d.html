@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>5D 원가와 디지털 견적 · BIMBook</title>
+<meta name="description" content="모델에 돈을 더한다. B-10 BIM 요소의 공제 물량·거푸집·철근에 SiteBook 일위대가를 곱하는 5D 원가, 내역 연결 검사, 설계 변경의 원가 델타, 4D + 5D 현금 흐름, RC와 철골 대안, 기성 산정, 원가 히트맵과 단가 민감도를 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .fv-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); line-height: 1.7; overflow-wrap: anywhere; }
+  .fv-msg b { color: var(--text); }
+  .fv-msg.ok { color: var(--ok); font-weight: 600; }
+  .fv-msg.warn { color: var(--warn); font-weight: 600; }
+  .fv-msg.bad { color: var(--bad); font-weight: 600; }
+  .fv-tbl td, .fv-tbl th { font-variant-numeric: tabular-nums; }
+  .fv-tbl td.n, .fv-tbl th.n { text-align: right; }
+  .fv-map { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .fv-map th, .fv-map td { padding: 4px 4px; border-bottom: 1px solid var(--border); text-align: center; }
+  .fv-map th:first-child, .fv-map td:first-child { text-align: left; }
+  .fv-map input { accent-color: var(--accent); width: 16px; height: 16px; }
+  .fv-sub { border-top: 1px solid var(--border); }
+  .fv-key { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 18px; font-size: 13px; color: var(--text-dim); border-top: 1px solid var(--border); }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="five-d">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="fv-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="fv-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 10</div>
+    <h1 data-no-glossary>5D 원가와 디지털 견적</h1>
+    <p class="lead">설계자가 기둥을 800에서 600으로 줄이자고 합니다. 공사비는 얼마나 줄까요? 2D 도면으로 일하던 때에는 적산 담당자가 수량을 다시 세고 내역서를 고치는 데 며칠이 걸렸습니다. 모델의 요소가 수량을 알고, 그 수량이 내역 항목의 단가와 이어져 있으면 답은 슬라이더를 움직이는 순간 나옵니다. 모델(3D)에 공정(4D)과 원가를 더한 것을 <b>5D</b>라 부릅니다. 이 장은 B-10 BIM 요소 360개의 물량에 SiteBook 12장의 교육용 일위대가를 곱해 5D 원가를 만들고, 설계 변경의 원가 델타, 9장의 4D 일정과 합친 현금 흐름, RC와 철골 대안, 완료 요소로 하는 기성, 단가의 민감도를 계산합니다. 그리고 한 가지를 처음부터 분명히 합니다: <b>모델의 5D 원가 약 16.7억 원은 P-B10의 계약 금액 244억 원이 아니다.</b></p>
+    <ul class="objectives">
+      <li>5D 원가를 "요소 → 물량 규칙 → 내역 항목 → 단가 → 금액"의 연결로 정의하고, 요소별·공종별·층별로 집계한다.</li>
+      <li>공제 우선순위(기둥 &gt; 벽 &gt; 보 &gt; 슬래브)로 순 콘크리트 부피를, 접촉면을 뺀 면으로 거푸집 면적을, 원단위로 철근을 산출한다.</li>
+      <li>요소 유형과 내역 항목의 연결을 검사해 누락·이중·단위 불일치를 찾는다.</li>
+      <li>모델의 5D 원가(약 16.7억 원)와 BAC 244억 원의 차이를 모델 범위·간접비·관리비·이윤으로 설명한다.</li>
+      <li>기둥 단면·슬래브 두께·보 춤을 바꿔 물량과 원가의 델타를 계산하고, 4D 완료 시점과 합쳐 S 곡선과 기성을 만든다.</li>
+      <li>RC와 철골 대안을 직접비·공기·간접비로 비교하고, 단가 민감도를 토네이도 차트로 읽는다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 정보가 없었다면</small><b>설계를 바꿀 때마다 견적을 처음부터</b></div>
+      <div class="o-body"><p>적산 전문가가 도면에서 수량을 세어 수량 명세서를 만들고 입찰자가 단가를 적는 방식은 19세기 영국에서 자리 잡았습니다(SiteBook 12장). 이 방식에서 수량은 도면에서 "한 번" 세는 것이었습니다. 설계가 바뀌면 다시 세야 했고, 그래서 설계 후반의 변경은 원가가 얼마나 바뀌는지 모른 채 결정되곤 했습니다. 1980–90년대에 객체 기반 설계 도구가 등장하면서 부재가 자기 치수를 알게 되었고, 수량을 모델에서 바로 읽고(7장) 그 수량을 원가 항목과 이어 두는 일이 가능해졌습니다.</p>
+        <p>그러나 모델이 수량을 안다고 견적이 끝나지는 않습니다. 모델에 없는 것(가설·동바리·양중·관리)은 금액에도 없고, 물량 규칙(무엇을 공제하나)이 다르면 같은 모델에서 다른 수량이 나오며, 단가는 여전히 사람이 판단합니다. 5D의 가치는 숫자 하나를 자동으로 내는 데 있지 않고, <b>변경의 영향</b>을 즉시 보이고 <b>시간에 따른 돈의 흐름</b>을 모델 요소와 같은 단위로 추적하는 데 있습니다.</p>
+        <div class="o-chain"><span>요소 360개 · 4D 일정(9장)</span><i>→</i><span class="tool">순 부피 · 거푸집 · 철근 원단위 · 일위대가 · 연결 검사 · spread</span><i>→</i><span>5D 원가 · 설계 변경 델타 · 현금 흐름 · 기성 · 대안</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="what-is-5d">
+    <h2>5D = 모델 + 물량 + 단가</h2>
+    <div class="problem"><strong>슬래브 하나는 얼마인가</strong>
+      <p>B-10 BIM의 2층 슬래브 <code>S-2F</code>는 32.8 × 24.8 × 0.21 m 상자입니다. 콘크리트 170.8 m³, 그 아래 거푸집, 그 안의 철근. SiteBook 12장의 단가(콘크리트 119,450원/m³, 거푸집 40,570원/m², 철근 1,417,000원/t)를 쓰면 이 요소는 얼마일까요? 그리고 요소 360개를 다 더하면?</p></div>
+    <p><span class="term">5D BIM</span><span class="en">(5D BIM)</span>은 모델의 요소마다 물량을 꺼내고, 그 물량을 <span class="term">내역 항목</span><span class="en">(cost item)</span>(예: "콘크리트 타설 C30, m³")에 연결하고, 항목의 단가를 곱해 금액을 만드는 방법입니다. 단가는 SiteBook 12장의 <span class="term">일위대가</span><span class="en">(unit price breakdown)</span>처럼 재료·노무·경비를 더한 단위 단가를 씁니다. 4D가 "요소 → 활동"의 연결이었다면, 5D는 "요소 → 내역 항목"의 연결입니다. 둘을 합치면 "언제, 얼마가" 나갑니다.</p>
+    <figure class="diagram" id="fig-fv-flow">
+      <svg viewBox="0 0 860 300" role="img" aria-label="요소에서 물량 규칙, 내역 항목, 단가를 거쳐 금액이 되는 5D 계산 흐름">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g text-anchor="middle">
+          <rect x="30" y="50" width="140" height="150" rx="10" class="f-elev"/>
+          <text x="100" y="74" class="t" style="font-weight:700">요소</text>
+          <text x="100" y="100" class="t-mono" style="font-size:12px">S-2F</text>
+          <text x="100" y="120" class="t-mono" style="font-size:11px">IfcSlab · 2층</text>
+          <text x="100" y="140" class="t-mono" style="font-size:11px">box 32.8×24.8×0.21</text>
+          <text x="100" y="160" class="t-mono" style="font-size:11px">C30</text>
+          <rect x="200" y="50" width="160" height="150" rx="10" class="f-acc-soft"/>
+          <text x="280" y="74" class="t" style="font-weight:700;fill:var(--accent)">물량 규칙</text>
+          <text x="280" y="100" class="t-mono" style="font-size:11px">순 부피 V (공제)</text>
+          <text x="280" y="120" class="t-mono" style="font-size:11px">거푸집 A (접촉면 제외)</text>
+          <text x="280" y="140" class="t-mono" style="font-size:11px">철근 W = 0.12 V</text>
+          <text x="280" y="160" class="t-mono" style="font-size:11px">덕트 면적 · 배관 길이</text>
+          <rect x="390" y="50" width="160" height="150" rx="10" class="f-elev"/>
+          <text x="470" y="74" class="t" style="font-weight:700">내역 항목 · 단가</text>
+          <text x="470" y="100" class="t-mono" style="font-size:11px">콘크리트 119,450 /m³</text>
+          <text x="470" y="120" class="t-mono" style="font-size:11px">거푸집 40,570 /m²</text>
+          <text x="470" y="140" class="t-mono" style="font-size:11px">철근 1,417,000 /t</text>
+          <text x="470" y="164" class="t-dim" style="font-size:11px">SiteBook 표 12-1</text>
+          <rect x="580" y="50" width="250" height="150" rx="10" class="f-elev"/>
+          <text x="705" y="74" class="t" style="font-weight:700">금액 (S-2F)</text>
+          <text x="705" y="100" class="t-mono" style="font-size:11px">170.8 m³ × 119,450 = 20.4백만</text>
+          <text x="705" y="120" class="t-mono" style="font-size:11px">729.8 m² × 40,570 = 29.6백만</text>
+          <text x="705" y="140" class="t-mono" style="font-size:11px">20.5 t × 1,417,000 = 29.0백만</text>
+          <text x="705" y="168" class="t" style="font-weight:700">≈ 0.79억 원</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.5;fill:none"><path d="M170 125H196" marker-end="url(#fv-ah)"/><path d="M360 125H386" marker-end="url(#fv-ah)"/><path d="M550 125H576" marker-end="url(#fv-ah)"/></g>
+        <text x="430" y="238" text-anchor="middle" class="t-dim">요소 360개를 같은 규칙으로 → 공종별 · 층별 · 요소별 합계 · 4D 일정과 곱하면 현금 흐름</text>
+        <text x="430" y="262" text-anchor="middle" class="t-dim">모델이 바뀌면 물량부터 금액까지 자동으로 다시 계산된다(규칙과 단가는 사람이 정한다)</text>
+      </svg>
+      <figcaption><b>그림 10-1.</b> 5D 계산의 흐름. 같은 모델이라도 물량 규칙이 다르면 수량이 다르고, 단가는 견적자의 판단이다. 모델이 자동으로 하는 일은 그 사이의 곱셈과 합산, 그리고 변경이 생겼을 때의 재계산이다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 10.1 (5D 원가)</strong> 요소 \(e\), 내역 항목 \(i\)(단위 \(u_i\)), 연결 \(m_{e,i} \in \{0, 1\}\), 물량 \(q_i(e)\), 단가 \(p_i\)에 대해
+      <div class="formula">$$C_e = \sum_i m_{e,i}\, q_i(e)\, p_i, \qquad C = \sum_{e \in E} C_e, \qquad C(\text{층 } k) = \sum_{e:\ \text{storey}(e) = k} C_e$$<div class="where">이 장의 \(C\)는 모델 요소의 <b>직접 공사비 일부</b>(골조 3공종 + 덕트·배관)다. 간접비·일반관리비·이윤·모델에 없는 공종은 들어 있지 않다(10.3절). 금액은 억 원(1억 = 10<sup>8</sup>원).</div></div></div>
+    <div class="sim" id="sim-fv-calc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>5D 계산기: B-10 요소 물량 × 단가 → 공종별 · 유형별 금액</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fv-cv-calc" aria-label="공종별 또는 요소 유형별 5D 금액 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>콘크리트 (원/m³) <output id="fv-ca-c-out"></output></span><input type="range" id="fv-ca-c" min="80000" max="160000" step="50" value="119450"></label>
+          <label class="ctrl"><span>거푸집 (원/m²) <output id="fv-ca-f-out"></output></span><input type="range" id="fv-ca-f" min="25000" max="60000" step="10" value="40570"></label>
+          <label class="ctrl"><span>철근 (원/t) <output id="fv-ca-r-out"></output></span><input type="range" id="fv-ca-r" min="900000" max="2000000" step="1000" value="1417000"></label>
+          <label class="ctrl"><span>덕트 (원/m², 교육용) <output id="fv-ca-d-out"></output></span><input type="range" id="fv-ca-d" min="50000" max="150000" step="1000" value="90000"></label>
+          <label class="ctrl"><span>배관 (원/m, 교육용) <output id="fv-ca-p-out"></output></span><input type="range" id="fv-ca-p" min="30000" max="120000" step="1000" value="70000"></label>
+          <div class="ctrl"><span>층</span><div class="seg" id="fv-ca-s"><button data-value="all" class="on">전체</button><button data-value="1">1층</button><button data-value="2">기준층(2층)</button><button data-value="lo">1–5</button><button data-value="hi">6–10</button></div></div>
+          <div class="ctrl"><span>막대</span><div class="seg" id="fv-ca-v"><button data-value="trade" class="on">공종별</button><button data-value="type">유형별</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">선택 범위 합계</span><span class="v" id="fv-ca-o-t">—</span></div>
+        <div class="stat"><span class="k">층당 평균</span><span class="v" id="fv-ca-o-f">—</span></div>
+        <div class="stat"><span class="k">골조 3공종 / 층 (SiteBook 1.38억)</span><span class="v" id="fv-ca-o-s">—</span></div>
+        <div class="stat"><span class="k">BAC 244억 대비(전체 모델)</span><span class="v" id="fv-ca-o-b">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본 단가에서 모델 전체 약 16.69억 원(콘크리트 3.89, 거푸집 6.26, 철근 5.54, 덕트 0.78, 배관 0.22)을 확인하세요 · 거푸집이 가장 큽니다 — 면적이 콘크리트 부피의 약 4.7배이고 노무 비중이 큰 공종입니다(SiteBook 12장과 같은 결론) · "기준층"에서 골조 3공종 약 1.55억 원은 SiteBook 예제 12.2의 1.38억 원보다 13 % 큽니다(7장의 1.55억 원과 같다)(예제 10.1에서 이유를 따진다) · "유형별"로 보면 슬래브가 절반 가까이 됩니다 · 모델: 정의 10.1·10.2, 콘크리트·거푸집·철근 단가는 SiteBook 표 12-1의 교육용 일위대가, 덕트·배관 단가는 이 장의 교육용 가정(SiteBook에 없음). 실제 단가가 아니다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="quantity-rules">
+    <h2>모델에서 꺼내는 물량: 공제, 거푸집, 철근</h2>
+    <div class="problem"><strong>상자를 그냥 더하면 339 m³</strong>
+      <p><code>CB.bim.qto</code>로 상자 부피를 더하면 층당 약 339 m³입니다. 그런데 보와 벽, 벽과 벽, 기둥과 벽은 서로 겹쳐 있어 같은 콘크리트를 두 번 셉니다. 그리고 거푸집과 철근은 모델에 요소로 없습니다. 견적에 쓸 수량은 어떻게 꺼낼까요?</p></div>
+    <p>7장에서 본 것처럼 모델 기반 물량은 <b>규칙</b>입니다. 이 장은 다음 규칙을 씁니다. 겹친 부피는 우선순위가 높은 요소에 남기고 낮은 요소에서 뺍니다(<span class="term">공제</span><span class="en">(deduction)</span>). <span class="term">거푸집</span><span class="en">(formwork)</span>은 콘크리트가 다른 콘크리트와 닿지 않는 옆면과 밑면입니다(7장 정의 7.4와 같은 규칙). 철근은 부재별 배근 대신 SiteBook 12장의 <span class="term">원단위</span><span class="en">(unit quantity rate)</span> 0.12 t/m³를 씁니다(4장의 LOD가 높아 철근이 모델에 있으면 직접 센다).</p>
+    <div class="callout def"><strong>정의 10.2 (이 장의 모델 물량 규칙, 교육용)</strong> 같은 층의 요소에 대해
+      <div class="formula">$$V_e = |b_e| - \Bigl|\, b_e \cap \bigcup_{h \succ e} b_h \Bigr|, \qquad W_e = \rho_s V_e\ (\rho_s = 0.12\ \text{t/m}^3)$$<div class="where">\(|b|\): 상자 부피, \(h \succ e\): 우선순위가 높은 요소(기둥 &gt; 벽 &gt; 보 &gt; 슬래브). 합집합 부피는 좌표 압축으로 정확히 계산한다. 거푸집 \(A_e\): 7장 정의 7.4와 같다 — 같은 층 구조 요소의 합집합 경계 가운데 수직 노출면과 아래를 향한 노출면(층 바닥 \(z_0\) 위)을 그 칸을 배정받은 요소에 붙이고, 윗면(타설면)·층 바닥에 닿는 면·요소끼리 닿는 접촉면은 뺀다. 덕트 = 단면 둘레 × 길이(m²), 배관 = 길이(m). 개구부·계단·헌치·이음 할증은 없다.</div></div></div>
+    <figure class="diagram" id="fig-fv-rules">
+      <svg viewBox="0 0 860 320" role="img" aria-label="보–슬래브–기둥 단면에서 공제되는 겹침과 거푸집이 필요한 면을 표시한 그림">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">단면 (기둥 – 보 – 슬래브)</text>
+          <rect x="0" y="40" width="380" height="24" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="190" y="57" text-anchor="middle" class="t-mono" style="font-size:11px">슬래브 0.21</text>
+          <rect x="150" y="64" width="40" height="56" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="196" y="96" class="t-mono" style="font-size:11px">보 웨브 0.49</text>
+          <rect x="140" y="120" width="60" height="140" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="170" y="196" text-anchor="middle" class="t-mono" style="font-size:11px">기둥</text>
+          <rect x="300" y="64" width="40" height="196" style="fill:var(--accent);opacity:.25;stroke:var(--accent)"/>
+          <text x="320" y="282" text-anchor="middle" class="t-mono" style="fill:var(--accent);font-size:11px">코어 벽</text>
+          <rect x="300" y="64" width="40" height="0" />
+          <rect x="300" y="64" width="20" height="56" style="fill:var(--bad);opacity:.45"/>
+          <text x="352" y="100" class="t-mono" style="fill:var(--bad);font-size:11px">보∩벽: 보에서 공제</text>
+          <g style="stroke:var(--ok);stroke-width:4;fill:none">
+            <path d="M0 64H150"/><path d="M190 64H300"/><path d="M150 64V120"/><path d="M190 64V120"/><path d="M150 120H140"/><path d="M200 120H190"/>
+            <path d="M140 120V260"/><path d="M200 120V260"/><path d="M0 40V64"/>
+          </g>
+        </g>
+        <g transform="translate(470,50)" class="t-dim" style="font-size:13px">
+          <text x="0" y="0" class="t" style="font-weight:700">기준층(2층) 물량</text>
+          <g class="t-mono" style="font-size:12px">
+            <text x="0" y="26">상자 합   335.8 m³</text>
+            <text x="0" y="46">공제 후   322.9 m³ (−12.9)</text>
+            <text x="0" y="74" style="fill:var(--ok)">거푸집(초록 면) 1,527.7 m²</text>
+            <text x="0" y="94">  기둥 195.4 · 보 295.8</text>
+            <text x="0" y="114">  슬래브 729.8 · 벽 306.7</text>
+            <text x="0" y="142">철근 0.12 × 322.9 = 38.7 t</text>
+          </g>
+          <text x="0" y="176">SiteBook 12장 기준층: 288.7 m³ ·</text>
+          <text x="0" y="196">1,350 m² · 34.6 t (단순화 규칙)</text>
+          <text x="0" y="224" style="fill:var(--bad)">차이는 공제보다 모델 형상 차이</text>
+          <text x="0" y="244">(코어 벽 48 m vs 20 m, 슬래브 외곽)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-2.</b> 물량 규칙. 겹친 부피(빨강)는 우선순위가 낮은 요소에서 빼고, 거푸집은 다른 콘크리트와 닿지 않는 면(초록)만 센다. B-10 BIM의 기준층은 공제 후 322.9 m³로, 겹침 공제는 층당 약 13 m³뿐이다. SiteBook 12장의 288.7 m³와의 차이(약 34 m³)는 대부분 모델 형상의 차이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 10.1 (기준층의 5D와 SiteBook 견적의 차이)</strong> 2층, 정의 10.2, 기본 단가.
+      <p><b>① 물량</b> 콘크리트 322.9 m³(기둥 42.2, 벽 66.1, 보 43.7, 슬래브 170.8), 거푸집 1,527.7 m²(기둥 195.4, 보 295.8, 슬래브 729.8, 벽 306.7), 철근 38.75 t, 덕트 86.8 m², 배관 31 m.</p>
+      <p><b>② 금액</b> \(322.9 \times 119{,}450 = 38.6\)백만, \(1{,}527.7 \times 40{,}570 = 62.0\)백만, \(38.75 \times 1{,}417{,}000 = 54.9\)백만, 덕트 7.8백만, 배관 2.2백만 → 약 <b>1.65억 원</b>(골조 3공종 1.55억, 7장 예제와 같다).</p>
+      <p><b>③ 차이의 원인</b> SiteBook 예제 12.2는 3공종 1.38억 원(288.7 m³, 1,350 m², 34.6 t). 차이 0.17억의 원인: (가) 코어 벽 — 모델은 16 × 8 m 코어를 개구부 없이 닫힌 벽 48 m로 두었고, SiteBook은 개구부를 뺀 순길이 20 m로 보았다(벽 66.1 vs 30.3 m³, 거푸집 306.7 vs 151.6 m²). (나) 슬래브 — 모델은 기둥 바깥면까지 32.8 × 24.8 m(170.8 vs 161.3 m³). (다) 기둥 — 모델은 보 밑에서 끝나 SiteBook보다 작다(42.2 vs 48.5 m³). 겹침 공제는 12.9 m³로 작다.</p>
+      <p><b>④ 판단</b> 같은 건물이라도 모델의 상세(코어 개구부를 그렸는가)와 물량 규칙이 다르면 수량이 12–13 % 다르다. 5D 결과를 쓰기 전에 "어떤 모델, 어떤 규칙"인지 적어 두어야 한다. 이 장의 수치는 모두 B-10 BIM 모델과 정의 10.2를 따른다.</p></div>
+    <div class="callout site"><strong>B-10 BIM 5D (기본 단가)</strong> 공제 후 콘크리트 3,259.4 m³(상자 합 3,390.5에서 131.1 m³ 공제), 거푸집 15,422 m²(기준층 1,527.7, 1층 1,673.3 — 7장과 같다), 철근 391.1 t, 덕트 868 m², 배관 310 m. 금액 콘크리트 3.89 + 거푸집 6.26 + 철근 5.54 + 덕트 0.78 + 배관 0.22 = <b>16.69억 원</b>(1층 1.80억, 2–10층 각 1.65억). 단가: 콘크리트 119,450원/m³, 거푸집 40,570원/m², 철근 1,417,000원/t(SiteBook 표 12-1, 교육용), 덕트 90,000원/m², 배관 70,000원/m(이 장의 교육용 가정).</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="mapping">
+    <h2>요소와 내역 항목의 연결</h2>
+    <div class="problem"><strong>벽 거푸집이 빠진 내역서</strong>
+      <p>5D 도구에서 벽 유형을 "콘크리트"와 "철근" 항목에만 연결하고 "거푸집"을 빠뜨렸습니다. 모델은 완벽해도 내역서에서 1.5억 원이 사라집니다. 이런 실수를 어떻게 찾을까요?</p></div>
+    <p>요소 유형마다 어떤 내역 항목이 붙어야 하는지는 정해져 있습니다. RC 부재는 콘크리트·거푸집·철근 세 항목, 덕트는 덕트 면적, 배관은 길이. 이 대응을 <span class="term">내역 연결</span><span class="en">(cost item mapping)</span>이라 하고, 실무에서는 <span class="term">분류 코드</span><span class="en">(classification code)</span>(3장)로 자동화합니다. 연결 검사는 9장의 연결 규칙 검사와 같은 생각입니다: 빠진 연결(누락), 단위가 맞지 않는 연결(덕트를 m³ 콘크리트로), 같은 물량을 두 항목에 넣는 <span class="term">이중 계상</span><span class="en">(double counting)</span>.</p>
+    <div class="sim" id="sim-fv-map">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>내역 연결 검사: 요소 유형 × 내역 항목 → 누락 · 불일치 · 금액 차이</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fv-cv-map" aria-label="올바른 연결 대비 현재 연결의 항목별 금액 막대"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시</span><div class="seg" id="fv-mp-pre"><button data-value="base" class="on">올바른 연결</button><button data-value="wall">벽 거푸집 누락</button><button data-value="duct">덕트→콘크리트</button><button data-value="bar">철근 누락</button></div></div>
+          <div class="table-wrap" style="margin:0"><table class="fv-map"><thead><tr><th>유형</th><th title="콘크리트 m³">콘</th><th title="거푸집 m²">거</th><th title="철근 t">철</th><th title="덕트 m²">덕</th><th title="배관 m">배</th></tr></thead><tbody id="fv-mp-body"></tbody></table></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">현재 연결 합계</span><span class="v" id="fv-mp-o-t">—</span></div>
+        <div class="stat"><span class="k">올바른 연결 대비</span><span class="v" id="fv-mp-o-d">—</span></div>
+        <div class="stat"><span class="k">누락 항목</span><span class="v" id="fv-mp-o-m">—</span></div>
+        <div class="stat"><span class="k">단위 · 공종 불일치</span><span class="v" id="fv-mp-o-u">—</span></div>
+      </div>
+      <div class="fv-msg" id="fv-mp-msg">—</div>
+      <div class="sim-note">해볼 것: "벽 거푸집 누락"은 1.28억 원(벽 거푸집 3,153 m²)을 잃습니다 · "덕트→콘크리트"는 덕트 상자 부피(층당 12.4 m³)를 콘크리트로 사고 철근까지 붙여 금액이 늘어납니다 — 상자 부피는 속이 빈 덕트의 물량이 아닙니다 · 슬래브의 철근만 빼도 약 2.9억 원이 사라집니다 · 칸(체크)을 직접 바꿔 보세요 · 모델: 정의 10.1·10.2, 허용 연결 = RC 부재(기둥·보·슬래브·벽) ↔ 콘크리트·거푸집·철근, 덕트 ↔ 덕트, 배관 ↔ 배관. 불일치 연결의 물량은 그 항목의 규칙을 요소 상자에 그대로 적용한 값(덕트의 "부피"는 상자 부피).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="bac-gap">
+    <h2>모델의 5D는 왜 244억이 아닌가</h2>
+    <div class="problem"><strong>16.7억과 244억</strong>
+      <p>발주자가 5D 화면을 보고 묻습니다. "모델에서 나온 공사비가 16.7억인데, 계약 금액이 왜 244억입니까?" 무엇이 빠져 있을까요?</p></div>
+    <p>모델의 5D 원가는 <b>모델에 있는 요소의 직접 공사비 일부</b>입니다. P-B10의 <span class="term">완료 시 예산</span><span class="en">(budget at completion, BAC)</span> 244.10억 원(SiteBook 12장)은 <span class="term">순공사비</span><span class="en">(net construction cost)</span> 220.08억 + <span class="term">일반관리비</span><span class="en">(general administrative expenses)</span> 12.10억 + <span class="term">이윤</span><span class="en">(profit)</span> 11.92억이고, 순공사비는 14개 활동의 모든 공종(가설·흙막이·굴착·기초·지하 골조·커튼월·설비 전체·마감·조경)과 각 공종의 간접비를 포함합니다. B-10 BIM에는 지상 골조와 설비 주관 두 줄만 있습니다. 골조 활동 G1 + G2(58억 원) 안에서도 모델이 아는 것은 콘크리트·거푸집·철근뿐이고, 동바리·양중·먹매김·검측·가설·현장 관리비는 없습니다.</p>
+    <figure class="diagram" id="fig-fv-gap">
+      <svg viewBox="0 0 860 330" role="img" aria-label="모델 5D 16.7억 원에서 골조 활동 58억, 순공사비 220억, BAC 244억으로 쌓이는 막대">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(70,30)">
+          <line x1="0" y1="250" x2="700" y2="250" class="s-axis"/>
+          <rect x="20" y="232.6" width="90" height="17.4" style="fill:var(--accent)"/>
+          <text x="65" y="222" text-anchor="middle" class="t-mono" style="font-size:12px">16.7</text>
+          <text x="65" y="270" text-anchor="middle" class="t-dim" style="font-size:12px">모델 5D</text>
+          <rect x="150" y="190.6" width="90" height="59.4" style="fill:var(--accent-2);opacity:.7"/>
+          <rect x="150" y="234" width="90" height="16" style="fill:var(--accent)"/>
+          <text x="195" y="180" text-anchor="middle" class="t-mono" style="font-size:12px">58 + 1.0</text>
+          <text x="195" y="270" text-anchor="middle" class="t-dim" style="font-size:12px">G1+G2 (+I 모델분)</text>
+          <rect x="280" y="24.6" width="90" height="225.4" style="fill:var(--text-dim);opacity:.45"/>
+          <rect x="280" y="190.6" width="90" height="59.4" style="fill:var(--accent-2);opacity:.7"/>
+          <text x="325" y="16" text-anchor="middle" class="t-mono" style="font-size:12px">220.08</text>
+          <text x="325" y="270" text-anchor="middle" class="t-dim" style="font-size:12px">순공사비</text>
+          <rect x="410" y="0" width="90" height="250" style="fill:var(--text-dim);opacity:.45"/>
+          <rect x="410" y="0" width="90" height="12.2" style="fill:var(--warn);opacity:.8"/>
+          <rect x="410" y="12.2" width="90" height="12.4" style="fill:var(--ok);opacity:.7"/>
+          <text x="455" y="-6" text-anchor="middle" class="t-mono" style="font-size:12px">244.10</text>
+          <text x="455" y="270" text-anchor="middle" class="t-dim" style="font-size:12px">BAC</text>
+          <g class="t-dim" style="font-size:12px">
+            <text x="530" y="10">이윤 11.92 · 일반관리비 12.10</text>
+            <text x="530" y="60">모델에 없는 공종</text>
+            <text x="530" y="78">A–F 69 · H 32 · I(나머지) 39</text>
+            <text x="530" y="96">K 3 · J 35 · L 5 · M 2</text>
+            <text x="530" y="180" style="fill:var(--accent-2)">골조 활동 중 모델에 없는 것</text>
+            <text x="530" y="198" style="fill:var(--accent-2)">동바리 · 양중 · 가설 · 관리 ≈ 42억</text>
+            <text x="530" y="238" style="fill:var(--accent)">모델 5D = 7 % of BAC</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-3.</b> 모델 5D와 계약 금액(억 원, 높이는 개략 비례). 모델 5D 16.7억 원 가운데 골조 부분 15.7억 원은 골조 활동비 58억의 약 27 %이고, 전체는 BAC의 약 7 %다. 활동 비용 배분(A 3 … M 2)은 SiteBook 9장의 교육용 값이며, 활동 배분은 관리비·이윤을 포함한 총원가를 나눈 것이라 순공사비 막대와 정확히 같은 기준은 아니다.</figcaption>
+    </figure>
+    <div class="callout warn"><strong>5D 숫자를 말할 때의 규칙</strong> ① 범위: 어떤 요소·공종이 들어 있나(모델의 범위 = 견적의 범위). ② 규칙: 공제·거푸집·철근을 어떻게 셌나. ③ 단가: 직접비 단가인가, 간접비·관리비가 얹힌 복합 단가인가. 이 셋을 밝히지 않은 5D 금액은 계약 금액과 비교할 수 없다. 모델에 없는 공종은 면적당 단가 같은 <span class="term">매개 변수 견적</span><span class="en">(parametric estimating)</span>(SiteBook 12장의 AACE 등급 형태)으로 채우고, 둘을 구분해 표시한다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="design-change">
+    <h2>설계 변경의 원가 델타</h2>
+    <div class="problem"><strong>상부 기둥을 600으로</strong>
+      <p>ConcreteBook은 5–10층 기둥을 600 × 600으로 줄일 수 있다고 했습니다(축력이 작아지므로). B-10 BIM은 전 층 800 × 800입니다. 6–10층 기둥만 600으로 줄이면 콘크리트·거푸집·철근은 얼마나 바뀌고, 보와 슬래브에는 어떤 영향이 갈까요?</p></div>
+    <p>모델에서 기둥 하나를 바꾸면 그 기둥만 바뀌는 것이 아닙니다. 기둥 면 사이의 보 순길이가 늘어 보 거푸집이 늘고, 기둥 바깥면까지 가는 슬래브 외곽이 줄고, 겹침 공제량도 바뀝니다. 손 적산에서는 이 연쇄를 놓치기 쉽지만, 규칙으로 계산하는 5D에서는 저절로 따라옵니다. 바뀐 금액의 차이를 <span class="term">원가 델타</span><span class="en">(cost delta)</span>라 하고, 설계 대안을 비교하는 <span class="term">가치 공학</span><span class="en">(value engineering, VE)</span> 검토의 출발점입니다.</p>
+    <figure class="diagram" id="fig-fv-delta">
+      <svg viewBox="0 0 860 280" role="img" aria-label="기둥 단면 변경이 기둥, 보, 슬래브, 공제의 물량으로 퍼지는 그림">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g text-anchor="middle">
+          <rect x="40" y="100" width="150" height="60" rx="10" class="f-acc-soft"/>
+          <text x="115" y="126" class="t" style="font-weight:700;fill:var(--accent)">기둥 c</text>
+          <text x="115" y="146" class="t-mono" style="font-size:11px">800 → 600 (6–10층)</text>
+          <rect x="280" y="30" width="230" height="44" rx="8" class="f-elev"/><text x="395" y="57" class="t-mono" style="font-size:12px">기둥 V −0.28c² 감소 · 둘레 거푸집 감소</text>
+          <rect x="280" y="88" width="230" height="44" rx="8" class="f-elev"/><text x="395" y="115" class="t-mono" style="font-size:12px">보 순길이 +0.2 m × 기둥 수 → 거푸집 증가</text>
+          <rect x="280" y="146" width="230" height="44" rx="8" class="f-elev"/><text x="395" y="173" class="t-mono" style="font-size:12px">슬래브 외곽 32.6 × 24.6 → V 감소</text>
+          <rect x="280" y="204" width="230" height="44" rx="8" class="f-elev"/><text x="395" y="231" class="t-mono" style="font-size:12px">벽∩기둥 공제 감소 → 벽 V 증가</text>
+          <rect x="600" y="100" width="220" height="60" rx="10" class="f-elev"/>
+          <text x="710" y="124" class="t" style="font-weight:700">ΔC ≈ −0.39억 원</text>
+          <text x="710" y="146" class="t-mono" style="font-size:11px">ΔV −97 m³ · ΔA −270 m²</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.4;fill:none">
+          <path d="M190 120L276 52" marker-end="url(#fv-ah)"/><path d="M190 126L276 110" marker-end="url(#fv-ah)"/><path d="M190 136L276 168" marker-end="url(#fv-ah)"/><path d="M190 146L276 224" marker-end="url(#fv-ah)"/>
+          <path d="M510 52L596 120" marker-end="url(#fv-ah)"/><path d="M510 110L596 126" marker-end="url(#fv-ah)"/><path d="M510 168L596 136" marker-end="url(#fv-ah)"/><path d="M510 226L596 146" marker-end="url(#fv-ah)"/>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-4.</b> 설계 변경의 전파. 한 매개 변수가 여러 요소의 물량을 바꾸고, 어떤 것은 늘고 어떤 것은 준다. 5D는 모든 요소를 같은 규칙으로 다시 세어 순 델타를 낸다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fv-change">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>설계 변경 원가 델타: 기둥 단면 · 슬래브 두께 · 보 춤 → 물량 · 금액 변화</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fv-cv-change" aria-label="기준안과 변경안의 공종별 금액 비교 막대와 델타"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>기둥 c × c <output id="fv-ch-c-out"></output></span><input type="range" id="fv-ch-c" min="600" max="1000" step="50" value="800"></label>
+          <label class="ctrl"><span>슬래브 두께 t <output id="fv-ch-t-out"></output></span><input type="range" id="fv-ch-t" min="150" max="300" step="10" value="210"></label>
+          <label class="ctrl"><span>큰보 춤 h (슬래브 포함) <output id="fv-ch-h-out"></output></span><input type="range" id="fv-ch-h" min="500" max="900" step="50" value="700"></label>
+          <div class="ctrl"><span>적용 층</span><div class="seg" id="fv-ch-sc"><button data-value="all" class="on">전 층</button><button data-value="up">6–10층만</button></div></div>
+          <div class="btn-row"><button class="btn" id="fv-ch-cb">ConcreteBook 안: 6–10층 기둥 600</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">Δ 콘크리트</span><span class="v" id="fv-ch-o-v">—</span></div>
+        <div class="stat"><span class="k">Δ 거푸집</span><span class="v" id="fv-ch-o-a">—</span></div>
+        <div class="stat"><span class="k">Δ 철근</span><span class="v" id="fv-ch-o-w">—</span></div>
+        <div class="stat"><span class="k">Δ 금액 (5D)</span><span class="v" id="fv-ch-o-c">—</span></div>
+      </div>
+      <div class="fv-msg" id="fv-ch-msg">—</div>
+      <div class="sim-note">해볼 것: 버튼(6–10층 기둥 600)에서 콘크리트 −97 m³, 거푸집 −270 m², 금액 약 −0.39억 원 · 전 층 600이면 약 −0.80억 원이지만 하부 층의 구조 안전(ConcreteBook)이 먼저입니다 · 슬래브를 180으로 줄이면 콘크리트는 212 m³ 줄지만 보 웨브(h − t)가 깊어져 거푸집은 110 m² 늘어납니다 — 공종마다 방향이 다릅니다 · 보 춤을 줄이면 물량은 줄지만 처짐·내력(StructureBook)과 덕트 간섭(6장)을 함께 봐야 합니다 — 덕트–보 하드 간섭 수를 메시지에서 확인하세요 · 모델: 변경안은 <code>CB.bim.model()</code>의 상자를 매개 변수로 다시 만든 것(기둥 상자, 보 높이 z₁ − h … z₁ − t, 슬래브 외곽 = 기둥 바깥면), 물량은 정의 10.2, 단가는 기본값. 구조 검토는 하지 않는다.</div>
+    </div>
+    <div class="callout"><strong>예제 10.2 (6–10층 기둥 600의 원가 델타)</strong> 정의 10.2, 기본 단가, 6–10층 기둥 50개.
+      <p><b>① 기둥</b> 부피 \(50 \times (0.8^2 - 0.6^2)\times3.3 = 46.2\) m³ 감소, 둘레 거푸집 \(50 \times 4 \times 0.2 \times 3.3 = 132\) m² 감소.</p>
+      <p><b>② 보·슬래브·벽</b> 보 순길이는 기둥 하나에 0.2 m씩 늘어 거푸집이 늘고, 슬래브 외곽은 32.6 × 24.6 m로 줄어 콘크리트가 준다. 기둥과 겹치던 벽의 공제가 줄어 벽 부피는 조금 는다. 5D 합계: 콘크리트 −97.0 m³, 거푸집 −270 m², 철근 −11.6 t.</p>
+      <p><b>③ 금액</b> \(-97.0\times119{,}450 - 270\times40{,}570 - 11.6\times1{,}417{,}000 \approx -0.39\)억 원(모델 5D의 −2.3 %).</p>
+      <p><b>④ 판단</b> 손으로는 ①만 세기 쉽다. ①만 세면 −46 m³로 절반을 놓친다(슬래브 외곽의 감소가 더 크다). 다만 실제 변경에서는 외곽 슬래브를 기둥 바깥면에 맞출지 경계선에 둘지가 설계 의도의 문제이므로, 물량 규칙이 설계 의도를 반영하는지 확인한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="cash-flow">
+    <h2>4D + 5D: 요소로 만든 현금 흐름</h2>
+    <div class="problem"><strong>골조 공사비는 언제 나가나</strong>
+      <p>SiteBook 12장은 활동 비용을 기간에 고르게 나누어(<code>CB.pm.spread</code>) <span class="term">S 곡선</span><span class="en">(S-curve)</span>을 만들었습니다. G1 30억은 38–53주에 주당 2억씩입니다. 그런데 실제로는 1층(층고 5 m)이 더 비싸고, 한 층 안에서도 기둥·벽이 먼저, 슬래브가 나중에 완료됩니다. 요소의 완료 시점과 금액으로 곡선을 만들면 무엇이 달라질까요?</p></div>
+    <p>9장의 4D가 요소마다 \([s_e, f_e]\)를 주고, 이 장의 5D가 요소마다 \(C_e\)를 줍니다. 둘을 곱하면 요소 단위의 <span class="term">현금 흐름</span><span class="en">(cash flow)</span>이 됩니다. 요소의 금액을 언제 인정하는지(<span class="term">진도 인정 규칙</span><span class="en">(progress credit rule)</span>)는 SiteBook 13장의 0/100·물량 비례와 같습니다.</p>
+    <div class="callout def"><strong>정의 10.3 (요소 기반 누적 원가)</strong>
+      <div class="formula">$$C(w) = \sum_{e} C_e\, g_e(w), \qquad g_e(w) = \begin{cases} \mathbf{1}[\,w \ge f_e\,] & \text{(0/100, 완료 시 인정)} \\ \mathrm{clamp}\!\left(\dfrac{w - s_e}{f_e - s_e},\ 0,\ 1\right) & \text{(진행 비례)} \end{cases}$$<div class="where">\(s_e, f_e\): 9장 정의 9.3의 요소 일정. 활동 기반 곡선은 \(\sum_X c_X\,\mathrm{clamp}((w - ES_X)/d_X, 0, 1)\)(<code>CB.pm.spread</code>)로, 활동 안에서 균등하다.</div></div></div>
+    <figure class="diagram" id="fig-fv-scurve">
+      <svg viewBox="0 0 860 300" role="img" aria-label="활동 균등 분배 직선과 요소 완료 계단으로 만든 누적 원가 곡선 비교">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(80,30)">
+          <line x1="0" y1="220" x2="460" y2="220" class="s-axis"/><line x1="0" y1="220" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 220L460 0" style="stroke:var(--text-dim);stroke-width:2;stroke-dasharray:6 4;fill:none"/>
+          <path d="M0 220H14V208H46V196H46V196H60V184H92V172H106V160H138V148H152V136H184V124H198V112H230V100H244V88H276V76H290V64H322V52H336V40H368V28H382V16H414V8H460V0" style="stroke:var(--accent);stroke-width:2.4;fill:none"/>
+          <g class="t-mono" text-anchor="middle" style="font-size:11px"><text x="0" y="236">38</text><text x="230" y="236">53</text><text x="460" y="236">68주</text></g>
+          <text x="-10" y="4" text-anchor="end" class="t-mono" style="font-size:11px">100 %</text>
+          <text x="250" y="160" class="t-mono" style="fill:var(--text-dim);font-size:12px">활동 균등 (spread)</text>
+          <text x="40" y="90" class="t-mono" style="fill:var(--accent);font-size:12px">요소 0/100 (층마다 두 계단)</text>
+        </g>
+        <g transform="translate(600,50)" class="t-dim" style="font-size:13px">
+          <text x="0" y="0" class="t" style="font-weight:700">비율로 보면 거의 같다</text>
+          <text x="0" y="26">50주: 요소 40.6 % · 활동 41.4 %</text>
+          <text x="0" y="50">계단: 기둥·벽 완료(0.3Δ)</text>
+          <text x="0" y="70">→ 보·슬래브 완료(Δ)</text>
+          <text x="0" y="104" class="t" style="font-weight:700">금액으로 보면 다르다</text>
+          <text x="0" y="128">모델 골조 15.7억 vs G1+G2 58억</text>
+          <text x="0" y="148">1층이 기준층보다 9 % 비싸다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-5.</b> 요소 기반 S 곡선(개략). 정규화하면 활동 균등 배분과 거의 같지만, 요소 곡선은 층마다 계단을 가지며 1층이 크다. 활동 배분 58억과 모델 16억의 차이는 10.4절의 범위 차이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fv-cash">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>4D + 5D 현금 흐름: 요소 완료 × 금액 → S 곡선, <code>CB.pm.spread</code>와 비교</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fv-cv-cash" aria-label="요소 기반 누적 원가와 활동 기반 누적 원가, 주별 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>주 w <output id="fv-cs-w-out"></output></span><input type="range" id="fv-cs-w" min="30" max="93" step="1" value="50"></label>
+          <div class="ctrl"><span>진도 인정</span><div class="seg" id="fv-cs-g"><button data-value="z" class="on">0/100</button><button data-value="lin">진행 비례</button></div></div>
+          <div class="ctrl"><span>일정 기준</span><div class="seg" id="fv-cs-b"><button data-value="ES" class="on">ES</button><button data-value="LS">LS</button></div></div>
+          <div class="ctrl"><span>표시</span><div class="seg" id="fv-cs-u"><button data-value="pct" class="on">비율 %</button><button data-value="won">금액 억</button></div></div>
+          <div class="ctrl"><span>범위</span><div class="seg" id="fv-cs-r"><button data-value="g" class="on">골조 G1·G2</button><button data-value="gi">+ 설비 I</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">요소 기반 누적</span><span class="v" id="fv-cs-o-m">—</span></div>
+        <div class="stat"><span class="k">활동 기반 누적 (spread)</span><span class="v" id="fv-cs-o-a">—</span></div>
+        <div class="stat"><span class="k">이번 주 요소 원가</span><span class="v" id="fv-cs-o-p">—</span></div>
+        <div class="stat"><span class="k">모델 / 활동 총액</span><span class="v" id="fv-cs-o-r">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 비율로 보면 50주에 요소 40.6 %, 활동 41.4 %로 거의 같습니다 — 골조는 층마다 같은 구성의 반복이기 때문입니다 · 막대(주별 요소 원가)는 매 층 두 번 뛰는 계단입니다: 기둥·벽 완료 주와 보·슬래브 완료 주. 현금은 매끈하게 나가지 않습니다 · "금액 억"으로 바꾸면 모델 15.7억과 활동 58억의 차이가 보입니다 · "+ 설비 I"를 고르면 활동 쪽(40억, 30주 균등)과 모델 쪽(덕트·배관 1.0억)이 크게 갈라집니다 — 설비는 모델의 범위가 특히 좁습니다 · LS 기준이면 G2의 1주 여유만큼 오른쪽으로 · 모델: 정의 10.3, 요소 일정 = 9장 정의 9.3(<code>CB.pm.cpm(CB.pm.B10)</code>), 활동 곡선 = <code>CB.pm.spread([G1, G2(, I)], r, "cost", 기준, 93)</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 10.3 (50주의 두 곡선)</strong> ES 기준, 0/100.
+      <p><b>① 요소</b> 50주에 1–4층 골조 완료(4층 슬래브 50주). 골조 3공종은 1층 1.70억, 기준층 1.55억(덕트·배관 제외)이므로 \(C = 1.70 + 3\times1.55 = 6.36\)억, 골조 모델 합 15.69억의 40.6 %.</p>
+      <p><b>② 활동</b> G1 30억 × (50 − 38)/15 = 24.0억, 58억의 41.4 %.</p>
+      <p><b>③ 판단</b> 비율 차이는 0.8 %p로 작다. 반복 층 골조에서는 활동 균등 배분이 좋은 근사다. 그러나 요소 곡선은 "어떤 요소가 끝나서 이 돈을 인정하는가"를 요소 목록으로 보여 줄 수 있고, 이것이 다음 절의 기성 증빙이 된다. 금액 크기는 58억의 27 %뿐이므로 현금 계획 전체는 여전히 활동 배분으로 한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="alternatives">
+    <h2>대안 비교: RC 골조와 철골 골조</h2>
+    <div class="problem"><strong>골조비는 늘고 공기는 준다</strong>
+      <p>SiteBook 7장은 B-10을 철골조 B-10S로 바꾸면 골조가 층당 1주로 빨라져 공기가 93주에서 83주로 줄지만 골조비가 늘어난다고 했습니다. 모델의 물량으로 두 안을 같은 기준에서 비교하면 어떤 결론이 나올까요?</p></div>
+    <p>대안 비교는 5D와 4D를 함께 써야 합니다. 직접비는 물량 × 단가로, 공기는 CPM으로, 공기에 비례하는 <span class="term">간접비</span><span class="en">(indirect cost)</span>(현장 관리비·가설·장비 임대)는 주당 금액으로 셉니다. 철골안의 물량은 모델의 축선(기둥 높이, 큰보 길이)에 SiteBook 7장의 단면(기둥 H-400×400 172 kg/m → 137 → 94, 큰보 H-600×200 106 kg/m)을 곱하고 부속 12 %를 더해 얻습니다. 모델에 없는 작은보·가새는 할증으로 넣습니다. 바닥은 <span class="term">데크 합성 슬래브</span><span class="en">(composite deck slab)</span>로 바꾸고, 강재에는 <span class="term">내화 피복</span><span class="en">(fire protection)</span>을 더합니다.</p>
+    <figure class="diagram" id="fig-fv-alt">
+      <svg viewBox="0 0 860 300" role="img" aria-label="RC 골조와 철골 골조의 구성 요소와 비교 기준">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">RC (B-10 BIM)</text>
+          <rect x="20" y="30" width="260" height="18" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="40" y="48" width="18" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="141" y="48" width="18" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="242" y="48" width="18" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="58" y="48" width="83" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="159" y="48" width="83" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <text x="150" y="186" text-anchor="middle" class="t-mono" style="font-size:12px">콘크리트 · 거푸집 · 철근</text>
+          <text x="150" y="206" text-anchor="middle" class="t-mono" style="font-size:12px">층 사이클 3주 → 93주</text>
+        </g>
+        <g transform="translate(360,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">철골 (B-10S, 교육용)</text>
+          <rect x="20" y="30" width="260" height="10" style="fill:var(--accent);opacity:.3;stroke:var(--accent)"/>
+          <path d="M20 40H280" style="stroke:var(--accent);stroke-width:1;stroke-dasharray:3 2"/>
+          <g style="stroke:var(--accent-2);stroke-width:5"><line x1="49" y1="42" x2="49" y2="158"/><line x1="150" y1="42" x2="150" y2="158"/><line x1="251" y1="42" x2="251" y2="158"/></g>
+          <g style="stroke:var(--accent-2);stroke-width:4"><line x1="49" y1="46" x2="251" y2="46"/></g>
+          <text x="150" y="186" text-anchor="middle" class="t-mono" style="font-size:12px">강재 t · 데크 합성 슬래브 m² · 내화 피복</text>
+          <text x="150" y="206" text-anchor="middle" class="t-mono" style="font-size:12px">층 사이클 1주 → 83주(H가 주공정)</text>
+        </g>
+        <g transform="translate(680,60)" class="t-dim" style="font-size:13px">
+          <text x="0" y="0" class="t" style="font-weight:700">공통(비교에서 상쇄)</text>
+          <text x="0" y="24">코어 벽 RC</text>
+          <text x="0" y="44">설비 · 지하 · 기초</text>
+          <text x="0" y="78" class="t" style="font-weight:700">순 차이</text>
+          <text x="0" y="102">Δ직접비 + ΔT × 간접비</text>
+          <text x="0" y="122">(조기 사용 가치 제외)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 10-6.</b> 두 대안의 비교 기준. 같은 모델의 축선과 슬래브 면적에서 RC 물량과 철골 물량을 각각 만든다. 코어 벽처럼 두 안에 공통인 것은 차이에서 빠진다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fv-alt">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>RC vs 철골 대안: 모델 물량 × 단가 + CPM 공기 × 간접비 (교육용)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fv-cv-alt" aria-label="RC와 철골 대안의 직접비 구성 막대와 공기 비교"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>철골 단가 (원/t, 제작·운반·세우기) <output id="fv-al-s-out"></output></span><input type="range" id="fv-al-s" min="2000000" max="3600000" step="50000" value="2800000"></label>
+          <label class="ctrl"><span>작은보 · 가새 할증 <output id="fv-al-x-out"></output></span><input type="range" id="fv-al-x" min="0" max="30" step="1" value="18"></label>
+          <label class="ctrl"><span>철골 층 사이클 <output id="fv-al-c-out"></output></span><input type="range" id="fv-al-c" min="0.5" max="3" step="0.5" value="1"></label>
+          <label class="ctrl"><span>주당 간접비 <output id="fv-al-i-out"></output></span><input type="range" id="fv-al-i" min="0" max="0.6" step="0.05" value="0.3"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">철골량</span><span class="v" id="fv-al-o-t">—</span></div>
+        <div class="stat"><span class="k">Δ직접비 (철골 − RC)</span><span class="v" id="fv-al-o-d">—</span></div>
+        <div class="stat"><span class="k">공기 RC / 철골</span><span class="v" id="fv-al-o-T">—</span></div>
+        <div class="stat"><span class="k">순 차이 (간접비 포함)</span><span class="v" id="fv-al-o-n">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 철골 약 490 t(SiteBook 7장의 어림 490 t), 직접비 차이 약 +8.8억 원, 공기 93 → 83주, 순 차이 약 +5.8억 원 — SiteBook 7장의 "골조비 +15 %(8.7억) − 간접비 3억 = +5.7억"과 같은 크기가 되도록 교육용 단가를 골랐습니다 · 층 사이클을 0.5주로 줄여도 공기는 83주 그대로입니다(커튼월 H가 주공정) · 주당 간접비가 약 0.88억 원을 넘거나 조기 사용 가치를 더하면 철골이 유리해집니다 · 모델: 철골량 = 기둥(1–3층 172, 4–6층 137, 7–10층 94 kg/m × 층고) + 큰보(106 kg/m × 248 m/층) × 1.12 × (1 + 할증), 데크 합성 슬래브 = 모델 슬래브 면적 8,134 m² × 78,500원/m², 내화 피복 230,000원/t, 철골 단가 모두 교육용 가정. 공기는 <code>CB.pm.cpm</code>: G1·G2 → S1·S2(사이클 × 5), S0 제작 16주(A 뒤), FP 내화 피복 6주(S2 뒤), H ← S1, J ← S2·H·FP(SiteBook 7장과 같은 망).</div>
+    </div>
+    <div class="callout"><strong>예제 10.4 (B-10S의 5D 비교)</strong> 기본값.
+      <p><b>① 철골량</b> 기둥 \(20\times(13\times172 + 12\times137 + 16\times94) = 107.7\) t, 큰보 \(10\times248\times106 = 262.9\) t, \((107.7 + 262.9)\times1.12\times1.18 = 489.7\) t.</p>
+      <p><b>② 직접비</b> RC(기둥·보·슬래브, 벽 제외) 12.45억. 철골 489.7 t × 280만 원 = 13.71억, 데크 8,134 m² × 7.85만 원 = 6.39억, 내화 489.7 t × 23만 원 = 1.13억 → 21.23억. 차이 +8.78억.</p>
+      <p><b>③ 공기와 간접비</b> 철골 S1 38–43, S2 43–48, H 43–59, J 59–79, M 79–83 → 83주. \(-10 \times 0.3 = -3.0\)억.</p>
+      <p><b>④ 판단</b> 순 +5.8억 원으로 RC가 싸다. 철골을 정당화하는 것은 10주 빠른 사용 수익, 가벼운 골조의 기초 절감, 숙련 인력 위험 같은 모델 밖의 가치다(SiteBook 7장). 5D가 계산하는 것은 비교의 공통 부분이고, 판단은 그 밖을 더한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="billing">
+    <h2>기성 산정: 완료 요소로 청구하기</h2>
+    <div class="problem"><strong>50주 기성 청구서</strong>
+      <p>시공자는 4주마다 그동안 한 일만큼 <span class="term">기성</span><span class="en">(progress payment)</span>을 청구합니다. 감리자는 "이만큼 했다"는 증빙을 요구합니다. 활동 진도 % 대신 완료된 모델 요소의 목록과 물량을 증빙으로 쓰면 어떨까요?</p></div>
+    <p>5D 모델은 기성에 두 가지를 줍니다. 첫째, <b>물량 근거</b>: 완료 요소의 물량 × 계약 단가가 곧 기성액이고, 요소 목록(GUID)이 증빙이다. 둘째, <b>계획과 비교</b>: 같은 규칙으로 계획 일정의 기성을 만들면 9장의 늦은 요소가 곧 덜 청구한 금액이다. 청구액의 일부를 하자 담보로 남기는 <span class="term">유보금</span><span class="en">(retention)</span>(해외·민간 계약 형태, SiteBook 12장)을 빼면 실제 지급액이 된다. 실제 기성 검사와 지급 기한은 계약 조건과 현행 법령·예규를 따른다.</p>
+    <div class="sim" id="sim-fv-billing">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>기성 산정: 주 → 완료 요소 금액 = 기성 (계획 vs 50주 지연 시나리오)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fv-cv-bill" aria-label="4주 청구 회차별 기성 막대와 누적 기성 곡선, 계획과 실적"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>상태 기준일 w <output id="fv-bl-w-out"></output></span><input type="range" id="fv-bl-w" min="36" max="76" step="1" value="50"></label>
+          <div class="ctrl"><span>진도 인정</span><div class="seg" id="fv-bl-g"><button data-value="z" class="on">완료 요소(0/100)</button><button data-value="lin">진행 비례</button></div></div>
+          <label class="ctrl"><span>청구 주기 <output id="fv-bl-p-out"></output></span><input type="range" id="fv-bl-p" min="1" max="8" step="1" value="4"></label>
+          <label class="ctrl"><span>유보율 <output id="fv-bl-r-out"></output></span><input type="range" id="fv-bl-r" min="0" max="10" step="1" value="5"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기성 누계 (실적 · 청구 기준)</span><span class="v" id="fv-bl-o-a">—</span></div>
+        <div class="stat"><span class="k">계획 기성 누계</span><span class="v" id="fv-bl-o-p">—</span></div>
+        <div class="stat"><span class="k">이번 회차 청구 → 지급</span><span class="v" id="fv-bl-o-n">—</span></div>
+        <div class="stat"><span class="k">증빙 요소 수</span><span class="v" id="fv-bl-o-e">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 50주(진도 인정 0/100)에서 실적 기성 3.97억 원, 계획 6.76억 원 — 9장의 지연 요소 48개가 2.79억 원어치입니다 · 실적/계획 = 0.59로, 9장의 요소 수 비(0.67)보다 나쁩니다: 늦은 것이 금액이 큰 슬래브이기 때문입니다 · 청구는 회차 끝에만 일어나므로 누적 청구 곡선(계단)은 실적보다 뒤에 있습니다 · "진행 비례"는 기성을 빨리 인정하지만 증빙이 약합니다(진행 중 요소의 % 판단) · 모델: 계획 = <code>CB.pm.cpm(CB.pm.B10)</code> ES, 실적 = SiteBook 13장 시나리오(G1 42, G2 57, I 42주 시작), 요소 금액 = 정의 10.1(기본 단가, 직접비만), 청구 = 회차 끝 누계 − 이전 청구, 지급 = 청구 × (1 − 유보율).</div>
+    </div>
+    <div class="callout"><strong>예제 10.5 (48–52주 회차의 기성)</strong> 청구 주기 4주(회차 끝 44, 48, 52주), 0/100, 유보 5 %.
+      <p><b>① 실적 누계</b> 48주: 1층 + 2층 = 3.46억. 52주: 1–3층 + 4층 기둥·벽 = 5.63억(3층 슬래브 51주, 4층 기둥·벽 51.9주 완료).</p>
+      <p><b>② 이번 회차 청구</b> \(5.63 - 3.46 = 2.17\)억 원, 지급 \(2.17\times0.95 = 2.06\)억 원(유보 0.11억).</p>
+      <p><b>③ 계획 비교</b> 계획 52주 누계 7.28억(1–4층 + 5층 기둥·벽) → 실적은 1.65억 원(꼭 한 층) 모자란다.</p>
+      <p><b>④ 판단</b> 요소 기반 기성은 늦은 만큼 정확히 덜 청구된다. 증빙은 3층 요소 34개의 GUID와 물량 목록이며, 11장의 현장 스캔과 대조하면 "완료"의 판정도 자동화할 수 있다. 모델 범위 밖(동바리·양중·관리)의 기성은 여전히 활동 진도로 청구한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="cost-map">
+    <h2>원가 3D 히트맵</h2>
+    <p>표는 합계를 잘 보여 주지만 "돈이 어디에 몰려 있는가"는 모델 위에 칠해야 보입니다. 요소를 금액으로 칠하면 슬래브가 압도적이고, m³당 금액으로 칠하면 거푸집이 많은 얇은 부재(보)가 비싸며, 거푸집 비중으로 칠하면 원가를 줄일 곳(거푸집 전용, 시스템 거푸집 — SiteBook 6장)이 드러납니다. 같은 모델, 다른 질문, 다른 그림입니다.</p>
+    <div class="sim" id="sim-fv-heat">
+      <div class="sim-head"><span class="sim-tag three">3D</span><h3>원가 3D 히트맵: 요소를 금액 · 단위 금액 · 거푸집 비중으로 칠하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fv-cv-heat" aria-label="B-10 요소를 원가 지표로 색칠한 3D 장면과 색 범례"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>지표</span><div class="seg" id="fv-ht-m"><button data-value="c" class="on">요소 금액(로그)</button><button data-value="u">m³당 금액</button><button data-value="f">거푸집 비중</button></div></div>
+          <label class="ctrl"><span>보이는 층 (1층부터) <output id="fv-ht-k-out"></output></span><input type="range" id="fv-ht-k" min="1" max="10" step="1" value="10"></label>
+          <div class="ctrl"><span>슬래브</span><div class="seg" id="fv-ht-s"><button data-value="on" class="on">보이기</button><button data-value="off">숨기기</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">보이는 요소 합계</span><span class="v" id="fv-ht-o-t">—</span></div>
+        <div class="stat"><span class="k">최대 요소</span><span class="v" id="fv-ht-o-m" style="font-size:14px">—</span></div>
+        <div class="stat"><span class="k">지표 범위</span><span class="v" id="fv-ht-o-r" style="font-size:14px">—</span></div>
+        <div class="stat"><span class="k">상위 10 % 요소의 금액 몫</span><span class="v" id="fv-ht-o-p">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 끌어서 돌려 보세요 · "요소 금액"에서 슬래브(층당 약 0.79억)가 가장 밝고, 기둥(약 93만 원)이 가장 어둡습니다 — 상위 10 %의 요소가 금액의 절반을 넘습니다(파레토) · 슬래브를 숨기면 보와 벽의 차이가 보입니다 · "m³당 금액"에서 보(약 55만 원/m³)가 슬래브(약 46만 원/m³)보다 비쌉니다 — 거푸집이 많은 얇은 부재 · "거푸집 비중"이 높은 요소가 거푸집 전용·시스템 거푸집 검토 대상입니다 · 덕트·배관은 m³당·거푸집 지표에서 회색 · 모델: 정의 10.1·10.2, 기본 단가, 색은 viridis(<code>CB.colormap</code>).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="sensitivity">
+    <h2>단가 민감도와 5D의 정확도</h2>
+    <div class="problem"><strong>무엇을 더 정확히 알아야 하나</strong>
+      <p>모델 5D 16.69억 원은 단가 다섯 개, 원단위 하나, 생산성 하나, 물량 규칙 하나에 기대고 있습니다. 모두 ±20 % 불확실하다면 어느 것이 결과를 가장 크게 흔들까요?</p></div>
+    <p>한 번에 한 입력만 낮은 값·높은 값으로 바꾸고 결과의 변화를 막대로 그려 큰 것부터 쌓으면 깔때기 모양이 됩니다. 이것이 <span class="term">토네이도 차트</span><span class="en">(tornado chart)</span>이고, 한 번에 하나씩 바꾸는 <span class="term">민감도 분석</span><span class="en">(sensitivity analysis)</span>의 표준 그림입니다(SiteBook 10장은 공기의 불확실성을 같은 그림으로 보았다). 위쪽 막대의 입력이 견적에서 가장 공들여 확인할 항목입니다.</p>
+    <div class="sim" id="sim-fv-tornado">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>단가 민감도 토네이도: 입력 ±범위 → 모델 5D 합계의 변화</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fv-cv-tor" aria-label="입력별 낮은 값과 높은 값에서의 합계 변화를 큰 순서로 쌓은 토네이도 차트"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>입력 변동 범위 ± <output id="fv-tr-r-out"></output></span><input type="range" id="fv-tr-r" min="5" max="40" step="5" value="20"></label>
+          <div class="ctrl"><span>물량 규칙 항목</span><div class="seg" id="fv-tr-q"><button data-value="on" class="on">포함(상자 합)</button><button data-value="off">제외</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기준 합계</span><span class="v" id="fv-tr-o-b">—</span></div>
+        <div class="stat"><span class="k">가장 큰 입력</span><span class="v" id="fv-tr-o-t" style="font-size:14px">—</span></div>
+        <div class="stat"><span class="k">그 폭 (높음 − 낮음)</span><span class="v" id="fv-tr-o-s">—</span></div>
+        <div class="stat"><span class="k">하위 3개 폭 합</span><span class="v" id="fv-tr-o-l">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: ±20 %에서 거푸집 단가(약 ±1.25억)가 맨 위, 철근 단가·철근 원단위·거푸집 생산성이 뒤를 잇습니다 — 생산성 막대는 비대칭입니다(산출량이 20 % 줄면 노무·장비비가 25 % 늘고, 20 % 늘면 17 % 준다) · 철근 단가와 철근 원단위는 같은 폭입니다(곱으로 들어가니까) · 배관·덕트 단가는 거의 보이지 않습니다 — 모델에 작은 몫이기 때문이지 설비가 싸다는 뜻이 아닙니다(10.4절) · "물량 규칙"은 공제 후 → 상자 합으로 바꿀 때의 한쪽 변화(+0.38억)입니다 · 모델: 정의 10.1·10.2, 거푸집 생산성은 SiteBook 표 12-1의 거푸집 일위대가(재료 9,000 + (노무 2,140,000 + 장비 70,000)/70 m²/일)에서 산출량만 ±.</div>
+    </div>
+    <div class="callout tip"><strong>5D의 정확도는 세 층의 정확도의 곱</strong> ① 모델의 범위와 상세(LOD, 4장 — 코어 개구부를 그렸나), ② 물량 규칙(7장 — 공제·거푸집·할증), ③ 단가(SiteBook 12장 — 일위대가와 생산성). 5D 도구가 정확히 하는 것은 곱셈뿐이다. 견적 등급(SiteBook 12장의 AACE 형태)은 5D를 써도 설계 성숙도가 정한다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 정보가 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="four-d.html"><small>CH.09 · 4D 공정 시뮬레이션</small>요소 일정 [s, f]<br><span>4D의 완료 시점이 현금 흐름과 기성의 시간축이다.</span></a>
+      <a href="qto.html"><small>CH.07 · 모델 기반 물량 산출</small>공제와 거푸집 규칙<br><span>물량 규칙이 바뀌면 5D 금액이 바뀐다.</span></a>
+      <a href="lod.html"><small>CH.04 · LOD와 정보 요구 사항</small>모델의 상세와 범위<br><span>모델에 없는 것은 견적에도 없다.</span></a>
+      <a href="computational.html"><small>CH.16 · 계산 설계와 AI</small>원가를 목적 함수로<br><span>그리드 최적화의 비용 항이 5D다.</span></a>
+      <a href="../../site/chapters/estimating.html"><small>SiteBook CH.12 · 적산과 원가 관리</small>일위대가와 원가 구성<br><span>단가 119,450 · 40,570 · 1,417,000원과 BAC 244억.</span></a>
+      <a href="../../site/chapters/steel-erection.html"><small>SiteBook CH.07 · 철골 공사</small>B-10S와 공기<br><span>철골 490 t, 83주, 순 +5.7억의 출처.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>5D = 요소 → 물량 규칙 → 내역 항목 → 단가 → 금액. \(C = \sum_e \sum_i m_{e,i} q_i(e) p_i\). 자동인 것은 곱셈과 재계산이고, 규칙과 단가는 사람이 정한다.</li>
+      <li>B-10 BIM(정의 10.2): 공제 후 콘크리트 3,259 m³(상자 합에서 131 m³ 공제), 거푸집 15,422 m², 철근 391 t → 16.69억 원(거푸집 6.26 &gt; 철근 5.54 &gt; 콘크리트 3.89 &gt; 덕트 0.78 &gt; 배관 0.22).</li>
+      <li>기준층 3공종 1.55억(7장과 같다) vs SiteBook 1.38억: 차이는 공제가 아니라 모델 형상(닫힌 코어 벽 48 m, 슬래브 외곽, 기둥 높이). "어떤 모델, 어떤 규칙"을 밝힌다.</li>
+      <li>내역 연결 검사: 누락(벽 거푸집 −1.28억), 단위 불일치(덕트 상자 부피를 콘크리트로), 이중 계상.</li>
+      <li>모델 5D 16.7억 ≠ BAC 244.10억(순공사비 220.08 + 일반관리비 12.10 + 이윤 11.92). 모델의 골조 부분은 골조 활동 58억의 27 %, 전체는 BAC의 7 %. 범위·규칙·단가를 함께 말한다.</li>
+      <li>설계 변경의 델타는 연쇄된다: 6–10층 기둥 600 → 콘크리트 −97 m³(기둥만이면 −46), 약 −0.39억 원. 슬래브를 얇게 하면 콘크리트는 줄고 거푸집은 는다.</li>
+      <li>4D + 5D: \(C(w) = \sum_e C_e g_e(w)\). 반복 층 골조에서는 활동 균등 배분과 비율이 거의 같지만(50주 40.6 vs 41.4 %), 요소 목록이 기성의 증빙이 된다. 50주 기성 실적 3.97 vs 계획 6.76억.</li>
+      <li>RC vs 철골: 철골 약 490 t, Δ직접비 +8.8억, 공기 93 → 83주, 간접비 −3.0억 → 순 +5.8억(교육용). 토네이도에서는 거푸집 단가가 가장 크다(거푸집이 5D의 약 37 %).</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 5D BIM에서 모델이 스스로 결정하지 <b>않는</b> 것은?</p><div class="opts">
+        <button class="opt">요소의 부피</button><button class="opt">층별 요소 수</button><button class="opt" data-correct>내역 항목의 단가</button><button class="opt">설계 변경 뒤 바뀐 수량</button>
+      </div><div class="quiz-exp">단가는 일위대가·시장 가격·생산성에 대한 견적자의 판단이다. 모델은 물량을 주고 곱셈을 다시 할 뿐이다.</div></div>
+      <div class="quiz-q"><p>2. 슬래브 콘크리트 170.8 m³의 금액은(단가 119,450원/m³)?</p><div class="opts">
+        <button class="opt">약 0.02억 원</button><button class="opt" data-correct>약 0.20억 원</button><button class="opt">약 2.0억 원</button><button class="opt">약 0.79억 원</button>
+      </div><div class="quiz-exp">\(170.8\times119{,}450 = 20{,}402{,}000\)원 ≈ 0.20억 원. 0.79억 원은 거푸집·철근까지 더한 슬래브 요소 전체 금액이다.</div></div>
+      <div class="quiz-q"><p>3. 모델 5D가 약 16.7억 원인데 BAC가 244억 원인 이유로 가장 알맞은 것은?</p><div class="opts">
+        <button class="opt">모델의 공제 규칙이 틀려서</button><button class="opt">단가가 너무 낮아서</button><button class="opt" data-correct>모델에 없는 공종·간접 항목과 관리비·이윤이 BAC에 포함되어 있어서</button><button class="opt">4D 일정이 늦어서</button>
+      </div><div class="quiz-exp">모델은 지상 골조와 설비 주관만 가진다. 가설·지하·커튼월·마감, 골조의 동바리·양중·관리, 일반관리비 12.10억·이윤 11.92억은 모델 밖이다.</div></div>
+      <div class="quiz-q"><p>4. 기둥을 800에서 600으로 줄이면 큰보의 거푸집은?</p><div class="opts">
+        <button class="opt">기둥과 함께 줄어든다</button><button class="opt" data-correct>기둥 면 사이 순길이가 늘어 조금 늘어난다</button><button class="opt">변하지 않는다</button><button class="opt">0이 된다</button>
+      </div><div class="quiz-exp">보 거푸집은 기둥 면 사이 순길이에 비례한다. 기둥이 줄면 순길이가 기둥 하나에 0.2 m씩 는다 — 설계 변경의 연쇄 효과.</div></div>
+      <div class="quiz-q"><p>5. 요소 0/100 인정으로 만든 누적 원가 곡선의 특징은?</p><div class="opts">
+        <button class="opt">활동 균등 배분보다 항상 앞선다</button><button class="opt" data-correct>요소가 완료되는 주에만 오르는 계단 모양이다</button><button class="opt">직선이다</button><button class="opt">총액이 BAC와 같다</button>
+      </div><div class="quiz-exp">완료 시에만 금액을 인정하므로 층마다 기둥·벽 완료, 보·슬래브 완료 두 번 뛴다. 총액은 모델 범위의 금액이다.</div></div>
+      <div class="quiz-q"><p>6. 이번 회차 기성 청구 2.17억 원, 유보율 5 %면 이번 회차 지급액은?</p><div class="opts">
+        <button class="opt">2.17억 원</button><button class="opt" data-correct>약 2.06억 원</button><button class="opt">약 2.28억 원</button><button class="opt">0.11억 원</button>
+      </div><div class="quiz-exp">\(2.17\times0.95 = 2.06\)억 원. 유보된 0.11억 원은 계약 조건에 따라 준공 뒤 돌려받는다.</div></div>
+      <div class="quiz-q"><p>7. 토네이도 차트에서 맨 위 막대가 뜻하는 것은?</p><div class="opts">
+        <button class="opt">가장 비싼 요소</button><button class="opt" data-correct>같은 변동 범위에서 결과를 가장 크게 흔드는 입력</button><button class="opt">가장 불확실한 입력</button><button class="opt">가장 먼저 시공하는 공종</button>
+      </div><div class="quiz-exp">입력마다 같은 ±범위를 줄 때의 결과 폭으로 줄 세운다. 입력 자체의 불확실성이 다르면 범위를 입력별로 정해야 한다.</div></div>
+      <div class="quiz-q"><p>8. 철골안이 직접비 +8.8억 원, 공기 −10주, 주당 간접비 0.3억 원이면 순 차이는?</p><div class="opts">
+        <button class="opt">+11.8억 원</button><button class="opt" data-correct>+5.8억 원</button><button class="opt">−1.2억 원</button><button class="opt">+8.8억 원</button>
+      </div><div class="quiz-exp">\(8.8 - 10\times0.3 = 5.8\)억 원. 조기 사용 수익이나 기초 절감은 모델 밖의 가치로 따로 더한다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* =================================================================== 공통 도구 (이 장 전용) */
+const FVX = (() => {
+  const ELS = CB.bim.model(), B = CB.pm.B10, R = CB.pm.cpm(B);
+  const Hz = (k) => (k <= 0 ? 0 : 5 + 4 * (k - 1));
+  const MEP = (e) => e.ifc === "IfcDuctSegment" || e.ifc === "IfcPipeSegment";
+  const vol = (b) => (b[3] - b[0]) * (b[4] - b[1]) * (b[5] - b[2]);
+  const PRI = { IfcColumn: 0, IfcWall: 1, IfcBeam: 2, IfcSlab: 3 };
+  const STR = (e) => PRI[e.ifc] != null;
+  /** 정의 10.2: 7장(정의 7.4)과 같은 칸 분할 — 우선순위로 칸을 배정해 순 부피, 빈 칸과 맞닿은 옆면·밑면(층 바닥 z0 위)을 거푸집으로 */
+  function qty(els, rho = 0.12) {
+    const Rd = (v) => Math.round(v * 1e4) / 1e4, byS = {}; els.forEach((e) => (byS[e.storey] = byS[e.storey] || []).push(e)); const out = new Map();
+    Object.values(byS).forEach((list) => {
+      const L = list.filter(STR).sort((a, b) => PRI[a.ifc] - PRI[b.ifc] || a.id - b.id), z0 = Hz(list[0].storey - 1);
+      const ax = (i, j) => [...new Set(L.flatMap((e) => [Rd(e.box[i]), Rd(e.box[j])]))].sort((a, b) => a - b);
+      const xs = ax(0, 3), ys = ax(1, 4), zs = ax(2, 5), nx = xs.length - 1, ny = ys.length - 1, nz = zs.length - 1, g = new Int32Array(nx * ny * nz).fill(-1);
+      const V = new Float64Array(L.length), A = new Float64Array(L.length);
+      for (let i = 0; i < nx; i++) { const cx = (xs[i] + xs[i + 1]) / 2; for (let j = 0; j < ny; j++) { const cy = (ys[j] + ys[j + 1]) / 2; for (let k = 0; k < nz; k++) { const cz = (zs[k] + zs[k + 1]) / 2;
+        for (let n = 0; n < L.length; n++) { const b = L[n].box; if (cx > b[0] && cx < b[3] && cy > b[1] && cy < b[4] && cz > b[2] && cz < b[5]) { g[(i * ny + j) * nz + k] = n; V[n] += (xs[i + 1] - xs[i]) * (ys[j + 1] - ys[j]) * (zs[k + 1] - zs[k]); break; } } } } }
+      const at = (i, j, k) => (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz ? -1 : g[(i * ny + j) * nz + k]);
+      for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let k = 0; k < nz; k++) {
+        const n = at(i, j, k); if (n < 0) continue; const dx = xs[i + 1] - xs[i], dy = ys[j + 1] - ys[j], dz = zs[k + 1] - zs[k];
+        if (at(i - 1, j, k) < 0) A[n] += dy * dz; if (at(i + 1, j, k) < 0) A[n] += dy * dz; if (at(i, j - 1, k) < 0) A[n] += dx * dz; if (at(i, j + 1, k) < 0) A[n] += dx * dz;
+        if (at(i, j, k - 1) < 0 && Math.abs(zs[k] - z0) > 1e-6) A[n] += dx * dy;
+      }
+      L.forEach((e, n) => out.set(e.id, { V: V[n], A: A[n], W: rho * V[n], Vbox: vol(e.box) }));
+      list.filter((e) => !STR(e)).forEach((e) => { const b = e.box, dx = b[3] - b[0], dy = b[4] - b[1], dz = b[5] - b[2], Lm = Math.max(dx, dy), w = Math.min(dx, dy);
+        out.set(e.id, { Ad: e.ifc === "IfcDuctSegment" ? 2 * (w + dz) * Lm : 0, L: e.ifc === "IfcPipeSegment" ? Lm : 0, Vbox: vol(b), Abox: 2 * (w + dz) * Lm, Lbox: Lm }); });
+    });
+    return out;
+  }
+  const RATE = { con: 119450, form: 40570, bar: 1417000, duct: 90000, pipe: 70000 };
+  /** 요소 → 공종별 금액(원) */
+  function cost(e, q, r = RATE) { if (STR(e)) return { con: q.V * r.con, form: q.A * r.form, bar: q.W * r.bar, duct: 0, pipe: 0 }; return { con: 0, form: 0, bar: 0, duct: q.Ad * r.duct, pipe: q.L * r.pipe }; }
+  const sum = (c) => c.con + c.form + c.bar + c.duct + c.pipe;
+  const TRADES = [["con", "콘크리트"], ["form", "거푸집"], ["bar", "철근"], ["duct", "덕트"], ["pipe", "배관"]];
+  const TYPES = [["IfcColumn", "기둥"], ["IfcBeam", "보"], ["IfcSlab", "슬래브"], ["IfcWall", "벽"], ["IfcDuctSegment", "덕트"], ["IfcPipeSegment", "배관"]];
+  const Q0 = qty(ELS);
+  /** 변경안: 기둥 c, 슬래브 t, 보 춤 h (m), upper면 6–10층만 */
+  function variant(o) {
+    const c = o.c, t = o.t, h = o.h;
+    return CB.bim.model().map((e) => {
+      if (o.upper && e.storey < 6) return e; const z0 = Hz(e.storey - 1), z1 = Hz(e.storey), b = e.box.slice();
+      if (e.ifc === "IfcColumn") { const x = (b[0] + b[3]) / 2, y = (b[1] + b[4]) / 2; return { ...e, box: [x - c / 2, y - c / 2, z0, x + c / 2, y + c / 2, z1 - h] }; }
+      if (e.ifc === "IfcBeam") { if (b[3] - b[0] > b[4] - b[1]) { const y = (b[1] + b[4]) / 2; return { ...e, box: [-c / 2, y - 0.2, z1 - h, 32 + c / 2, y + 0.2, z1 - t] }; } const x = (b[0] + b[3]) / 2; return { ...e, box: [x - 0.2, -c / 2, z1 - h, x + 0.2, 24 + c / 2, z1 - t] }; }
+      if (e.ifc === "IfcSlab") return { ...e, box: [-c / 2, -c / 2, z1 - t, 32 + c / 2, 24 + c / 2, z1] };
+      if (e.ifc === "IfcWall") { b[5] = z1 - t; return { ...e, box: b }; }
+      return e;
+    });
+  }
+  function totals(els, Q, r = RATE) { const s = { V: 0, A: 0, W: 0, con: 0, form: 0, bar: 0, duct: 0, pipe: 0 }; els.forEach((e) => { const q = Q.get(e.id); if (STR(e)) { s.V += q.V; s.A += q.A; s.W += q.W; } const c = cost(e, q, r); TRADES.forEach(([k]) => (s[k] += c[k])); }); s.C = sum(s); return s; }
+  /** 9장 정의 9.3의 요소 일정 */
+  const PH = { IfcColumn: [0, 0.3], IfcWall: [0, 0.3], IfcBeam: [0.3, 1], IfcSlab: [0.3, 1], IfcDuctSegment: [0, 1], IfcPipeSegment: [0, 1] };
+  const defLink = (e) => (MEP(e) ? "I" : e.storey <= 5 ? "G1" : "G2");
+  function sched(tm) {
+    const g = {}; ELS.forEach((e) => { const a = defLink(e); (g[a] = g[a] || new Set()).add(e.storey); });
+    const idx = {}; Object.keys(g).forEach((a) => { const arr = [...g[a]].sort((x, y) => x - y); idx[a] = { n: arr.length, m: new Map(arr.map((s, i) => [s, i])) }; });
+    const out = new Map(); ELS.forEach((e) => { const a = defLink(e), T = tm[a], n = idx[a].n, D = T.d / n, t0 = T.s + idx[a].m.get(e.storey) * D, ph = PH[e.ifc]; out.set(e.id, { s: t0 + ph[0] * D, f: t0 + ph[1] * D }); });
+    return out;
+  }
+  const timing = (basis = "ES", dl = 0) => { const t = {}; B.forEach((a) => (t[a.id] = { s: R.acts[a.id][basis] + (["G1", "G2", "I"].includes(a.id) ? dl : 0), d: a.d })); return t; };
+  const credit = (x, w, mode) => (mode === "lin" ? CB.clamp((w - x.s) / Math.max(1e-9, x.f - x.s), 0, 1) : w >= x.f - 1e-9 ? 1 : 0);
+  const eok = (v) => CB.num(v / 1e8, 2) + "억";
+  function text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.fillStyle = color; ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "left"; ctx.textBaseline = o.base || "middle"; ctx.fillText(s, x, y); ctx.restore();
+  }
+  const msg = (id, html, cls = "") => { const el = document.getElementById(id); if (!el) return; el.className = "fv-msg" + (cls ? " " + cls : ""); el.innerHTML = html; };
+  /** 가로 막대 묶음: rows [{ label, vals: [{ v, color }] }] */
+  function hbars(ctx, W, H, rows, o = {}) {
+    const P = CB.palette(), x0 = o.x0 || 74, top = o.top || 14, rh = (H - top - 26) / rows.length, max = o.max || Math.max(1e-9, ...rows.map((r) => r.vals.reduce((s, q) => s + Math.max(0, q.v), 0))), w = W - x0 - (o.right || 70);
+    rows.forEach((r, k) => {
+      const y = top + k * rh + rh * 0.18, bh = rh * 0.64; let x = x0;
+      text(ctx, r.label, x0 - 6, y + bh / 2, P.text, { size: 11, align: "right" });
+      r.vals.forEach((q) => { const ww = (Math.max(0, q.v) / max) * w; ctx.fillStyle = q.color; ctx.globalAlpha = q.alpha ?? 0.85; ctx.fillRect(x, y, ww, bh); ctx.globalAlpha = 1; x += ww; });
+      if (r.note) text(ctx, r.note, x + 6, y + bh / 2, P.dim, { size: 10.5 });
+    });
+  }
+  function boxes(V, items) {
+    const st = V.st, cp = Math.cos(st.pitch), sp = Math.sin(st.pitch), cy = Math.cos(st.yaw), sy = Math.sin(st.yaw);
+    const cam = [st.target[0] - st.dist * cp * sy, st.target[1] - st.dist * cp * cy, st.target[2] + st.dist * sp], F = [];
+    items.forEach((it) => { const [x0, y0, z0, x1, y1, z1] = it.b;
+      const add = (pts) => { let cx = 0, cyy = 0, cz = 0; pts.forEach((p) => { cx += p[0]; cyy += p[1]; cz += p[2]; }); F.push({ pts, d: (cx / 4 - cam[0]) ** 2 + (cyy / 4 - cam[1]) ** 2 + (cz / 4 - cam[2]) ** 2, it }); };
+      if (cam[0] < x0) add([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]]); if (cam[0] > x1) add([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]]);
+      if (cam[1] < y0) add([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]]); if (cam[1] > y1) add([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]]);
+      if (cam[2] < z0) add([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]]); if (cam[2] > z1) add([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]]); });
+    F.sort((a, b) => b.d - a.d);
+    F.forEach((f) => V.poly3(f.pts, { fill: f.it.fill, fillAlpha: f.it.a ?? 0.8, color: f.it.stroke || f.it.fill, width: f.it.lw || 0.6, alpha: f.it.sa ?? 0.8 }));
+  }
+  return { ELS, B, R, Hz, MEP, STR, qty, cost, sum, RATE, TRADES, TYPES, Q0, variant, totals, sched, timing, credit, eok, text, msg, hbars, boxes, vol };
+})();
+
+/* ---------- 1. 5D 계산기 ---------- */
+(function () {
+  const fw = (v) => Math.round(v).toLocaleString("en-US");
+  const gc = CB.range("fv-ca-c", fw, upd), gf = CB.range("fv-ca-f", fw, upd), gr = CB.range("fv-ca-r", fw, upd), gd = CB.range("fv-ca-d", fw, upd), gp = CB.range("fv-ca-p", fw, upd);
+  const gs = CB.seg("fv-ca-s", upd), gv = CB.seg("fv-ca-v", upd);
+  const rate = () => ({ con: gc(), form: gf(), bar: gr(), duct: gd(), pipe: gp() });
+  const inS = (e) => { const s = gs(); return s === "all" || (s === "lo" ? e.storey <= 5 : s === "hi" ? e.storey >= 6 : e.storey === +s); };
+  const nS = () => ({ all: 10, lo: 5, hi: 5 }[gs()] || 1);
+  let res = null;
+  const cv = CB.canvas("#fv-cv-calc", (ctx, W, H) => {
+    if (!res) return; const P = CB.palette(), col = { con: P.dim, form: P.accent2, bar: P.accent, duct: P.blue, pipe: P.ok };
+    const rows = gv() === "trade" ? FVX.TRADES.map(([k, n]) => ({ label: n, vals: [{ v: res.t[k], color: col[k] }], note: FVX.eok(res.t[k]) }))
+      : FVX.TYPES.map(([k, n]) => ({ label: n, vals: FVX.TRADES.map(([t]) => ({ v: res.ty[k][t], color: col[t] })), note: FVX.eok(FVX.sum(res.ty[k])) }));
+    FVX.hbars(ctx, W, H, rows, { right: 76 });
+    if (gv() === "type") { let x = 80; FVX.TRADES.forEach(([k, n]) => { ctx.fillStyle = col[k]; ctx.fillRect(x, H - 16, 10, 10); FVX.text(ctx, n, x + 14, H - 11, P.dim, { size: 10.5, bold: false }); x += W < 420 ? 52 : 70; }); }
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 240, maxHeight: 360 });
+  function upd() {
+    const r = rate(), t = { con: 0, form: 0, bar: 0, duct: 0, pipe: 0 }, ty = {}; FVX.TYPES.forEach(([k]) => (ty[k] = { con: 0, form: 0, bar: 0, duct: 0, pipe: 0 }));
+    let all = 0, s2 = 0;
+    FVX.ELS.forEach((e) => { const c = FVX.cost(e, FVX.Q0.get(e.id), r); all += FVX.sum(c); if (e.storey === 2) s2 += c.con + c.form + c.bar; if (!inS(e)) return; FVX.TRADES.forEach(([k]) => { t[k] += c[k]; ty[e.ifc][k] += c[k]; }); });
+    res = { t, ty }; const tot = FVX.sum(t);
+    CB.stat("fv-ca-o-t", FVX.eok(tot)); CB.stat("fv-ca-o-f", FVX.eok(tot / nS())); CB.stat("fv-ca-o-s", FVX.eok(s2) + ` <small>(${CB.signed((s2 / 1.38e8 - 1) * 100, 0)} %)</small>`); CB.stat("fv-ca-o-b", CB.num((all / 244.1e8) * 100, 1) + " %");
+    cv.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 2. 내역 연결 검사 ---------- */
+(function () {
+  const ITEMS = ["con", "form", "bar", "duct", "pipe"], OK = { str: ["con", "form", "bar"], IfcDuctSegment: ["duct"], IfcPipeSegment: ["pipe"] };
+  const allowed = (t) => (t === "IfcDuctSegment" || t === "IfcPipeSegment" ? OK[t] : OK.str);
+  const body = document.getElementById("fv-mp-body");
+  body.innerHTML = FVX.TYPES.map(([t, n]) => `<tr><td>${n}</td>` + ITEMS.map((i) => `<td><input type="checkbox" id="fv-mp-${t}-${i}" aria-label="${n} ${i}"></td>`).join("") + "</tr>").join("");
+  const box = (t, i) => document.getElementById(`fv-mp-${t}-${i}`);
+  const setPre = (p) => FVX.TYPES.forEach(([t]) => ITEMS.forEach((i) => { let on = allowed(t).includes(i);
+    if (p === "wall" && t === "IfcWall" && i === "form") on = false;
+    if (p === "duct" && t === "IfcDuctSegment") on = i === "con" || i === "bar";
+    if (p === "bar" && t === "IfcSlab" && i === "bar") on = false;
+    box(t, i).checked = on; }));
+  CB.seg("fv-mp-pre", (p) => { setPre(p); upd(); });
+  FVX.TYPES.forEach(([t]) => ITEMS.forEach((i) => box(t, i).addEventListener("change", upd)));
+  setPre("base");
+  /** 항목 i의 규칙을 요소에 적용한 물량 */
+  const q = (e, i) => { const Q = FVX.Q0.get(e.id), S = FVX.STR(e);
+    if (i === "con") return S ? Q.V : Q.Vbox; if (i === "form") return S ? Q.A : Q.Abox; if (i === "bar") return 0.12 * (S ? Q.V : Q.Vbox);
+    if (i === "duct") return S ? 2 * ((e.box[3] - e.box[0]) + (e.box[4] - e.box[1])) * (e.box[5] - e.box[2]) : Q.Abox; return S ? Math.max(e.box[3] - e.box[0], e.box[4] - e.box[1]) : Q.Lbox; };
+  let res = null;
+  const cv = CB.canvas("#fv-cv-map", (ctx, W, H) => {
+    if (!res) return; const P = CB.palette();
+    const rows = FVX.TRADES.map(([k, n]) => ({ label: n, vals: [{ v: res.cur[k], color: res.cur[k] > res.ref[k] + 1 ? P.warn : res.cur[k] < res.ref[k] - 1 ? P.bad : P.accent }], note: FVX.eok(res.cur[k]) + (Math.abs(res.cur[k] - res.ref[k]) > 1 ? " (" + CB.signed((res.cur[k] - res.ref[k]) / 1e8, 2) + ")" : "") }));
+    const max = Math.max(...FVX.TRADES.map(([k]) => Math.max(res.cur[k], res.ref[k])), 1);
+    FVX.hbars(ctx, W, H, rows, { max, right: W < 420 ? 110 : 130 });
+    const x0 = 74, w = W - x0 - (W < 420 ? 110 : 130), rh = (H - 40) / 5;
+    FVX.TRADES.forEach(([k], j) => { const x = x0 + (res.ref[k] / max) * w; ctx.strokeStyle = P.text; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, 14 + j * rh + 2); ctx.lineTo(x, 14 + (j + 1) * rh - 2); ctx.stroke(); ctx.setLineDash([]); });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.45), minHeight: 220, maxHeight: 320 });
+  function upd() {
+    const cur = {}, ref = {}; ITEMS.forEach((i) => { cur[i] = 0; ref[i] = 0; });
+    const miss = [], bad = [];
+    FVX.ELS.forEach((e) => ITEMS.forEach((i) => { const r = FVX.RATE[i], v = q(e, i) * r; if (allowed(e.ifc).includes(i)) ref[i] += v; if (box(e.ifc, i).checked) cur[i] += v; }));
+    FVX.TYPES.forEach(([t, n]) => { allowed(t).forEach((i) => { if (!box(t, i).checked) miss.push(n + "–" + FVX.TRADES.find((x) => x[0] === i)[1]); }); ITEMS.forEach((i) => { if (box(t, i).checked && !allowed(t).includes(i)) bad.push(n + "–" + FVX.TRADES.find((x) => x[0] === i)[1]); }); });
+    res = { cur, ref }; const C = FVX.sum(cur), Rf = FVX.sum(ref);
+    CB.stat("fv-mp-o-t", FVX.eok(C)); CB.stat("fv-mp-o-d", `<span style="color:var(--${Math.abs(C - Rf) < 1 ? "ok" : "bad"})">${CB.signed((C - Rf) / 1e8, 2)}억</span>`);
+    CB.stat("fv-mp-o-m", miss.length + "건"); CB.stat("fv-mp-o-u", bad.length + "건");
+    if (!miss.length && !bad.length) FVX.msg("fv-mp-msg", "연결 검사 통과: RC 부재 4유형 × 3항목, 덕트·배관 각 1항목. 합계 " + FVX.eok(C) + ".", "ok");
+    else FVX.msg("fv-mp-msg", (miss.length ? `<b>누락</b> ${miss.join(", ")}. ` : "") + (bad.length ? `<b>불일치</b> ${bad.join(", ")} — 그 항목의 단위로 잴 수 없는 요소입니다(예: 속이 빈 덕트의 상자 부피를 콘크리트로).` : ""), bad.length ? "bad" : "warn");
+    cv.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 3. 설계 변경 원가 델타 ---------- */
+(function () {
+  const gc = CB.range("fv-ch-c", (v) => v + " mm", upd), gt = CB.range("fv-ch-t", (v) => v + " mm", upd), gh = CB.range("fv-ch-h", (v) => v + " mm", upd), gs = CB.seg("fv-ch-sc", upd);
+  document.getElementById("fv-ch-cb").addEventListener("click", () => { gc.set(600, false); gt.set(210, false); gh.set(700, false); gs.set("up", false); upd(); });
+  const base = FVX.totals(FVX.ELS, FVX.Q0);
+  let cur = base;
+  const cv = CB.canvas("#fv-cv-change", (ctx, W, H) => {
+    const P = CB.palette(), rows = [];
+    [["con", "콘크리트"], ["form", "거푸집"], ["bar", "철근"]].forEach(([k, n]) => { rows.push({ label: n + " 기준", vals: [{ v: base[k], color: P.faint }], note: FVX.eok(base[k]) }); rows.push({ label: "변경", vals: [{ v: cur[k], color: cur[k] < base[k] - 1 ? P.ok : cur[k] > base[k] + 1 ? P.bad : P.dim }], note: FVX.eok(cur[k]) + " (" + CB.signed((cur[k] - base[k]) / 1e8, 2) + ")" }); });
+    FVX.hbars(ctx, W, H, rows, { x0: W < 420 ? 82 : 92, right: W < 420 ? 112 : 130, max: Math.max(base.form, cur.form, base.bar, cur.bar, base.con, cur.con) });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.45), minHeight: 240, maxHeight: 340 });
+  function upd() {
+    const els = FVX.variant({ c: gc() / 1000, t: gt() / 1000, h: gh() / 1000, upper: gs() === "up" });
+    cur = FVX.totals(els, FVX.qty(els));
+    const d = (k) => cur[k] - base[k];
+    CB.stat("fv-ch-o-v", CB.signed(d("V"), 1) + " m³"); CB.stat("fv-ch-o-a", CB.signed(d("A"), 0) + " m²"); CB.stat("fv-ch-o-w", CB.signed(d("W"), 1) + " t");
+    CB.stat("fv-ch-o-c", `<span style="color:var(--${d("C") < -1 ? "ok" : d("C") > 1 ? "bad" : "text"})">${CB.signed(d("C") / 1e8, 2)}억</span> <small>${CB.signed((d("C") / base.C) * 100, 1)} %</small>`);
+    const cl = CB.bim.clashes(els, ["IfcDuctSegment"], ["IfcBeam"]).filter((x) => x.type === "hard").length;
+    const web = gh() - gt();
+    FVX.msg("fv-ch-msg", `보 웨브(h − t) ${web} mm · 덕트–보 하드 간섭 ${cl}건(6장, 기본 30건) · 모델 5D ${FVX.eok(base.C)} → ${FVX.eok(cur.C)}. 구조 성능(처짐·내력·기둥 축력)은 이 계산에 없습니다.`, web < 250 ? "warn" : "");
+    cv.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 4. 4D + 5D 현금 흐름 ---------- */
+(function () {
+  const ec = new Map(); FVX.ELS.forEach((e) => ec.set(e.id, FVX.sum(FVX.cost(e, FVX.Q0.get(e.id))) / 1e8));
+  const gw = CB.range("fv-cs-w", (v) => v + "주", draw), gg = CB.seg("fv-cs-g", draw), gb = CB.seg("fv-cs-b", draw), gu = CB.seg("fv-cs-u", draw), gr = CB.seg("fv-cs-r", draw);
+  function series() {
+    const S = FVX.sched(FVX.timing(gb())), list = FVX.ELS.filter((e) => gr() === "gi" || !FVX.MEP(e)), mode = gg();
+    const acts = FVX.B.filter((a) => a.id === "G1" || a.id === "G2" || (gr() === "gi" && a.id === "I"));
+    const sp = CB.pm.spread(acts, FVX.R, "cost", gb(), 93);
+    const m = [], a = []; for (let w = 30; w <= 93; w++) { m.push([w, list.reduce((s, e) => s + ec.get(e.id) * FVX.credit(S.get(e.id), w, mode), 0)]); a.push([w, w <= 0 ? 0 : sp.cum[w - 1]]); }
+    const mt = list.reduce((s, e) => s + ec.get(e.id), 0), at = acts.reduce((s, x) => s + x.cost, 0);
+    return { m, a, mt, at };
+  }
+  let D = null;
+  const cv = CB.canvas("#fv-cv-cash", (ctx, W, H) => {
+    if (!D) return; const P = CB.palette(), pct = gu() === "pct", f = (v, t) => (pct ? (v / t) * 100 : v);
+    const ym = pct ? 100 : Math.ceil(Math.max(D.at, D.mt) / 10) * 10;
+    const res = CB.chart(ctx, { x: 52, y: 12, w: W - 66, h: H - 56 }, { x: [30, 93], y: [0, ym], xLabel: "주", yLabel: pct ? "누적 %" : "누적 억 원", series: [{ data: D.a.map(([w, v]) => [w, f(v, D.at)]), color: P.dim, dash: [6, 4] }, { data: D.m.map(([w, v]) => [w, f(v, D.mt)]), color: P.accent, width: 2.4 }], vlines: [{ x: gw(), color: P.accent2 }] });
+    const bw = Math.max(1, res.X(31) - res.X(30) - 1), pm = Math.max(1e-9, ...D.m.map((p, i) => (i ? p[1] - D.m[i - 1][1] : 0)));
+    ctx.globalAlpha = 0.3; ctx.fillStyle = P.accent;
+    D.m.forEach((p, i) => { if (!i) return; const dv = p[1] - D.m[i - 1][1]; if (dv <= 0) return; const hh = (dv / pm) * res.box.h * 0.3; ctx.fillRect(res.X(p[0] - 1), res.box.y + res.box.h - hh, bw, hh); });
+    ctx.globalAlpha = 1;
+    FVX.text(ctx, "요소 기반(보라) · 활동 spread(점선) · 막대 = 주별 요소 원가", res.box.x + 6, res.box.y + 8, P.dim, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.48), minHeight: 240, maxHeight: 360 });
+  function draw() {
+    D = series(); const w = gw(), i = w - 30, m = D.m[i][1], a = D.a[i][1], pw = i ? m - D.m[i - 1][1] : m;
+    CB.stat("fv-cs-o-m", CB.num(m, 2) + "억 <small>" + CB.num((m / D.mt) * 100, 1) + " %</small>");
+    CB.stat("fv-cs-o-a", CB.num(a, 2) + "억 <small>" + CB.num((a / D.at) * 100, 1) + " %</small>");
+    CB.stat("fv-cs-o-p", CB.num(pw, 2) + "억"); CB.stat("fv-cs-o-r", CB.num(D.mt, 1) + " / " + CB.num(D.at, 0) + "억");
+    cv.redraw();
+  }
+  draw();
+})();
+
+/* ---------- 5. RC vs 철골 대안 ---------- */
+(function () {
+  const fw = (v) => Math.round(v / 1000).toLocaleString("en-US") + "천";
+  const gs = CB.range("fv-al-s", fw, upd), gx = CB.range("fv-al-x", (v) => v + " %", upd), gc = CB.range("fv-al-c", (v) => v + "주/층", upd), gi = CB.range("fv-al-i", (v) => CB.num(v, 2) + "억/주", upd);
+  let rcFrame = 0, walls = 0, slabA = 0;
+  FVX.ELS.forEach((e) => { if (!FVX.STR(e)) return; const c = FVX.sum(FVX.cost(e, FVX.Q0.get(e.id))); if (e.ifc === "IfcWall") walls += c; else rcFrame += c; if (e.ifc === "IfcSlab") slabA += (e.box[3] - e.box[0]) * (e.box[4] - e.box[1]); });
+  const kgm = (s) => (s <= 3 ? 172 : s <= 6 ? 137 : 94), Hs = (s) => (s === 1 ? 5 : 4);
+  let colT = 0; for (let s = 1; s <= 10; s++) colT += (20 * Hs(s) * kgm(s)) / 1000;
+  const girT = (10 * 248 * 106) / 1000, DECK = 78500, FP = 230000;
+  const Trc = FVX.R.T;
+  function steelT(c) {
+    const acts = []; FVX.B.forEach((a) => {
+      if (a.id === "G1") { acts.push({ id: "S0", d: 16, pred: ["A"] }); acts.push({ id: "S1", d: 5 * c, pred: ["F", "S0"] }); return; }
+      if (a.id === "G2") { acts.push({ id: "S2", d: 5 * c, pred: ["S1"] }); acts.push({ id: "FP", d: 6, pred: ["S2"] }); return; }
+      const b = { id: a.id, d: a.d, pred: (a.pred || []).map((p) => (p === "G1" ? "S1" : p === "G2" ? "S2" : p)) }; if (b.id === "J") b.pred.push("FP"); acts.push(b); });
+    return CB.pm.cpm(acts);
+  }
+  let r = null;
+  const cv = CB.canvas("#fv-cv-alt", (ctx, W, H) => {
+    if (!r) return; const P = CB.palette(), max = Math.max(r.rc + walls, r.st + walls) / 1e8;
+    FVX.hbars(ctx, W, H * 0.62, [
+      { label: "RC", vals: [{ v: r.rc / 1e8, color: P.dim }, { v: walls / 1e8, color: P.accent, alpha: 0.5 }], note: FVX.eok(r.rc + walls) },
+      { label: "철골", vals: [{ v: r.steel / 1e8, color: P.accent2 }, { v: r.deck / 1e8, color: P.warn }, { v: r.fp / 1e8, color: P.bad, alpha: 0.6 }, { v: walls / 1e8, color: P.accent, alpha: 0.5 }], note: FVX.eok(r.st + walls) },
+    ], { max, right: 70, x0: 60 });
+    const y0 = H * (W < 460 ? 0.6 : 0.66), x0 = 60, w = W - x0 - 70, X = (t) => x0 + (t / 100) * w;
+    [["RC 공기", Trc, P.dim], ["철골 공기", r.Ts, P.accent2]].forEach(([n, t, c], k) => { const y = y0 + k * 26; FVX.text(ctx, n, x0 - 6, y + 8, P.text, { size: 11, align: "right" }); ctx.fillStyle = c; ctx.globalAlpha = 0.8; ctx.fillRect(x0, y, X(t) - x0, 16); ctx.globalAlpha = 1; FVX.text(ctx, t + "주", X(t) + 6, y + 8, P.dim, { size: 10.5 }); });
+    let x = 10, yl = H - (W < 460 ? 30 : 14); ctx.font = "10px " + getComputedStyle(document.body).getPropertyValue("--font"); [["RC 골조", P.dim], ["코어 벽(공통)", P.accent], ["강재", P.accent2], ["데크 슬래브", P.warn], ["내화", P.bad]].forEach(([n, c]) => { const tw = ctx.measureText(n).width + 26; if (x + tw > W - 6) { x = 10; yl += 16; } ctx.fillStyle = c; ctx.fillRect(x, yl, 10, 10); FVX.text(ctx, n, x + 13, yl + 5, P.dim, { size: 10, bold: false }); x += tw; });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.5), minHeight: 250, maxHeight: 360 });
+  function upd() {
+    const t = (colT + girT) * 1.12 * (1 + gx() / 100), steel = t * gs(), deck = slabA * DECK, fp = t * FP, R2 = steelT(gc());
+    r = { t, steel, deck, fp, st: steel + deck + fp, rc: rcFrame, Ts: R2.T };
+    const dd = r.st - r.rc, net = dd / 1e8 + (R2.T - Trc) * gi();
+    CB.stat("fv-al-o-t", CB.num(t, 0) + " t"); CB.stat("fv-al-o-d", CB.signed(dd / 1e8, 2) + "억");
+    CB.stat("fv-al-o-T", Trc + " / " + R2.T + "주"); CB.stat("fv-al-o-n", `<span style="color:var(--${net > 0 ? "bad" : "ok"})">${CB.signed(net, 2)}억</span> <small>${net > 0 ? "RC 유리" : "철골 유리"}</small>`);
+    cv.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 6. 기성 산정 ---------- */
+(function () {
+  const ec = new Map(); FVX.ELS.forEach((e) => ec.set(e.id, FVX.sum(FVX.cost(e, FVX.Q0.get(e.id))) / 1e8));
+  const Sp = FVX.sched(FVX.timing("ES", 0)), Sa = FVX.sched(FVX.timing("ES", 4));
+  const gw = CB.range("fv-bl-w", (v) => v + "주", draw), gg = CB.seg("fv-bl-g", draw), gp = CB.range("fv-bl-p", (v) => v + "주", draw), gr = CB.range("fv-bl-r", (v) => v + " %", draw);
+  const cum = (S, w) => FVX.ELS.reduce((s, e) => s + ec.get(e.id) * FVX.credit(S.get(e.id), w, gg()), 0);
+  const nDone = (S, w) => FVX.ELS.reduce((n, e) => n + (w >= S.get(e.id).f - 1e-9 ? 1 : 0), 0);
+  const cv = CB.canvas("#fv-cv-bill", (ctx, W, H) => {
+    const P = CB.palette(), p = gp(), dp = [], da = [], bill = [];
+    for (let w = 36; w <= 76; w += 0.5) { dp.push([w, cum(Sp, w)]); da.push([w, cum(Sa, w)]); }
+    let prev = 0; for (let w = p; w <= 76; w += p) { if (w < 36) { prev = cum(Sa, w); continue; } const c = cum(Sa, w); bill.push([w, c, c - prev]); prev = c; }
+    const step = []; let last = cum(Sa, 36 - (36 % p)); step.push([36, last]); bill.forEach(([w, c]) => { step.push([w, last]); step.push([w, c]); last = c; }); step.push([76, last]);
+    const res = CB.chart(ctx, { x: 48, y: 12, w: W - 62, h: H - 56 }, { x: [36, 76], y: [0, 18], xLabel: "주", yLabel: "억 원", series: [{ data: dp, color: P.dim, dash: [6, 4] }, { data: da, color: P.ok, width: 2 }, { data: step, color: P.accent, width: 2.2 }], vlines: [{ x: gw(), color: P.accent2 }] });
+    ctx.globalAlpha = 0.35; ctx.fillStyle = P.accent; const bw = Math.max(3, res.X(36 + p) - res.X(36) - 4);
+    bill.forEach(([w, , b]) => { if (b <= 0) return; ctx.fillRect(res.X(w) - bw, res.Y(b), bw, res.Y(0) - res.Y(b)); }); ctx.globalAlpha = 1;
+    FVX.text(ctx, "계획(점선) · 실적(초록) · 청구 누계(보라 계단) · 막대 = 회차 청구", res.box.x + 6, res.box.y + 8, P.dim, { size: 10.5, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.75 : 0.48), minHeight: 240, maxHeight: 360 });
+  function draw() {
+    const w = gw(), p = gp(), we = Math.floor(w / p) * p, wb = we - p;
+    const billed = cum(Sa, we), prevB = wb > 0 ? cum(Sa, wb) : 0, cur = billed - prevB, ret = gr() / 100;
+    CB.stat("fv-bl-o-a", CB.num(cum(Sa, w), 2) + "억 <small>청구 " + CB.num(billed, 2) + "</small>");
+    CB.stat("fv-bl-o-p", CB.num(cum(Sp, w), 2) + "억");
+    CB.stat("fv-bl-o-n", CB.num(cur, 2) + " → " + CB.num(cur * (1 - ret), 2) + "억 <small>(" + Math.max(0, wb) + "–" + we + "주)</small>");
+    CB.stat("fv-bl-o-e", nDone(Sa, w) + "개");
+    cv.redraw();
+  }
+  draw();
+})();
+
+/* ---------- 7. 원가 3D 히트맵 ---------- */
+(function () {
+  const gm = CB.seg("fv-ht-m", upd), gk = CB.range("fv-ht-k", (v) => v + "층", upd), gs = CB.seg("fv-ht-s", upd);
+  const C = new Map(), U = new Map(), Fr = new Map();
+  FVX.ELS.forEach((e) => { const q = FVX.Q0.get(e.id), c = FVX.cost(e, q), s = FVX.sum(c); C.set(e.id, s); U.set(e.id, FVX.STR(e) && q.V > 0 ? s / q.V : NaN); Fr.set(e.id, FVX.STR(e) && s > 0 ? c.form / s : NaN); });
+  const metric = (e) => { const m = gm(); return m === "c" ? Math.log10(Math.max(1, C.get(e.id))) : m === "u" ? U.get(e.id) : Fr.get(e.id); };
+  let rng = [0, 1];
+  const v = CB.orbit("#fv-cv-heat", { yaw: -0.62, pitch: 0.36, dist: 118, target: [16, 12, 19], fov: 0.82, aspect: (W) => (W < 520 ? 1.0 : 0.66), minHeight: 300, maxHeight: 520,
+    draw(V) {
+      const P = V.P, items = [];
+      FVX.ELS.forEach((e) => { if (e.storey > gk() || (gs() === "off" && e.ifc === "IfcSlab")) return; const m = metric(e);
+        if (!isFinite(m)) { items.push({ b: e.box, fill: P.faint, a: 0.5, stroke: P.faint, sa: 0.5 }); return; }
+        const col = CB.rgb(CB.colormap((m - rng[0]) / Math.max(1e-9, rng[1] - rng[0])));
+        items.push({ b: e.box, fill: col, a: e.ifc === "IfcSlab" ? 0.55 : 0.9, stroke: col, sa: 0.9 }); });
+      FVX.boxes(V, items);
+      const ctx = V.ctx, x0 = 12, y0 = V.h - 22, w = Math.min(180, V.w * 0.4);
+      for (let i = 0; i < 40; i++) { ctx.fillStyle = CB.rgb(CB.colormap(i / 39)); ctx.fillRect(x0 + (i * w) / 40, y0, w / 40 + 1, 10); }
+      const lab = (m) => (gm() === "c" ? CB.sig(10 ** m / 1e4, 2) + "만" : gm() === "u" ? CB.sig(m / 1e4, 3) + "만/m³" : CB.num(m * 100, 0) + "%");
+      FVX.text(ctx, lab(rng[0]), x0, y0 - 8, P.dim, { size: 10 }); FVX.text(ctx, lab(rng[1]), x0 + w, y0 - 8, P.dim, { size: 10, align: "right" });
+    } });
+  function upd() {
+    const vis = FVX.ELS.filter((e) => e.storey <= gk() && !(gs() === "off" && e.ifc === "IfcSlab"));
+    const ms = vis.map(metric).filter(isFinite); rng = ms.length ? [Math.min(...ms), Math.max(...ms)] : [0, 1];
+    const tot = vis.reduce((s, e) => s + C.get(e.id), 0), top = [...vis].sort((a, b) => C.get(b.id) - C.get(a.id)), n10 = Math.max(1, Math.round(vis.length * 0.1));
+    CB.stat("fv-ht-o-t", FVX.eok(tot)); CB.stat("fv-ht-o-m", top.length ? top[0].name + " · " + FVX.eok(C.get(top[0].id)) : "—");
+    const lab = (m) => (gm() === "c" ? CB.sig(10 ** m / 1e4, 3) + "만 원" : gm() === "u" ? CB.sig(m / 1e4, 3) + "만 원/m³" : CB.num(m * 100, 0) + " %");
+    CB.stat("fv-ht-o-r", ms.length ? lab(rng[0]) + " – " + lab(rng[1]) : "—");
+    CB.stat("fv-ht-o-p", tot > 0 ? CB.num((top.slice(0, n10).reduce((s, e) => s + C.get(e.id), 0) / tot) * 100, 0) + " %" : "—");
+    v.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 8. 단가 민감도 토네이도 ---------- */
+(function () {
+  const gr = CB.range("fv-tr-r", (v) => "±" + v + " %", draw), gq = CB.seg("fv-tr-q", draw);
+  const base = FVX.totals(FVX.ELS, FVX.Q0), R0 = FVX.RATE;
+  let Vbox = 0; FVX.ELS.forEach((e) => { if (FVX.STR(e)) Vbox += FVX.Q0.get(e.id).Vbox; });
+  const lab = 30571.4, eqp = 1000, mat = 9000; // 거푸집 일위대가 분해(SiteBook 표 12-1)
+  function cases(p) {
+    const T = (o) => { const r = { ...R0, ...(o.r || {}) }, rho = o.rho ?? 0.12, V = o.V ?? base.V; return (V * r.con + base.A * r.form + rho * V * r.bar + base.duct / R0.duct * r.duct + base.pipe / R0.pipe * r.pipe) / 1e8; };
+    const out = [
+      ["콘크리트 단가", T({ r: { con: R0.con * (1 - p) } }), T({ r: { con: R0.con * (1 + p) } })],
+      ["거푸집 단가", T({ r: { form: R0.form * (1 - p) } }), T({ r: { form: R0.form * (1 + p) } })],
+      ["철근 단가", T({ r: { bar: R0.bar * (1 - p) } }), T({ r: { bar: R0.bar * (1 + p) } })],
+      ["철근 원단위", T({ rho: 0.12 * (1 - p) }), T({ rho: 0.12 * (1 + p) })],
+      ["거푸집 생산성", T({ r: { form: mat + (lab + eqp) / (1 + p) } }), T({ r: { form: mat + (lab + eqp) / Math.max(0.05, 1 - p) } })],
+      ["덕트 단가", T({ r: { duct: R0.duct * (1 - p) } }), T({ r: { duct: R0.duct * (1 + p) } })],
+      ["배관 단가", T({ r: { pipe: R0.pipe * (1 - p) } }), T({ r: { pipe: R0.pipe * (1 + p) } })],
+    ];
+    if (gq() === "on") out.push(["물량 규칙(상자 합)", T({}), T({ V: Vbox })]);
+    return out.map(([n, lo, hi]) => ({ n, lo: Math.min(lo, hi), hi: Math.max(lo, hi), s: Math.abs(hi - lo) })).sort((a, b) => b.s - a.s);
+  }
+  let D = null; const b0 = base.C / 1e8;
+  const cv = CB.canvas("#fv-cv-tor", (ctx, W, H) => {
+    if (!D) return; const P = CB.palette(), x0 = W < 420 ? 96 : 120, w = W - x0 - 16, top = 12, rh = (H - top - 34) / D.length;
+    const ext = Math.max(...D.map((d) => Math.max(b0 - d.lo, d.hi - b0)), 0.01) * 1.15, X = (v) => x0 + w / 2 + ((v - b0) / ext) * (w / 2);
+    D.forEach((d, k) => { const y = top + k * rh + rh * 0.18, bh = rh * 0.64;
+      FVX.text(ctx, d.n, x0 - 6, y + bh / 2, P.text, { size: 10.5, align: "right" });
+      ctx.fillStyle = P.ok; ctx.globalAlpha = 0.75; ctx.fillRect(X(d.lo), y, X(b0) - X(d.lo), bh); ctx.fillStyle = P.bad; ctx.fillRect(X(b0), y, X(d.hi) - X(b0), bh); ctx.globalAlpha = 1; });
+    ctx.strokeStyle = P.text; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(X(b0), top); ctx.lineTo(X(b0), H - 26); ctx.stroke();
+    FVX.text(ctx, CB.num(b0 - ext, 1), x0, H - 12, P.dim, { size: 10 }); FVX.text(ctx, CB.num(b0, 2) + "억", X(b0), H - 12, P.text, { size: 10, align: "center" }); FVX.text(ctx, CB.num(b0 + ext, 1), x0 + w, H - 12, P.dim, { size: 10, align: "right" });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 380 });
+  function draw() {
+    D = cases(gr() / 100);
+    CB.stat("fv-tr-o-b", CB.num(b0, 2) + "억"); CB.stat("fv-tr-o-t", D[0].n); CB.stat("fv-tr-o-s", CB.num(D[0].s, 2) + "억");
+    CB.stat("fv-tr-o-l", CB.num(D.slice(-3).reduce((s, d) => s + d.s, 0), 2) + "억");
+    cv.redraw();
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

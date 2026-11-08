@@ -1,0 +1,1286 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>IFC와 데이터 모델 · BIMBook</title>
+<meta name="description" content="모델이 대화하는 언어. 개방형 BIM과 상호 운용성, IFC의 상속과 관계 엔터티, 공간 구조, 속성·수량 세트, GlobalId, STEP 파일, MVD와 IDS, 분류 체계를 B-10 BIM 요소 360개로 직접 읽고 검증한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .if-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .if-msg b { color: var(--text); }
+  .if-msg.ok { color: var(--ok); }
+  .if-msg.bad { color: var(--bad); }
+  .if-msg code { font-size: 12.5px; }
+  .if-tree { max-height: 380px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 4px 0; font-size: 13px; }
+  .if-tree button { display: flex; gap: 6px; align-items: baseline; width: 100%; text-align: left; font: inherit; font-size: 13px; background: none; border: 0; color: var(--text); padding: 3px 8px; cursor: pointer; white-space: nowrap; }
+  .if-tree button:hover { background: var(--accent-soft); }
+  .if-tree button.on { background: var(--accent-2-soft); color: var(--accent-2); font-weight: 700; }
+  .if-tree .if-tw { display: inline-block; width: 12px; color: var(--text-faint); flex: none; }
+  .if-tree small { color: var(--text-faint); font-family: var(--mono); font-size: 11px; }
+  .if-tree .if-off { color: var(--text-faint); font-style: italic; }
+  .if-ta { display: block; width: 100%; box-sizing: border-box; min-height: 300px; font: 12px/1.55 var(--mono); padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--text); resize: vertical; white-space: pre; overflow: auto; }
+  .if-ta:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .if-pre { margin: 22px 0; padding: 14px 16px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow-x: auto; font-size: 12.5px; line-height: 1.6; }
+  .if-pre code { background: none; padding: 0; font-size: inherit; white-space: pre; }
+  .if-pre .if-c { color: var(--text-faint); }
+  .if-sim-pre { margin: 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; max-height: 300px; overflow: auto; }
+  .if-tbl td, .if-tbl th { font-variant-numeric: tabular-nums; }
+  .if-tbl td.bad { color: var(--bad); font-weight: 700; }
+  .if-tbl td.ok { color: var(--ok); font-weight: 700; }
+  .if-tbl-wrap { max-height: 300px; margin: 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; }
+  .if-tbl-wrap table { font-size: 13px; }
+  .if-tbl-wrap td, .if-tbl-wrap th { padding: 6px 10px; }
+  .if-in { font: inherit; font-size: 14px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); width: 100%; box-sizing: border-box; min-width: 0; }
+  .if-in.mono { font-family: var(--mono); font-size: 13px; }
+  .if-bar { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg-elev); }
+  .if-row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="ifc">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="if-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="if-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="if-ah-or" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="if-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 03</div>
+    <h1 data-no-glossary>IFC와 데이터 모델</h1>
+    <p class="lead">B-10의 구조 모델은 구조 설계 사무소의 저작 도구로, 덕트와 배관은 설비 설계 사무소의 다른 도구로 만들어집니다. 시공사는 그 둘을 합쳐 간섭을 보고(6장), 물량을 뽑고(7장), 준공 뒤에는 시설 관리 시스템이 같은 모델에서 자산 목록을 읽어 갑니다(13장). 도구마다 내부 형식이 다른데 모델은 어떻게 오갈까요? 답은 모두가 읽고 쓰기로 약속한 <b>공개 데이터 모델</b>입니다. 이 장은 국제 표준 IFC가 건물을 어떻게 "엔터티와 관계의 그래프"로 적는지 — 상속, 관계 엔터티, 공간 구조, 속성 세트, GlobalId, STEP 파일 — 를 B-10 BIM의 요소 360개로 직접 읽고 고쳐 보고, 주고받을 정보의 범위(MVD)와 요구 사항(IDS)을 규칙으로 검증합니다.</p>
+    <ul class="objectives">
+      <li>상호 운용성 문제를 변환기 수 \(n(n-1)\) 대 \(2n\)으로 설명하고, 중립 형식 IFC가 하는 일과 하지 못하는 일을 구별한다.</li>
+      <li>IFC 엔터티의 상속 사슬(<code>IfcRoot</code> → … → <code>IfcWall</code>)을 읽고 IFC2x3·IFC4·IFC4.3의 차이를 짚는다.</li>
+      <li>관계 엔터티(<code>IfcRelAggregates</code>, <code>IfcRelContainedInSpatialStructure</code>, <code>IfcRelDefinesByProperties</code>, <code>IfcRelDefinesByType</code>)로 공간 구조·속성·유형을 잇는다.</li>
+      <li>속성 세트와 수량 세트를 구별하고, GlobalId(128비트 → 22자)가 "같은 객체 = 같은 ID"를 지키는 이유를 설명한다.</li>
+      <li>STEP 물리 파일(ISO 10303-21)을 직접 읽고 고쳐 엔터티 표와 참조 그래프로 바꾼다.</li>
+      <li>MVD와 IDS로 교환 범위와 요구 사항을 정하고, B-10 요소를 규칙으로 검증한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 정보가 없었다면</small><b>도구를 바꿀 때마다 모델을 다시 그렸다</b></div>
+      <div class="o-body"><p>2D CAD 시대에도 파일 교환은 골칫거리였지만, 선과 글자는 어떻게든 옮길 수 있었습니다. 모델이 "벽", "기둥", "덕트" 같은 객체와 그 속성을 담기 시작하자 문제가 커졌습니다. A 도구의 벽은 B 도구에서 의미 없는 면 조각이 되거나, 아예 읽히지 않았습니다. 1990년대 중반 설계·시공·소프트웨어 업계가 모여 만든 국제 컨소시엄(IAI, 지금의 buildingSMART International)이 건물 정보를 위한 공개 데이터 모델을 만들기로 했고, 그 결과가 <b>IFC</b>(Industry Foundation Classes)입니다. IFC는 제조업의 제품 데이터 표준 STEP(ISO 10303)의 데이터 정의 언어 EXPRESS와 파일 형식을 빌려 썼고, 여러 판을 거쳐 ISO 16739로 국제 표준이 되었습니다.</p>
+        <p>IFC가 없다면 B-10의 구조·설비 모델을 합치는 일은 특정 회사의 도구를 모두가 같이 쓰는 경우에만 가능합니다. 발주자는 그 회사에 묶이고, 30년 뒤 시설 관리자는 단종된 형식을 열지 못합니다. 공개 데이터 모델은 교환의 문제이면서 동시에 <b>장기 보존</b>과 <b>공정한 경쟁</b>의 문제입니다.</p>
+        <div class="o-chain"><span>도구마다 다른 내부 형식</span><i>→</i><span class="tool">IFC 스키마 · 엔터티와 관계 · Pset · GlobalId · STEP · MVD/IDS</span><i>→</i><span>도구 사이 교환 · 자동 검증 · 장기 보관</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="openbim">
+    <h2>개방형 BIM과 상호 운용성</h2>
+    <div class="problem"><strong>도구 다섯 개, 변환기는 몇 개</strong>
+      <p>B-10 프로젝트는 구조 모델링, 설비 모델링, 구조 해석, 물량·견적, 시설 관리의 다섯 가지 도구를 씁니다. 도구끼리 직접 파일을 바꿔 주는 변환기를 만들면 몇 개가 필요할까요? 도구가 하나 더 늘면?</p></div>
+    <p>서로 다른 소프트웨어가 데이터를 주고받아 <b>뜻을 잃지 않고</b> 쓸 수 있는 능력을 <span class="term">상호 운용성</span><span class="en">(interoperability)</span>이라 합니다. 파일이 열린다고 상호 운용되는 것은 아닙니다. 받은 쪽이 "이것은 내력 기둥이고, 3층에 있고, 콘크리트 C30이다"를 알아야 간섭 검토·물량 산출·해석에 쓸 수 있습니다. 특정 회사 형식이 아니라 공개된 데이터 모델로 협업하자는 생각을 <span class="term">개방형 BIM</span><span class="en">(open BIM)</span>이라 하고, 그 중심에 공개 표준 <span class="term">IFC</span><span class="en">(Industry Foundation Classes)</span>가 있습니다. IFC는 buildingSMART International이 개발하고 ISO 16739-1로 발행된 국제 표준으로, 특정 도구에 속하지 않는 <span class="term">중립 형식</span><span class="en">(neutral format)</span>입니다.</p>
+    <div class="callout def"><strong>정의 3.1 (상호 운용성과 변환기 수)</strong> 도구 \(n\)개가 서로 직접 데이터를 바꾸려면 방향마다 변환기가 필요하고, 중립 형식을 거치면 도구마다 읽기·쓰기 두 개면 된다.
+      <div class="formula">$$N_{\text{직접}} = n(n-1), \qquad N_{\text{중립}} = 2n, \qquad R_k = (1-p)^k$$<div class="where">\(N\): 필요한 변환기 수. \(R_k\): 교환을 \(k\)번 거친 뒤 남는 정보의 비율(교환마다 비율 \(p\)를 잃는다고 본 교육용 근사). 중립 형식은 변환기 수를 줄일 뿐 손실을 없애지는 않는다. 손실을 줄이려면 교환 범위(MVD)와 요구 사항(IDS)을 미리 정하고(3.8절), 같은 객체를 같은 ID로 추적해야 한다(3.6절).</div></div></div>
+    <figure class="diagram" id="fig-if-hub">
+      <svg viewBox="0 0 860 320" role="img" aria-label="다섯 도구 사이의 직접 변환과 IFC를 거치는 중립 형식 교환 비교">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <text x="215" y="40" text-anchor="middle" class="t" style="font-weight:700">직접 변환: n(n − 1) = 20개</text>
+        <text x="645" y="40" text-anchor="middle" class="t" style="font-weight:700">중립 형식: 2n = 10개</text>
+        <line x1="430" y1="30" x2="430" y2="290" style="stroke:var(--border)"/>
+        <g style="stroke:var(--accent-2);stroke-width:1.4;opacity:.75">
+          <line x1="215" y1="78" x2="330" y2="160"/><line x1="215" y1="78" x2="285" y2="262"/><line x1="215" y1="78" x2="145" y2="262"/><line x1="215" y1="78" x2="100" y2="160"/>
+          <line x1="330" y1="160" x2="285" y2="262"/><line x1="330" y1="160" x2="145" y2="262"/><line x1="330" y1="160" x2="100" y2="160"/>
+          <line x1="285" y1="262" x2="145" y2="262"/><line x1="285" y1="262" x2="100" y2="160"/><line x1="145" y1="262" x2="100" y2="160"/>
+        </g>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="165" y="62" width="100" height="32" rx="8" class="f-elev"/><text x="215" y="82" style="fill:var(--text)">구조 모델링</text>
+          <rect x="282" y="144" width="100" height="32" rx="8" class="f-elev"/><text x="332" y="164" style="fill:var(--text)">설비 모델링</text>
+          <rect x="237" y="246" width="100" height="32" rx="8" class="f-elev"/><text x="287" y="266" style="fill:var(--text)">구조 해석</text>
+          <rect x="95" y="246" width="100" height="32" rx="8" class="f-elev"/><text x="145" y="266" style="fill:var(--text)">물량·견적</text>
+          <rect x="48" y="144" width="100" height="32" rx="8" class="f-elev"/><text x="98" y="164" style="fill:var(--text)">시설 관리</text>
+        </g>
+        <text x="215" y="300" text-anchor="middle" class="t-dim">선 하나 = 양방향 변환기 2개 · 도구 하나 늘면 +2n</text>
+        <g style="stroke:var(--accent);stroke-width:2.2">
+          <line x1="645" y1="165" x2="645" y2="88"/><line x1="645" y1="165" x2="762" y2="160"/><line x1="645" y1="165" x2="717" y2="262"/><line x1="645" y1="165" x2="575" y2="262"/><line x1="645" y1="165" x2="528" y2="160"/>
+        </g>
+        <circle cx="645" cy="165" r="34" class="f-acc-soft"/><text x="645" y="162" text-anchor="middle" class="t" style="font-weight:700;fill:var(--accent)">IFC</text><text x="645" y="179" text-anchor="middle" class="t-mono">ISO 16739-1</text>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="595" y="62" width="100" height="32" rx="8" class="f-elev"/><text x="645" y="82" style="fill:var(--text)">구조 모델링</text>
+          <rect x="712" y="144" width="100" height="32" rx="8" class="f-elev"/><text x="762" y="164" style="fill:var(--text)">설비 모델링</text>
+          <rect x="667" y="246" width="100" height="32" rx="8" class="f-elev"/><text x="717" y="266" style="fill:var(--text)">구조 해석</text>
+          <rect x="525" y="246" width="100" height="32" rx="8" class="f-elev"/><text x="575" y="266" style="fill:var(--text)">물량·견적</text>
+          <rect x="478" y="144" width="100" height="32" rx="8" class="f-elev"/><text x="528" y="164" style="fill:var(--text)">시설 관리</text>
+        </g>
+        <text x="645" y="300" text-anchor="middle" class="t-dim">도구마다 가져오기·내보내기 2개 · 도구 하나 늘면 +2</text>
+      </svg>
+      <figcaption><b>그림 3-1.</b> 상호 운용성의 두 방식. 직접 변환은 도구 쌍마다 방향별 변환기가 필요해 \(n\)의 제곱으로 늘고, 중립 형식은 도구 수에 비례한다. 대신 모든 도구가 같은 데이터 모델의 <b>뜻</b>을 똑같이 해석해야 한다 — IFC 스키마가 정하는 것이 그 뜻이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 3.1 (B-10의 변환기와 정보 손실)</strong> 도구 다섯 개(\(n = 5\)).
+      <p><b>① 변환기 수</b> 직접: \(5\times4 = 20\)개. 중립: \(2\times5 = 10\)개. 도구가 6개가 되면 30개 대 12개 — 직접 방식은 10개, 중립 방식은 2개만 늘어난다.</p>
+      <p><b>② 정보 손실</b> 교환마다 정보의 5 %를 잃는다고 하자(교육용 가정). 구조 모델 → 설비 조정 → 견적 → 시설 관리의 세 번 교환 뒤 \(R_3 = 0.95^3 = 0.857\), 약 14 %를 잃는다. 원본 모델에서 한 번에 받으면 \(R_1 = 0.95\).</p>
+      <p><b>③ 판단</b> 중립 형식은 "모두가 원본에서 받는" 별 모양 교환을 가능하게 해 손실의 누적을 막는다. 그러려면 원본 모델이 공통 데이터 환경(5장)에 있고, 무엇을 넘길지(MVD), 무엇이 꼭 있어야 하는지(IDS)를 계약 단계에서 정해야 한다(4장).</p></div>
+    <div class="callout warn"><strong>"IFC로 내보냈다"가 끝이 아니다</strong> IFC는 주로 <b>교환과 참조</b>를 위한 형식입니다. 저작 도구의 파라메트릭 규칙(벽이 그리드를 따라 움직이는 구속, 패밀리 매개변수 — 2장)은 대부분 IFC로 넘어가지 않고, 받은 쪽은 결과 형상과 속성만 봅니다. 그래서 IFC 모델을 받아 고친 뒤 원래 도구로 되돌려 보내는 왕복(round trip)은 정보를 잃기 쉽습니다. 협업의 기본은 분야마다 자기 원본을 고치고 IFC를 서로 <b>참조</b>하는 연합 모델(5장)입니다.</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="schema">
+    <h2>IFC의 구조: 스키마, 엔터티, 상속</h2>
+    <div class="problem"><strong>"벽"을 컴퓨터에 어떻게 정의하나</strong>
+      <p>"벽은 이름이 있고, 위치가 있고, 형상이 있으며, 층에 속한다." 기둥도, 보도, 덕트도 이 문장의 앞부분은 같습니다. 공통 부분을 요소마다 반복해 정의하면 수백 종의 요소가 서로 조금씩 다르게 정의될 것입니다. 공통 부분을 한 번만 적는 방법은?</p></div>
+    <p>IFC의 내용은 <span class="term">스키마</span><span class="en">(schema)</span>, 즉 "어떤 종류의 데이터가 어떤 속성과 관계를 가질 수 있는가"의 정의입니다. 스키마는 STEP의 데이터 정의 언어 EXPRESS(ISO 10303-11)로 적혀 있습니다. 스키마의 기본 단위가 <span class="term">엔터티</span><span class="en">(entity)</span>입니다. <code>IfcWall</code>, <code>IfcBuildingStorey</code>, <code>IfcPropertySet</code>, <code>IfcCartesianPoint</code>는 모두 엔터티이고, 파일 속의 벽 하나는 <code>IfcWall</code> 엔터티의 <b>인스턴스</b>입니다. 엔터티는 스키마가 순서까지 정해 둔 <span class="term">엔터티 속성</span><span class="en">(entity attribute)</span>을 가지며, 공통 속성은 상위 엔터티에서 물려받습니다.</p>
+    <div class="callout def"><strong>정의 3.2 (엔터티와 상속)</strong> 엔터티 \(B\)가 엔터티 \(A\)의 <span class="term">하위형</span><span class="en">(subtype)</span>이면, \(B\)의 인스턴스는 \(A\)의 모든 속성을 가지며 \(A\)가 쓰일 수 있는 자리에 쓰일 수 있다. 엔터티의 속성 목록은 뿌리부터 자신까지의 직접 속성을 차례로 이은 것이다.
+      <div class="formula">$$\text{Attr}(E) = \text{Attr}_{\text{직접}}(\text{IfcRoot}) \,\Vert\, \cdots \,\Vert\, \text{Attr}_{\text{직접}}(E)$$<div class="where">\(\Vert\)는 목록 잇기. 인스턴스가 직접 만들어질 수 없는 상위형(<code>IfcRoot</code>, <code>IfcProduct</code>, <code>IfcElement</code> 등)을 <span class="term">추상 엔터티</span><span class="en">(abstract entity)</span>라 한다. 파일에는 하위형의 인스턴스만 나타나고, 속성은 이 순서대로 적힌다(3.7절). 선택적(OPTIONAL) 속성은 비워 둘 수 있다.</div></div></div>
+    <p>스키마는 네 개의 층으로 나뉩니다(그림 3-2). 맨 아래 <b>자원 층</b>(resource layer)은 형상, 단위·측정값, 재료, 행위자, 날짜처럼 독립적으로는 의미가 없는 재료들입니다. 그 위 <b>핵심 층</b>(core layer)의 커널이 <code>IfcRoot</code>, <code>IfcObject</code>, <code>IfcRelationship</code>처럼 모든 것의 뼈대를 정하고, <b>공유 층</b>(interoperability layer)이 여러 분야가 함께 쓰는 벽·기둥·보·슬래브 등을, <b>영역 층</b>(domain layer)이 공조·전기·구조 해석처럼 한 분야에 특화된 엔터티를 둡니다. 위층은 같은 층이나 아래층만 참조할 수 있어서, 아래층이 위층의 변화에 흔들리지 않습니다.</p>
+    <figure class="diagram" id="fig-if-layers">
+      <svg viewBox="0 0 860 310" role="img" aria-label="IFC 스키마의 네 층: 영역, 공유, 핵심, 자원 층과 대표 엔터티">
+        <rect x="10" y="10" width="840" height="290" rx="10" class="f-surface"/>
+        <g class="t-mono">
+          <rect x="40" y="30" width="600" height="54" rx="8" class="f-acc2-soft"/>
+          <text x="56" y="52" class="t" style="font-weight:700">영역 층 (domain)</text>
+          <text x="56" y="72">공조: IfcDuctSegment · 배관: IfcPipeSegment · 전기 · 구조 해석 · 건축 …</text>
+          <rect x="40" y="94" width="600" height="54" rx="8" class="f-elev"/>
+          <text x="56" y="116" class="t" style="font-weight:700">공유 층 (interoperability)</text>
+          <text x="56" y="136">공유 건물 요소: IfcWall · IfcColumn · IfcBeam · IfcSlab · 공유 설비 요소 …</text>
+          <rect x="40" y="158" width="600" height="54" rx="8" class="f-acc-soft"/>
+          <text x="56" y="180" class="t" style="font-weight:700">핵심 층 (core): 커널 + 확장</text>
+          <text x="56" y="200">IfcRoot · IfcObject · IfcRelationship · IfcPropertySet · IfcBuildingStorey …</text>
+          <rect x="40" y="222" width="600" height="54" rx="8" class="f-elev"/>
+          <text x="56" y="244" class="t" style="font-weight:700">자원 층 (resource)</text>
+          <text x="56" y="264">형상 · 측정값·단위 · 재료 · 행위자 · 날짜 · 속성 값 (IfcCartesianPoint …)</text>
+        </g>
+        <g style="stroke:var(--accent);stroke-width:2;fill:none" marker-end="url(#if-ah-acc)"><path d="M700 56V258"/></g>
+        <text x="716" y="120" class="t-dim">참조는</text><text x="716" y="140" class="t-dim">같은 층이나</text><text x="716" y="160" class="t-dim">아래층으로만</text>
+        <text x="716" y="200" class="t-mono">위: 분야 특화</text><text x="716" y="220" class="t-mono">아래: 범용</text>
+      </svg>
+      <figcaption><b>그림 3-2.</b> IFC 스키마의 층 구조(개략). B-10 BIM의 기둥·보·슬래브·벽은 공유 층, 덕트·배관은 공조·배관 영역에 있다. 공간 구조(<code>IfcBuildingStorey</code>)와 관계 엔터티의 다수는 핵심 층의 확장 부분에 있다. 패키지 구성은 버전마다 조금씩 다르다.</figcaption>
+    </figure>
+    <figure class="diagram" id="fig-if-chain">
+      <svg viewBox="0 0 860 380" role="img" aria-label="IfcRoot에서 IfcWall까지 상속 사슬과 각 단계의 직접 속성, STEP 줄에서의 순서">
+        <rect x="10" y="10" width="840" height="360" rx="10" class="f-surface"/>
+        <g class="t-mono">
+          <rect x="30" y="26" width="360" height="40" rx="7" class="f-acc-soft"/><text x="44" y="44" class="t" style="font-weight:700">IfcRoot</text><text x="44" y="60">GlobalId · OwnerHistory · Name · Description</text>
+          <rect x="54" y="74" width="336" height="30" rx="7" class="f-elev"/><text x="68" y="94"><tspan class="t" style="font-weight:700">IfcObjectDefinition</tspan>  (직접 속성 없음)</text>
+          <rect x="78" y="112" width="312" height="30" rx="7" class="f-elev"/><text x="92" y="132"><tspan class="t" style="font-weight:700">IfcObject</tspan>  ObjectType</text>
+          <rect x="102" y="150" width="288" height="40" rx="7" class="f-elev"/><text x="116" y="168" class="t" style="font-weight:700">IfcProduct</text><text x="116" y="184">ObjectPlacement · Representation</text>
+          <rect x="126" y="198" width="264" height="30" rx="7" class="f-elev"/><text x="140" y="218"><tspan class="t" style="font-weight:700">IfcElement</tspan>  Tag</text>
+          <rect x="150" y="236" width="240" height="40" rx="7" class="f-acc2-soft"/><text x="164" y="254" class="t" style="font-weight:700">IfcBuildingElement</text><text x="164" y="270" style="fill:var(--accent-2)">IFC4.3: IfcBuiltElement</text>
+          <rect x="174" y="284" width="216" height="30" rx="7" class="f-acc-soft"/><text x="188" y="304"><tspan class="t" style="font-weight:700">IfcWall</tspan>  PredefinedType</text>
+        </g>
+        <g style="stroke:var(--text-faint);stroke-width:1.2;fill:none"><path d="M42 66V89H54M66 104V127H78M90 142V170H102M114 190V213H126M138 228V256H150M162 276V299H174"/></g>
+        <text x="420" y="44" class="t" style="font-weight:700">STEP 줄에서 속성의 순서 (IFC4)</text>
+        <g class="t-mono" style="font-size:11.5px">
+          <text x="420" y="74">① GlobalId     ← IfcRoot</text>
+          <text x="420" y="94">② OwnerHistory ← IfcRoot (IFC2x3 필수, IFC4 선택)</text>
+          <text x="420" y="114">③ Name  ④ Description ← IfcRoot</text>
+          <text x="420" y="134">⑤ ObjectType   ← IfcObject</text>
+          <text x="420" y="154">⑥ ObjectPlacement ⑦ Representation ← IfcProduct</text>
+          <text x="420" y="174">⑧ Tag          ← IfcElement</text>
+          <text x="420" y="194">⑨ PredefinedType ← IfcWall (IFC4부터)</text>
+        </g>
+        <rect x="420" y="222" width="410" height="66" rx="8" class="f-elev"/>
+        <text x="434" y="246" class="t-mono" style="fill:var(--text)">#200=IFCWALL('2HHI…',$,'W-CORE1-1F',$,$,</text>
+        <text x="434" y="266" class="t-mono" style="fill:var(--text)">        #201,#210,'W1',.SOLIDWALL.);</text>
+        <text x="434" y="282" class="t-mono">        ①  ②  ③  ④ ⑤  ⑥   ⑦   ⑧   ⑨</text>
+        <text x="420" y="320" class="t-dim">IfcColumn·IfcBeam·IfcSlab도 같은 사슬을 지나 아홉 속성을 갖는다.</text>
+        <text x="420" y="340" class="t-dim">IfcDuctSegment는 IfcElement 아래 설비 요소 가지(IFC4부터).</text>
+      </svg>
+      <figcaption><b>그림 3-3.</b> <code>IfcWall</code>의 상속 사슬(IFC4 기준, 주요 직접 속성만). 공통 속성은 위에서 한 번만 정의되고, 하위형은 그것을 그대로 물려받아 자기 속성 하나만 더한다. 파일의 한 줄은 이 순서를 그대로 따른다. IFC4.3에서는 <code>IfcBuildingElement</code>가 교량·도로 요소까지 포괄하도록 <code>IfcBuiltElement</code>로 이름이 바뀌었다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-if-inherit">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>상속 계층 탐색: 엔터티를 고르면 물려받은 속성이 보인다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="if-cv-inherit" aria-label="선택한 엔터티의 상속 사슬과 단계별 직접 속성, 형제 하위형"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>엔터티</span><div class="seg" id="if-ih-e"><button data-value="IfcWall" class="on">IfcWall</button><button data-value="IfcColumn">IfcColumn</button><button data-value="IfcDuctSegment">IfcDuctSegment</button><button data-value="IfcBuildingStorey">IfcBuildingStorey</button><button data-value="IfcProject">IfcProject</button><button data-value="IfcRelContainedInSpatialStructure">IfcRelContained…</button><button data-value="IfcPropertySet">IfcPropertySet</button></div></div>
+          <div class="ctrl"><span>스키마 버전</span><div class="seg" id="if-ih-v"><button data-value="2x3">IFC2x3</button><button data-value="4" class="on">IFC4</button><button data-value="4.3">IFC4.3</button></div></div>
+        </div>
+      </div>
+      <div class="if-msg" id="if-ih-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">상속 깊이</span><span class="v" id="if-ih-o-d">—</span></div>
+        <div class="stat"><span class="k">전체 속성 수</span><span class="v" id="if-ih-o-n">—</span></div>
+        <div class="stat"><span class="k">직접 / 물려받은</span><span class="v" id="if-ih-o-s">—</span></div>
+        <div class="stat"><span class="k">추상 상위형</span><span class="v" id="if-ih-o-a">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: <code>IfcWall</code>(IFC4)에서 속성 9개 중 8개를 물려받는 것을 보세요 · IFC2x3으로 바꾸면 <code>PredefinedType</code>이 없어 8개가 되고, <code>IfcDuctSegment</code>는 아예 없습니다(2x3에서는 <code>IfcFlowSegment</code>에 덕트 유형을 붙였다) · IFC4.3에서 <code>IfcBuildingElement</code>가 <code>IfcBuiltElement</code>로 바뀌고 <code>IfcBuilding</code>이 <code>IfcFacility</code> 아래로 들어가는 것을 확인하세요 · <code>IfcProject</code>는 IFC4부터 <code>IfcContext</code> 아래로 옮겨 갔습니다 · 아래 칸은 같은 순서로 쓴 STEP 줄의 틀입니다 · 모델: 주요 엔터티와 직접 속성만 담은 교육용 발췌(속성 이름은 공식 스키마 문서로 확인), "?"는 선택적 속성.</div>
+    </div>
+    <div class="callout"><strong>예제 3.2 (IfcColumn의 속성 세기)</strong> IFC4에서 B-10 기둥 C-B2-1F를 적으려면 몇 개의 값을 써야 하나?
+      <p><b>① 사슬</b> <code>IfcRoot</code>(4) → <code>IfcObjectDefinition</code>(0) → <code>IfcObject</code>(1) → <code>IfcProduct</code>(2) → <code>IfcElement</code>(1) → <code>IfcBuildingElement</code>(0) → <code>IfcColumn</code>(1).</p>
+      <p><b>② 합</b> \(4 + 0 + 1 + 2 + 1 + 0 + 1 = 9\)개. 이 중 필수는 GlobalId 하나뿐이고, 나머지는 비워 둘 수 있다(\(\$\)로 적는다, 3.7절). IFC2x3에서는 <code>PredefinedType</code>이 없어 8개, 대신 OwnerHistory가 필수다.</p>
+      <p><b>③ 판단</b> "기둥의 단면이 800 × 800"이라는 정보는 이 아홉 칸 어디에도 없다. 단면은 형상(Representation이 가리키는 돌출 형상, 3.7절)이나 속성 세트(3.5절)에 들어간다. 스키마 속성은 모든 기둥에 공통인 <b>틀</b>이고, 기둥마다 다른 내용은 대부분 다른 엔터티를 <b>참조</b>해서 붙인다. 이 참조의 그물이 IFC 모델의 본질이다.</p></div>
+    <div class="callout warn"><strong>버전을 반드시 밝힌다</strong> 같은 이름의 엔터티도 버전마다 속성의 수와 순서, 상위형이 다를 수 있습니다. IFC2x3 파일을 IFC4 스키마로 읽으면 칸이 어긋납니다. 그래서 STEP 파일 머리에 <code>FILE_SCHEMA(('IFC4'))</code>처럼 스키마를 적고, BIM 수행 계획(4장)에는 교환할 IFC 버전과 MVD를 명시합니다. 이 장의 엔터티 이름과 속성 순서는 IFC4를 기준으로 하고, 다른 버전은 따로 밝힙니다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="relationships">
+    <h2>관계 엔터티: 객체를 잇는 객체</h2>
+    <div class="problem"><strong>기둥은 자기가 몇 층인지 알까</strong>
+      <p>그림 3-3의 아홉 칸에는 "3층"이라는 칸이 없습니다. 재료도, 유형도, 속성도 없습니다. 그런데 B-10 BIM의 모든 기둥은 층과 재료와 속성을 가집니다. 그 정보는 어디에 있을까요?</p></div>
+    <p>IFC는 객체 사이의 관계를 객체의 속성으로 적지 않고, <b>관계 자체를 하나의 엔터티</b>로 만듭니다. 이것을 <span class="term">객체화된 관계</span><span class="en">(objectified relationship)</span>라 합니다. 기둥이 1층에 있다는 사실은 기둥 안이 아니라 <code>IfcRelContainedInSpatialStructure</code> 인스턴스 하나에 "관련 요소들: (기둥, 기둥, …), 담는 공간: 1층"으로 적힙니다. 관계가 객체이므로 GlobalId와 이름을 가질 수 있고, 하나의 관계가 수백 개의 요소를 한꺼번에 묶을 수 있으며, 관계만 바꾸면 요소를 고치지 않고도 연결을 바꿀 수 있습니다. 반대 방향("이 기둥은 어느 층에 있나")은 스키마의 <span class="term">역속성</span><span class="en">(inverse attribute)</span>으로 정의되어, 읽는 프로그램이 관계를 거꾸로 따라가 계산합니다. 파일에는 역속성이 적히지 않습니다.</p>
+    <div class="callout def"><strong>정의 3.3 (주요 관계 엔터티)</strong> 관계는 "주는 쪽(relating)" 하나와 "받는 쪽(related)" 하나 이상을 잇는다.
+      <div class="table-wrap"><table class="if-tbl">
+        <thead><tr><th>관계 엔터티</th><th>relating(하나)</th><th>related(여럿)</th><th>뜻</th></tr></thead>
+        <tbody>
+          <tr><td><code>IfcRelAggregates</code></td><td>전체</td><td>부분</td><td>분해·<span class="term">집합 관계</span><span class="en">(aggregation)</span>: 건물 → 층, 프로젝트 → 대지</td></tr>
+          <tr><td><code>IfcRelContainedInSpatialStructure</code></td><td>공간 구조 요소</td><td>요소</td><td>요소가 어느 층(공간)에 놓이는가 — 요소 하나는 한 곳에만 포함</td></tr>
+          <tr><td><code>IfcRelDefinesByProperties</code></td><td>속성 세트·수량 세트</td><td>객체</td><td>속성을 붙인다. 한 세트를 여러 객체가 공유할 수 있다</td></tr>
+          <tr><td><code>IfcRelDefinesByType</code></td><td>유형 객체</td><td>개별 객체</td><td>유형(C1 800 × 800)과 그 유형의 개별 기둥들</td></tr>
+          <tr><td><code>IfcRelAssociatesMaterial</code></td><td>재료</td><td>객체</td><td>재료 연결(C30)</td></tr>
+          <tr><td><code>IfcRelVoidsElement</code></td><td>벽 등</td><td>개구부 요소</td><td>덕트가 지나는 벽 구멍(<code>IfcOpeningElement</code>) — 6장의 관통부 해결</td></tr>
+        </tbody></table></div></div>
+    <figure class="diagram" id="fig-if-rel">
+      <svg viewBox="0 0 860 360" role="img" aria-label="기둥 C-B2-1F를 중심으로 층, 유형, 속성 세트, 재료를 잇는 관계 엔터티">
+        <rect x="10" y="10" width="840" height="340" rx="10" class="f-surface"/>
+        <rect x="350" y="160" width="160" height="48" rx="8" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:2"/>
+        <text x="430" y="181" text-anchor="middle" class="t" style="font-weight:700">IfcColumn</text><text x="430" y="198" text-anchor="middle" class="t-mono">C-B2-1F</text>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="40" y="40" width="170" height="44" rx="8" class="f-acc-soft"/><text x="125" y="59" style="fill:var(--text);font-weight:700">IfcBuildingStorey</text><text x="125" y="75">1F · Elevation 0</text>
+          <rect x="650" y="40" width="170" height="44" rx="8" class="f-elev"/><text x="735" y="59" style="fill:var(--text);font-weight:700">IfcColumnType</text><text x="735" y="75">C1 · 800 × 800</text>
+          <rect x="40" y="286" width="170" height="44" rx="8" class="f-elev"/><text x="125" y="305" style="fill:var(--text);font-weight:700">IfcPropertySet</text><text x="125" y="321">Pset_ColumnCommon</text>
+          <rect x="650" y="286" width="170" height="44" rx="8" class="f-elev"/><text x="735" y="305" style="fill:var(--text);font-weight:700">IfcMaterial</text><text x="735" y="321">C30</text>
+        </g>
+        <g style="fill:var(--bg-elev);stroke:var(--ok);stroke-width:1.8">
+          <path d="M240 112L300 92L360 112L300 132Z"/><path d="M500 112L560 92L620 112L560 132Z"/><path d="M240 256L300 236L360 256L300 276Z"/><path d="M500 256L560 236L620 256L560 276Z"/>
+        </g>
+        <g class="t-mono" text-anchor="middle" style="fill:var(--ok);font-size:10.5px">
+          <text x="300" y="116">ContainedIn…</text><text x="560" y="116">DefinesByType</text><text x="300" y="260">DefinesByProps</text><text x="560" y="260">AssociatesMat.</text>
+        </g>
+        <g style="stroke:var(--ok);stroke-width:1.6;fill:none">
+          <path d="M240 112H210V84" marker-end="url(#if-ah-ok)"/><path d="M360 112L392 156" marker-end="url(#if-ah-ok)"/>
+          <path d="M620 112H650V84" marker-end="url(#if-ah-ok)"/><path d="M500 112L468 156" marker-end="url(#if-ah-ok)"/>
+          <path d="M240 256H210V286" marker-end="url(#if-ah-ok)"/><path d="M360 256L392 212" marker-end="url(#if-ah-ok)"/>
+          <path d="M620 256H650V286" marker-end="url(#if-ah-ok)"/><path d="M500 256L468 212" marker-end="url(#if-ah-ok)"/>
+        </g>
+        <g class="t-mono" style="font-size:10.5px"><text x="160" y="100">relating</text><text x="350" y="150" text-anchor="end">related</text><text x="660" y="100">relating</text><text x="510" y="150">related</text></g>
+                <rect x="40" y="136" width="200" height="64" rx="8" style="fill:none;stroke:var(--text-faint);stroke-dasharray:4 3"/>
+        <text x="52" y="156" class="t-mono">같은 관계가 1층의</text><text x="52" y="172" class="t-mono">요소 36개를 한 번에 담는다</text><text x="52" y="188" class="t-mono">(RelatedElements 목록)</text>
+        <rect x="620" y="136" width="200" height="64" rx="8" style="fill:none;stroke:var(--text-faint);stroke-dasharray:4 3"/>
+        <text x="632" y="156" class="t-mono">역속성으로 거꾸로 읽기:</text><text x="632" y="172" class="t-mono">ContainedInStructure,</text><text x="632" y="188" class="t-mono">IsTypedBy, IsDefinedBy</text>
+      </svg>
+      <figcaption><b>그림 3-4.</b> 객체화된 관계(마름모). 기둥 자체에는 층·유형·속성·재료가 없고, 네 개의 관계 인스턴스가 기둥을 다른 객체와 잇는다. 화살표는 관계가 참조하는 방향이다. "C-B2-1F는 몇 층인가"는 관계를 거꾸로 따라가(역속성) 답한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-if-graph">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>관계 그래프 3D: B-10 BIM의 요소와 관계 선</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="if-cv-graph" aria-label="B-10 BIM 요소와 프로젝트·대지·건물·층·유형·속성 세트 노드를 잇는 관계 선의 3D 그림"></canvas></div>
+        <div class="sim-controls">
+          <label class="check"><input type="checkbox" id="if-gr-agg" checked> 집합(IfcRelAggregates)</label>
+          <label class="check"><input type="checkbox" id="if-gr-con" checked> 공간 포함(…ContainedIn…)</label>
+          <label class="check"><input type="checkbox" id="if-gr-typ"> 유형(IfcRelDefinesByType)</label>
+          <label class="check"><input type="checkbox" id="if-gr-pro"> 속성(IfcRelDefinesByProperties)</label>
+          <label class="ctrl"><span>보일 층 <output id="if-gr-s-out"></output></span><input type="range" id="if-gr-s" min="0" max="10" step="1" value="3"></label>
+          <div class="ctrl"><span>속성 세트 만들기</span><div class="seg" id="if-gr-ps"><button data-value="each" class="on">요소마다 하나</button><button data-value="share">같은 값끼리 공유</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">관계 인스턴스</span><span class="v" id="if-gr-o-r">—</span></div>
+        <div class="stat"><span class="k">연결(참조) 수</span><span class="v" id="if-gr-o-l">—</span></div>
+        <div class="stat"><span class="k">속성 세트 인스턴스</span><span class="v" id="if-gr-o-p">—</span></div>
+        <div class="stat"><span class="k">속성 값 인스턴스</span><span class="v" id="if-gr-o-v">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 끌어서 돌려 보세요(터치는 가로로 끌기) · 공간 포함 관계는 층마다 하나, 모두 10개가 요소 360개를 담습니다 · "유형"을 켜면 기둥 200개가 유형 하나(C1)로 모이는 것이 보입니다 · "속성"을 켜고 "같은 값끼리 공유"로 바꾸면 속성 세트가 340개에서 6개로 줄어듭니다(외부 기둥·내부 기둥처럼 값이 같은 요소끼리 한 세트) · 보일 층을 0으로 하면 전체 층입니다 · 모델: <code>CB.bim.model()</code>, 표준 속성 세트는 기둥·보·슬래브·벽에만(덕트·배관의 형식 정보는 유형에), 값은 표 3-1의 결함 없는 원본 값(교육용). 관계 노드 위치는 보기 좋게 둔 것일 뿐 좌표 의미는 없다.</div>
+    </div>
+    <div class="callout"><strong>예제 3.3 (B-10 BIM의 관계 세기)</strong> 공간 구조 프로젝트 1 · 대지 1 · 건물 1 · 층 10, 요소 360개.
+      <p><b>① 집합</b> 프로젝트 → 대지, 대지 → 건물, 건물 → 층 10개: 관계 인스턴스 3개, 연결 \(1 + 1 + 10 = 12\)개.</p>
+      <p><b>② 공간 포함</b> 층마다 하나: 인스턴스 10개, 연결 360개(층당 기둥 20 · 보 9 · 슬래브 1 · 벽 4 · 덕트 1 · 배관 1 = 36).</p>
+      <p><b>③ 유형</b> C1·G1·S1·W1·덕트·배관 유형 6개: 인스턴스 6개, 연결 360개.</p>
+      <p><b>④ 속성</b> 기둥·보·슬래브·벽 340개에 표준 속성 세트를 하나씩 붙이면 세트 340개 + 관계 340개. 값이 같은 요소끼리 세트를 공유하면 세트 6개(외부·내부 기둥, 외부·내부 보, 슬래브, 벽) + 관계 6개로 같은 정보를 적는다.</p>
+      <p><b>⑤ 판단</b> 공유는 파일을 줄이지만, 나중에 기둥 하나의 값만 바꾸려면 세트를 쪼개야 한다. 저작 도구가 어떻게 내보내는지에 따라 같은 모델의 IFC 파일 크기와 구조가 크게 다르다. 받는 쪽 프로그램은 두 방식을 모두 읽을 수 있어야 한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="spatial">
+    <h2>공간 구조: 프로젝트에서 층까지</h2>
+    <div class="problem"><strong>360개 요소를 어떻게 찾아가나</strong>
+      <p>B-10 BIM을 받은 설비 기술자가 "7층 덕트"를 찾으려 합니다. 요소 360개를 처음부터 훑을 수도 있지만, 사람도 프로그램도 "프로젝트 → 건물 → 7층 → 덕트"로 찾는 편이 자연스럽습니다. IFC는 이 길을 어떻게 정해 둘까요?</p></div>
+    <p>IFC 모델의 뼈대는 <span class="term">공간 구조</span><span class="en">(spatial structure)</span>입니다. <code>IfcProject</code>(맥락: 단위, 좌표계, 표현 문맥) 아래 <code>IfcSite</code>(대지), <code>IfcBuilding</code>(건물), <code>IfcBuildingStorey</code>(층), <code>IfcSpace</code>(실)가 <code>IfcRelAggregates</code>로 나무를 이루고, 물리 요소는 <code>IfcRelContainedInSpatialStructure</code>로 그 나무의 한 마디에 매달립니다.</p>
+    <div class="callout def"><strong>정의 3.4 (공간 구조와 포함 규칙)</strong> 공간 구조는 프로젝트를 뿌리로 하는 나무 \(T\)이며, 모든 물리 요소 \(e\)는 정확히 하나의 공간 구조 요소 \(s(e) \in T\)에 포함된다.
+      <div class="formula">$$\text{IfcProject} \xrightarrow{\text{agg}} \text{IfcSite} \xrightarrow{\text{agg}} \text{IfcBuilding} \xrightarrow{\text{agg}} \text{IfcBuildingStorey} \xrightarrow{\text{agg}} \text{IfcSpace}, \qquad e \xrightarrow{\text{contained}} s(e)$$<div class="where">여러 층에 걸친 요소(커튼월, 여러 층 기둥)도 포함은 한 곳이고, 다른 층과는 참조 관계(<code>IfcRelReferencedInSpatialStructure</code>)로 잇는다. 층의 높이는 <code>IfcBuildingStorey</code>의 Elevation(B-10: 0, 5, 9, …, 37 m)으로 적는다. 실(<code>IfcSpace</code>)은 선택적이며, B-10 BIM에는 아직 없다(13장에서 공간을 더한다).</div></div></div>
+    <figure class="diagram" id="fig-if-spatial">
+      <svg viewBox="0 0 860 330" role="img" aria-label="B-10 BIM의 공간 구조: 프로젝트, 대지, 건물, 층 10개와 층마다 요소 36개">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g class="t-mono">
+          <rect x="30" y="140" width="120" height="48" rx="8" class="f-acc-soft"/><text x="90" y="160" text-anchor="middle" style="fill:var(--text);font-weight:700">IfcProject</text><text x="90" y="177" text-anchor="middle">B-10 · 단위 m</text>
+          <rect x="180" y="140" width="110" height="48" rx="8" class="f-acc-soft"/><text x="235" y="160" text-anchor="middle" style="fill:var(--text);font-weight:700">IfcSite</text><text x="235" y="177" text-anchor="middle">대지</text>
+          <rect x="320" y="140" width="110" height="48" rx="8" class="f-acc-soft"/><text x="375" y="160" text-anchor="middle" style="fill:var(--text);font-weight:700">IfcBuilding</text><text x="375" y="177" text-anchor="middle">B-10</text>
+        </g>
+        <g style="stroke:var(--accent);stroke-width:1.8;fill:none"><path d="M150 164H178"/><path d="M290 164H318"/><path d="M430 164H450V40H468M450 70H468M450 100H468M450 130H468M450 288H468"/></g>
+        <g class="t-mono">
+          <rect x="470" y="28" width="150" height="24" rx="6" class="f-elev"/><text x="480" y="45" style="fill:var(--text)">10F · Elev 37</text>
+          <rect x="470" y="58" width="150" height="24" rx="6" class="f-elev"/><text x="480" y="75" style="fill:var(--text)">9F · Elev 33</text>
+          <rect x="470" y="88" width="150" height="24" rx="6" class="f-elev"/><text x="480" y="105" style="fill:var(--text)">8F · Elev 29</text>
+          <rect x="470" y="118" width="150" height="24" rx="6" class="f-elev"/><text x="480" y="135" style="fill:var(--text)">7F · Elev 25</text>
+          <text x="545" y="190" text-anchor="middle">⋮ (6F 21 · 5F 17 · 4F 13</text><text x="545" y="208" text-anchor="middle">3F 9 · 2F 5)</text>
+          <rect x="470" y="276" width="150" height="24" rx="6" class="f-acc2-soft"/><text x="480" y="293" style="fill:var(--text)">1F · Elev 0</text>
+        </g>
+        <g style="stroke:var(--ok);stroke-width:1.6;fill:none"><path d="M620 288H650V220H668M650 250H668M650 288H668M650 318V288"/></g>
+        <g class="t-mono">
+          <text x="672" y="224">IfcColumn ×20</text><text x="672" y="254">IfcBeam ×9 · IfcSlab ×1</text><text x="672" y="284">IfcWall ×4</text><text x="672" y="304">Duct ×1 · Pipe ×1</text>
+          <text x="672" y="160" style="fill:var(--text-faint)">IfcSpace — 아직 없음(13장)</text>
+          <text x="660" y="40" style="fill:var(--accent)">집합(aggregates)</text><text x="660" y="58" style="fill:var(--accent)">= 공간 나무</text>
+          <text x="660" y="90" style="fill:var(--ok)">포함(contained)</text><text x="660" y="108" style="fill:var(--ok)">= 요소를 마디에</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-5.</b> B-10 BIM의 공간 구조. 층의 Elevation은 층 바닥 높이(m)다. 층마다 요소 36개가 포함 관계로 매달린다. 이 책의 모델은 층 \(k\)의 기둥·벽과 함께 그 층 <b>위</b>의 보·슬래브(층 \(k+1\)의 바닥)를 층 \(k\)에 넣는다 — 3.4절의 "어느 층에 넣을까"를 보라.</figcaption>
+    </figure>
+    <div class="sim" id="sim-if-tree">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>IFC 공간 구조 트리: B-10 BIM 접고 펼치기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="if-cv-tree" aria-label="B-10 BIM 3D 모델에서 트리에서 고른 노드에 속한 요소를 주황으로 강조"></canvas></div>
+        <div class="sim-controls">
+          <div class="if-tree" id="if-tr-list" role="tree" aria-label="B-10 BIM 공간 구조 트리"></div>
+          <div class="btn-row"><button class="btn" id="if-tr-open">층 모두 펼치기</button> <button class="btn" id="if-tr-close">모두 접기</button></div>
+        </div>
+      </div>
+      <div class="if-msg" id="if-tr-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">선택</span><span class="v" id="if-tr-o-n">—</span></div>
+        <div class="stat"><span class="k">엔터티</span><span class="v" id="if-tr-o-e">—</span></div>
+        <div class="stat"><span class="k">포함 요소</span><span class="v" id="if-tr-o-c">—</span></div>
+        <div class="stat"><span class="k">부피(상자 합)</span><span class="v" id="if-tr-o-v">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: ▸를 눌러 펼치고 이름을 눌러 고르세요 · 처음에는 "7F"가 골라져 요소 36개가 주황입니다 —, 그 층의 보·슬래브가 층 <b>위</b>에 있는 것이 보입니다 · 7F → IfcDuctSegment → DU-SA-7F를 고르면 GlobalId와 속성이 아래에 나옵니다 · "IfcBuilding"을 고르면 360개, 부피 약 3,518 m³(상자 합 — 겹침 공제 전, 7장) · 끌어서 돌려 보세요 · 모델: <code>CB.bim.model()</code>, GlobalId는 <code>CB.bim.guid</code>(교육용 결정적 ID, 3.6절), 공간 구조 요소의 ID는 "엔터티 이름 + 이름"을 씨앗으로 만들었다.</div>
+    </div>
+    <div class="callout warn"><strong>어느 층에 넣을까</strong> 2층 바닥 슬래브는 1층의 천장이기도 합니다. B-10 BIM은 층 \(k\)의 기둥·벽과 함께 그 위의 보·슬래브를 층 \(k\)에 넣습니다(골조 시공 단위 — 9장 4D의 "층 사이클"과 맞음). 많은 설계 사무소는 반대로 슬래브를 그것이 바닥이 되는 층에 넣습니다(마감·실 면적 단위). 어느 쪽도 틀리지 않지만, 한 프로젝트 안에서 섞이면 "7층 물량"이 분야마다 달라집니다. 이 규칙은 BIM 수행 계획(4장)에 적고 모델 검수 규칙(4장)으로 확인합니다.</div>
+    <div class="callout site"><strong>B-10 BIM의 IFC 골격</strong> 프로젝트 B-10(단위 m, 모델 로컬 원점 = 격자 A/1), 대지 1, 건물 1, 층 10(Elevation 0, 5, 9, 13, …, 37 m, 지붕 41 m). 요소 360개 = <code>IfcColumn</code> 200 + <code>IfcBeam</code> 90 + <code>IfcSlab</code> 10 + <code>IfcWall</code> 40 + <code>IfcDuctSegment</code> 10 + <code>IfcPipeSegment</code> 10, 층마다 36개. 상자 부피 합은 기둥 435 · 보 500 · 슬래브 1,708 · 벽 747 m³(겹침 공제 전, 7장). 지도 좌표(가상, E 203,450 · N 551,820, 회전 12°)는 IFC4의 지리 참조 엔터티(<code>IfcMapConversion</code> 형태)로 프로젝트에 붙일 수 있다(15장). 덕트–보 간섭 30건, 배관–보 30건, 덕트–코어 벽 관통 20건은 6장에서 다룬다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="psets">
+    <h2>속성 세트와 수량 세트</h2>
+    <div class="problem"><strong>"내력벽인가, 외벽인가, 내화 몇 시간인가"는 어디에</strong>
+      <p>스키마 속성은 아홉 칸뿐인데, 실무에서 요소에 붙이는 정보는 수십 가지입니다. 나라마다, 프로젝트마다 필요한 정보도 다릅니다. 스키마를 고치지 않고 정보를 늘리는 방법은?</p></div>
+    <p>IFC는 고정된 스키마 속성과 별도로, 이름–값 쌍의 묶음인 <span class="term">속성 세트</span><span class="en">(property set, Pset)</span>를 관계(<code>IfcRelDefinesByProperties</code>)로 붙입니다. buildingSMART가 정의한 표준 속성 세트는 이름이 <code>Pset_</code>로 시작하고(<code>Pset_WallCommon</code>, <code>Pset_ColumnCommon</code>, <code>Pset_BeamCommon</code>, <code>Pset_SlabCommon</code>), 그 안에 <code>Reference</code>(유형 표시), <code>LoadBearing</code>(내력 여부), <code>IsExternal</code>(외부 여부), <code>FireRating</code>(내화 등급) 같은 속성이 정해져 있습니다. 프로젝트 고유 속성은 <code>Pset_</code> 접두어를 쓰지 않는 사용자 세트(예: <code>B10_Structure</code>)로 더합니다. 길이·넓이·부피·무게 같은 측정값은 <span class="term">수량 세트</span><span class="en">(quantity set)</span>(<code>IfcElementQuantity</code>, 표준 이름 <code>Qto_ColumnBaseQuantities</code> 등)에 단위가 있는 수량 엔터티(<code>IfcQuantityVolume</code> 등)로 적습니다.</p>
+    <div class="callout def"><strong>정의 3.5 (속성 세트·수량 세트·유형)</strong> 객체 \(o\)의 속성 값은 개별 객체에 붙은 세트가 먼저이고, 없으면 그 객체의 유형에 붙은 세트의 값을 쓴다.
+      <div class="formula">$$v(o, p) = \begin{cases} v_{\text{개별}}(o, p) & \text{개별 객체에 값이 있으면} \\ v_{\text{유형}}(\text{type}(o), p) & \text{그렇지 않으면} \end{cases}$$<div class="where">유형 객체(<code>IfcColumnType</code> 등, <span class="term">유형 객체</span><span class="en">(type object)</span>)는 같은 유형의 모든 기둥에 공통인 정보(단면 800 × 800, 재료)를 한 번만 적고, 개별 객체(occurrence)는 위치·층·외부 여부처럼 기둥마다 다른 값을 가진다. 수량 세트의 GrossVolume은 공제 전, NetVolume은 개구부·겹침을 뺀 값이다(공제 규칙은 7장).</div></div></div>
+    <div class="table-wrap"><table class="if-tbl">
+      <caption>표 3-1. B-10 BIM 요소의 표준 속성 세트와 이 장의 교육용 값</caption>
+      <thead><tr><th>요소</th><th>속성 세트</th><th>Reference</th><th>LoadBearing</th><th>IsExternal</th><th>FireRating</th><th>기타</th></tr></thead>
+      <tbody>
+        <tr><td><code>IfcColumn</code> 200</td><td><code>Pset_ColumnCommon</code></td><td>C1</td><td>TRUE</td><td>둘레 기둥 TRUE(층당 14)</td><td>3시간</td><td>단면은 유형·형상</td></tr>
+        <tr><td><code>IfcBeam</code> 90</td><td><code>Pset_BeamCommon</code></td><td>G1</td><td>TRUE</td><td>둘레 보 TRUE(층당 4)</td><td>2시간</td><td>Span 8.0 m</td></tr>
+        <tr><td><code>IfcSlab</code> 10</td><td><code>Pset_SlabCommon</code></td><td>S1</td><td>TRUE</td><td>FALSE</td><td>2시간</td><td>두께는 형상</td></tr>
+        <tr><td><code>IfcWall</code> 40</td><td><code>Pset_WallCommon</code></td><td>W1</td><td>TRUE</td><td>FALSE(코어 벽)</td><td>2시간</td><td>두께 400 mm</td></tr>
+        <tr><td>덕트·배관 20</td><td>유형의 속성</td><td colspan="4">크기(1,000 × 400, DN 100), 계통(급기, 스프링클러)은 유형과 설비 계통 그룹으로</td><td></td></tr>
+      </tbody></table></div>
+    <p>표 3-1의 FireRating 값은 이 장의 연습을 위한 <b>교육용 값</b>입니다(실제 내화 성능은 관련 법령과 설계로 정한다). 또 이 장의 "인계 모델"에는 연습을 위해 결함을 일부러 넣었습니다: 9·10층 기둥 40개의 FireRating 누락, 4층 코어 벽 4개의 <code>Pset_WallCommon</code> 누락, 보 하나의 이름 오기(G1-YC-6F → G1-YC-6). 아래 속성 세트 편집기와 3.8절의 IDS 검증기가 같은 데이터를 함께 씁니다 — 편집기에서 고치면 검증 결과가 바뀝니다.</p>
+    <div class="sim" id="sim-if-pset">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>속성 세트 편집: 요소를 골라 Pset 값을 바꾸면 질의 결과가 바뀐다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="if-cv-pset" aria-label="선택한 층의 평면에 기둥, 보, 코어 벽, 덕트, 배관과 질의에 맞는 요소 강조"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>층 <output id="if-ps-s-out"></output></span><input type="range" id="if-ps-s" min="1" max="10" step="1" value="9"></label>
+          <div class="ctrl"><span>질의</span><div class="seg" id="if-ps-q"><button data-value="ext" class="on">IsExternal = TRUE</button><button data-value="fire">FireRating 없음</button><button data-value="nlb">LoadBearing ≠ TRUE</button><button data-value="nopset">Pset 없음</button></div></div>
+          <div id="if-ps-ed" class="ctrl"></div>
+          <div class="btn-row"><button class="btn" id="if-ps-fix">이 층 FireRating 채우기</button> <button class="btn" id="if-ps-reset">인계 모델로 되돌리기</button></div>
+        </div>
+      </div>
+      <div class="if-msg" id="if-ps-msg">평면에서 요소를 눌러 고르세요.</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">질의 일치(전체)</span><span class="v" id="if-ps-o-a">—</span></div>
+        <div class="stat"><span class="k">질의 일치(이 층)</span><span class="v" id="if-ps-o-f">—</span></div>
+        <div class="stat"><span class="k">선택 요소</span><span class="v" id="if-ps-o-e">—</span></div>
+        <div class="stat"><span class="k">고친 값</span><span class="v" id="if-ps-o-c">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 9층에서 "FireRating 없음"을 고르면 기둥 20개가 빨갛게 나옵니다 — 기둥 하나를 눌러 FireRating을 "3시간"으로 바꾸면 전체 일치가 40 → 39로 줄어듭니다 · "이 층 FireRating 채우기"로 한 번에 고칠 수도 있습니다 · 4층에서 "Pset 없음"을 고르면 코어 벽 4개가 나옵니다 · 외부 기둥(IsExternal)은 층당 14개 — 내부 기둥 하나를 외부로 바꾸면 결과가 바로 바뀝니다 · 고친 값은 3.8절 IDS 검증에도 쓰입니다 · 모델: 표 3-1의 교육용 값 + 일부러 넣은 결함, 질의는 페이지 스크립트(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 3.4 (기둥의 수량 세트와 B-10의 기둥 부피)</strong> C-B2-1F의 <code>Qto_ColumnBaseQuantities</code>.
+      <p><b>① 1층 기둥</b> 단면 \(0.8\times0.8 = 0.64\) m², 높이는 층 바닥 0에서 보 밑 \(5 - 0.7 = 4.3\) m → GrossVolume \(= 0.64\times4.3 = 2.752\) m³.</p>
+      <p><b>② 2–10층 기둥</b> 층고 4 m → 높이 3.3 m, \(0.64\times3.3 = 2.112\) m³.</p>
+      <p><b>③ 합</b> \(20\times2.752 + 180\times2.112 = 55.04 + 380.16 = 435.2\) m³ — 기준 모델 표의 "기둥 435 m³"와 같다.</p>
+      <p><b>④ 판단</b> 이 모델의 기둥은 보 밑에서 끝나 보와 겹치지 않으므로 Gross = Net이다. 그러나 보(400 × 700, 슬래브 포함 춤)와 슬래브는 서로 겹쳐 그려져 있어, 상자 부피를 더하면 층당 약 339 m³로 SiteBook의 288.7 m³보다 크다. 수량 세트의 값이 Gross인지 Net인지, 어느 공제 규칙을 썼는지(<code>MethodOfMeasurement</code>)를 밝히지 않으면 받는 쪽은 숫자를 믿을 수 없다(7장).</p></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="guid">
+    <h2>GlobalId: 같은 객체는 같은 ID</h2>
+    <div class="problem"><strong>지난주 모델과 이번 주 모델, 무엇이 바뀌었나</strong>
+      <p>설비 사무소가 매주 새 IFC 파일을 보냅니다. 시공사는 "이번 주에 바뀐 덕트만" 다시 검토하고 싶습니다. 이름으로 맞추면 이름을 바꾼 덕트를 놓치고, 위치로 맞추면 옮긴 덕트를 놓칩니다. 두 파일의 객체를 어떻게 짝지을까요?</p></div>
+    <p><code>IfcRoot</code>의 첫 속성 GlobalId는 객체마다 세계에서 유일한 <span class="term">전역 고유 식별자</span><span class="en">(globally unique identifier, GUID)</span>입니다. 한 번 발급된 GUID는 객체가 사는 동안(모델이 수정되고 다시 내보내져도) 바뀌지 않아야 합니다. 그래야 버전 비교(5장), 간섭 이력 추적(6장), 공정 연결(9장), 시설 관리 자산 대장(13장)이 같은 객체를 같은 객체로 알아봅니다.</p>
+    <div class="callout def"><strong>정의 3.6 (IFC GlobalId)</strong> 128비트 GUID를 64개 문자 집합 <code>0–9 A–Z a–z _ $</code>(한 문자 = 6비트)로 적은 22자 문자열이다.
+      <div class="formula">$$128 = 2 + 21\times 6, \qquad p_{\text{충돌}} \approx 1 - e^{-n^2/2^{k+1}} \approx \frac{n^2}{2^{k+1}}$$<div class="where">첫 문자는 2비트만 담으므로 0–3 중 하나다. \(n\): 객체 수, \(k\): ID의 무작위 비트 수(무작위 UUID는 128비트 중 122비트, RFC 4122 형태). 같은 객체 = 같은 ID가 목적이므로, 저작 도구는 객체를 처음 만들 때 ID를 발급해 저장하고 내보낼 때마다 그대로 쓴다. 이 책의 <code>CB.bim.guid(seed)</code>는 "엔터티 + 이름 + 층" 문자열을 해시해 22자를 만드는 <b>교육용 결정적 대용품</b>이다 — 같은 씨앗이면 같은 ID가 나오지만 이름을 바꾸면 ID도 바뀐다.</div></div></div>
+    <figure class="diagram" id="fig-if-guid">
+      <svg viewBox="0 0 860 250" role="img" aria-label="128비트 GUID를 2비트와 6비트 21묶음으로 나눠 22자로 적는 방법">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <text x="40" y="44" class="t" style="font-weight:700">128비트</text>
+        <rect x="120" y="28" width="700" height="24" rx="4" class="f-elev"/>
+        <rect x="120" y="28" width="11" height="24" style="fill:var(--accent-2)"/>
+        <g style="stroke:var(--border)"><line x1="164" y1="28" x2="164" y2="52"/><line x1="197" y1="28" x2="197" y2="52"/><line x1="230" y1="28" x2="230" y2="52"/><line x1="263" y1="28" x2="263" y2="52"/><line x1="296" y1="28" x2="296" y2="52"/><line x1="329" y1="28" x2="329" y2="52"/><line x1="362" y1="28" x2="362" y2="52"/><line x1="395" y1="28" x2="395" y2="52"/><line x1="428" y1="28" x2="428" y2="52"/><line x1="461" y1="28" x2="461" y2="52"/><line x1="494" y1="28" x2="494" y2="52"/><line x1="527" y1="28" x2="527" y2="52"/><line x1="560" y1="28" x2="560" y2="52"/><line x1="593" y1="28" x2="593" y2="52"/><line x1="626" y1="28" x2="626" y2="52"/><line x1="659" y1="28" x2="659" y2="52"/><line x1="692" y1="28" x2="692" y2="52"/><line x1="725" y1="28" x2="725" y2="52"/><line x1="758" y1="28" x2="758" y2="52"/><line x1="791" y1="28" x2="791" y2="52"/><line x1="131" y1="28" x2="131" y2="52"/></g>
+        <text x="126" y="72" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">2</text>
+        <text x="476" y="72" text-anchor="middle" class="t-mono">6비트 × 21묶음</text>
+        <g style="stroke:var(--text-faint);fill:none" marker-end="url(#if-ah)"><path d="M126 78V106"/><path d="M147 78L170 106"/><path d="M808 78L795 106"/></g>
+        <g class="t-mono" style="font-size:15px;fill:var(--text)" text-anchor="middle">
+          <rect x="112" y="110" width="28" height="30" rx="4" class="f-acc2-soft"/><text x="126" y="131">0</text>
+          <rect x="146" y="110" width="28" height="30" rx="4" class="f-elev"/><text x="160" y="131">T</text>
+          <rect x="180" y="110" width="28" height="30" rx="4" class="f-elev"/><text x="194" y="131">w</text>
+          <rect x="214" y="110" width="28" height="30" rx="4" class="f-elev"/><text x="228" y="131">c</text>
+          <text x="470" y="131">l u s f b 9 9 U g t f d 8 F s 9 p</text>
+          <rect x="780" y="110" width="28" height="30" rx="4" class="f-elev"/><text x="794" y="131">Q</text>
+        </g>
+        <text x="40" y="131" class="t" style="font-weight:700">22자</text>
+        <text x="112" y="168" class="t-mono">첫 문자: 0–3 (2비트) · 나머지 21자: 64가지 (6비트) → 2 + 126 = 128비트</text>
+        <text x="112" y="190" class="t-mono">64자 집합: 0–9 A–Z a–z _ $   (일반 Base64와 순서가 다르다)</text>
+        <text x="112" y="216" class="t-dim">예: B-10 BIM의 기둥 C-B2-1F = CB.bim.guid("IfcColumn" + "C-B2-1F" + 1) (교육용 결정적 ID)</text>
+      </svg>
+      <figcaption><b>그림 3-6.</b> IFC GlobalId의 구조. 128비트 수를 6비트씩 끊어 64개 문자 중 하나로 적으면 22자가 된다(첫 문자는 남은 2비트). 일반적인 UUID 표기(16진수 32자 + 하이픈)보다 짧고, STEP 파일의 작은따옴표 문자열에 그대로 들어간다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-if-guid">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>GlobalId 만들기와 버전 비교: ID가 유지될 때와 바뀔 때</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="if-cv-guid" aria-label="22자 GlobalId의 문자와 비트, 두 버전 모델의 비교 결과 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>요소 이름</span><input class="if-in mono" id="if-gu-name" type="text" value="C-B2-1F" spellcheck="false" autocomplete="off" aria-label="요소 이름"></label>
+          <div class="ctrl"><span>엔터티</span><div class="seg" id="if-gu-t"><button data-value="IfcColumn" class="on">IfcColumn</button><button data-value="IfcBeam">IfcBeam</button><button data-value="IfcWall">IfcWall</button></div></div>
+          <label class="ctrl"><span>층 <output id="if-gu-s-out"></output></span><input type="range" id="if-gu-s" min="1" max="10" step="1" value="1"></label>
+          <div class="ctrl"><span>새 버전을 내보낼 때 ID</span><div class="seg" id="if-gu-m"><button data-value="keep" class="on">발급한 ID 유지</button><button data-value="name">이름에서 계산</button><button data-value="new">매번 새로 발급</button></div></div>
+          <label class="ctrl"><span>객체 수 n (충돌 확률) <output id="if-gu-n-out"></output></span><input type="range" id="if-gu-n" min="3" max="15" step="1" value="9"></label>
+        </div>
+      </div>
+      <div class="if-msg" id="if-gu-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">GlobalId</span><span class="v" id="if-gu-o-g" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">모델과 일치</span><span class="v" id="if-gu-o-m">—</span></div>
+        <div class="stat"><span class="k">비교: 변경 · 추가 · 삭제</span><span class="v" id="if-gu-o-d">—</span></div>
+        <div class="stat"><span class="k">충돌 확률(122비트)</span><span class="v" id="if-gu-o-p">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(IfcColumn, C-B2-1F, 1층)이 모델 속 기둥의 ID와 같은지 보세요 — 같은 씨앗이면 같은 ID · 한 글자만 바꿔도 ID 전체가 바뀝니다 · 아래 막대는 "3층 기둥 C-B2-3F의 이름을 C-B2-3F-R로 바꾸고 단면을 900 × 900으로 고친" 새 버전과 원래 버전의 비교입니다: ID를 유지하면 변경 1건, 이름에서 계산하면 삭제 1 + 추가 1(이력이 끊김), 매번 새로 발급하면 360개 모두 삭제·추가로 보입니다 · 객체 10⁹개에서도 무작위 122비트 ID의 충돌 확률은 약 10⁻¹⁹ · 모델: <code>CB.bim.guid</code>(교육용 결정적 ID), 버전 비교는 ID로 짝짓는 페이지 계산, 충돌 확률은 생일 문제 근사(정의 3.6).</div>
+    </div>
+    <div class="callout"><strong>예제 3.5 (충돌 확률과 ID 유지)</strong>
+      <p><b>① 충돌</b> 무작위 UUID의 무작위 비트 \(k = 122\). 전 세계 BIM 모델의 객체가 \(n = 10^9\)개라 해도 \(p \approx (10^9)^2/2^{123} = 10^{18}/1.06\times10^{37} \approx 9.4\times10^{-20}\). 우연한 충돌은 걱정할 일이 아니다.</p>
+      <p><b>② 진짜 위험</b> 문제는 충돌이 아니라 <b>재발급</b>이다. 도구가 내보낼 때마다 ID를 새로 만들거나, 요소를 지우고 다시 그리면(복사–붙여넣기, 다른 도구로 옮겨 그리기) 같은 기둥이 새 ID를 받는다. B-10 기둥 하나를 고쳤을 뿐인데 비교 결과는 "360개 삭제, 360개 추가"가 되고, 간섭 이력과 4D 연결과 자산 대장이 모두 끊어진다.</p>
+      <p><b>③ 판단</b> ID 유지는 교환 품질의 첫 검사 항목이다. 두 버전의 ID 일치율을 재 보면(5장 버전 비교) 도구 설정 문제를 바로 알 수 있다. 이 책의 <code>CB.bim.guid</code>처럼 이름에서 ID를 계산하는 방식은 재현성은 좋지만 이름 변경에 약하다 — 교육용으로만 쓴다.</p></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="step">
+    <h2>파일 형식: STEP, XML, JSON</h2>
+    <div class="problem"><strong>IFC 파일을 메모장으로 열면</strong>
+      <p>확장자 .ifc 파일을 텍스트 편집기로 열면 <code>#120=IFCRELCONTAINEDINSPATIALSTRUCTURE(…)</code> 같은 줄이 수만 줄 이어집니다. 읽을 수 있는 글자인데 뜻은 잘 보이지 않습니다. 이 줄들을 어떻게 읽을까요?</p></div>
+    <p>가장 널리 쓰이는 IFC 파일 형식은 STEP의 <span class="term">STEP 물리 파일</span><span class="en">(STEP physical file, SPF)</span> 형식(ISO 10303-21)입니다. 파일은 <code>HEADER</code>(파일 설명, 이름, 작성 도구, 스키마 이름)와 <code>DATA</code>(인스턴스 줄들) 두 부분으로 되어 있고, 인스턴스 줄은 "번호 = 엔터티 이름(속성들);"의 꼴입니다. 같은 데이터 모델을 XML로 적은 ifcXML, 압축한 ifcZIP도 있고, 웹 개발에 맞춘 JSON 표현은 buildingSMART에서 개발·시험 중인 형태입니다(차세대 IFC의 형식과 함께 현행 확인). 형식이 달라도 담는 것은 같은 엔터티·속성·참조의 그래프입니다.</p>
+    <div class="callout def"><strong>원리 3.7 (STEP 인스턴스 줄의 문법)</strong> <code>#번호=엔터티이름(속성1,속성2,…);</code>
+      <div class="where" style="margin-top:8px">속성은 스키마가 정한 순서(정의 3.2)대로 쉼표로 나열한다. <code>'문자열'</code>(작은따옴표; 한글 등은 <code>\X2\…\X0\</code> 형태로 인코딩), <code>#12</code>(다른 인스턴스 참조), <code>$</code>(값 없음 — 선택적 속성), <code>*</code>(상위형에서 다시 정의되어 여기서는 적지 않음), <code>.ELEMENT.</code>(열거형 값), <code>.T.</code>·<code>.F.</code>(참·거짓), <code>(#1,#2)</code>(목록), <code>IFCLABEL('C30')</code>(형이 붙은 값), <code>4.3</code>·<code>0.</code>(실수는 소수점 필수). 번호는 파일 안에서만 의미가 있고(다시 내보내면 바뀐다), 객체의 신원은 GlobalId가 지킨다. 역속성은 적지 않는다.</div></div>
+    <figure class="diagram" id="fig-if-step">
+      <svg viewBox="0 0 860 300" role="img" aria-label="STEP 물리 파일의 구조: HEADER와 DATA, 인스턴스 줄의 각 부분 설명">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <rect x="30" y="28" width="520" height="70" rx="8" class="f-elev"/>
+        <g class="t-mono" style="fill:var(--text)"><text x="44" y="48">ISO-10303-21;  HEADER;</text><text x="44" y="66">FILE_DESCRIPTION(…); FILE_NAME('B10-STR.ifc',…);</text><text x="44" y="84">FILE_SCHEMA(('IFC4'));  ENDSEC;</text></g>
+        <text x="570" y="52" class="t" style="font-weight:700">머리: 무엇을 어떤 스키마로</text><text x="570" y="72" class="t-dim">스키마 이름을 보고 읽는 규칙을 고른다</text>
+        <rect x="30" y="110" width="520" height="150" rx="8" class="f-elev"/>
+        <g class="t-mono" style="fill:var(--text)"><text x="44" y="132">DATA;</text>
+          <text x="44" y="154"><tspan style="fill:var(--accent);font-weight:700">#100</tspan>=<tspan style="fill:var(--accent-2);font-weight:700">IFCCOLUMN</tspan>(<tspan style="fill:var(--ok)">'0Twclusfb99Ugtfd8Fs9pQ'</tspan>,$,'C-B2-1F',</text>
+          <text x="44" y="174">     $,$,<tspan style="fill:var(--accent);font-weight:700">#101</tspan>,<tspan style="fill:var(--accent);font-weight:700">#110</tspan>,'C1',.COLUMN.);</text>
+          <text x="44" y="196"><tspan style="fill:var(--accent);font-weight:700">#120</tspan>=IFCRELCONTAINEDINSPATIALSTRUCTURE('1UoU…',</text>
+          <text x="44" y="216">     $,$,$,(<tspan style="fill:var(--accent);font-weight:700">#100</tspan>),<tspan style="fill:var(--accent);font-weight:700">#50</tspan>);</text>
+          <text x="44" y="244">ENDSEC;  END-ISO-10303-21;</text></g>
+        <g class="t-mono">
+          <text x="570" y="134" style="fill:var(--accent)">#번호 = 인스턴스 이름표(파일 안에서만)</text>
+          <text x="570" y="156" style="fill:var(--accent-2)">엔터티 이름(대문자)</text>
+          <text x="570" y="178" style="fill:var(--ok)">GlobalId(22자, 객체의 신원)</text>
+          <text x="570" y="200">$ 값 없음 · .COLUMN. 열거형</text>
+          <text x="570" y="222">(#100) 목록 · #50 = 1층(참조)</text>
+          <text x="570" y="244">참조는 앞·뒤 어느 줄이든 가능</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 3-7.</b> STEP 물리 파일의 구조. 한 줄이 인스턴스 하나이고, <code>#번호</code>로 서로를 가리켜 그래프를 이룬다. 기둥 #100은 배치 #101과 형상 #110을 가리키지만 자기 층은 모른다 — 관계 #120이 기둥 #100과 층 #50을 가리킨다.</figcaption>
+    </figure>
+    <p>아래는 이 장의 예제 파일에서 기둥 부분만 잘라 낸 것입니다. 전체 파일(약 35줄)은 다음 시뮬레이터에 들어 있고, 직접 고칠 수 있습니다.</p>
+<pre class="if-pre"><code><span class="if-c">/* B-10 BIM 발췌 (IFC4, 손으로 쓴 교육용 예) */</span>
+#100=IFCCOLUMN('0Twclusfb99Ugtfd8Fs9pQ',$,'C-B2-1F',$,$,#101,#110,'C1',.COLUMN.);
+#101=IFCLOCALPLACEMENT(#51,#102);                  <span class="if-c">/* 1층 배치(#51)에 대한 상대 위치 */</span>
+#102=IFCAXIS2PLACEMENT3D(#103,$,$);
+#103=IFCCARTESIANPOINT((8.,8.,0.));                <span class="if-c">/* 격자 B/2 = (8, 8) m */</span>
+#110=IFCPRODUCTDEFINITIONSHAPE($,$,(#111));
+#111=IFCSHAPEREPRESENTATION(#20,'Body','SweptSolid',(#112));
+#112=IFCEXTRUDEDAREASOLID(#113,#21,#115,4.3);      <span class="if-c">/* 단면을 4.3 m 돌출 */</span>
+#113=IFCRECTANGLEPROFILEDEF(.AREA.,'800x800',$,0.8,0.8);
+#130=IFCPROPERTYSET('27h3K8umyZL6WXqTAFRbzT',$,'Pset_ColumnCommon',$,(#131,#132,#133));
+#132=IFCPROPERTYSINGLEVALUE('LoadBearing',$,IFCBOOLEAN(.T.),$);
+#140=IFCRELDEFINESBYPROPERTIES('0CSUGvPsZAvcFoNJ7PvJRS',$,$,$,(#100),#130);</code></pre>
+    <div class="sim" id="sim-if-step">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>STEP 파일 읽기: 고치면 엔터티 표와 참조 그래프가 바뀐다</h3></div>
+      <textarea class="if-ta" id="if-st-ta" spellcheck="false" wrap="off" aria-label="편집할 수 있는 IFC STEP 텍스트"></textarea>
+      <div class="if-bar">
+        <button class="btn" id="if-st-reset">예제 복원</button>
+        <button class="btn" id="if-st-dang">오류: 끊어진 참조</button>
+        <button class="btn" id="if-st-norel">오류: 공간 포함 관계 지우기</button>
+        <button class="btn" id="if-st-wall">벽 하나 더하기</button>
+      </div>
+      <div class="sim-body"><div class="sim-view"><canvas id="if-cv-step" aria-label="STEP 인스턴스를 관계, 공간·제품, 속성·재료, 형상·자원 네 열로 놓고 참조를 화살표로 이은 그래프"></canvas></div></div>
+      <div class="if-msg" id="if-st-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">인스턴스</span><span class="v" id="if-st-o-n">—</span></div>
+        <div class="stat"><span class="k">참조</span><span class="v" id="if-st-o-r">—</span></div>
+        <div class="stat"><span class="k">경고</span><span class="v" id="if-st-o-w">—</span></div>
+        <div class="stat"><span class="k">제품 → 층</span><span class="v" id="if-st-o-s">—</span></div>
+      </div>
+      <div class="table-wrap if-tbl-wrap"><table class="if-tbl"><thead><tr><th>#</th><th>엔터티</th><th>속성 수</th><th>참조하는 것</th><th>참조받음</th></tr></thead><tbody id="if-st-tb"></tbody></table></div>
+      <div class="sim-note">해볼 것: 그래프의 상자를 누르면 그 인스턴스가 가리키는 것(주황)과 그것을 가리키는 것(보라)이 강조됩니다 · #100을 눌러 기둥이 층을 직접 가리키지 않는 것을 확인하세요 · "공간 포함 관계 지우기"를 누르면 기둥이 어느 층에도 속하지 않는다는 경고가 나옵니다 · "끊어진 참조"는 #50을 없는 #55로 바꿉니다 · 직접 <code>#100</code> 줄의 속성 하나를 지워 보면 "속성 수가 IFC4 스키마와 다름" 경고가 나옵니다 · "벽 하나 더하기"는 IFCWALL 줄을 넣고 포함 관계 목록에 더합니다 · 모델: <code>CB.bim.parseStep</code>(아주 작은 해석기 — 엔터티 이름은 대문자, 문자열 안의 <code>);</code>는 지원하지 않음), 검사(끊어진 참조, 중복 번호, 포함 안 된 제품, 속성 수, GlobalId 길이)는 페이지 스크립트(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 3.6 (거꾸로 따라가기: C-B2-1F는 몇 층인가)</strong> 예제 파일에서.
+      <p><b>① 앞으로 읽기</b> #100 <code>IFCCOLUMN</code>의 참조는 #101(배치)과 #110(형상)뿐이다. 층 정보는 없다.</p>
+      <p><b>② 거꾸로 찾기</b> #100을 참조하는 줄을 찾는다: #120 <code>IFCRELCONTAINEDINSPATIALSTRUCTURE</code>(5번째 속성 RelatedElements에 #100), #140·#162 <code>IFCRELDEFINESBYPROPERTIES</code>, #151 <code>IFCRELASSOCIATESMATERIAL</code>.</p>
+      <p><b>③ 관계의 다른 끝</b> #120의 6번째 속성 RelatingStructure = #50 → <code>IFCBUILDINGSTOREY('…',$,'1F',…,0.)</code>. 답: 1층, Elevation 0 m. 같은 방법으로 #140 → #130 <code>Pset_ColumnCommon</code>, #151 → #150 <code>IFCMATERIAL('C30')</code>.</p>
+      <p><b>④ 판단</b> 거꾸로 따라가려면 파일 전체를 읽어 "누가 나를 가리키나" 색인을 만들어야 한다. IFC 뷰어가 파일을 다 읽고 나서야 트리를 보여 주는 이유다. 수십만 줄의 파일에서 이 색인은 메모리와 시간이 드는 일이며, 데이터베이스나 그래프 저장소에 IFC를 넣어 질의하는 방법이 쓰이는 이유이기도 하다.</p></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="mvd-ids">
+    <h2>MVD와 IDS: 무엇을 주고받을지 정하기</h2>
+    <div class="problem"><strong>구조 해석 사무소에 덕트까지 보내야 하나</strong>
+      <p>B-10 전체 모델에는 형상, 속성, 공정 연결, 덕트, 배관이 다 들어 있습니다. 구조 해석 사무소는 기둥과 보의 축선, 단면, 재료만 있으면 되고, 시설 관리 회사는 형상보다 자산 목록과 속성이 필요합니다. 그리고 받는 쪽은 "꼭 있어야 할 정보가 정말 있는지"를 어떻게 확인할까요?</p></div>
+    <p>교환에는 세 가지 약속이 필요합니다. 첫째, 어떤 업무 과정에서 누가 누구에게 언제 어떤 정보를 넘기는지 적은 <span class="term">정보 전달 매뉴얼</span><span class="en">(information delivery manual, IDM)</span>(ISO 29481-1). 둘째, 그 교환에 필요한 IFC 스키마의 부분 집합과 구현 규칙인 <span class="term">모델 뷰 정의</span><span class="en">(model view definition, MVD)</span> — 저작 도구의 내보내기 설정에 나오는 "IFC2x3 Coordination View 2.0", "IFC4 Reference View", "IFC4 Design Transfer View" 같은 이름이 MVD입니다. 셋째, 프로젝트가 요구하는 정보를 컴퓨터가 검사할 수 있게 적은 <span class="term">정보 전달 사양</span><span class="en">(Information Delivery Specification, IDS)</span>입니다. IDS는 buildingSMART의 표준으로, "어떤 객체에(적용 대상, applicability) 무엇이 있어야 하는가(요구 사항, requirements)"를 엔터티·속성·속성 세트 값·분류·재료·소속 같은 조건(facet)으로 적은 XML 파일입니다.</p>
+    <div class="callout def"><strong>정의 3.8 (IDS 명세의 판정)</strong> 명세 \(S = (A, Q)\)에서 적용 대상 조건 \(A\)를 만족하는 객체 집합 \(O_A\)의 모든 객체가 요구 조건 \(Q\)를 만족하면 통과다.
+      <div class="formula">$$O_A = \{o : A(o)\}, \qquad \text{통과율} = \frac{|\{o \in O_A : Q(o)\}|}{|O_A|}, \qquad S \text{ 통과} \iff \forall o \in O_A,\ Q(o)$$<div class="where">예: \(A\) = "엔터티가 <code>IfcColumn</code>", \(Q\) = "<code>Pset_ColumnCommon.FireRating</code> 값이 있음". 실패한 객체 목록은 이슈(BCF, 5·6장)로 작성자에게 돌아간다. IDS는 무엇을 확인할지만 적고, 판정은 검사 도구가 한다. MVD가 "스키마 중 무엇을 쓰나"라면 IDS는 "그 안에 무엇이 꼭 있어야 하나"다.</div></div></div>
+    <figure class="diagram" id="fig-if-idm">
+      <svg viewBox="0 0 860 250" role="img" aria-label="IDM에서 MVD와 IDS를 거쳐 모델 검사와 이슈로 가는 흐름">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="60" width="150" height="80" rx="10" class="f-elev"/><text x="105" y="88" style="fill:var(--text);font-weight:700">IDM</text><text x="105" y="108">누가·언제·무엇을</text><text x="105" y="124">(업무 과정)</text>
+          <rect x="230" y="30" width="160" height="70" rx="10" class="f-acc-soft"/><text x="310" y="58" style="fill:var(--text);font-weight:700">MVD</text><text x="310" y="78">스키마의 부분 집합</text>
+          <rect x="230" y="120" width="160" height="70" rx="10" class="f-acc2-soft"/><text x="310" y="148" style="fill:var(--text);font-weight:700">IDS</text><text x="310" y="168">검사 가능한 요구</text>
+          <rect x="440" y="60" width="160" height="80" rx="10" class="f-elev"/><text x="520" y="88" style="fill:var(--text);font-weight:700">모델 검사</text><text x="520" y="108">IFC + IDS → 통과/실패</text><text x="520" y="124">(검사 도구)</text>
+          <rect x="650" y="60" width="170" height="80" rx="10" class="f-elev"/><text x="735" y="88" style="fill:var(--text);font-weight:700">이슈 · 수정</text><text x="735" y="108">실패 객체 목록(BCF)</text><text x="735" y="124">→ 작성자 원본 수정</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.6;fill:none" marker-end="url(#if-ah)"><path d="M180 90L226 68"/><path d="M180 110L226 150"/><path d="M390 66L436 90"/><path d="M390 154L436 116"/><path d="M600 100H646"/></g>
+        <path d="M735 140V200H520V144" style="stroke:var(--accent-2);stroke-width:1.6;fill:none;stroke-dasharray:5 4" marker-end="url(#if-ah-or)"/>
+        <text x="628" y="218" text-anchor="middle" class="t-dim">고친 모델을 다시 검사(4장 검수)</text>
+      </svg>
+      <figcaption><b>그림 3-8.</b> 교환 약속의 세 층. IDM이 업무 과정과 교환 요구를 사람의 말로 정하면, MVD는 IFC 스키마 중 쓸 부분을, IDS는 프로젝트가 요구하는 정보를 기계가 검사할 수 있는 규칙으로 바꾼다. 검사 결과의 실패 목록은 이슈로 작성자에게 돌아간다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-if-mvd">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>교환 범위 고르기: 목적에 따라 무엇이 넘어가나</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="if-cv-mvd" aria-label="정보 범주와 요소 유형 행렬에서 선택한 교환 범위에 포함되는 칸과 인스턴스 수"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>교환 목적(MVD 형태)</span><div class="seg" id="if-mv-p"><button data-value="coord" class="on">설계 조정·참조</button><button data-value="transfer">설계 전달</button><button data-value="struct">구조 해석</button><button data-value="qto">물량 산출</button><button data-value="fm">시설 관리 인계</button></div></div>
+          <label class="check"><input type="checkbox" id="if-mv-mep" checked> 덕트·배관 포함</label>
+          <label class="check"><input type="checkbox" id="if-mv-share"> 속성 세트 공유(같은 값끼리)</label>
+        </div>
+      </div>
+      <div class="if-msg" id="if-mv-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">내보낸 인스턴스</span><span class="v" id="if-mv-o-n">—</span></div>
+        <div class="stat"><span class="k">전체 대비</span><span class="v" id="if-mv-o-r">—</span></div>
+        <div class="stat"><span class="k">파일 크기(추정)</span><span class="v" id="if-mv-o-s">—</span></div>
+        <div class="stat"><span class="k">받는 쪽이 못 하는 일</span><span class="v" id="if-mv-o-x" style="font-size:14px">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: "구조 해석"은 몸체 형상 대신 축선·단면·재료만 넘겨 인스턴스가 크게 줄지만, 받는 쪽은 간섭 검토를 할 수 없습니다 · "시설 관리 인계"는 형상을 거의 빼고 공간·유형·속성을 남깁니다 · "속성 세트 공유"를 켜면 같은 정보가 더 적은 인스턴스로 갑니다 · 덕트·배관을 끄면 설비 정보가 빠집니다 · 모델: 정보 범주별 요소당 인스턴스 수(몸체 형상 7, 축선 4, 배치 3, 속성 세트 1 + 값 4, 수량 1 + 값 3, 재료·유형·분류 연결 등)와 목적별 포함 범위는 이 장의 <b>교육용 단순화</b>다. 실제 MVD(Coordination View, Reference View, Design Transfer View, 구조 해석 뷰, COBie 등)의 범위는 각 문서를 확인할 것. 크기는 인스턴스당 약 90바이트로 추정.</div>
+    </div>
+    <div class="sim" id="sim-if-ids">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>IDS 검증: 요구 규칙을 넣으면 B-10 요소가 통과·실패로 갈린다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="if-cv-ids" aria-label="IDS 명세마다 적용 대상 요소의 통과와 실패를 나타낸 가로 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="check"><input type="checkbox" id="if-id-s1" checked> S1 기둥: LoadBearing = TRUE</label>
+          <label class="check"><input type="checkbox" id="if-id-s2" checked> S2 골조 요소: FireRating 있음</label>
+          <label class="check"><input type="checkbox" id="if-id-s3" checked> S3 보: 이름 규칙</label>
+          <label class="check"><input type="checkbox" id="if-id-s4" checked> S4 벽: Pset_WallCommon 있음</label>
+          <div class="ctrl"><span>S5 직접 만들기: 적용 대상</span><select id="if-id-ent" class="if-in"><option value="IfcColumn">IfcColumn</option><option value="IfcBeam">IfcBeam</option><option value="IfcSlab">IfcSlab</option><option value="IfcWall">IfcWall</option><option value="IfcDuctSegment" selected>IfcDuctSegment</option><option value="IfcPipeSegment">IfcPipeSegment</option></select></div>
+          <div class="ctrl"><span>요구 사항</span><select id="if-id-req" class="if-in"><option value="mat" selected>재료 = 값</option><option value="ext">IsExternal = 값</option><option value="ref">Reference = 값</option><option value="name">이름이 패턴(정규식)과 일치</option><option value="storey">층 번호 ≤ 값</option></select></div>
+          <label class="ctrl"><span>값</span><input class="if-in mono" id="if-id-val" type="text" value="Galvanized steel" spellcheck="false" autocomplete="off" aria-label="요구 값"></label>
+        </div>
+      </div>
+      <div class="if-msg" id="if-id-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">적용 대상</span><span class="v" id="if-id-o-a">—</span></div>
+        <div class="stat"><span class="k">통과 / 실패</span><span class="v" id="if-id-o-p">—</span></div>
+        <div class="stat"><span class="k">통과율</span><span class="v" id="if-id-o-r">—</span></div>
+        <div class="stat"><span class="k">통과한 명세</span><span class="v" id="if-id-o-s">—</span></div>
+      </div>
+      <pre class="if-pre if-sim-pre"><code id="if-id-xml"></code></pre>
+      <div class="sim-note">해볼 것: 기본 인계 모델에서 S2가 44개(9·10층 기둥 40 + 속성 세트가 없는 4층 벽 4), S3이 1개, S4가 4개 실패합니다 · 3.5절 편집기에서 9층 FireRating을 채우고 돌아오면 S2 실패가 24개로 줄어듭니다 · S5에서 IfcPipeSegment·재료 = Galvanized steel로 하면 배관(재료 Steel pipe) 10개가 모두 실패 — 요구 사항이 틀린 경우도 있습니다 · 이름 규칙에 <code>^DU-SA-\d+F$</code>를 넣어 보세요 · 아래 칸은 S5를 IDS 형태의 XML로 적은 것(요소 이름 단순화, 실제 스키마는 buildingSMART IDS 문서 확인) · 모델: 정의 3.8, 데이터는 3.5절과 공유, 판정은 페이지 스크립트(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 3.7 (구조 인계 IDS의 판정)</strong> 인계 모델(3.5절의 결함 포함)에 명세 S1–S4를 적용한다.
+      <p><b>① S1</b> 적용 대상 기둥 200개, LoadBearing = TRUE 200개 → 통과(100 %).</p>
+      <p><b>② S2</b> 적용 대상 기둥·보·슬래브·벽 340개. 9·10층 기둥 40개는 FireRating이 비었고, 4층 벽 4개는 속성 세트가 통째로 없다 → 실패 44, 통과 296(87.1 %).</p>
+      <p><b>③ S3</b> 보 90개 중 이름 "G1-YC-6" 하나가 패턴 <code>^G1-(X[1-4]|Y[A-E])-([1-9]|10)F$</code>에 맞지 않음 → 실패 1. <b>S4</b> 벽 40개 중 4개 실패.</p>
+      <p><b>④ 판단</b> 네 명세 중 S1만 통과다. 실패 49건이지만 원인은 세 가지(상부층 입력 누락, 내보내기 설정에서 속성 세트 빠짐, 이름 오기)다. 실패 목록을 원인별로 묶어 작성자에게 돌려보내면 원본에서 몇 번의 수정으로 해결된다. 같은 IDS를 납품 때마다 돌리면 "지난번에 고친 것이 다시 깨졌는지"도 자동으로 확인된다(4장 검수).</p></div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="classification">
+    <h2>분류 체계와 IFC 버전</h2>
+    <div class="problem"><strong>"기둥"은 견적서의 어느 줄인가</strong>
+      <p>IFC는 B-10의 요소를 <code>IfcColumn</code>이라 부르지만, 견적 내역서는 "철근 콘크리트 공사 &gt; 기둥 콘크리트 타설"처럼 공종으로, 시설 관리 시스템은 "구조 &gt; 기둥"처럼 자산 분류로 부릅니다. 같은 기둥에 여러 분류 코드를 어떻게 붙일까요?</p></div>
+    <p>건설 정보를 일관되게 묶는 코드 체계가 <span class="term">분류 체계</span><span class="en">(classification system)</span>입니다. 국제적으로는 분류 체계의 틀을 정한 ISO 12006-2를 바탕으로 영국의 Uniclass(Uniclass 2015, 요소·시스템·제품·공간 등 여러 표로 이루어진 형태), 북미의 OmniClass(여러 번호 표로 이루어진 형태) 같은 체계가 쓰이고, 국내에도 건설 정보를 분류하는 체계가 있습니다(구성과 적용 범위는 현행 지침 확인). IFC는 분류 체계 자체를 정하지 않고, 어느 체계의 어느 코드인지를 <code>IfcClassificationReference</code>로 적어 <code>IfcRelAssociatesClassification</code>으로 객체에 붙입니다. 그래서 같은 기둥에 공종 코드와 자산 코드를 함께 붙일 수 있습니다. 용어와 속성의 정의를 나라·언어를 넘어 공유하는 buildingSMART의 <span class="term">데이터 사전</span><span class="en">(buildingSMART Data Dictionary, bSDD)</span>도 IDS·분류와 함께 쓰입니다.</p>
+    <div class="table-wrap"><table class="if-tbl">
+      <caption>표 3-2. IFC의 주요 버전(널리 알려진 사실만, 세부는 buildingSMART 문서 확인)</caption>
+      <thead><tr><th>버전</th><th>발표·표준</th><th>특징</th><th>B-10에 미치는 영향</th></tr></thead>
+      <tbody>
+        <tr><td>IFC2x3</td><td>2006년 무렵 발표, 오랫동안 가장 널리 구현</td><td>Coordination View 2.0 등 MVD. 설비 요소는 <code>IfcFlowSegment</code> + 유형</td><td><code>IfcDuctSegment</code> 대신 <code>IfcFlowSegment</code>, OwnerHistory 필수</td></tr>
+        <tr><td>IFC4</td><td>2013년, ISO 16739:2013</td><td>Reference View·Design Transfer View, 설비 개별 엔터티, <code>IfcContext</code>, 지리 참조(<code>IfcMapConversion</code>) 등</td><td>이 장의 기준. 덕트·배관을 그대로 표현</td></tr>
+        <tr><td>IFC4.3</td><td>ISO 16739-1:2024(현행 확인)</td><td>도로·철도·교량·항만 등 인프라 확장(<code>IfcAlignment</code>, <code>IfcFacility</code>), <code>IfcBuiltElement</code></td><td>CivilBook의 교량·도로를 같은 틀로 표현할 수 있다(15장)</td></tr>
+      </tbody></table></div>
+    <p>새 버전이 나와도 현장은 한동안 여러 버전이 섞여 쓰입니다. 그래서 프로젝트는 교환할 버전과 MVD를 계약 단계에서 하나로 정하고(4장 BIM 수행 계획), 버전을 넘을 때 바뀌는 엔터티(그림 3-3, 표 3-2)를 검사 규칙에 반영합니다. 차세대 IFC(웹·데이터베이스 친화적인 형식)는 개발 중인 형태로, 채택 여부와 일정은 현행 확인이 필요합니다.</p>
+    <div class="callout site"><strong>B-10 BIM을 IFC 그래프로 읽으면</strong> 요소 360개는 공간 포함 관계 10개로 층에 매달리고, 집합 관계 3개가 프로젝트–대지–건물–층 나무를 만든다. 유형 6개가 요소를 묶고, 표준 속성 세트는 요소마다 붙이면 340개, 값이 같은 것끼리 공유하면 6개다. 이 장의 인계 모델은 일부러 넣은 결함 49건(S2 44 · S3 1 · S4 4)을 가진다. 기둥 C-B2-1F의 GlobalId는 <code>0Twclusfb99Ugtfd8Fs9pQ</code>(교육용 결정적 ID)이며, 이 ID는 4장(LOD)·6장(간섭)·9장(4D)에서 같은 기둥을 가리킨다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 정보가 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="lod.html"><small>CH.04 · LOD와 정보 요구 사항</small>무엇을 얼마나 넣을까<br><span>속성 세트와 IDS가 단계별 정보 요구와 모델 검수의 단위가 된다.</span></a>
+      <a href="cde.html"><small>CH.05 · 공통 데이터 환경</small>버전 비교와 이력<br><span>GlobalId가 유지되어야 두 버전의 차이를 객체 단위로 읽는다.</span></a>
+      <a href="clash.html"><small>CH.06 · 간섭 검토</small>연합 모델과 이슈<br><span>분야별 IFC를 합쳐 덕트–보 간섭을 찾고, 관통부는 개구부 관계로 푼다.</span></a>
+      <a href="qto.html"><small>CH.07 · 모델 기반 물량 산출</small>수량 세트와 공제<br><span>Gross·Net 부피와 측정 방법을 밝혀야 물량을 믿을 수 있다.</span></a>
+      <a href="facility.html"><small>CH.13 · 시설 관리와 자산 정보</small>공간·유형·속성의 인계<br><span>공간 구조와 유형, 속성 세트가 자산 대장의 뼈대가 된다.</span></a>
+      <a href="gis.html"><small>CH.15 · GIS와 도시 모델</small>지리 참조와 IFC4.3<br><span>로컬 좌표를 지도 좌표에 잇고, 교량·도로를 같은 틀로 표현한다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>상호 운용성은 받은 쪽이 뜻을 잃지 않고 쓰는 능력이다. 직접 변환은 n(n − 1)개, 중립 형식은 2n개의 변환기가 필요하다. IFC(ISO 16739-1, buildingSMART)는 개방형 BIM의 중립 형식이며, 왕복 편집보다 교환·참조에 강하다.</li>
+      <li>IFC 스키마는 EXPRESS로 적은 엔터티의 상속 계층이다. 엔터티의 속성은 뿌리(<code>IfcRoot</code>: GlobalId·OwnerHistory·Name·Description)부터 자신까지의 직접 속성을 이은 것이고, IFC4의 <code>IfcColumn</code>·<code>IfcWall</code>은 9개다. 버전마다 속성과 상위형이 다르다(IFC4.3의 <code>IfcBuiltElement</code>, IFC2x3에 없는 <code>IfcDuctSegment</code>).</li>
+      <li>관계는 객체로 적는다(객체화된 관계). 집합(<code>IfcRelAggregates</code>), 공간 포함(<code>IfcRelContainedInSpatialStructure</code>), 속성(<code>IfcRelDefinesByProperties</code>), 유형(<code>IfcRelDefinesByType</code>), 재료·개구부 관계가 객체를 잇고, 반대 방향은 역속성으로 계산한다.</li>
+      <li>공간 구조는 프로젝트–대지–건물–층–실의 나무이며, 요소는 정확히 한 곳에 포함된다. B-10 BIM: 층 10개, 층마다 요소 36개. 슬래브를 어느 층에 넣는지는 프로젝트 규칙으로 정한다.</li>
+      <li>속성 세트(Pset_…Common)와 수량 세트(Qto_…BaseQuantities)는 스키마를 고치지 않고 정보를 늘린다. 유형의 값을 개별 객체가 물려받거나 덮어쓴다. 수량은 Gross·Net과 측정 방법을 밝혀야 한다(기둥 435.2 m³).</li>
+      <li>GlobalId는 128비트를 64자 집합으로 적은 22자(2 + 21 × 6)이며, 객체가 사는 동안 바뀌지 않아야 한다. 충돌보다 재발급이 위험하다. <code>CB.bim.guid</code>는 이름 기반 교육용 대용품이다.</li>
+      <li>STEP 물리 파일(ISO 10303-21)은 HEADER와 DATA, <code>#번호=엔터티(속성,…);</code> 줄로 된 그래프다. <code>$</code>는 값 없음, <code>#n</code>은 참조, 번호는 파일 안에서만 의미가 있다. ifcXML·JSON은 같은 그래프의 다른 표기다.</li>
+      <li>IDM은 업무 과정, MVD는 스키마의 부분 집합, IDS는 검사 가능한 요구 사항이다. IDS 명세는 적용 대상의 모든 객체가 요구를 만족해야 통과하며, 실패 목록은 원인별로 묶어 작성자에게 돌려보낸다(B-10 인계 모델: 실패 49건, 원인 3가지).</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 도구 6개가 서로 직접 변환기를 쓸 때와 중립 형식을 쓸 때 필요한 변환기 수는?</p><div class="opts">
+        <button class="opt">15개와 6개</button><button class="opt" data-correct>30개와 12개</button><button class="opt">36개와 6개</button><button class="opt">30개와 6개</button>
+      </div><div class="quiz-exp">직접: \(n(n-1) = 6\times5 = 30\)(방향마다 하나). 중립: 도구마다 읽기·쓰기 \(2n = 12\).</div></div>
+      <div class="quiz-q"><p>2. IFC4에서 <code>IfcColumn</code> 인스턴스의 STEP 줄에 적히는 속성 수와 그중 <code>IfcRoot</code>에서 물려받는 수는?</p><div class="opts">
+        <button class="opt">4개, 4개</button><button class="opt">8개, 1개</button><button class="opt" data-correct>9개, 4개</button><button class="opt">9개, 8개</button>
+      </div><div class="quiz-exp">IfcRoot 4 + IfcObject 1 + IfcProduct 2 + IfcElement 1 + IfcColumn 1 = 9. 물려받은 것은 모두 8개지만 그중 <code>IfcRoot</code>에서 온 것은 GlobalId·OwnerHistory·Name·Description 4개다.</div></div>
+      <div class="quiz-q"><p>3. STEP 파일에서 기둥이 1층에 있다는 정보는 어디에 적히는가?</p><div class="opts">
+        <button class="opt">기둥 줄의 Tag 속성</button><button class="opt">기둥 줄의 ObjectPlacement</button><button class="opt" data-correct><code>IfcRelContainedInSpatialStructure</code> 줄의 RelatedElements와 RelatingStructure</button><button class="opt">층 줄의 역속성</button>
+      </div><div class="quiz-exp">IFC는 관계를 객체로 적는다. 역속성(ContainedInStructure)은 파일에 적히지 않고 읽는 쪽이 관계를 거꾸로 따라가 계산한다. 배치는 위치일 뿐 소속을 뜻하지 않는다.</div></div>
+      <div class="quiz-q"><p>4. IFC GlobalId가 22자인 이유는?</p><div class="opts">
+        <button class="opt">16진수 128비트를 반으로 줄여서</button><button class="opt" data-correct>128비트를 6비트(64자 집합) 단위로 적으면 21자 + 남은 2비트용 1자가 필요해서</button><button class="opt">IFC 이름 길이 제한이 22자라서</button><button class="opt">UUID의 하이픈을 빼서</button>
+      </div><div class="quiz-exp">\(128 = 2 + 21\times6\). 첫 문자는 2비트만 담아 0–3 중 하나다.</div></div>
+      <div class="quiz-q"><p>5. 기둥 하나만 고친 새 버전을 내보냈는데, 버전 비교 결과가 "360개 삭제, 360개 추가"로 나왔다. 가장 그럴듯한 원인은?</p><div class="opts">
+        <button class="opt">GUID 충돌</button><button class="opt">IFC 버전 차이</button><button class="opt" data-correct>내보낼 때마다 GlobalId가 새로 발급되었다</button><button class="opt">STEP 번호(#n)가 바뀌었다</button>
+      </div><div class="quiz-exp">비교는 GlobalId로 짝짓는다. #번호는 원래 파일마다 바뀌는 것이고, 무작위 GUID의 충돌 확률은 사실상 0이다. ID가 재발급되면 모든 객체가 새것으로 보인다.</div></div>
+      <div class="quiz-q"><p>6. STEP 줄 <code style="overflow-wrap:anywhere;word-break:break-all">#50=IFCBUILDINGSTOREY('…',$,'1F',$,$,#51,$,$,.ELEMENT.,0.);</code>에서 <code>$</code>와 <code>0.</code>의 뜻은?</p><div class="opts">
+        <button class="opt" data-correct>값이 없는 선택적 속성, Elevation 0 m(실수)</button><button class="opt">달러 단위의 비용, 0층</button><button class="opt">상위형에서 정의된 속성, 정수 0</button><button class="opt">참조할 인스턴스 없음 오류, 소수점 오타</button>
+      </div><div class="quiz-exp"><code>$</code>는 값 없음, <code>*</code>가 상위형 재정의다. 실수는 소수점이 필수라 0을 <code>0.</code>으로 적는다. 마지막 속성이 층의 Elevation이다.</div></div>
+      <div class="quiz-q"><p>7. MVD와 IDS의 차이를 가장 잘 설명한 것은?</p><div class="opts">
+        <button class="opt">MVD는 XML, IDS는 STEP 형식이다</button><button class="opt" data-correct>MVD는 교환에 쓸 스키마의 부분 집합과 구현 규칙이고, IDS는 프로젝트가 요구하는 정보를 기계로 검사할 수 있게 적은 명세다</button><button class="opt">MVD는 업무 과정, IDS는 분류 코드다</button><button class="opt">둘은 같은 것의 다른 이름이다</button>
+      </div><div class="quiz-exp">업무 과정은 IDM(ISO 29481-1)이 적는다. MVD는 "무엇을 쓸 수 있나", IDS는 "무엇이 꼭 있어야 하나"를 정한다.</div></div>
+      <div class="quiz-q"><p>8. IDS 명세 "모든 <code>IfcBeam</code>의 이름이 규칙에 맞아야 한다"를 보 90개에 적용해 1개가 실패했다. 통과율과 명세 판정은?</p><div class="opts">
+        <button class="opt">98.9 %, 통과</button><button class="opt" data-correct>98.9 %, 실패</button><button class="opt">1.1 %, 실패</button><button class="opt">100 %, 통과(90 % 이상이므로)</button>
+      </div><div class="quiz-exp">89/90 = 98.9 %. 명세는 적용 대상의 <b>모든</b> 객체가 만족해야 통과다(정의 3.8). 실패한 1개는 이슈로 돌려보낸다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+/* ---------- 이 장의 도우미: B-10 BIM 데이터, 교육용 속성 세트(인계 결함 포함), 3D 상자 그리기 ---------- */
+const IFX = {
+  els: CB.bim.model(),
+  H: (k) => (k <= 0 ? 0 : 5 + 4 * (k - 1)),
+  PSET: { IfcColumn: "Pset_ColumnCommon", IfcBeam: "Pset_BeamCommon", IfcSlab: "Pset_SlabCommon", IfcWall: "Pset_WallCommon" },
+  REF: { IfcColumn: "C1", IfcBeam: "G1", IfcSlab: "S1", IfcWall: "W1" },
+  TYPE: { IfcColumn: "C1 800×800", IfcBeam: "G1 400×700", IfcSlab: "S1 t210", IfcWall: "W1 t400", IfcDuctSegment: "SA 1000×400", IfcPipeSegment: "SP DN100" },
+  KO: { IfcColumn: "기둥", IfcBeam: "보", IfcSlab: "슬래브", IfcWall: "벽", IfcDuctSegment: "덕트", IfcPipeSegment: "배관" },
+  TYPES: ["IfcColumn", "IfcBeam", "IfcSlab", "IfcWall", "IfcDuctSegment", "IfcPipeSegment"],
+  ctr: (b) => [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2],
+  isExt(e) {
+    const c = IFX.ctr(e.box);
+    if (e.ifc === "IfcColumn") return Math.abs(c[0]) < 0.1 || Math.abs(c[0] - 32) < 0.1 || Math.abs(c[1]) < 0.1 || Math.abs(c[1] - 24) < 0.1;
+    if (e.ifc === "IfcBeam") return /^G1-(X1|X4|YA|YE)-/.test(e.name);
+    return false;
+  },
+  /** 결함 없는 원본 값(표 3-1, 교육용) */
+  clean(e) {
+    if (!IFX.PSET[e.ifc]) return null;
+    const p = { Reference: IFX.REF[e.ifc], LoadBearing: true, IsExternal: IFX.isExt(e), FireRating: e.ifc === "IfcColumn" ? "3시간" : "2시간" };
+    if (e.ifc === "IfcBeam") p.Span = 8.0;
+    return p;
+  },
+  data: {},
+  edits: 0,
+  listeners: [],
+  reset() {
+    IFX.edits = 0;
+    IFX.els.forEach((e) => {
+      const p = IFX.clean(e); let name = e.name;
+      if (p && e.ifc === "IfcColumn" && e.storey >= 9) p.FireRating = "";
+      if (e.name === "G1-YC-6F") name = "G1-YC-6";
+      IFX.data[e.id] = { name, pset: e.ifc === "IfcWall" && e.storey === 4 ? null : p };
+    });
+  },
+  notify() { IFX.listeners.forEach((f) => f()); },
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  colorOf(P, e) { return { IfcColumn: P.dim, IfcBeam: P.dim, IfcSlab: P.faint, IfcWall: P.accent, IfcDuctSegment: P.blue, IfcPipeSegment: P.ok }[e.ifc]; },
+  EDGES: [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]],
+  corners: (b) => [[b[0], b[1], b[2]], [b[3], b[1], b[2]], [b[3], b[4], b[2]], [b[0], b[4], b[2]], [b[0], b[1], b[5]], [b[3], b[1], b[5]], [b[3], b[4], b[5]], [b[0], b[4], b[5]]],
+  /** 상자 모서리를 한 경로로 그린다(요소 수백 개) */
+  edges(V, boxes, color, width = 1, alpha = 1) {
+    const ctx = V.ctx; ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.globalAlpha = alpha; ctx.beginPath();
+    boxes.forEach((b) => { const c = IFX.corners(b).map(V.p); if (c.some((q) => !q)) return; IFX.EDGES.forEach(([i, j]) => { ctx.moveTo(c[i][0], c[i][1]); ctx.lineTo(c[j][0], c[j][1]); }); });
+    ctx.stroke(); ctx.restore();
+  },
+  faces(V, b, fill, alpha) {
+    const C = IFX.corners(b), F = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]];
+    F.forEach((f) => V.poly3(f.map((i) => C[i]), { fill, fillAlpha: alpha, stroke: false }));
+  },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    if (o.halo !== false) { ctx.lineWidth = 3; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); }
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  msg(id, cls, html) { const el = document.getElementById(id); if (!el) return; el.className = "if-msg" + (cls ? " " + cls : ""); el.innerHTML = html; },
+  esc: (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+  vol: (b) => (b[3] - b[0]) * (b[4] - b[1]) * (b[5] - b[2]),
+};
+IFX.reset();
+
+/* ---------- 1. 상속 계층 탐색 ---------- */
+(function () {
+  const BE = (v) => (v === "4.3" ? "IfcBuiltElement" : "IfcBuildingElement");
+  const ENT = {
+    IfcRoot: { abs: 1, a: (v) => ["GlobalId", v === "2x3" ? "OwnerHistory" : "OwnerHistory?", "Name?", "Description?"] },
+    IfcObjectDefinition: { p: () => "IfcRoot", abs: 1 },
+    IfcObject: { p: () => "IfcObjectDefinition", abs: 1, a: () => ["ObjectType?"] },
+    IfcProduct: { p: () => "IfcObject", abs: 1, a: () => ["ObjectPlacement?", "Representation?"] },
+    IfcElement: { p: () => "IfcProduct", abs: 1, a: () => ["Tag?"] },
+    IfcBuildingElement: { p: () => "IfcElement", abs: 1, only: ["2x3", "4"] },
+    IfcBuiltElement: { p: () => "IfcElement", only: ["4.3"] },
+    IfcWall: { p: BE, a: (v) => (v === "2x3" ? [] : ["PredefinedType?"]) },
+    IfcColumn: { p: BE, a: (v) => (v === "2x3" ? [] : ["PredefinedType?"]) },
+    IfcBeam: { p: BE, a: (v) => (v === "2x3" ? [] : ["PredefinedType?"]) },
+    IfcSlab: { p: BE, a: () => ["PredefinedType?"] },
+    IfcDistributionElement: { p: () => "IfcElement" },
+    IfcDistributionFlowElement: { p: () => "IfcDistributionElement" },
+    IfcFlowSegment: { p: () => "IfcDistributionFlowElement" },
+    IfcDuctSegment: { p: () => "IfcFlowSegment", a: () => ["PredefinedType?"], only: ["4", "4.3"] },
+    IfcPipeSegment: { p: () => "IfcFlowSegment", a: () => ["PredefinedType?"], only: ["4", "4.3"] },
+    IfcSpatialElement: { p: () => "IfcProduct", abs: 1, a: () => ["LongName?"], only: ["4", "4.3"] },
+    IfcSpatialStructureElement: { p: (v) => (v === "2x3" ? "IfcProduct" : "IfcSpatialElement"), abs: 1, a: (v) => (v === "2x3" ? ["LongName?", "CompositionType"] : ["CompositionType?"]) },
+    IfcSite: { p: () => "IfcSpatialStructureElement", a: () => ["RefLatitude?", "RefLongitude?", "RefElevation?", "LandTitleNumber?", "SiteAddress?"] },
+    IfcFacility: { p: () => "IfcSpatialStructureElement", only: ["4.3"] },
+    IfcBuilding: { p: (v) => (v === "4.3" ? "IfcFacility" : "IfcSpatialStructureElement"), a: () => ["ElevationOfRefHeight?", "ElevationOfTerrain?", "BuildingAddress?"] },
+    IfcBridge: { p: () => "IfcFacility", only: ["4.3"] }, IfcRoad: { p: () => "IfcFacility", only: ["4.3"] }, IfcRailway: { p: () => "IfcFacility", only: ["4.3"] }, IfcMarineFacility: { p: () => "IfcFacility", only: ["4.3"] },
+    IfcBuildingStorey: { p: () => "IfcSpatialStructureElement", a: () => ["Elevation?"] },
+    IfcSpace: { p: () => "IfcSpatialStructureElement", a: (v) => (v === "2x3" ? ["InteriorOrExteriorSpace", "ElevationWithFlooring?"] : ["PredefinedType?", "ElevationWithFlooring?"]) },
+    IfcContext: { p: () => "IfcObjectDefinition", abs: 1, a: () => ["ObjectType?", "LongName?", "Phase?", "RepresentationContexts?", "UnitsInContext?"], only: ["4", "4.3"] },
+    IfcProject: { p: (v) => (v === "2x3" ? "IfcObject" : "IfcContext"), a: (v) => (v === "2x3" ? ["LongName?", "Phase?", "RepresentationContexts", "UnitsInContext"] : []) },
+    IfcRelationship: { p: () => "IfcRoot", abs: 1 },
+    IfcRelConnects: { p: () => "IfcRelationship", abs: 1 },
+    IfcRelContainedInSpatialStructure: { p: () => "IfcRelConnects", a: () => ["RelatedElements", "RelatingStructure"] },
+    IfcRelDecomposes: { p: () => "IfcRelationship", abs: 1, a: (v) => (v === "2x3" ? ["RelatingObject", "RelatedObjects"] : []) },
+    IfcRelAggregates: { p: () => "IfcRelDecomposes", a: (v) => (v === "2x3" ? [] : ["RelatingObject", "RelatedObjects"]) },
+    IfcRelDefines: { p: () => "IfcRelationship", abs: 1, a: (v) => (v === "2x3" ? ["RelatedObjects"] : []) },
+    IfcRelDefinesByProperties: { p: () => "IfcRelDefines", a: (v) => (v === "2x3" ? ["RelatingPropertyDefinition"] : ["RelatedObjects", "RelatingPropertyDefinition"]) },
+    IfcRelDefinesByType: { p: () => "IfcRelDefines", a: (v) => (v === "2x3" ? ["RelatingType"] : ["RelatedObjects", "RelatingType"]) },
+    IfcPropertyDefinition: { p: () => "IfcRoot", abs: 1 },
+    IfcPropertySetDefinition: { p: () => "IfcPropertyDefinition", abs: 1 },
+    IfcPropertySet: { p: () => "IfcPropertySetDefinition", a: () => ["HasProperties"] },
+    IfcElementQuantity: { p: () => "IfcPropertySetDefinition", a: () => ["MethodOfMeasurement?", "Quantities"] },
+  };
+  const has = (n, v) => ENT[n] && (!ENT[n].only || ENT[n].only.includes(v));
+  const par = (n, v) => (ENT[n].p ? ENT[n].p(v) : null);
+  const attrs = (n, v) => (ENT[n].a ? ENT[n].a(v) : []);
+  const kids = (n, v) => Object.keys(ENT).filter((k) => has(k, v) && ENT[k].p && par(k, v) === n);
+  const ge = CB.seg("if-ih-e", draw), gv = CB.seg("if-ih-v", draw);
+  const chainOf = () => {
+    let n = ge(), v = gv(), note = "";
+    if (!has(n, v)) { note = `${n}은(는) IFC${v}에 없다 → IfcFlowSegment(+ 덕트 유형 IfcDuctSegmentType)로 표현`; n = "IfcFlowSegment"; }
+    const ch = []; let c = n; while (c) { ch.unshift(c); c = par(c, v); }
+    return { ch, n, v, note };
+  };
+  const cv = CB.canvas("#if-cv-inherit", (ctx, W, H) => {
+    const P = CB.palette(), { ch, n, v } = chainOf(), narrow = W < 560;
+    const bh = 34, gap = 6, ind = Math.min(20, W * 0.035), bw = narrow ? W - 24 - ind * (ch.length - 1) : Math.min(380, W * 0.6);
+    ch.forEach((name, i) => {
+      const x = 12 + i * ind, y = 12 + i * (bh + gap), own = attrs(name, v), sel = name === n, renamed = name === "IfcBuiltElement" || (name === "IfcProject" && v !== "2x3") || name === "IfcFacility";
+      ctx.save(); ctx.fillStyle = sel ? IFX.alpha(P.accent2, 0.16) : ENT[name].abs ? P.surface : P.elev; ctx.strokeStyle = sel ? P.accent2 : renamed ? P.accent : P.border; ctx.lineWidth = sel ? 2 : 1.2;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, bw, bh, 6) : ctx.rect(x, y, bw, bh); ctx.fill(); ctx.stroke(); ctx.restore();
+      if (i) { ctx.save(); ctx.strokeStyle = P.faint; ctx.beginPath(); ctx.moveTo(x - ind + 6, y - gap); ctx.lineTo(x - ind + 6, y + bh / 2); ctx.lineTo(x, y + bh / 2); ctx.stroke(); ctx.restore(); }
+      IFX.text(ctx, name + (ENT[name].abs ? " (추상)" : ""), x + 8, y + 11, sel ? P.accent2 : P.text, { align: "left", size: 11.5, halo: false });
+      let s = own.length ? own.join(" · ") : "직접 속성 없음"; ctx.save(); ctx.font = `10.5px ${getComputedStyle(document.body).getPropertyValue("--mono")}`;
+      while (s.length > 4 && ctx.measureText(s).width > bw - 16) s = s.slice(0, -2); ctx.restore();
+      if (s !== (own.length ? own.join(" · ") : "직접 속성 없음")) s += "…";
+      IFX.text(ctx, s, x + 8, y + 25, own.length ? P.dim : P.faint, { align: "left", size: 10.5, bold: false, halo: false });
+    });
+    const p = par(n, v), sib = p ? kids(p, v).filter((k) => k !== n) : [];
+    const below = narrow || W - (12 + bw + ind * (ch.length - 1) + 16) < 170; const sx = below ? 12 : 12 + bw + ind * (ch.length - 1) + 16, sy = below ? 12 + ch.length * (bh + gap) + 8 : 16;
+    if (p) {
+      IFX.text(ctx, `${p}의 다른 하위형`, sx, sy + 6, P.dim, { align: "left", size: 11, bold: false });
+      (sib.length ? sib : ["(이 발췌에는 없음)"]).slice(0, below ? 6 : 12).forEach((k, i) => {
+        const col = below ? i % 2 : 0, row = below ? Math.floor(i / 2) : i;
+        IFX.text(ctx, "· " + k, sx + col * ((W - 24) / 2), sy + 26 + row * 18, P.text, { align: "left", size: 11, halo: false });
+      });
+    }
+  }, { aspect: (W) => (W < 560 ? 1.55 : 0.66), minHeight: 400, maxHeight: 560 });
+  function draw() {
+    cv.redraw();
+    const { ch, n, v, note } = chainOf();
+    const all = []; ch.forEach((c) => attrs(c, v).forEach((a) => all.push([a, c])));
+    const own = attrs(n, v).length;
+    CB.stat("if-ih-o-d", ch.length - 1 + "단계"); CB.stat("if-ih-o-n", all.length + "개");
+    CB.stat("if-ih-o-s", own + " / " + (all.length - own)); CB.stat("if-ih-o-a", ch.filter((c) => ENT[c].abs).length + "개");
+    const step = "#n=" + n.toUpperCase() + "(" + all.map(([a]) => a.replace("?", "")).join(", ") + ");";
+    IFX.msg("if-ih-msg", note ? "bad" : "", (note ? `<b>${note}</b><br>` : "") + `STEP 줄의 틀(IFC${v}): <code>${IFX.esc(step)}</code>`);
+  }
+  draw();
+})();
+
+/* ---------- 2. 관계 그래프 3D ---------- */
+(function () {
+  const els = IFX.els, H = IFX.H;
+  const cA = CB.check("if-gr-agg", go), cC = CB.check("if-gr-con", go), cT = CB.check("if-gr-typ", go), cP = CB.check("if-gr-pro", go);
+  const gs = CB.range("if-gr-s", (v) => (v ? v + "층" : "전체"), go), gp = CB.seg("if-gr-ps", go);
+  const NP = [-24, 12, 46], NS = [-24, 12, 4], NB = [-14, 12, 24], NF = (k) => [-5, 12, H(k - 1) + 2];
+  const NT = {}; IFX.TYPES.forEach((t, i) => (NT[t] = [44, 12, 4 + i * 7]));
+  const key = (e) => { const p = IFX.clean(e); return p ? e.ifc + JSON.stringify(p) : null; };
+  const groups = {}; els.forEach((e) => { const k = key(e); if (k) (groups[k] ??= []).push(e); });
+  const gKeys = Object.keys(groups), NG = {}; gKeys.forEach((k, i) => (NG[k] = [2 + i * 5.5, -12, 44]));
+  const v = CB.orbit("#if-cv-graph", {
+    yaw: -0.55, pitch: 0.32, dist: 105, target: [10, 10, 20], aspect: (W) => (W < 560 ? 1.0 : 0.72), maxHeight: 520, minHeight: 300,
+    draw(V) {
+      const P = V.P, s = gs(), vis = (e) => !s || e.storey === s;
+      IFX.edges(V, els.filter((e) => !vis(e)).map((e) => e.box), P.faint, 0.6, 0.25);
+      IFX.TYPES.forEach((t) => IFX.edges(V, els.filter((e) => vis(e) && e.ifc === t).map((e) => e.box), IFX.colorOf(P, { ifc: t }), 0.9, 0.6));
+      const lines = (pairs, color, a, w = 1) => { const ctx = V.ctx; ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = a; ctx.lineWidth = w; ctx.beginPath(); pairs.forEach(([p, q]) => { const A = V.p(p), B = V.p(q); if (A && B) { ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); } }); ctx.stroke(); ctx.restore(); };
+      if (cA()) { const pr = [[NP, NS], [NS, NB]]; for (let k = 1; k <= 10; k++) pr.push([NB, NF(k)]); lines(pr, P.accent, 0.9, 1.8); }
+      if (cC()) lines(els.filter(vis).map((e) => [NF(e.storey), IFX.ctr(e.box)]), P.ok, 0.35, 0.8);
+      if (cT()) lines(els.filter(vis).map((e) => [NT[e.ifc], IFX.ctr(e.box)]), P.accent2, 0.3, 0.8);
+      if (cP()) {
+        if (gp() === "each") els.filter((e) => vis(e) && IFX.clean(e)).forEach((e) => { const c = IFX.ctr(e.box), q = [c[0] + 0.9, c[1] - 0.9, c[2] + 0.9]; lines([[c, q]], P.warn, 0.9, 1); V.dot3(q, { color: P.warn, r: 2 }); });
+        else { lines(els.filter((e) => vis(e) && key(e)).map((e) => [NG[key(e)], IFX.ctr(e.box)]), P.warn, 0.3, 0.8); gKeys.forEach((k) => V.dot3(NG[k], { color: P.warn, r: 5 })); }
+      }
+      const node = (p, label, col) => { V.dot3(p, { color: col, r: 6 }); V.text3(label, p, { color: col, size: 11, dy: -12 }); };
+      node(NP, "IfcProject", P.accent); node(NS, "IfcSite", P.accent); node(NB, "IfcBuilding", P.accent);
+      for (let k = 1; k <= 10; k++) if (!s || s === k) node(NF(k), k + "F", P.ok); else V.dot3(NF(k), { color: P.ok, r: 3 });
+      if (cT()) IFX.TYPES.forEach((t) => node(NT[t], IFX.TYPE[t], P.accent2));
+    },
+  });
+  function go() {
+    v.redraw();
+    let r = 0, l = 0, ps = 0, pv = 0;
+    if (cA()) { r += 3; l += 12; } if (cC()) { r += 10; l += 360; } if (cT()) { r += 6; l += 360; }
+    if (cP()) {
+      const st = els.filter((e) => IFX.clean(e)), nv = (e) => Object.keys(IFX.clean(e)).length;
+      if (gp() === "each") { ps = st.length; r += st.length; l += st.length; pv = st.reduce((s, e) => s + nv(e), 0); }
+      else { ps = gKeys.length; r += gKeys.length; l += st.length; pv = gKeys.reduce((s, k) => s + nv(groups[k][0]), 0); }
+    }
+    const f = (n) => n.toLocaleString("en-US"); CB.stat("if-gr-o-r", f(r) + "개"); CB.stat("if-gr-o-l", f(l) + "개"); CB.stat("if-gr-o-p", cP() ? f(ps) + "개" : "—"); CB.stat("if-gr-o-v", cP() ? f(pv) + "개" : "—");
+  }
+  go();
+})();
+
+/* ---------- 3. 공간 구조 트리 ---------- */
+(function () {
+  const els = IFX.els, list = document.getElementById("if-tr-list");
+  const open = new Set(["P", "S", "B"]); let sel = "F7";
+  const node = (key) => {
+    if (key === "P") return { label: "B-10", ent: "IfcProject", kids: ["S"], seed: "IfcProjectB-10" };
+    if (key === "S") return { label: "B-10 대지", ent: "IfcSite", kids: ["B"], seed: "IfcSiteB-10" };
+    if (key === "B") return { label: "B-10", ent: "IfcBuilding", kids: Array.from({ length: 10 }, (_, i) => "F" + (i + 1)), seed: "IfcBuildingB-10" };
+    let m = /^F(\d+)$/.exec(key);
+    if (m) return { label: m[1] + "F", ent: "IfcBuildingStorey", kids: IFX.TYPES.map((t) => key + ":" + t).concat([key + ":sp"]), seed: "IfcBuildingStorey" + m[1] + "F", st: +m[1] };
+    m = /^F(\d+):(\w+)$/.exec(key);
+    if (m && m[2] === "sp") return { label: "IfcSpace — 아직 없음(13장)", ent: "", kids: [], off: true };
+    if (m) { const ids = els.filter((e) => e.storey === +m[1] && e.ifc === m[2]); return { label: `${m[2]} (${ids.length})`, ent: m[2], kids: ids.map((e) => "E" + e.id), group: true }; }
+    m = /^E(\d+)$/.exec(key); const e = els[+m[1] - 1];
+    return { label: e.name, ent: e.ifc, kids: [], el: e };
+  };
+  const members = (key) => {
+    const n = node(key); if (n.el) return [n.el]; if (n.off) return [];
+    if (key === "P" || key === "S" || key === "B") return els;
+    if (n.st) return els.filter((e) => e.storey === n.st);
+    return n.kids.map((k) => els[+k.slice(1) - 1]);
+  };
+  function render() {
+    const rows = [];
+    const walk = (key, d) => {
+      const n = node(key), isOpen = open.has(key), hasK = n.kids.length > 0;
+      rows.push(`<button role="treeitem" data-k="${key}" class="${key === sel ? "on" : ""}" style="padding-left:${8 + d * 14}px" aria-expanded="${hasK ? isOpen : ""}"><span class="if-tw" data-t="1">${hasK ? (isOpen ? "▾" : "▸") : ""}</span><span class="${n.off ? "if-off" : ""}">${n.label}</span>${n.ent && !n.group ? ` <small>${n.ent}</small>` : ""}</button>`);
+      if (hasK && isOpen) n.kids.forEach((k) => walk(k, d + 1));
+    };
+    walk("P", 0); list.innerHTML = rows.join("");
+  }
+  list.addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return; const k = b.dataset.k, n = node(k);
+    if (ev.target.dataset.t || (n.kids.length && sel === k)) { open.has(k) ? open.delete(k) : open.add(k); }
+    if (!n.off) sel = k; render(); go();
+  });
+  document.getElementById("if-tr-open").addEventListener("click", () => { for (let i = 1; i <= 10; i++) open.add("F" + i); render(); });
+  document.getElementById("if-tr-close").addEventListener("click", () => { open.clear(); open.add("P"); render(); });
+  const v = CB.orbit("#if-cv-tree", {
+    yaw: -0.7, pitch: 0.35, dist: 82, target: [16, 12, 19], aspect: (W) => (W < 560 ? 1.0 : 0.8), maxHeight: 520, minHeight: 300,
+    draw(V) {
+      const P = V.P, M = new Set(members(sel).map((e) => e.id)), n = node(sel);
+      IFX.TYPES.forEach((t) => IFX.edges(V, els.filter((e) => e.ifc === t && !M.has(e.id)).map((e) => e.box), IFX.colorOf(P, { ifc: t }), 0.7, M.size === els.length ? 0.6 : 0.25));
+      if (M.size < 40) els.filter((e) => M.has(e.id)).forEach((e) => IFX.faces(V, e.box, P.accent2, 0.18));
+      IFX.edges(V, els.filter((e) => M.has(e.id)).map((e) => e.box), P.accent2, M.size < 40 ? 1.8 : 1.1, 0.95);
+      if (n.st) { const z = IFX.H(n.st - 1); V.poly3([[-2, -2, z], [34, -2, z], [34, 26, z], [-2, 26, z]], { fill: P.accent2, fillAlpha: 0.06, color: P.accent2, width: 1, dash: [4, 4] }); V.text3(`Elevation ${z} m`, [34, -2, z], { color: P.accent2, size: 11, align: "left", dx: 6 }); }
+    },
+  });
+  function go() {
+    v.redraw();
+    const n = node(sel), M = members(sel), vol = M.reduce((s, e) => s + IFX.vol(e.box), 0);
+    CB.stat("if-tr-o-n", n.label.replace(/ [(][0-9]+[)]$/, "")); CB.stat("if-tr-o-e", n.ent || "—"); CB.stat("if-tr-o-c", M.length + "개"); CB.stat("if-tr-o-v", CB.sig(vol, 4) + " m³");
+    if (n.el) {
+      const e = n.el, p = IFX.data[e.id].pset, b = e.box.map((x) => CB.num(x, 2));
+      IFX.msg("if-tr-msg", "", `<b>${e.name}</b> · ${e.ifc} · GlobalId <code>${e.guid}</code> · ${e.storey}층에 포함 · 상자 [${b.join(", ")}] m · 재료 ${e.material} · 속성 ${IFX.esc(JSON.stringify(e.props))}${p ? ` · ${IFX.PSET[e.ifc]}: IsExternal ${p.IsExternal ? "TRUE" : "FALSE"}` : ""}`);
+    } else if (n.seed) IFX.msg("if-tr-msg", "", `<b>${n.ent}</b> “${n.label}” · GlobalId <code>${CB.bim.guid(n.seed)}</code>${n.st ? ` · Elevation ${IFX.H(n.st - 1)} m · 공간 포함 관계 1개가 요소 ${M.length}개를 담는다` : ` · 집합 관계(IfcRelAggregates)로 아래 마디를 가진다`}`);
+    else IFX.msg("if-tr-msg", "", `<b>${n.label}</b> — 같은 층·같은 엔터티의 요소 묶음(트리 표시용, IFC 엔터티가 아님).`);
+  }
+  render(); go();
+})();
+
+/* ---------- 4. 속성 세트 편집 ---------- */
+(function () {
+  const els = IFX.els, ed = document.getElementById("if-ps-ed");
+  const gs = CB.range("if-ps-s", (v) => v + "층", () => { selId = null; go(); }), gq = CB.seg("if-ps-q", go);
+  let selId = null, boxes = [];
+  const match = (e) => {
+    const d = IFX.data[e.id], st = !!IFX.PSET[e.ifc], q = gq();
+    if (q === "ext") return !!(d.pset && d.pset.IsExternal === true);
+    if (q === "fire") return st && (!d.pset || !d.pset.FireRating);
+    if (q === "nlb") return st && (!d.pset || d.pset.LoadBearing !== true);
+    return st && !d.pset;
+  };
+  const cv = CB.canvas("#if-cv-pset", (ctx, W, H) => {
+    const P = CB.palette(), s = gs(), m = 22, sc = Math.min((W - 2 * m) / 32.8, (H - 2 * m - 18) / 24.8), ox = m + 0.4 * sc + (W - 2 * m - 32.8 * sc) / 2, oy = H - m - 0.4 * sc - 10;
+    const X = (x) => ox + x * sc, Y = (y) => oy - y * sc; boxes = [];
+    const order = ["IfcSlab", "IfcBeam", "IfcPipeSegment", "IfcDuctSegment", "IfcWall", "IfcColumn"];
+    els.filter((e) => e.storey === s).sort((a, b) => order.indexOf(a.ifc) - order.indexOf(b.ifc)).forEach((e) => {
+      const b = e.box, x0 = X(b[0]), x1 = X(b[3]), y0 = Y(b[4]), y1 = Y(b[1]), hit = match(e), q = gq();
+      let fill = IFX.colorOf(P, e), a = e.ifc === "IfcSlab" ? 0.06 : e.ifc === "IfcBeam" ? 0.3 : 0.55;
+      if (hit) { fill = q === "ext" ? P.accent2 : P.bad; a = e.ifc === "IfcSlab" ? 0.18 : 0.85; }
+      ctx.fillStyle = IFX.alpha(fill, a); ctx.fillRect(x0, y0, Math.max(1.5, x1 - x0), Math.max(1.5, y1 - y0));
+      if (e.id === selId) { ctx.save(); ctx.strokeStyle = P.accent2; ctx.lineWidth = 3; ctx.strokeRect(x0 - 3, y0 - 3, x1 - x0 + 6, y1 - y0 + 6); ctx.restore(); }
+      if (e.ifc !== "IfcSlab") boxes.push({ e, x0: x0 - 4, x1: x1 + 4, y0: y0 - 4, y1: y1 + 4, pr: order.indexOf(e.ifc) });
+    });
+    ["A", "B", "C", "D", "E"].forEach((g, i) => IFX.text(ctx, g, X(i * 8), oy + 0.4 * sc + 12, P.dim, { size: 10.5 }));
+    [1, 2, 3, 4].forEach((g, i) => IFX.text(ctx, g, ox - 0.4 * sc - 10, Y(i * 8), P.dim, { size: 10.5 }));
+    IFX.text(ctx, s + "층 평면 · 덕트(파랑) y = 12 m · 배관(초록) y = 4 m", W / 2, 10, P.dim, { size: 10.5, bold: false });
+  }, { aspect: 0.78, minHeight: 260, maxHeight: 460 });
+  cv.canvas.style.cursor = "pointer";
+  cv.canvas.addEventListener("click", (ev) => {
+    const r = cv.canvas.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top;
+    const hits = boxes.filter((b) => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1).sort((a, b) => b.pr - a.pr);
+    selId = hits.length ? hits[0].e.id : null; go();
+  });
+  const set = (k, val) => { const d = IFX.data[selId]; if (!d.pset) return; d.pset[k] = val; IFX.edits++; IFX.notify(); };
+  ed.addEventListener("change", (ev) => {
+    const t = ev.target; if (!selId) return;
+    if (t.dataset.k === "FireRating") set("FireRating", t.value); else if (t.dataset.k) set(t.dataset.k, t.checked);
+  });
+  ed.addEventListener("click", (ev) => { if (ev.target.id === "if-ps-mk" && selId) { const e = els[selId - 1]; IFX.data[selId].pset = IFX.clean(e); IFX.data[selId].pset.FireRating = ""; IFX.edits++; IFX.notify(); } });
+  document.getElementById("if-ps-fix").addEventListener("click", () => {
+    els.filter((e) => e.storey === gs() && IFX.PSET[e.ifc]).forEach((e) => { const d = IFX.data[e.id]; if (!d.pset) d.pset = IFX.clean(e); if (!d.pset.FireRating) { d.pset.FireRating = IFX.clean(e).FireRating; IFX.edits++; } });
+    IFX.notify();
+  });
+  document.getElementById("if-ps-reset").addEventListener("click", () => { IFX.reset(); IFX.notify(); });
+  function editor() {
+    if (!selId) { ed.innerHTML = '<span>선택한 요소의 속성</span><div style="color:var(--text-faint);font-size:13px">평면에서 요소를 누르세요</div>'; return; }
+    const e = els[selId - 1], d = IFX.data[selId], ps = IFX.PSET[e.ifc];
+    if (!ps) { ed.innerHTML = `<span>${d.name} · ${e.ifc}</span><div style="font-size:13px;color:var(--text-dim)">개별 속성 세트 없음 — 유형 ${IFX.TYPE[e.ifc]}, 계통 ${e.props.system}, 재료 ${e.material}</div>`; return; }
+    if (!d.pset) { ed.innerHTML = `<span>${d.name} · ${ps}</span><div style="font-size:13px;color:var(--bad)">속성 세트가 없음(내보내기 누락)</div><button class="btn" id="if-ps-mk">${ps} 만들기</button>`; return; }
+    const p = d.pset, opt = ["", "2시간", "3시간"].map((o) => `<option value="${o}" ${p.FireRating === o ? "selected" : ""}>${o || "(비어 있음)"}</option>`).join("");
+    ed.innerHTML = `<span>${d.name} · ${ps} · Reference ${p.Reference}</span>
+      <label class="check"><input type="checkbox" data-k="LoadBearing" ${p.LoadBearing ? "checked" : ""}> LoadBearing</label>
+      <label class="check"><input type="checkbox" data-k="IsExternal" ${p.IsExternal ? "checked" : ""}> IsExternal</label>
+      <label class="ctrl"><span>FireRating(교육용 값)</span><select class="if-in" data-k="FireRating">${opt}</select></label>`;
+  }
+  function go() {
+    cv.redraw(); editor();
+    const all = els.filter(match).length, fl = els.filter((e) => e.storey === gs() && match(e)).length;
+    CB.stat("if-ps-o-a", all + "개"); CB.stat("if-ps-o-f", fl + "개"); CB.stat("if-ps-o-e", selId ? IFX.data[selId].name : "—"); CB.stat("if-ps-o-c", IFX.edits + "건");
+    const qn = { ext: "IsExternal = TRUE", fire: "FireRating 없음", nlb: "LoadBearing ≠ TRUE", nopset: "속성 세트 없음" }[gq()];
+    IFX.msg("if-ps-msg", "", selId ? `<b>${IFX.data[selId].name}</b>을(를) 골랐습니다. 값을 바꾸면 질의 “${qn}”의 결과와 3.8절 IDS 검증이 바로 바뀝니다.` : `질의 “${qn}”: 전체 ${all}개, ${gs()}층 ${fl}개. 평면에서 요소를 눌러 고르세요.`);
+  }
+  IFX.listeners.push(go);
+  go();
+})();
+
+/* ---------- 5. GlobalId와 버전 비교 ---------- */
+(function () {
+  const B64 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_" + "$";
+  const nameEl = document.getElementById("if-gu-name");
+  const gt = CB.seg("if-gu-t", go), gs = CB.range("if-gu-s", (v) => v + "층", go), gm = CB.seg("if-gu-m", go);
+  const gn = CB.range("if-gu-n", (v) => "10^" + v, go);
+  nameEl.addEventListener("input", go);
+  const sup = (n) => String(n).replace(/-/g, "⁻").replace(/\d/g, (d) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]);
+  const sci = (p) => { if (!(p > 0)) return "0"; if (p >= 0.01) return CB.num(p * 100, 1) + " %"; const e = Math.floor(Math.log10(p)); return CB.num(p / 10 ** e, 1) + " × 10" + sup(e); };
+  /** 버전 비교: v1(원본)과 v2(C-B2-3F 이름·단면 변경)를 ID로 짝짓는다 */
+  const diffs = {};
+  ["keep", "name", "new"].forEach((mode) => {
+    const els = IFX.els, v1 = new Map(els.map((e) => [e.guid, e.props.section || ""]));
+    const v2 = new Map(els.map((e) => {
+      const ch = e.name === "C-B2-3F", nm = ch ? "C-B2-3F-R" : e.name;
+      const id = mode === "keep" ? e.guid : mode === "name" ? CB.bim.guid(e.ifc + nm + e.storey) : CB.bim.guid("v2/" + e.ifc + nm + e.storey);
+      return [id, ch ? "900x900" : e.props.section || ""];
+    }));
+    let c = 0, a = 0, d = 0, u = 0; v2.forEach((s, id) => { if (!v1.has(id)) a++; else if (v1.get(id) !== s) c++; else u++; }); v1.forEach((s, id) => { if (!v2.has(id)) d++; });
+    diffs[mode] = { c, a, d, u };
+  });
+  const cur = () => { const nm = nameEl.value; return { nm, g: CB.bim.guid(gt() + nm + gs()) }; };
+  const cv = CB.canvas("#if-cv-guid", (ctx, W, H) => {
+    const P = CB.palette(), { g } = cur(), n = 22, cw = Math.min(30, (W - 24) / n), x0 = (W - cw * n) / 2;
+    IFX.text(ctx, "GlobalId 22자 = 2비트 + 6비트 × 21", W / 2, 14, P.dim, { size: 11, bold: false });
+    for (let i = 0; i < n; i++) {
+      const ch = g[i] || "", x = x0 + i * cw;
+      ctx.fillStyle = i === 0 ? IFX.alpha(P.accent2, 0.25) : IFX.alpha(P.accent, 0.08 + (B64.indexOf(ch) / 63) * 0.3); ctx.fillRect(x + 1, 28, cw - 2, 30);
+      IFX.text(ctx, ch, x + cw / 2, 43, P.text, { size: Math.min(15, cw * 0.6), halo: false });
+    }
+    const bits = g.split("").slice(0, 4).map((c, i) => c + "→" + B64.indexOf(c).toString(2).padStart(i ? 6 : 2, "0")).join("  ");
+    IFX.text(ctx, bits + "  …", W / 2, 72, P.dim, { size: W < 480 ? 9.5 : 11, bold: false });
+    const top = 98, bh = H - top - 34, modes = [["keep", "ID 유지"], ["name", "이름에서 계산"], ["new", "매번 새 ID"]], gw = (W - 40) / 3, mx = 360;
+    IFX.text(ctx, "새 버전(C-B2-3F 이름·단면 변경) 비교 결과", W / 2, top - 8, P.dim, { size: 11, bold: false });
+    modes.forEach(([m, lab], k) => {
+      const D = diffs[m], gx = 20 + k * gw, on = m === gm(), bars = [["변경", D.c, P.warn], ["추가", D.a, P.ok], ["삭제", D.d, P.bad]];
+      if (on) { ctx.fillStyle = IFX.alpha(P.accent2, 0.08); ctx.fillRect(gx + 2, top, gw - 4, bh + 30); }
+      bars.forEach(([t, val, col], j) => {
+        const bw = (gw - 30) / 3, x = gx + 10 + j * (bw + 5), hgt = val ? Math.max(4, (Math.sqrt(val) / Math.sqrt(mx)) * (bh - 30)) : 0;
+        ctx.fillStyle = IFX.alpha(col, on ? 0.85 : 0.4); ctx.fillRect(x, top + bh - hgt, bw, hgt);
+        IFX.text(ctx, String(val), x + bw / 2, top + bh - hgt - 9, P.text, { size: 10.5 });
+        IFX.text(ctx, t, x + bw / 2, top + bh + 9, P.dim, { size: 9.5, bold: false, halo: false });
+      });
+      IFX.text(ctx, lab, gx + gw / 2, top + bh + 24, on ? P.accent2 : P.dim, { size: 11 });
+    });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.6), minHeight: 300, maxHeight: 420 });
+  function go() {
+    cv.redraw();
+    const { nm, g } = cur(), e = IFX.els.find((x) => x.ifc === gt() && x.name === nm && x.storey === gs());
+    CB.stat("if-gu-o-g", g); CB.stat("if-gu-o-m", e ? "예 · 요소 #" + e.id : "모델에 없음");
+    const D = diffs[gm()]; CB.stat("if-gu-o-d", `${D.c} · ${D.a} · ${D.d}`);
+    const n = 10 ** gn(), x = (n * n) / 2 ** 123, p = x < 1e-6 ? x : 1 - Math.exp(-x);
+    CB.stat("if-gu-o-p", sci(p));
+    const txt = { keep: "같은 객체가 같은 ID를 지켜 변경 1건으로 정확히 잡힙니다.", name: "이름이 바뀐 기둥이 삭제 1 + 추가 1로 보여 간섭·공정 이력이 끊깁니다(이 책의 결정적 ID의 한계).", new: "모든 객체가 새것으로 보여 비교가 쓸모없어집니다 — 내보내기 설정을 고쳐야 합니다." }[gm()];
+    IFX.msg("if-gu-msg", e ? "ok" : "", `씨앗 “${IFX.esc(gt() + nm + gs())}” → <code>${g}</code>${e ? " = 모델 속 요소의 GlobalId." : " (같은 이름·층의 요소가 모델에 없음)"} · 버전 비교: ${txt} 바뀌지 않은 객체 ${D.u}개.`);
+  }
+  go();
+})();
+
+/* ---------- 6. STEP 파일 읽기 ---------- */
+(function () {
+  const DEF = [
+    "ISO-10303-21;",
+    "HEADER;",
+    "FILE_DESCRIPTION(('ViewDefinition [ReferenceView]'),'2;1');",
+    "FILE_NAME('B10-STR.ifc','2026-11-07T09:00:00',('BIMBook'),('B-10 education'),'hand-written','BIMBook','');",
+    "FILE_SCHEMA(('IFC4'));",
+    "ENDSEC;",
+    "DATA;",
+    "#1=IFCPROJECT('29HAqOvluyy14mmQTruQcT',$,'B-10',$,$,'B-10 Office',$,(#20),#10);",
+    "#10=IFCUNITASSIGNMENT((#11,#12));",
+    "#11=IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);",
+    "#12=IFCSIUNIT(*,.VOLUMEUNIT.,$,.CUBIC_METRE.);",
+    "#20=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,#21,$);",
+    "#21=IFCAXIS2PLACEMENT3D(#22,$,$);",
+    "#22=IFCCARTESIANPOINT((0.,0.,0.));",
+    "#30=IFCSITE('3UVakhDNYQkHj" + "$VOVCwbas',$,'B-10 Site',$,$,#31,$,$,.ELEMENT.,$,$,$,$,$);",
+    "#31=IFCLOCALPLACEMENT($,#21);",
+    "#40=IFCBUILDING('02G4lPM36kfSKLvvVSY5rK',$,'B-10',$,$,#41,$,$,.ELEMENT.,$,$,$);",
+    "#41=IFCLOCALPLACEMENT(#31,#21);",
+    "#50=IFCBUILDINGSTOREY('24GrwQAZ9EPgvMk9j3fF5B',$,'1F',$,$,#51,$,$,.ELEMENT.,0.);",
+    "#51=IFCLOCALPLACEMENT(#41,#21);",
+    "#60=IFCRELAGGREGATES('2bZdwhtV0furYk" + "$yDATm_O',$,$,$,#1,(#30));",
+    "#61=IFCRELAGGREGATES('2HFaWl4U_rekg95fm5" + "$ZlV',$,$,$,#30,(#40));",
+    "#62=IFCRELAGGREGATES('1BVhXog_nu3Wplhcck73Jv',$,$,$,#40,(#50));",
+    "#100=IFCCOLUMN('0Twclusfb99Ugtfd8Fs9pQ',$,'C-B2-1F',$,$,#101,#110,'C1',.COLUMN.);",
+    "#101=IFCLOCALPLACEMENT(#51,#102);",
+    "#102=IFCAXIS2PLACEMENT3D(#103,$,$);",
+    "#103=IFCCARTESIANPOINT((8.,8.,0.));",
+    "#110=IFCPRODUCTDEFINITIONSHAPE($,$,(#111));",
+    "#111=IFCSHAPEREPRESENTATION(#20,'Body','SweptSolid',(#112));",
+    "#112=IFCEXTRUDEDAREASOLID(#113,#21,#115,4.3);",
+    "#113=IFCRECTANGLEPROFILEDEF(.AREA.,'800x800',$,0.8,0.8);",
+    "#115=IFCDIRECTION((0.,0.,1.));",
+    "#120=IFCRELCONTAINEDINSPATIALSTRUCTURE('1UoU7n9gtMMwAfjeu" + "$ovZ3',$,$,$,(#100),#50);",
+    "#130=IFCPROPERTYSET('27h3K8umyZL6WXqTAFRbzT',$,'Pset_ColumnCommon',$,(#131,#132,#133));",
+    "#131=IFCPROPERTYSINGLEVALUE('Reference',$,IFCIDENTIFIER('C1'),$);",
+    "#132=IFCPROPERTYSINGLEVALUE('LoadBearing',$,IFCBOOLEAN(.T.),$);",
+    "#133=IFCPROPERTYSINGLEVALUE('IsExternal',$,IFCBOOLEAN(.F.),$);",
+    "#140=IFCRELDEFINESBYPROPERTIES('0CSUGvPsZAvcFoNJ7PvJRS',$,$,$,(#100),#130);",
+    "#150=IFCMATERIAL('C30',$,$);",
+    "#151=IFCRELASSOCIATESMATERIAL('3hH" + "$R2MusQtn" + "$3qV0_7zib',$,$,$,(#100),#150);",
+    "#160=IFCELEMENTQUANTITY('0FHNBVdG52FYf2WVwPaSuw',$,'Qto_ColumnBaseQuantities',$,$,(#161));",
+    "#161=IFCQUANTITYVOLUME('NetVolume',$,$,2.752,$);",
+    "#162=IFCRELDEFINESBYPROPERTIES('2dcmD_CUbxPJ0" + "$3aXfTf0X',$,$,$,(#100),#160);",
+    "ENDSEC;",
+    "END-ISO-10303-21;",
+  ].join("\n");
+  const WALL = ["#200=IFCWALL('2HHIyKgGamW3EH4" + "$1QFIiC',$,'W-CORE1-1F',$,$,#201,$,'W1',.SOLIDWALL.);", "#201=IFCLOCALPLACEMENT(#51,#202);", "#202=IFCAXIS2PLACEMENT3D(#203,$,$);", "#203=IFCCARTESIANPOINT((16.,8.2,0.));"];
+  const EXPECT = { IFCPROJECT: 9, IFCSITE: 14, IFCBUILDING: 12, IFCBUILDINGSTOREY: 10, IFCCOLUMN: 9, IFCWALL: 9, IFCBEAM: 9, IFCSLAB: 9, IFCRELAGGREGATES: 6, IFCRELCONTAINEDINSPATIALSTRUCTURE: 6, IFCRELDEFINESBYPROPERTIES: 6, IFCRELASSOCIATESMATERIAL: 6, IFCPROPERTYSET: 5, IFCPROPERTYSINGLEVALUE: 4, IFCELEMENTQUANTITY: 6, IFCQUANTITYVOLUME: 5, IFCLOCALPLACEMENT: 2, IFCAXIS2PLACEMENT3D: 3 };
+  const PROD = /^IFC(PROJECT|SITE|BUILDING|BUILDINGSTOREY|SPACE|COLUMN|BEAM|SLAB|WALL|DUCTSEGMENT|PIPESEGMENT|FLOWSEGMENT|\w+TYPE)$/;
+  const PHYS = /^IFC(COLUMN|BEAM|SLAB|WALL|DUCTSEGMENT|PIPESEGMENT|FLOWSEGMENT)$/;
+  const cat = (t) => (/^IFCREL/.test(t) ? 0 : PROD.test(t) ? 1 : /^IFC(PROPERTY|ELEMENTQUANTITY|QUANTITY|MATERIAL)/.test(t) ? 2 : 3);
+  const ta = document.getElementById("if-st-ta"), tb = document.getElementById("if-st-tb");
+  ta.value = DEF;
+  let R = null, sel = 100, rects = [], rows = 10;
+  function analyse() {
+    const text = ta.value, ents = CB.bim.parseStep(text), ids = Object.keys(ents).map(Number).sort((a, b) => a - b), warn = [], inb = {};
+    ids.forEach((i) => ents[i].refs.forEach((r) => (inb[r] = (inb[r] || 0) + 1)));
+    const counts = {}; for (const m of text.matchAll(/^\s*#(\d+)\s*=\s*([^\s(]*)/gm)) { counts[m[1]] = (counts[m[1]] || 0) + 1; if (!/^[A-Z0-9_]+$/.test(m[2])) warn.push(`#${m[1]}: 엔터티 이름 “${IFX.esc(m[2])}”은 대문자여야 한다(해석 안 됨)`); }
+    Object.entries(counts).forEach(([k, c]) => { if (c > 1) warn.push(`#${k}: 번호가 ${c}번 쓰였다(뒤의 줄이 앞을 덮음)`); });
+    const dang = new Set();
+    ids.forEach((i) => ents[i].refs.forEach((r) => { if (!ents[r]) { dang.add(r); warn.push(`#${i}이(가) 없는 #${r}을(를) 참조한다(끊어진 참조)`); } }));
+    ids.forEach((i) => { const e = ents[i], x = EXPECT[e.type]; if (x && e.args.length !== x) warn.push(`#${i} ${e.type}: 속성 ${e.args.length}개 — IFC4 스키마는 ${x}개`); });
+    ids.forEach((i) => { const e = ents[i]; if (PROD.test(e.type) || /^IFCREL|^IFCPROPERTYSET$|^IFCELEMENTQUANTITY$/.test(e.type)) { const g = (e.args[0] || "").replace(/'/g, ""); if (g.length !== 22) warn.push(`#${i} ${e.type}: GlobalId 길이 ${g.length}자(22자여야 함)`); } });
+    const contained = {}, storeyName = (id) => (ents[id] && ents[id].type === "IFCBUILDINGSTOREY" ? (ents[id].args[2] || "").replace(/'/g, "") : "#" + id);
+    ids.forEach((i) => { const e = ents[i]; if (e.type === "IFCRELCONTAINEDINSPATIALSTRUCTURE") { const rel = [...(e.args[4] || "").matchAll(/#(\d+)/g)].map((m) => +m[1]), st = +((e.args[5] || "").replace("#", "")); rel.forEach((r) => (contained[r] = st)); } });
+    const prods = ids.filter((i) => PHYS.test(ents[i].type));
+    prods.forEach((i) => { if (contained[i] == null) warn.push(`#${i} ${ents[i].type}: 어느 공간 구조에도 포함되지 않았다`); });
+    const map = prods.map((i) => `${(ents[i].args[2] || "").replace(/'/g, "")}→${contained[i] != null ? storeyName(contained[i]) : "?"}`);
+    R = { ents, ids, warn, inb, dang, map, prods, contained };
+    const cols = [[], [], [], []]; ids.forEach((i) => cols[cat(ents[i].type)].push(i)); R.cols = cols;
+    const nr = Math.max(4, ...cols.map((c) => c.length)); if (nr !== rows) { rows = nr; cv.resize(); }
+  }
+  const cv = CB.canvas("#if-cv-step", (ctx, W, H) => {
+    if (!R) return; const P = CB.palette(), cw = (W - 16) / 4, rh = 19, top = 30, pos = {}; rects = [];
+    const CC = [P.ok, P.accent2, P.warn, P.dim], heads = ["관계", "공간·제품", "속성·재료", "형상·자원"];
+    heads.forEach((h, k) => IFX.text(ctx, h, 8 + k * cw + cw / 2, 12, CC[k], { size: 11 }));
+    R.cols.forEach((c, k) => c.forEach((i, r) => (pos[i] = { x: 8 + k * cw + 4, y: top + r * rh, w: cw - 8, h: rh - 4, k })));
+    const S = R.ents[sel], out = new Set(S ? S.refs : []), inc = new Set(R.ids.filter((i) => R.ents[i].refs.includes(sel)));
+    R.ids.forEach((i) => R.ents[i].refs.forEach((r) => {
+      const A = pos[i], B = pos[r]; if (!A || !B) return; const hot = i === sel || r === sel;
+      const x1 = A.k <= B.k ? A.x + A.w : A.x, x2 = A.k < B.k ? B.x : A.k === B.k ? B.x + B.w : B.x + B.w, y1 = A.y + A.h / 2, y2 = B.y + B.h / 2;
+      const bend = A.k === B.k ? 26 : (x2 - x1) / 2;
+      ctx.save(); ctx.strokeStyle = hot ? (i === sel ? P.accent2 : P.accent) : P.faint; ctx.globalAlpha = hot ? 0.95 : 0.35; ctx.lineWidth = hot ? 1.8 : 0.9;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.bezierCurveTo(x1 + bend, y1, x2 + (A.k === B.k ? bend : -bend), y2, x2, y2); ctx.stroke(); ctx.restore();
+    }));
+    R.ids.forEach((i) => {
+      const p = pos[i], e = R.ents[i], on = i === sel, col = CC[p.k];
+      ctx.fillStyle = on ? IFX.alpha(P.accent2, 0.25) : out.has(i) ? IFX.alpha(P.accent2, 0.12) : inc.has(i) ? IFX.alpha(P.accent, 0.14) : P.elev;
+      ctx.fillRect(p.x, p.y, p.w, p.h); ctx.strokeStyle = on ? P.accent2 : IFX.alpha(col, 0.7); ctx.lineWidth = on ? 2 : 1; ctx.strokeRect(p.x, p.y, p.w, p.h);
+      let s = "#" + i + " " + e.type.replace(/^IFC/, ""); const fs = cw < 100 ? 9 : 10.5;
+      ctx.save(); ctx.font = `${fs}px ${getComputedStyle(document.body).getPropertyValue("--mono")}`; while (s.length > 4 && ctx.measureText(s).width > p.w - 6) s = s.slice(0, -1); ctx.restore();
+      IFX.text(ctx, s, p.x + 3, p.y + p.h / 2, R.dang.has(i) ? P.bad : P.text, { align: "left", size: fs, bold: on, halo: false });
+      rects.push({ i, ...p });
+    });
+    [...R.dang].forEach((d, k) => IFX.text(ctx, `#${d} 없음!`, W - 8, H - 10 - k * 14, P.bad, { align: "right", size: 10.5 }));
+  }, { aspect: (W) => (30 + rows * 19 + 24) / W, minHeight: 200, maxHeight: 900 });
+  cv.canvas.style.cursor = "pointer";
+  cv.canvas.addEventListener("click", (ev) => { const r = cv.canvas.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top, h = rects.find((q) => x >= q.x && x <= q.x + q.w && y >= q.y && y <= q.y + q.h); if (h) { sel = h.i; show(); } });
+  function show() {
+    cv.redraw(); const { ents, ids, warn, inb } = R;
+    CB.stat("if-st-o-n", ids.length + "개"); CB.stat("if-st-o-r", ids.reduce((s, i) => s + ents[i].refs.length, 0) + "개"); CB.stat("if-st-o-w", warn.length + "건");
+    CB.stat("if-st-o-s", R.map.length ? R.map[0] + (R.map.length > 1 ? " 외 " + (R.map.length - 1) : "") : "—");
+    tb.innerHTML = ids.map((i) => { const e = ents[i], rf = e.refs.map((r) => (ents[r] ? "#" + r : `<b style="color:var(--bad)">#${r}?</b>`)).join(" "); return `<tr${i === sel ? ' style="background:var(--accent-2-soft)"' : ""}><td>#${i}</td><td><code>${e.type}</code></td><td class="num">${e.args.length}</td><td>${rf || "—"}</td><td class="num">${inb[i] || 0}</td></tr>`; }).join("");
+    const S = ents[sel];
+    const head = S ? `<b>#${sel} ${S.type}</b>(${S.args.map((a) => IFX.esc(a.length > 26 ? a.slice(0, 24) + "…" : a)).join(", ")}) · 가리킴: ${S.refs.map((r) => "#" + r).join(", ") || "없음"} · 가리켜짐: ${ids.filter((i) => ents[i].refs.includes(sel)).map((i) => "#" + i).join(", ") || "없음"}` : "상자를 눌러 인스턴스를 고르세요.";
+    IFX.msg("if-st-msg", warn.length ? "bad" : "ok", head + "<br>" + (warn.length ? "경고: " + warn.slice(0, 6).join(" · ") + (warn.length > 6 ? ` 외 ${warn.length - 6}건` : "") : `경고 없음 · 제품 → 층: ${R.map.join(", ") || "—"}`));
+  }
+  const update = () => { analyse(); if (!R.ents[sel]) sel = R.ids.find((i) => PHYS.test(R.ents[i].type)) || R.ids[0]; show(); };
+  let tmr = 0; ta.addEventListener("input", () => { clearTimeout(tmr); tmr = setTimeout(update, 250); });
+  const lines = () => ta.value.split("\n");
+  document.getElementById("if-st-reset").addEventListener("click", () => { ta.value = DEF; sel = 100; update(); });
+  document.getElementById("if-st-dang").addEventListener("click", () => { ta.value = lines().map((l) => (/^#120=/.test(l) ? l.split(",#50);").join(",#55);") : l)).join("\n"); update(); });
+  document.getElementById("if-st-norel").addEventListener("click", () => { ta.value = lines().filter((l) => !/^#120=/.test(l)).join("\n"); sel = 100; update(); });
+  document.getElementById("if-st-wall").addEventListener("click", () => {
+    if (/^#200=/m.test(ta.value)) return;
+    const L = lines(), k = L.lastIndexOf("ENDSEC;"); if (k < 0) return;
+    L.splice(k, 0, ...WALL); ta.value = L.map((l) => (/^#120=/.test(l) ? l.split("(#100)").join("(#100,#200)") : l)).join("\n"); sel = 200; update();
+  });
+  analyse(); cv.resize(); update();
+})();
+
+/* ---------- 7. 교환 범위(MVD 형태) ---------- */
+(function () {
+  const gp = CB.seg("if-mv-p", go), cM = CB.check("if-mv-mep", go), cS = CB.check("if-mv-share", go);
+  const ROWS = [
+    { k: "spatial", t: "공간 구조", f: 26 }, { k: "place", t: "배치", per: 3 }, { k: "body", t: "몸체 형상", per: 7 }, { k: "axis", t: "축선·단면(해석)", per: 4, st: 1 },
+    { k: "mat", t: "재료", f: 9 }, { k: "type", t: "유형", f: 24 }, { k: "pset", t: "속성 세트", per: 6, st: 1 }, { k: "qto", t: "수량 세트", per: 5 },
+    { k: "class", t: "분류 코드", f: 12 }, { k: "sys", t: "설비 계통", f: 4, mep: 1 }, { k: "proc", t: "공정 연결", f: 6 },
+  ];
+  const INC = {
+    coord: ["spatial", "place", "body", "mat", "type", "pset", "class", "sys"],
+    transfer: ["spatial", "place", "body", "mat", "type", "pset", "qto", "class", "sys"],
+    struct: ["spatial", "place", "axis", "mat", "type"],
+    qto: ["spatial", "place", "body", "mat", "type", "qto", "class"],
+    fm: ["spatial", "type", "pset", "class", "sys"],
+  };
+  const NOT = { coord: "형상 재설계(왕복 편집)", transfer: "파라메트릭 규칙 재현", struct: "간섭 검토·물량", qto: "구조 해석·속성 질의", fm: "간섭·3D 시공 검토" };
+  const COLS = IFX.TYPES, N = {}; COLS.forEach((t) => (N[t] = IFX.els.filter((e) => e.ifc === t).length));
+  const cellOn = (r, t, p, mep) => {
+    if (!INC[p].includes(r.k)) return false; const isM = t === "IfcDuctSegment" || t === "IfcPipeSegment";
+    if (isM && (!mep || p === "struct")) return false; if (r.st && isM) return false; if (r.k === "axis" && t === "IfcSlab") return true; if (r.mep && !mep) return false; return true;
+  };
+  const count = (p, mep, share) => {
+    let tot = 0; const per = {};
+    ROWS.forEach((r) => {
+      let n = 0;
+      if (r.f) n = (r.mep && (!mep || p === "struct")) || !INC[p].includes(r.k) ? 0 : r.f;
+      else COLS.forEach((t) => { if (cellOn(r, t, p, mep)) n += r.k === "body" && p === "transfer" ? N[t] * 9 : N[t] * r.per; });
+      if (r.k === "pset" && share && n) n = 6 * 6;
+      per[r.k] = n; tot += n;
+    });
+    return { tot, per };
+  };
+  const FULL = count("transfer", true, false).tot + ROWS.filter((r) => r.k === "axis" || r.k === "proc").reduce((s, r) => s + (r.f || 0) + (r.k === "axis" ? 340 * 4 : 0), 0);
+  const cv = CB.canvas("#if-cv-mvd", (ctx, W, H) => {
+    const P = CB.palette(), p = gp(), mep = cM(), C = count(p, mep, cS()), lw = W < 520 ? 92 : 120, nw = 54, cw = (W - lw - nw - 16) / COLS.length, rh = (H - 40) / ROWS.length;
+    COLS.forEach((t, j) => IFX.text(ctx, IFX.KO[t], lw + j * cw + cw / 2, 14, P.dim, { size: W < 520 ? 9.5 : 11, bold: false }));
+    IFX.text(ctx, "인스턴스", W - 8 - nw / 2, 14, P.dim, { size: 10, bold: false });
+    ROWS.forEach((r, i) => {
+      const y = 30 + i * rh; IFX.text(ctx, r.t, 6, y + rh / 2, P.text, { align: "left", size: W < 520 ? 10 : 11.5, bold: false, halo: false });
+      COLS.forEach((t, j) => {
+        const on = r.f ? INC[p].includes(r.k) && !(r.mep && (!mep || p === "struct")) : cellOn(r, t, p, mep);
+        ctx.fillStyle = on ? IFX.alpha(P.accent, 0.55) : IFX.alpha(P.dim, 0.08); ctx.fillRect(lw + j * cw + 2, y + 2, cw - 4, rh - 4);
+      });
+      IFX.text(ctx, C.per[r.k] ? C.per[r.k].toLocaleString("en-US") : "—", W - 8, y + rh / 2, C.per[r.k] ? P.text : P.faint, { align: "right", size: 10.5, halo: false });
+    });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.62), minHeight: 300, maxHeight: 440 });
+  function go() {
+    cv.redraw(); const p = gp(), C = count(p, cM(), cS());
+    CB.stat("if-mv-o-n", C.tot.toLocaleString("en-US") + "개"); CB.stat("if-mv-o-r", CB.num((C.tot / FULL) * 100, 0) + " %"); CB.stat("if-mv-o-s", "약 " + CB.sig((C.tot * 90) / 1024) + " KB"); CB.stat("if-mv-o-x", NOT[p]);
+    const name = { coord: "IFC2x3 Coordination View·IFC4 Reference View 형태", transfer: "IFC4 Design Transfer View 형태", struct: "구조 해석 뷰 형태", qto: "물량 산출용 교환(프로젝트 정의 형태)", fm: "COBie·시설 관리 인계 형태" }[p];
+    IFX.msg("if-mv-msg", "", `<b>${name}</b> — 전체 모델(모든 범주, 공정·축선 포함) ${CB.sig(FULL)}개 중 ${CB.sig(C.tot)}개를 내보냅니다. 받는 쪽이 이 범위로 할 수 없는 일: ${NOT[p]}. 범위는 교육용 단순화이며 실제 MVD 문서를 확인할 것.`);
+  }
+  go();
+})();
+
+/* ---------- 8. IDS 검증 ---------- */
+(function () {
+  const els = IFX.els, st = (e) => !!IFX.PSET[e.ifc];
+  const c1 = CB.check("if-id-s1", go), c2 = CB.check("if-id-s2", go), c3 = CB.check("if-id-s3", go), c4 = CB.check("if-id-s4", go);
+  const ent = document.getElementById("if-id-ent"), req = document.getElementById("if-id-req"), val = document.getElementById("if-id-val"), xml = document.getElementById("if-id-xml");
+  const DEFV = { mat: "Galvanized steel", ext: "TRUE", ref: "C1", name: "^DU-SA-\\d+F$", storey: "8" };
+  req.addEventListener("change", () => { val.value = DEFV[req.value]; go(); }); ent.addEventListener("change", go); val.addEventListener("input", go);
+  const bool = (s) => String(s).trim().toUpperCase() === "TRUE";
+  function custom() {
+    const r = req.value, x = val.value; let re = null, bad = "";
+    if (r === "name") { try { re = new RegExp(x); } catch (e) { bad = "정규식 오류"; } }
+    return { id: "S5", t: `S5 ${ent.value}: ${req.options[req.selectedIndex].text.replace("값", x || "?")}`, A: (e) => e.ifc === ent.value, bad,
+      Q: (e) => { const d = IFX.data[e.id], p = d.pset; if (r === "mat") return e.material === x; if (r === "ext") return !!p && p.IsExternal === bool(x); if (r === "ref") return !!p && p.Reference === x; if (r === "name") return !!re && re.test(d.name); return e.storey <= Number(x); } };
+  }
+  const SPECS = () => [
+    c1() && { id: "S1", t: "S1 기둥 LoadBearing = TRUE", A: (e) => e.ifc === "IfcColumn", Q: (e) => !!IFX.data[e.id].pset && IFX.data[e.id].pset.LoadBearing === true },
+    c2() && { id: "S2", t: "S2 골조 FireRating 있음", A: st, Q: (e) => !!IFX.data[e.id].pset && !!IFX.data[e.id].pset.FireRating },
+    c3() && { id: "S3", t: "S3 보 이름 규칙", A: (e) => e.ifc === "IfcBeam", Q: (e) => /^G1-(X[1-4]|Y[A-E])-([1-9]|10)F$/.test(IFX.data[e.id].name) },
+    c4() && { id: "S4", t: "S4 벽 Pset_WallCommon 있음", A: (e) => e.ifc === "IfcWall", Q: (e) => !!IFX.data[e.id].pset },
+    custom(),
+  ].filter(Boolean);
+  const run = () => SPECS().map((s) => { const app = els.filter(s.A), fail = s.bad ? app : app.filter((e) => !s.Q(e)); return { ...s, app, fail }; });
+  const cv = CB.canvas("#if-cv-ids", (ctx, W, H) => {
+    const P = CB.palette(), res = run(), lw = W < 520 ? 0 : 190, rh = Math.min(56, (H - 20) / Math.max(1, res.length)), bw = W - lw - 24;
+    res.forEach((s, i) => {
+      const y = 12 + i * rh, n = s.app.length, f = s.fail.length, by = lw ? y + 8 : y + 20, bh = Math.min(22, rh - 30);
+      IFX.text(ctx, s.t.length > 34 ? s.t.slice(0, 33) + "…" : s.t, lw ? 8 : 12, lw ? y + 8 + bh / 2 : y + 9, f ? P.bad : P.ok, { align: "left", size: 11, halo: false });
+      ctx.fillStyle = IFX.alpha(P.dim, 0.1); ctx.fillRect(lw + 12, by, bw, bh);
+      if (n) { ctx.fillStyle = IFX.alpha(P.ok, 0.7); ctx.fillRect(lw + 12, by, (bw * (n - f)) / n, bh); ctx.fillStyle = IFX.alpha(P.bad, 0.8); ctx.fillRect(lw + 12 + (bw * (n - f)) / n, by, (bw * f) / n, bh); }
+      IFX.text(ctx, n ? `통과 ${n - f} · 실패 ${f}` : "적용 대상 없음", lw + 12 + bw / 2, by + bh / 2, P.text, { size: 10.5 });
+    });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.55), minHeight: 260, maxHeight: 380 });
+  function go() {
+    cv.redraw(); const res = run();
+    const A = res.reduce((s, r) => s + r.app.length, 0), F = res.reduce((s, r) => s + r.fail.length, 0), ok = res.filter((r) => r.app.length && !r.fail.length).length;
+    CB.stat("if-id-o-a", A + "개"); CB.stat("if-id-o-p", `${A - F} / ${F}`); CB.stat("if-id-o-r", A ? CB.num(((A - F) / A) * 100, 1) + " %" : "—"); CB.stat("if-id-o-s", `${ok} / ${res.length}`);
+    const fl = res.filter((r) => r.fail.length).map((r) => `<b>${r.id}</b>${r.bad ? "(" + r.bad + ")" : ""}: ${r.fail.slice(0, 5).map((e) => IFX.data[e.id].name).join(", ")}${r.fail.length > 5 ? ` 외 ${r.fail.length - 5}` : ""}`);
+    IFX.msg("if-id-msg", fl.length ? "bad" : "ok", fl.length ? "실패 객체(이슈로 돌려보낼 목록): " + fl.join(" · ") : "모든 명세 통과.");
+    const x = IFX.esc(val.value).replace(/"/g, "&quot;"), e = ent.value.toUpperCase(), r = req.value, ps = IFX.PSET[ent.value] || "Pset_" + ent.value.slice(3) + "Common";
+    const body = r === "mat" ? `      <material>\n        <value><simpleValue>${x}</simpleValue></value>\n      </material>`
+      : r === "name" ? `      <attribute>\n        <name><simpleValue>Name</simpleValue></name>\n        <value><xs:restriction base="xs:string"><xs:pattern value="${x}"/></xs:restriction></value>\n      </attribute>`
+      : r === "storey" ? `      <!-- 층 번호 조건은 교육용 표기(실제로는 partOf·속성 조건으로 표현) -->\n      <partOf relation="IFCRELCONTAINEDINSPATIALSTRUCTURE">\n        <entity><name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name></entity>\n      </partOf>`
+      : `      <property dataType="${r === "ext" ? "IFCBOOLEAN" : "IFCIDENTIFIER"}">\n        <propertySet><simpleValue>${ps}</simpleValue></propertySet>\n        <baseName><simpleValue>${r === "ext" ? "IsExternal" : "Reference"}</simpleValue></baseName>\n        <value><simpleValue>${x}</simpleValue></value>\n      </property>`;
+    xml.textContent = `<!-- S5를 IDS 형태로 적은 예(요소 이름 단순화) -->\n<ids>\n  <info><title>B-10 인계 IDS(교육용)</title></info>\n  <specifications>\n    <specification name="S5" ifcVersion="IFC4">\n    <applicability>\n      <entity><name><simpleValue>${e}</simpleValue></name></entity>\n    </applicability>\n    <requirements>\n${body}\n    </requirements>\n    </specification>\n  </specifications>\n</ids>`.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  }
+  IFX.listeners.push(go);
+  go();
+})();
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 // Copyright (c) 2026 geniuskey and ConstructionBooks contributors. MIT. Based on the MathBooks og renderer.
-// Render the 1200×630 share images: og.png (shelf home), mechanics/, materials/, geotech/, structure/, concrete/, civil/ and site/og.png.
+// Render the 1200×630 share images: og.png (shelf home), mechanics/, materials/, geotech/, structure/, concrete/, civil/, site/ and bim/og.png.
 // Usage: node tools/og.mjs   (rerun after books, chapters or simulators change). Needs Playwright.
 // Covers use the same shelf.css and covers.js as the home page; stats are counted like shared/js/shelf.js.
 import { chromium } from 'playwright';
@@ -56,6 +56,11 @@ sandbox6.window = sandbox6;
 vm.createContext(sandbox6);
 vm.runInContext(read('site/js/common.js'), sandbox6);
 CB.pm = sandbox6.CB.pm;
+const sandbox7 = { ...sandbox, document: { ...sandbox.document, currentScript: { src: 'http://x/bim/js/common.js' } } };
+sandbox7.window = sandbox7;
+vm.createContext(sandbox7);
+vm.runInContext(read('bim/js/common.js'), sandbox7);
+CB.bim = sandbox7.CB.bim;
 
 const base = `
   html, body { margin:0; width:1200px; height:630px; overflow:hidden; }
@@ -362,9 +367,51 @@ const sitePage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><st
   <div class="art">${siteArt}</div>
 </body></html>`;
 
+// BIMBook: an isometric view of the B-10 BIM model (360 elements) with the duct/pipe–beam hard clashes in red, and the QTO box sums.
+const bimArt = (() => {
+  let s = '';
+  const els = CB.bim.model(), k = 6.2, ox = 278, oy = 330;
+  const P = (x, y, z) => [ox + (x - y) * 0.866 * k, oy + (x + y) * 0.5 * k - z * k];
+  const L = (a, b, c, w, o = 1) => `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${c}" stroke-width="${w}" opacity="${o}" stroke-linecap="round"/>`;
+  const Q = (pts, fill, op, stroke = 'none') => `<polygon points="${pts.map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' ')}" fill="${fill}" fill-opacity="${op}" stroke="${stroke}" stroke-opacity=".55"/>`;
+  const clashes = [...CB.bim.clashes(els, ['IfcDuctSegment'], ['IfcBeam']), ...CB.bim.clashes(els, ['IfcPipeSegment'], ['IfcBeam'])].filter((c) => c.type === 'hard');
+  for (let st = 1; st <= 10; st++) {
+    const fl = els.filter((e) => e.storey === st), by = (t) => fl.filter((e) => e.ifc === t);
+    by('IfcWall').forEach((e) => { const b = e.box, thinX = b[3] - b[0] < b[4] - b[1];
+      const pts = thinX ? [[(b[0] + b[3]) / 2, b[1]], [(b[0] + b[3]) / 2, b[4]]] : [[b[0], (b[1] + b[4]) / 2], [b[3], (b[1] + b[4]) / 2]];
+      s += Q([P(pts[0][0], pts[0][1], b[2]), P(pts[1][0], pts[1][1], b[2]), P(pts[1][0], pts[1][1], b[5]), P(pts[0][0], pts[0][1], b[5])], '#b197fc', 0.16); });
+    by('IfcColumn').forEach((e) => { const b = e.box, x = (b[0] + b[3]) / 2, y = (b[1] + b[4]) / 2; s += L(P(x, y, b[2]), P(x, y, b[5]), '#8a94a8', 2.6); });
+    by('IfcBeam').forEach((e) => { const b = e.box, z = (b[2] + b[5]) / 2, alongX = b[3] - b[0] > b[4] - b[1];
+      s += alongX ? L(P(b[0], (b[1] + b[4]) / 2, z), P(b[3], (b[1] + b[4]) / 2, z), '#6c7690', 2) : L(P((b[0] + b[3]) / 2, b[1], z), P((b[0] + b[3]) / 2, b[4], z), '#6c7690', 2); });
+    by('IfcDuctSegment').forEach((e) => { const b = e.box, y = (b[1] + b[4]) / 2, z = (b[2] + b[5]) / 2; s += L(P(b[0], y, z), P(b[3], y, z), '#5b8cff', 4.5); });
+    by('IfcPipeSegment').forEach((e) => { const b = e.box, y = (b[1] + b[4]) / 2, z = (b[2] + b[5]) / 2; s += L(P(b[0], y, z), P(b[3], y, z), '#8ce99a', 2.2); });
+    by('IfcSlab').forEach((e) => { const b = e.box, z = b[5]; s += Q([P(b[0], b[1], z), P(b[3], b[1], z), P(b[3], b[4], z), P(b[0], b[4], z)], '#b197fc', 0.09, '#b197fc'); });
+    clashes.filter((c) => c.a.storey === st).forEach((c) => { const p = P(...c.center); s += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4.2" fill="#ff5f57" stroke="#0f1625" stroke-width="1.2"/>`; });
+  }
+  s += `<text x="300" y="52" text-anchor="middle" fill="#cfd6e4" font-size="17" font-weight="700">B-10 BIM · 요소 ${els.length}개 · 하드 간섭 ${clashes.length}건(빨강)</text>`;
+  const q = CB.bim.qto(els), rows = [['기둥', 'IfcColumn'], ['보', 'IfcBeam'], ['슬래브', 'IfcSlab'], ['벽', 'IfcWall']], vmax = Math.max(...rows.map((r) => q[r[1]].volume));
+  rows.forEach(([lab, t], i) => { const y = 506 + i * 17, w = (q[t].volume / vmax) * 300;
+    s += `<text x="120" y="${y + 11}" text-anchor="end" fill="#aeb8cc" font-size="12.5">${lab}</text><rect x="130" y="${y}" width="${w.toFixed(1)}" height="12" rx="3" fill="#b197fc" opacity=".85"/><text x="${(136 + w).toFixed(1)}" y="${y + 11}" fill="#cfd6e4" font-family="monospace" font-size="12.5">${Math.round(q[t].volume).toLocaleString('en-US')} m³</text>`; });
+  return `<svg viewBox="0 0 600 600" width="600" height="600"><defs><clipPath id="c8"><rect x="20" y="20" width="560" height="560" rx="28"/></clipPath></defs><rect x="20" y="20" width="560" height="560" rx="28" fill="#0f1625" stroke="#26324a"/><g clip-path="url(#c8)">${s}</g></svg>`;
+})();
+const bim = books.find((b) => b.id === 'bimbook');
+const bimPage = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>${read('shelf.css')}</style><style>${base}
+  .art { position:absolute; right:40px; top:15px; }
+</style></head><body>
+  <div class="left">
+    <div class="brand">${read('bim/favicon.svg')}<span>BIMBook</span></div>
+    <div class="eyebrow">INTERACTIVE BIM &amp; DIGITAL CONSTRUCTION</div>
+    <h1>짓기 전에<br><span class="soft">컴퓨터 속에서</span><br><span class="warm">한 번 짓는다</span></h1>
+    <p class="lead">IFC와 LOD, 간섭 검토와 물량, 4D·5D,<br>점군과 디지털 트윈을 직접 계산하는 BIM.</p>
+    <div class="stats"><span><b>4</b>부</span><span><b>16</b>개 장</span><span><b>${Math.floor((bim.simulators || 0) / 10) * 10}+</b>시뮬레이터</span></div>
+  </div>
+  <div class="url">construction.euiyun.com/bim/</div>
+  <div class="art">${bimArt}</div>
+</body></html>`;
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
-for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png'], [strPage, 'structure/og.png'], [rcPage, 'concrete/og.png'], [civPage, 'civil/og.png'], [sitePage, 'site/og.png']]) {
+for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [matPage, 'materials/og.png'], [geoPage, 'geotech/og.png'], [strPage, 'structure/og.png'], [rcPage, 'concrete/og.png'], [civPage, 'civil/og.png'], [sitePage, 'site/og.png'], [bimPage, 'bim/og.png']]) {
   await page.setContent(html, { waitUntil: 'networkidle' });
   await page.addScriptTag({ content: read('shared/js/covers.js') });
   await page.evaluate(async () => {
@@ -374,4 +421,4 @@ for (const [html, out] of [[shelf, 'og.png'], [mechPage, 'mechanics/og.png'], [m
   await page.screenshot({ path: join(root, out) });
 }
 await browser.close();
-console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators}, structure/og.png: ${structure.simulators}, concrete/og.png: ${concrete.simulators}, civil/og.png: ${civil.simulators}, site/og.png: ${site.simulators} simulators`);
+console.log(`og.png: ${live.length} books, ${chapters} chapters, ${simulators} simulators; mechanics/og.png: ${mechanics.simulators}, materials/og.png: ${materials.simulators}, geotech/og.png: ${geotech.simulators}, structure/og.png: ${structure.simulators}, concrete/og.png: ${concrete.simulators}, civil/og.png: ${civil.simulators}, site/og.png: ${site.simulators}, bim/og.png: ${bim.simulators} simulators`);

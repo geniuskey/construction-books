@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>4D 공정 시뮬레이션 · BIMBook</title>
+<meta name="description" content="모델에 시간을 더한다. B-10 BIM의 요소 360개를 P-B10 공정(CB.pm.cpm)에 연결하는 규칙, 층 분할과 층 안 순서, 4D 재생, 순서 오류와 작업 공간 충돌, 계획 대 실적, 층별 진도 히트맵, 타워크레인 양중 시퀀스를 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .fd-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); line-height: 1.7; overflow-wrap: anywhere; }
+  .fd-msg b { color: var(--text); }
+  .fd-msg.ok { color: var(--ok); font-weight: 600; }
+  .fd-msg.warn { color: var(--warn); font-weight: 600; }
+  .fd-msg.bad { color: var(--bad); font-weight: 600; }
+  .fd-tbl td, .fd-tbl th { font-variant-numeric: tabular-nums; }
+  .fd-link { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .fd-link th, .fd-link td { padding: 4px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+  .fd-link select { width: 100%; min-width: 0; font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); }
+  .fd-sub { border-top: 1px solid var(--border); }
+  .fd-key { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 18px; font-size: 13px; color: var(--text-dim); border-top: 1px solid var(--border); }
+  .fd-key span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: currentColor; opacity: .8; }
+  .fd-key .ok { color: var(--ok); } .fd-key .warn { color: var(--warn); } .fd-key .bad { color: var(--bad); } .fd-key .dim { color: var(--text-faint); }
+  .fd-key .acc { color: var(--accent); } .fd-key .acc2 { color: var(--accent-2); } .fd-key .blue { color: var(--blue); }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="four-d">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="fd-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="fd-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 09</div>
+    <h1 data-no-glossary>4D 공정 시뮬레이션</h1>
+    <p class="lead">공정표는 "G1 지상 골조 1–5층, 38–53주"라고 말합니다. 그런데 45주에 현장에는 무엇이 서 있어야 할까요? 3층 기둥은 끝났을까요, 3층 슬래브는? 그 아래에서 설비 덕트를 매달 수 있을까요? 막대 하나는 이 질문에 답하지 못합니다. 모델의 요소 하나하나를 공정표의 활동에 연결하고, 활동 안에서 요소가 나타나는 순서를 규칙으로 정하면, 공정표는 주 단위로 자라는 3차원 건물이 됩니다. 이것이 <b>4D</b>입니다. 이 장은 B-10 BIM의 요소 360개를 P-B10 공정(<code>CB.pm.B10</code>, 93주)에 연결하고, 4D로 재생하며, 4D가 찾아내는 문제 — 지지되지 않은 요소를 먼저 설치하는 순서 오류, 같은 시기 같은 곳에서 일하는 작업 공간 충돌, 늦은 요소, 들 수 없는 인양물 — 를 계산합니다.</p>
+    <ul class="objectives">
+      <li>4D 모델을 "형상 요소 + 활동 + 연결 규칙 + 활동 안의 순서 규칙"으로 정의하고, 연결 규칙의 세밀도(활동 단위·층 단위·요소 단위)를 비교한다.</li>
+      <li>B-10의 연결 규칙(1–5층 → G1, 6–10층 → G2, 설비 → I)과 층 분할 규칙으로 요소마다 시작·완료 주를 계산하고, 주 \(w\)에서 요소의 상태를 판정한다.</li>
+      <li>연결 규칙을 편집하며 미연결 요소, 공종 불일치, 지지 조건을 어기는 순서 오류를 검출한다.</li>
+      <li>활동 기간과 선후행 관계를 바꾸어 CPM(<code>CB.pm.cpm</code>)과 4D가 함께 바뀌는 것을 확인하고, 설비 덕트가 슬래브보다 먼저 매달리는 공정 논리 오류를 고친다.</li>
+      <li>활동별 작업 공간 상자를 시간에 따라 움직여 작업 공간 충돌을 찾고, 커튼월 버퍼 규칙이 공기에 주는 영향(약 72.8주)을 계산한다.</li>
+      <li>SiteBook 13장의 50주 지연 시나리오로 계획 대 실적 4D와 층 × 공종 진도 히트맵을 만들고, 프리캐스트 대안의 타워크레인 양중 가능성을 요소별로 판정한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 정보가 없었다면</small><b>공정표는 맞는데 현장은 막힌다</b></div>
+      <div class="o-body"><p>막대 공정표는 20세기 초 헨리 간트(Henry Gantt)의 차트에서, 네트워크 공정표와 주공정법(CPM)은 1950년대 후반 미국의 화학 플랜트·군사 개발 사업에서 나왔습니다. 둘 다 "무엇을 언제"는 잘 말하지만 "어디서"는 말하지 않습니다. 1990년대에 3차원 모델의 부재를 공정표 활동과 이어 시간 순서대로 보여 주는 연구가 대학과 건설사에서 시작되었고, 이것이 4D CAD, 오늘의 4D BIM입니다. 4D가 처음부터 보여 준 가치는 계산이 아니라 <b>발견</b>이었습니다. 공정표를 읽을 때는 보이지 않던 "아직 없는 슬래브에 덕트를 매다는 순서", "같은 층에서 겹치는 두 공종", "크레인이 닿지 않는 인양물"이 화면에서 바로 드러났기 때문입니다.</p>
+        <p>4D의 핵심은 그림이 아니라 <b>연결 규칙</b>입니다. 요소 360개를 손으로 하나씩 활동에 끌어다 놓으면 하루가 걸리고, 모델이 바뀔 때마다 다시 해야 합니다. 요소의 속성(유형·층·구역)으로 활동을 정하는 규칙을 쓰면 모델이 바뀌어도 4D가 저절로 다시 만들어집니다. 3장의 IFC 속성, 5장의 명명 규칙이 여기서 공정 정보가 됩니다.</p>
+        <div class="o-chain"><span>모델 요소(유형·층·위치)</span><i>→</i><span class="tool">연결 규칙 · 층 분할 · CPM · 상태 판정 · 작업 공간 상자</span><i>→</i><span>4D 재생 · 순서·공간 충돌 · 계획 대 실적 · 양중 판정</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="what-is-4d">
+    <h2>4D = 모델 + 공정</h2>
+    <div class="problem"><strong>45주의 현장 사진을 미리 찍을 수 있을까</strong>
+      <p>발주자가 "45주 공정 회의 때 현장이 어떤 모습이어야 하는지 보여 달라"고 합니다. 손에는 3D 모델(요소 360개)과 공정표(활동 14개)가 따로 있습니다. 두 가지를 어떻게 합치면 45주의 건물을 그릴 수 있을까요?</p></div>
+    <p>3D 모델은 "무엇이 어디에" 있는지, 공정표는 "무엇을 언제" 하는지 압니다. 둘을 합치려면 공통 언어가 필요합니다. 공정표의 활동은 작업 분류 체계(SiteBook 9장의 <span class="term">작업 분류 체계</span><span class="en">(work breakdown structure, WBS)</span>)로 나뉘고, 모델의 요소는 유형·층·구역 속성을 가집니다. 요소의 속성을 활동의 범위에 대응시키는 것이 <span class="term">요소–활동 연결</span><span class="en">(element–activity linking)</span>입니다. 연결이 끝나면 주 \(w\)마다 각 요소가 "아직 없음, 짓는 중, 완성" 중 어디에 있는지 정할 수 있고, 그것을 그린 것이 <span class="term">4D 시뮬레이션</span><span class="en">(4D simulation)</span>입니다.</p>
+    <figure class="diagram" id="fig-fd-concept">
+      <svg viewBox="0 0 860 330" role="img" aria-label="3D 모델과 공정표가 연결 규칙을 통해 4D 장면으로 합쳐지는 개념도">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(36,40)">
+          <text x="90" y="0" text-anchor="middle" class="t" style="font-weight:700">3D 모델 (무엇·어디)</text>
+          <g style="stroke:var(--text-dim);stroke-width:1.2">
+            <rect x="30" y="150" width="120" height="16" style="fill:var(--surface-2)"/><rect x="30" y="110" width="120" height="16" style="fill:var(--surface-2)"/><rect x="30" y="70" width="120" height="16" style="fill:var(--surface-2)"/>
+            <rect x="36" y="166" width="8" height="40" style="fill:var(--surface-2)"/><rect x="86" y="166" width="8" height="40" style="fill:var(--surface-2)"/><rect x="136" y="166" width="8" height="40" style="fill:var(--surface-2)"/>
+            <rect x="36" y="126" width="8" height="24" style="fill:var(--surface-2)"/><rect x="86" y="126" width="8" height="24" style="fill:var(--surface-2)"/><rect x="136" y="126" width="8" height="24" style="fill:var(--surface-2)"/>
+            <rect x="36" y="86" width="8" height="24" style="fill:var(--surface-2)"/><rect x="86" y="86" width="8" height="24" style="fill:var(--surface-2)"/><rect x="136" y="86" width="8" height="24" style="fill:var(--surface-2)"/>
+          </g>
+          <line x1="44" y1="140" x2="136" y2="140" style="stroke:var(--blue);stroke-width:4"/>
+          <text x="90" y="230" text-anchor="middle" class="t-mono">요소 360개</text>
+          <text x="90" y="250" text-anchor="middle" class="t-dim">유형 · 층 · 위치 · GUID</text>
+        </g>
+        <g transform="translate(250,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">공정표 (무엇·언제)</text>
+          <g class="t-mono" style="font-size:12px">
+            <text x="0" y="44">F</text><rect x="30" y="32" width="40" height="16" style="fill:var(--bad);opacity:.8"/>
+            <text x="0" y="74">G1</text><rect x="70" y="62" width="75" height="16" style="fill:var(--bad);opacity:.8"/>
+            <text x="0" y="104">G2</text><rect x="145" y="92" width="75" height="16" style="fill:var(--accent-2);opacity:.8"/>
+            <text x="0" y="134">I</text><rect x="70" y="122" width="150" height="16" style="fill:var(--accent-2);opacity:.8"/>
+            <text x="0" y="164">H</text><rect x="145" y="152" width="80" height="16" style="fill:var(--bad);opacity:.8"/>
+          </g>
+          <line x1="30" y1="190" x2="230" y2="190" class="s-axis"/>
+          <g class="t-mono" text-anchor="middle" style="font-size:11px"><text x="30" y="206">30</text><text x="70" y="206">38</text><text x="145" y="206">53</text><text x="220" y="206">68주</text></g>
+          <text x="110" y="250" text-anchor="middle" class="t-dim">활동 14개 · CPM 93주</text>
+        </g>
+        <g transform="translate(500,40)">
+          <rect x="0" y="40" width="110" height="120" rx="10" class="f-acc-soft"/>
+          <text x="55" y="80" text-anchor="middle" class="t" style="font-weight:700;fill:var(--accent)">연결 규칙</text>
+          <text x="55" y="104" text-anchor="middle" class="t-mono" style="font-size:11px">유형·층 → 활동</text>
+          <text x="55" y="122" text-anchor="middle" class="t-mono" style="font-size:11px">층 분할 · 층 안 순서</text>
+          <text x="55" y="140" text-anchor="middle" class="t-mono" style="font-size:11px">→ [s, f]</text>
+        </g>
+        <path d="M206 140H496" style="stroke:var(--text-dim);stroke-width:1.4;fill:none;stroke-dasharray:4 4" marker-end="url(#fd-ah)"/>
+        <path d="M480 100H496" style="stroke:var(--text-dim);stroke-width:1.4;fill:none" marker-end="url(#fd-ah)"/>
+        <g transform="translate(650,40)">
+          <text x="85" y="0" text-anchor="middle" class="t" style="font-weight:700">4D (주 w의 상태)</text>
+          <g style="stroke-width:1.2">
+            <rect x="40" y="150" width="100" height="14" style="fill:var(--ok);opacity:.6;stroke:var(--ok)"/>
+            <rect x="44" y="164" width="7" height="40" style="fill:var(--ok);opacity:.6"/><rect x="86" y="164" width="7" height="40" style="fill:var(--ok);opacity:.6"/><rect x="129" y="164" width="7" height="40" style="fill:var(--ok);opacity:.6"/>
+            <rect x="40" y="110" width="100" height="14" style="fill:var(--warn);opacity:.7;stroke:var(--warn)"/>
+            <rect x="44" y="124" width="7" height="26" style="fill:var(--ok);opacity:.6"/><rect x="86" y="124" width="7" height="26" style="fill:var(--ok);opacity:.6"/><rect x="129" y="124" width="7" height="26" style="fill:var(--ok);opacity:.6"/>
+            <rect x="40" y="70" width="100" height="14" style="fill:none;stroke:var(--text-faint);stroke-dasharray:3 3"/>
+          </g>
+          <g class="t-mono" style="font-size:11px"><text x="0" y="232" style="fill:var(--ok)">완료</text><text x="50" y="232" style="fill:var(--warn)">진행 중</text><text x="110" y="232" style="fill:var(--text-faint)">미착수</text></g>
+        </g>
+        <path d="M612 100H690" style="stroke:var(--accent);stroke-width:1.6;fill:none" marker-end="url(#fd-ah-acc)"/>
+      </svg>
+      <figcaption><b>그림 9-1.</b> 4D의 구성. 모델의 요소와 공정표의 활동은 따로 만들어지고, 연결 규칙이 둘을 잇는다. 규칙이 요소마다 시작 \(s_e\)·완료 \(f_e\)를 정하면, 주 \(w\)의 장면은 모든 요소의 상태를 칠한 그림이다(진행 중 주황 계열 <code>warn</code>, 완료 초록 <code>ok</code> — 이 책의 3D 색 규약).</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 9.1 (4D 모델)</strong> <span class="term">4D 모델</span><span class="en">(4D model)</span>은 네 가지로 이루어진다. ① 요소 집합 \(E\)(형상과 속성), ② 활동 집합 \(A\)와 그 일정(CPM 결과 \(ES_X\), 기간 \(d_X\)), ③ <span class="term">연결 규칙</span><span class="en">(linking rule)</span> \(\lambda: E \to A \cup \{\varnothing\}\), ④ 활동 안에서 요소가 나타나는 순서 규칙. 요소 \(e\)의 시작·완료 주 \([s_e, f_e]\)가 정해지면 주 \(w\)의 상태는
+      <div class="formula">$$\text{state}(e, w) = \begin{cases} \text{미착수}, & w \le s_e \\ \text{진행 중}, & s_e \lt w \lt f_e \\ \text{완료}, & w \ge f_e \end{cases}$$<div class="where">\(\lambda(e) = \varnothing\)이면 <span class="term">미연결 요소</span><span class="en">(unlinked element)</span>로, 4D에 영영 나타나지 않는다(검사 대상). 시간 단위는 주(SiteBook과 같다).</div></div></div>
+    <div class="sim" id="sim-fd-play">
+      <div class="sim-head"><span class="sim-tag three">3D</span><h3>4D 재생: 주 슬라이더 → B-10 BIM이 P-B10 공정대로 올라간다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fd-cv-play" aria-label="B-10 BIM 요소 360개가 주에 따라 진행 중(주황)과 완료(초록)로 나타나는 3D 장면"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>주 w <output id="fd-pl-w-out"></output></span><input type="range" id="fd-pl-w" min="30" max="93" step="0.1" value="45"></label>
+          <div class="btn-row"><button class="btn" id="fd-pl-play">▶ 재생</button></div>
+          <div class="ctrl"><span>미착수 요소</span><div class="seg" id="fd-pl-ghost"><button data-value="off" class="on">숨김</button><button data-value="on">윤곽</button></div></div>
+          <div class="ctrl"><span>보기</span><div class="seg" id="fd-pl-view"><button data-value="all" class="on">전체</button><button data-value="str">구조만</button><button data-value="mep">설비만</button></div></div>
+        </div>
+      </div>
+      <div class="fd-sub sim-view"><canvas id="fd-cv-play-g" aria-label="P-B10 활동 14개의 막대 공정표와 현재 주 표시선"></canvas></div>
+      <div class="fd-key"><span class="ok">완료</span><span class="warn">진행 중</span><span class="dim">미착수(윤곽)</span></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">주 / 공기</span><span class="v" id="fd-pl-o-w">—</span></div>
+        <div class="stat"><span class="k">진행 중 활동</span><span class="v" id="fd-pl-o-a">—</span></div>
+        <div class="stat"><span class="k">완료 · 진행 중 요소</span><span class="v" id="fd-pl-o-n">—</span></div>
+        <div class="stat"><span class="k">완료 콘크리트(상자 부피)</span><span class="v" id="fd-pl-o-v">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 끌어서 돌려 보세요(터치는 가로로 끌기) · 38주까지는 지상 요소가 하나도 없습니다 — 그 전의 A–F(가설·흙막이·굴착·기초·지하 골조)는 이 모델에 없는 요소입니다 · 45주에서 2층까지 완료, 3층 기둥·벽 완료, 3층 보·슬래브 진행 중임을 확인하세요(예제 9.1) · 40주 근처에서 "설비만"을 보면 1층 덕트가 아직 없는 1층 슬래브 아래에 떠 있습니다 — 9.3절의 순서 오류 · 68주에 요소 360개가 모두 완료됩니다(G2·I의 EF) · 모델: <code>CB.bim.model()</code> + <code>CB.pm.cpm(CB.pm.B10)</code>의 ES 일정, 연결 규칙은 정의 9.2·9.3, 상태는 정의 9.1.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="linking">
+    <h2>요소–활동 연결 규칙과 층 분할</h2>
+    <div class="problem"><strong>활동 하나에 요소 170개</strong>
+      <p>G1(지상 골조 1–5층, 15주)에는 기둥 100개, 보 45개, 슬래브 5개, 벽 20개가 연결됩니다. 이들이 38주에 한꺼번에 나타났다가 53주에 한꺼번에 완성되면 4D는 쓸모가 없습니다. 활동 안에서 요소가 언제 나타나는지를 무엇으로 정할까요?</p></div>
+    <p>연결의 세밀도는 세 단계로 생각할 수 있습니다. ① <b>활동 단위</b>: 활동에 연결된 요소가 모두 같은 \([ES, EF]\)를 가진다. 가장 쉽지만 15주 동안 다섯 개 층이 한꺼번에 "진행 중"으로 보인다. ② <b>층(구역) 단위</b>(<span class="term">층 분할</span><span class="en">(floor-by-floor split)</span>): 활동의 기간을 연결된 층 수로 나누어 아래층부터 차례로 배정한다. 반복 층 공사(SiteBook 6장의 3주/층 사이클)와 잘 맞는다. ③ <b>요소 단위</b>: 요소마다 따로 일정을 준다. 가장 정확하지만 공정표가 요소 수만큼 커지고 관리가 어렵다. 실무의 4D는 대개 ②처럼 활동을 구역·층으로 나누고(<span class="term">모델 분할</span><span class="en">(model partitioning)</span>), 그 안에서 공종 순서를 규칙으로 준다. 이 책은 B-10에 다음 규칙을 쓴다.</p>
+    <div class="callout def"><strong>정의 9.2 (B-10 연결 규칙)</strong> 기둥·보·슬래브·벽(<code>IfcColumn</code>, <code>IfcBeam</code>, <code>IfcSlab</code>, <code>IfcWall</code>) 가운데 1–5층 → <b>G1</b>, 6–10층 → <b>G2</b>, 덕트·배관(<code>IfcDuctSegment</code>, <code>IfcPipeSegment</code>) → <b>I</b>(기계·전기 설비). 규칙은 요소의 속성 <code>ifc</code>와 <code>storey</code>만 읽으므로 모델이 바뀌어도 그대로 다시 적용된다. 어느 규칙에도 걸리지 않는 요소는 미연결(정의 9.1)이다.</div>
+    <div class="callout def"><strong>정의 9.3 (층 분할과 층 안 순서, 교육용)</strong> 활동 \(X\)에 연결된 요소들의 서로 다른 층을 아래부터 \(1, 2, \dots, n_X\)번째로 세고, 요소 \(e\)가 \(j\)번째 층에 있으면
+      <div class="formula">$$\Delta_X = \frac{d_X}{n_X}, \qquad t_0(e) = ES_X + (j - 1)\,\Delta_X, \qquad [s_e,\ f_e] = [\,t_0 + \phi_1\Delta_X,\ \ t_0 + \phi_2\Delta_X\,]$$<div class="where">층 안 순서 \((\phi_1, \phi_2)\): 기둥·벽 (0, 0.3), 보·슬래브 (0.3, 1.0), 덕트·배관 (0, 1.0). 즉 층 \(j\)는 \(ES_X + j\,d_X/n_X\)에 완료되고, 한 층 안에서는 수직 부재(기둥·벽)를 먼저 치고 보·슬래브를 한 번에 친다(우리나라 RC 현장의 흔한 순서 — SiteBook 6장의 층 사이클 비율 기둥·벽 0.3을 따랐다). 보·슬래브 구간 0.3–1.0에는 거푸집·철근·타설·양생이 들어 있다. G1: \(ES = 38\), \(d = 15\), \(n = 5\) → \(\Delta = 3\)주.</div></div></div>
+    <figure class="diagram" id="fig-fd-rule">
+      <svg viewBox="0 0 860 330" role="img" aria-label="연결 규칙: 요소 유형과 층으로 활동을 정하고 G1의 다섯 층을 3주씩 나누는 시간 막대">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(30,36)" class="t-mono" style="font-size:12px">
+          <text x="0" y="0" class="t" style="font-weight:700;font-size:14px">① 유형 × 층 → 활동</text>
+          <g transform="translate(0,16)">
+            <rect x="0" y="0" width="300" height="24" style="fill:var(--surface-2)"/>
+            <text x="8" y="16">유형</text><text x="118" y="16">1–5층</text><text x="218" y="16">6–10층</text>
+            <text x="8" y="44">기둥 · 보</text><rect x="110" y="30" width="80" height="20" rx="4" style="fill:var(--accent-2);opacity:.75"/><text x="150" y="44" text-anchor="middle" style="fill:#fff">G1</text><rect x="210" y="30" width="80" height="20" rx="4" style="fill:var(--accent);opacity:.75"/><text x="250" y="44" text-anchor="middle" style="fill:#fff">G2</text>
+            <text x="8" y="72">슬래브 · 벽</text><rect x="110" y="58" width="80" height="20" rx="4" style="fill:var(--accent-2);opacity:.75"/><text x="150" y="72" text-anchor="middle" style="fill:#fff">G1</text><rect x="210" y="58" width="80" height="20" rx="4" style="fill:var(--accent);opacity:.75"/><text x="250" y="72" text-anchor="middle" style="fill:#fff">G2</text>
+            <text x="8" y="100">덕트 · 배관</text><rect x="110" y="86" width="180" height="20" rx="4" style="fill:var(--blue);opacity:.75"/><text x="200" y="100" text-anchor="middle" style="fill:#fff">I (1–10층)</text>
+            <text x="8" y="132" class="t-dim">그 밖(계단·창호·마감)</text><text x="200" y="132" text-anchor="middle" style="fill:var(--bad)">모델에 없음</text>
+          </g>
+          <text x="0" y="190" class="t-dim">요소 수: G1 170 · G2 170 · I 20 = 360</text>
+          <text x="0" y="212" class="t-dim">속성 ifc · storey만 읽는다 → 모델이 바뀌면 자동 갱신</text>
+        </g>
+        <g transform="translate(380,36)">
+          <text x="0" y="0" class="t" style="font-weight:700">② G1을 다섯 층으로 나누기 (Δ = 15/5 = 3주)</text>
+          <g transform="translate(20,30)">
+            <line x1="0" y1="200" x2="420" y2="200" class="s-axis"/>
+            <g class="t-mono" text-anchor="middle" style="font-size:11px"><text x="0" y="216">38</text><text x="84" y="216">41</text><text x="168" y="216">44</text><text x="252" y="216">47</text><text x="336" y="216">50</text><text x="420" y="216">53주</text></g>
+            <g class="t-mono" style="font-size:11px" text-anchor="end">
+              <text x="-4" y="190">1층</text><text x="-4" y="152">2층</text><text x="-4" y="114">3층</text><text x="-4" y="76">4층</text><text x="-4" y="38">5층</text>
+            </g>
+            <g>
+              <rect x="0" y="178" width="25" height="16" style="fill:var(--text-dim);opacity:.8"/><rect x="25" y="178" width="59" height="16" style="fill:var(--accent-2);opacity:.6"/>
+              <rect x="84" y="140" width="25" height="16" style="fill:var(--text-dim);opacity:.8"/><rect x="109" y="140" width="59" height="16" style="fill:var(--accent-2);opacity:.6"/>
+              <rect x="168" y="102" width="25" height="16" style="fill:var(--text-dim);opacity:.8"/><rect x="193" y="102" width="59" height="16" style="fill:var(--accent-2);opacity:.6"/>
+              <rect x="252" y="64" width="25" height="16" style="fill:var(--text-dim);opacity:.8"/><rect x="277" y="64" width="59" height="16" style="fill:var(--accent-2);opacity:.6"/>
+              <rect x="336" y="26" width="25" height="16" style="fill:var(--text-dim);opacity:.8"/><rect x="361" y="26" width="59" height="16" style="fill:var(--accent-2);opacity:.6"/>
+            </g>
+            <line x1="196" y1="0" x2="196" y2="200" style="stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 4"/>
+            <text x="200" y="10" class="t-mono" style="fill:var(--accent);font-size:11px">w = 45</text>
+          </g>
+          <g transform="translate(20,270)" class="t-mono" style="font-size:11px"><rect x="0" y="-10" width="14" height="10" style="fill:var(--text-dim)"/><text x="20" y="0">기둥·벽 (0–0.3Δ)</text><rect x="150" y="-10" width="14" height="10" style="fill:var(--accent-2);opacity:.6"/><text x="170" y="0">보·슬래브 (0.3Δ–Δ)</text></g>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-2.</b> 연결 규칙(왼쪽)과 층 분할(오른쪽). G1에 연결된 다섯 층은 3주씩 아래부터 배정되고, 각 층은 기둥·벽(처음 0.9주) → 보·슬래브(나머지 2.1주)로 진행한다. 45주 선(보라)에서 1·2층은 완료, 3층은 기둥·벽 완료(44.9주)·보·슬래브 진행 중이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 9.1 (45주의 4D 장면)</strong> 정의 9.2·9.3, CPM의 \(ES_{G1} = 38\), \(ES_I = 38\), \(d_I = 30\), \(n_I = 10\).
+      <p><b>① G1 층</b> \(j = \lfloor (45 - 38)/3 \rfloor + 1 = 3\), 3층의 \(t_0 = 44\). 기둥·벽은 \(44 + 0.3\times3 = 44.9\)주에 완료(45 ≥ 44.9), 보·슬래브는 \([44.9, 47]\)로 진행 중이다.</p>
+      <p><b>② 요소 수</b> 층당 구조 요소 34개(기둥 20 + 보 9 + 슬래브 1 + 벽 4). 완료 = 1·2층 68 + 3층 기둥·벽 24 = 92, 진행 중 = 3층 보·슬래브 10. 설비 I는 층당 3주이므로 1·2층의 덕트·배관 4개 완료, 3층 2개 진행 중.</p>
+      <p><b>③ 합계</b> 완료 96, 진행 중 12, 미착수 252(합 360). 시뮬레이터에서 45주를 맞추면 같은 값이 나온다.</p>
+      <p><b>④ 판단</b> 3층 덕트가 "진행 중"인데 3층 슬래브(덕트를 매다는 바닥판)는 47주에 완료된다. 4D가 그대로 보여 주는 이 모순은 9.3절에서 공정 논리로 고친다.</p></div>
+    <p>규칙은 사람이 쓰는 것이라 틀릴 수 있습니다. 층 경계를 잘못 두면 G1이 여섯 개 층을 가져가고, 벽을 규칙에서 빠뜨리면 코어가 4D에서 사라지고, 슬래브를 실수로 다른 활동에 붙이면 기둥보다 슬래브가 먼저 생깁니다. 그래서 4D 도구는 연결 결과를 <b>검사</b>합니다: 미연결 요소 수, 공종이 맞지 않는 연결(덕트를 골조 활동에), 그리고 지지 조건을 어기는 <span class="term">순서 오류</span><span class="en">(sequence error)</span>(원리 9.4). 다음 시뮬레이터에서 규칙을 고쳐 보세요.</p>
+    <div class="callout def"><strong>원리 9.4 (지지 조건으로 하는 순서 검사, 교육용)</strong> 요소는 자기를 받치는 요소가 완료된 뒤에 시작해야 한다. B-10에서 받침 관계는 층 \(k\)의 기둥·벽 ← 층 \(k-1\)의 슬래브(1층은 지하 골조 F), 보·슬래브 ← 같은 층 기둥·벽, 덕트·배관 ← 같은 층 슬래브(천장에 매단다)다. 위반 조건은
+      <div class="formula">$$s_e \lt f_{\text{sup}(e)} \;\Rightarrow\; \text{순서 오류}$$<div class="where">\(\text{sup}(e)\): \(e\)를 받치는 요소들(그중 가장 늦은 완료). 실제 <span class="term">시공성 검토</span><span class="en">(constructability review)</span>는 동바리 존치, 양생 강도, 개구부, 가설 발판 같은 조건을 더 본다.</div></div></div>
+    <div class="sim" id="sim-fd-link">
+      <div class="sim-head"><span class="sim-tag three">3D</span><h3>연결 규칙 편집기: 유형 × 층 → 활동, 미연결 · 공종 불일치 · 순서 오류 검사</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fd-cv-link" aria-label="연결된 활동별로 색칠한 B-10 요소와 빨간 미연결 요소"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시 규칙</span><div class="seg" id="fd-lk-pre"><button data-value="base" class="on">기본</button><button data-value="wall">벽 누락</button><button data-value="swap">슬래브 오연결</button><button data-value="mep">설비→골조</button></div></div>
+          <label class="ctrl"><span>층 경계 k (1–k층 / 위층) <output id="fd-lk-k-out"></output></span><input type="range" id="fd-lk-k" min="1" max="9" step="1" value="5"></label>
+          <div class="table-wrap" style="margin:0"><table class="fd-link"><thead><tr><th>유형</th><th id="fd-lk-ha">1–5층</th><th id="fd-lk-hb">6–10층</th></tr></thead><tbody id="fd-lk-body"></tbody></table></div>
+        </div>
+      </div>
+      <div class="fd-key"><span class="acc2">G1</span><span class="acc">G2</span><span class="blue">I</span><span class="dim">H · J</span><span class="warn">공종 불일치</span><span class="bad">미연결</span></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">연결된 요소</span><span class="v" id="fd-lk-o-n">—</span></div>
+        <div class="stat"><span class="k">미연결</span><span class="v" id="fd-lk-o-u">—</span></div>
+        <div class="stat"><span class="k">공종 불일치</span><span class="v" id="fd-lk-o-m">—</span></div>
+        <div class="stat"><span class="k">순서 오류(원리 9.4)</span><span class="v" id="fd-lk-o-s">—</span></div>
+      </div>
+      <div class="fd-msg" id="fd-lk-msg">—</div>
+      <div class="sim-note">해볼 것: 기본 규칙에서도 순서 오류가 20건입니다 — 모두 덕트·배관(I)이 매달릴 슬래브보다 먼저 시작하는 경우로, 9.3절의 주제입니다 · "벽 누락"을 누르면 코어 벽 40개가 미연결(빨강)이 되어 4D에서 사라집니다 · "슬래브 오연결"(6–10층 슬래브를 G1에)은 G1이 열 개 층을 가져가 층당 1.5주로 줄고, 6–10층 슬래브가 기둥보다 먼저 생기는 순서 오류를 만듭니다 · 층 경계를 3으로 바꾸면 G1은 3개 층(층당 5주), G2는 7개 층(층당 약 2.1주)이 됩니다 — 규칙이 공정의 가정을 바꿉니다 · 모델: 정의 9.2·9.3, 원리 9.4, 일정은 <code>CB.pm.cpm(CB.pm.B10)</code>의 ES. H·J를 고르면 그 활동의 기간에 층 분할된다.</div>
+    </div>
+    <div class="callout site"><strong>B-10 BIM의 4D 연결</strong> 요소 360개 = G1 170 + G2 170 + I 20. G1 38–53주(층당 3주), G2 53–68주(층당 3주, 전체 여유 1주), I 38–68주(층당 3주, 여유 21주). 층 \(k\) 슬래브 완료 \(= 38 + 3k\)주(1층 41주 … 10층 68주). 모델에 없는 활동(A–F, H 커튼월, K 방수, J 마감, L 조경, M 시운전)은 4D에서 보이지 않는다 — 4D의 범위는 모델의 범위다(10장의 5D도 같다). SiteBook 1장의 4D 장면은 같은 공정을 개략 형상(선·면)으로 그렸고, 이 장은 IFC 요소 단위로 그린다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="schedule-change">
+    <h2>공정 변경과 순서 검사</h2>
+    <div class="problem"><strong>덕트는 언제 매달 수 있나</strong>
+      <p>공정표의 선후행은 "I(설비) ← F(지하 골조), FS"입니다. 설비는 지하부터 시작하니 틀린 말은 아닙니다. 그런데 4D에서 I의 지상 덕트를 층마다 3주씩 배정하면, 층 \(s\)의 덕트는 \(35 + 3s\)주에 시작하고 그 덕트를 매다는 층 \(s\) 슬래브는 \(38 + 3s\)주에 완료됩니다. 덕트가 3주 일찍 허공에 매달립니다. 어떻게 고칠까요?</p></div>
+    <p>4D는 공정표를 고치는 도구이기도 합니다. 활동 기간이나 <span class="term">선후행 관계</span><span class="en">(precedence relationship)</span>를 바꾸면 CPM이 다시 계산되고(<code>CB.pm.cpm</code>), 정의 9.3으로 요소 일정이 다시 나오고, 원리 9.4로 순서가 다시 검사됩니다. 층마다 일어나는 반복 작업은 시간–층 평면에 그리면 잘 보입니다. 가로축을 주, 세로축을 층으로 두고 공종마다 층별 작업 구간을 이으면 기울어진 띠가 생기는데, 이것이 SiteBook 11장의 <span class="term">라인 오브 밸런스</span><span class="en">(line of balance, LOB)</span>입니다. 뒤따르는 공종의 띠가 앞 공종 띠의 왼쪽(이전 시간)에 있으면 순서 오류입니다.</p>
+    <figure class="diagram" id="fig-fd-lob">
+      <svg viewBox="0 0 860 320" role="img" aria-label="층과 주의 평면에 그린 골조 슬래브 완료선과 설비 덕트 설치 띠. 덕트 띠가 슬래브 완료선보다 왼쪽에 있어 순서 오류">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(90,30)">
+          <line x1="0" y1="240" x2="460" y2="240" class="s-axis"/><line x1="0" y1="240" x2="0" y2="0" class="s-axis"/>
+          <g class="t-mono" text-anchor="middle" style="font-size:11px"><text x="0" y="256">35</text><text x="60" y="256">41</text><text x="120" y="256">47</text><text x="180" y="256">53</text><text x="240" y="256">59</text><text x="300" y="256">65</text><text x="360" y="256">71</text><text x="420" y="256">77주</text></g>
+          <g class="t-mono" text-anchor="end" style="font-size:11px"><text x="-6" y="232">1</text><text x="-6" y="136">5</text><text x="-6" y="16">10층</text></g>
+          <path d="M30 240L330 0" style="stroke:var(--text-dim);stroke-width:3;fill:none"/>
+          <text x="210" y="70" class="t-mono" style="fill:var(--text-dim);font-size:12px" transform="rotate(-38 210 70)">슬래브 k 완료 = 38 + 3k</text>
+          <path d="M0 240L300 0" style="stroke:var(--bad);stroke-width:3;fill:none"/>
+          <path d="M0 240L30 240L330 0L300 0Z" style="fill:var(--bad);opacity:.12"/>
+          <text x="40" y="150" class="t-mono" style="fill:var(--bad);font-size:12px">I ← F (FS): 덕트가 3주 일찍</text>
+          <path d="M120 240L420 0" style="stroke:var(--blue);stroke-width:3;fill:none;stroke-dasharray:7 5"/>
+          <text x="300" y="200" class="t-mono" style="fill:var(--blue);font-size:12px">I ← G1 (SS + 9주)</text>
+          <text x="300" y="218" class="t-mono" style="fill:var(--blue);font-size:12px">: 동바리 2개 층 위</text>
+        </g>
+        <g transform="translate(600,60)" class="t-dim" style="font-size:13px">
+          <text x="0" y="0" class="t" style="font-weight:700">순서 검사(원리 9.4)</text>
+          <text x="0" y="28">덕트 s 시작 ≥ 슬래브 s 완료</text>
+          <text x="0" y="56">I ← F: 35 + 3s &lt; 38 + 3s</text>
+          <text x="0" y="76" style="fill:var(--bad)">→ 10개 층 × 2 = 20건</text>
+          <text x="0" y="110">I ← G1 SS + L:</text>
+          <text x="0" y="130">38 + L + 3(s − 1) ≥ 38 + 3s</text>
+          <text x="0" y="150" style="fill:var(--ok)">→ L ≥ 3이면 0건</text>
+          <text x="0" y="184">I의 여유 21주가 지연을 흡수</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-3.</b> 시간–층 평면(LOB 형태). 골조의 슬래브 완료선(회색)보다 왼쪽에 놓인 설비 띠(빨강)는 받침 없는 설치다. I의 선후행을 "G1 시작 후 L주(SS)"로 바꾸면 띠가 오른쪽으로 밀린다. L = 3이면 순서 오류는 없어지고, 동바리가 남은 두 개 층을 피하려면(9.4절) L = 9가 필요하다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fd-dur">
+      <div class="sim-head"><span class="sim-tag three">3D</span><h3>공정 변경 영향: 활동 기간 · 선후행 → CPM · 4D · 순서 오류 즉시 갱신</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fd-cv-dur" aria-label="바뀐 공정으로 다시 계산한 4D 장면, 순서 오류 요소는 빨강"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>G1 기간 <output id="fd-du-g1-out"></output></span><input type="range" id="fd-du-g1" min="9" max="24" step="1" value="15"></label>
+          <label class="ctrl"><span>G2 기간 <output id="fd-du-g2-out"></output></span><input type="range" id="fd-du-g2" min="9" max="24" step="1" value="15"></label>
+          <label class="ctrl"><span>I 기간 <output id="fd-du-i-out"></output></span><input type="range" id="fd-du-i" min="18" max="42" step="1" value="30"></label>
+          <div class="ctrl"><span>I의 선행</span><div class="seg" id="fd-du-mode"><button data-value="fs" class="on">F 뒤 (FS)</button><button data-value="ss">G1 시작 + L (SS)</button></div></div>
+          <label class="ctrl"><span>SS 지연 L <output id="fd-du-lag-out"></output></span><input type="range" id="fd-du-lag" min="0" max="15" step="1" value="3"></label>
+          <label class="ctrl"><span>4D 장면의 주 <output id="fd-du-w-out"></output></span><input type="range" id="fd-du-w" min="30" max="110" step="0.5" value="45"></label>
+        </div>
+      </div>
+      <div class="fd-sub sim-view"><canvas id="fd-cv-dur-lob" aria-label="층별 골조 구간과 설비 설치 구간을 주에 따라 그린 LOB 차트"></canvas></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">공기 T</span><span class="v" id="fd-du-o-t">—</span></div>
+        <div class="stat"><span class="k">주공정</span><span class="v" id="fd-du-o-c" style="font-size:14px">—</span></div>
+        <div class="stat"><span class="k">I 기간 · 전체 여유</span><span class="v" id="fd-du-o-i">—</span></div>
+        <div class="stat"><span class="k">순서 오류</span><span class="v" id="fd-du-o-s">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(I ← F)에서 순서 오류 20건을 확인하고 "G1 시작 + L"로 바꾸세요. L = 3이면 0건, I는 41–71주, 전체 여유 18주 · L을 15로 올리면 I가 53–83주가 되어도 공기는 93주 그대로입니다(여유 21주 안). L = 15에서 I 기간을 42주로 늘리면 I가 53–95주가 되어 여유를 다 쓰고 공기가 99주로 늘어납니다 · G1을 18주로 늘리면 층당 3.6주, 공기 96주 — 그리고 L = 3에서도 덕트가 다시 슬래브를 앞지릅니다: 골조 층 속도(3.6주)가 설비 층 속도(3주)보다 느리면 위층으로 갈수록 간격이 좁아집니다 · 모델: <code>CB.pm.cpm</code>로 다시 계산한 ES 일정 → 정의 9.3 → 원리 9.4. LOB의 회색 막대는 골조 층 구간(진한 부분 기둥·벽), 파랑은 설비, 빨강은 순서 오류.</div>
+    </div>
+    <div class="callout"><strong>예제 9.2 (설비 선후행 고치기)</strong> I ← G1(SS, 지연 \(L\)), \(d_I = 30\), \(n_I = 10\), 층당 \(\Delta_I = 3\)주, \(ES_{G1} = 38\).
+      <p><b>① 조건</b> 층 \(s\) 덕트 시작 \(38 + L + 3(s - 1)\) ≥ 층 \(s\) 슬래브 완료 \(38 + 3s\) → \(L \ge 3\)주. 골조와 설비의 층 속도가 같아(3주/층) 모든 층에서 같은 조건이다.</p>
+      <p><b>② CPM</b> \(L = 3\): I = 41–71주. I의 후행 M의 \(LS = 89\)이므로 I의 <span class="term">전체 여유</span><span class="en">(total float)</span> \(TF_I = 89 - 71 = 18\)주, 공기 93주 그대로.</p>
+      <p><b>③ 민감도</b> G1이 층당 3.6주(\(d = 18\))로 느려지면 조건은 \(L + 3(s-1) \ge 3.6s\), 즉 \(L \ge 0.6s + 3\) — 10층에서 \(L \ge 9\). 층 속도가 다른 두 공종은 위층으로 갈수록 간격이 줄어든다(LOB의 기울기 차이).</p>
+      <p><b>④ 판단</b> 공정표의 "I ← F"는 지하 설비에는 맞지만 지상 덕트에는 너무 거칠다. 4D가 드러낸 것은 그림의 오류가 아니라 <b>공정 논리의 오류</b>다. 실무에서는 I를 층별 활동으로 쪼개거나 SS 관계를 쓴다(SiteBook 9장).</p></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="workspace">
+    <h2>작업 공간 충돌: 같은 시기, 같은 곳</h2>
+    <div class="problem"><strong>골조 아래층에서 커튼월을 달아도 되나</strong>
+      <p>CPM에서 H(커튼월)는 G1이 끝난 53주에 시작해 16주 동안 층당 1.6주로 올라갑니다. 골조 G2는 층당 3주로 올라갑니다. 언젠가 커튼월이 골조를 따라잡습니다. 그때 커튼월 작업자는 거푸집·동바리가 남아 있고 위에서 자재가 떨어질 수 있는 층에서 일하게 됩니다. 언제, 몇 주 동안일까요?</p></div>
+    <p>6장의 간섭은 "두 요소가 같은 공간을 차지하는가"였습니다. 4D에서는 요소가 아니라 <b>작업</b>이 공간을 차지합니다. 작업자, 장비, 자재 야적, 동바리, 낙하물 방호 구역이 그 공간입니다. 활동마다 시간에 따라 움직이는 상자를 정의하고, 같은 시각에 두 상자가 겹치면 <span class="term">작업 공간 충돌</span><span class="en">(workspace conflict)</span>입니다. 시간 축이 들어간 간섭이라는 뜻에서 <span class="term">4D 간섭</span><span class="en">(4D clash)</span>이라고도 합니다. 판정은 6장의 상자 겹침(<code>CB.bim.overlap</code>) 그대로이고, 시간에 대해 반복할 뿐입니다.</p>
+    <div class="callout def"><strong>정의 9.5 (작업 공간 상자와 충돌 시간, 교육용)</strong> 활동 \(a\)의 주 \(t\)의 작업 공간 \(Z_a(t)\)는 그때 작업 중인 층의 상자들이다. 골조 G: 작업 층(평면 + 둘레 1.5 m) + 그 아래 \(n_s\)개 층(<span class="term">동바리</span><span class="en">(shoring)</span> 존치·낙하물 방호), 커튼월 H: 작업 층의 외피 띠(바깥 1.5 m, 안쪽 0.5 m), 설비 I·마감 J: 작업 층의 실내(외피에서 0.5 m 안쪽). 두 활동의 충돌 시간은
+      <div class="formula">$$C_{ab} = \int_0^{T} \mathbf{1}\!\left[\,Z_a(t) \cap Z_b(t) \ne \varnothing\,\right] dt \quad (\text{주})$$<div class="where">겹침은 상자의 하드 간섭(세 축 모두 양의 겹침)으로 판정한다. 위아래 층이 맞닿기만 한 것은 충돌이 아니다. 실제 작업 공간은 공종별 작업 방식, 장비 크기, 안전 규정으로 정한다.</div></div></div>
+    <figure class="diagram" id="fig-fd-zone">
+      <svg viewBox="0 0 860 320" role="img" aria-label="층과 주의 평면에 그린 골조 작업 구역 띠(작업 층과 아래 두 층)와 커튼월 작업선이 66주 무렵 띠에 들어가는 그림">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(90,30)">
+          <line x1="0" y1="240" x2="480" y2="240" class="s-axis"/><line x1="0" y1="240" x2="0" y2="0" class="s-axis"/>
+          <g class="t-mono" text-anchor="middle" style="font-size:11px"><text x="0" y="256">38</text><text x="120" y="256">53</text><text x="240" y="256">68</text><text x="280" y="256">73주</text></g>
+          <g class="t-mono" text-anchor="end" style="font-size:11px"><text x="-6" y="232">1</text><text x="-6" y="136">5</text><text x="-6" y="16">10층</text></g>
+          <path d="M0 240L240 0L240 48L48 240Z" style="fill:var(--accent-2);opacity:.18"/>
+          <path d="M0 240L240 0" style="stroke:var(--accent-2);stroke-width:2.5;fill:none"/>
+          <text x="140" y="70" class="t-mono" style="fill:var(--accent-2);font-size:12px">골조 작업 층</text>
+          <text x="150" y="150" class="t-mono" style="fill:var(--accent-2);font-size:12px">+ 동바리 2개 층</text>
+          <path d="M120 240L248 0" style="stroke:var(--accent);stroke-width:2.5;fill:none"/>
+          <path d="M200 90L240 48L248 0L232 0Z" style="fill:var(--bad);opacity:.35"/>
+          <text x="256" y="70" class="t-mono" style="fill:var(--bad);font-size:12px">충돌 약 6.4주</text>
+          <path d="M120 240L184 120L216 96L240 72L256 48L280 0" style="stroke:var(--accent);stroke-width:2;fill:none;stroke-dasharray:6 4"/>
+          <text x="300" y="20" class="t-mono" style="fill:var(--accent);font-size:12px">버퍼 규칙: 72.8주에 완료</text>
+          <text x="20" y="200" class="t-mono" style="fill:var(--accent);font-size:12px">H 균등 1.6주/층</text>
+        </g>
+        <g transform="translate(620,60)" class="t-dim" style="font-size:13px">
+          <text x="0" y="0" class="t" style="font-weight:700">버퍼 규칙(교육용)</text>
+          <text x="0" y="26">H 층 h 시작 ≥</text>
+          <text x="0" y="46">골조 층 h + nₛ 완료</text>
+          <text x="0" y="76">nₛ = 2: 6층은 8층 골조</text>
+          <text x="0" y="96">(62주)를 기다린다</text>
+          <text x="0" y="130">SiteBook 8장 예제와</text>
+          <text x="0" y="150">같은 결론(약 72.7주)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-4.</b> 시간–층 평면의 작업 공간. 골조의 작업 구역(주황 띠)은 작업 층과 그 아래 동바리 두 개 층이다. 층당 1.6주로 오르는 커튼월(보라 실선)은 약 63주부터 띠 안으로 들어간다(빨강). 버퍼 규칙(보라 점선)을 쓰면 충돌은 없어지지만 커튼월이 CPM의 69주가 아닌 약 72.8주에 끝난다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fd-zone">
+      <div class="sim-head"><span class="sim-tag three">3D</span><h3>작업 공간 간섭: 활동별 작업 상자 → 같은 시기 겹침 검출</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fd-cv-zone" aria-label="골조·커튼월·설비·마감의 작업 공간 상자와 겹친 부분(빨강)의 3D 장면"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>주 t <output id="fd-zn-w-out"></output></span><input type="range" id="fd-zn-w" min="38" max="90" step="0.1" value="65"></label>
+          <div class="btn-row"><button class="btn" id="fd-zn-play">▶ 재생</button></div>
+          <label class="ctrl"><span>동바리 존치 층수 nₛ <output id="fd-zn-ns-out"></output></span><input type="range" id="fd-zn-ns" min="0" max="3" step="1" value="2"></label>
+          <div class="ctrl"><span>커튼월 H</span><div class="seg" id="fd-zn-h"><button data-value="u" class="on">균등 1.6주/층</button><button data-value="b">버퍼 규칙</button></div></div>
+          <div class="ctrl"><span>설비 I</span><div class="seg" id="fd-zn-i"><button data-value="u" class="on">균등(I ← F)</button><button data-value="b">버퍼 규칙</button></div></div>
+        </div>
+      </div>
+      <div class="fd-sub sim-view"><canvas id="fd-cv-zone-t" aria-label="활동 쌍별 충돌 구간을 주에 따라 표시한 막대"></canvas></div>
+      <div class="fd-key"><span class="acc2">골조 작업 층</span><span class="dim">동바리 층</span><span class="acc">커튼월</span><span class="blue">설비</span><span class="ok">마감</span><span class="bad">충돌</span></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">G–H 충돌</span><span class="v" id="fd-zn-o-gh">—</span></div>
+        <div class="stat"><span class="k">G–I 충돌</span><span class="v" id="fd-zn-o-gi">—</span></div>
+        <div class="stat"><span class="k">H 완료 (CPM 69)</span><span class="v" id="fd-zn-o-h">—</span></div>
+        <div class="stat"><span class="k">I 완료 (CPM 68, LF 89)</span><span class="v" id="fd-zn-o-i">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 G–I 충돌 30주(설비가 늘 골조 작업 층에 있음 — 9.3절의 순서 오류가 공간으로도 보입니다), G–H 충돌 약 6.4주를 확인하세요 · 커튼월을 "버퍼 규칙"으로 바꾸면 충돌 0, 완료 72.8주 — 커튼월이 주공정(H–J–M)이므로 공기가 3.8주 늘 위험입니다 · 동바리를 0층으로 두면 충돌은 0.6주로 줄지만 거푸집 전용과 양생 강도(SiteBook 6장)를 다시 따져야 합니다 · 설비 "버퍼 규칙"은 I 완료 77주로 여유 안에서 흡수됩니다 · 모델: 정의 9.5, 골조 일정은 <code>CB.pm.cpm(CB.pm.B10)</code>의 ES(층당 3주), H·I·J는 층마다 \(d/10\), 버퍼 규칙은 "층 h 시작 ≥ 골조 층 min(10, h + nₛ) 완료", 겹침은 <code>CB.bim.overlap</code>, 시간 간격 0.1주.</div>
+    </div>
+    <div class="callout"><strong>예제 9.3 (커튼월 버퍼와 공기)</strong> 골조 층 \(k\) 완료 \(38 + 3k\), \(n_s = 2\), H는 53주 시작·층당 1.6주.
+      <p><b>① 균등 진행</b> H의 층 \(h\) 시작 \(53 + 1.6(h - 1)\). 골조 작업 구역의 맨 아래 층은 \(k - 2\) (\(k\)는 작업 층). 두 선이 만나는 때는 \(1 + (t-53)/1.6 \ge (t - 38)/3 - 1\) → \(t \approx 63.3\)주(H 7층, 골조 9층). 68주(골조 완료)까지 약 5주, 계산 간격까지 넣으면 약 6.4주가 충돌이다.</p>
+      <p><b>② 버퍼 규칙</b> 층 \(h\) 시작 ≥ 골조 층 \(h + 2\) 완료. 1–5층은 53.0–61.0주에 균등대로 가고, 6층은 8층 골조(62주), 7층은 65주, 8층은 68주를 기다린다. 9·10층은 69.6–72.8주.</p>
+      <p><b>③ 판단</b> H 완료 72.8주 > CPM 69주. H는 <span class="term">주공정</span><span class="en">(critical path)</span> 활동이므로 J·M을 밀어 공기가 약 3.8주 늘 수 있다. SiteBook 8장 예제(층당 1.58주)도 약 72.7주를 얻었다. 대책은 상부 층 작업조 증원, 낙하물 방호를 두어 \(n_s\)를 줄이기, J를 "외피가 닫힌 층부터" SS로 시작하기다.</p></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="planned-actual">
+    <h2>계획 대 실적: 늦은 요소를 빨갛게</h2>
+    <div class="problem"><strong>50주 공정 회의</strong>
+      <p>굴착 중 암반과 지하수 때문에 C가 4주 늦게 끝났고, 후속 공정이 모두 4주 밀렸습니다(SiteBook 13장의 교육용 시나리오). 50주 회의에서 "SPI 0.878"이라는 숫자보다 더 빨리 전달되는 것은 무엇일까요?</p></div>
+    <p>4D는 두 일정을 같은 모델에 겹쳐 <span class="term">계획 대 실적</span><span class="en">(planned versus actual)</span>을 비교할 수 있습니다. 계획 일정은 <span class="term">기준선</span><span class="en">(baseline)</span>(CPM의 ES), 실적 일정은 실제 시작·완료 기록입니다. 같은 주 \(w\)에서 요소마다 두 상태를 비교하면 네 경우가 생깁니다: 둘 다 완료(정상), 계획은 완료인데 실적은 아님(<b>지연</b>, 빨강), 실적만 완료(<b>선행</b>), 둘 다 미착수. 진도를 요소 수나 물량으로 세면 "얼마나 늦었나"도 숫자가 됩니다.</p>
+    <figure class="diagram" id="fig-fd-status">
+      <svg viewBox="0 0 860 300" role="img" aria-label="50주의 계획 대 실적 비교: 계획 완료 144개, 실적 완료 96개, 지연 48개를 층별 막대로">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,34)">
+          <text x="0" y="0" class="t" style="font-weight:700">50주, 층별 상태 (구조 34 + 설비 2 = 층당 36개)</text>
+          <g transform="translate(40,20)" class="t-mono" style="font-size:11px">
+            <g text-anchor="end"><text x="-6" y="16">1층</text><text x="-6" y="40">2층</text><text x="-6" y="64">3층</text><text x="-6" y="88">4층</text><text x="-6" y="112">5층</text><text x="-6" y="136">6–10층</text></g>
+            <rect x="0" y="4" width="360" height="16" style="fill:var(--ok);opacity:.7"/>
+            <rect x="0" y="28" width="360" height="16" style="fill:var(--ok);opacity:.7"/>
+            <rect x="0" y="52" width="240" height="16" style="fill:var(--ok);opacity:.7"/><rect x="240" y="52" width="120" height="16" style="fill:var(--bad);opacity:.75"/>
+            <rect x="0" y="76" width="360" height="16" style="fill:var(--bad);opacity:.75"/>
+            <rect x="0" y="100" width="360" height="16" style="fill:none;stroke:var(--text-faint);stroke-dasharray:3 3"/>
+            <rect x="0" y="124" width="360" height="16" style="fill:none;stroke:var(--text-faint);stroke-dasharray:3 3"/>
+            <text x="370" y="16">36 완료</text><text x="370" y="40">36 완료</text><text x="370" y="64">24 완료 · 12 지연</text><text x="370" y="88">36 지연</text><text x="370" y="112">미착수(계획도)</text>
+          </g>
+        </g>
+        <g transform="translate(560,60)" class="t-mono" style="font-size:13px">
+          <rect x="0" y="0" width="14" height="14" style="fill:var(--ok);opacity:.7"/><text x="22" y="12">정상 완료 96</text>
+          <rect x="0" y="28" width="14" height="14" style="fill:var(--bad);opacity:.75"/><text x="22" y="40">지연 48 (계획 완료, 실적 아님)</text>
+          <rect x="0" y="56" width="14" height="14" style="fill:var(--blue);opacity:.7"/><text x="22" y="68">선행 0</text>
+          <text x="0" y="110" class="t-dim">요소 진도 96/144 = 0.67</text>
+          <text x="0" y="132" class="t-dim">요소 기준 획득 일정 ≈ 44.9주</text>
+          <text x="0" y="154" class="t-dim">(전체 공사 비용 기준 ES 46.0주)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-5.</b> 50주의 계획 대 실적(교육용 시나리오). 계획으로는 4층까지 완료여야 하지만 실적은 2층 완료와 3층 기둥·벽까지다. 3층 보·슬래브와 4층 전체, 3·4층의 덕트·배관이 지연(빨강)이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fd-actual">
+      <div class="sim-head"><span class="sim-tag three">3D</span><h3>계획 대 실적: SiteBook 13장 지연 시나리오 → 늦은 요소 빨강</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fd-cv-actual" aria-label="계획과 실적을 비교해 지연 요소를 빨강으로 칠한 3D 장면"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>상태 기준일 w <output id="fd-ac-w-out"></output></span><input type="range" id="fd-ac-w" min="36" max="100" step="0.5" value="50"></label>
+          <div class="ctrl"><span>보기</span><div class="seg" id="fd-ac-view"><button data-value="cmp" class="on">비교</button><button data-value="plan">계획</button><button data-value="act">실적</button></div></div>
+          <label class="ctrl"><span>실적 지연(C 이후 일괄) <output id="fd-ac-d-out"></output></span><input type="range" id="fd-ac-d" min="0" max="8" step="1" value="4"></label>
+        </div>
+      </div>
+      <div class="fd-sub sim-view"><canvas id="fd-cv-actual-c" aria-label="계획과 실적의 완료 요소 수 누적 곡선"></canvas></div>
+      <div class="fd-key"><span class="ok">정상 완료</span><span class="warn">실적 진행 중</span><span class="bad">지연</span><span class="blue">선행</span></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">계획 완료</span><span class="v" id="fd-ac-o-p">—</span></div>
+        <div class="stat"><span class="k">실적 완료</span><span class="v" id="fd-ac-o-a">—</span></div>
+        <div class="stat"><span class="k">지연 요소</span><span class="v" id="fd-ac-o-l">—</span></div>
+        <div class="stat"><span class="k">요소 진도비 · 획득 일정</span><span class="v" id="fd-ac-o-s">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 50주에서 계획 144, 실적 96, 지연 48을 확인하세요 · 요소 진도비 0.67은 SiteBook 13장의 SPI 0.878보다 훨씬 나쁩니다 — SPI는 공사 전체(이미 끝난 A–F 포함)의 금액 비율이고, 여기는 지금 진행 중인 골조·설비만 셉니다. 무엇을 분모로 하느냐가 지표를 바꿉니다 · 지연을 0으로 두면 빨강이 사라집니다 · 72주로 옮기면 계획으로는 끝났어야 할 9–10층이 여전히 빨갛습니다 · 모델: 계획 = <code>CB.pm.cpm(CB.pm.B10)</code>의 ES, 실적 = SiteBook 13장 시나리오(G1 42주, G2 57주, I 42주 시작, 기간은 계획과 같음), 지연 슬라이더는 그 4주를 바꾼다. 획득 일정은 계획 완료 수가 실적 완료 수와 같아지는 주.</div>
+    </div>
+    <div class="callout"><strong>예제 9.4 (50주의 요소 진도)</strong> 계획 G1 38주, 실적 42주 시작, 층당 3주.
+      <p><b>① 계획</b> \((50 - 38)/3 = 4\) → 1–4층 구조 136 + 설비 8 = 144개 완료.</p>
+      <p><b>② 실적</b> \((50 - 42)/3 = 2.67\) → 1·2층 72(구조 68 + 설비 4), 3층 \(t_0 = 48\)에서 기둥·벽 \(48.9\)주 완료 24 → 96개.</p>
+      <p><b>③ 지연</b> 144 − 96 = 48개(3층 보·슬래브 10, 4층 구조 34, 3·4층 덕트·배관 4). 요소 진도비 \(96/144 = 0.67\). 계획 곡선이 96에 이르는 때(요소 기준 <span class="term">획득 일정</span><span class="en">(earned schedule)</span>)는 44.9주 → 요소 기준 일정 차이 약 −5.1주.</p>
+      <p><b>④ 판단</b> 실제 지연은 4주인데 요소 기준으로는 5.1주처럼 보인다. 층 안 순서(기둥·벽이 먼저 0.3Δ) 때문에 요소 수가 시간에 비례하지 않기 때문이다. 진도를 요소 수로 셀지, 부피로 셀지, 금액으로 셀지(10장)는 보고 전에 정해 두어야 한다.</p></div>
+    <div class="callout site"><strong>P-B10 50주 시나리오</strong> SiteBook 13장: C가 20주부터 암반·지하수로 늦어져 30주에 완료, 후속 공정 모두 4주 지연. 50주 PV 109.0 · EV 95.7 · AC 102.3억 원, SPI 0.878, CPI 0.935, 획득 일정 46.0주. 4D 실적: G1 42–57주, G2 57–72주, I 42–72주, H 57–73주, J 73–93주. 회복 대책이 없으면 97주 준공, J 4주 단축(0.8억 원)으로 93주 회복.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="heatmap">
+    <h2>층별 진도 히트맵</h2>
+    <div class="problem"><strong>3D를 돌리지 않고 한눈에</strong>
+      <p>4D 장면은 생생하지만 회의실의 모두가 같은 각도에서 보기는 어렵고, 실내 공종(설비·마감)은 외피에 가려 보이지 않습니다. 층과 공종을 한 표에 놓고 진도를 색으로 칠하면 어떨까요?</p></div>
+    <p>4D의 결과는 3D가 아니어도 됩니다. 층 × 공종의 표에 각 칸의 진도(0–100 %)를 색으로 칠한 <span class="term">진도 히트맵</span><span class="en">(progress heat map)</span>은 같은 정보를 평면에 펼친 것입니다. 한 행(층)에서 여러 칸이 동시에 "진행 중"이면 그 층에 공종이 몰린 것이고, 한 열(공종)에서 칸이 위로 올라가는 속도가 그 공종의 층 속도입니다. 모델에 없는 공종(커튼월 H, 마감 J)도 층 분할 규칙만 있으면 칸을 만들 수 있습니다.</p>
+    <div class="sim" id="sim-fd-heat">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>층별 진도 히트맵: 주 → 층 × 공종 진도 (계획 · 실적 · 차이)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fd-cv-heat" aria-label="10개 층과 네 공종의 진도를 색으로 칠한 표"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>주 w <output id="fd-ht-w-out"></output></span><input type="range" id="fd-ht-w" min="36" max="100" step="0.5" value="60"></label>
+          <div class="btn-row"><button class="btn" id="fd-ht-play">▶ 재생</button></div>
+          <div class="ctrl"><span>기준</span><div class="seg" id="fd-ht-b"><button data-value="plan" class="on">계획</button><button data-value="act">실적</button><button data-value="diff">차이</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">완료 칸</span><span class="v" id="fd-ht-o-d">—</span></div>
+        <div class="stat"><span class="k">진행 중 칸(동시 작업면)</span><span class="v" id="fd-ht-o-p">—</span></div>
+        <div class="stat"><span class="k">한 층 최대 동시 공종</span><span class="v" id="fd-ht-o-m">—</span></div>
+        <div class="stat"><span class="k">가장 늦은 공종(차이)</span><span class="v" id="fd-ht-o-l">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 계획 60주에서 골조·설비는 7층까지 완료, 8층 진행 중, 커튼월은 4층까지 완료입니다 · 계획 53–68주에는 한 층에 골조·설비가 늘 함께 있습니다(9.3·9.4절의 문제) · "차이"를 고르고 50주로 가면 골조·설비 3·4층이 빨갛습니다. 75주에서는 커튼월·마감 칸이 빨갛습니다 — 4주 지연이 공종을 따라 위로, 뒤로 퍼집니다 · 모델: 골조 = 정의 9.3의 층 구간, 설비 I = 층당 \(d/10\), 커튼월 H = 층당 1.6주(53주 시작), 마감 J = 층당 2주(69주 시작), 실적은 9.5절 시나리오(H 57주, J 73주), 차이 = 계획 진도 − 실적 진도.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="crane">
+    <h2>타워크레인 양중 시퀀스</h2>
+    <div class="problem"><strong>기둥과 보를 공장에서 만든다면</strong>
+      <p>공기를 줄이려고 B-10의 기둥과 큰보를 프리캐스트 콘크리트로 바꾸는 안을 검토합니다(12장). 그러면 요소 하나가 곧 인양물 하나입니다. SiteBook 3장의 160 t·m급 크레인(대지 서쪽, 건물 서쪽 면에서 4 m)으로 모든 부재를 들 수 있을까요?</p></div>
+    <p>현장 타설(RC) 골조에서 크레인이 드는 것은 철근 묶음·거푸집·자재이지만, <span class="term">프리캐스트 콘크리트</span><span class="en">(precast concrete, PC)</span> 골조에서는 모델의 요소 하나하나가 인양물입니다. 4D 모델은 인양의 세 가지 정보를 이미 가지고 있습니다: 무게(부피 × 단위 질량), 놓는 위치(상자 중심 → 크레인과의 수평 거리, <span class="term">작업 반경</span><span class="en">(working radius)</span>), 순서(4D 일정). 크레인의 <span class="term">정격 하중</span><span class="en">(rated load)</span> 곡선만 있으면 모든 인양을 순서대로 판정할 수 있습니다. 이것이 4D의 <span class="term">양중 계획</span><span class="en">(lifting plan)</span> 검토입니다.</p>
+    <div class="callout def"><strong>원리 9.6 (요소 인양 판정, 교육용)</strong> 요소 \(e\)의 인양 무게 \(W_e = \rho V_e\) (\(\rho = 2.4\) t/m³, 철근콘크리트 단위 중량 약 24 kN/m³를 질량으로 어림), 줄걸이·훅 \(W_r = 0.3\) t. 크레인 중심 \((x_c, y_c)\)에서 반경 \(r_e = \sqrt{(x_e - x_c)^2 + (y_e - y_c)^2}\). SiteBook 3장 원리 3.3의 교육용 <span class="term">하중–반경 곡선</span><span class="en">(load–radius curve)</span>
+      <div class="formula">$$Q(r) = \min\!\left(Q_{max},\ \frac{\eta(L)\,M_0}{r + 2}\right), \quad \eta(L) = 1 - 0.006\,(L - 40), \qquad u_e = \frac{W_e + W_r}{Q(r_e)}$$<div class="where">\(M_0\): 등급 정격 모멘트(100·160·250 t·m), \(Q_{max}\): 6·8·12 t, \(L\): 지브 길이(m). 판정 \(u \le 0.9\) 가능, \(0.9 \lt u \le 1\) 주의, \(u \gt 1\) 불가, \(r \gt L\) 도달 불가. 실제 판정은 해당 기종의 제조사 하중표로 한다. PC 큰보는 기둥 면 사이 경간(7.2 m)으로 나눈다.</div></div></div>
+    <figure class="diagram" id="fig-fd-crane">
+      <svg viewBox="0 0 860 330" role="img" aria-label="B-10 평면과 크레인 위치, 기둥 5.37 t를 들 수 있는 반경 26 m 원과 가장 먼 모서리 37.9 m">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <defs><clipPath id="fd-clip"><rect x="10" y="10" width="560" height="310"/></clipPath></defs>
+        <g clip-path="url(#fd-clip)">
+          <circle cx="140" cy="174" r="208" style="fill:var(--ok);opacity:.08;stroke:var(--ok);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <circle cx="140" cy="174" r="303" style="fill:none;stroke:var(--text-faint);stroke-width:1.2;stroke-dasharray:3 4"/>
+        </g>
+        <rect x="172" y="78" width="256" height="192" style="fill:var(--accent);opacity:.06;stroke:var(--text-dim)"/>
+        <rect x="236" y="142" width="128" height="64" style="fill:none;stroke:var(--accent);stroke-width:3"/>
+        <g style="fill:var(--text-dim)">
+          <rect x="168" y="74" width="8" height="8"/><rect x="232" y="74" width="8" height="8"/><rect x="296" y="74" width="8" height="8"/><rect x="360" y="74" width="8" height="8" style="fill:var(--bad)"/><rect x="424" y="74" width="8" height="8" style="fill:var(--bad)"/>
+          <rect x="168" y="138" width="8" height="8"/><rect x="232" y="138" width="8" height="8"/><rect x="296" y="138" width="8" height="8"/><rect x="360" y="138" width="8" height="8" style="fill:var(--bad)"/><rect x="424" y="138" width="8" height="8" style="fill:var(--bad)"/>
+          <rect x="168" y="202" width="8" height="8"/><rect x="232" y="202" width="8" height="8"/><rect x="296" y="202" width="8" height="8"/><rect x="360" y="202" width="8" height="8" style="fill:var(--bad)"/><rect x="424" y="202" width="8" height="8" style="fill:var(--bad)"/>
+          <rect x="168" y="266" width="8" height="8"/><rect x="232" y="266" width="8" height="8"/><rect x="296" y="266" width="8" height="8"/><rect x="360" y="266" width="8" height="8" style="fill:var(--bad)"/><rect x="424" y="266" width="8" height="8" style="fill:var(--bad)"/>
+        </g>
+        <circle cx="140" cy="174" r="7" style="fill:var(--warn)"/>
+        <text x="140" y="200" text-anchor="middle" class="t-mono" style="fill:var(--warn);font-size:12px">TC (−4, 12)</text>
+        <line x1="140" y1="174" x2="428" y2="270" style="stroke:var(--bad);stroke-width:1.4"/>
+        <text x="300" y="250" class="t-mono" style="fill:var(--bad);font-size:12px">r = 37.9 m</text>
+        <text x="190" y="60" class="t-mono" style="fill:var(--ok);font-size:12px">u ≤ 1: r ≤ 26.0 m</text>
+        <g transform="translate(600,50)" class="t-dim" style="font-size:13px">
+          <text x="0" y="0" class="t" style="font-weight:700">PC 기둥 (2–10층)</text>
+          <text x="0" y="24">V = 0.8 × 0.8 × 3.3 = 2.11 m³</text>
+          <text x="0" y="44">W = 2.4 × 2.11 = 5.07 t (+0.3)</text>
+          <text x="0" y="74" class="t" style="font-weight:700">160 t·m, L = 50 m</text>
+          <text x="0" y="98">Q(r) = 0.94 × 160 / (r + 2)</text>
+          <text x="0" y="118">5.37 ≤ Q → r ≤ 26.0 m</text>
+          <text x="0" y="148" style="fill:var(--bad)">x = 24, 32 m 줄 기둥: 불가</text>
+          <text x="0" y="172">PC 큰보(경간 7.2 m): 3.39 t</text>
+          <text x="0" y="192">→ 전 범위 가능(일부 주의)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 9-6.</b> 크레인 반경과 PC 기둥(교육용). 160 t·m급, 지브 50 m 크레인이 2–10층 PC 기둥(5.37 t)을 들 수 있는 반경은 약 26 m이다. 격자 D·E줄(x = 24, 32 m)의 기둥(빨강)은 모두 반경 밖이다. 크레인 위치·등급을 바꾸거나 무거운 부재를 크레인 쪽에 두어야 한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fd-crane">
+      <div class="sim-head"><span class="sim-tag three">3D</span><h3>타워크레인 양중 시퀀스: PC 요소 무게 · 반경 → 4D 순서대로 판정</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fd-cv-crane" aria-label="타워크레인이 4D 순서대로 PC 기둥과 보를 드는 3D 장면, 불가 부재는 빨강"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>인양 순번 <output id="fd-cr-n-out"></output></span><input type="range" id="fd-cr-n" min="1" max="510" step="1" value="61"></label>
+          <div class="btn-row"><button class="btn" id="fd-cr-play">▶ 재생</button></div>
+          <div class="ctrl"><span>크레인 위치</span><div class="seg" id="fd-cr-pos"><button data-value="w" class="on">서쪽 (−4, 12)</button><button data-value="c">코어 안 (16, 12)</button><button data-value="s">남쪽 (16, −5)</button></div></div>
+          <div class="ctrl"><span>크레인 등급</span><div class="seg" id="fd-cr-cls"><button data-value="100">100 t·m</button><button data-value="160" class="on">160 t·m</button><button data-value="250">250 t·m</button></div></div>
+          <label class="ctrl"><span>지브 길이 L <output id="fd-cr-l-out"></output></span><input type="range" id="fd-cr-l" min="30" max="60" step="1" value="50"></label>
+        </div>
+      </div>
+      <div class="fd-key"><span class="dim">설치 완료(가능)</span><span class="acc2">지금 인양</span><span class="warn">주의</span><span class="bad">불가 · 도달 불가</span></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">지금 인양</span><span class="v" id="fd-cr-o-e" style="font-size:14px">—</span></div>
+        <div class="stat"><span class="k">W + Wᵣ / Q(r) at r</span><span class="v" id="fd-cr-o-u" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">불가 · 주의 (전체 510회)</span><span class="v" id="fd-cr-o-b">—</span></div>
+        <div class="stat"><span class="k">크레인 시간 합</span><span class="v" id="fd-cr-o-h">—</span></div>
+      </div>
+      <div class="fd-msg" id="fd-cr-msg">—</div>
+      <div class="sim-note">해볼 것: 기본값(SiteBook 3장 배치)에서 불가 84회, 주의 48회 — D·E줄 기둥 80개와 1층 C줄 기둥 4개(6.6 t)입니다 · 250 t·m로 올리면 불가 4회(1층 E줄 기둥 6.6 t), 코어 안 160 t·m로 옮기면 반경이 20 m 이하가 되어 불가 4회(1층 모서리 기둥 6.9 t)만 남습니다 — 크레인 위치가 등급보다 효과적일 때가 많습니다 · 지브를 60 m로 늘리면 같은 반경의 정격이 줄어듭니다 · 순번은 4D 순서(층 → 기둥 → 큰보 경간)입니다 · 모델: 원리 9.6, 인양물 = 기둥 200 + 큰보 경간 310 = 510회, 사이클 \(t_c = t_{fix} + 2H/v_h + t_s\)(SiteBook 원리 3.4 형태, \(t_{fix}\) 15분, \(v_h\) 40 m/분, \(t_s\) = 선회 왕복 각도/216°/분, 집는 곳 (−10, 12)), 모두 교육용. 집는 곳의 정격 하중과 바람 제한은 따로 확인한다.</div>
+    </div>
+    <div class="callout"><strong>예제 9.5 (두 기둥의 인양 판정)</strong> 크레인 (−4, 12), 160 t·m, \(L = 50\) m → \(\eta = 0.94\).
+      <p><b>① C-C2-3F</b> (16, 8): \(r = \sqrt{20^2 + 4^2} = 20.4\) m, \(Q = 0.94\times160/22.4 = 6.72\) t, \(u = (5.07 + 0.3)/6.72 = 0.80\) → 가능.</p>
+      <p><b>② C-E1-3F</b> (32, 0): \(r = \sqrt{36^2 + 12^2} = 37.9\) m, \(Q = 150.4/39.9 = 3.77\) t, \(u = 5.37/3.77 = 1.43\) → 불가.</p>
+      <p><b>③ 대책 비교</b> (가) 250 t·m급: \(Q = 235/39.9 = 5.89\), \(u = 0.91\) → 주의. (나) 크레인을 코어 안 (16, 12)로: 가장 먼 기둥 \(r = 20\) m, \(Q = 6.84\), \(u = 0.79\) → 가능(단 1층 모서리 6.6 t 기둥은 \(u = 1.01\)). (다) D·E줄 기둥을 두 토막으로 나누기(이음이 늘어난다, 12장).</p>
+      <p><b>④ 판단</b> PC안은 크레인 계획과 함께 검토해야 한다. 4D 모델이 있으면 510회의 판정이 한 번에 끝나고, 위치·등급을 바꿀 때마다 다시 계산된다. RC 현장 타설 B-10에서는 이 무게가 아니라 철근 묶음·거푸집(SiteBook 3장)이 인양물이다.</p></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="limits">
+    <h2>4D의 상세 수준과 한계</h2>
+    <p>4D는 모델과 공정표 가운데 <b>더 거친 쪽</b>의 수준을 넘지 못합니다. B-10 BIM에는 거푸집·동바리·철근·가설 비계가 없으므로 이 장의 4D는 "콘크리트가 언제 생기나"만 보여 주고, 거푸집이 얼마 동안 몇 층에 남는지는 정의 9.5처럼 따로 모형을 만들어야 했습니다. 공정표가 활동 14개뿐이라 층 분할(정의 9.3)이라는 가정을 넣어야 했고, 그 가정이 틀리면 4D도 틀립니다. 반대로 요소마다 활동을 만들면 공정표가 관리할 수 없게 커집니다. 실무에서는 4D의 목적(발주자 설명, 시공 순서 검토, 양중 계획, 진도 보고)에 맞추어 모델 분할과 공정 상세도를 함께 정합니다 — 4장의 LOD와 같은 생각입니다.</p>
+    <div class="callout deep"><strong>4D의 자동화와 검증</strong> 연결 규칙은 결국 "속성 → 활동"의 함수이므로 분류 코드(3장)나 구역 속성이 잘 정리된 모델에서는 자동으로 만들 수 있습니다. 연구 분야에서는 부재의 위상(무엇이 무엇을 받치나)에서 시공 순서를 자동으로 생성하고, 자원·공간 제약을 넣어 최적화하는 시도가 이어지고 있습니다. 다만 자동으로 만든 4D도 원리 9.4 같은 검사 규칙과 현장 기술자의 검토를 거쳐야 합니다. 이 장의 규칙과 판정은 모두 교육용 단순화입니다.</div>
+    <div class="callout warn"><strong>4D가 보여 주지 않는 것</strong> ① 모델에 없는 것(가설재·장비·인력), ② 공정표에 없는 제약(자재 반입, 날씨, 검측 대기), ③ 공정의 불확실성(SiteBook 10장의 PERT·몬테카를로 — 4D는 대개 결정적 일정 하나를 그린다). 4D 화면이 매끄럽다고 공정이 타당한 것은 아니다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 정보가 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="five-d.html"><small>CH.10 · 5D 원가와 디지털 견적</small>요소 완료 시점 × 금액<br><span>4D 일정이 5D 현금 흐름과 기성의 시간축이 된다.</span></a>
+      <a href="clash.html"><small>CH.06 · 간섭 검토</small>상자 겹침 → 시간 겹침<br><span>작업 공간 충돌은 6장의 판정을 시간에 대해 반복한 것이다.</span></a>
+      <a href="fabrication.html"><small>CH.12 · 디지털 제작과 프리패브</small>PC 부재와 양중<br><span>부재 분할은 크레인 반경·정격 하중과 함께 정한다.</span></a>
+      <a href="reality-capture.html"><small>CH.11 · 현실 캡처</small>실적을 스캔으로<br><span>계획 대 실적의 "실적"을 점군에서 자동으로 읽는다.</span></a>
+      <a href="../../site/chapters/cpm.html"><small>SiteBook CH.09 · 공정 계획과 CPM</small>CPM과 선후행<br><span>4D가 찾은 논리 오류(I ← F)는 공정표로 돌아가 고친다.</span></a>
+      <a href="../../site/chapters/evm.html"><small>SiteBook CH.13 · 진도 관리와 EVM</small>50주 시나리오<br><span>SPI·획득 일정과 4D 요소 진도를 비교한다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>4D = 요소 + 활동 일정 + 연결 규칙 + 활동 안의 순서 규칙. 요소의 \([s_e, f_e]\)로 주 \(w\)의 상태(미착수·진행 중·완료)를 정한다. 미연결 요소는 4D에 나타나지 않는다.</li>
+      <li>B-10 연결 규칙: 기둥·보·슬래브·벽 1–5층 → G1, 6–10층 → G2, 덕트·배관 → I. 층 분할: \(t_0 = ES + (j-1)d/n\), 층 \(j\)는 \(ES + j\,d/n\)에 완료. 층 안에서 기둥·벽 0–0.3Δ, 보·슬래브 0.3Δ–Δ.</li>
+      <li>45주 장면: 완료 96, 진행 중 12, 미착수 252. 층 \(k\) 슬래브는 \(38 + 3k\)주에 완료되고 68주에 360개 모두 완료.</li>
+      <li>연결 결과는 미연결, 공종 불일치, 지지 조건 순서 오류(\(s_e \lt f_{sup}\))로 검사한다. 규칙을 바꾸면 층 분할 가정도 바뀐다.</li>
+      <li>"I ← F"를 층별로 펼치면 덕트가 슬래브보다 3주 먼저 매달린다(20건). I ← G1(SS + 3주)이면 0건, I 41–71주, 여유 18주. 공정 논리의 오류를 4D가 드러낸다.</li>
+      <li>작업 공간 충돌은 시간에 따라 움직이는 작업 상자의 겹침이다. 동바리 2개 층이면 커튼월이 약 63주부터 골조 구역에 들어가고(약 6.4주), 버퍼 규칙을 쓰면 H 완료가 69 → 72.8주로 늦어진다(주공정).</li>
+      <li>50주 계획 대 실적: 계획 144, 실적 96, 지연 48(빨강), 요소 진도비 0.67, 요소 기준 획득 일정 44.9주. 진도의 분모(요소 수·부피·금액, 전체·진행 중 공종)를 먼저 정한다.</li>
+      <li>PC안 양중: \(W = 2.4V\), \(u = (W + 0.3)/Q(r)\). SiteBook 배치의 160 t·m 크레인으로는 510회 중 84회 불가(D·E줄 기둥), 코어 안으로 옮기면 4회. 4D가 순서·위치·무게를 한 번에 준다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 4D 모델을 만드는 데 꼭 필요한 것이 아닌 것은?</p><div class="opts">
+        <button class="opt">요소의 형상과 속성</button><button class="opt">활동의 일정</button><button class="opt">요소와 활동의 연결 규칙</button><button class="opt" data-correct>요소마다의 단가</button>
+      </div><div class="quiz-exp">단가는 5D(10장)의 정보다. 4D는 요소·일정·연결 규칙·활동 안의 순서 규칙으로 만든다.</div></div>
+      <div class="quiz-q"><p>2. G1(ES 38주, 15주, 1–5층)에서 정의 9.3을 쓰면 3층은 언제 완료되는가?</p><div class="opts">
+        <button class="opt">44주</button><button class="opt" data-correct>47주</button><button class="opt">45.5주</button><button class="opt">53주</button>
+      </div><div class="quiz-exp">\(38 + 3\times15/5 = 47\)주. 44주는 3층이 시작하는 때, 53주는 G1 전체의 완료다.</div></div>
+      <div class="quiz-q"><p>3. 층 구간이 3주일 때 정의 9.3에서 그 층의 보·슬래브는 언제 시작하는가?</p><div class="opts">
+        <button class="opt">층 시작과 동시에</button><button class="opt" data-correct>층 시작 0.9주 뒤</button><button class="opt">층 시작 2.1주 뒤</button><button class="opt">층 완료 뒤</button>
+      </div><div class="quiz-exp">\(\phi_1 = 0.3\), \(0.3\times3 = 0.9\)주. 기둥·벽을 먼저 치고 보·슬래브를 한 번에 친다.</div></div>
+      <div class="quiz-q"><p>4. 설비 I를 "F 뒤 FS"로 둔 채 지상 덕트를 층마다 3주씩 배정하면 4D에서 무엇이 보이는가?</p><div class="opts">
+        <button class="opt">덕트가 슬래브보다 늦게 나타나 문제없다</button><button class="opt" data-correct>덕트가 매달릴 슬래브보다 3주 먼저 나타나는 순서 오류</button><button class="opt">덕트가 미연결 요소가 된다</button><button class="opt">공기가 즉시 늘어난다</button>
+      </div><div class="quiz-exp">층 \(s\) 덕트 시작 \(35 + 3s\) &lt; 슬래브 완료 \(38 + 3s\). I ← G1(SS, 3주 이상)로 고치면 사라지고, I의 여유(21주) 안이라 공기는 그대로다.</div></div>
+      <div class="quiz-q"><p>5. 작업 공간 충돌(4D 간섭)의 조건으로 옳은 것은?</p><div class="opts">
+        <button class="opt">두 요소의 형상이 겹친다</button><button class="opt">두 활동이 같은 기간에 진행된다</button><button class="opt" data-correct>두 활동의 작업 공간이 같은 시각에 겹친다</button><button class="opt">두 활동이 같은 층에 연결된다</button>
+      </div><div class="quiz-exp">공간과 시간이 동시에 겹쳐야 한다. 같은 기간이라도 다른 층이면 충돌이 아니고, 같은 층이라도 시기가 다르면 충돌이 아니다.</div></div>
+      <div class="quiz-q"><p>6. 50주에 계획 완료 요소 144개, 실적 완료 96개다. 옳은 해석은?</p><div class="opts">
+        <button class="opt">SPI = 0.67이다</button><button class="opt" data-correct>요소 진도비는 0.67이며, 공사 전체 금액 기준 SPI(0.878)와 분모가 달라 직접 비교할 수 없다</button><button class="opt">48개 요소의 원가가 초과되었다</button><button class="opt">공기가 정확히 48주 늦었다</button>
+      </div><div class="quiz-exp">요소 진도비는 진행 중인 골조·설비만, SPI는 전체 공사의 금액을 센다. 원가 초과는 AC와 비교해야 알 수 있다.</div></div>
+      <div class="quiz-q"><p>7. 160 t·m급(Q<sub>max</sub> 8 t), 지브 50 m 크레인이 반경 30 m에서 PC 기둥(5.07 t, 줄걸이 0.3 t)을 들 수 있는가?</p><div class="opts">
+        <button class="opt">가능(u ≈ 0.67)</button><button class="opt">주의(u ≈ 0.95)</button><button class="opt" data-correct>불가(u ≈ 1.14)</button><button class="opt">도달 불가</button>
+      </div><div class="quiz-exp">\(Q = 0.94\times160/32 = 4.70\) t, \(u = 5.37/4.70 = 1.14\). 기둥을 들 수 있는 반경은 약 26 m까지다.</div></div>
+      <div class="quiz-q"><p>8. 연결 규칙에서 벽을 빠뜨렸을 때 생기는 문제가 아닌 것은?</p><div class="opts">
+        <button class="opt">4D에서 코어 벽이 끝내 나타나지 않는다</button><button class="opt">5D 현금 흐름에서 벽 금액이 시간에 배분되지 않는다</button><button class="opt">벽 위 보의 받침 검사가 불완전해진다</button><button class="opt" data-correct>벽의 IFC GlobalId가 바뀐다</button>
+      </div><div class="quiz-exp">연결 규칙은 요소의 속성을 읽을 뿐 요소 자체(형상·GUID)를 바꾸지 않는다. 미연결 요소는 4D·5D의 시간축에서 빠진다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* =================================================================== 공통 도구 (이 장 전용) */
+const FDX = (() => {
+  const ELS = CB.bim.model(), B = CB.pm.B10, R = CB.pm.cpm(B);
+  const Hz = (k) => (k <= 0 ? 0 : 5 + 4 * (k - 1));
+  const PH = { IfcColumn: [0, 0.3], IfcWall: [0, 0.3], IfcBeam: [0.3, 1], IfcSlab: [0.3, 1], IfcDuctSegment: [0, 1], IfcPipeSegment: [0, 1] };
+  const MEP = (e) => e.ifc === "IfcDuctSegment" || e.ifc === "IfcPipeSegment";
+  const defLink = (e) => (MEP(e) ? "I" : e.storey <= 5 ? "G1" : "G2");
+  const vol = (b) => (b[3] - b[0]) * (b[4] - b[1]) * (b[5] - b[2]);
+  /** CPM 결과 → { id: { s, d } } */
+  const timing = (acts, r, basis = "ES") => { const t = {}; acts.forEach((a) => (t[a.id] = { s: r.acts[a.id][basis], d: a.d })); return t; };
+  /** 정의 9.3: 요소 일정 Map(id → { act, s, f, t0, t1 } | null) */
+  function sched(link, tm, els = ELS) {
+    const g = {};
+    els.forEach((e) => { const a = link(e); if (!a || !tm[a]) return; (g[a] = g[a] || new Set()).add(e.storey); });
+    const idx = {};
+    Object.keys(g).forEach((a) => { const arr = [...g[a]].sort((x, y) => x - y); idx[a] = { n: arr.length, m: new Map(arr.map((s, i) => [s, i])) }; });
+    const out = new Map();
+    els.forEach((e) => {
+      const a = link(e); if (!a || !tm[a]) { out.set(e.id, null); return; }
+      const T = tm[a], n = idx[a].n, j = idx[a].m.get(e.storey), D = Math.max(1e-6, T.d) / n, t0 = T.s + j * D, ph = PH[e.ifc];
+      out.set(e.id, { act: a, s: t0 + ph[0] * D, f: t0 + ph[1] * D, t0, t1: t0 + D });
+    });
+    return out;
+  }
+  /** -1 미연결, 0 미착수, 1 진행 중, 2 완료 */
+  const state = (x, w) => (!x ? -1 : w <= x.s + 1e-9 ? 0 : w >= x.f - 1e-9 ? 2 : 1);
+  /** 원리 9.4: 순서 오류 요소 id 집합 */
+  function seqErrors(S, els = ELS) {
+    const colF = {}, slabF = {}, bad = new Set();
+    els.forEach((e) => { const x = S.get(e.id); if (!x) return;
+      if (e.ifc === "IfcColumn" || e.ifc === "IfcWall") colF[e.storey] = Math.max(colF[e.storey] ?? -1e9, x.f);
+      if (e.ifc === "IfcSlab") slabF[e.storey] = Math.max(slabF[e.storey] ?? -1e9, x.f); });
+    els.forEach((e) => { const x = S.get(e.id); if (!x) return; let sup = null;
+      if (e.ifc === "IfcColumn" || e.ifc === "IfcWall") sup = e.storey > 1 ? slabF[e.storey - 1] : R.acts.F.EF;
+      else if (e.ifc === "IfcBeam" || e.ifc === "IfcSlab") sup = colF[e.storey];
+      else sup = slabF[e.storey];
+      if (sup != null && x.s < sup - 1e-6) bad.add(e.id); });
+    return bad;
+  }
+  /** 축 정렬 상자들을 면 단위로 깊이 정렬해 칠한다(뒷면 제거). items: { b, fill, a, stroke, sa, lw } */
+  function boxes(V, items) {
+    const st = V.st, cp = Math.cos(st.pitch), sp = Math.sin(st.pitch), cy = Math.cos(st.yaw), sy = Math.sin(st.yaw);
+    const cam = [st.target[0] - st.dist * cp * sy, st.target[1] - st.dist * cp * cy, st.target[2] + st.dist * sp];
+    const F = [];
+    items.forEach((it) => {
+      const [x0, y0, z0, x1, y1, z1] = it.b;
+      const add = (pts) => { let cx = 0, cyy = 0, cz = 0; pts.forEach((p) => { cx += p[0]; cyy += p[1]; cz += p[2]; }); F.push({ pts, d: (cx / 4 - cam[0]) ** 2 + (cyy / 4 - cam[1]) ** 2 + (cz / 4 - cam[2]) ** 2, it }); };
+      if (cam[0] < x0) add([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]]);
+      if (cam[0] > x1) add([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]]);
+      if (cam[1] < y0) add([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]]);
+      if (cam[1] > y1) add([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]]);
+      if (cam[2] < z0) add([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]]);
+      if (cam[2] > z1) add([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]]);
+    });
+    F.sort((a, b) => b.d - a.d);
+    F.forEach((f) => V.poly3(f.pts, { fill: f.it.fill, fillAlpha: f.it.a ?? 0.8, color: f.it.stroke || f.it.fill, width: f.it.lw || 0.6, alpha: f.it.sa ?? 0.85, stroke: f.it.noStroke ? false : undefined }));
+  }
+  function ground(V) { const P = V.P; V.poly3([[-8, -8, 0], [40, -8, 0], [40, 32, 0], [-8, 32, 0]], { fill: P.faint, fillAlpha: 0.08, color: P.border, width: 0.8 }); }
+  /** 상태 → 칠하기 */
+  function styleOf(e, st, P, ghost) {
+    if (st === 2) return { b: e.box, fill: P.ok, a: e.ifc === "IfcSlab" ? 0.35 : 0.6, stroke: P.ok, sa: 0.6 };
+    if (st === 1) return { b: e.box, fill: P.warn, a: 0.8, stroke: P.warn, sa: 0.9, lw: 1 };
+    if (st === 0) return ghost ? { b: e.box, fill: P.faint, a: 0.03, stroke: P.faint, sa: 0.25, lw: 0.5 } : null;
+    return { b: e.box, fill: P.bad, a: 0.85, stroke: P.bad, sa: 1, lw: 1 };
+  }
+  const orbitOpts = (draw, o = {}) => Object.assign({ yaw: -0.62, pitch: 0.36, dist: 118, target: [16, 12, 19], fov: 0.82, aspect: (W) => (W < 520 ? 1.0 : 0.66), minHeight: 300, maxHeight: 520, draw }, o);
+  function text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.fillStyle = color; ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`;
+    ctx.textAlign = o.align || "left"; ctx.textBaseline = o.base || "middle"; ctx.fillText(s, x, y); ctx.restore();
+  }
+  const msg = (id, html, cls = "") => { const el = document.getElementById(id); if (!el) return; el.className = "fd-msg" + (cls ? " " + cls : ""); el.innerHTML = html; };
+  /** 재생 루프 */
+  function player(btn, el, get, set, lo, hi, speed) {
+    let anim = null;
+    const stop = () => { if (anim) { anim.stop(); anim = null; } };
+    const pb = CB.playButton(btn, () => { if (get() >= hi - 1e-6) set(lo); anim = CB.loop(document.getElementById(el), (dt) => { let v = get() + dt * speed; if (v >= hi) { set(hi); stop(); pb.set(false); return; } set(v); }); }, stop);
+    return pb;
+  }
+  /** 실적 시나리오(SiteBook 13장): 계획 ES에 지연 dl을 더한 시작 */
+  const actualTiming = (dl = 4) => { const t = timing(B, R); ["E", "F", "G1", "G2", "H", "I", "K", "J", "L", "M"].forEach((k) => (t[k] = { s: t[k].s + dl, d: t[k].d })); return t; };
+  return { ELS, B, R, Hz, PH, MEP, defLink, vol, timing, sched, state, seqErrors, boxes, ground, styleOf, orbitOpts, text, msg, player, actualTiming };
+})();
+
+/* ---------- 1. 4D 재생 ---------- */
+(function () {
+  const S = FDX.sched(FDX.defLink, FDX.timing(FDX.B, FDX.R)), T = FDX.R.T;
+  let W = 45;
+  const gw = CB.range("fd-pl-w", (v) => CB.num(v, 1) + "주", (v) => { W = v; upd(); });
+  const gg = CB.seg("fd-pl-ghost", () => upd()), gv = CB.seg("fd-pl-view", () => upd());
+  const show = (e) => gv() === "all" || (gv() === "mep") === FDX.MEP(e);
+  const v = CB.orbit("#fd-cv-play", FDX.orbitOpts((V) => {
+    FDX.ground(V); const items = [];
+    FDX.ELS.forEach((e) => { if (!show(e)) return; const it = FDX.styleOf(e, FDX.state(S.get(e.id), W), V.P, gg() === "on"); if (it) items.push(it); });
+    FDX.boxes(V, items);
+    FDX.text(V.ctx, "B-10 BIM · " + CB.num(W, 1) + "주", 10, 14, V.P.dim, { size: 11.5 });
+  }));
+  const g = CB.canvas("#fd-cv-play-g", (ctx, Wd, Hh) => {
+    const P = CB.palette(), acts = FDX.B, x0 = 34, w = Wd - x0 - 12, rh = (Hh - 30) / acts.length, X = (t) => x0 + (t / 95) * w;
+    CB.chart(ctx, { x: x0, y: 4, w, h: Hh - 30 }, { x: [0, 95], y: [0, 1], yTicks: [], xTicks: [0, 20, 38, 53, 68, 93], xFmt: (t) => t + "" });
+    acts.forEach((a, k) => {
+      const r = FDX.R.acts[a.id], y = 4 + rh * k + rh * 0.18, inModel = a.id === "G1" || a.id === "G2" || a.id === "I";
+      ctx.strokeStyle = P.faint; ctx.lineWidth = 1; ctx.strokeRect(X(r.ES), y, X(r.EF) - X(r.ES), rh * 0.64);
+      const f = CB.clamp((W - r.ES) / a.d, 0, 1);
+      ctx.globalAlpha = inModel ? 0.9 : 0.35; ctx.fillStyle = r.critical ? P.bad : P.accent2; ctx.fillRect(X(r.ES), y, (X(r.EF) - X(r.ES)) * f, rh * 0.64); ctx.globalAlpha = 1;
+      FDX.text(ctx, a.id, x0 - 5, y + rh * 0.32, inModel ? P.text : P.faint, { size: 9.5, align: "right" });
+    });
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(X(W), 4); ctx.lineTo(X(W), Hh - 26); ctx.stroke();
+  }, { aspect: (Wd) => (Wd < 520 ? 0.5 : 0.28), minHeight: 160, maxHeight: 230 });
+  function upd() {
+    v.redraw(); g.redraw();
+    let done = 0, prog = 0, vol = 0;
+    FDX.ELS.forEach((e) => { const s = FDX.state(S.get(e.id), W); if (s === 2) { done++; if (!FDX.MEP(e)) vol += FDX.vol(e.box); } else if (s === 1) prog++; });
+    const on = FDX.B.filter((a) => { const r = FDX.R.acts[a.id]; return W > r.ES && W < r.EF; }).map((a) => a.id);
+    CB.stat("fd-pl-o-w", CB.num(W, 1) + " / " + T + "주");
+    CB.stat("fd-pl-o-a", on.length ? on.join(", ") : "—");
+    CB.stat("fd-pl-o-n", done + " · " + prog);
+    CB.stat("fd-pl-o-v", CB.sig(vol) + " m³");
+  }
+  FDX.player("fd-pl-play", "fd-cv-play", () => W, (x) => { W = x; gw.set(x, false); upd(); }, 30, 93, 6);
+  upd();
+})();
+
+/* ---------- 2. 연결 규칙 편집기 ---------- */
+(function () {
+  const TYPES = [["IfcColumn", "기둥"], ["IfcBeam", "보"], ["IfcSlab", "슬래브"], ["IfcWall", "벽"], ["IfcDuctSegment", "덕트"], ["IfcPipeSegment", "배관"]];
+  const OPTS = [["G1", "G1 골조 하부"], ["G2", "G2 골조 상부"], ["I", "I 설비"], ["H", "H 커튼월"], ["J", "J 마감"], ["", "(없음)"]];
+  const TRADE = { G1: "str", G2: "str", I: "mep", H: "ext", J: "fin" };
+  const body = document.getElementById("fd-lk-body");
+  body.innerHTML = TYPES.map(([t, n]) => `<tr><td>${n}</td>` + ["a", "b"].map((s) => `<td><select id="fd-lk-${t}-${s}" aria-label="${n} ${s === "a" ? "아래층" : "위층"} 활동">${OPTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></td>`).join("") + "</tr>").join("");
+  const sel = (t, s) => document.getElementById(`fd-lk-${t}-${s}`);
+  const PRE = {
+    base: (t) => (t === "IfcDuctSegment" || t === "IfcPipeSegment" ? ["I", "I"] : ["G1", "G2"]),
+    wall: (t) => (t === "IfcWall" ? ["", ""] : PRE.base(t)),
+    swap: (t) => (t === "IfcSlab" ? ["G1", "G1"] : PRE.base(t)),
+    mep: (t) => (t === "IfcDuctSegment" ? ["G1", "G2"] : PRE.base(t)),
+  };
+  const gk = CB.range("fd-lk-k", (v) => v + "층", () => upd());
+  const gp = CB.seg("fd-lk-pre", (p) => { TYPES.forEach(([t]) => { const [a, b] = PRE[p](t); sel(t, "a").value = a; sel(t, "b").value = b; }); gk.set(5, false); upd(); });
+  TYPES.forEach(([t]) => ["a", "b"].forEach((s) => sel(t, s).addEventListener("change", upd)));
+  TYPES.forEach(([t]) => { const [a, b] = PRE.base(t); sel(t, "a").value = a; sel(t, "b").value = b; });
+  const tm = FDX.timing(FDX.B, FDX.R);
+  let res = null;
+  const link = (e) => sel(e.ifc, e.storey <= gk() ? "a" : "b").value || null;
+  const mismatch = (e, a) => a && (FDX.MEP(e) ? TRADE[a] !== "mep" : TRADE[a] !== "str");
+  const v = CB.orbit("#fd-cv-link", FDX.orbitOpts((V) => {
+    if (!res) return; const P = V.P, col = { G1: P.accent2, G2: P.accent, I: P.blue, H: P.dim, J: P.dim }, items = [];
+    FDX.ground(V);
+    FDX.ELS.forEach((e) => { const a = res.L.get(e.id);
+      if (!a) items.push({ b: e.box, fill: P.bad, a: 0.9, stroke: P.bad, sa: 1, lw: 1.2 });
+      else if (mismatch(e, a)) items.push({ b: e.box, fill: P.warn, a: 0.9, stroke: P.warn, sa: 1 });
+      else items.push({ b: e.box, fill: col[a], a: e.ifc === "IfcSlab" ? 0.22 : res.E.has(e.id) ? 0.9 : 0.5, stroke: res.E.has(e.id) ? P.bad : col[a], sa: res.E.has(e.id) ? 1 : 0.6, lw: res.E.has(e.id) ? 1.8 : 0.6 }); });
+    FDX.boxes(V, items);
+  }));
+  function upd() {
+    const k = gk(); document.getElementById("fd-lk-ha").textContent = k === 1 ? "1층" : `1–${k}층`; document.getElementById("fd-lk-hb").textContent = k === 9 ? "10층" : `${k + 1}–10층`;
+    const L = new Map(); FDX.ELS.forEach((e) => L.set(e.id, link(e)));
+    const S = FDX.sched((e) => L.get(e.id), tm), E = FDX.seqErrors(S);
+    res = { L, S, E };
+    const un = FDX.ELS.filter((e) => !L.get(e.id)), mm = FDX.ELS.filter((e) => mismatch(e, L.get(e.id)));
+    const eMep = [...E].filter((id) => FDX.MEP(FDX.ELS[id - 1])).length, eStr = E.size - eMep;
+    CB.stat("fd-lk-o-n", (360 - un.length) + " / 360"); CB.stat("fd-lk-o-u", un.length + "개"); CB.stat("fd-lk-o-m", mm.length + "개"); CB.stat("fd-lk-o-s", `${E.size}건 <small>구조 ${eStr} · 설비 ${eMep}</small>`);
+    const per = {}; FDX.ELS.forEach((e) => { const a = L.get(e.id); if (a) per[a] = (per[a] || 0) + 1; });
+    const perTxt = Object.entries(per).map(([a, n]) => `${a} ${n}`).join(" · ");
+    const n0 = (arr) => arr.slice(0, 3).map((e) => e.name).join(", ") + (arr.length > 3 ? " …" : "");
+    const strErr = FDX.ELS.filter((e) => E.has(e.id) && !FDX.MEP(e));
+    if (un.length) FDX.msg("fd-lk-msg", `미연결 ${un.length}개(${n0(un)}) — 4D에 나타나지 않고 5D 현금 흐름에서도 빠집니다. 연결: ${perTxt}`, "bad");
+    else if (mm.length) FDX.msg("fd-lk-msg", `공종 불일치 ${mm.length}개(${n0(mm)}) — 설비 요소가 골조 활동의 일정·원가로 잡힙니다. 연결: ${perTxt}`, "warn");
+    else if (strErr.length) FDX.msg("fd-lk-msg", `구조 순서 오류 ${strErr.length}건(${n0(strErr)}) — 받치는 요소보다 먼저 시작합니다(원리 9.4). 연결: ${perTxt}`, "bad");
+    else FDX.msg("fd-lk-msg", `연결 완료: ${perTxt}. 남은 순서 오류 ${eMep}건은 덕트·배관이 슬래브보다 먼저 시작하는 경우로, 규칙이 아니라 공정표(I ← F)의 문제입니다 — 9.3절.`, eMep ? "warn" : "ok");
+    v.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 3. 공정 변경 영향 ---------- */
+(function () {
+  const r = (id, f) => CB.range(id, (x) => x + "주", f);
+  const g1 = r("fd-du-g1", upd), g2 = r("fd-du-g2", upd), gi = r("fd-du-i", upd), gl = r("fd-du-lag", upd);
+  const gm = CB.seg("fd-du-mode", upd);
+  let W = 45; const gw = CB.range("fd-du-w", (x) => CB.num(x, 1) + "주", (x) => { W = x; v.redraw(); lob.redraw(); });
+  let st = null;
+  function calc() {
+    const acts = FDX.B.map((a) => ({ ...a, pred: (a.pred || []).slice() }));
+    const by = {}; acts.forEach((a) => (by[a.id] = a));
+    by.G1.d = g1(); by.G2.d = g2(); by.I.d = gi();
+    by.I.pred = gm() === "fs" ? ["F"] : [{ id: "G1", type: "SS", lag: gl() }];
+    const R = CB.pm.cpm(acts), S = FDX.sched(FDX.defLink, FDX.timing(acts, R)), E = FDX.seqErrors(S);
+    st = { acts, R, S, E };
+  }
+  const v = CB.orbit("#fd-cv-dur", FDX.orbitOpts((V) => {
+    if (!st) return; FDX.ground(V); const items = [];
+    FDX.ELS.forEach((e) => { const s = FDX.state(st.S.get(e.id), W); let it = FDX.styleOf(e, s, V.P, false); if (it && st.E.has(e.id)) { it = { ...it, fill: V.P.bad, stroke: V.P.bad, a: 0.85 }; } if (it) items.push(it); });
+    FDX.boxes(V, items); FDX.text(V.ctx, CB.num(W, 1) + "주 · 공기 " + st.R.T + "주", 10, 14, V.P.dim, { size: 11.5 });
+  }));
+  const lob = CB.canvas("#fd-cv-dur-lob", (ctx, Wd, Hh) => {
+    if (!st) return; const P = CB.palette(), t1 = Math.max(100, Math.ceil(st.R.T / 10) * 10);
+    const res = CB.chart(ctx, { x: 46, y: 10, w: Wd - 46 - 14, h: Hh - 10 - 42 }, { x: [30, t1], y: [0.5, 10.5], yTicks: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], xLabel: "주", yFmt: (k) => k + "층", vlines: [{ x: W, color: P.accent }] });
+    const { X, Y } = res, bh = Math.min(10, (res.box.h / 10) * 0.32);
+    FDX.ELS.forEach((e) => {
+      const x = st.S.get(e.id); if (!x) return;
+      if (e.ifc === "IfcSlab") { ctx.fillStyle = P.dim; ctx.globalAlpha = 0.35; ctx.fillRect(X(x.t0), Y(e.storey) - bh, X(x.t1) - X(x.t0), bh); ctx.globalAlpha = 0.8; ctx.fillRect(X(x.t0), Y(e.storey) - bh, (X(x.t1) - X(x.t0)) * 0.3, bh); ctx.globalAlpha = 1; ctx.fillStyle = P.text; ctx.fillRect(X(x.f) - 1, Y(e.storey) - bh - 2, 2, bh + 2); }
+      if (e.ifc === "IfcDuctSegment") { ctx.fillStyle = st.E.has(e.id) ? P.bad : P.blue; ctx.globalAlpha = 0.85; ctx.fillRect(X(x.s), Y(e.storey) + 2, X(x.f) - X(x.s), bh); ctx.globalAlpha = 1; }
+    });
+    FDX.text(ctx, "골조 층 구간 ▮ 슬래브 완료 │", res.box.x + 6, res.box.y + 8, P.dim, { size: 10.5 });
+    FDX.text(ctx, st.E.size ? "설비 (빨강 = 순서 오류)" : "설비", res.box.x + 6, res.box.y + 22, st.E.size ? P.bad : P.blue, { size: 10.5 });
+  }, { aspect: (Wd) => (Wd < 520 ? 0.8 : 0.42), minHeight: 230, maxHeight: 340 });
+  function upd() {
+    calc(); gl.el.disabled = gm() === "fs";
+    gw.el.max = Math.max(100, Math.ceil(st.R.T + 2)); if (W > +gw.el.max) { W = +gw.el.max; gw.set(W, false); }
+    const I = st.R.acts.I;
+    CB.stat("fd-du-o-t", st.R.T + "주" + (st.R.T !== 93 ? ` <small>(${CB.signed(st.R.T - 93, 0)})</small>` : ""));
+    CB.stat("fd-du-o-c", st.R.critical.join("–"));
+    CB.stat("fd-du-o-i", `${I.ES}–${I.EF}주 · ${I.TF}주`);
+    CB.stat("fd-du-o-s", `<span style="color:var(--${st.E.size ? "bad" : "ok"})">${st.E.size}건</span>`);
+    v.redraw(); lob.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 4. 작업 공간 간섭 ---------- */
+(function () {
+  const Hz = FDX.Hz, R = FDX.R;
+  const fw = []; for (let k = 1; k <= 10; k++) { const a = k <= 5 ? R.acts.G1 : R.acts.G2, j = (k - 1) % 5; fw[k] = [a.ES + j * 3, a.ES + (j + 1) * 3]; }
+  const uni = (s, d) => { const w = []; for (let k = 1; k <= 10; k++) w[k] = [s + (k - 1) * d / 10, s + k * d / 10]; return w; };
+  const buf = (s0, d, ns) => { const w = []; let t = s0; for (let k = 1; k <= 10; k++) { const st = Math.max(t, fw[Math.min(10, k + ns)][1]); w[k] = [st, st + d / 10]; t = st + d / 10; } return w; };
+  const at = (win, t) => { for (let k = 1; k <= 10; k++) if (t >= win[k][0] && t < win[k][1]) return k; return 0; };
+  let W = 65, Wn = null, CL = null;
+  const gw = CB.range("fd-zn-w", (x) => CB.num(x, 1) + "주", (x) => { W = x; draw(); });
+  const gn = CB.range("fd-zn-ns", (x) => x + "개 층", recalc), gh = CB.seg("fd-zn-h", recalc), gi = CB.seg("fd-zn-i", recalc);
+  function zones(t) {
+    const z = [], ns = gn(), k = at(Wn.G, t);
+    if (k) for (let j = k; j >= Math.max(1, k - ns); j--) z.push({ a: "G", sh: j < k, b: [-1.5, -1.5, Hz(j - 1), 33.5, 25.5, Hz(j)] });
+    const h = at(Wn.H, t); if (h) [[-1.5, -1.5, 33.5, 0.5], [-1.5, 23.5, 33.5, 25.5], [-1.5, 0.5, 0.5, 23.5], [31.5, 0.5, 33.5, 23.5]].forEach((r) => z.push({ a: "H", b: [r[0], r[1], Hz(h - 1), r[2], r[3], Hz(h)] }));
+    const i = at(Wn.I, t); if (i) z.push({ a: "I", b: [0.5, 0.5, Hz(i - 1), 31.5, 23.5, Hz(i)] });
+    const j = at(Wn.J, t); if (j) z.push({ a: "J", b: [0.5, 0.5, Hz(j - 1), 31.5, 23.5, Hz(j)] });
+    return z;
+  }
+  const PAIRS = ["G-H", "G-I", "G-J", "I-J"];
+  function hits(z) { const out = []; for (let a = 0; a < z.length; a++) for (let b = a + 1; b < z.length; b++) { if (z[a].a === z[b].a) continue; const o = CB.bim.overlap(z[a].b, z[b].b, 0); if (o.hard) { const bb = [0, 1, 2].map((q) => Math.max(z[a].b[q], z[b].b[q])).concat([0, 1, 2].map((q) => Math.min(z[a].b[q + 3], z[b].b[q + 3]))); out.push({ p: [z[a].a, z[b].a].sort().join("-"), b: bb }); } } return out; }
+  function recalc() {
+    const ns = gn();
+    Wn = { G: fw, H: gh() === "b" ? buf(R.acts.H.ES, 16, ns) : uni(R.acts.H.ES, 16), I: gi() === "b" ? buf(R.acts.I.ES, 30, ns) : uni(R.acts.I.ES, 30), J: uni(R.acts.J.ES, 20) };
+    const dt = 0.1; CL = { sum: {}, mask: {} }; PAIRS.forEach((p) => { CL.sum[p] = 0; CL.mask[p] = []; });
+    for (let i = 0; i * dt < 92; i++) { const t = i * dt, hs = new Set(hits(zones(t)).map((h) => h.p)); PAIRS.forEach((p) => { const on = hs.has(p); CL.mask[p].push(on); if (on) CL.sum[p] += dt; }); }
+    CB.stat("fd-zn-o-gh", CB.num(CL.sum["G-H"], 1) + "주"); CB.stat("fd-zn-o-gi", CB.num(CL.sum["G-I"], 1) + "주");
+    const he = Wn.H[10][1], ie = Wn.I[10][1];
+    CB.stat("fd-zn-o-h", `<span style="color:var(--${he > 69.01 ? "bad" : "ok"})">${CB.num(he, 1)}주</span>`);
+    CB.stat("fd-zn-o-i", `<span style="color:var(--${ie > 89 ? "bad" : "ok"})">${CB.num(ie, 1)}주</span>`);
+    draw();
+  }
+  const v = CB.orbit("#fd-cv-zone", FDX.orbitOpts((V) => {
+    if (!Wn) return; const P = V.P; FDX.ground(V);
+    for (let k = 1; k <= 10; k++) if (W >= fw[k][1]) V.poly3([[-0.4, -0.4, Hz(k)], [32.4, -0.4, Hz(k)], [32.4, 24.4, Hz(k)], [-0.4, 24.4, Hz(k)]], { fill: P.dim, fillAlpha: 0.1, color: P.dim, width: 0.6, alpha: 0.5 });
+    const z = zones(W), col = { G: P.accent2, H: P.accent, I: P.blue, J: P.ok }, items = z.map((q) => ({ b: q.b, fill: q.a === "G" && q.sh ? P.dim : col[q.a], a: 0.16, stroke: q.a === "G" && q.sh ? P.dim : col[q.a], sa: 0.7, lw: 0.8 }));
+    hits(z).forEach((h) => items.push({ b: h.b, fill: P.bad, a: 0.55, stroke: P.bad, sa: 1, lw: 1.4 }));
+    FDX.boxes(V, items); FDX.text(V.ctx, CB.num(W, 1) + "주", 10, 14, V.P.dim, { size: 11.5 });
+  }, { dist: 125 }));
+  const tl = CB.canvas("#fd-cv-zone-t", (ctx, Wd, Hh) => {
+    if (!CL) return; const P = CB.palette(), x0 = 46, w = Wd - x0 - 14, rh = (Hh - 30) / PAIRS.length, X = (t) => x0 + ((t - 36) / 56) * w;
+    CB.chart(ctx, { x: x0, y: 4, w, h: Hh - 30 }, { x: [36, 92], y: [0, 1], yTicks: [], xTicks: [38, 53, 68, 73, 89] });
+    PAIRS.forEach((p, k) => { const y = 4 + rh * k + rh * 0.2; FDX.text(ctx, p, x0 - 6, y + rh * 0.3, P.dim, { size: 10.5, align: "right" });
+      ctx.fillStyle = P.bad; CL.mask[p].forEach((on, i) => { if (on) { const t = i * 0.1; if (t >= 36) ctx.fillRect(X(t), y, Math.max(1, X(t + 0.1) - X(t)), rh * 0.6); } }); });
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(X(W), 4); ctx.lineTo(X(W), Hh - 26); ctx.stroke();
+  }, { aspect: 0.2, minHeight: 130, maxHeight: 170 });
+  function draw() { v.redraw(); tl.redraw(); }
+  FDX.player("fd-zn-play", "fd-cv-zone", () => W, (x) => { W = x; gw.set(x, false); draw(); }, 38, 90, 5);
+  recalc();
+})();
+
+/* ---------- 5. 계획 대 실적 ---------- */
+(function () {
+  const Sp = FDX.sched(FDX.defLink, FDX.timing(FDX.B, FDX.R));
+  let Sa = null, W = 50;
+  const gw = CB.range("fd-ac-w", (x) => CB.num(x, 1) + "주", (x) => { W = x; upd(); });
+  const gd = CB.range("fd-ac-d", (x) => x + "주", () => { Sa = FDX.sched(FDX.defLink, FDX.actualTiming(gd())); upd(); });
+  const gv = CB.seg("fd-ac-view", () => upd());
+  Sa = FDX.sched(FDX.defLink, FDX.actualTiming(gd()));
+  const count = (S, w) => FDX.ELS.reduce((n, e) => n + (FDX.state(S.get(e.id), w) === 2 ? 1 : 0), 0);
+  const v = CB.orbit("#fd-cv-actual", FDX.orbitOpts((V) => {
+    const P = V.P, mode = gv(), items = []; FDX.ground(V);
+    FDX.ELS.forEach((e) => {
+      const p = FDX.state(Sp.get(e.id), W), a = FDX.state(Sa.get(e.id), W);
+      let it = null;
+      if (mode === "plan") it = FDX.styleOf(e, p, P, false);
+      else if (mode === "act") it = FDX.styleOf(e, a, P, false);
+      else if (p === 2 && a !== 2) it = { b: e.box, fill: P.bad, a: 0.75, stroke: P.bad, sa: 1, lw: 1 };
+      else if (a === 2 && p !== 2) it = { b: e.box, fill: P.blue, a: 0.7, stroke: P.blue, sa: 1 };
+      else it = FDX.styleOf(e, a, P, false);
+      if (it) items.push(it);
+    });
+    FDX.boxes(V, items); FDX.text(V.ctx, (mode === "plan" ? "계획 " : mode === "act" ? "실적 " : "비교 ") + CB.num(W, 1) + "주", 10, 14, V.P.dim, { size: 11.5 });
+  }));
+  const c = CB.canvas("#fd-cv-actual-c", (ctx, Wd, Hh) => {
+    const P = CB.palette(), dp = [], da = [];
+    for (let t = 36; t <= 100.001; t += 0.5) { dp.push([t, count(Sp, t)]); da.push([t, count(Sa, t)]); }
+    CB.chart(ctx, { x: 50, y: 10, w: Wd - 64, h: Hh - 52 }, { x: [36, 100], y: [0, 380], xLabel: "주", yLabel: "완료 요소", series: [{ data: dp, color: P.dim, dash: [6, 4] }, { data: da, color: P.ok, width: 2.4 }], vlines: [{ x: W, color: P.accent }] });
+    FDX.text(ctx, "계획(점선) · 실적(초록)", 58, 18, P.dim, { size: 10.5 });
+  }, { aspect: (Wd) => (Wd < 520 ? 0.6 : 0.3), minHeight: 170, maxHeight: 240 });
+  function upd() {
+    v.redraw(); c.redraw();
+    let pd = 0, ad = 0, late = 0;
+    FDX.ELS.forEach((e) => { const p = FDX.state(Sp.get(e.id), W) === 2, a = FDX.state(Sa.get(e.id), W) === 2; if (p) pd++; if (a) ad++; if (p && !a) late++; });
+    let es = W; for (let t = 36; t <= W + 1e-9; t += 0.05) if (count(Sp, t) >= ad) { es = t; break; }
+    CB.stat("fd-ac-o-p", pd + "개"); CB.stat("fd-ac-o-a", ad + "개"); CB.stat("fd-ac-o-l", `<span style="color:var(--${late ? "bad" : "ok"})">${late}개</span>`);
+    CB.stat("fd-ac-o-s", (pd ? CB.num(ad / pd, 2) : "—") + " · " + CB.num(Math.min(es, W), 1) + "주");
+  }
+  upd();
+})();
+
+/* ---------- 6. 층별 진도 히트맵 ---------- */
+(function () {
+  const R = FDX.R, Sp = FDX.sched(FDX.defLink, FDX.timing(FDX.B, FDX.R)), Sa = FDX.sched(FDX.defLink, FDX.actualTiming(4));
+  const TR = ["골조", "설비 I", "커튼월 H", "마감 J"];
+  const frameWin = (S) => { const w = []; FDX.ELS.forEach((e) => { if (e.ifc === "IfcSlab") { const x = S.get(e.id); w[e.storey] = [x.t0, x.t1]; } }); return w; };
+  const ductWin = (S) => { const w = []; FDX.ELS.forEach((e) => { if (e.ifc === "IfcDuctSegment") { const x = S.get(e.id); w[e.storey] = [x.s, x.f]; } }); return w; };
+  const uni = (s, d) => { const w = []; for (let k = 1; k <= 10; k++) w[k] = [s + (k - 1) * d / 10, s + k * d / 10]; return w; };
+  const WIN = { plan: [frameWin(Sp), ductWin(Sp), uni(R.acts.H.ES, 16), uni(R.acts.J.ES, 20)], act: [frameWin(Sa), ductWin(Sa), uni(R.acts.H.ES + 4, 16), uni(R.acts.J.ES + 4, 20)] };
+  const pr = (win, w) => CB.clamp((w - win[0]) / (win[1] - win[0]), 0, 1);
+  let W = 60;
+  const gw = CB.range("fd-ht-w", (x) => CB.num(x, 1) + "주", (x) => { W = x; upd(); }), gb = CB.seg("fd-ht-b", () => upd());
+  const grid = () => { const m = gb(), out = []; for (let k = 1; k <= 10; k++) out[k] = TR.map((_, j) => { const p = pr(WIN.plan[j][k], W), a = pr(WIN.act[j][k], W); return m === "plan" ? p : m === "act" ? a : p - a; }); return out; };
+  const cv = CB.canvas("#fd-cv-heat", (ctx, Wd, Hh) => {
+    const P = CB.palette(), m = gb(), G = grid(), x0 = 46, y0 = 30, cw = (Wd - x0 - 12) / TR.length, ch = (Hh - y0 - 12) / 10;
+    TR.forEach((t, j) => FDX.text(ctx, Wd < 420 ? t.split(" ")[0] : t, x0 + cw * (j + 0.5), 14, P.text, { size: 11, align: "center" }));
+    for (let k = 10; k >= 1; k--) {
+      const y = y0 + (10 - k) * ch; FDX.text(ctx, k + "층", x0 - 6, y + ch / 2, P.dim, { size: 10.5, align: "right" });
+      TR.forEach((_, j) => {
+        const v = G[k][j], x = x0 + cw * j;
+        ctx.fillStyle = P.surface; ctx.fillRect(x + 1, y + 1, cw - 2, ch - 2);
+        if (m === "diff") { if (Math.abs(v) > 0.005) { ctx.globalAlpha = 0.25 + 0.7 * Math.min(1, Math.abs(v)); ctx.fillStyle = v > 0 ? P.bad : P.blue; ctx.fillRect(x + 1, y + 1, cw - 2, ch - 2); } }
+        else if (v >= 1) { ctx.globalAlpha = 0.75; ctx.fillStyle = P.ok; ctx.fillRect(x + 1, y + 1, cw - 2, ch - 2); }
+        else if (v > 0) { ctx.globalAlpha = 0.85; ctx.fillStyle = P.warn; ctx.fillRect(x + 1, y + 1, (cw - 2) * v, ch - 2); }
+        ctx.globalAlpha = 1;
+        if (ch > 16 && v !== 0) FDX.text(ctx, (m === "diff" ? CB.signed(v * 100, 0) : Math.round(v * 100)) + "%", x + cw / 2, y + ch / 2, P.text, { size: 10, align: "center", bold: false });
+      });
+    }
+  }, { aspect: (Wd) => (Wd < 520 ? 1.05 : 0.6), minHeight: 300, maxHeight: 440 });
+  function upd() {
+    cv.redraw(); const G = grid(), m = gb();
+    let d = 0, p = 0, mx = 0; const lag = TR.map(() => 0);
+    for (let k = 1; k <= 10; k++) { let rowp = 0; TR.forEach((_, j) => { const v = G[k][j]; if (m !== "diff") { if (v >= 1) d++; else if (v > 0) { p++; rowp++; } } lag[j] += Math.max(0, pr(WIN.plan[j][k], W) - pr(WIN.act[j][k], W)); }); mx = Math.max(mx, rowp); }
+    CB.stat("fd-ht-o-d", m === "diff" ? "—" : d + " / 40"); CB.stat("fd-ht-o-p", m === "diff" ? "—" : p + "칸"); CB.stat("fd-ht-o-m", m === "diff" ? "—" : mx + "개");
+    const jm = lag.indexOf(Math.max(...lag)); CB.stat("fd-ht-o-l", lag[jm] > 0.001 ? TR[jm].split(" ")[0] + " " + CB.num(lag[jm], 1) + "층분" : "없음");
+  }
+  FDX.player("fd-ht-play", "fd-cv-heat", () => W, (x) => { W = x; gw.set(x, false); upd(); }, 36, 100, 6);
+  upd();
+})();
+
+/* ---------- 7. 타워크레인 양중 시퀀스 ---------- */
+(function () {
+  const RHO = 2.4, RIG = 0.3, CL = { 100: { M0: 100, Q: 6 }, 160: { M0: 160, Q: 8 }, 250: { M0: 250, Q: 12 } }, POS = { w: [-4, 12], c: [16, 12], s: [16, -5] }, PICK = [-10, 12];
+  const S = FDX.sched(FDX.defLink, FDX.timing(FDX.B, FDX.R));
+  const L = [];
+  FDX.ELS.forEach((e) => {
+    if (e.ifc === "IfcColumn") L.push({ name: e.name, st: e.storey, b: e.box, W: FDX.vol(e.box) * RHO, t: S.get(e.id).s, o: 0 });
+    if (e.ifc === "IfcBeam") { const b = e.box, X = b[3] - b[0] > b[4] - b[1], n = (X ? 32 : 24) / 8;
+      for (let i = 0; i < n; i++) { const a = i * 8 + 0.4, c = (i + 1) * 8 - 0.4, bb = X ? [a, b[1], b[2], c, b[4], b[5]] : [b[0], a, b[2], b[3], c, b[5]]; L.push({ name: e.name + "/" + (i + 1), st: e.storey, b: bb, W: FDX.vol(bb) * RHO, t: S.get(e.id).s, o: 1 + i * 0.01 }); } }
+  });
+  L.sort((p, q) => p.st - q.st || p.o - q.o || p.t - q.t);
+  L.forEach((x) => (x.c = [(x.b[0] + x.b[3]) / 2, (x.b[1] + x.b[4]) / 2, x.b[5]]));
+  const gn = CB.range("fd-cr-n", (x) => x + " / " + L.length, () => upd());
+  const gp = CB.seg("fd-cr-pos", recalc), gc = CB.seg("fd-cr-cls", recalc), gL = CB.range("fd-cr-l", (x) => x + " m", recalc);
+  const cap = (r) => { const c = CL[gc()]; return Math.min(c.Q, ((1 - 0.006 * (gL() - 40)) * c.M0) / (r + 2)); };
+  let J = null;
+  function recalc() {
+    const p = POS[gp()], th0 = Math.atan2(PICK[1] - p[1], PICK[0] - p[0]);
+    J = L.map((x) => { const r = Math.hypot(x.c[0] - p[0], x.c[1] - p[1]), reach = r <= gL(), Q = cap(r), u = (x.W + RIG) / Q;
+      let dth = Math.abs(Math.atan2(x.c[1] - p[1], x.c[0] - p[0]) - th0) * 180 / Math.PI; if (dth > 180) dth = 360 - dth;
+      const tc = 15 + (2 * (x.c[2] + 3)) / 40 + (2 * dth) / 216;
+      return { r, Q, u, reach, k: !reach ? "far" : u > 1 ? "bad" : u > 0.9 ? "warn" : "ok", tc }; });
+    const nb = J.filter((j) => j.k === "bad" || j.k === "far").length, nw = J.filter((j) => j.k === "warn").length, hrs = J.reduce((s, j) => s + j.tc, 0) / 60;
+    CB.stat("fd-cr-o-b", `<span style="color:var(--${nb ? "bad" : "ok"})">${nb}</span> · ${nw}`);
+    CB.stat("fd-cr-o-h", CB.num(hrs, 0) + " h <small>(층당 " + CB.num(hrs / 10, 1) + ")</small>");
+    upd();
+  }
+  const v = CB.orbit("#fd-cv-crane", FDX.orbitOpts((V) => {
+    if (!J) return; const P = V.P, n = gn(), p = POS[gp()], items = []; FDX.ground(V);
+    for (let i = 0; i < n; i++) { const x = L[i], j = J[i], cur = i === n - 1;
+      const col = cur ? P.accent2 : j.k === "ok" ? P.dim : j.k === "warn" ? P.warn : P.bad;
+      items.push({ b: x.b, fill: col, a: cur ? 0.95 : j.k === "ok" ? 0.35 : 0.85, stroke: col, sa: cur ? 1 : 0.7, lw: cur ? 1.6 : 0.6 }); }
+    FDX.boxes(V, items);
+    const x = L[n - 1], j = J[n - 1], H = 52, ang = Math.atan2(x.c[1] - p[1], x.c[0] - p[0]), Lj = gL();
+    const ring = (r, o) => { const pts = []; for (let k = 0; k <= 48; k++) { const a = (k / 48) * Math.PI * 2; pts.push([p[0] + r * Math.cos(a), p[1] + r * Math.sin(a), 0.05]); } for (let k = 0; k < 48; k++) V.line3(pts[k], pts[k + 1], o); };
+    ring(Lj, { color: P.faint, width: 1, dash: [4, 4] }); ring(j.r, { color: j.k === "ok" ? P.ok : P.bad, width: 1.2 });
+    V.line3([p[0], p[1], 0], [p[0], p[1], H + 4], { color: P.warn, width: 3 });
+    V.line3([p[0] - 0.25 * Lj * Math.cos(ang), p[1] - 0.25 * Lj * Math.sin(ang), H], [p[0] + Lj * Math.cos(ang), p[1] + Lj * Math.sin(ang), H], { color: P.warn, width: 2.4 });
+    const hk = [p[0] + Math.min(j.r, Lj) * Math.cos(ang), p[1] + Math.min(j.r, Lj) * Math.sin(ang)];
+    V.line3([hk[0], hk[1], H], [hk[0], hk[1], x.c[2] + 0.5], { color: P.text, width: 1 });
+    V.text3("TC", [p[0], p[1], H + 6], { color: P.warn, size: 11 });
+  }, { dist: 165, target: [14, 12, 26] }));
+  function upd() {
+    if (!J) return; const n = gn(), x = L[n - 1], j = J[n - 1];
+    CB.stat("fd-cr-o-e", `${x.name} · ${CB.num(x.W, 2)} t`);
+    CB.stat("fd-cr-o-u", `${CB.num(x.W + RIG, 2)} / ${CB.num(j.Q, 2)} t at ${CB.num(j.r, 1)} m`);
+    const word = { ok: "가능", warn: "주의", bad: "불가", far: "도달 불가" }[j.k];
+    FDX.msg("fd-cr-msg", j.k === "far" ? `<b>${x.name}</b>: 반경 ${CB.num(j.r, 1)} m가 지브 ${gL()} m보다 깁니다 — 도달 불가.` : `<b>${x.name}</b> (${x.st}층): u = ${CB.num(j.u, 2)} → ${word}. 사이클 약 ${CB.num(j.tc, 1)}분.`, j.k === "ok" ? "ok" : j.k === "warn" ? "warn" : "bad");
+    v.redraw();
+  }
+  FDX.player("fd-cr-play", "fd-cv-crane", () => gn(), (x) => { gn.set(Math.round(x), false); upd(); }, 1, L.length, 25);
+  recalc();
+})();
+</script>
+</body>
+</html>

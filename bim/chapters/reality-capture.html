@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>현실 캡처: 측량·드론·스캔 · BIMBook</title>
+<meta name="description" content="지어진 것을 모델로. 기준점과 측량 좌표, 지리 참조, 사진 측량의 중복·삼각 측량·지상 표본 거리, 레이저 스캔 점군과 점 간격, 대응점 정합과 ICP, 최소 제곱·RANSAC 평면, 슬래브 평탄도와 스캔 대 BIM 편차를 B-10 BIM으로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .rc-tbl td, .rc-tbl th { font-variant-numeric: tabular-nums; }
+  .rc-tbl td.rc-num { text-align: right; font-family: var(--mono); }
+  .rc-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .rc-msg b { color: var(--text); }
+  .rc-msg.ok { color: var(--ok); }
+  .rc-msg.bad { color: var(--bad); font-weight: 600; }
+  .rc-msg.warn { color: var(--warn); font-weight: 600; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="reality-capture">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="rc-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="rc-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="rc-ah-2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="rc-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 11</div>
+    <h1 data-no-glossary>현실 캡처: 측량·드론·스캔</h1>
+    <p class="lead">앞의 열 장은 "짓기 전에 컴퓨터 속에서 한 번 짓는" 이야기였습니다. 그런데 현장의 건물은 모델과 똑같이 지어지지 않습니다. 기둥은 몇 mm에서 몇 cm 비켜 서고, 바닥판은 처지고, 배관은 현장에서 길을 바꿉니다. 이 장은 방향을 거꾸로 돌려 <b>지어진 것을 다시 모델로 가져오는</b> 방법을 다룹니다. 땅 위의 기준점으로 모델의 좌표를 지도에 묶고(지리 참조), 겹쳐 찍은 사진과 레이저 스캔으로 현장을 수백만 개의 점으로 기록하고, 여러 번 찍은 점들을 한 좌표로 맞추고(정합), 점 속에서 바닥과 벽을 찾아(평면 추출), B-10 BIM과 비교해 "제자리에, 평평하게 지어졌는가"를 숫자로 판정합니다.</p>
+    <ul class="objectives">
+      <li>기준점과 측량 좌표(E, N, H)를 설명하고, 2D 헬머트 변환 \(E = E_0 + s(x\cos\theta - y\sin\theta)\)으로 B-10 BIM의 로컬 좌표를 지도 좌표로 바꾼다.</li>
+      <li>사진 측량의 중복 촬영과 삼각 측량 원리를 이해하고, 지상 표본 거리 \(GSD = pH/f\)와 높이 오차를 비행 계획에서 계산한다.</li>
+      <li>레이저 스캐너의 거리·각도 측정을 직교 좌표로 바꾸고, 점 간격 \(s \approx r\,\Delta\alpha\)와 잡음이 점군의 품질을 어떻게 정하는지 판단한다.</li>
+      <li>대응점으로 두 점군을 강체 정합하고(<code>CB.bim.rigid2D</code>), ICP 반복이 무엇을 하며 언제 실패하는지 설명한다.</li>
+      <li>최소 제곱 평면과 RANSAC 평면을 비교해 이상점이 섞인 점군에서 바닥면을 찾고, 슬래브의 평탄도와 수평도를 판정한다.</li>
+      <li>시공된 기둥의 스캔을 BIM과 비교해 편차를 계산하고 허용치로 판정하며, 드론 측량의 체적을 모델과 잇는다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 정보가 없었다면</small><b>도면대로 지어졌다고 믿을 수밖에 없었다</b></div>
+      <div class="o-body"><p>과거의 준공 기록은 줄자·레벨·트랜싯으로 잰 몇십 개의 점과, 현장에서 바뀐 곳을 빨간 펜으로 고친 도면이었습니다. 리모델링을 맡은 설계자가 "도면의 기둥이 실제로는 그 자리에 없다"는 것을 철거 뒤에야 알게 되는 일은 드물지 않았고, 설비 업체는 천장 속 배관 경로를 직접 열어 보기 전에는 믿지 못했습니다.</p>
+        <p>사진으로 형태를 재는 생각은 오래되었습니다. 1850년대 프랑스의 에메 로스다(Aimé Laussedat)는 사진으로 지형도를 만드는 방법을 연구했고, 독일 건축가 알브레히트 메이덴바우어(Albrecht Meydenbauer)는 1860년대에 건물을 사진으로 기록해 치수를 재는 방법을 다루며 '사진 측량(photogrammetry)'이라는 말을 쓴 것으로 알려져 있습니다. 1990년대 후반에는 한 자리에서 주변을 수백만 개의 점으로 기록하는 지상 레이저 스캐너가 상용화되었고, 2010년대에는 소형 드론과 컴퓨터 비전이 현장 전체를 몇 시간 만에 3차원으로 만들었습니다. 이제 어려운 일은 점을 얻는 것이 아니라, 그 점을 모델과 같은 좌표에 놓고 비교해 판단하는 것입니다.</p>
+        <div class="o-chain"><span>지어진 현장</span><i>→</i><span class="tool">기준점 · 사진 측량 · 레이저 스캔 · 정합 · 평면 추출 · 편차</span><i>→</i><span>준공 모델 · 품질 판정 · 물량</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="capture">
+    <h2>현실 캡처: 지어진 것을 모델로</h2>
+    <div class="problem"><strong>골조 검측의 날</strong>
+      <p>B-10 1층 기둥 20개와 2층 바닥판(모델 요소 <code>S-1F</code>)이 타설되었습니다. 2층 거푸집을 올리기 전에 기둥이 제자리에 섰는지, 바닥이 평평한지 확인해야 합니다. 줄자로 기둥 20개의 두 방향 위치를 재고 레벨로 바닥 높이를 수십 점 찍으면 반나절이 걸립니다. 스캐너를 네 번 세우면 한 시간 남짓에 수백만 개의 점이 생깁니다. 그 점들로 무엇을, 어떻게 판단할까요?</p></div>
+    <p>BIM은 설계 의도를 담은 모델입니다. 시공이 진행되면 그 의도와 실제 사이에 차이가 생기고, 그 차이를 재야 다음 공정(거푸집, 커튼월 앵커, 설비 행거)이 맞물립니다. 준공 뒤에는 실제 상태가 담긴 모델이 있어야 운영(13장)과 리모델링이 가능합니다. 이 장의 방법들은 모두 하나의 질문에 답합니다. <b>"현장의 이 점은 모델 좌표로 어디이며, 모델과 얼마나 다른가?"</b></p>
+    <div class="callout def"><strong>정의 11.1 (현실 캡처와 점군)</strong> <span class="term">현실 캡처</span><span class="en">(reality capture)</span>는 측량·사진·레이저 스캔으로 실제 대상의 형상을 좌표가 있는 디지털 데이터로 기록하는 일이다. 대표적인 결과물인 <span class="term">점군</span><span class="en">(point cloud)</span>은 좌표 \((x, y, z)\)와 선택적으로 색·반사 강도를 가진 점들의 집합이다. 점군에서 BIM 요소를 만들거나 기존 모델을 실제 상태로 고치는 작업을 <span class="term">스캔 투 BIM</span><span class="en">(scan-to-BIM)</span>이라 하고, 그 결과가 <span class="term">준공 모델</span><span class="en">(as-built model)</span>이다. 점군은 '점의 목록'일 뿐 기둥·바닥 같은 의미가 없으므로, 의미는 모델과의 비교나 분할(평면 추출, 요소 맞춤)로 붙인다.</div>
+    <figure class="diagram" id="fig-rc-flow">
+      <svg viewBox="0 0 880 300" role="img" aria-label="현실 캡처의 흐름: 기준점 측량, 드론 사진 측량, 레이저 스캔에서 정합과 지리 참조, 처리, BIM 비교, 판단까지">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="34" width="150" height="56" rx="9" class="f-elev"/><text x="105" y="57" style="fill:var(--text);font-weight:700">기준점 측량</text><text x="105" y="76">토털 스테이션 · GNSS</text>
+          <rect x="30" y="112" width="150" height="56" rx="9" class="f-elev"/><text x="105" y="135" style="fill:var(--text);font-weight:700">사진 측량</text><text x="105" y="154">드론 · 겹친 사진</text>
+          <rect x="30" y="190" width="150" height="56" rx="9" class="f-elev"/><text x="105" y="213" style="fill:var(--text);font-weight:700">레이저 스캔</text><text x="105" y="232">거리 + 두 각도</text>
+          <rect x="236" y="100" width="150" height="80" rx="10" class="f-acc-soft"/><text x="311" y="128" style="fill:var(--accent);font-weight:700">정합 · 지리 참조</text><text x="311" y="148">같은 좌표로</text><text x="311" y="166">(이 장 2·5절)</text>
+          <rect x="442" y="100" width="150" height="80" rx="10" class="f-elev"/><text x="517" y="128" style="fill:var(--text);font-weight:700">처리</text><text x="517" y="148">평면 추출 · 분할</text><text x="517" y="166">메시 · 정사 영상</text>
+          <rect x="648" y="34" width="200" height="56" rx="9" class="f-acc2-soft"/><text x="748" y="57" style="fill:var(--accent-2);font-weight:700">BIM과 비교</text><text x="748" y="76">편차 · 평탄도 · 물량</text>
+          <rect x="648" y="112" width="200" height="56" rx="9" class="f-elev"/><text x="748" y="135" style="fill:var(--text);font-weight:700">판단</text><text x="748" y="154">재시공 · 검측 합격 · 기성</text>
+          <rect x="648" y="190" width="200" height="56" rx="9" class="f-elev"/><text x="748" y="213" style="fill:var(--text);font-weight:700">준공 모델</text><text x="748" y="232">스캔 투 BIM → 운영(13장)</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.6;fill:none" marker-end="url(#rc-ah)">
+          <path d="M180 62C210 62 210 120 232 124"/><path d="M180 140H232"/><path d="M180 218C210 218 210 160 232 156"/>
+          <path d="M386 140H438"/><path d="M592 128C620 128 620 64 644 62"/><path d="M592 140H644"/><path d="M592 152C620 152 620 216 644 218"/>
+        </g>
+        <text x="440" y="276" text-anchor="middle" class="t-dim">모든 점은 기준점이 정한 하나의 좌표계에 놓여야 비교가 가능하다</text>
+      </svg>
+      <figcaption><b>그림 11-1.</b> 현실 캡처의 흐름. 측정 방법은 달라도 결과는 모두 좌표가 있는 점이다. 기준점이 좌표계를 정하고, 사진과 스캔의 점은 정합과 지리 참조로 그 좌표계에 들어온 뒤에야 BIM과 비교할 수 있다.</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="rc-tbl">
+      <caption>표 11-1. 현실 캡처 방법의 비교(정확도는 장비·거리·조건에 따라 크게 다르며 여기서는 크기 감각만 적는다)</caption>
+      <thead><tr><th>방법</th><th>얻는 것</th><th>정확도 수준(형태)</th><th>강점</th><th>약점</th></tr></thead>
+      <tbody>
+        <tr><td>토털 스테이션</td><td>점 하나씩(각도 + 거리)</td><td>mm 수준</td><td>가장 정확, 기준점·먹매김</td><td>점이 적음, 사람이 점을 고름</td></tr>
+        <tr><td>GNSS(RTK)</td><td>점 하나씩(위성 측위)</td><td>cm 수준</td><td>넓은 현장, 시통 불필요</td><td>건물 안·고층 사이에서 약함</td></tr>
+        <tr><td>드론 사진 측량</td><td>넓은 면의 점군·정사 영상</td><td>cm 수준(GSD에 비례)</td><td>토공·외부·지붕, 빠름</td><td>건물 안 불가, 높이가 평면보다 부정확</td></tr>
+        <tr><td>지상 레이저 스캐너</td><td>촘촘한 점군</td><td>mm 수준(거리에 따라)</td><td>실내·골조·설비, 직접 거리 측정</td><td>가림, 정합 필요, 데이터가 큼</td></tr>
+        <tr><td>이동형(모바일·핸드헬드) 스캐너</td><td>걸으며 만든 점군</td><td>cm 수준(경로가 길면 누적)</td><td>빠른 실내 기록</td><td>누적 오차, 기준점 보정 필요</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="control">
+    <h2>기준점과 측량 좌표</h2>
+    <div class="problem"><strong>모델의 (0, 0)은 땅 위 어디인가</strong>
+      <p>B-10 BIM의 원점은 격자 A/1 교점이고, x축은 A → E 방향입니다. 그런데 측량 회사가 넘겨준 현장 기준점 성과표에는 "E 203,450.000, N 551,820.000" 같은 숫자만 있습니다. 모델의 기둥 E/4는 땅 위 어느 좌표에 먹매김해야 할까요? 그리고 각도를 0.01°만 틀리면 얼마나 어긋날까요?</p></div>
+    <p>측량은 땅 위에 좌표를 아는 점, 곧 기준점을 두는 일에서 시작합니다. 국가가 관리하는 기준점(위성기준점, 통합기준점, 삼각점, 수준점 등 — 「공간정보의 구축 및 관리 등에 관한 법률」의 체계, 현행 확인)에서 출발해 현장 둘레에 <span class="term">현장 기준점</span><span class="en">(site control point)</span>을 박고 좌표를 측정해 둡니다. 이후 모든 먹매김(설계 위치를 땅과 바닥에 표시하는 일)과 검측, 드론·스캔의 지리 참조는 이 점들에서 출발합니다. 기준점이 틀리면 그 뒤의 모든 점이 같은 만큼 틀리므로, 기준점은 서로 검증할 수 있게 셋 이상 두고 공사 중 흔들리지 않는 곳에 둡니다.</p>
+    <div class="callout def"><strong>정의 11.2 (측량 좌표와 지리 참조)</strong> 지도에 투영한 평면 좌표를 <span class="term">측량 좌표</span><span class="en">(survey coordinates)</span>라 하고, 이 책은 동쪽 거리 \(E\)(easting), 북쪽 거리 \(N\)(northing), 표고 \(H\)로 쓴다(단위 m, 투영과 좌표계는 15장). 건물 모델은 계산이 편하도록 격자 교점을 원점으로 하는 <span class="term">로컬 좌표</span><span class="en">(local coordinates)</span>를 쓴다. 두 좌표를 잇는 변환을 정하는 일이 <span class="term">지리 참조</span><span class="en">(georeferencing)</span>이고, 건물 규모에서는 평면의 이동·회전·축척(4개 매개변수)과 높이의 이동 하나로 충분하다. 토털 스테이션은 각도와 거리로 점 하나를 mm 수준으로 재는 측량기이고, <span class="term">GNSS</span><span class="en">(global navigation satellite system)</span> 수신기는 위성 신호로 위치를 재며 기준국 보정을 실시간으로 받는 <span class="term">RTK</span><span class="en">(real-time kinematic)</span> 방식은 cm 수준의 위치를 준다(형태).</div>
+    <div class="callout def"><strong>원리 11.3 (2D 헬머트 변환)</strong> 로컬 점 \((x, y)\)의 지도 좌표는
+      <div class="formula">$$\begin{bmatrix}E\\N\end{bmatrix} = \begin{bmatrix}E_0\\N_0\end{bmatrix} + s\begin{bmatrix}\cos\theta & -\sin\theta\\ \sin\theta & \cos\theta\end{bmatrix}\begin{bmatrix}x\\y\end{bmatrix}, \qquad \begin{bmatrix}x\\y\end{bmatrix} = \frac{1}{s}\begin{bmatrix}\cos\theta & \sin\theta\\ -\sin\theta & \cos\theta\end{bmatrix}\begin{bmatrix}E - E_0\\N - N_0\end{bmatrix}$$<div class="where">\((E_0, N_0)\): 로컬 원점의 지도 좌표, \(\theta\): 로컬 x축에서 지도 동쪽 축으로의 회전(반시계 +), \(s\): 축척 계수(지도 투영이 거리를 조금 늘이거나 줄이는 비율, 15장). 이 네 값을 정하려면 로컬·지도 좌표를 모두 아는 점이 둘 이상 필요하고, 셋 이상이면 최소 제곱으로 맞추고 잔차로 기준점을 검증한다. B-10 BIM의 가상 값은 <code>CB.bim.GEO</code> = {E₀ 203,450.000, N₀ 551,820.000, θ 12°, s 0.99993}(교육용, 실제 위치 아님)이고, <code>CB.bim.toMap(x, y)</code>와 <code>toLocal(E, N)</code>이 이 식과 역변환을 계산한다.</div></div></div>
+    <figure class="diagram" id="fig-rc-geo">
+      <svg viewBox="0 0 860 330" role="img" aria-label="B-10 격자의 로컬 좌표와 12도 회전한 지도 좌표, 기준점 두 개와 모서리 E/4">
+        <rect x="10" y="10" width="840" height="310" rx="10" class="f-surface"/>
+        <g transform="translate(70,290)">
+          <line x1="0" y1="0" x2="360" y2="0" class="s-axis" marker-end="url(#rc-ah)"/><line x1="0" y1="0" x2="0" y2="-262" class="s-axis" marker-end="url(#rc-ah)"/>
+          <text x="352" y="18" class="t-mono">E (동)</text><text x="8" y="-252" class="t-mono">N (북)</text>
+          <g transform="rotate(-12)">
+            <g style="stroke:var(--text-faint);stroke-width:1;stroke-dasharray:3 3">
+              <line x1="0" y1="0" x2="0" y2="-168"/><line x1="70" y1="0" x2="70" y2="-168"/><line x1="140" y1="0" x2="140" y2="-168"/><line x1="210" y1="0" x2="210" y2="-168"/><line x1="280" y1="0" x2="280" y2="-168"/>
+              <line x1="0" y1="0" x2="280" y2="0"/><line x1="0" y1="-56" x2="280" y2="-56"/><line x1="0" y1="-112" x2="280" y2="-112"/><line x1="0" y1="-168" x2="280" y2="-168"/>
+            </g>
+            <rect x="0" y="-168" width="280" height="168" style="fill:var(--accent-soft);opacity:.45;stroke:var(--accent);stroke-width:1.6"/>
+            <rect x="70" y="-112" width="140" height="56" style="fill:var(--surface-2, var(--surface));stroke:var(--text-dim);stroke-width:1.2"/>
+            <g class="t-mono" text-anchor="middle"><text x="0" y="16">A</text><text x="70" y="16">B</text><text x="140" y="16">C</text><text x="210" y="16">D</text><text x="280" y="16">E</text></g>
+            <g class="t-mono" text-anchor="end"><text x="-8" y="4">1</text><text x="-8" y="-52">2</text><text x="-8" y="-108">3</text><text x="-8" y="-164">4</text></g>
+            <line x1="0" y1="0" x2="120" y2="0" style="stroke:var(--accent);stroke-width:2.4" marker-end="url(#rc-ah-acc)"/><text x="96" y="-8" class="t-acc">x</text>
+            <line x1="0" y1="0" x2="0" y2="-80" style="stroke:var(--accent);stroke-width:2.4" marker-end="url(#rc-ah-acc)"/><text x="8" y="-70" class="t-acc">y</text>
+            <circle cx="280" cy="-168" r="6" style="fill:var(--accent-2)"/>
+          </g>
+          <path d="M60 0A60 60 0 0 0 58.7 -12.5" style="fill:none;stroke:var(--accent-2);stroke-width:1.6"/><text x="42" y="-3" class="t-mono" style="fill:var(--accent-2)">θ</text>
+          <circle cx="0" cy="0" r="6" style="fill:var(--bad)"/><text x="10" y="18" class="t-mono" style="fill:var(--bad)">원점 A/1 = (E₀, N₀)</text>
+        </g>
+        <g transform="translate(470,48)" class="t-mono">
+          <text x="0" y="0" class="t" style="font-weight:700">지리 참조의 네 매개변수</text>
+          <text x="0" y="28">원점 E₀ = 203,450.000, N₀ = 551,820.000</text>
+          <text x="0" y="50">회전 θ = 12°(로컬 x → 지도 동쪽, 반시계 +)</text>
+          <text x="0" y="72">축척 s = 0.99993(교육용)</text>
+          <text x="0" y="106" style="fill:var(--accent-2)">E/4 = 로컬 (32, 24)</text>
+          <text x="0" y="128" style="fill:var(--accent-2)">→ E 203,476.31 · N 551,850.13</text>
+          <text x="0" y="162">θ를 0.01° 틀리면 40 m 떨어진 점은</text>
+          <text x="0" y="184">40 × 0.01 × π/180 ≈ 7 mm 어긋난다</text>
+          <text x="0" y="218">s를 70 ppm 틀리면 40 m에서 2.8 mm</text>
+          <text x="0" y="252" class="t-dim">가운데 회색 칸은 코어(x 8–24, y 8–16 m)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-2.</b> B-10의 로컬 좌표(격자 A–E, 1–4)와 지도 좌표. 건물은 동쪽에서 12° 돌아가 있다. 모델의 모든 점은 원리 11.3으로 지도 좌표가 되고, 거꾸로 측량한 점은 역변환으로 모델 좌표가 된다. 모서리 E/4(주황)는 예제 11.1에서 계산한다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 11.1 (B-10의 모서리 E/4를 지도 좌표로)</strong> <code>CB.bim.GEO</code>로 로컬 점 \((32, 24)\)의 지도 좌표를 구하고, 각도·축척 오류의 영향을 판단한다.
+      <p><b>① 회전</b> \(\cos 12° = 0.978148\), \(\sin 12° = 0.207912\). \(x\cos\theta - y\sin\theta = 31.3007 - 4.9899 = 26.3108\) m, \(x\sin\theta + y\cos\theta = 6.6532 + 23.4756 = 30.1287\) m.</p>
+      <p><b>② 축척과 이동</b> \(s = 0.99993\)을 곱하면 26.3090, 30.1266 m. \(E = 203{,}450 + 26.309 = 203{,}476.309\) m, \(N = 551{,}820 + 30.127 = 551{,}850.127\) m. 역변환(<code>toLocal</code>)에 넣으면 \((32.000, 24.000)\)으로 돌아온다.</p>
+      <p><b>③ 오류의 크기</b> 원점에서 E/4까지는 \(\sqrt{32^2 + 24^2} = 40\) m. θ를 0.01° 틀리면 \(40 \times 0.01 \times \pi/180 = 0.0070\) m = 7 mm, 축척을 1로 두면(70 ppm 차이) \(40 \times 70\times10^{-6} = 2.8\) mm 어긋난다. 원점 E₀를 1 cm 틀리면 모든 점이 1 cm 옮겨진다.</p>
+      <p><b>④ 판단</b> 건물 안의 상대 위치(기둥 사이 거리)는 축척 오류에 거의 영향받지 않지만, 대지 경계·도로·인접 건물과의 관계와 기준점에서 먼 점은 회전 오류에 민감하다. 회전은 건물 길이만큼 떨어진 두 기준점으로 정하고, 세 번째 점으로 검증한다. 반대로 축척 계수를 건물 안 먹매김에 그대로 쓰면 32 m 길이가 2.2 mm 짧게 표시되므로, 현장 먹매김은 보통 로컬(축척 1) 좌표로 하고 지도 좌표는 연결에만 쓴다.</p></div>
+    <div class="sim" id="sim-rc-geo">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>지리 참조: 로컬 점 → 지도 좌표, 매개변수 오류의 영향</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rc-cv-geo" aria-label="지도 좌표 위의 B-10 격자와 매개변수 오류로 놓인 유령 건물, 끄는 점"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>회전 오류 Δθ <output id="rc-ge-dt-out"></output></span><input type="range" id="rc-ge-dt" min="-2" max="2" step="0.01" value="0.5"></label>
+          <label class="ctrl"><span>축척 오류 <output id="rc-ge-ds-out"></output></span><input type="range" id="rc-ge-ds" min="-1000" max="1000" step="10" value="0"></label>
+          <label class="ctrl"><span>원점 오류 ΔE₀ <output id="rc-ge-de-out"></output></span><input type="range" id="rc-ge-de" min="-1" max="1" step="0.01" value="0"></label>
+          <label class="ctrl"><span>원점 오류 ΔN₀ <output id="rc-ge-dn-out"></output></span><input type="range" id="rc-ge-dn" min="-1" max="1" step="0.01" value="0"></label>
+          <div class="ctrl"><span>끄는 점</span><div class="seg" id="rc-ge-snap"><button data-value="grid" class="on">0.5 m 눈금에 맞춤</button><button data-value="free">자유</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">로컬 (x, y)</span><span class="v" id="rc-ge-o-l">—</span></div>
+        <div class="stat"><span class="k">지도 (E, N)</span><span class="v" id="rc-ge-o-m">—</span></div>
+        <div class="stat"><span class="k">이 점의 어긋남</span><span class="v" id="rc-ge-o-d">—</span></div>
+        <div class="stat"><span class="k">네 모서리 최대</span><span class="v" id="rc-ge-o-x">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 주황 점을 끌어 E/4 모서리 (32, 24)에서 예제 11.1의 E 203,476.309 · N 551,850.127을 확인하세요 · Δθ = 0.5°는 E/4에서 약 349 mm, 원점 A/1에서는 0입니다 — 회전 오류는 원점에서 멀수록 커집니다 · 축척 오류 +1,000 ppm은 40 m에서 40 mm지만 같은 방향으로 늘어날 뿐 모양은 그대로입니다 · 원점 오류는 모든 점을 같은 벡터로 옮깁니다 · 모델: 원리 11.3(<code>CB.bim.toMap</code>, <code>toLocal</code>), 실선 = 참 매개변수(<code>CB.bim.GEO</code>), 점선 = 오류가 든 매개변수로 놓은 건물, 그림 좌표는 (E − E₀, N − N₀) m.</div>
+    </div>
+    <div class="callout"><strong>예제 11.2 (기준점 두 개로 회전과 축척 정하기)</strong> 기준점 CP1은 로컬 \((0, 0)\), 지도 \((203{,}450.000,\ 551{,}820.000)\). CP2는 격자 E/1, 로컬 \((32, 0)\), 지도 \((203{,}481.299,\ 551{,}826.653)\)으로 측량되었다.
+      <p><b>① 방향각</b> 지도에서 \(\Delta E = 31.299\), \(\Delta N = 6.653\) → \(\theta_{map} = \operatorname{atan2}(6.653, 31.299) = 12.000°\). 로컬에서 \(\theta_{loc} = 0°\)이므로 \(\theta = 12.000°\).</p>
+      <p><b>② 축척</b> 지도 거리 \(\sqrt{31.299^2 + 6.653^2} = 31.998\) m, 로컬 거리 32 m → \(s = 0.99993\). 측량값이 mm 단위로 반올림되었으므로 축척의 불확실성은 약 \(0.001/32 \approx 30\) ppm이다.</p>
+      <p><b>③ 판단</b> 두 점만으로는 네 값이 꼭 맞게 정해져 잘못을 찾을 여유가 없다. 세 번째 기준점(예: A/4)을 측량해 원리 11.3으로 예측한 좌표와 비교하고, 차이(잔차)가 측량 정확도 범위 안이면 매개변수를 채택한다. 잔차가 크면 어느 한 점의 성과나 점 번호가 잘못된 것이다.</p></div>
+    <div class="callout warn"><strong>X는 북쪽일 수도 있다</strong> 이 책은 E(동)·N(북)으로 쓰지만, 국내 측량 성과표는 관행적으로 <b>X를 북(종축), Y를 동(횡축)</b>으로 적는 경우가 많다(형태, 성과표의 정의 확인). 수학·CAD 습관대로 X를 동쪽으로 읽으면 모든 점이 대각선에 대해 뒤집혀 놓인다. 성과표를 받으면 축의 정의, 좌표계 이름(원점·투영), 높이 기준(표고 기준면)을 먼저 확인하고, 이미 아는 점 하나를 변환해 검증한다. 높이는 1층 바닥 \(z = 0\)을 표고 \(H_0\)에 맞추는 이동 하나로 다룬다(B-10 BIM은 교육용으로 \(H_0\)을 정하지 않는다).</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="photogrammetry">
+    <h2>사진 측량: 겹쳐 찍어 높이를 얻는다</h2>
+    <div class="problem"><strong>사진 한 장에는 깊이가 없다</strong>
+      <p>드론이 80 m 위에서 B-10 현장을 내려다보며 사진을 찍습니다. 사진 속 덤프트럭의 한 점은 카메라에서 그 점으로 가는 <b>방향</b>만 알려 줄 뿐, 그 점이 얼마나 멀리 있는지(높이)는 알려 주지 않습니다. 다른 자리에서 찍은 두 번째 사진이 무엇을 더해 줄까요? 그리고 몇 cm까지 믿을 수 있을까요?</p></div>
+    <p><span class="term">사진 측량</span><span class="en">(photogrammetry)</span>은 사진에서 대상의 위치와 형상을 재는 기술입니다. 카메라는 바늘구멍 사진기처럼 볼 수 있고, 영상의 한 화소는 카메라 중심에서 나가는 하나의 광선입니다. 같은 점이 두 장 이상의 사진에 찍히면 광선들이 만나는 곳이 그 점의 3차원 위치입니다. 오늘날의 드론 측량은 수백 장의 사진에서 같은 특징점을 자동으로 찾아, 카메라들의 위치·자세와 점들의 좌표를 한꺼번에 맞추는 <span class="term">SfM</span><span class="en">(structure from motion)</span>과 다시점 정합으로 점군과 <span class="term">정사 영상</span><span class="en">(orthophoto)</span>을 만듭니다. 이렇게 만든 모델은 크기와 위치가 정해지지 않았으므로, 좌표를 아는 <span class="term">지상 기준점</span><span class="en">(ground control point, GCP)</span>을 사진에 찍히게 두어 지리 참조합니다.</p>
+    <div class="callout def"><strong>원리 11.4 (삼각 측량과 높이 오차)</strong> 두 카메라 중심 \(C_1, C_2\)에서 같은 점으로 가는 광선의 교점이 점의 위치다. 두 카메라가 같은 높이 \(H\)에서 기선 \(B\)만큼 떨어져 아래를 볼 때(정규 사례), 두 영상의 시차 \(p\)(같은 점의 영상 위치 차이, 화소 길이 단위)로
+      <div class="formula">$$Z = \frac{B f}{p}, \qquad \sigma_Z \approx \frac{H^2}{B f}\,\sigma_p = \frac{H}{B}\cdot GSD\cdot \sigma_{p,\text{px}}$$<div class="where">\(Z\): 카메라에서 점까지 연직 거리(≈ \(H\)), \(f\): 초점 거리, \(\sigma_p\): 시차 측정 오차(\(\sigma_{p,\text{px}}\)는 화소 수로 센 값). 높이 오차는 <span class="term">기선고도비</span><span class="en">(base-to-height ratio, B/H)</span>에 반비례한다. 두 광선이 이루는 교차각이 작을수록(카메라가 가깝거나 점이 멀수록) 광선이 거의 평행해져 교점이 광선 방향으로 크게 흔들린다. 평면 위치 오차는 대략 \(GSD\cdot\sigma_{p,\text{px}}\) 수준이어서, 사진 측량의 높이는 보통 평면보다 부정확하다. 여러 장의 사진을 함께 쓰는 SfM은 사실상 기선을 늘려 이 오차를 줄인다(교육용 두 장 모델).</div></div></div>
+    <figure class="diagram" id="fig-rc-tri">
+      <svg viewBox="0 0 860 320" role="img" aria-label="두 카메라에서 같은 지상점으로 가는 광선, 기선, 비행 높이, 각도 오차가 만드는 오차 사각형">
+        <rect x="10" y="10" width="840" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <line x1="0" y1="230" x2="440" y2="230" class="s-axis"/>
+          <text x="400" y="250" class="t-mono">지면</text>
+          <g style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5"><rect x="110" y="0" width="34" height="22" rx="4"/><rect x="270" y="0" width="34" height="22" rx="4"/></g>
+          <g class="t-mono" text-anchor="middle"><text x="127" y="-6" style="fill:var(--accent)">C₁</text><text x="287" y="-6" style="fill:var(--accent)">C₂</text></g>
+          <line x1="127" y1="38" x2="287" y2="38" style="stroke:var(--accent-2);stroke-width:1.4" marker-start="url(#rc-ah-2)" marker-end="url(#rc-ah-2)"/><text x="207" y="54" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">기선 B</text>
+          <line x1="20" y1="22" x2="20" y2="230" style="stroke:var(--text-dim);stroke-width:1.2" marker-start="url(#rc-ah)" marker-end="url(#rc-ah)"/><text x="28" y="130" class="t-mono">H</text>
+          <g style="stroke:var(--text);stroke-width:1.6"><line x1="127" y1="22" x2="230" y2="230"/><line x1="287" y1="22" x2="230" y2="230"/></g>
+          <g style="stroke:var(--text-faint);stroke-width:1;stroke-dasharray:4 3"><line x1="127" y1="22" x2="242" y2="230"/><line x1="127" y1="22" x2="218" y2="230"/><line x1="287" y1="22" x2="218" y2="230"/><line x1="287" y1="22" x2="242" y2="230"/></g>
+          <path d="M230 205L236 230L230 255L224 230Z" style="fill:var(--bad);opacity:.35;stroke:var(--bad)"/>
+          <circle cx="230" cy="230" r="4" style="fill:var(--bad)"/>
+          <path d="M213 196A36 36 0 0 0 247 196" style="fill:none;stroke:var(--accent-2);stroke-width:1.4"/><text x="252" y="190" class="t-mono" style="fill:var(--accent-2)">γ</text>
+          <text x="250" y="268" class="t-mono" style="fill:var(--bad)">오차 사각형: 연직으로 길다</text>
+        </g>
+        <g transform="translate(520,52)" class="t-mono">
+          <text x="0" y="0" class="t" style="font-weight:700">왜 높이가 더 부정확한가</text>
+          <text x="0" y="30">광선 하나의 방향 오차 ±δ → 광선이 부채꼴로</text>
+          <text x="0" y="52">두 부채꼴이 겹친 사각형 = 교점의 불확실성</text>
+          <text x="0" y="84">교차각 γ가 작으면 사각형이 광선 방향(연직)으로</text>
+          <text x="0" y="106">길쭉해진다: σ_Z ∝ (H/B) × GSD</text>
+          <text x="0" y="140">B/H = 0.2이면 높이 오차는 평면의 약 5배</text>
+          <text x="0" y="174">해결: 중복 많이 · 여러 방향 · 지상 기준점</text>
+          <text x="0" y="196">· 기준점으로 쓰지 않은 검사점으로 검증</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-3.</b> 두 광선의 삼각 측량(원리 11.4). 각 광선의 방향 오차 ±δ(점선)가 만드는 오차 사각형(빨강)은 교차각 γ가 작을수록 광선 방향, 곧 연직으로 길어진다. 그래서 같은 사진이라도 높이 정확도가 평면보다 나쁘고, 기선을 늘리면(중복을 줄이면) 높이가 좋아지는 대신 같은 점을 찾기가 어려워진다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-rc-tri">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>사진 측량 삼각 측량: 두 카메라 · 각도 오차 → 점 위치와 오차(교육용 2D)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rc-cv-tri" aria-label="두 카메라와 지상점, 광선과 확대한 오차 사각형"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>영상 측정 오차 σ <output id="rc-tr-s-out"></output></span><input type="range" id="rc-tr-s" min="0.1" max="3" step="0.1" value="0.5"></label>
+          <label class="ctrl"><span>오차 그림 확대 <output id="rc-tr-k-out"></output></span><input type="range" id="rc-tr-k" min="1" max="500" step="1" value="200"></label>
+          <div class="ctrl"><span>카메라 배치</span><div class="seg" id="rc-tr-pre"><button data-value="std" class="on">중복 80 % (B = 16 m)</button><button data-value="wide">넓은 기선</button><button data-value="narrow">좁은 기선</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">교차각 γ · B/H</span><span class="v" id="rc-tr-o-g">—</span></div>
+        <div class="stat"><span class="k">σ 수평</span><span class="v" id="rc-tr-o-x">—</span></div>
+        <div class="stat"><span class="k">σ 연직</span><span class="v" id="rc-tr-o-z">—</span></div>
+        <div class="stat"><span class="k">연직/수평</span><span class="v" id="rc-tr-o-r">—</span></div>
+      </div>
+      <div class="rc-msg" id="rc-tr-msg">—</div>
+      <div class="sim-note">해볼 것: 카메라 두 개(파랑 사각형)와 지상점(빨강)을 끌어 보세요 · 기본값(H = 80 m, B = 16 m, σ 0.5 화소)에서 연직 오차가 수평의 약 10배(≈ 2H/B)인 것을 확인하세요(두 광선 각각에 오차를 주므로 연직 오차는 원리 11.4의 시차 공식보다 √2배 큼) · "넓은 기선"은 교차각이 커져 연직 오차가 줄고, "좁은 기선"은 광선이 거의 평행해 연직 오차가 급증합니다 · 지상점을 카메라 바로 아래에서 옆으로 옮기면 사각형이 기울어집니다 · 모델: 카메라 1인치급 센서(화소 2.41 µm, f = 8.8 mm → 1화소 = 0.274 mrad, 형태), 광선 방향 오차 σ<sub>α</sub> = σ × 0.274 mrad를 두 광선에 독립으로 주고 교점의 공분산을 선형화(교육용 2D). 그림의 오차 사각형(±1σ)은 확대 배율만큼 키워 그린다.</div>
+    </div>
+    <div class="callout def"><strong>정의 11.5 (지상 표본 거리와 중복도)</strong> 화소 하나가 땅 위에서 차지하는 길이를 <span class="term">지상 표본 거리</span><span class="en">(ground sample distance, GSD)</span>라 한다.
+      <div class="formula">$$GSD = \frac{p\,H}{f}, \qquad W = n\cdot GSD, \qquad b = (1 - o_f)\,W_{along}, \qquad a = (1 - o_s)\,W_{across}$$<div class="where">\(p\): 센서의 화소 크기, \(H\): 촬영 고도(지면 기준), \(f\): 초점 거리, \(W\): 사진 한 장이 덮는 땅의 폭(\(n\)은 그 방향 화소 수), \(b\): 같은 비행선에서 사진 사이 간격, \(a\): 비행선 사이 간격. 진행 방향으로 겹치는 비율 \(o_f\)를 <span class="term">종중복</span><span class="en">(forward overlap)</span>, 옆 비행선과 겹치는 비율 \(o_s\)를 <span class="term">횡중복</span><span class="en">(side overlap)</span>이라 한다. SfM 측량에서는 종중복 약 70–80 %, 횡중복 약 60–70 %를 흔히 쓴다(형태, 장비·지형·지침 확인). 기선 \(B\)는 사진 간격 \(b\)와 같다.</div></div></div>
+    <figure class="diagram" id="fig-rc-overlap">
+      <svg viewBox="0 0 860 300" role="img" aria-label="비행선과 사진 범위: 종중복과 횡중복, 사진 간격과 비행선 간격, 화소 크기와 지상 표본 거리">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="0" y="20" width="160" height="100" style="fill:var(--accent-soft);opacity:.55;stroke:var(--accent)"/>
+          <rect x="44" y="20" width="160" height="100" style="fill:var(--accent-soft);opacity:.55;stroke:var(--accent)"/>
+          <rect x="88" y="20" width="160" height="100" style="fill:var(--accent-soft);opacity:.55;stroke:var(--accent)"/>
+          <rect x="0" y="92" width="160" height="100" style="fill:var(--accent-2-soft);opacity:.6;stroke:var(--accent-2)"/>
+          <rect x="44" y="92" width="160" height="100" style="fill:var(--accent-2-soft);opacity:.6;stroke:var(--accent-2)"/>
+          <line x1="-14" y1="70" x2="300" y2="70" style="stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4" marker-end="url(#rc-ah-acc)"/>
+          <line x1="300" y1="142" x2="-14" y2="142" style="stroke:var(--accent-2);stroke-width:2;stroke-dasharray:6 4" marker-end="url(#rc-ah-2)"/>
+          <g style="fill:var(--accent)"><circle cx="80" cy="70" r="4"/><circle cx="124" cy="70" r="4"/><circle cx="168" cy="70" r="4"/></g>
+          <g style="fill:var(--accent-2)"><circle cx="80" cy="142" r="4"/><circle cx="124" cy="142" r="4"/></g>
+          <line x1="80" y1="-2" x2="124" y2="-2" style="stroke:var(--text-dim)" marker-start="url(#rc-ah)" marker-end="url(#rc-ah)"/><text x="102" y="-8" text-anchor="middle" class="t-mono">b</text>
+          <line x1="312" y1="70" x2="312" y2="142" style="stroke:var(--text-dim)" marker-start="url(#rc-ah)" marker-end="url(#rc-ah)"/><text x="320" y="110" class="t-mono">a</text>
+          <text x="0" y="222" class="t-mono">파랑: 1번 비행선 사진 범위 · 주황: 2번 비행선</text>
+          <text x="0" y="242" class="t-mono">겹친 부분이 진할수록 더 많은 사진에 찍힌 땅</text>
+        </g>
+        <g transform="translate(470,40)">
+          <line x1="40" y1="0" x2="40" y2="200" class="s-axis"/>
+          <rect x="22" y="0" width="36" height="14" style="fill:var(--accent)"/><text x="66" y="12" class="t-mono">센서 화소 p</text>
+          <line x1="40" y1="14" x2="40" y2="40" style="stroke:var(--accent)"/>
+          <circle cx="40" cy="44" r="4" style="fill:var(--text)"/><text x="50" y="48" class="t-mono">렌즈(초점 f 아래)</text>
+          <path d="M31 0L40 44L49 0" style="fill:none;stroke:var(--accent);stroke-dasharray:3 3"/>
+          <path d="M40 44L0 200M40 44L80 200" style="fill:none;stroke:var(--accent);stroke-dasharray:3 3"/>
+          <rect x="0" y="196" width="80" height="8" style="fill:var(--accent-2)"/><text x="88" y="204" class="t-mono" style="fill:var(--accent-2)">GSD</text>
+          <text x="120" y="100" class="t-mono">닮은 삼각형:</text>
+          <text x="120" y="122" class="t-mono">GSD / H = p / f</text>
+          <text x="120" y="152" class="t-mono">1인치급 센서(p 2.41 µm, f 8.8 mm)</text>
+          <text x="120" y="174" class="t-mono">H 80 m → GSD 2.19 cm</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-4.</b> 비행 계획(왼쪽)과 지상 표본 거리(오른쪽). 같은 비행선의 사진은 간격 \(b\)마다, 비행선은 간격 \(a\)마다 놓인다. 중복도를 높이면 한 점이 더 많은 사진에 찍혀 정합이 튼튼해지지만 사진 수와 처리 시간이 늘어난다. GSD는 고도에 비례하므로 낮게 날수록 세밀하지만 덮는 범위가 좁아진다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-rc-gsd">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>드론 비행 계획: 고도 · 중복도 → GSD · 사진 수 · 높이 오차</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rc-cv-gsd" aria-label="B-10 현장 120 × 90 m 위의 비행선, 촬영 위치와 사진 범위"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>촬영 고도 H <output id="rc-gs-h-out"></output></span><input type="range" id="rc-gs-h" min="20" max="150" step="5" value="80"></label>
+          <div class="ctrl"><span>카메라(형태)</span><div class="seg" id="rc-gs-cam"><button data-value="one" class="on">1인치급 20 MP</button><button data-value="small">소형 12 MP</button></div></div>
+          <label class="ctrl"><span>종중복 <output id="rc-gs-of-out"></output></span><input type="range" id="rc-gs-of" min="60" max="90" step="5" value="80"></label>
+          <label class="ctrl"><span>횡중복 <output id="rc-gs-os-out"></output></span><input type="range" id="rc-gs-os" min="50" max="85" step="5" value="70"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">GSD</span><span class="v" id="rc-gs-o-g">—</span></div>
+        <div class="stat"><span class="k">사진 범위</span><span class="v" id="rc-gs-o-w">—</span></div>
+        <div class="stat"><span class="k">간격 b · a</span><span class="v" id="rc-gs-o-b">—</span></div>
+        <div class="stat"><span class="k">사진 수</span><span class="v" id="rc-gs-o-n">—</span></div>
+        <div class="stat"><span class="k">σ<sub>Z</sub>(두 장, 0.5 px)</span><span class="v" id="rc-gs-o-z">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(80 m, 1인치급, 80/70 %)에서 GSD 2.19 cm, 사진 간격 16 m, 비행선 간격 36 m를 확인하세요(예제 11.3) · 고도를 40 m로 낮추면 GSD는 절반이 되지만 사진 수는 약 3배가 됩니다 · 종중복을 90 %로 올리면 사진 수가 두 배 가까이 늘고 B/H가 0.1로 줄어 두 장 기준 높이 오차는 오히려 커집니다 — SfM이 한 점을 많은 사진에서 보게 하는 이유입니다 · 소형 12 MP는 화소가 작아도 초점 거리가 짧아 같은 고도에서 GSD가 비슷합니다 · 모델: 정의 11.5, 측량 범위 120 × 90 m, 센서 긴 변을 비행 방향과 직각으로, 사진 수 = 비행선 수 × 비행선당 사진 수(각각 ⌈길이/간격⌉ + 1), 1인치급 13.2 × 8.8 mm · 5,472 × 3,648 화소 · f 8.8 mm, 소형 6.17 × 4.55 mm · 4,000 × 3,000 화소 · f 4.5 mm(형태). 고도는 항공 안전 법령의 제한(150 m 형태, 현행 확인)과 관제 구역을 확인한다.</div>
+    </div>
+    <div class="callout"><strong>예제 11.3 (B-10 현장 비행 계획)</strong> 1인치급 카메라(화소 \(p = 13.2/5{,}472 = 2.41\ \mu\)m, \(f = 8.8\) mm), 고도 80 m, 종중복 80 %, 횡중복 70 %.
+      <p><b>① GSD</b> \(GSD = 2.41\times10^{-6}\times 80/0.0088 = 0.0219\) m = <b>2.19 cm/화소</b>.</p>
+      <p><b>② 사진 범위와 간격</b> 진행 방향(짧은 변) \(3{,}648\times0.0219 = 80\) m, 직각 방향(긴 변) \(5{,}472\times0.0219 = 120\) m. 사진 간격 \(b = 0.2\times80 = 16\) m, 비행선 간격 \(a = 0.3\times120 = 36\) m.</p>
+      <p><b>③ 높이 오차(두 장)</b> \(B/H = 16/80 = 0.2\). 시차 측정 오차를 0.5화소로 보면 \(\sigma_Z \approx (1/0.2)\times2.19\times0.5 = 5.5\) cm, 평면은 약 1.1 cm다.</p>
+      <p><b>④ 판단</b> 토공 진도(SiteBook 16장의 점고법)나 적치물 체적에는 충분하지만, 슬래브 평탄도(mm 단위)에는 턱없이 부족하다. 사진 측량은 넓고 cm 단위인 일, 레이저 스캔은 좁고 mm 단위인 일에 쓴다. 정확도는 계산이 아니라 <b>검사점</b>(지리 참조에 쓰지 않은 별도의 측량점)과 비교한 잔차로 확인해 보고서에 적는다.</p></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="laser">
+    <h2>레이저 스캔과 점군</h2>
+    <div class="problem"><strong>한 자리에서 수천만 점</strong>
+      <p>지상 레이저 스캐너를 B-10 1층 한가운데 세우고 버튼을 누르면, 기계가 천천히 돌며 몇 분 만에 수천만 개의 점을 기록합니다. 기둥 표면에 점이 몇 mm 간격으로 찍힐까요? 20 m 떨어진 기둥은요? 비스듬히 보이는 벽은요? 점마다 몇 mm씩 흔들린다면 기둥 위치를 몇 mm까지 믿을 수 있을까요?</p></div>
+    <p><span class="term">지상 레이저 스캐너</span><span class="en">(terrestrial laser scanner, TLS)</span>는 레이저로 거리를 재는 장치를 수평·연직으로 돌리며 주변의 점을 차례로 기록합니다. 거리는 빛이 다녀온 시간(펄스 방식)이나 변조한 빛의 위상 차이(위상 방식)로 잽니다. 점마다 거리 \(r\), 수평각 \(\varphi\), 연직각 \(v\)와 되돌아온 빛의 세기(반사 강도)가 남고, 스캐너에 달린 카메라로 색을 입히기도 합니다. 넓게 보면 이 모든 방식이 <span class="term">라이다</span><span class="en">(light detection and ranging, LiDAR)</span>입니다.</p>
+    <div class="callout def"><strong>원리 11.6 (극좌표에서 직교 좌표로, 점 간격)</strong> 스캐너 중심을 원점으로
+      <div class="formula">$$x = r\cos v\cos\varphi, \quad y = r\cos v\sin\varphi, \quad z = r\sin v, \qquad s \approx r\,\Delta\alpha, \qquad s_i \approx \frac{r\,\Delta\alpha}{\cos i}$$<div class="where">\(\Delta\alpha\): 이웃한 측정 사이의 각도 간격(rad), \(s\): 거리 \(r\)인 면에 수직으로 맞을 때의 <span class="term">점 간격</span><span class="en">(point spacing)</span>, \(i\): <span class="term">입사각</span><span class="en">(incidence angle)</span>(광선과 면의 법선 사이 각). 점 간격은 거리에 비례하고 비스듬한 면에서 \(1/\cos i\)배로 벌어진다. 거리 잡음 \(\sigma_r\)은 광선 방향으로 점을 흔들어 면을 두께 있는 띠로 만든다. 각도 오차 \(\sigma_\alpha\)는 \(r\sigma_\alpha\)만큼 옆으로 흔드므로 먼 점일수록 커진다. 스캐너가 놓인 자리의 좌표와 방향을 알면(정합, 5절) 이 좌표가 프로젝트 좌표가 된다.</div></div></div>
+    <figure class="diagram" id="fig-rc-scan">
+      <svg viewBox="0 0 860 300" role="img" aria-label="스캐너의 거리와 두 각도, 거리에 비례하는 점 간격과 비스듬한 면에서 벌어지는 간격">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,230)">
+          <line x1="0" y1="0" x2="300" y2="0" class="s-axis"/><text x="270" y="18" class="t-mono">수평면</text>
+          <rect x="-10" y="-14" width="20" height="14" rx="3" style="fill:var(--accent)"/><line x1="0" y1="0" x2="0" y2="30" style="stroke:var(--text-dim);stroke-width:2"/>
+          <line x1="0" y1="-7" x2="250" y2="-160" style="stroke:var(--accent-2);stroke-width:2"/><circle cx="250" cy="-160" r="5" style="fill:var(--accent-2)"/>
+          <text x="140" y="-104" class="t-mono" style="fill:var(--accent-2)">거리 r</text>
+          <path d="M70 -7A70 70 0 0 0 60 -43" style="fill:none;stroke:var(--accent);stroke-width:1.6"/><text x="76" y="-24" class="t-mono" style="fill:var(--accent)">연직각 v</text>
+          <line x1="250" y1="-160" x2="250" y2="0" style="stroke:var(--text-faint);stroke-dasharray:3 3"/><text x="256" y="-70" class="t-mono">z = r sin v</text>
+          <text x="40" y="44" class="t-mono">옆에서 본 모습(수평각 φ는 위에서 본 회전)</text>
+        </g>
+        <g transform="translate(470,40)">
+          <circle cx="20" cy="120" r="7" style="fill:var(--accent)"/>
+          <g style="stroke:var(--accent);stroke-width:1;opacity:.7"><line x1="20" y1="120" x2="150" y2="40"/><line x1="20" y1="120" x2="150" y2="80"/><line x1="20" y1="120" x2="150" y2="120"/><line x1="20" y1="120" x2="150" y2="160"/><line x1="20" y1="120" x2="150" y2="200"/></g>
+          <line x1="150" y1="20" x2="150" y2="220" style="stroke:var(--text);stroke-width:3"/>
+          <g style="fill:var(--accent-2)"><circle cx="150" cy="40" r="3.5"/><circle cx="150" cy="80" r="3.5"/><circle cx="150" cy="120" r="3.5"/><circle cx="150" cy="160" r="3.5"/><circle cx="150" cy="200" r="3.5"/></g>
+          <text x="160" y="104" class="t-mono">가까운 벽: 간격 s = rΔα</text>
+          <g style="stroke:var(--accent);stroke-width:1;opacity:.7"><line x1="20" y1="120" x2="290" y2="92"/><line x1="20" y1="120" x2="300" y2="140"/><line x1="20" y1="120" x2="310" y2="190"/></g>
+          <line x1="270" y1="60" x2="330" y2="230" style="stroke:var(--text);stroke-width:3"/>
+          <g style="fill:var(--bad)"><circle cx="281" cy="92" r="3.5"/><circle cx="298" cy="140" r="3.5"/><circle cx="316" cy="190" r="3.5"/></g>
+          <text x="196" y="250" class="t-mono" style="fill:var(--bad)">먼 벽 + 비스듬: s / cos i</text>
+          <text x="0" y="0" class="t" style="font-weight:700">위에서 본 모습</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-5.</b> 스캐너의 측정량(왼쪽)과 점 간격(오른쪽). 같은 각도 간격으로 쏘아도 먼 면에는 점이 성기게, 비스듬한 면에는 더 성기게 찍힌다. 기둥의 뒷면처럼 광선이 닿지 않는 곳에는 점이 없다(가림). 그래서 한 대상을 여러 자리에서 스캔하고 정합한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-rc-scan">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>점 밀도와 거리: 각도 간격 · 거리 · 입사각 · 잡음 → 점 간격</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rc-cv-scan" aria-label="스캐너와 벽의 평면도, 벽 25 cm 구간을 실제 축척으로 확대한 점 분포"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>각도 간격 Δα <output id="rc-sc-a-out"></output></span><input type="range" id="rc-sc-a"></label>
+          <label class="ctrl"><span>벽까지 거리 r <output id="rc-sc-r-out"></output></span><input type="range" id="rc-sc-r" min="2" max="60" step="1" value="12"></label>
+          <label class="ctrl"><span>입사각 i <output id="rc-sc-i-out"></output></span><input type="range" id="rc-sc-i" min="0" max="80" step="1" value="0"></label>
+          <label class="ctrl"><span><span>거리 잡음 σ<sub>r</sub></span> <output id="rc-sc-n-out"></output></span><input type="range" id="rc-sc-n" min="0" max="10" step="0.5" value="2"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">벽 위 점 간격</span><span class="v" id="rc-sc-o-s">—</span></div>
+        <div class="stat"><span class="k">1 m²당 점 수</span><span class="v" id="rc-sc-o-d">—</span></div>
+        <div class="stat"><span class="k">한 번 스캔 점 수</span><span class="v" id="rc-sc-o-n">—</span></div>
+        <div class="stat"><span class="k">면 두께(±2σ)</span><span class="v" id="rc-sc-o-t">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(0.036°, 12 m, 수직 입사)에서 간격 약 7.5 mm(예제 11.4)를 확인하세요 · 거리를 36 m로 늘리면 간격이 세 배, 1 m²당 점은 1/9이 됩니다 · 입사각 70°에서는 수평 간격이 약 2.9배로 벌어지고, 거리 잡음의 법선 성분은 cos i배로 작아지지만 면을 따라 흩어집니다 · 각도 간격을 절반으로 줄이면 점이 네 배가 되고 스캔 시간과 데이터도 네 배입니다 · 모델: 원리 11.6, 벽 25 cm 구간을 실제 축척으로 확대(가로 = 벽을 따라, 세로 = 벽 법선 방향 편차 mm), 점 수는 수평 360° × 연직 300° 시야(형태)를 각도 간격으로 나눈 값, 거리 잡음은 정규 분포(시드 고정).</div>
+    </div>
+    <div class="callout"><strong>예제 11.4 (점 하나의 좌표와 점 간격)</strong> 스캐너가 \(r = 12.000\) m, \(\varphi = 30°\), \(v = 10°\)를 기록했다. 스캐너 중심의 프로젝트 좌표는 \((16.000, 4.000, 1.500)\)이고 스캐너 축은 프로젝트 축과 나란하다.
+      <p><b>① 직교 좌표</b> \(x = 12\cos10°\cos30° = 12\times0.98481\times0.86603 = 10.234\) m, \(y = 12\times0.98481\times0.5 = 5.909\) m, \(z = 12\sin10° = 2.084\) m. 프로젝트 좌표는 \((26.234,\ 9.909,\ 3.584)\) m.</p>
+      <p><b>② 점 간격</b> \(\Delta\alpha = 0.036° = 6.28\times10^{-4}\) rad이면 12 m에서 \(s = 12\times6.28\times10^{-4} = 7.5\) mm, 30 m에서 18.8 mm. 입사각 60°인 면에서는 \(7.5/\cos60° = 15\) mm로 벌어진다.</p>
+      <p><b>③ 판단</b> 800 mm 기둥 면 하나에 12 m에서 가로 약 100개의 점이 찍히므로 면의 위치는 많은 점의 평균으로 거리 잡음보다 정확하게 정해진다. 그러나 각도 오차 0.01°(\(1.7\times10^{-4}\) rad)는 12 m에서 2 mm의 옆 흔들림이 되고 이는 모든 점에 같은 방향으로 들어오는 계통 오차일 수 있다. 정밀 검측은 스캐너를 대상 가까이(대개 수–수십 m 안) 두고, 측정 범위의 끝에서 얻은 점에 의존하지 않는다.</p></div>
+    <div class="callout warn"><strong>점군이 거짓말하는 곳</strong> ① <b>모서리의 혼합 점</b>: 광선의 지름 일부가 앞 물체, 일부가 뒤 물체에 맞으면 둘 사이 허공에 점이 생긴다. ② <b>유리·금속·물</b>: 빛이 투과하거나 거울처럼 튀어 점이 없거나 엉뚱한 곳(반사된 상)에 생긴다. ③ <b>움직이는 물체</b>: 지나가는 사람과 장비가 '유령'으로 남는다. ④ <b>가림</b>: 기둥 뒤, 덕트 위는 비어 있다. 점군을 모델과 비교하기 전에 이런 점을 걸러 내고, 비어 있는 곳을 '없음'이 아니라 '모름'으로 다뤄야 한다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="registration">
+    <h2>정합: 여러 스캔을 한 좌표로</h2>
+    <div class="problem"><strong>스캐너를 옮길 때마다 원점이 바뀐다</strong>
+      <p>B-10 1층을 네 자리에서 스캔했습니다. 스캔마다 그 자리의 스캐너 중심이 원점이고 방향도 제각각이어서, 네 점군을 그냥 겹치면 기둥이 네 겹으로 보입니다. 같은 기둥이 한 자리에 오게 하려면 각 점군을 얼마나 돌리고 옮겨야 할까요?</p></div>
+    <p>두 점군을 같은 좌표에 놓는 일을 <span class="term">정합</span><span class="en">(registration)</span>이라 합니다. 스캐너는 거리를 직접 재므로 축척은 1이고, 남는 것은 회전과 이동뿐인 <span class="term">강체 변환</span><span class="en">(rigid transformation)</span>입니다. 방법은 두 가지입니다. 현장에 구형·체커보드 <span class="term">타깃</span><span class="en">(target)</span>을 두고 두 스캔에 함께 찍힌 타깃의 중심을 <b>대응점</b>으로 쓰는 방법, 그리고 겹치는 부분의 형상 자체를 맞추는 점군 대 점군 정합(ICP)입니다. 타깃을 토털 스테이션으로 측량해 두면 같은 계산으로 프로젝트 좌표(지리 참조)까지 한 번에 얻습니다.</p>
+    <div class="callout def"><strong>원리 11.7 (대응점 강체 정합, 2D)</strong> 대응점 쌍 \((p_i, q_i)\), \(i = 1..n\)에 대해 \(q_i \approx R(\theta)p_i + t\)를 최소 제곱으로 맞추면
+      <div class="formula">$$a_i = p_i - \bar p,\quad b_i = q_i - \bar q, \qquad \theta = \operatorname{atan2}\!\Big(\sum_i a_i\times b_i,\ \sum_i a_i\cdot b_i\Big), \qquad t = \bar q - R(\theta)\,\bar p$$<div class="where">\(\bar p, \bar q\): 두 점 집합의 무게중심, \(a\times b = a_xb_y - a_yb_x\)(2D 외적), \(a\cdot b\): 내적. 정합 후 잔차의 제곱 평균 제곱근 \(RMS = \sqrt{\frac1n\sum|R p_i + t - q_i|^2}\)이 정합의 품질이다. 3D에서는 공분산 행렬의 특이값 분해로 같은 일을 한다(Kabsch 방법, 1976). <code>CB.bim.rigid2D(P, Q)</code>가 이 식을 계산한다. 대응점은 한 직선 위에 있지 않은 셋 이상이 필요하고, 넓게 퍼져 있을수록 회전이 정확하다.</div></div></div>
+    <div class="callout def"><strong>원리 11.8 (ICP: 반복 최근접점)</strong> 대응점을 모를 때는 ① 현재 추정으로 움직인 점군 B의 각 점에서 점군 A의 <b>가장 가까운 점</b>을 대응으로 삼고, ② 너무 먼 쌍을 버린 뒤 원리 11.7로 변환을 다시 구하고, ③ 변환이 거의 변하지 않을 때까지 반복한다. 이것이 <span class="term">ICP</span><span class="en">(iterative closest point)</span>다(Besl·McKay, Chen·Medioni, 1990년대 초). ICP는 매 단계 RMS를 줄이지만 <b>가까운 해</b>로만 수렴하므로, 처음 어긋남이 크면 엉뚱한 기둥끼리 맞물린 국소 최소에 빠진다. 그래서 실무는 타깃이나 사람이 고른 몇 쌍으로 대략 맞춘 뒤 ICP로 다듬는다.</div>
+    <figure class="diagram" id="fig-rc-reg">
+      <svg viewBox="0 0 860 300" role="img" aria-label="두 스캔의 타깃 대응점으로 강체 변환을 구하는 정합과 ICP 반복 순환">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">대응점 정합</text>
+          <g style="fill:none;stroke:var(--text-dim);stroke-width:1.4"><rect x="10" y="30" width="24" height="24"/><rect x="130" y="30" width="24" height="24"/><rect x="10" y="150" width="24" height="24"/><path d="M60 100H130V130"/></g>
+          <g transform="translate(200,40) rotate(14)" style="fill:none;stroke:var(--accent-2);stroke-width:1.4;stroke-dasharray:4 3"><rect x="10" y="30" width="24" height="24"/><rect x="130" y="30" width="24" height="24"/><rect x="10" y="150" width="24" height="24"/><path d="M60 100H130V130"/></g>
+          <g style="fill:var(--accent)"><circle cx="70" cy="42" r="6"/><circle cx="150" cy="170" r="6"/><circle cx="40" cy="200" r="6"/></g>
+          <g transform="translate(200,40) rotate(14)" style="fill:var(--accent-2)"><circle cx="70" cy="42" r="6"/><circle cx="150" cy="170" r="6"/><circle cx="40" cy="200" r="6"/></g>
+          <g style="stroke:var(--text-faint);stroke-dasharray:3 3"><line x1="70" y1="42" x2="258" y2="99"/><line x1="40" y1="200" x2="191" y2="243"/></g>
+          <text x="0" y="250" class="t-mono">회색 = 기준(A) · 주황 점선 = 옮길 스캔(B) · 원 = 타깃</text>
+        </g>
+        <g transform="translate(520,50)" class="t-mono" text-anchor="middle">
+          <text x="140" y="-10" class="t" style="font-weight:700">ICP 반복</text>
+          <rect x="70" y="10" width="140" height="40" rx="8" class="f-elev"/><text x="140" y="35" style="fill:var(--text)">① 최근접점 찾기</text>
+          <rect x="170" y="90" width="140" height="40" rx="8" class="f-elev"/><text x="240" y="115" style="fill:var(--text)">② 먼 쌍 버리기</text>
+          <rect x="70" y="170" width="140" height="40" rx="8" class="f-acc-soft"/><text x="140" y="195" style="fill:var(--accent)">③ 원리 11.7 정합</text>
+          <rect x="-30" y="90" width="140" height="40" rx="8" class="f-elev"/><text x="40" y="115" style="fill:var(--text)">④ B를 옮기고 반복</text>
+          <g style="stroke:var(--text-dim);stroke-width:1.5;fill:none" marker-end="url(#rc-ah)"><path d="M210 40C250 50 250 70 245 86"/><path d="M240 132C240 160 220 175 214 182"/><path d="M70 190C40 180 40 150 40 134"/><path d="M40 88C40 60 50 40 66 32"/></g>
+          <text x="140" y="240">RMS가 더 줄지 않으면 멈춘다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-6.</b> 정합의 두 방법. 타깃처럼 대응을 아는 점이 있으면 원리 11.7을 한 번 풀면 끝이다(왼쪽). 대응을 모르면 '가장 가까운 점이 짝'이라고 가정하고 정합을 되풀이한다(오른쪽, ICP). 가정이 맞으려면 처음부터 대략 맞아 있어야 한다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 11.5 (타깃 세 개로 정합)</strong> 스캔 좌표 \(P\)와 프로젝트 좌표 \(Q\)(m).
+      <div class="table-wrap"><table class="rc-tbl">
+        <thead><tr><th>타깃</th><th>P (x, y)</th><th>Q (x, y)</th><th>a = P − P̄</th><th>b = Q − Q̄</th></tr></thead>
+        <tbody>
+          <tr><td>T1</td><td class="rc-num">(2, 1)</td><td class="rc-num">(6.232, 4.866)</td><td class="rc-num">(−3.333, −2.667)</td><td class="rc-num">(−1.555, −3.975)</td></tr>
+          <tr><td>T2</td><td class="rc-num">(12, 1)</td><td class="rc-num">(14.900, 9.866)</td><td class="rc-num">(6.667, −2.667)</td><td class="rc-num">(7.113, 1.025)</td></tr>
+          <tr><td>T3</td><td class="rc-num">(2, 9)</td><td class="rc-num">(2.232, 11.788)</td><td class="rc-num">(−3.333, 5.333)</td><td class="rc-num">(−5.555, 2.947)</td></tr>
+        </tbody></table></div>
+      <p><b>① 무게중심</b> \(\bar p = (5.333, 3.667)\), \(\bar q = (7.788, 8.840)\).</p>
+      <p><b>② 회전</b> \(\sum a\cdot b = 94.69\), \(\sum a\times b = 54.69\) → \(\theta = \operatorname{atan2}(54.69, 94.69) = 30.01°\).</p>
+      <p><b>③ 이동과 잔차</b> \(t = \bar q - R\bar p = (5.002,\ 2.999)\) m. 세 타깃의 잔차 RMS = 2.2 mm(<code>CB.bim.rigid2D</code>와 같은 값).</p>
+      <p><b>④ 판단</b> RMS 2.2 mm는 타깃 중심을 찾는 정밀도 수준이므로 정합을 채택한다. 어느 타깃 하나의 잔차만 크면(예: 15 mm) 그 타깃이 공사 중 밀렸거나 번호가 바뀐 것이다 — 빼고 다시 풀어 확인한다. 타깃이 정확히 셋뿐이면 하나가 틀려도 RMS가 작게 나올 수 있으므로 넷 이상을 넓게 둔다.</p></div>
+    <div class="sim" id="sim-rc-reg">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>점군 정합: 손으로 맞추기 vs 타깃 정합(rigid2D) vs ICP</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rc-cv-reg" aria-label="B-10 1층 평면 점군(기준)과 옮길 스캔 점군, 타깃과 최근접 연결선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>회전 θ <output id="rc-rg-t-out"></output></span><input type="range" id="rc-rg-t" min="-45" max="45" step="0.1" value="0"></label>
+          <label class="ctrl"><span><span>이동 t<sub>x</sub></span> <output id="rc-rg-x-out"></output></span><input type="range" id="rc-rg-x" min="-6" max="6" step="0.01" value="0"></label>
+          <label class="ctrl"><span><span>이동 t<sub>y</sub></span> <output id="rc-rg-y-out"></output></span><input type="range" id="rc-rg-y" min="-6" max="6" step="0.01" value="0"></label>
+          <div class="ctrl"><span>처음 어긋남</span><div class="seg" id="rc-rg-init"><button data-value="small" class="on">작게(6°)</button><button data-value="large">크게(35°)</button></div></div>
+          <div class="btn-row"><button class="btn primary" id="rc-rg-tg">타깃으로 정합</button><button class="btn" id="rc-rg-i1">ICP 1회</button><button class="btn" id="rc-rg-i10">ICP 10회</button><button class="btn" id="rc-rg-reset">처음으로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">현재 θ · t</span><span class="v" id="rc-rg-o-p">—</span></div>
+        <div class="stat"><span class="k">타깃 RMS</span><span class="v" id="rc-rg-o-t">—</span></div>
+        <div class="stat"><span class="k">점군 RMS(최근접)</span><span class="v" id="rc-rg-o-c">—</span></div>
+        <div class="stat"><span class="k">ICP 반복</span><span class="v" id="rc-rg-o-n">—</span></div>
+      </div>
+      <div class="rc-msg" id="rc-rg-msg">—</div>
+      <div class="sim-note">해볼 것: 슬라이더로 주황 점군을 회색 기둥에 맞춰 보세요 — 손으로는 RMS 수 cm 아래로 내리기 어렵습니다 · "타깃으로 정합"은 세 타깃으로 한 번에 맞춥니다(원리 11.7) · "처음으로" 뒤 바로 "ICP 10회"를 누르면 처음 어긋남 6°에서는 잘 맞습니다 · 처음 어긋남을 35°로 바꾸고 ICP만 쓰면 RMS가 줄다 멈춘 채 기둥이 엇갈려 맞물립니다(국소 최소) — 타깃으로 대략 맞춘 뒤 ICP로 다듬는 이유입니다 · 모델: 기준 A = B-10 1층 기둥 20개·코어 벽의 평면 단면 점(교육용 2D), 스캔 B = 서쪽 절반을 본 스캔(잡음 5 mm)을 미지의 회전·이동으로 옮긴 것, ICP는 최근접점 + 거리 0.8 m 넘는 쌍 제외 + <code>CB.bim.rigid2D</code>.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="planes">
+    <h2>평면 추출: 최소 제곱과 RANSAC</h2>
+    <div class="problem"><strong>자재 더미가 놓인 바닥</strong>
+      <p>2층 바닥판의 높이를 알고 싶어 스캔했는데, 바닥 위에 거푸집 자재와 철근 다발이 쌓여 있었습니다. 모든 점에 평면 하나를 맞추면 그 평면은 바닥일까요?</p></div>
+    <p>점군에서 바닥·벽·천장을 찾는 가장 기본적인 일은 평면 맞춤입니다. 모든 점이 평면 근처에 있다면 최소 제곱이 가장 좋은 답을 주지만, 바닥 위의 자재처럼 평면에 속하지 않는 <span class="term">이상점</span><span class="en">(outlier)</span>이 섞이면 최소 제곱은 그 점들 쪽으로 끌려가 기웁니다. 이상점에 강한 대표적 방법이 RANSAC입니다.</p>
+    <div class="callout def"><strong>원리 11.9 (최소 제곱 평면)</strong> 점들의 무게중심 \(c\)와 공분산 행렬 \(C = \sum_i (p_i - c)(p_i - c)^{\mathsf T}\)을 구하면, 점에서 평면까지 수직 거리 제곱합을 최소로 하는 평면의 법선 \(n\)은 \(C\)의 <b>가장 작은 고윳값</b>의 고유 벡터이고 평면은 \(n\cdot x = n\cdot c\)다. 가장 작은 고윳값 \(\lambda_{min}\)으로 \(RMS = \sqrt{\lambda_{min}/m}\)(m은 점 수). <code>CB.bim.planeFit</code>이 이 계산을 한다. 모든 점에 같은 무게를 주므로, 바닥에서 1 m 위의 점 하나는 1 mm 위의 점 백만 개만큼 평면을 끈다.</div>
+    <div class="callout def"><strong>원리 11.10 (RANSAC)</strong> ① 점 세 개를 무작위로 골라 평면을 만들고, ② 그 평면에서 허용 거리 \(\tau\) 안에 드는 점(<span class="term">인라이어</span><span class="en">(inlier)</span>)을 센다. ③ 이를 \(k\)번 반복해 인라이어가 가장 많은 평면을 고르고, ④ 그 인라이어만으로 최소 제곱 평면을 다시 맞춘다. 이것이 <span class="term">RANSAC</span><span class="en">(random sample consensus)</span>이다(Fischler·Bolles, 1981). 인라이어 비율이 \(w\)일 때 확률 \(P\)로 인라이어 세 개를 한 번 이상 뽑으려면
+      <div class="formula">$$k = \frac{\ln(1 - P)}{\ln(1 - w^3)}$$<div class="where">\(w = 0.6\), \(P = 0.99\)이면 \(k \approx 19\)회, \(w = 0.3\)이면 약 169회. 허용 거리 \(\tau\)는 측정 잡음의 2–3배 정도로 정한다. 너무 작으면 진짜 바닥 점도 버리고, 너무 크면 바닥 위의 얇은 판도 바닥으로 받아들인다. <code>CB.bim.ransacPlane(pts, iters, tol, seed)</code>.</div></div></div>
+    <figure class="diagram" id="fig-rc-plane">
+      <svg viewBox="0 0 860 280" role="img" aria-label="바닥 점과 자재 더미 점에 맞춘 최소 제곱 직선은 기울고 RANSAC은 바닥을 찾는 단면 그림">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <g style="fill:var(--ok)">
+            <circle cx="10" cy="160" r="3"/><circle cx="40" cy="161" r="3"/><circle cx="70" cy="159" r="3"/><circle cx="100" cy="160" r="3"/><circle cx="130" cy="161" r="3"/><circle cx="160" cy="159" r="3"/><circle cx="190" cy="160" r="3"/><circle cx="220" cy="161" r="3"/><circle cx="250" cy="160" r="3"/><circle cx="280" cy="159" r="3"/><circle cx="310" cy="160" r="3"/><circle cx="340" cy="161" r="3"/>
+          </g>
+          <rect x="390" y="90" width="120" height="70" style="fill:var(--bad);opacity:.12;stroke:var(--bad);stroke-dasharray:4 3"/>
+          <g style="fill:var(--bad)"><circle cx="400" cy="100" r="3"/><circle cx="430" cy="96" r="3"/><circle cx="460" cy="102" r="3"/><circle cx="490" cy="98" r="3"/><circle cx="420" cy="120" r="3"/><circle cx="470" cy="118" r="3"/><circle cx="500" cy="130" r="3"/><circle cx="440" cy="140" r="3"/></g>
+          <text x="400" y="80" class="t-mono" style="fill:var(--bad)">자재 더미(이상점)</text>
+          <line x1="0" y1="176" x2="520" y2="122" style="stroke:var(--warn);stroke-width:2.4"/><text x="530" y="120" class="t-mono" style="fill:var(--warn)">최소 제곱: 기운다</text>
+          <line x1="0" y1="160" x2="520" y2="160" style="stroke:var(--accent);stroke-width:2.4"/><text x="530" y="164" class="t-mono" style="fill:var(--accent)">RANSAC: 바닥</text>
+          <line x1="0" y1="152" x2="520" y2="152" style="stroke:var(--accent);stroke-dasharray:3 3"/><line x1="0" y1="168" x2="520" y2="168" style="stroke:var(--accent);stroke-dasharray:3 3"/>
+          <text x="0" y="200" class="t-mono">점선 띠 = 허용 거리 ±τ 안(인라이어)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-7.</b> 이상점이 있을 때의 평면 맞춤(단면). 최소 제곱은 모든 점의 거리 제곱을 줄이려 자재 더미 쪽으로 기운다. RANSAC은 '가장 많은 점이 동의하는 평면'을 고르므로 더미를 무시하고 바닥을 찾는다. 단, 더미가 바닥보다 많으면 RANSAC도 더미의 윗면을 고를 수 있다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-rc-ransac">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>RANSAC 평면: 잡음 · 이상점 비율 → 찾은 평면과 인라이어, 최소 제곱과 비교</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rc-cv-ransac" aria-label="8 × 8 m 바닥 점군과 자재 더미, RANSAC 평면과 최소 제곱 평면의 3D 그림"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>이상점 비율 <output id="rc-rs-o-out"></output></span><input type="range" id="rc-rs-o" min="0" max="60" step="1" value="20"></label>
+          <label class="ctrl"><span>측정 잡음 σ <output id="rc-rs-n-out"></output></span><input type="range" id="rc-rs-n" min="1" max="10" step="0.5" value="3"></label>
+          <label class="ctrl"><span>허용 거리 τ <output id="rc-rs-t-out"></output></span><input type="range" id="rc-rs-t" min="2" max="60" step="1" value="12"></label>
+          <label class="ctrl"><span>반복 횟수 k <output id="rc-rs-k-out"></output></span><input type="range" id="rc-rs-k" min="1" max="300" step="1" value="60"></label>
+          <div class="btn-row"><button class="btn" id="rc-rs-seed">다시 측정</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최소 제곱 기울기</span><span class="v" id="rc-rs-o-ls">—</span></div>
+        <div class="stat"><span class="k">RANSAC 기울기</span><span class="v" id="rc-rs-o-rs">—</span></div>
+        <div class="stat"><span class="k">인라이어</span><span class="v" id="rc-rs-o-in">—</span></div>
+        <div class="stat"><span class="k">필요 k(P 0.99)</span><span class="v" id="rc-rs-o-k">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 이상점 0 %에서는 두 방법이 같습니다 · 20 %로 올리면 최소 제곱 평면(노랑)이 더미 쪽으로 약 3–4° 기울고 모서리 높이가 수십 cm 틀리지만 RANSAC 평면(보라)은 그대로입니다 · τ를 2 mm로 줄이면 잡음 3 mm인 바닥 점의 절반가량을 버립니다 · 반복을 1–3회로 줄이고 "다시 측정"을 눌러 보세요 — 운이 나쁘면 더미 윗면을 고릅니다 · 이상점이 55 %를 넘으면 바닥보다 더미 점이 많아집니다 · 모델: 8 × 8 m 바닥(z = 5.000 m, 2층 바닥판 일부)에 정규 잡음, 이상점의 3/4은 자재 더미 두 개의 윗면·옆면(높이 0.3–1.2 m), 1/4은 공중의 흩어진 점(사람·먼지), <code>CB.bim.planeFit</code>과 <code>CB.bim.ransacPlane</code>, 점 수 약 900–2,250개. 초록 = 인라이어, 빨강 = 아웃라이어.</div>
+    </div>
+    <div class="callout"><strong>예제 11.6 (반복 횟수와 최소 제곱의 기울기)</strong> 8 × 8 m 바닥에서 바닥 점 900개(잡음 3 mm), 한쪽 모서리 2.5 × 2.5 m에 자재 더미의 점 225개(바닥 위 0.2–1.2 m)가 있다(이상점 20 %).
+      <p><b>① 필요한 반복</b> \(w = 0.8\): \(k = \ln 0.01/\ln(1 - 0.512) = 6.4\) → 7회면 99 %. 더미 위 점이 더 많은 현장(\(w = 0.3\))이라면 169회가 필요하다. 반복 비용은 \(k \times\) 점 수이므로 수백 회는 실시간에 가깝다.</p>
+      <p><b>② 최소 제곱의 결과</b> 같은 점에 <code>planeFit</code>을 쓰면 평면이 약 3.6° 기울어, 더미 반대쪽 모서리 (0, 0)에서 높이가 약 27 cm 낮게, 더미 쪽 모서리 (8, 8)에서 약 45 cm 높게 나온다(RMS 0.25 m). RANSAC(τ 15 mm)은 바닥 점 900개를 모두 인라이어로 찾고 기울기 0.005°, 높이 5.000 m를 준다.</p>
+      <p><b>③ 판단</b> 평면 맞춤의 RMS가 측정 잡음(수 mm)보다 훨씬 크면 이상점이 섞인 것이다. 결과를 숫자 하나로 보고하기 전에 잔차의 분포를 보고, 이상점을 걸러 낸 근거(τ, 반복 수, 인라이어 비율)를 함께 적는다.</p></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="flatness">
+    <h2>슬래브 평탄도 검사</h2>
+    <div class="problem"><strong>평평한가, 수평인가</strong>
+      <p>2층 바닥판 위에 사무실 바닥 마감과 이중 바닥을 올려야 합니다. 마감 업체는 "바닥이 울퉁불퉁하면 몰탈로 채워야 하니 비용이 늘어난다"고 합니다. 바닥 전체가 한쪽으로 5 mm 기운 것과, 한 칸 안이 접시처럼 5 mm 처진 것은 같은 문제일까요?</p></div>
+    <p>바닥 품질은 두 가지로 나눠 봅니다. 짧은 거리 안의 오르내림(울퉁불퉁함)과, 긴 거리에 걸친 설계 높이와의 차이(기울어짐)입니다. 전자는 마감재를 놓을 때, 후자는 문턱·엘리베이터·이웃 구역과 높이를 맞출 때 문제가 됩니다. 전통적인 검사는 3 m 직선자를 바닥에 놓고 그 아래 틈을 재는 방법이고, 점군은 바닥 전체를 촘촘히 재서 같은 판정을 모든 곳에서 할 수 있게 합니다.</p>
+    <div class="callout def"><strong>정의 11.11 (평탄도와 수평도)</strong> <span class="term">평탄도</span><span class="en">(flatness)</span>는 짧은 거리 안에서 면이 오르내리는 정도로, 이 장에서는 길이 3 m 직선자를 면에 걸쳤을 때 자와 면 사이의 가장 큰 틈으로 잰다. <span class="term">수평도</span><span class="en">(levelness)</span>는 설계 높이(또는 설계 경사)와의 차이로, 넓은 범위의 기울어짐과 높이 오차를 본다. 점군으로는 ① 설계 높이 기준 편차(수평도)와 ② 맞춤 평면 기준 편차(평탄도에 가까움)를 색으로 칠한 <span class="term">편차 지도</span><span class="en">(deviation map)</span>를 만든다. 미국에서는 바닥 높이를 일정 간격으로 재서 통계적으로 계산하는 F-수(\(F_F\) 평탄도, \(F_L\) 수평도, ASTM E1155)도 쓴다. 허용 틈·허용 편차는 마감 종류와 공사 시방이 정한다(형태, 현행 시방 확인 — 이 장의 값은 교육용).</div>
+    <figure class="diagram" id="fig-rc-flat">
+      <svg viewBox="0 0 860 280" role="img" aria-label="3 m 직선자 아래의 틈과 설계 높이 기준 편차, 맞춤 평면 기준 편차의 차이">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">평탄도: 3 m 직선자</text>
+          <path d="M0 120C40 118 70 135 110 140C150 145 180 128 220 122C260 116 290 130 330 126" style="fill:none;stroke:var(--text);stroke-width:2.4"/>
+          <line x1="20" y1="118" x2="230" y2="121" style="stroke:var(--accent);stroke-width:4"/>
+          <line x1="110" y1="120" x2="110" y2="139" style="stroke:var(--bad);stroke-width:2" marker-start="url(#rc-ah-bad)" marker-end="url(#rc-ah-bad)"/>
+          <text x="118" y="160" class="t-mono" style="fill:var(--bad)">틈 g</text>
+          <text x="20" y="104" class="t-mono" style="fill:var(--accent)">3 m 직선자(높은 두 점에 걸침)</text>
+          <text x="0" y="200" class="t-mono">짧은 파장의 오르내림을 본다(마감재 품질)</text>
+        </g>
+        <g transform="translate(450,40)">
+          <text x="0" y="0" class="t" style="font-weight:700">수평도: 설계 높이 기준</text>
+          <line x1="0" y1="110" x2="350" y2="110" style="stroke:var(--accent-2);stroke-width:1.6;stroke-dasharray:6 4"/><text x="250" y="102" class="t-mono" style="fill:var(--accent-2)">설계 FL +5.000</text>
+          <path d="M0 98C60 100 120 108 180 114C240 120 300 126 350 130" style="fill:none;stroke:var(--text);stroke-width:2.4"/>
+          <line x1="20" y1="110" x2="20" y2="99" style="stroke:var(--bad);stroke-width:2"/><line x1="330" y1="110" x2="330" y2="129" style="stroke:var(--bad);stroke-width:2"/>
+          <text x="0" y="160" class="t-mono">직선자는 통과해도 전체가 기울 수 있다</text>
+          <text x="0" y="182" class="t-mono">→ 문턱·엘리베이터·이웃 구역과 높이 차</text>
+          <text x="0" y="214" class="t-mono">맞춤 평면 기준 편차 = 기울기를 뺀 나머지</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-8.</b> 평탄도와 수평도. 직선자 검사(왼쪽)는 짧은 오르내림을, 설계 높이 기준 편차(오른쪽)는 넓은 기울어짐을 본다. 점군의 편차 지도는 두 기준을 바꿔 가며 같은 데이터로 둘 다 보여 준다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-rc-flat">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>슬래브 평탄도 히트맵: 합성 점군 → 편차 색과 3 m 직선자 판정</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rc-cv-flat" aria-label="2층 바닥판 평면 위 점군의 편차 색 지도와 직선자 불합격 구간"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>편차 기준</span><div class="seg" id="rc-fl-ref"><button data-value="design" class="on">설계 높이 5.000</button><button data-value="fit">맞춤 평면</button></div></div>
+          <label class="ctrl"><span>칸 중앙 처짐 δ <output id="rc-fl-d-out"></output></span><input type="range" id="rc-fl-d" min="0" max="15" step="0.5" value="5"></label>
+          <label class="ctrl"><span>국부 요철 크기 <output id="rc-fl-b-out"></output></span><input type="range" id="rc-fl-b" min="0" max="15" step="0.5" value="6"></label>
+          <label class="ctrl"><span>전체 기울기 <output id="rc-fl-s-out"></output></span><input type="range" id="rc-fl-s" min="0" max="2" step="0.05" value="0.3"></label>
+          <label class="ctrl"><span>스캔 잡음 σ <output id="rc-fl-n-out"></output></span><input type="range" id="rc-fl-n" min="0" max="5" step="0.5" value="1.5"></label>
+          <label class="ctrl"><span>허용 틈(교육용) <output id="rc-fl-t-out"></output></span><input type="range" id="rc-fl-t" min="2" max="12" step="0.5" value="5"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">맞춤 평면 기울기</span><span class="v" id="rc-fl-o-p">—</span></div>
+        <div class="stat"><span class="k">편차 범위</span><span class="v" id="rc-fl-o-r">—</span></div>
+        <div class="stat"><span class="k">직선자 불합격</span><span class="v" id="rc-fl-o-f">—</span></div>
+        <div class="stat"><span class="k">최대 틈</span><span class="v" id="rc-fl-o-g">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 처짐(칸마다 접시 모양)과 두 곳의 국부 요철이 색으로 보이고, 불합격 직선자 구간(빨간 선)이 요철 근처에 몰리는 것을 확인하세요 · 전체 기울기를 2 mm/m로 키우면 "설계 높이" 기준 지도는 한쪽이 빨갛고 다른 쪽이 파랗지만 직선자 판정은 거의 그대로입니다 — 기울기는 평탄도가 아니라 수평도 문제입니다 · "맞춤 평면"으로 바꾸면 기울기가 빠지고 처짐과 요철만 남습니다 · 잡음 σ를 5 mm로 키우면 실제로는 평평한 곳에서도 틈이 커 보입니다 — 스캐너 잡음이 허용치에 가까우면 판정할 수 없습니다 · 모델(교육용 합성 면): 바닥판 32.8 × 24.8 m(코어 x 8–24, y 8–16 m 제외), 8 m 칸마다 sin·sin 처짐, 요철 두 곳(가우스 반지름 1.2 m, 패임 −1배 · 솟음 +0.8배), 점 약 2,300개(<code>CB.bim.planeFit</code>), 직선자는 x·y 방향 2 m 간격 선 위에서 0.5 m씩 옮기며 0.25 m 간격 높이(점군을 반지름 약 5 cm 안에서 평균한 값으로 보아 잡음 σ/3)에 걸친 지지선 아래 최대 틈.</div>
+    </div>
+    <div class="callout"><strong>예제 11.7 (직선자 한 번의 판정)</strong> 3 m 직선자 아래에서 0.5 m 간격으로 잰 설계 높이 기준 편차(mm): 0, −2, −5, −7, −6, −3, −1.
+      <p><b>① 자가 놓이는 곳</b> 자는 가장 높은 두 점, 곧 양 끝(0, −1)에 걸친다. 자의 높이는 0에서 −1까지 직선이므로 0.5 m마다 −0.17 mm씩 내려간다.</p>
+      <p><b>② 틈</b> 가운데 1.5 m 지점에서 자의 높이 −0.5, 면 −7 → 틈 6.5 mm. 다른 점은 이보다 작다. 허용 틈이 5 mm(교육용)라면 불합격이다.</p>
+      <p><b>③ 수평도는 따로</b> 같은 구간의 설계 높이 편차는 최대 −7 mm이지만, 다른 칸 전체가 +8 mm 높다면 두 칸 사이에 15 mm의 높이 차가 생긴다. 평탄도는 마감재 품질, 수평도는 공간 사이 높이 맞춤이다.</p>
+      <p><b>④ 판단</b> 접시 모양 처짐은 거푸집·동바리 처짐이나 타설 높이 관리 문제이고, 국부 요철은 미장 마무리 문제다. 편차 지도는 '어디를 얼마나' 갈아 내거나 채울지(그라인딩·셀프 레벨링)를 물량으로 바꿔 준다: 불합격 영역 넓이 × 평균 채움 두께.</p></div>
+    <div class="callout site"><strong>B-10 2층 바닥판(S-1F) 검측 계획(교육용)</strong> 1층 기둥 타설 뒤, 2층 바닥판 타설 다음 날 스캐너를 코어 바깥 네 칸에 한 번씩(네 자리) 세워 바닥과 기둥을 함께 기록한다. 네 스캔은 벽·기둥에 붙인 타깃 여섯 개(토털 스테이션으로 측량, 현장 기준점에서 출발)로 정합해 프로젝트 좌표에 놓는다. 바닥은 RANSAC으로 자재와 사람을 거른 뒤 편차 지도를 만들고 직선자 판정을 하며, 기둥은 다음 절의 편차 분석을 한다. 결과(점군, 편차 지도, 판정표)는 2층 바닥판 요소 <code>S-1F</code>의 GUID와 함께 CDE(5장)에 올려 검측 기록으로 남기고, 마감 업체의 레벨링 물량 산정에 쓴다.</div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="scan-vs-bim">
+    <h2>스캔 대 BIM 편차 분석</h2>
+    <div class="problem"><strong>1층 기둥 20개는 제자리에 섰나</strong>
+      <p>스캔 점군과 B-10 BIM을 같은 좌표에 겹쳤습니다. 기둥 C-B4 근처의 점들이 모델 면보다 4 cm 바깥에 있습니다. 기둥이 틀어진 걸까요, 정합이 틀린 걸까요, 아니면 기둥에 붙은 거푸집 조각일까요? 20개 기둥 모두에 대해 같은 판단을 어떻게 빠르고 공정하게 할까요?</p></div>
+    <p>정합된 점군을 모델과 비교하는 방법은 두 층위입니다. ① 점마다 가장 가까운 모델 면까지의 거리를 색으로 칠하는 <b>점–모델 거리</b>(넓게 훑어보기), ② 요소마다 점들로 실제 위치·크기·기울기를 추정해 설계값과 비교하는 <b>요소별 편차</b>(판정). 판정은 ②로 합니다. 예를 들어 기둥은 네 면의 점으로 중심 위치를, 높이별 면 위치로 수직도를 추정합니다.</p>
+    <div class="callout def"><strong>정의 11.12 (요소 편차와 허용치)</strong> 요소 \(e\)의 <span class="term">편차</span><span class="en">(deviation)</span>는 점군으로 추정한 실제 기하와 모델 기하의 차이다. 기둥이면 중심의 수평 편차 \(\Delta = \sqrt{\Delta x^2 + \Delta y^2}\)와 <span class="term">수직도</span><span class="en">(plumbness)</span>(높이당 기울어짐)를 쓴다. 편차를 <span class="term">허용치</span><span class="en">(tolerance)</span>와 비교해 합격·주의·불합격으로 나누고, 불합격이면 재시공·보강·설계 반영(다음 층 먹매김 조정, 모델 갱신) 중 하나를 정한다. 측정 불확실성(정합 RMS + 면 추정 오차)이 허용치의 상당 부분을 차지하면 판정을 믿을 수 없으므로, 측정 정확도는 허용치보다 충분히 작아야 한다(흔히 몇 분의 일, 형태). 측정 정확도 등급을 정하는 문서(예: 미국 USIBD의 LOA 사양)도 있다(형태).</div>
+    <figure class="diagram" id="fig-rc-dev">
+      <svg viewBox="0 0 860 290" role="img" aria-label="기둥 평면: 설계 위치와 스캔한 면의 점, 보이는 면으로 추정한 중심과 편차 벡터, 한 면만 보일 때의 추정">
+        <rect x="10" y="10" width="840" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(70,50)">
+          <text x="0" y="-12" class="t" style="font-weight:700">네 면이 보일 때</text>
+          <rect x="40" y="40" width="160" height="160" style="fill:none;stroke:var(--text-dim);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <rect x="62" y="30" width="160" height="160" style="fill:var(--accent-soft);opacity:.4;stroke:none"/>
+          <g style="fill:var(--accent-2)"><circle cx="62" cy="60" r="3"/><circle cx="63" cy="100" r="3"/><circle cx="61" cy="140" r="3"/><circle cx="62" cy="170" r="3"/><circle cx="222" cy="60" r="3"/><circle cx="221" cy="110" r="3"/><circle cx="223" cy="160" r="3"/><circle cx="90" cy="30" r="3"/><circle cx="140" cy="31" r="3"/><circle cx="190" cy="29" r="3"/><circle cx="100" cy="190" r="3"/><circle cx="160" cy="191" r="3"/></g>
+          <circle cx="120" cy="120" r="4" style="fill:var(--text-dim)"/><circle cx="142" cy="110" r="5" style="fill:var(--bad)"/>
+          <line x1="120" y1="120" x2="140" y2="111" style="stroke:var(--bad);stroke-width:2" marker-end="url(#rc-ah-bad)"/>
+          <text x="0" y="230" class="t-mono">점선 = 모델 · 점 = 스캔 · 빨강 = 편차 Δ</text>
+          <text x="0" y="250" class="t-mono">중심 = 마주 보는 두 면 위치의 평균</text>
+        </g>
+        <g transform="translate(470,50)">
+          <text x="0" y="-12" class="t" style="font-weight:700">한쪽 면만 보일 때</text>
+          <rect x="40" y="40" width="160" height="160" style="fill:none;stroke:var(--text-dim);stroke-width:1.6;stroke-dasharray:6 4"/>
+          <g style="fill:var(--accent-2)"><circle cx="58" cy="60" r="3"/><circle cx="58" cy="100" r="3"/><circle cx="57" cy="140" r="3"/><circle cx="58" cy="180" r="3"/></g>
+          <line x1="58" y1="120" x2="138" y2="120" style="stroke:var(--accent);stroke-width:1.4;stroke-dasharray:3 3"/><text x="70" y="114" class="t-mono" style="fill:var(--accent)">+ 설계 폭/2</text>
+          <circle cx="138" cy="120" r="5" style="fill:var(--warn)"/>
+          <circle cx="-20" cy="120" r="8" style="fill:var(--accent)"/><text x="-40" y="146" class="t-mono">스캐너</text>
+          <text x="0" y="230" class="t-mono">뒷면이 가려지면 '단면이 설계대로'라고</text>
+          <text x="0" y="250" class="t-mono">가정해 중심을 추정(불확실성 증가)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-9.</b> 기둥 중심의 추정. 마주 보는 두 면이 모두 찍히면 두 면의 평균 위치가 중심이다(단면 크기 오차와 무관). 한 면만 찍히면 설계 단면 크기를 빌려 중심을 추정하므로, 단면이 설계보다 크거나 작으면 그만큼 편차가 잘못 나온다. 그래서 검측 스캔은 각 기둥의 마주 보는 면이 보이도록 자리를 정한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-rc-dev">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>스캔 대 BIM 편차: 시공 기둥 위치 오차 → 스캔 점 → 편차 색 3D</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="rc-cv-dev" aria-label="B-10 1층 기둥 20개의 모델 상자와 스캔 점, 편차에 따라 색칠한 기둥과 확대한 편차 화살표"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>시공 오차 σ <output id="rc-dv-s-out"></output></span><input type="range" id="rc-dv-s" min="0" max="20" step="0.5" value="6"></label>
+          <label class="ctrl"><span>C-B4 오시공 이동 <output id="rc-dv-g-out"></output></span><input type="range" id="rc-dv-g" min="0" max="80" step="1" value="40"></label>
+          <label class="ctrl"><span>허용치(교육용) <output id="rc-dv-t-out"></output></span><input type="range" id="rc-dv-t" min="5" max="40" step="1" value="15"></label>
+          <div class="ctrl"><span>스캐너 자리</span><div class="seg" id="rc-dv-n"><button data-value="1">1곳</button><button data-value="2">2곳</button><button data-value="4" class="on">4곳</button></div></div>
+          <div class="btn-row"><button class="btn" id="rc-dv-seed">다른 현장</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">측정한 기둥</span><span class="v" id="rc-dv-o-m">—</span></div>
+        <div class="stat"><span class="k">최대 편차</span><span class="v" id="rc-dv-o-x">—</span></div>
+        <div class="stat"><span class="k">RMS 편차</span><span class="v" id="rc-dv-o-r">—</span></div>
+        <div class="stat"><span class="k">불합격 기둥</span><span class="v" id="rc-dv-o-f">—</span></div>
+      </div>
+      <div class="rc-msg" id="rc-dv-msg">—</div>
+      <div class="sim-note">해볼 것: 기본값에서 C-B4(x 8, y 24)가 약 40 mm로 불합격(빨강)인 것을 확인하세요 · 스캐너를 1곳으로 줄이면 많은 기둥이 한쪽 면만 찍혀 설계 폭으로 중심을 추정합니다(점선 테두리) — 이 모델은 단면이 설계대로라고 가정해 편차를 얻지만, 실제로 단면이 10 mm 크면 그만큼 틀립니다 · 허용치를 σ의 두 배 아래로 낮추면 정상적인 기둥까지 불합격이 늘어납니다 — 허용치는 시공 능력에 맞게 정해야 합니다 · 모델: <code>CB.bim.model()</code>의 1층 <code>IfcColumn</code> 20개(800 × 800, 높이 4.3 m), 실제 위치 = 설계 + 정규 오차(σ, 시드), 스캐너는 코어 바깥 칸 중심, 시야 안(30 m)의 보이는 면에 높이 6 × 폭 4점(잡음 2 mm), 가림은 무시(교육용). 화살표는 편차를 50배로 그린다.</div>
+    </div>
+    <div class="callout"><strong>예제 11.8 (기둥 C-B4의 편차 판정)</strong> 설계 중심 \((8.000, 24.000)\), 단면 800 × 800. 스캔한 면의 평균 위치: 서쪽 면 \(x = 7.641\), 동쪽 면 \(x = 8.437\), 남쪽 면 \(y = 23.606\). 북쪽 면(건물 바깥)은 스캔되지 않았다.
+      <p><b>① x 방향</b> 두 면이 보였으므로 중심 \(x = (7.641 + 8.437)/2 = 8.039\), \(\Delta x = +39\) mm. 실제 폭 \(8.437 - 7.641 = 0.796\) m(설계 800, −4 mm).</p>
+      <p><b>② y 방향</b> 남쪽 면만 보였으므로 설계 폭을 빌려 \(y = 23.606 + 0.400 = 24.006\), \(\Delta y = +6\) mm(단면 오차만큼 불확실).</p>
+      <p><b>③ 편차와 판정</b> \(\Delta = \sqrt{39^2 + 6^2} = 39.5\) mm. 허용치 15 mm(교육용)를 넘으므로 불합격이다.</p>
+      <p><b>④ 판단</b> 먼저 측정을 의심한다: 정합 RMS(예: 3 mm)와 이웃 기둥의 편차(모두 수 mm)를 보면 정합 오류가 아니라 이 기둥만의 문제다. 다음 층 먹매김을 이 기둥의 실제 위치에 맞출지, 보 접합부 철근 정착에 문제가 없는지 구조 담당자와 검토하고, 결정 결과를 모델 요소 <code>C-B4-1F</code>의 속성(실측 중심, 편차, 조치)으로 기록한다. 그래야 준공 모델이 '설계 그대로'가 아니라 '실제 그대로'가 된다.</p></div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="drone-volume">
+    <h2>드론 체적과 진도: 모델과 다시 만나기</h2>
+    <div class="problem"><strong>골재 적치물은 몇 m³인가</strong>
+      <p>B-10 현장 한쪽에 되메우기용 골재를 쌓아 두었습니다. 공급 업체의 반입 전표와 실제 남은 양이 맞는지 확인하려 합니다. 드론 점군으로 적치물의 표면은 얻었는데, 그 아래 '바닥'은 어디로 잡아야 할까요?</p></div>
+    <p>SiteBook 16장은 굴착 전·후 두 번의 드론 측량 높이 차이로 굴착 체적을 점고법으로 계산했습니다(<a href="../../site/chapters/productivity.html">SiteBook 16장 드론 측량과 물량</a>). 적치물은 굴착 전 표면이 없으므로 <b>바닥면을 정하는 일</b>이 체적의 정확도를 좌우합니다. 실무는 적치물 둘레 발치의 점들로 바닥면을 정하고(평면 맞춤, 원리 11.9), 표면과 바닥면 사이를 격자 기둥이나 삼각망(TIN)으로 적분합니다. 표면 삼각망과 바닥면, 옆면을 이어 닫힌 메시로 만들면 2장의 발산 정리 부피(<code>CB.bim.meshVolume</code>)로도 같은 값을 얻습니다.</p>
+    <div class="callout def"><strong>원리 11.13 (적치물 체적)</strong>
+      <div class="formula">$$V = \sum_{k} A_k\,\bar h_k, \qquad h(x, y) = z_{surf}(x, y) - z_{base}(x, y), \qquad z_{base}: \text{ 발치 점의 최소 제곱 평면}$$<div class="where">\(A_k\): 격자 칸(또는 삼각형)의 수평 넓이, \(\bar h_k\): 칸 꼭짓점 높이의 평균. 바닥면을 1 cm 틀리면 체적은 '적치물 바닥 넓이 × 0.01' m³만큼 틀린다. 바닥 넓이가 넓고 높이가 낮은 적치물일수록 바닥면 오차가 체적 오차를 지배한다. 무게가 필요하면 시험으로 정한 단위 부피 질량을 곱한다.</div></div></div>
+    <div class="callout"><strong>예제 11.9 (경사진 바닥 위의 적치물)</strong> 2 m 격자 4 × 4점(칸 9개, 6 × 6 m)으로 측량했다. 둘레 12점은 발치로, 높이(m)가 서쪽 10.00에서 동쪽 10.12로 고르게 올라간다(바닥 경사 2 %). 안쪽 네 점(x = 2, 4 m × y = 2, 4 m)의 표면 높이는 11.24, 11.46, 11.06, 11.68 m다.
+      <p><b>① 맞춤 바닥면</b> 발치 12점에 <code>planeFit</code>을 쓰면 \(z_{base} = 10.00 + 0.02x\)(x는 서쪽 끝에서 m). 안쪽 점의 바닥면 위 높이는 \(11.24 - 10.04 = 1.20\), \(11.46 - 10.08 = 1.38\), \(11.06 - 10.04 = 1.02\), \(11.68 - 10.08 = 1.60\) m다.</p>
+      <p><b>② 체적</b> 둘레 점의 높이는 0이고 안쪽 점은 네 칸이 공유하므로 \(V = \frac{4}{4}\times4\times(1.20 + 1.38 + 1.02 + 1.60) = 4\times5.20 = 20.8\) m³.</p>
+      <p><b>③ 바닥면을 잘못 잡으면</b> 가장 낮은 발치(10.00)를 지나는 수평면을 바닥으로 쓰면 모든 점의 높이가 \(0.02x\)만큼 커진다. 36 m² 전체의 평균 증가분은 \(0.02\times3 = 0.06\) m이므로 체적이 \(36\times0.06 \approx 2.2\) m³(약 10 %) 과대가 된다.</p>
+      <p><b>④ 판단</b> 이 정도 크기의 적치물에서 10 %는 덤프트럭 한 대 분량이다. 드론 체적을 정산에 쓰려면 바닥면을 정하는 규칙(발치 점, 맞춤 평면, 적치 전 측량면)을 계약 당사자와 미리 합의하고, 같은 규칙으로 매번 계산해야 한다. 점의 우연 오차는 수많은 점의 평균으로 작아지지만 바닥면·기준점의 계통 오차는 넓이에 곱해져 그대로 남는다(SiteBook 16장과 같은 결론).</p></div>
+    <div class="callout site"><strong>B-10 현장의 현실 캡처 묶음(교육용)</strong> ① 착공 전: 현장 기준점 네 개(대지 모서리, 서로 시통), GNSS·토털 스테이션 측량 → <code>CB.bim.GEO</code>와 같은 지리 참조 매개변수 확정(예제 11.2 방식 + 검증점). ② 토공 중: 매주 드론 비행(고도 80 m, GSD 약 2 cm, 검사점 다섯 개) → 굴착 진도(SiteBook 16장)·적치물 체적. ③ 골조 중: 층마다 바닥판 타설 다음 날 지상 스캔 네 자리 → 기둥 편차·바닥 평탄도 판정, 결과를 요소 GUID에 연결. ④ 설비 중: 천장을 덮기 전 덕트·배관 스캔 → 설계 경로와 비교(6장의 간섭이 실제로 해결되었는지). ⑤ 준공: 스캔 투 BIM으로 실측 속성을 반영한 준공 모델을 운영 단계(13장)에 넘긴다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 정보가 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="gis.html"><small>CH.15 · GIS와 도시 모델</small>지리 참조의 다음 단계<br><span>투영과 좌표계, 축척 계수의 정체, BIM을 도시 모델에 올리기.</span></a>
+      <a href="fabrication.html"><small>CH.12 · 디지털 제작과 프리패브</small>스캔해야 맞물린다<br><span>공장 부재가 현장의 실제 위치에 맞으려면 현장을 먼저 재야 한다.</span></a>
+      <a href="four-d.html"><small>CH.09 · 4D 공정 시뮬레이션</small>계획 대 실적을 3D로<br><span>스캔·드론으로 본 실적을 4D 계획과 겹쳐 진도를 본다.</span></a>
+      <a href="qto.html"><small>CH.07 · 모델 기반 물량 산출</small>실측 물량<br><span>설계 물량과 실측 체적의 차이가 기성과 정산의 근거가 된다.</span></a>
+      <a href="facility.html"><small>CH.13 · 시설 관리와 자산 정보</small>준공 모델의 인수<br><span>스캔 투 BIM의 결과가 운영 단계의 출발점이다.</span></a>
+      <a href="digital-twin.html"><small>CH.14 · 디지털 트윈과 IoT</small>실제 상태를 계속 반영<br><span>한 번의 스캔이 아니라 센서와 반복 측정으로 모델을 살린다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>현실 캡처는 지어진 대상을 좌표가 있는 점으로 기록하는 일이다. 모든 점은 기준점이 정한 하나의 좌표계에 놓여야 모델과 비교할 수 있다.</li>
+      <li>지리 참조는 이동·회전·축척의 2D 헬머트 변환이다. B-10 E/4 (32, 24) → E 203,476.31 · N 551,850.13. 회전 0.01°는 40 m에서 7 mm, 원점 오류는 모든 점을 같이 옮긴다. 측량 성과표의 X·Y 정의를 먼저 확인한다.</li>
+      <li>사진 측량은 두 광선의 교점이다. GSD = pH/f(80 m, 1인치급 → 2.19 cm), 높이 오차 σ<sub>Z</sub> ≈ (H/B)·GSD·σ<sub>px</sub>로 B/H가 작으면 높이가 평면보다 몇 배 부정확하다. 정확도는 검사점 잔차로 확인한다.</li>
+      <li>레이저 스캔 점은 x = r cos v cos φ, y = r cos v sin φ, z = r sin v. 점 간격 ≈ rΔα(0.036°, 12 m → 7.5 mm)이고 비스듬한 면에서 1/cos i배 벌어진다. 혼합 점·반사·가림을 걸러야 한다.</li>
+      <li>대응점 정합은 무게중심과 θ = atan2(Σa×b, Σa·b)로 한 번에 풀고 RMS로 검증한다. ICP는 대응을 모를 때 최근접점으로 반복하지만 처음 어긋남이 크면 국소 최소에 빠진다.</li>
+      <li>최소 제곱 평면은 공분산의 최소 고유 벡터로 정해지며 이상점에 끌려 기운다. RANSAC은 k = ln(1 − P)/ln(1 − w³)번 세 점 표본을 뽑아 가장 많은 점이 동의하는 평면을 고른다.</li>
+      <li>평탄도(짧은 거리의 오르내림, 3 m 직선자 틈)와 수평도(설계 높이와의 차이)는 다른 문제다. 편차 지도는 두 기준을 바꿔 보며 보수 위치와 물량을 정한다.</li>
+      <li>스캔 대 BIM은 요소별로 실제 기하를 추정해 허용치와 비교한다. 측정 불확실성이 허용치보다 충분히 작아야 판정이 성립하고, 결과는 요소 GUID에 기록되어 준공 모델이 된다. 드론 체적은 바닥면 규칙이 정확도를 좌우한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 화소 크기 2.4 µm, 초점 거리 8.8 mm인 카메라로 고도 110 m에서 찍으면 GSD는 약?</p><div class="opts">
+        <button class="opt">0.3 cm</button><button class="opt" data-correct>3.0 cm</button><button class="opt">30 cm</button><button class="opt">1.1 cm</button>
+      </div><div class="quiz-exp">\(GSD = pH/f = 2.4\times10^{-6}\times110/0.0088 = 0.030\) m. 고도에 비례하므로 80 m의 2.19 cm보다 크다.</div></div>
+      <div class="quiz-q"><p>2. B-10 BIM의 지리 참조에서 회전 θ를 12.00° 대신 12.05°로 썼다. 원점에서 40 m 떨어진 점은 대략 얼마나 어긋나는가?</p><div class="opts">
+        <button class="opt">0.7 mm</button><button class="opt" data-correct>35 mm</button><button class="opt">0 mm(회전은 거리를 바꾸지 않으므로)</button><button class="opt">2 m</button>
+      </div><div class="quiz-exp">\(40\times0.05\times\pi/180 = 0.035\) m. 회전은 거리를 바꾸지 않지만 위치를 원 둘레 방향으로 옮긴다. 원점에서 멀수록 커진다.</div></div>
+      <div class="quiz-q"><p>3. 두 사진의 기선이 고도의 0.2배일 때(B/H = 0.2), 두 장으로 얻은 점의 높이 오차는 평면 오차와 비교해 대략?</p><div class="opts">
+        <button class="opt">같다</button><button class="opt">1/5이다</button><button class="opt" data-correct>약 5배 크다</button><button class="opt">25배 크다</button>
+      </div><div class="quiz-exp">\(\sigma_Z \approx (H/B)\cdot GSD\cdot\sigma_{px}\), 평면 오차는 약 \(GSD\cdot\sigma_{px}\)이므로 비는 \(H/B = 5\). 교차각이 작을수록 광선 방향으로 오차가 길어진다.</div></div>
+      <div class="quiz-q"><p>4. 각도 간격 0.036°로 스캔할 때 30 m 떨어진 면에 수직으로 맞는 점의 간격은?</p><div class="opts">
+        <button class="opt">약 1.1 mm</button><button class="opt">약 7.5 mm</button><button class="opt" data-correct>약 19 mm</button><button class="opt">약 108 mm</button>
+      </div><div class="quiz-exp">\(s = r\Delta\alpha = 30\times0.036\times\pi/180 = 0.0188\) m. 거리에 비례하므로 12 m의 7.5 mm보다 2.5배 크다.</div></div>
+      <div class="quiz-q"><p>5. 타깃 다섯 개로 두 스캔을 정합했더니 RMS 2 mm인데, 한 타깃의 잔차만 18 mm다. 가장 알맞은 조치는?</p><div class="opts">
+        <button class="opt">RMS가 작으니 그대로 채택한다</button><button class="opt" data-correct>그 타깃이 움직였거나 번호가 틀렸을 수 있으니 빼고 다시 풀어 비교한다</button><button class="opt">ICP를 10회 더 돌린다</button><button class="opt">축척을 함께 맞춘다</button>
+      </div><div class="quiz-exp">잔차 하나가 튀면 그 대응점이 의심스럽다. 제외하고 다시 정합해 나머지 잔차가 줄면 원인을 확인한 것이다. 레이저 스캔은 거리를 직접 재므로 축척을 맞추지 않는다.</div></div>
+      <div class="quiz-q"><p>6. 점의 70 %가 바닥(인라이어)일 때, 99 % 확률로 인라이어 세 점을 한 번 이상 뽑는 데 필요한 RANSAC 반복 수는 약?</p><div class="opts">
+        <button class="opt">3회</button><button class="opt" data-correct>11회</button><button class="opt">100회</button><button class="opt">1,000회</button>
+      </div><div class="quiz-exp">\(k = \ln0.01/\ln(1 - 0.343) = 10.96\) → 11회. 인라이어 비율이 낮아지면 \(w^3\)이 급격히 작아져 반복이 빠르게 는다.</div></div>
+      <div class="quiz-q"><p>7. 바닥 전체가 한쪽으로 2 mm/m 기울었지만 3 m 직선자 틈은 모든 곳에서 2 mm 이하다. 맞는 설명은?</p><div class="opts">
+        <button class="opt">평탄도 불량이다</button><button class="opt" data-correct>평탄도는 좋고 수평도(설계 높이와의 차이)가 문제다</button><button class="opt">둘 다 문제없다</button><button class="opt">스캐너 잡음 때문이다</button>
+      </div><div class="quiz-exp">직선자는 짧은 거리의 오르내림을 본다. 32 m 바닥이 2 mm/m 기울면 양 끝 높이 차가 64 mm로, 문턱·이웃 구역 높이 맞춤의 문제(수평도)다.</div></div>
+      <div class="quiz-q"><p>8. 기둥의 한쪽 면만 스캔되어 설계 단면 폭으로 중심을 추정했다. 실제 단면이 설계보다 20 mm 크다면?</p><div class="opts">
+        <button class="opt">중심 추정에 영향이 없다</button><button class="opt" data-correct>중심이 그 방향으로 약 10 mm 잘못 추정된다</button><button class="opt">중심이 20 mm × 2 = 40 mm 틀린다</button><button class="opt">점 간격이 넓어진다</button>
+      </div><div class="quiz-exp">보이는 면에서 설계 폭의 절반(400 mm)을 더해 중심을 놓았는데 실제 절반은 410 mm이므로 10 mm 틀린다. 마주 보는 두 면을 모두 스캔하면 이 오류가 없다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미(그리기·난수, 교육용) ---------- */
+const RCX = {
+  font(o) { return `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`; },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = RCX.font(o); ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    if (o.halo !== false) { ctx.lineWidth = 3; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); }
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, x0, y0, x1, y1, color, width = 1.4, dash) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.restore(); },
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  gauss(r) { let u = r(); while (u <= 1e-12) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); },
+  /** 편차(mm) → 파랑(낮음)–흰–빨강(높음) */
+  dev(v, R) { return CB.rgb(CB.colormap(0.5 + CB.clamp(v / (2 * R), -0.5, 0.5), "diverge")); },
+  mm: (v, d = 1) => CB.num(v * 1000, d) + " mm",
+  fix3: (v) => v.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 }),
+  box3(V, b, op) {
+    const [x0, y0, z0, x1, y1, z1] = b;
+    const c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+    for (let i = 0; i < 4; i++) { const a = c[i], d = c[(i + 1) % 4]; V.line3([a[0], a[1], z0], [d[0], d[1], z0], op); V.line3([a[0], a[1], z1], [d[0], d[1], z1], op); V.line3([a[0], a[1], z0], [a[0], a[1], z1], op); }
+  },
+};
+
+/* ---------- 1. 지리 참조 ---------- */
+(function () {
+  const G = CB.bim.GEO;
+  const sg = (v, d) => (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v).toFixed(d);
+  const gdt = CB.range("rc-ge-dt", (v) => sg(v, 2) + "°", upd), gds = CB.range("rc-ge-ds", (v) => sg(v, 0) + " ppm", upd);
+  const gde = CB.range("rc-ge-de", (v) => sg(v, 2) + " m", upd), gdn = CB.range("rc-ge-dn", (v) => sg(v, 2) + " m", upd);
+  const gsn = CB.seg("rc-ge-snap", () => { snapPt(pt); upd(); });
+  const wrong = () => ({ E0: G.E0 + gde(), N0: G.N0 + gdn(), theta: G.theta + gdt(), s: G.s * (1 + gds() * 1e-6) });
+  const rel = (x, y, g) => { const m = CB.bim.toMap(x, y, g); return [m.E - G.E0, m.N - G.N0]; };
+  const loc = (p) => CB.bim.toLocal(p.x + G.E0, p.y + G.N0);
+  function snapPt(p) { if (gsn() !== "grid") return; const l = loc(p); const q = rel(Math.round(l.x * 2) / 2, Math.round(l.y * 2) / 2, G); p.x = q[0]; p.y = q[1]; }
+  const p0 = rel(32, 24, G);
+  const pt = { x: p0[0], y: p0[1], r: 8, constrain: snapPt };
+  function building(P, g, op) {
+    const L = (x, y) => rel(x, y, g);
+    [0, 8, 16, 24, 32].forEach((x) => { const a = L(x, 0), b = L(x, 24); P.line(a[0], a[1], b[0], b[1], { color: op.grid, width: 1, dash: op.dash || [3, 3] }); });
+    [0, 8, 16, 24].forEach((y) => { const a = L(0, y), b = L(32, y); P.line(a[0], a[1], b[0], b[1], { color: op.grid, width: 1, dash: op.dash || [3, 3] }); });
+    P.poly([L(0, 0), L(32, 0), L(32, 24), L(0, 24)], { color: op.color, width: 2, fill: op.fill, dash: op.dash });
+    P.poly([L(8, 8), L(24, 8), L(24, 16), L(8, 16)], { color: op.color, width: 1.2, fill: op.core, dash: op.dash });
+  }
+  const pl = CB.plane("#rc-cv-geo", {
+    x: [-14, 42], cy: 15, aspect: 0.85, gridStep: 10, points: [pt], onDrag: () => upd(false),
+    draw(P, api) {
+      const C = P.P, gw = wrong();
+      building(P, G, { color: C.accent, grid: C.faint, fill: RCX.alpha(C.accent, 0.12), core: RCX.alpha(C.dim, 0.18) });
+      building(P, gw, { color: C.accent2, grid: RCX.alpha(C.accent2, 0.4), dash: [6, 4] });
+      "ABCDE".split("").forEach((c, i) => { const q = rel(i * 8, -1.8, G); P.text(c, q[0], q[1], { color: C.dim, size: 11, align: "center" }); });
+      [1, 2, 3, 4].forEach((n, j) => { const q = rel(-1.8, j * 8, G); P.text(String(n), q[0], q[1], { color: C.dim, size: 11, align: "center" }); });
+      P.arrow(36, 26, 36, 33, { color: C.dim, width: 1.5, head: 8 }); P.text("N", 36, 34.8, { color: C.dim, size: 12, bold: true, align: "center" });
+      P.text("(E − E₀, N − N₀) m", -13, -3.5, { color: C.faint, size: 11 });
+      const p = api.points[0]; p.color = C.accent2;
+      const l = loc(p), q = rel(l.x, l.y, gw);
+      if (Math.hypot(q[0] - p.x, q[1] - p.y) > 0.05) P.arrow(p.x, p.y, q[0], q[1], { color: C.bad, width: 2, head: 9 });
+      P.dot(q[0], q[1], { r: 5, color: C.bad });
+    },
+  });
+  function upd(redraw = true) {
+    if (redraw) pl.redraw();
+    const l = loc(pt), gw = wrong(), m = CB.bim.toMap(l.x, l.y, G), w = CB.bim.toMap(l.x, l.y, gw);
+    CB.stat("rc-ge-o-l", `(${CB.num(l.x, 2)}, ${CB.num(l.y, 2)}) m`);
+    CB.stat("rc-ge-o-m", `E ${RCX.fix3(m.E)}<br>N ${RCX.fix3(m.N)}`);
+    CB.stat("rc-ge-o-d", CB.sig(Math.hypot(w.E - m.E, w.N - m.N) * 1000) + " mm");
+    const mx = Math.max(...[[0, 0], [32, 0], [32, 24], [0, 24]].map(([x, y]) => { const a = CB.bim.toMap(x, y, G), b = CB.bim.toMap(x, y, gw); return Math.hypot(a.E - b.E, a.N - b.N); }));
+    CB.stat("rc-ge-o-x", CB.sig(mx * 1000) + " mm");
+  }
+  upd();
+})();
+
+/* ---------- 2. 삼각 측량 ---------- */
+(function () {
+  const RAD_PX = (13.2 / 5472) / 8.8; // 1화소의 각(rad), 1인치급 센서 형태
+  const gs = CB.range("rc-tr-s", (v) => v.toFixed(1) + " 화소", upd), gk = CB.range("rc-tr-k", (v) => "×" + v, upd);
+  const PRE = { std: [32, 48], wide: [16, 64], narrow: [38, 42] };
+  const C1 = { x: 32, y: 80, r: 9, constrain: (p) => { p.y = CB.clamp(p.y, 20, 88); } }, C2 = { x: 48, y: 80, r: 9, constrain: (p) => { p.y = CB.clamp(p.y, 20, 88); } };
+  const T = { x: 40, y: 0, r: 7, constrain: (p) => { p.y = CB.clamp(p.y, -6, Math.min(C1.y, C2.y) - 8); } };
+  CB.seg("rc-tr-pre", (v) => { C1.x = PRE[v][0]; C2.x = PRE[v][1]; C1.y = C2.y = 80; T.x = 40; T.y = 0; upd(); });
+  const isect = (A, a, B, b) => { const u = [Math.cos(a), Math.sin(a)], w = [Math.cos(b), Math.sin(b)], den = u[0] * w[1] - u[1] * w[0]; if (Math.abs(den) < 1e-9) return null; const t = ((B.x - A.x) * w[1] - (B.y - A.y) * w[0]) / den; return [A.x + t * u[0], A.y + t * u[1]]; };
+  function calc() {
+    const d1 = Math.hypot(T.x - C1.x, T.y - C1.y), d2 = Math.hypot(T.x - C2.x, T.y - C2.y);
+    const u1 = [(T.x - C1.x) / d1, (T.y - C1.y) / d1], u2 = [(T.x - C2.x) / d2, (T.y - C2.y) / d2];
+    const sg = Math.abs(u1[0] * u2[1] - u1[1] * u2[0]), sa = gs() * RAD_PX;
+    if (sg < 1e-4) return { ok: false, d1, d2, u1, u2, sg, sa };
+    const k1 = d1 / sg, k2 = d2 / sg;
+    const cxx = sa * sa * (k1 * k1 * u2[0] * u2[0] + k2 * k2 * u1[0] * u1[0]), cyy = sa * sa * (k1 * k1 * u2[1] * u2[1] + k2 * k2 * u1[1] * u1[1]);
+    return { ok: true, d1, d2, u1, u2, sg, sa, sx: Math.sqrt(cxx), sy: Math.sqrt(cyy), gamma: Math.asin(Math.min(1, sg)) * 180 / Math.PI };
+  }
+  const pl = CB.plane("#rc-cv-tri", {
+    x: [-40, 120], cy: 43, aspect: 0.6, gridStep: 20, points: [C1, C2, T], onDrag: () => upd(false),
+    draw(P, api) {
+      const Cc = P.P, r = calc();
+      P.ctx.save(); P.ctx.fillStyle = RCX.alpha(Cc.dim, 0.12); P.ctx.fillRect(0, P.Y(0), P.w, P.h - P.Y(0)); P.ctx.restore();
+      P.line(-40, 0, 120, 0, { color: Cc.dim, width: 1.5 });
+      const a1 = Math.atan2(T.y - C1.y, T.x - C1.x), a2 = Math.atan2(T.y - C2.y, T.x - C2.x);
+      [[C1, a1], [C2, a2]].forEach(([C, a]) => { const L = 1.25 * Math.hypot(T.x - C.x, T.y - C.y); P.line(C.x, C.y, C.x + L * Math.cos(a), C.y + L * Math.sin(a), { color: Cc.text, width: 1.4 }); });
+      if (r.ok) {
+        const e = r.sa * gk();
+        const q = [[e, e], [e, -e], [-e, -e], [-e, e]].map(([s1, s2]) => isect(C1, a1 + s1, C2, a2 + s2)).filter(Boolean);
+        if (q.length === 4) P.poly(q, { color: Cc.bad, width: 1.5, fill: RCX.alpha(Cc.bad, 0.3) });
+        [[C1, a1], [C2, a2]].forEach(([C, a]) => [-1, 1].forEach((s) => { const L = 1.15 * Math.hypot(T.x - C.x, T.y - C.y); P.line(C.x, C.y, C.x + L * Math.cos(a + s * e), C.y + L * Math.sin(a + s * e), { color: Cc.faint, width: 1, dash: [4, 3] }); }));
+      }
+      P.line(C1.x, C1.y + 4, C2.x, C2.y + 4, { color: Cc.accent2, width: 1.4 });
+      P.text(`B = ${CB.num(Math.hypot(C2.x - C1.x, C2.y - C1.y), 1)} m`, (C1.x + C2.x) / 2, Math.max(C1.y, C2.y) + 7, { color: Cc.accent2, size: 11, align: "center" });
+      api.points[0].color = api.points[1].color = Cc.blue; api.points[2].color = Cc.bad;
+      P.text("C₁", C1.x - 3, C1.y + 5, { color: Cc.blue, size: 12, bold: true, align: "right" }); P.text("C₂", C2.x + 3, C2.y + 5, { color: Cc.blue, size: 12, bold: true });
+      P.text(`오차 사각형 ×${gk()}`, T.x + 4, T.y - 5, { color: Cc.bad, size: 11 });
+    },
+  });
+  function upd(redraw = true) {
+    if (redraw) pl.redraw();
+    const r = calc(), H = (C1.y + C2.y) / 2 - T.y, B = Math.hypot(C2.x - C1.x, C2.y - C1.y), msg = document.getElementById("rc-tr-msg");
+    if (!r.ok) {
+      CB.stat("rc-tr-o-g", "≈ 0°"); ["x", "z", "r"].forEach((k) => CB.stat("rc-tr-o-" + k, "—"));
+      msg.className = "rc-msg bad"; msg.textContent = "두 광선이 거의 평행해 교점이 정해지지 않습니다. 카메라를 더 벌리세요."; return;
+    }
+    CB.stat("rc-tr-o-g", `${CB.num(r.gamma, 1)}° · ${CB.num(B / Math.max(H, 1e-6), 2)}`);
+    CB.stat("rc-tr-o-x", CB.sig(r.sx * 1000) + " mm"); CB.stat("rc-tr-o-z", CB.sig(r.sy * 1000) + " mm"); CB.stat("rc-tr-o-r", CB.num(r.sy / Math.max(r.sx, 1e-9), 1) + "배");
+    msg.className = "rc-msg" + (r.gamma < 5 ? " bad" : r.gamma < 12 ? " warn" : " ok");
+    msg.innerHTML = `한 광선의 방향 오차 σ<sub>α</sub> = ${CB.num(r.sa * 1000, 3)} mrad · 거리 ${CB.num(r.d1, 0)} m에서 옆으로 ${CB.num(r.sa * r.d1 * 1000, 1)} mm` + (r.gamma < 5 ? " — 교차각이 너무 작아 높이가 거의 정해지지 않습니다." : r.gamma < 12 ? " — 교차각이 작아 연직 오차가 큽니다." : " — 교차각이 충분합니다.");
+  }
+  upd();
+})();
+
+/* ---------- 3. 드론 비행 계획 ---------- */
+(function () {
+  const CAM = { one: { w: 13.2, h: 8.8, nx: 5472, ny: 3648, f: 8.8 }, small: { w: 6.17, h: 4.55, nx: 4000, ny: 3000, f: 4.5 } };
+  const AX = 120, AY = 90;
+  const gh = CB.range("rc-gs-h", (v) => v + " m", draw), gc = CB.seg("rc-gs-cam", draw);
+  const gf = CB.range("rc-gs-of", (v) => v + " %", draw), go = CB.range("rc-gs-os", (v) => v + " %", draw);
+  function calc() {
+    const c = CAM[gc()], H = gh(), p = (c.w / c.nx) * 1e-3, gsd = (p * H) / (c.f * 1e-3);
+    const Wacross = c.nx * gsd, Walong = c.ny * gsd, b = (1 - gf() / 100) * Walong, a = (1 - go() / 100) * Wacross;
+    const nAlong = Math.ceil(AX / b - 1e-9) + 1, nLines = Math.ceil(AY / a - 1e-9) + 1;
+    return { H, gsd, Wacross, Walong, b, a, nAlong, nLines, n: nAlong * nLines, sz: (H / b) * gsd * 0.5 };
+  }
+  const cv = CB.canvas("#rc-cv-gsd", (ctx, W, Hh) => {
+    const P = CB.palette(), r = calc(), m = 26, sc = Math.min((W - 2 * m) / (AX + 40), (Hh - 2 * m - 20) / (AY + 30));
+    const ox = (W - AX * sc) / 2, oy = m + 10 + 15 * sc, X = (x) => ox + x * sc, Y = (y) => oy + (AY - y) * sc;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, Hh); ctx.clip();
+    ctx.fillStyle = RCX.alpha(P.ok, 0.08); ctx.fillRect(X(0), Y(AY), AX * sc, AY * sc);
+    ctx.strokeStyle = P.ok; ctx.lineWidth = 1.5; ctx.strokeRect(X(0), Y(AY), AX * sc, AY * sc);
+    // B-10 평면(12° 회전)
+    const th = (12 * Math.PI) / 180, cx = 60, cy = 45, bp = [[0, 0], [32, 0], [32, 24], [0, 24]].map(([x, y]) => [cx + (x - 16) * Math.cos(th) - (y - 12) * Math.sin(th), cy + (x - 16) * Math.sin(th) + (y - 12) * Math.cos(th)]);
+    ctx.beginPath(); bp.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y)))); ctx.closePath(); ctx.fillStyle = RCX.alpha(P.dim, 0.3); ctx.fill(); ctx.strokeStyle = P.dim; ctx.stroke();
+    const x0 = AX / 2 - ((r.nAlong - 1) * r.b) / 2, y0 = AY / 2 - ((r.nLines - 1) * r.a) / 2;
+    // 사진 범위 몇 장
+    const fp = (x, y, col) => { ctx.fillStyle = RCX.alpha(col, 0.12); ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.fillRect(X(x - r.Walong / 2), Y(y + r.Wacross / 2), r.Walong * sc, r.Wacross * sc); ctx.strokeRect(X(x - r.Walong / 2), Y(y + r.Wacross / 2), r.Walong * sc, r.Wacross * sc); };
+    fp(x0, y0, P.accent); if (r.nAlong > 1) fp(x0 + r.b, y0, P.accent); if (r.nLines > 1) fp(x0, y0 + r.a, P.accent2);
+    // 비행 경로
+    ctx.strokeStyle = P.text; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.beginPath();
+    for (let j = 0; j < r.nLines; j++) { const y = y0 + j * r.a, xa = j % 2 ? x0 + (r.nAlong - 1) * r.b : x0, xb = j % 2 ? x0 : x0 + (r.nAlong - 1) * r.b; if (j) ctx.lineTo(X(xa), Y(y)); else ctx.moveTo(X(xa), Y(y)); ctx.lineTo(X(xb), Y(y)); }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = P.accent; const rr = r.n > 300 ? 1.5 : 2.5;
+    for (let j = 0; j < r.nLines; j++) for (let i = 0; i < r.nAlong; i++) { ctx.beginPath(); ctx.arc(X(x0 + i * r.b), Y(y0 + j * r.a), rr, 0, 7); ctx.fill(); }
+    ctx.restore();
+    RCX.text(ctx, "측량 범위 120 × 90 m · 점 = 촬영 위치 · 파랑·주황 = 사진 범위", W / 2, Hh - 12, P.dim, { size: 11, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.72), minHeight: 260, maxHeight: 460 });
+  function draw() {
+    cv.redraw(); const r = calc();
+    CB.stat("rc-gs-o-g", CB.num(r.gsd * 100, 2) + " cm/화소"); CB.stat("rc-gs-o-w", CB.num(r.Walong, 0) + " × " + CB.num(r.Wacross, 0) + " m");
+    CB.stat("rc-gs-o-b", CB.num(r.b, 1) + " · " + CB.num(r.a, 1) + " m"); CB.stat("rc-gs-o-n", r.n + "장 (" + r.nLines + "줄)");
+    CB.stat("rc-gs-o-z", CB.num(r.sz * 100, 1) + " cm");
+  }
+  draw();
+})();
+
+/* ---------- 4. 점 밀도와 거리 ---------- */
+(function () {
+  const ga = CB.steps("rc-sc-a", [0.009, 0.018, 0.036, 0.072, 0.144, 0.288], (v) => v + "°", 0.036, draw);
+  const gr = CB.range("rc-sc-r", (v) => v + " m", draw), gi = CB.range("rc-sc-i", (v) => v + "°", draw), gn = CB.range("rc-sc-n", (v) => v.toFixed(1) + " mm", draw);
+  function hits() {
+    const r = gr(), inc = (gi() * Math.PI) / 180, da = (ga() * Math.PI) / 180, sr = gn() / 1000, rng = CB.rng(7);
+    const n = [-Math.cos(inc), -Math.sin(inc)], tw = [-Math.sin(inc), Math.cos(inc)], H0 = [r, 0], c = H0[0] * n[0];
+    const out = [];
+    for (const sgn of [1, -1]) for (let k = sgn > 0 ? 0 : 1; k < 6000; k++) {
+      const h = sgn * k * da, d = [Math.cos(h), Math.sin(h)], dn = d[0] * n[0] + d[1] * n[1];
+      if (Math.abs(dn) < 1e-6) break;
+      const t = c / dn; if (t <= 0) break;
+      const tt = t + sr * RCX.gauss(rng), p = [tt * d[0] - H0[0], tt * d[1] - H0[1]];
+      const al = p[0] * tw[0] + p[1] * tw[1], no = -(p[0] * n[0] + p[1] * n[1]);
+      if (Math.abs(al) > 0.125) break;
+      out.push([al, no]);
+    }
+    return out;
+  }
+  const cv = CB.canvas("#rc-cv-scan", (ctx, W, H) => {
+    const P = CB.palette(), narrow = W < 560, r = gr(), inc = (gi() * Math.PI) / 180;
+    const A = narrow ? { x: 10, y: 10, w: W - 20, h: H * 0.42 } : { x: 10, y: 10, w: W * 0.42, h: H - 20 };
+    const Z = narrow ? { x: 44, y: A.y + A.h + 26, w: W - 60, h: H - A.h - 70 } : { x: A.x + A.w + 50, y: 30, w: W - A.w - 80, h: H - 74 };
+    // 평면도(개략, 거리 축척)
+    const sc = Math.min((A.w - 40) / 62, A.h / 40), sx = A.x + 18, sy = A.y + A.h / 2;
+    ctx.strokeStyle = P.border; ctx.strokeRect(A.x, A.y, A.w, A.h);
+    const wx = sx + r * sc, wl = 16 * sc;
+    ctx.strokeStyle = RCX.alpha(P.accent, 0.35); ctx.lineWidth = 1;
+    for (let k = -6; k <= 6; k++) { const h = k * 0.05; ctx.beginPath(); ctx.moveTo(sx, sy); const tt = r / Math.max(0.2, Math.cos(h) - Math.sin(h) * Math.tan(inc) * 0); ctx.lineTo(sx + tt * Math.cos(h) * sc, sy - tt * Math.sin(h) * sc); ctx.stroke(); }
+    RCX.line(ctx, wx + Math.sin(inc) * wl / 2, sy + Math.cos(inc) * wl / 2 * 1, wx - Math.sin(inc) * wl / 2, sy - Math.cos(inc) * wl / 2, P.text, 3);
+    ctx.fillStyle = P.accent; ctx.beginPath(); ctx.arc(sx, sy, 6, 0, 7); ctx.fill();
+    RCX.text(ctx, "스캐너", sx + 4, sy + 18, P.dim, { size: 11, align: "left", bold: false });
+    RCX.text(ctx, `벽: ${r} m, 입사각 ${gi()}°`, A.x + A.w / 2, A.y + 14, P.text, { size: 11.5 });
+    RCX.text(ctx, "평면도(광선은 개략)", A.x + A.w / 2, A.y + A.h - 10, P.faint, { size: 10.5, bold: false });
+    // 확대
+    const pts = hits(), ymax = Math.max(12, 4 * gn() * Math.cos(inc) + 2);
+    const X = (al) => Z.x + ((al + 0.125) / 0.25) * Z.w, Y = (no) => Z.y + Z.h / 2 - (no * 1000 / ymax) * (Z.h / 2);
+    ctx.strokeStyle = P.border; ctx.strokeRect(Z.x, Z.y, Z.w, Z.h);
+    RCX.line(ctx, Z.x, Y(0), Z.x + Z.w, Y(0), P.dim, 2);
+    ctx.fillStyle = P.accent2; pts.forEach(([al, no]) => { ctx.beginPath(); ctx.arc(X(al), Y(no), 2.4, 0, 7); ctx.fill(); });
+    RCX.text(ctx, "벽 25 cm 구간 확대(실제 점 위치)", Z.x + Z.w / 2, Z.y - 12, P.text, { size: 11.5 });
+    RCX.text(ctx, "−125", Z.x, Z.y + Z.h + 12, P.dim, { size: 10 }); RCX.text(ctx, "+125 mm", Z.x + Z.w - 10, Z.y + Z.h + 12, P.dim, { size: 10 });
+    RCX.text(ctx, "벽을 따라 →", Z.x + Z.w / 2, Z.y + Z.h + 12, P.dim, { size: 10, bold: false });
+    RCX.text(ctx, "+" + CB.num(ymax, 0), Z.x - 4, Z.y + 8, P.dim, { size: 10, align: "right" }); RCX.text(ctx, "−" + CB.num(ymax, 0), Z.x - 4, Z.y + Z.h - 8, P.dim, { size: 10, align: "right" });
+    RCX.text(ctx, "법선 mm", Z.x - 4, Z.y + Z.h / 2 - 12, P.dim, { size: 9.5, align: "right", bold: false });
+  }, { aspect: (W) => (W < 560 ? 1.1 : 0.5), minHeight: 260, maxHeight: 440 });
+  function draw() {
+    cv.redraw();
+    const r = gr(), da = (ga() * Math.PI) / 180, ci = Math.cos((gi() * Math.PI) / 180), sh = (r * da) / ci, sv = r * da;
+    CB.stat("rc-sc-o-s", CB.num(sh * 1000, 1) + " × " + CB.num(sv * 1000, 1) + " mm");
+    CB.stat("rc-sc-o-d", CB.sig(1 / (sh * sv)));
+    const N = (360 / ga()) * (300 / ga()); CB.stat("rc-sc-o-n", N >= 1e6 ? CB.num(N / 1e6, 1) + "백만" : CB.sig(N));
+    CB.stat("rc-sc-o-t", "±" + CB.num(2 * gn() * ci, 1) + " mm");
+  }
+  draw();
+})();
+
+/* ---------- 5. 점군 정합 ---------- */
+(function () {
+  const rng = CB.rng(11), A = [];
+  [0, 8, 16, 24, 32].forEach((x) => [0, 8, 16, 24].forEach((y) => { for (let k = 0; k < 4; k++) { const s = -0.4 + k * 0.2; A.push([x + s, y - 0.4], [x + 0.4, y + s], [x - s, y + 0.4], [x - 0.4, y - s]); } }));
+  for (let s = 0; s < 16; s += 0.4) A.push([8 + s, 8], [8 + s, 16]);
+  for (let s = 0; s < 8; s += 0.4) A.push([8, 8 + s], [24, 8 + s]);
+  const sub = A.filter((p) => p[0] <= 18.5).map((p) => [p[0] + 0.005 * RCX.gauss(rng), p[1] + 0.005 * RCX.gauss(rng)]);
+  const TG = [[2.0, 3.0], [15.0, 5.5], [4.0, 20.0]];
+  const INIT = { small: { th: 6, t: [1.2, -0.8] }, large: { th: 35, t: [2.0, 1.5] } };
+  const R = (th, p) => { const c = Math.cos(th), s = Math.sin(th); return [c * p[0] - s * p[1], s * p[0] + c * p[1]]; };
+  let raw = [], rawT = [], st = { th: 0, tx: 0, ty: 0 }, iters = 0;
+  const gt = CB.range("rc-rg-t", (v) => CB.num(v, 2) + "°", () => { st.th = gt(); redraw(); });
+  const gx = CB.range("rc-rg-x", (v) => CB.num(v, 3) + " m", () => { st.tx = gx(); redraw(); });
+  const gy = CB.range("rc-rg-y", (v) => CB.num(v, 3) + " m", () => { st.ty = gy(); redraw(); });
+  [gt, gx, gy].forEach((g) => (g.el.step = "any"));
+  const gi = CB.seg("rc-rg-init", reset);
+  const msg = document.getElementById("rc-rg-msg");
+  function setState(th, tx, ty) { st = { th, tx, ty }; gt.set(CB.clamp(th, -45, 45), false); gx.set(CB.clamp(tx, -6, 6), false); gy.set(CB.clamp(ty, -6, 6), false); }
+  function reset() {
+    const I = INIT[gi()], th0 = (I.th * Math.PI) / 180, r2 = CB.rng(5);
+    const inv = (q) => R(-th0, [q[0] - I.t[0], q[1] - I.t[1]]);
+    raw = sub.map(inv); rawT = TG.map((q) => inv([q[0] + 0.002 * RCX.gauss(r2), q[1] + 0.002 * RCX.gauss(r2)]));
+    iters = 0; setState(0, 0, 0); msg.className = "rc-msg"; msg.textContent = "주황 점군(스캔 B)을 회색(기준 A)에 맞춰 보세요.";
+    redraw();
+  }
+  const cur = (p) => { const q = R((st.th * Math.PI) / 180, p); return [q[0] + st.tx, q[1] + st.ty]; };
+  function nearest(q) { let bd = Infinity, bi = 0; for (let i = 0; i < A.length; i++) { const dx = A[i][0] - q[0], dy = A[i][1] - q[1], d = dx * dx + dy * dy; if (d < bd) { bd = d; bi = i; } } return [bi, Math.sqrt(bd)]; }
+  function cloudRms() { let s = 0; raw.forEach((p) => { const d = nearest(cur(p))[1]; s += d * d; }); return Math.sqrt(s / raw.length); }
+  function targetRms() { let s = 0; rawT.forEach((p, i) => { const q = cur(p); s += (q[0] - TG[i][0]) ** 2 + (q[1] - TG[i][1]) ** 2; }); return Math.sqrt(s / rawT.length); }
+  function icp(n) {
+    for (let k = 0; k < n; k++) {
+      const P1 = [], Q1 = [];
+      raw.forEach((p) => { const [i, d] = nearest(cur(p)); if (d < 0.8) { P1.push(p); Q1.push(A[i]); } });
+      if (P1.length < 3) { msg.className = "rc-msg bad"; msg.textContent = "0.8 m 안에 짝이 거의 없습니다. ICP가 시작할 수 없습니다 — 먼저 대략 맞추세요."; break; }
+      const r = CB.bim.rigid2D(P1, Q1); setState(r.theta, r.tx, r.ty); iters++;
+    }
+  }
+  document.getElementById("rc-rg-tg").addEventListener("click", () => { const r = CB.bim.rigid2D(rawT, TG); setState(r.theta, r.tx, r.ty); msg.className = "rc-msg ok"; msg.textContent = `타깃 3개로 정합: θ = ${CB.num(r.theta, 3)}°, t = (${CB.num(r.tx, 3)}, ${CB.num(r.ty, 3)}) m. 이제 ICP로 다듬을 수 있습니다.`; redraw(); });
+  document.getElementById("rc-rg-i1").addEventListener("click", () => { icp(1); after(); });
+  document.getElementById("rc-rg-i10").addEventListener("click", () => { icp(10); after(); });
+  document.getElementById("rc-rg-reset").addEventListener("click", reset);
+  function after() { redraw(); if (msg.classList.contains("bad")) return; const c = cloudRms(); msg.className = "rc-msg " + (c < 0.02 ? "ok" : "warn"); msg.textContent = c < 0.02 ? `ICP ${iters}회: 점군 RMS ${CB.num(c * 1000, 1)} mm — 잡음 수준까지 맞았습니다.` : `ICP ${iters}회: 점군 RMS ${CB.num(c * 100, 1)} cm — 더 줄지 않으면 국소 최소(엇갈린 기둥끼리 맞물림)를 의심하세요.`; }
+  const cv = CB.canvas("#rc-cv-reg", (ctx, W, H) => {
+    const P = CB.palette(), sc = Math.min((W - 30) / 40, (H - 30) / 32), ox = 15 + (W - 30 - 40 * sc) / 2 + 4 * sc, oy = H - 15 - (H - 30 - 32 * sc) / 2 - 4 * sc;
+    const X = (x) => ox + x * sc, Y = (y) => oy - y * sc;
+    ctx.fillStyle = P.dim; A.forEach(([x, y]) => ctx.fillRect(X(x) - 1.2, Y(y) - 1.2, 2.4, 2.4));
+    ctx.fillStyle = P.accent2; raw.forEach((p) => { const q = cur(p); ctx.fillRect(X(q[0]) - 1.2, Y(q[1]) - 1.2, 2.4, 2.4); });
+    if (rawT.length) TG.forEach((q, i) => { ctx.strokeStyle = P.dim; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), 7, 0, 7); ctx.stroke(); const b = cur(rawT[i]); ctx.strokeStyle = P.accent2; ctx.beginPath(); ctx.arc(X(b[0]), Y(b[1]), 7, 0, 7); ctx.stroke(); RCX.line(ctx, X(q[0]), Y(q[1]), X(b[0]), Y(b[1]), P.faint, 1, [3, 3]); RCX.text(ctx, "T" + (i + 1), X(q[0]) + 12, Y(q[1]) - 10, P.dim, { size: 10.5 }); });
+    RCX.text(ctx, "회색 = 기준 A · 주황 = 스캔 B · 원 = 타깃", W / 2, 12, P.dim, { size: 11, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.75), minHeight: 260, maxHeight: 460 });
+  function redraw() {
+    cv.redraw();
+    CB.stat("rc-rg-o-p", `${CB.num(st.th, 2)}° · (${CB.num(st.tx, 2)}, ${CB.num(st.ty, 2)})`);
+    const t = targetRms(), c = cloudRms();
+    CB.stat("rc-rg-o-t", t < 1 ? CB.num(t * 1000, 1) + " mm" : CB.num(t, 2) + " m"); CB.stat("rc-rg-o-c", c < 1 ? CB.num(c * 1000, 1) + " mm" : CB.num(c, 2) + " m"); CB.stat("rc-rg-o-n", iters + "회");
+  }
+  reset();
+})();
+
+/* ---------- 6. RANSAC 평면 ---------- */
+(function () {
+  let seed = 3, data = null;
+  const go = CB.range("rc-rs-o", (v) => v + " %", gen), gn = CB.range("rc-rs-n", (v) => v.toFixed(1) + " mm", gen);
+  const gt = CB.range("rc-rs-t", (v) => v + " mm", fit), gk = CB.range("rc-rs-k", (v) => v + "회", fit);
+  document.getElementById("rc-rs-seed").addEventListener("click", () => { seed++; gen(); });
+  const BOX = [[5.5, 5.5, 7.5, 7.5, 1.2], [1.0, 5.0, 2.5, 7.0, 0.3]];
+  function gen() {
+    const r = CB.rng(seed * 31 + 1), f = go() / 100, sg = gn() / 1000, pts = [];
+    for (let i = 0; i < 900; i++) pts.push([r() * 8, r() * 8, 5 + sg * RCX.gauss(r)]);
+    const nOut = Math.min(1350, Math.round((900 * f) / Math.max(1e-6, 1 - f)));
+    for (let i = 0; i < nOut; i++) {
+      if (i % 4 === 3) { pts.push([r() * 8, r() * 8, 5.1 + r() * 1.7]); continue; }
+      const b = BOX[r() < 0.75 ? 0 : 1], [x0, y0, x1, y1, h] = b, u = r();
+      if (u < 0.5) pts.push([x0 + r() * (x1 - x0), y0 + r() * (y1 - y0), 5 + h + sg * RCX.gauss(r)]);
+      else { const side = Math.floor(r() * 4), t = r(), z = 5 + 0.05 + r() * (h - 0.05); pts.push(side === 0 ? [x0 + t * (x1 - x0), y0, z] : side === 1 ? [x1, y0 + t * (y1 - y0), z] : side === 2 ? [x0 + t * (x1 - x0), y1, z] : [x0, y0 + t * (y1 - y0), z]); }
+    }
+    data = { pts, nIn: 900 }; fit();
+  }
+  const tilt = (n) => (Math.acos(Math.min(1, Math.abs(n[2]))) * 180) / Math.PI;
+  const zAt = (pl, x, y) => (pl.d - pl.n[0] * x - pl.n[1] * y) / pl.n[2];
+  function fit() {
+    data.ls = CB.bim.planeFit(data.pts);
+    data.rs = CB.bim.ransacPlane(data.pts, gk(), gt() / 1000, seed);
+    data.inl = new Set(data.rs.ok ? data.rs.inliers : []);
+    view.redraw(); stat();
+  }
+  const view = CB.orbit("#rc-cv-ransac", {
+    yaw: -0.65, pitch: 0.42, dist: 17, target: [4, 4, 5.4], aspect: 0.78, maxHeight: 480,
+    draw(V) {
+      if (!data) return;
+      const P = V.P, ctx = V.ctx;
+      V.poly3([[0, 0, 5], [8, 0, 5], [8, 8, 5], [0, 8, 5]], { stroke: true, color: P.faint, width: 1, dash: [4, 3] });
+      const quad = (pl, col) => { if (!pl || !pl.n || Math.abs(pl.n[2]) < 0.2) return; const c = [[0, 0], [8, 0], [8, 8], [0, 8]].map(([x, y]) => [x, y, CB.clamp(zAt(pl, x, y), 3.5, 7.5)]); V.poly3(c, { fill: col, fillAlpha: 0.18, color: col, width: 1.6 }); };
+      quad(data.ls, P.warn);
+      data.pts.forEach((p) => { const q = V.p(p); if (!q) return; ctx.fillStyle = data.inl.has(p) ? P.ok : P.bad; ctx.fillRect(q[0] - 1.3, q[1] - 1.3, 2.6, 2.6); });
+      if (data.rs.ok) quad(data.rs, P.accent);
+      V.text3("최소 제곱", [8.3, 0, CB.clamp(zAt(data.ls, 8, 0), 3.5, 7.5)], { color: P.warn, size: 11, align: "left" });
+      if (data.rs.ok) V.text3("RANSAC", [8.3, 8, CB.clamp(zAt(data.rs, 8, 8), 3.5, 7.5)], { color: P.accent, size: 11, align: "left" });
+    },
+  });
+  function stat() {
+    const ls = data.ls, rs = data.rs, n = data.pts.length;
+    CB.stat("rc-rs-o-ls", CB.num(tilt(ls.n), 2) + "° · (0,0) " + CB.signed((zAt(ls, 0, 0) - 5) * 1000, 0) + " mm");
+    CB.stat("rc-rs-o-rs", rs.ok ? CB.num(tilt(rs.n), 3) + "° · (0,0) " + CB.signed((zAt(rs, 0, 0) - 5) * 1000, 0) + " mm" : "실패");
+    CB.stat("rc-rs-o-in", rs.ok ? `${rs.inliers.length} / ${n}` : "—");
+    const w = data.nIn / n, k = w >= 0.9999 ? 1 : Math.log(0.01) / Math.log(1 - w ** 3);
+    CB.stat("rc-rs-o-k", Math.ceil(k) + "회 (w " + CB.num(w, 2) + ")");
+  }
+  gen();
+})();
+
+/* ---------- 7. 슬래브 평탄도 ---------- */
+(function () {
+  const gref = CB.seg("rc-fl-ref", draw);
+  const gd = CB.range("rc-fl-d", (v) => v.toFixed(1) + " mm", calc), gb = CB.range("rc-fl-b", (v) => v.toFixed(1) + " mm", calc);
+  const gs = CB.range("rc-fl-s", (v) => v.toFixed(2) + " mm/m", calc), gn = CB.range("rc-fl-n", (v) => v.toFixed(1) + " mm", calc);
+  const gt = CB.range("rc-fl-t", (v) => v.toFixed(1) + " mm", calc);
+  const X0 = -0.4, X1 = 32.4, Y0 = -0.4, Y1 = 24.4, inCore = (x, y) => x > 8 && x < 24 && y > 8 && y < 16;
+  const clampU = (x) => CB.clamp(x, 0, 32), clampV = (y) => CB.clamp(y, 0, 24);
+  function dz(x, y) { // mm
+    const u = clampU(x) % 8, v = clampV(y) % 8, b = gb(), s = gs();
+    const g = (cx, cy) => Math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * 1.2 * 1.2));
+    return -gd() * Math.sin((Math.PI * u) / 8) * Math.sin((Math.PI * v) / 8) - b * g(21, 4.5) + 0.8 * b * g(11, 19.5) + s * (0.6 * (x - 16) + 0.8 * (y - 12));
+  }
+  let R = null;
+  function calc() {
+    const r = CB.rng(17), sn = gn(), pts = [];
+    while (pts.length < 2300) { const x = X0 + r() * (X1 - X0), y = Y0 + r() * (Y1 - Y0); if (inCore(x, y)) continue; const e = dz(x, y) + sn * RCX.gauss(r); pts.push([x, y, 5 + e / 1000, e]); }
+    const pl = CB.bim.planeFit(pts.map((p) => [p[0], p[1], p[2]])), sgn = pl.n[2] < 0 ? -1 : 1;
+    pts.forEach((p) => { p[4] = sgn * (pl.n[0] * p[0] + pl.n[1] * p[1] + pl.n[2] * p[2] - pl.d) * 1000; });
+    // 3 m 직선자
+    const tol = gt(), wins = [], rl = CB.rng(23);
+    const lines = [];
+    for (let y = 1; y < 24; y += 2) lines.push({ dir: "x", c: y });
+    for (let x = 1; x < 32; x += 2) lines.push({ dir: "y", c: x });
+    let maxG = 0, fails = 0, tot = 0;
+    lines.forEach((L) => {
+      const a = L.dir === "x" ? X0 : Y0, b = L.dir === "x" ? X1 : Y1, S = [];
+      for (let s = a; s <= b + 1e-9; s += 0.25) { const x = L.dir === "x" ? s : L.c, y = L.dir === "x" ? L.c : s; S.push({ s, x, y, core: inCore(x, y), z: dz(x, y) + (sn / 3) * RCX.gauss(rl) }); }
+      for (let i0 = 0; i0 + 12 < S.length; i0 += 2) {
+        const w = S.slice(i0, i0 + 13); if (w.some((q) => q.core)) continue;
+        let best = Infinity;
+        for (let i = 0; i < 13; i++) for (let j = i + 1; j < 13; j++) {
+          const k = (w[j].z - w[i].z) / (j - i); let ok = true, g = 0;
+          for (let m = 0; m < 13; m++) { const lz = w[i].z + k * (m - i), d = lz - w[m].z; if (d < -1e-9) { ok = false; break; } if (d > g) g = d; }
+          if (ok && g < best) best = g;
+        }
+        tot++; if (best > maxG) maxG = best;
+        if (best > tol) { fails++; wins.push(L.dir === "x" ? [w[0].s, L.c, w[12].s, L.c] : [L.c, w[0].s, L.c, w[12].s]); }
+      }
+    });
+    R = { pts, pl, wins, maxG, fails, tot }; draw();
+  }
+  const cv = CB.canvas("#rc-cv-flat", (ctx, W, H) => {
+    if (!R) return;
+    const P = CB.palette(), m = 12, lg = 40, sc = Math.min((W - 2 * m) / (X1 - X0), (H - 2 * m - lg) / (Y1 - Y0));
+    const ox = (W - (X1 - X0) * sc) / 2, oy = m + (Y1 - Y0) * sc, X = (x) => ox + (x - X0) * sc, Y = (y) => oy - (y - Y0) * sc;
+    ctx.fillStyle = RCX.alpha(P.dim, 0.08); ctx.fillRect(X(X0), Y(Y1), (X1 - X0) * sc, (Y1 - Y0) * sc);
+    ctx.fillStyle = RCX.alpha(P.dim, 0.35); ctx.fillRect(X(8), Y(16), 16 * sc, 8 * sc); RCX.text(ctx, "코어(제외)", X(16), Y(12), P.text, { size: 11 });
+    const useFit = gref() === "fit", Rng = 15, sz = Math.max(2.5, sc * 0.55);
+    R.pts.forEach((p) => { ctx.fillStyle = RCX.dev(useFit ? p[4] : p[3], Rng); ctx.fillRect(X(p[0]) - sz / 2, Y(p[1]) - sz / 2, sz, sz); });
+    ctx.strokeStyle = RCX.alpha(P.text, 0.35); ctx.lineWidth = 1;
+    [0, 8, 16, 24, 32].forEach((x) => [0, 8, 16, 24].forEach((y) => ctx.strokeRect(X(x - 0.4), Y(y + 0.4), 0.8 * sc, 0.8 * sc)));
+    R.wins.forEach(([a, b, c, d]) => RCX.line(ctx, X(a), Y(b), X(c), Y(d), P.bad, 2.6));
+    // 범례
+    const lx = X(X0), lw = Math.min(260, (X1 - X0) * sc * 0.6), ly = H - 26;
+    for (let i = 0; i < 60; i++) { ctx.fillStyle = RCX.dev(-Rng + (2 * Rng * i) / 59, Rng); ctx.fillRect(lx + (lw * i) / 60, ly, lw / 60 + 1, 10); }
+    RCX.text(ctx, "−15", lx, ly + 20, P.dim, { size: 10 }); RCX.text(ctx, "0", lx + lw / 2, ly + 20, P.dim, { size: 10 }); RCX.text(ctx, "+15 mm", lx + lw, ly + 20, P.dim, { size: 10 });
+    RCX.text(ctx, useFit ? "맞춤 평면 기준" : "설계 높이 5.000 기준", lx + lw + 12, ly + 5, P.text, { size: 11, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 0.95 : 0.84), minHeight: 260, maxHeight: 560 });
+  function draw() {
+    if (!R) return; cv.redraw();
+    const n = R.pl.n, slope = (Math.hypot(n[0], n[1]) / Math.abs(n[2])) * 1000, k = gref() === "fit" ? 4 : 3;
+    const v = R.pts.map((p) => p[k]);
+    CB.stat("rc-fl-o-p", CB.num(slope * 10, 1) + " mm/10 m");
+    CB.stat("rc-fl-o-r", CB.num(Math.min(...v), 1) + " ~ +" + CB.num(Math.max(...v), 1) + " mm");
+    CB.stat("rc-fl-o-f", `${R.fails} / ${R.tot}`);
+    CB.stat("rc-fl-o-g", CB.num(R.maxG, 1) + " mm");
+  }
+  calc();
+})();
+
+/* ---------- 8. 스캔 대 BIM 편차 ---------- */
+(function () {
+  const COLS = CB.bim.model({ floors: 1 }).filter((e) => e.ifc === "IfcColumn");
+  const SETUPS = { 1: [[4, 4]], 2: [[4, 4], [28, 20]], 4: [[4, 4], [28, 4], [4, 20], [28, 20]] };
+  let seed = 19, S = null;
+  const gs = CB.range("rc-dv-s", (v) => v.toFixed(1) + " mm", calc), gg = CB.range("rc-dv-g", (v) => v + " mm", calc), gt = CB.range("rc-dv-t", (v) => v + " mm", draw);
+  const gn = CB.seg("rc-dv-n", calc);
+  document.getElementById("rc-dv-seed").addEventListener("click", () => { seed++; calc(); });
+  function calc() {
+    const ro = CB.rng(seed * 101 + 7), r = CB.rng(seed + 991), sg = gs() / 1000, sets = SETUPS[gn()], pts = [];
+    const cols = COLS.map((c) => {
+      const b = c.box, dx0 = (b[0] + b[3]) / 2, dy0 = (b[1] + b[4]) / 2;
+      let ox = sg * RCX.gauss(ro), oy = sg * RCX.gauss(ro);
+      if (c.name === "C-B4-1F") ox += gg() / 1000;
+      const cx = dx0 + ox, cy = dy0 + oy, h = 0.4;
+      const faces = [{ ax: 0, s: 1, n: [1, 0] }, { ax: 0, s: -1, n: [-1, 0] }, { ax: 1, s: 1, n: [0, 1] }, { ax: 1, s: -1, n: [0, -1] }];
+      const meas = {};
+      faces.forEach((f) => {
+        const fc = f.ax === 0 ? [cx + f.s * h, cy] : [cx, cy + f.s * h];
+        const vis = sets.some((s) => (s[0] - fc[0]) * f.n[0] + (s[1] - fc[1]) * f.n[1] > 0.05 && Math.hypot(s[0] - fc[0], s[1] - fc[1]) < 30);
+        if (!vis) return;
+        let sum = 0, cnt = 0;
+        for (let a = 0; a < 4; a++) for (let k = 0; k < 6; k++) {
+          const t = -0.3 + (a * 0.6) / 3, z = 0.3 + (k * 3.7) / 5, e = 0.002 * RCX.gauss(r);
+          const p = f.ax === 0 ? [fc[0] + f.s * e, fc[1] + t, z] : [fc[0] + t, fc[1] + f.s * e, z];
+          pts.push(p); sum += p[f.ax]; cnt++;
+        }
+        meas[f.ax + (f.s > 0 ? "+" : "-")] = sum / cnt;
+      });
+      const est = (ax) => { const p = meas[ax + "+"], m = meas[ax + "-"]; if (p != null && m != null) return { v: (p + m) / 2, both: true }; if (p != null) return { v: p - h, both: false }; if (m != null) return { v: m + h, both: false }; return null; };
+      const ex = est(0), ey = est(1);
+      const ok = ex && ey, dev = ok ? Math.hypot(ex.v - dx0, ey.v - dy0) : NaN;
+      return { c, dx0, dy0, ex, ey, ok, dev, ddx: ok ? ex.v - dx0 : 0, ddy: ok ? ey.v - dy0 : 0, both: ok && ex.both && ey.both };
+    });
+    S = { cols, pts, sets }; draw();
+  }
+  const view = CB.orbit("#rc-cv-dev", {
+    yaw: -0.6, pitch: 0.5, dist: 58, target: [16, 12, 2], aspect: 0.72, maxHeight: 500,
+    draw(V) {
+      if (!S) return;
+      const P = V.P, ctx = V.ctx, tol = gt() / 1000;
+      V.poly3([[-0.4, -0.4, 0], [32.4, -0.4, 0], [32.4, 24.4, 0], [-0.4, 24.4, 0]], { fill: P.dim, fillAlpha: 0.07, color: P.faint, width: 1 });
+      V.poly3([[8, 8, 0], [24, 8, 0], [24, 16, 0], [8, 16, 0]], { fill: P.accent, fillAlpha: 0.1, color: RCX.alpha(P.accent, 0.5), width: 1 });
+      S.cols.forEach((k) => {
+        const col = !k.ok ? P.faint : k.dev > 1.5 * tol ? P.bad : k.dev > tol ? P.warn : P.ok;
+        RCX.box3(V, k.c.box, { color: col, width: k.ok && k.dev > tol ? 2.4 : 1.4, dash: k.ok ? (k.both ? [] : [5, 3]) : [2, 3] });
+      });
+      ctx.fillStyle = RCX.alpha(P.blue, 0.75);
+      S.pts.forEach((p) => { const q = V.p(p); if (q) ctx.fillRect(q[0] - 1, q[1] - 1, 2, 2); });
+      S.cols.forEach((k) => {
+        if (!k.ok) return; const z = 4.5, a = [k.dx0, k.dy0, z], b = [k.dx0 + 50 * k.ddx, k.dy0 + 50 * k.ddy, z];
+        V.line3(a, b, { color: k.dev > tol ? P.bad : P.text, width: 2 });
+        if (k.dev > tol) V.text3(k.c.name.replace("-1F", ""), [k.dx0, k.dy0, 5.4], { color: P.bad, size: 11, bold: true });
+      });
+      S.sets.forEach((s) => { V.dot3([s[0], s[1], 1.5], { color: P.accent, r: 5 }); V.line3([s[0], s[1], 0], [s[0], s[1], 1.5], { color: P.accent, width: 1.5 }); });
+    },
+  });
+  function draw() {
+    if (!S) return; view.redraw();
+    const tol = gt() / 1000, m = S.cols.filter((k) => k.ok), bad = m.filter((k) => k.dev > tol);
+    CB.stat("rc-dv-o-m", `${m.length} / 20 (두 면 ${m.filter((k) => k.both).length})`);
+    const mx = m.length ? m.reduce((a, b) => (b.dev > a.dev ? b : a)) : null;
+    CB.stat("rc-dv-o-x", mx ? CB.num(mx.dev * 1000, 1) + " mm · " + mx.c.name.replace("-1F", "") : "—");
+    CB.stat("rc-dv-o-r", m.length ? CB.num(Math.sqrt(m.reduce((s, k) => s + k.dev * k.dev, 0) / m.length) * 1000, 1) + " mm" : "—");
+    CB.stat("rc-dv-o-f", bad.length + "개");
+    const msg = document.getElementById("rc-dv-msg");
+    msg.className = "rc-msg " + (bad.length ? "bad" : "ok");
+    msg.innerHTML = bad.length ? "허용치 초과: " + bad.map((k) => `<b>${k.c.name.replace("-1F", "")}</b> ${CB.num(k.dev * 1000, 0)} mm` + (k.both ? "" : "(한 면 추정)")).join(", ") + " — 측정·정합을 먼저 확인하고, 구조 검토 후 조치를 요소 속성에 기록합니다." : "모든 측정 기둥이 허용치 안에 있습니다." + (m.length < 20 ? ` 미측정 ${20 - m.length}개는 스캐너 자리를 늘려 확인합니다.` : "");
+  }
+  calc();
+})();
+</script>
+</body>
+</html>

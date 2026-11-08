@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>디지털 트윈과 IoT · BIMBook</title>
+<meta name="description" content="살아 있는 모델. 디지털 모델·그림자·트윈의 구분, 센서와 데이터 흐름, 샘플링과 앨리어싱, 칼만 필터 상태 추정, 이상 탐지와 관리도, 잔여 수명 추정, 공조 제어 루프, 3D 센서 대시보드, 데이터 품질과 보안을 B-10 공조 트윈으로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .dt-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .dt-msg b { color: var(--text); }
+  .dt-msg.ok { color: var(--ok); }
+  .dt-msg.bad { color: var(--bad); font-weight: 600; }
+  .dt-tbl td, .dt-tbl th { font-variant-numeric: tabular-nums; }
+  .dt-stack > div + div { border-top: 1px solid var(--border); }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="digital-twin">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="dt-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="dt-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="dt-ah-2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 14</div>
+    <h1 data-no-glossary>디지털 트윈과 IoT</h1>
+    <p class="lead">13장의 자산 정보 모델은 "무엇이 어디에 있는가"를 압니다. 하지만 지금 7층이 몇 도인지, 공조기 베어링이 떨리기 시작했는지는 모릅니다. 건물에 센서를 달고 그 측정을 모델에 이어 붙이면 모델은 현재 상태를 따라가는 <b>살아 있는 모델</b>이 됩니다. 이것을 흔히 디지털 트윈이라 부르지만, 그 말에는 과장도 많습니다. 이 장은 디지털 트윈을 데이터가 흐르는 방향으로 정의하고, 센서와 데이터 흐름, 샘플링과 앨리어싱, 잡음 속에서 상태를 추정하는 칼만 필터, 이상 탐지와 관리도, 잔여 수명 추정, 공조 제어 루프, 3D 센서 대시보드, 데이터 품질과 보안을 B-10 공조 시스템의 교육용 트윈으로 하나씩 계산합니다.</p>
+    <ul class="objectives">
+      <li>디지털 모델·디지털 그림자·디지털 트윈을 물리 대상과 모델 사이의 자동 데이터 흐름으로 구별하고, 트윈이 돕는 결정을 먼저 정한다.</li>
+      <li>센서 → 수집 → 전송 → 저장 → 분석의 흐름을 설계하고 센서 수·주기·바이트로 데이터 양을 계산한다.</li>
+      <li>나이퀴스트 조건 \(f_s \gt 2f_{max}\)과 앨리어싱 진동수 \(f_a = |f - kf_s|\)를 계산한다.</li>
+      <li>1차원 칼만 필터의 예측–갱신과 이득 \(K = P^-/(P^- + r)\)을 설명하고 \(q\), \(r\)가 평활과 지연을 어떻게 바꾸는지 판단한다.</li>
+      <li>임계값·이동 평균·관리도로 이상을 탐지하고 탐지와 거짓 경보의 맞바꿈을 계산한다.</li>
+      <li>열화 추세의 선형 회귀와 예측 구간으로 잔여 수명을 추정하고, 실내 온도의 1차 모델로 제어 루프의 응답을 해석한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 정보가 없었다면</small><b>건물은 고장이 난 뒤에야 말을 했다</b></div>
+      <div class="o-body"><p>1960년 루돌프 칼만(R. E. Kalman)은 잡음 섞인 측정에서 시스템의 상태를 순차적으로 추정하는 방법을 발표했고, 이 필터는 곧 아폴로 계획의 항법 계산에 쓰였습니다. 측정과 모델을 함께 써서 "보이지 않는 현재 상태"를 추정한다는 생각이 디지털 트윈의 뿌리입니다. 물리 제품과 그 가상 짝을 데이터로 잇는다는 개념은 2002년 무렵 미시간 대학의 마이클 그리브스(M. Grieves)가 제품 수명 주기 관리 강의에서 제시한 것으로 알려져 있고, "디지털 트윈"이라는 말은 2010년대 초 미국 항공우주국(NASA)의 기술 로드맵과 관련 논문에서 널리 쓰이기 시작했습니다.</p>
+        <p>건물에서는 오래전부터 건물 자동화 시스템이 온도와 설비 상태를 읽어 왔지만, 그 자료는 대개 화면에 잠시 보였다가 사라지거나, 어느 공간·어느 자산의 값인지 모델과 연결되지 않은 채 쌓였습니다. 센서와 통신이 싸지고 13장의 자산 정보 모델이 생기면서, 측정을 공간·자산에 붙여 상태를 추정하고, 고장을 미리 보고, 설비를 조정하는 것이 가능해졌습니다. 그러나 센서는 틀리고, 자료는 빠지고, 모델은 단순화된 것입니다. 이 장의 계산은 그 한계를 숫자로 보이는 데 목적이 있습니다.</p>
+        <div class="o-chain"><span>센서 측정(온도·진동·전력)</span><i>→</i><span class="tool">샘플링 · 칼만 필터 · 관리도 · 회귀 · 1차 모델 · 3D 대시보드</span><i>→</i><span>상태 · 경보 · 잔여 수명 · 제어 · 작업 지시(13장)</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="definition">
+    <h2>디지털 트윈이란: 모델·그림자·트윈</h2>
+    <div class="problem"><strong>대시보드는 트윈인가</strong>
+      <p>B-10 운영팀에 "디지털 트윈 플랫폼" 제안서가 세 건 들어왔습니다. 하나는 3D 모델 위에 센서 값을 띄우는 화면, 하나는 매일 밤 에너지 시뮬레이션을 돌리는 모델, 하나는 측정으로 모델을 보정하고 공조 설정값을 자동으로 바꾸는 시스템입니다. 모두 디지털 트윈이라 부를 수 있을까요?</p></div>
+    <p>디지털 트윈이라는 말은 분야마다, 회사마다 다르게 쓰입니다. 쓸모 있는 구분 하나는 <b>물리 대상과 디지털 모델 사이에 데이터가 자동으로 흐르는가</b>입니다. 제조 분야의 문헌(Kritzinger 등, 2018)이 정리한 세 단계 구분이 널리 인용됩니다.</p>
+    <div class="callout def"><strong>정의 14.1 (디지털 모델·그림자·트윈, 데이터 흐름 형태)</strong> <span class="term">디지털 모델</span><span class="en">(digital model)</span>: 물리 대상과 모델 사이의 데이터 교환이 모두 사람 손으로 이루어진다(설계 BIM, 에너지 시뮬레이션). <span class="term">디지털 그림자</span><span class="en">(digital shadow)</span>: 물리 → 디지털 방향은 자동(센서 자료가 모델에 들어감), 디지털 → 물리 방향은 사람이 판단해 조치한다(센서 대시보드, 경보). <span class="term">디지털 트윈</span><span class="en">(digital twin)</span>: 양방향이 모두 자동이다. 측정이 모델의 상태를 갱신하고, 모델의 판단이 물리 대상의 제어나 작업 지시로 돌아간다. 실무에서는 "트윈"이라 불리는 것의 상당수가 그림자 단계이며, 그것만으로도 쓸모가 크다. 단계보다 중요한 것은 <b>어떤 결정을 돕는가, 얼마나 자주 갱신하는가, 모델이 얼마나 정확한가, 누가 조치하는가</b>이다.</div>
+    <figure class="diagram" id="fig-dt-levels">
+      <svg viewBox="0 0 880 270" role="img" aria-label="디지털 모델, 디지털 그림자, 디지털 트윈의 데이터 흐름 비교: 수동은 점선, 자동은 실선">
+        <rect x="10" y="10" width="860" height="250" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <text x="150" y="40" class="t" style="font-weight:700">디지털 모델</text><text x="440" y="40" class="t" style="font-weight:700">디지털 그림자</text><text x="730" y="40" class="t" style="font-weight:700">디지털 트윈</text>
+          <rect x="60" y="60" width="180" height="46" rx="8" class="f-elev"/><text x="150" y="88" style="fill:var(--text)">물리 B-10</text>
+          <rect x="60" y="170" width="180" height="46" rx="8" class="f-acc-soft"/><text x="150" y="198" style="fill:var(--text)">모델</text>
+          <rect x="350" y="60" width="180" height="46" rx="8" class="f-elev"/><text x="440" y="88" style="fill:var(--text)">물리 B-10</text>
+          <rect x="350" y="170" width="180" height="46" rx="8" class="f-acc-soft"/><text x="440" y="198" style="fill:var(--text)">모델</text>
+          <rect x="640" y="60" width="180" height="46" rx="8" class="f-elev"/><text x="730" y="88" style="fill:var(--text)">물리 B-10</text>
+          <rect x="640" y="170" width="180" height="46" rx="8" class="f-acc-soft"/><text x="730" y="198" style="fill:var(--text)">모델</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.8;fill:none;stroke-dasharray:6 4" marker-end="url(#dt-ah)"><path d="M120 108V166"/><path d="M180 168V110"/><path d="M470 168V110"/></g>
+        <g style="stroke:var(--accent);stroke-width:2.4;fill:none" marker-end="url(#dt-ah-acc)"><path d="M410 108V166"/><path d="M700 108V166"/><path d="M760 168V110"/></g>
+        <g class="t-mono"><text x="64" y="142">수동</text><text x="188" y="142">수동</text><text x="356" y="142" style="fill:var(--accent)">자동</text><text x="478" y="142">사람 조치</text><text x="646" y="142" style="fill:var(--accent)">자동</text><text x="768" y="142" style="fill:var(--accent)">자동</text></g>
+        <text x="440" y="244" text-anchor="middle" class="t-dim">점선 = 사람이 옮김 · 실선 = 자동 데이터 흐름</text>
+      </svg>
+      <figcaption><b>그림 14-1.</b> 데이터 흐름으로 본 세 단계(Kritzinger 등의 분류 형태). 위는 물리 대상(B-10), 아래는 디지털 모델이다. 그림자는 측정이 자동으로 들어오지만 조치는 사람이 하고, 트윈은 조치까지 자동으로 돌아간다. 같은 시스템 안에서도 공조 제어는 트윈, 교체 판단은 그림자처럼 섞여 있는 것이 보통이다.</figcaption>
+    </figure>
+    <div class="callout warn"><strong>"트윈"이라는 말에 속지 않기</strong> 제안서를 볼 때는 다음을 묻습니다. ① 이 시스템이 바꾸려는 결정은 무엇인가(에너지 절감, 고장 예방, 공간 재배치)? ② 모델은 무엇이고 측정으로 어떻게 보정되는가(아니면 3D 화면에 값만 띄우는가)? ③ 갱신 주기와 지연은 결정에 충분한가? ④ 모델·센서가 틀렸을 때 어떻게 아는가? ⑤ 누가 경보를 받고 조치하는가? ⑥ 운영 수십 년 동안 자료와 형식을 누가 유지하는가? 건물 디지털 트윈의 효과는 사례마다 크게 다르며, 이 장은 확인되지 않은 절감률을 제시하지 않습니다.</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="sensors">
+    <h2>센서와 데이터 흐름</h2>
+    <div class="problem"><strong>B-10에 센서 700개를 달면 하루에 얼마가 쌓이나</strong>
+      <p>B-10 운영팀은 층마다 온도·습도·CO₂·재실 센서와 공조기 상태 점, 전력 계량기를 달고, 펌프와 공조기에는 진동 센서를 붙이려 합니다. 1분마다 저장하면 하루 몇 MB일까요? 진동 파형까지 그대로 올리면?</p></div>
+    <p>건물의 측정 자료는 <b>센서</b>(온도, 습도, CO₂, 재실, 압력·차압, 유량, 전력, 진동 가속도) → <b>수집</b>(제어기·게이트웨이 같은 <span class="term">엣지 컴퓨팅</span><span class="en">(edge computing)</span> 장치, 아날로그 신호를 숫자로 바꾸는 표본화와 양자화) → <b>전송</b>(건물 자동화 프로토콜 BACnet(ISO 16484-5)·Modbus, 메시지 전달 방식 MQTT 같은 형태) → <b>저장</b>(시각–값 쌍을 쌓는 <span class="term">시계열 데이터베이스</span><span class="en">(time-series database)</span>) → <b>분석·모델</b>(필터, 이상 탐지, 예측) → <b>표시·조치</b>(대시보드, 경보, 작업 지시, 제어)로 흐릅니다. 각 단계에서 지연이 생기고 자료가 빠지거나 틀릴 수 있습니다.</p>
+    <figure class="diagram" id="fig-dt-pipe">
+      <svg viewBox="0 0 880 250" role="img" aria-label="센서에서 엣지, 네트워크, 시계열 저장소, 분석 모델, 대시보드와 조치로 이어지는 데이터 흐름과 각 단계의 지연">
+        <rect x="10" y="10" width="860" height="230" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="24" y="60" width="120" height="64" rx="9" class="f-elev"/><text x="84" y="86" style="fill:var(--text);font-weight:700">센서</text><text x="84" y="106">온도·CO₂·진동</text>
+          <rect x="164" y="60" width="120" height="64" rx="9" class="f-acc2-soft"/><text x="224" y="86" style="fill:var(--text);font-weight:700">엣지</text><text x="224" y="106">표본화·특징 추출</text>
+          <rect x="304" y="60" width="120" height="64" rx="9" class="f-elev"/><text x="364" y="86" style="fill:var(--text);font-weight:700">네트워크</text><text x="364" y="106">BACnet·MQTT 형태</text>
+          <rect x="444" y="60" width="120" height="64" rx="9" class="f-elev"/><text x="504" y="86" style="fill:var(--text);font-weight:700">시계열 저장</text><text x="504" y="106">시각 · 값 · 품질</text>
+          <rect x="584" y="60" width="120" height="64" rx="9" class="f-acc-soft"/><text x="644" y="86" style="fill:var(--text);font-weight:700">분석·모델</text><text x="644" y="106">필터·탐지·예측</text>
+          <rect x="724" y="60" width="130" height="64" rx="9" class="f-acc-soft"/><text x="789" y="86" style="fill:var(--text);font-weight:700">표시·조치</text><text x="789" y="106">경보·제어·작업 지시</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.6;fill:none" marker-end="url(#dt-ah)"><path d="M144 92H160"/><path d="M284 92H300"/><path d="M424 92H440"/><path d="M564 92H580"/><path d="M704 92H720"/></g>
+        <path d="M789 128V176H84V128" style="stroke:var(--accent-2);stroke-width:1.6;fill:none;stroke-dasharray:5 4" marker-end="url(#dt-ah-2)"/>
+        <text x="440" y="170" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">제어 명령 · 설정값 변경(트윈) → 다시 측정</text>
+        <text x="440" y="214" text-anchor="middle" class="t-dim">각 화살표마다 지연 · 결측 · 오류가 생길 수 있다 → 품질 표시(마지막 절)</text>
+        <text x="84" y="48" text-anchor="middle" class="t-mono" style="fill:var(--accent)">IfcSensor ↔ 공간</text>
+      </svg>
+      <figcaption><b>그림 14-2.</b> 건물 측정 자료의 흐름. 엣지(현장 게이트웨이)에서 진동 파형을 특징값(실효값 등)으로 줄이면 전송·저장량이 수백 배 준다. 모든 측정점은 모델의 공간·자산(IFC4의 <code>IfcSensor</code>, 13장의 Component)에 연결되어야 "어디의 값"인지 안다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 14.2 (표본화 주기와 데이터 양)</strong>
+      <div class="formula">$$V_{day} = N\cdot\frac{86{,}400}{\Delta t}\cdot B, \qquad V_{vib} = M\cdot n_b\cdot (f_s\,T_b)\cdot b$$<div class="where">\(N\): 일반 측정점 수, \(\Delta t\): <span class="term">샘플링 주기</span><span class="en">(sampling interval)</span>(s), \(B\): 1개 기록의 바이트(시각 8 + 값 4–8 + 측정점 ID + 품질 표시, 압축 전). 진동은 \(M\)개 센서가 하루 \(n_b\)번 길이 \(T_b\)(s)의 파형을 표본화 진동수 \(f_s\)(Hz), 표본당 \(b\) 바이트로 기록한다. 엣지에서 파형 대신 특징값 몇 개만 보내면 \(f_s T_b\)가 특징 수로 바뀐다. 저장소는 원자료를 정해진 기간만 두고 그 뒤로는 15분 평균 같은 집계만 남기는 보존 정책을 쓴다.</div></div></div>
+    <div class="sim" id="sim-dt-data">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>데이터 양 계산기: 센서 수 × 주기 × 바이트, 엣지 처리와 보존 정책</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dt-cv-data" aria-label="일반 측정과 진동 측정의 하루 데이터 양 막대(로그 축)와 연간 누적 저장량"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>일반 측정점 수 N <output id="dt-dv-n-out"></output></span><input type="range" id="dt-dv-n" min="50" max="5000" step="50" value="700"></label>
+          <label class="ctrl"><span>샘플링 주기 Δt <output id="dt-dv-t-out"></output></span><input type="range" id="dt-dv-t"></label>
+          <label class="ctrl"><span>기록 1개 크기 B <output id="dt-dv-b-out"></output></span><input type="range" id="dt-dv-b" min="12" max="200" step="4" value="24"></label>
+          <label class="ctrl"><span>진동 센서 수 M <output id="dt-dv-m-out"></output></span><input type="range" id="dt-dv-m" min="0" max="100" step="2" value="24"></label>
+          <label class="ctrl"><span><span>진동 표본화 진동수 f<sub>s</sub></span> <output id="dt-dv-f-out"></output></span><input type="range" id="dt-dv-f" min="500" max="20000" step="500" value="10000"></label>
+          <div class="ctrl"><span>진동 자료 전송</span><div class="seg" id="dt-dv-e"><button data-value="raw" class="on">원 파형</button><button data-value="feat">엣지 특징값(10개)</button></div></div>
+          <label class="ctrl"><span>원자료 보존 기간 <output id="dt-dv-r-out"></output></span><input type="range" id="dt-dv-r" min="7" max="365" step="1" value="90"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">일반 측정 / 일</span><span class="v" id="dt-dv-o-a">—</span></div>
+        <div class="stat"><span class="k">진동 / 일</span><span class="v" id="dt-dv-o-v">—</span></div>
+        <div class="stat"><span class="k">초당 기록 수</span><span class="v" id="dt-dv-o-r">—</span></div>
+        <div class="stat"><span class="k">1년 뒤 저장량</span><span class="v" id="dt-dv-o-y">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(700점, 1분, 24 B)에서 일반 측정은 하루 약 24 MB입니다 · 진동 원 파형(24개, 10 kHz, 2 s를 10분마다, 16비트)은 하루 약 138 MB로 일반 측정의 다섯 배가 넘지만, "엣지 특징값"으로 바꾸면 약 0.28 MB로 500분의 1이 됩니다 · Δt를 1초로 줄이면 일반 측정도 60배가 됩니다 — 결정에 필요한 주기보다 촘촘히 재는 것은 비용입니다 · 모델: 정의 14.2, 진동은 10분마다 2 s 버스트(하루 144회), 표본당 2 B, 특징값 1개 8 B, 보존 기간 뒤에는 15분 평균(같은 B)만 남김, 압축 무시(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 14.1 (B-10 측정 자료의 양)</strong> 층마다 실 7개 × (온도·습도·CO₂·재실) 28점 + 공조기 상태 20점 + 계량 10점 = 58점 × 10개 층 + 기계실 120점 ≈ 700점, \(\Delta t = 60\) s, \(B = 24\) B.
+      <p><b>① 일반 측정</b> \(700\times1{,}440\times24 = 24.2\) MB/일 → 1년 약 8.8 GB. 오늘의 저장 장치로는 작은 양이다.</p>
+      <p><b>② 진동</b> 펌프·공조기·팬 24곳, 10 kHz × 2 s 버스트를 10분마다(하루 144회), 16비트: \(24\times144\times20{,}000\times2 = 138\) MB/일. 엣지에서 버스트마다 특징값 10개(실효값, 첨도, 특정 대역 에너지 등, 각 8 B)만 보내면 \(24\times144\times80 = 0.28\) MB/일.</p>
+      <p><b>③ 판단</b> 양 자체보다 <b>얼마나 자주 재야 결정에 충분한가</b>가 설계 질문이다. 실내 온도는 몇 분에 한 번이면 충분하고, 베어링 손상의 고주파 징후는 kHz 표본화가 필요하지만 그 결과는 특징값 몇 개로 충분하다. 다음 절의 샘플링 이론이 하한을 정한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="sampling">
+    <h2>샘플링과 앨리어싱</h2>
+    <div class="problem"><strong>1초마다 잰 펌프 진동이 느리게 출렁인다</strong>
+      <p>B-10 냉수 펌프는 1,780 rpm(약 29.7 Hz)으로 돕니다. 건물 자동화 시스템이 진동을 25 Hz로 표본화했더니 4.7 Hz의 느린 진동이 보입니다. 이 4.7 Hz는 실제 진동일까요?</p></div>
+    <div class="callout def"><strong>원리 14.3 (나이퀴스트 조건과 앨리어싱)</strong>
+      <div class="formula">$$f_s \gt 2 f_{max}, \qquad f_a = \left|f - k f_s\right|,\ \ k = \operatorname{round}(f/f_s), \qquad 0 \le f_a \le \frac{f_s}{2}$$<div class="where">표본화 진동수 \(f_s\)로 잰 신호에서 \(f_s/2\)(<span class="term">나이퀴스트 진동수</span><span class="en">(Nyquist frequency)</span>)보다 높은 성분은 사라지지 않고 \(f_a\)라는 낮은 진동수로 둔갑한다. 이것이 <span class="term">앨리어싱</span><span class="en">(aliasing)</span>이다. 표본만으로는 진짜 낮은 진동과 둔갑한 진동을 구별할 수 없으므로, 표본화 전에 \(f_s/2\) 이상의 성분을 아날로그 저역 통과 필터(<span class="term">앤티앨리어싱 필터</span><span class="en">(anti-aliasing filter)</span>)로 걸러야 한다. 표본화 정리(나이퀴스트–섀넌)는 대역이 제한된 신호를 \(f_s \gt 2f_{max}\)로 재면 원래 신호를 복원할 수 있다고 말하며, 실무에서는 대개 그보다 훨씬 높게(수 배–10배 이상) 잰다.</div></div></div>
+    <figure class="diagram" id="fig-dt-alias">
+      <svg viewBox="0 0 880 250" role="img" aria-label="빠른 사인파를 느리게 표본화하면 표본이 느린 사인파 위에 놓이는 앨리어싱">
+        <rect x="10" y="10" width="860" height="230" rx="10" class="f-surface"/>
+        <line x1="60" y1="138" x2="830" y2="138" class="s-axis"/>
+        <path d="M60.0 83.0 L61.9 83.8 L63.9 86.3 L65.8 90.2 L67.7 95.6 L69.6 102.3 L71.5 110.0 L73.5 118.6 L75.4 127.7 L77.3 137.1 L79.2 146.6 L81.2 155.8 L83.1 164.5 L85.0 172.4 L87.0 179.3 L88.9 184.9 L90.8 189.1 L92.7 191.9 L94.7 193.0 L96.6 192.5 L98.5 190.3 L100.4 186.6 L102.3 181.5 L104.3 175.0 L106.2 167.5 L108.1 159.0 L110.1 150.0 L112.0 140.6 L113.9 131.1 L115.8 121.8 L117.8 113.0 L119.7 105.0 L121.6 97.9 L123.5 92.0 L125.5 87.5 L127.4 84.5 L129.3 83.1 L131.2 83.3 L133.1 85.2 L135.1 88.6 L137.0 93.5 L138.9 99.7 L140.9 107.1 L142.8 115.4 L144.7 124.3 L146.6 133.7 L148.6 143.2 L150.5 152.5 L152.4 161.4 L154.3 169.6 L156.2 176.9 L158.2 183.0 L160.1 187.8 L162.0 191.1 L163.9 192.8 L165.9 192.8 L167.8 191.3 L169.7 188.1 L171.6 183.5 L173.6 177.5 L175.5 170.3 L177.4 162.2 L179.4 153.3 L181.3 144.0 L183.2 134.5 L185.1 125.2 L187.1 116.2 L189.0 107.8 L190.9 100.3 L192.8 94.0 L194.8 89.0 L196.7 85.4 L198.6 83.4 L200.5 83.1 L202.5 84.3 L204.4 87.2 L206.3 91.6 L208.2 97.3 L210.2 104.3 L212.1 112.3 L214.0 121.0 L215.9 130.3 L217.8 139.7 L219.8 149.2 L221.7 158.2 L223.6 166.7 L225.5 174.4 L227.5 180.9 L229.4 186.2 L231.3 190.0 L233.2 192.3 L235.2 193.0 L237.1 192.0 L239.0 189.4 L241.0 185.3 L242.9 179.8 L244.8 173.1 L246.7 165.3 L248.7 156.6 L250.6 147.5 L252.5 138.0 L254.4 128.5 L256.4 119.4 L258.3 110.7 L260.2 102.9 L262.1 96.2 L264.0 90.7 L266.0 86.6 L267.9 84.0 L269.8 83.0 L271.8 83.7 L273.7 86.0 L275.6 89.8 L277.5 95.1 L279.5 101.6 L281.4 109.3 L283.3 117.8 L285.2 126.8 L287.1 136.3 L289.1 145.7 L291.0 155.0 L292.9 163.7 L294.9 171.7 L296.8 178.7 L298.7 184.4 L300.6 188.8 L302.5 191.7 L304.5 192.9 L306.4 192.6 L308.3 190.6 L310.2 187.0 L312.2 182.0 L314.1 175.7 L316.0 168.2 L317.9 159.8 L319.9 150.8 L321.8 141.5 L323.7 132.0 L325.7 122.7 L327.6 113.8 L329.5 105.7 L331.4 98.5 L333.3 92.5 L335.3 87.9 L337.2 84.7 L339.1 83.2 L341.1 83.2 L343.0 84.9 L344.9 88.2 L346.8 93.0 L348.8 99.1 L350.7 106.4 L352.6 114.6 L354.5 123.5 L356.4 132.8 L358.4 142.3 L360.3 151.7 L362.2 160.6 L364.2 168.9 L366.1 176.3 L368.0 182.5 L369.9 187.4 L371.8 190.8 L373.8 192.7 L375.7 192.9 L377.6 191.5 L379.6 188.5 L381.5 184.0 L383.4 178.1 L385.3 171.0 L387.2 163.0 L389.2 154.2 L391.1 144.9 L393.0 135.4 L394.9 126.0 L396.9 117.0 L398.8 108.5 L400.7 101.0 L402.7 94.5 L404.6 89.4 L406.5 85.7 L408.4 83.5 L410.3 83.0 L412.3 84.1 L414.2 86.9 L416.1 91.1 L418.1 96.7 L420.0 103.6 L421.9 111.5 L423.8 120.2 L425.8 129.4 L427.7 138.9 L429.6 148.3 L431.5 157.4 L433.4 166.0 L435.4 173.7 L437.3 180.4 L439.2 185.8 L441.2 189.7 L443.1 192.2 L445.0 193.0 L446.9 192.2 L448.8 189.7 L450.8 185.8 L452.7 180.4 L454.6 173.7 L456.6 166.0 L458.5 157.4 L460.4 148.3 L462.3 138.9 L464.2 129.4 L466.2 120.2 L468.1 111.5 L470.0 103.6 L471.9 96.7 L473.9 91.1 L475.8 86.9 L477.7 84.1 L479.7 83.0 L481.6 83.5 L483.5 85.7 L485.4 89.4 L487.3 94.5 L489.3 101.0 L491.2 108.5 L493.1 117.0 L495.1 126.0 L497.0 135.4 L498.9 144.9 L500.8 154.2 L502.8 163.0 L504.7 171.0 L506.6 178.1 L508.5 184.0 L510.4 188.5 L512.4 191.5 L514.3 192.9 L516.2 192.7 L518.2 190.8 L520.1 187.4 L522.0 182.5 L523.9 176.3 L525.8 168.9 L527.8 160.6 L529.7 151.7 L531.6 142.3 L533.5 132.8 L535.5 123.5 L537.4 114.6 L539.3 106.4 L541.2 99.1 L543.2 93.0 L545.1 88.2 L547.0 84.9 L549.0 83.2 L550.9 83.2 L552.8 84.7 L554.7 87.9 L556.7 92.5 L558.6 98.5 L560.5 105.7 L562.4 113.8 L564.3 122.7 L566.3 132.0 L568.2 141.5 L570.1 150.8 L572.1 159.8 L574.0 168.2 L575.9 175.7 L577.8 182.0 L579.8 187.0 L581.7 190.6 L583.6 192.6 L585.5 192.9 L587.4 191.7 L589.4 188.8 L591.3 184.4 L593.2 178.7 L595.1 171.7 L597.1 163.7 L599.0 155.0 L600.9 145.7 L602.9 136.3 L604.8 126.8 L606.7 117.8 L608.6 109.3 L610.6 101.6 L612.5 95.1 L614.4 89.8 L616.3 86.0 L618.2 83.7 L620.2 83.0 L622.1 84.0 L624.0 86.6 L625.9 90.7 L627.9 96.2 L629.8 102.9 L631.7 110.7 L633.6 119.4 L635.6 128.5 L637.5 138.0 L639.4 147.5 L641.4 156.6 L643.3 165.3 L645.2 173.1 L647.1 179.8 L649.1 185.3 L651.0 189.4 L652.9 192.0 L654.8 193.0 L656.8 192.3 L658.7 190.0 L660.6 186.2 L662.5 180.9 L664.4 174.4 L666.4 166.7 L668.3 158.2 L670.2 149.2 L672.1 139.7 L674.1 130.3 L676.0 121.0 L677.9 112.3 L679.9 104.3 L681.8 97.3 L683.7 91.6 L685.6 87.2 L687.6 84.3 L689.5 83.1 L691.4 83.4 L693.3 85.4 L695.2 89.0 L697.2 94.0 L699.1 100.3 L701.0 107.8 L702.9 116.2 L704.9 125.2 L706.8 134.5 L708.7 144.0 L710.6 153.3 L712.6 162.2 L714.5 170.3 L716.4 177.5 L718.4 183.5 L720.3 188.1 L722.2 191.3 L724.1 192.8 L726.1 192.8 L728.0 191.1 L729.9 187.8 L731.8 183.0 L733.8 176.9 L735.7 169.6 L737.6 161.4 L739.5 152.5 L741.4 143.2 L743.4 133.7 L745.3 124.3 L747.2 115.4 L749.1 107.1 L751.1 99.7 L753.0 93.5 L754.9 88.6 L756.9 85.2 L758.8 83.3 L760.7 83.1 L762.6 84.5 L764.6 87.5 L766.5 92.0 L768.4 97.9 L770.3 105.0 L772.2 113.0 L774.2 121.8 L776.1 131.1 L778.0 140.6 L779.9 150.0 L781.9 159.0 L783.8 167.5 L785.7 175.0 L787.6 181.5 L789.6 186.6 L791.5 190.3 L793.4 192.5 L795.4 193.0 L797.3 191.9 L799.2 189.1 L801.1 184.9 L803.1 179.3 L805.0 172.4 L806.9 164.5 L808.8 155.8 L810.8 146.6 L812.7 137.1 L814.6 127.7 L816.5 118.6 L818.4 110.0 L820.4 102.3 L822.3 95.6 L824.2 90.2 L826.1 86.3 L828.1 83.8 L830.0 83.0" style="fill:none;stroke:var(--accent);stroke-width:1.4;opacity:.8"/>
+        <path d="M60.0 83.0 L63.9 83.0 L67.7 83.1 L71.5 83.2 L75.4 83.4 L79.2 83.7 L83.1 84.0 L87.0 84.3 L90.8 84.7 L94.7 85.2 L98.5 85.7 L102.3 86.3 L106.2 86.9 L110.1 87.5 L113.9 88.2 L117.8 89.0 L121.6 89.8 L125.5 90.7 L129.3 91.6 L133.1 92.5 L137.0 93.5 L140.9 94.5 L144.7 95.6 L148.6 96.7 L152.4 97.9 L156.2 99.1 L160.1 100.3 L163.9 101.6 L167.8 102.9 L171.6 104.3 L175.5 105.7 L179.4 107.1 L183.2 108.5 L187.1 110.0 L190.9 111.5 L194.8 113.0 L198.6 114.6 L202.5 116.2 L206.3 117.8 L210.2 119.4 L214.0 121.0 L217.8 122.7 L221.7 124.3 L225.5 126.0 L229.4 127.7 L233.2 129.4 L237.1 131.1 L241.0 132.8 L244.8 134.5 L248.7 136.3 L252.5 138.0 L256.4 139.7 L260.2 141.5 L264.0 143.2 L267.9 144.9 L271.8 146.6 L275.6 148.3 L279.5 150.0 L283.3 151.7 L287.1 153.3 L291.0 155.0 L294.9 156.6 L298.7 158.2 L302.5 159.8 L306.4 161.4 L310.2 163.0 L314.1 164.5 L317.9 166.0 L321.8 167.5 L325.7 168.9 L329.5 170.3 L333.3 171.7 L337.2 173.1 L341.1 174.4 L344.9 175.7 L348.8 176.9 L352.6 178.1 L356.4 179.3 L360.3 180.4 L364.2 181.5 L368.0 182.5 L371.8 183.5 L375.7 184.4 L379.6 185.3 L383.4 186.2 L387.2 187.0 L391.1 187.8 L394.9 188.5 L398.8 189.1 L402.7 189.7 L406.5 190.3 L410.3 190.8 L414.2 191.3 L418.1 191.7 L421.9 192.0 L425.8 192.3 L429.6 192.6 L433.4 192.8 L437.3 192.9 L441.2 193.0 L445.0 193.0 L448.8 193.0 L452.7 192.9 L456.6 192.8 L460.4 192.6 L464.2 192.3 L468.1 192.0 L471.9 191.7 L475.8 191.3 L479.7 190.8 L483.5 190.3 L487.3 189.7 L491.2 189.1 L495.1 188.5 L498.9 187.8 L502.8 187.0 L506.6 186.2 L510.4 185.3 L514.3 184.4 L518.2 183.5 L522.0 182.5 L525.8 181.5 L529.7 180.4 L533.5 179.3 L537.4 178.1 L541.2 176.9 L545.1 175.7 L549.0 174.4 L552.8 173.1 L556.7 171.7 L560.5 170.3 L564.3 168.9 L568.2 167.5 L572.1 166.0 L575.9 164.5 L579.8 163.0 L583.6 161.4 L587.4 159.8 L591.3 158.2 L595.1 156.6 L599.0 155.0 L602.9 153.3 L606.7 151.7 L610.6 150.0 L614.4 148.3 L618.2 146.6 L622.1 144.9 L625.9 143.2 L629.8 141.5 L633.6 139.7 L637.5 138.0 L641.4 136.3 L645.2 134.5 L649.1 132.8 L652.9 131.1 L656.8 129.4 L660.6 127.7 L664.4 126.0 L668.3 124.3 L672.1 122.7 L676.0 121.0 L679.9 119.4 L683.7 117.8 L687.6 116.2 L691.4 114.6 L695.2 113.0 L699.1 111.5 L702.9 110.0 L706.8 108.5 L710.6 107.1 L714.5 105.7 L718.4 104.3 L722.2 102.9 L726.1 101.6 L729.9 100.3 L733.8 99.1 L737.6 97.9 L741.4 96.7 L745.3 95.6 L749.1 94.5 L753.0 93.5 L756.9 92.5 L760.7 91.6 L764.6 90.7 L768.4 89.8 L772.2 89.0 L776.1 88.2 L779.9 87.5 L783.8 86.9 L787.6 86.3 L791.5 85.7 L795.4 85.2 L799.2 84.7 L803.1 84.3 L806.9 84.0 L810.8 83.7 L814.6 83.4 L818.4 83.2 L822.3 83.1 L826.1 83.0 L830.0 83.0" style="fill:none;stroke:var(--accent-2);stroke-width:2.2;stroke-dasharray:6 4"/>
+        <circle cx="60.0" cy="83.0" r="5" style="fill:var(--accent-2)"/><circle cx="137.0" cy="93.5" r="5" style="fill:var(--accent-2)"/><circle cx="214.0" cy="121.0" r="5" style="fill:var(--accent-2)"/><circle cx="291.0" cy="155.0" r="5" style="fill:var(--accent-2)"/><circle cx="368.0" cy="182.5" r="5" style="fill:var(--accent-2)"/><circle cx="445.0" cy="193.0" r="5" style="fill:var(--accent-2)"/><circle cx="522.0" cy="182.5" r="5" style="fill:var(--accent-2)"/><circle cx="599.0" cy="155.0" r="5" style="fill:var(--accent-2)"/><circle cx="676.0" cy="121.0" r="5" style="fill:var(--accent-2)"/><circle cx="753.0" cy="93.5" r="5" style="fill:var(--accent-2)"/><circle cx="830.0" cy="83.0" r="5" style="fill:var(--accent-2)"/>
+        <text x="66" y="34" class="t-mono" style="fill:var(--accent)">실제 신호 f (빠름)</text>
+        <text x="66" y="52" class="t-mono" style="fill:var(--accent-2)">표본(●)이 그리는 신호 f<tspan baseline-shift="sub" style="font-size:8px">a</tspan> (느림)</text>
+        <text x="830" y="226" text-anchor="end" class="t-dim">표본 간격 1/f<tspan baseline-shift="sub" style="font-size:8px">s</tspan>가 신호 주기보다 약간 짧다(f = 1.1 f<tspan baseline-shift="sub" style="font-size:8px">s</tspan>)</text>
+      </svg>
+      <figcaption><b>그림 14-3.</b> 앨리어싱. 실제 신호의 진동수가 표본화 진동수의 1.1배이면, 표본(주황 점)은 진동수 0.1 f<sub>s</sub>의 느린 사인파(주황 점선) 위에 정확히 놓인다. 표본만 받은 사람은 느린 진동이 있다고 믿게 된다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-dt-alias">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>샘플링과 앨리어싱: 신호 진동수 · 표본화 진동수 → 보이는 진동수</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dt-cv-alias" aria-label="연속 사인 신호, 표본 점, 표본으로 복원한 앨리어스 사인파"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예</span><div class="seg" id="dt-al-pre"><button data-value="pump" class="on">펌프 1,780 rpm</button><button data-value="bldg">B-10 1차 진동</button><button data-value="line">전원 60 Hz</button></div></div>
+          <label class="ctrl"><span>신호 진동수 f <output id="dt-al-f-out"></output></span><input type="range" id="dt-al-f" min="0.2" max="70" step="0.01" value="29.67"></label>
+          <label class="ctrl"><span><span>표본화 진동수 f<sub>s</sub></span> <output id="dt-al-s-out"></output></span><input type="range" id="dt-al-s" min="0.5" max="200" step="0.5" value="25"></label>
+          <label class="ctrl"><span>보는 시간 창 <output id="dt-al-w-out"></output></span><input type="range" id="dt-al-w" min="0.2" max="5" step="0.1" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">나이퀴스트 f<sub>s</sub>/2</span><span class="v" id="dt-al-o-n">—</span></div>
+        <div class="stat"><span class="k">보이는 진동수 f<sub>a</sub></span><span class="v" id="dt-al-o-a">—</span></div>
+        <div class="stat"><span class="k">f<sub>s</sub> / f</span><span class="v" id="dt-al-o-r">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="dt-al-o-v">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 펌프(29.67 Hz)를 25 Hz로 재면 4.67 Hz가 보입니다 — f<sub>s</sub>를 60 Hz 이상으로 올리면 앨리어싱이 사라집니다 · "B-10 1차 진동"(StructureBook의 해석값 1.00 Hz)을 1 Hz로 재면 f<sub>a</sub> = 0, 건물이 전혀 흔들리지 않는 것처럼 보입니다 · f<sub>s</sub>를 신호의 정확히 2배로 하면 위상에 따라 0만 잴 수도 있습니다 — 2배는 "넘어야" 하는 하한입니다 · 모델: 원리 14.3, 신호 cos(2πft + 0.6), 앨리어스 곡선 cos(2π(f − kf<sub>s</sub>)t + 0.6)는 모든 표본을 지난다.</div>
+    </div>
+    <div class="callout"><strong>예제 14.2 (펌프와 건물의 표본화)</strong>
+      <p><b>① 펌프</b> \(f = 1{,}780/60 = 29.67\) Hz, \(f_s = 25\) Hz → \(k = \operatorname{round}(1.19) = 1\), \(f_a = |29.67 - 25| = 4.67\) Hz. 실제로 없는 4.67 Hz 진동이 기록된다. 회전 진동수의 2배·3배 성분(정렬 불량, 날개 통과 등)까지 보려면 \(f_s \gt 2\times3\times29.67 = 178\) Hz가 필요하고, 베어링 손상의 kHz 대역을 보려면 더 높아야 한다.</p>
+      <p><b>② B-10 흔들림</b> StructureBook 7장의 해석 모델에서 B-10의 1차 고유 주기는 1.00 s(1.00 Hz)이다. 지붕 가속도를 1초마다 재면 \(f_a = 0\)이 되어 진동이 보이지 않는다. 고차 모드(0.34 s → 2.9 Hz, 0.21 s → 4.8 Hz)까지 보려면 적어도 \(f_s \gt 9.6\) Hz, 실무에서는 수십–100 Hz로 잰다.</p>
+      <p><b>③ 판단</b> 실내 온도처럼 느린 신호는 분 단위로 충분하지만, 같은 시스템의 같은 저장 주기로 진동을 재면 숫자는 나오는데 의미가 없다. 측정점마다 신호의 최고 진동수에서 표본화 진동수를 정하고, 엣지에서 앤티앨리어싱 필터와 특징 추출을 한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="kalman">
+    <h2>상태 추정: 잡음과 칼만 필터</h2>
+    <div class="problem"><strong>온도 센서가 ±0.3 °C씩 흔들린다</strong>
+      <p>B-10 5층 사무실 A의 온도 센서는 1분마다 값을 보내지만 잡음이 ±0.3 °C쯤 섞여 있습니다. 공조 제어기가 이 값을 그대로 쓰면 냉방 밸브가 쉴 새 없이 열렸다 닫힙니다. 평균을 내면 잡음은 줄지만 설정값을 바꿨을 때 늦게 따라갑니다. 얼마나 믿고 얼마나 평균할지 어떻게 정할까요?</p></div>
+    <p>측정은 참값에 잡음이 더해진 것이고, 참값 자체도 시간에 따라 변합니다. 둘을 함께 모델로 쓰면, 새 측정이 들어올 때마다 "지금까지의 추정"과 "새 측정"을 각자의 불확실성에 비례해 섞을 수 있습니다. 그 섞는 비율을 매 순간 최적으로 정하는 것이 <span class="term">칼만 필터</span><span class="en">(Kalman filter)</span>입니다.</p>
+    <div class="callout def"><strong>정의 14.4 (상태 공간 모델, 1차원 랜덤 워크)</strong>
+      <div class="formula">$$x_k = x_{k-1} + w_k,\ \ w_k \sim N(0, q), \qquad z_k = x_k + v_k,\ \ v_k \sim N(0, r)$$<div class="where">\(x_k\): 시각 \(k\)의 참 상태(실내 온도), \(z_k\): 측정, \(q\): <span class="term">과정 잡음</span><span class="en">(process noise)</span> 분산(한 단계 동안 참값이 얼마나 움직일 수 있나, °C²), \(r\): <span class="term">측정 잡음</span><span class="en">(measurement noise)</span> 분산(센서 잡음, 표준편차 0.3 °C면 \(r = 0.09\) °C²). <span class="term">상태 추정</span><span class="en">(state estimation)</span>은 측정 \(z_1, \dots, z_k\)에서 \(x_k\)와 그 불확실성 \(P_k\)를 구하는 일이다.</div></div></div>
+    <div class="callout def"><strong>원리 14.5 (1차원 칼만 필터: 예측과 갱신)</strong>
+      <div class="formula">$$P^- = P_{k-1} + q, \qquad K_k = \frac{P^-}{P^- + r}, \qquad \hat x_k = \hat x_{k-1} + K_k\,(z_k - \hat x_{k-1}), \qquad P_k = (1 - K_k)\,P^-$$<div class="where">예측: 상태는 그대로 두고 불확실성만 \(q\)만큼 키운다. 갱신: 측정과 예측의 차이(혁신)에 <span class="term">칼만 이득</span><span class="en">(Kalman gain)</span> \(K\)를 곱해 더한다. \(K\)는 0–1 사이로, 추정을 덜 믿을수록(\(P^-\)가 클수록) 1에 가깝고 측정을 덜 믿을수록(\(r\)가 클수록) 0에 가깝다. 시간이 지나면 \(P\)와 \(K\)는 일정한 값으로 수렴한다.
+      $$P^-_\infty = \frac{q + \sqrt{q^2 + 4qr}}{2}, \qquad K_\infty = \frac{P^-_\infty}{P^-_\infty + r}$$
+      정상 상태의 필터는 이득 \(K_\infty\)의 지수 이동 평균과 같다. 측정이 빠진 시각에는 갱신을 건너뛰고 예측만 한다(\(P\)가 커져 다음 측정을 더 믿는다). <code>CB.bim.kalman1D(z, q, r, x0, P0)</code>가 이 계산을 한다.</div></div></div>
+    <figure class="diagram" id="fig-dt-kalman">
+      <svg viewBox="0 0 880 250" role="img" aria-label="칼만 필터의 예측과 갱신 순환: 이전 추정, 예측으로 불확실성 증가, 측정과 섞어 갱신">
+        <rect x="10" y="10" width="860" height="230" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="40" y="80" width="170" height="70" rx="10" class="f-elev"/><text x="125" y="108" style="fill:var(--text);font-weight:700">이전 추정</text><text x="125" y="130">x̂ₖ₋₁, Pₖ₋₁</text>
+          <rect x="270" y="80" width="170" height="70" rx="10" class="f-acc2-soft"/><text x="355" y="108" style="fill:var(--text);font-weight:700">① 예측</text><text x="355" y="130">P⁻ = P + q</text>
+          <rect x="500" y="80" width="170" height="70" rx="10" class="f-acc-soft"/><text x="585" y="108" style="fill:var(--text);font-weight:700">② 갱신</text><text x="585" y="130">K = P⁻/(P⁻ + r)</text>
+          <rect x="500" y="180" width="170" height="44" rx="9" class="f-elev"/><text x="585" y="207" style="fill:var(--text)">측정 zₖ (잡음 r)</text>
+          <rect x="720" y="80" width="130" height="70" rx="10" class="f-elev"/><text x="785" y="108" style="fill:var(--text);font-weight:700">새 추정</text><text x="785" y="130">x̂ₖ, Pₖ</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.8;fill:none" marker-end="url(#dt-ah)"><path d="M210 115H266"/><path d="M440 115H496"/><path d="M670 115H716"/><path d="M585 178V154"/></g>
+        <path d="M785 78V46H125V76" style="stroke:var(--accent);stroke-width:1.8;fill:none;stroke-dasharray:5 4" marker-end="url(#dt-ah-acc)"/>
+        <text x="455" y="38" text-anchor="middle" class="t-mono" style="fill:var(--accent)">다음 시각으로</text>
+        <g transform="translate(60,170)"><path d="M0 50 C20 50 30 10 50 10 C70 10 80 50 100 50" style="fill:none;stroke:var(--accent-2);stroke-width:1.6"/><path d="M15 50 C35 50 40 -5 50 -5 C60 -5 65 50 85 50" style="fill:none;stroke:var(--accent);stroke-width:1.6"/><text x="120" y="30" class="t-mono">갱신 뒤 분포가 좁아진다(P &lt; P⁻)</text></g>
+      </svg>
+      <figcaption><b>그림 14-4.</b> 칼만 필터의 순환. 예측 단계에서 불확실성 P가 q만큼 커지고(넓은 분포), 갱신 단계에서 측정과 섞여 좁아진다(좁은 분포). 이득 K는 두 불확실성의 비로 정해진다. 다차원(위치·속도, 온도·열부하)으로 넓히면 같은 식이 행렬이 된다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-dt-kalman">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>센서 데이터 스트림: 원 신호 vs 칼만 필터(q · r 조절)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dt-cv-kal" aria-label="6시간 동안의 참 온도, 잡음 섞인 측정, 칼만 필터 추정과 신뢰 띠, 이득 K의 변화"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>과정 잡음 q <output id="dt-kf-q-out"></output></span><input type="range" id="dt-kf-q" min="-6" max="-0.5" step="0.1" value="-3"></label>
+          <label class="ctrl"><span>필터가 가정한 측정 잡음 √r <output id="dt-kf-r-out"></output></span><input type="range" id="dt-kf-r" min="0.01" max="1.5" step="0.01" value="0.3"></label>
+          <label class="ctrl"><span>실제 센서 잡음 σ <output id="dt-kf-s-out"></output></span><input type="range" id="dt-kf-s" min="0.02" max="1" step="0.01" value="0.3"></label>
+          <label class="ctrl"><span>결측 비율 <output id="dt-kf-m-out"></output></span><input type="range" id="dt-kf-m" min="0" max="0.6" step="0.05" value="0"></label>
+          <div class="btn-row"><button class="btn" id="dt-kf-ex">예제 14.3 값</button><button class="btn" id="dt-kf-seed">다른 잡음</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">정상 이득 K<sub>∞</sub></span><span class="v" id="dt-kf-o-k">—</span></div>
+        <div class="stat"><span class="k">RMSE 원 측정</span><span class="v" id="dt-kf-o-r">—</span></div>
+        <div class="stat"><span class="k">RMSE 필터</span><span class="v" id="dt-kf-o-f">—</span></div>
+        <div class="stat"><span class="k">설정 변경 추종(63 %)</span><span class="v" id="dt-kf-o-l">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 예제 14.3 값(q 10⁻³, r 0.09)에서 K<sub>∞</sub> = 0.10을 확인하세요 — 전체 RMSE는 원 측정 약 0.29 °C에서 약 0.17 °C로 줄고(잡음 구간만 보면 약 3분의 1), 나머지는 설정 변경 직후의 지연 오차입니다 · q를 10⁻⁵로 줄이면 아주 매끄럽지만 120분의 설정값 변경(26 → 24 °C)을 수십 분 늦게 따라갑니다 · q를 10⁻¹로 키우면 K가 1에 가까워져 잡음을 거의 그대로 통과시킵니다 · 결측을 40 %로 하면 빈 구간에서 띠(±2√P)가 넓어지고 다음 측정을 더 크게 믿습니다 · 모델: 정의 14.4·원리 14.5, 갱신은 한 단계씩 <code>CB.bim.kalman1D([z], q, r, x, P)</code>, 결측 시 예측만(페이지 계산), 참 온도는 1차 응답(시상수 25분) + 완만한 변동(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 14.3 (정상 이득과 잡음 감소)</strong> \(q = 0.001\) °C²(1분에 참값이 약 0.03 °C 움직일 수 있음), \(r = 0.09\) °C²(σ = 0.3 °C).
+      <p><b>① 정상 예측 분산</b> \(P^-_\infty = (0.001 + \sqrt{0.001^2 + 4\times0.001\times0.09})/2 = (0.001 + 0.019)/2 = 0.010\) °C².</p>
+      <p><b>② 이득</b> \(K_\infty = 0.010/(0.010 + 0.09) = 0.10\). 새 측정을 10 %만 반영하는 지수 이동 평균과 같다(유효 기억 약 1/K = 10분).</p>
+      <p><b>③ 추정 오차</b> \(P_\infty = (1 - 0.10)\times0.010 = 0.009\) → 표준편차 0.095 °C. 원 측정 0.3 °C의 약 3분의 1이다.</p>
+      <p><b>④ 판단</b> 이 필터는 설정값 변경 같은 빠른 변화를 약 10분 늦게 따라간다. 제어에는 지연이 해롭고 경보에는 잡음이 해롭다. 그래서 같은 센서라도 용도마다 q를 다르게 둘 수 있다. \(r\)는 센서 사양이나 정지 상태의 측정 분산에서, \(q\)는 참값이 움직이는 빠르기에서 정한다. 둘 다 "조절 손잡이"이지 진리가 아니다.</p></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="anomaly">
+    <h2>이상 탐지: 임계값·이동 평균·관리도</h2>
+    <div class="problem"><strong>경보가 하루 30번 울리면 아무도 보지 않는다</strong>
+      <p>B-10 냉수 펌프 CHWP-1의 진동 실효값을 1시간마다 잽니다. 평소 2.0 mm/s 안팎입니다. 정비 뒤 정렬이 틀어져 0.35 mm/s 올라가거나, 베어링이 닳아 조금씩 올라가는 것은 잡고 싶습니다. 그러나 센서가 가끔 튀는 값까지 경보로 울리면 운영자는 곧 경보를 꺼 버립니다. 어떤 규칙이 좋을까요?</p></div>
+    <p><span class="term">이상 탐지</span><span class="en">(anomaly detection)</span>는 정상 상태의 자료로 <b>기준선</b>(평균과 흩어짐)을 정하고, 새 측정이 기준선에서 우연으로 보기 어려울 만큼 벗어나면 경보를 내는 일입니다. 품질 관리의 관리도(SiteBook <a href="../../site/chapters/quality.html#control-chart">14장</a>)와 같은 생각입니다. 규칙이 민감할수록 이상을 빨리 잡지만 <span class="term">거짓 경보</span><span class="en">(false alarm)</span>도 늘어납니다.</p>
+    <div class="callout def"><strong>정의 14.6 (세 가지 탐지 규칙, 교육용 형태)</strong> 기준 기간(이상이 없다고 확인한 기간)의 평균 \(\mu_0\), 표준편차 \(\sigma_0\)에 대해
+      <div class="formula">$$\text{① 고정 임계값: } z_t \gt A, \qquad \text{② 이동 평균: } \left|\bar z_t^{(m)} - \mu_0\right| \gt k\,\frac{\sigma_0}{\sqrt m}, \qquad \text{③ 관리도: } |z_t - \mu_0| \gt k\sigma_0 \ \text{또는 연속 8점이 한쪽}$$<div class="where">① 설비 사양·진동 심각도 기준(기계 종류별 구역 기준, ISO 20816 계열 형태 — 값은 현행 기준과 제조사 자료 확인) 같은 절대값 \(A\)를 넘으면 경보. 단순하지만 그 설비의 평소 수준을 모른다. ② 최근 \(m\)개 평균은 잡음 표준편차가 \(\sigma_0/\sqrt m\)로 줄어 작은 이동을 잡지만 \(m\)만큼 늦다. ③ 개별 값 관리도에 SiteBook 정의 14.4의 규칙 1(3σ 밖)과 규칙 4(연속 8점이 중심선 한쪽)를 쓴다. 정규 잡음에서 3σ 규칙 하나의 거짓 경보 확률은 표본마다 약 0.27 %다.</div></div></div>
+    <figure class="diagram" id="fig-dt-trade">
+      <svg viewBox="0 0 880 260" role="img" aria-label="경보 한계를 낮추면 탐지는 빨라지고 거짓 경보가 늘어나는 맞바꿈, 정상과 이상 분포의 겹침">
+        <rect x="10" y="10" width="860" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(50,30)">
+          <line x1="0" y1="170" x2="380" y2="170" class="s-axis"/>
+          <path d="M0 170 C60 170 90 20 130 20 C170 20 200 170 260 170" style="fill:color-mix(in srgb, var(--accent) 14%, transparent);stroke:var(--accent);stroke-width:2"/>
+          <path d="M100 170 C160 170 190 40 230 40 C270 40 300 170 360 170" style="fill:color-mix(in srgb, var(--bad) 12%, transparent);stroke:var(--bad);stroke-width:2"/>
+          <line x1="205" y1="10" x2="205" y2="170" style="stroke:var(--accent-2);stroke-width:2;stroke-dasharray:5 4"/>
+          <text x="210" y="12" class="t-mono" style="fill:var(--accent-2)">경보 한계</text>
+          <text x="80" y="60" class="t-mono" style="fill:var(--accent)">정상</text><text x="282" y="60" class="t-mono" style="fill:var(--bad)">이상</text>
+          <text x="190" y="196" text-anchor="middle" class="t-mono">한계를 왼쪽으로 → 탐지 ↑ · 거짓 경보 ↑</text>
+        </g>
+        <g transform="translate(500,30)">
+          <line x1="0" y1="170" x2="320" y2="170" class="s-axis"/><line x1="0" y1="170" x2="0" y2="0" class="s-axis"/>
+          <path d="M0 170 C10 60 60 20 320 8" style="fill:none;stroke:var(--accent);stroke-width:2.4"/>
+          <path d="M0 170 C40 150 100 120 320 70" style="fill:none;stroke:var(--text-dim);stroke-width:2;stroke-dasharray:5 4"/>
+          <text x="160" y="196" text-anchor="middle" class="t-mono">거짓 경보 비율 →</text>
+          <text x="-14" y="85" text-anchor="middle" class="t-mono" transform="rotate(-90 -14 85)">탐지 비율 →</text>
+          <text x="90" y="40" class="t-mono" style="fill:var(--accent)">좋은 특징·평균화</text><text x="150" y="128" class="t-mono">나쁜 특징</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-5.</b> 탐지와 거짓 경보의 맞바꿈. 정상과 이상의 분포가 겹치면 어떤 한계도 둘 다 0으로 만들 수 없다(왼쪽). 한계를 옮겨 가며 그린 탐지–거짓 경보 곡선(오른쪽)이 왼쪽 위로 붙을수록 좋은 방법이다. 평균화와 좋은 특징(온도 보정 잔차 등)은 두 분포의 겹침을 줄여 곡선 자체를 낫게 한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-dt-anomaly">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>이상 탐지: CHWP-1 진동 60일, 탐지와 거짓 경보</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dt-cv-an" aria-label="60일 진동 실효값 시계열, 이상 구간 음영, 경보 표시, 기준선과 한계"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>방법</span><div class="seg" id="dt-an-m"><button data-value="thr">고정 임계값</button><button data-value="ma">이동 평균</button><button data-value="cc" class="on">관리도</button></div></div>
+          <label class="ctrl"><span>고정 임계값 A <output id="dt-an-a-out"></output></span><input type="range" id="dt-an-a" min="2.2" max="4" step="0.05" value="2.8"></label>
+          <label class="ctrl"><span>한계 배수 k(이동 평균·관리도) <output id="dt-an-k-out"></output></span><input type="range" id="dt-an-k" min="1.5" max="5" step="0.1" value="3"></label>
+          <label class="ctrl"><span>이동 평균 창 m <output id="dt-an-w-out"></output></span><input type="range" id="dt-an-w" min="2" max="48" step="1" value="6"></label>
+          <label class="check"><input type="checkbox" id="dt-an-r4" checked> 관리도에 "연속 8점 한쪽" 규칙 더하기</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">탐지한 이상</span><span class="v" id="dt-an-o-d">—</span></div>
+        <div class="stat"><span class="k">평균 탐지 지연</span><span class="v" id="dt-an-o-l">—</span></div>
+        <div class="stat"><span class="k">거짓 경보(묶음)</span><span class="v" id="dt-an-o-f">—</span></div>
+        <div class="stat"><span class="k">경보 켜진 시간</span><span class="v" id="dt-an-o-t">—</span></div>
+      </div>
+      <div class="dt-msg" id="dt-an-msg">—</div>
+      <div class="sim-note">해볼 것: 고정 임계값 2.8 mm/s는 정렬 불량(+0.35)을 놓치고 마모를 80시간 넘게 늦게 잡으며, 센서 튐 두 번을 경보로 냅니다 · 이동 평균(m 6, k 3)은 세 이상을 모두 잡지만 튐이 창 안에 들어오면 거짓 경보가 납니다 · 관리도에서 "연속 8점" 규칙을 끄면 마모 탐지가 약 57시간, 켜면 약 13시간으로 빨라지지만 거짓 경보가 4회에서 8회로 늘어납니다 — 일교차 같은 느린 변동이 연속 규칙을 건드리기 때문입니다 · k를 2로 낮추면 거짓 경보가 20회를 넘습니다 · 모델: 기준 기간 1–7일(평균·표준편차), 1시간 표본, 이상 ① 20–22일 수준 이동 +0.35, ② 38일부터 하루 +0.02 마모, ③ 50일 6시간 공동 현상 +1.0, 센서 튐 3회(이상 아님), 탐지 = 이상 시작부터 끝 + 24시간 안의 경보, 교육용 생성 자료(<code>CB.rng</code>).</div>
+    </div>
+    <div class="callout"><strong>예제 14.4 (경보 피로와 평균화)</strong> 기준선 \(\mu_0 = 2.0\), \(\sigma_0 = 0.15\) mm/s, 표본 1시간.
+      <p><b>① 거짓 경보의 수</b> 3σ 규칙 하나: 표본당 0.27 % × 8,760시간 = 센서 하나에 연 약 24회. 센서 500개면 연 약 11,800회, 하루 약 32회다. 모두 거짓이다.</p>
+      <p><b>② 작은 이동</b> +0.35 mm/s는 \(2.33\sigma_0\). 개별 값이 3σ를 넘을 확률은 표본마다 \(P(Z \gt 0.67) \approx 25\) %로, 평균 4시간쯤 걸려 잡힌다. 6시간 이동 평균은 잡음이 \(0.15/\sqrt6 = 0.061\)이고 한계는 \(3\times0.061 = 0.18\)이므로, 이동이 창을 채우면(약 6시간) 거의 확실히 잡는다.</p>
+      <p><b>③ 판단</b> 경보 규칙은 "놓쳐도 되는 시간"과 "하루에 감당할 거짓 경보 수"로 정한다. 측정점이 수백 개면 측정점당 거짓 경보 확률을 훨씬 낮게(한계를 넓게, 평균화를 길게) 해야 운영자가 경보를 믿는다. 경보는 13장의 작업 지시로 이어질 때만 쓸모가 있다.</p></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="rul">
+    <h2>예측 유지보수: 잔여 수명 추정</h2>
+    <div class="problem"><strong>공조기 필터를 언제 갈까</strong>
+      <p>B-10 5층 공조기 AHU-05의 필터 차압은 먼지가 쌓이며 매일 조금씩 오릅니다. 교체 기준(교육용 250 Pa)에 언제 닿을까요? 60일치 자료로 앞을 내다볼 때 얼마나 확신할 수 있을까요?</p></div>
+    <p>상태 측정에 추세가 있으면 그 추세를 늘려 한계에 닿는 시각을 예측할 수 있습니다. 지금부터 그때까지가 <span class="term">잔여 수명</span><span class="en">(remaining useful life, RUL)</span>입니다. 예측은 점 하나가 아니라 구간이어야 하며, 추세 모양을 잘못 가정하면 구간까지 틀립니다.</p>
+    <div class="callout def"><strong>원리 14.7 (선형 회귀 외삽과 예측 구간, 교육용)</strong> 최근 \(n\)개 측정 \((t_j, y_j)\)에 최소 제곱 직선 \(\hat y = b_0 + b_1 t\)를 맞추면
+      <div class="formula">$$\hat t_f = \frac{y_{lim} - b_0}{b_1}, \qquad \hat y(t) \pm t_{\alpha/2,\,n-2}\; s\sqrt{1 + \frac1n + \frac{(t - \bar t)^2}{S_{tt}}}$$<div class="where">\(y_{lim}\): 한계값, 오른쪽 식이 <span class="term">예측 구간</span><span class="en">(prediction interval)</span>, \(s\): 잔차 표준편차, \(S_{tt} = \sum(t_j - \bar t)^2\). 예측 구간의 위·아래 경계가 한계에 닿는 시각이 고장 시각 구간의 끝이 된다(위 경계가 먼저 닿는 시각 = 이른 쪽). 멀리 외삽할수록 \((t - \bar t)^2\) 항이 커져 구간이 넓어진다. 추세가 가속하면(필터 차압은 보통 그렇다) 직선은 고장 시각을 늦게(낙관적으로) 본다.</div></div></div>
+    <figure class="diagram" id="fig-dt-rul">
+      <svg viewBox="0 0 880 260" role="img" aria-label="열화 추세의 회귀선과 예측 구간이 고장 한계에 닿는 시각의 범위">
+        <rect x="10" y="10" width="860" height="240" rx="10" class="f-surface"/>
+        <line x1="70" y1="210" x2="840" y2="210" class="s-axis"/><line x1="70" y1="210" x2="70" y2="30" class="s-axis"/>
+        <line x1="70" y1="60" x2="840" y2="60" style="stroke:var(--bad);stroke-width:2;stroke-dasharray:6 4"/><text x="76" y="54" class="t-mono" style="fill:var(--bad)">한계 y<tspan baseline-shift="sub" style="font-size:8px">lim</tspan></text>
+        <g style="fill:var(--accent)"><circle cx="90" cy="190" r="3"/><circle cx="120" cy="184" r="3"/><circle cx="150" cy="182" r="3"/><circle cx="180" cy="172" r="3"/><circle cx="210" cy="170" r="3"/><circle cx="240" cy="160" r="3"/><circle cx="270" cy="158" r="3"/><circle cx="300" cy="148" r="3"/><circle cx="330" cy="146" r="3"/><circle cx="360" cy="136" r="3"/></g>
+        <line x1="360" y1="30" x2="360" y2="210" style="stroke:var(--text-faint);stroke-dasharray:4 4"/><text x="366" y="200" class="t-mono">오늘</text>
+        <path d="M90 190 L700 34" style="stroke:var(--accent);stroke-width:2;fill:none"/>
+        <path d="M360 126 C460 96 540 62 620 34 L800 34 L800 34 C700 66 600 100 360 146 Z" style="fill:color-mix(in srgb, var(--accent) 10%, transparent);stroke:none"/>
+        <path d="M360 126 C460 96 540 62 620 34" style="stroke:var(--accent);stroke-dasharray:4 3;fill:none"/><path d="M360 146 C600 100 700 66 820 40" style="stroke:var(--accent);stroke-dasharray:4 3;fill:none"/>
+        <line x1="566" y1="60" x2="566" y2="210" style="stroke:var(--accent-2)"/><line x1="660" y1="60" x2="660" y2="210" style="stroke:var(--accent-2);stroke-width:2"/><line x1="770" y1="60" x2="770" y2="210" style="stroke:var(--accent-2)"/>
+        <text x="566" y="228" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">이른 쪽</text><text x="660" y="228" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">t̂<tspan baseline-shift="sub" style="font-size:8px">f</tspan></text><text x="770" y="228" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">늦은 쪽</text>
+        <text x="460" y="150" class="t-mono">RUL = t̂<tspan baseline-shift="sub" style="font-size:8px">f</tspan> − 오늘</text>
+      </svg>
+      <figcaption><b>그림 14-6.</b> 잔여 수명 추정. 측정(점)에 맞춘 직선을 한계(빨강)까지 늘리고, 예측 구간(띠)의 두 경계가 한계에 닿는 시각으로 구간을 잡는다. 정비 계획은 보통 이른 쪽 경계에 맞춘다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-dt-rul">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>잔여 수명 추정: 필터 차압 추세 → 예측 고장 시점과 구간</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dt-cv-rul" aria-label="일별 필터 차압 측정, 회귀선, 예측 구간, 한계 250 Pa, 예측 시점과 실제 도달 시점"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>오늘(관측한 날 수) <output id="dt-rl-d-out"></output></span><input type="range" id="dt-rl-d" min="15" max="95" step="1" value="60"></label>
+          <label class="ctrl"><span>회귀에 쓰는 최근 기간 <output id="dt-rl-w-out"></output></span><input type="range" id="dt-rl-w" min="10" max="95" step="1" value="95"></label>
+          <label class="ctrl"><span>측정 잡음 σ <output id="dt-rl-s-out"></output></span><input type="range" id="dt-rl-s" min="1" max="15" step="0.5" value="4"></label>
+          <div class="ctrl"><span>예측 구간 신뢰 수준</span><div class="seg" id="dt-rl-c"><button data-value="0.8">80 %</button><button data-value="0.9" class="on">90 %</button><button data-value="0.95">95 %</button></div></div>
+          <div class="btn-row"><button class="btn" id="dt-rl-seed">다른 측정</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기울기 b<sub>1</sub></span><span class="v" id="dt-rl-o-b">—</span></div>
+        <div class="stat"><span class="k">예측 도달일 (구간)</span><span class="v" id="dt-rl-o-t">—</span></div>
+        <div class="stat"><span class="k">잔여 수명 RUL</span><span class="v" id="dt-rl-o-r">—</span></div>
+        <div class="stat"><span class="k">실제 도달일</span><span class="v" id="dt-rl-o-a">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 60일 전체로 맞추면 예측 도달일이 실제(100일)보다 늦습니다 — 가속하는 추세를 직선으로 본 낙관 편향입니다 · 회귀 기간을 최근 30일로 줄이면 편향은 줄지만 구간이 넓어집니다 · 오늘을 90일로 밀면 구간이 좁아지고 실제와 가까워집니다 · 잡음을 키우면 구간이 넓어집니다 — 기본값의 90 % 구간이 실제 100일을 포함하지 않는 것에 주의하세요(모델 모양의 오류는 구간에 들어 있지 않음) · 모델: 원리 14.7, 참 추세 ΔP = 120 + 0.9t + 0.004t² Pa(교육용, 250 Pa에 100일째 도달), 정규 잡음, t 분포 분위수는 코니시–피셔 근사.</div>
+    </div>
+    <div class="callout"><strong>예제 14.5 (필터 차압의 직선 외삽, 잡음 없음)</strong> 참 추세 \(\Delta P = 120 + 0.9t + 0.004t^2\) Pa, 한계 250 Pa(실제 도달 \(t = 100\) 일).
+      <p><b>① 0–60일 전체로 맞춤</b> \(b_1 = 1.14\) Pa/일, \(b_0 = 117.6\) Pa → \(\hat t_f = (250 - 117.6)/1.14 = 116\) 일. 16일 늦게 본다.</p>
+      <p><b>② 최근 30–60일로 맞춤</b> \(b_1 = 1.26\), \(b_0 = 112.2\) → \(\hat t_f = 109\) 일. 편향이 줄었다.</p>
+      <p><b>③ 판단</b> 잡음이 없어도 모델 모양의 오류만으로 16일이 틀린다. 시뮬레이터에서 보듯 90 % 예측 구간(약 110–125일)조차 실제 100일을 포함하지 않는다 — 예측 구간은 잡음만 반영하고 모델 모양의 오류는 반영하지 못하기 때문이다. 그래서 RUL은 ① 최근 자료에 더 무게를 두고, ② 구간의 이른 쪽으로 정비를 계획하고, ③ 새 측정마다 다시 계산한다. 필터는 싸고 교체가 쉬워 이른 쪽을 쓰는 비용이 작다. 13장의 원리 13.8에서 \(p_d\)와 \(L\)이 바로 이 예측의 성능이다.</p></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="control">
+    <h2>공조 제어 루프: 실내 온도의 1차 모델</h2>
+    <div class="problem"><strong>설정값은 24 °C인데 오후에는 25.6 °C</strong>
+      <p>B-10 5층 사무실 A는 오후 내내 설정값보다 1.5 °C쯤 높습니다. 냉방 용량이 모자란 걸까요, 제어 방식의 문제일까요? 트윈의 간단한 물리 모델로 따져 봅니다.</p></div>
+    <div class="callout def"><strong>정의 14.8 (실내 온도의 1차 모델, 교육용)</strong>
+      <div class="formula">$$C\frac{dT}{dt} = UA\,(T_o - T) + Q_g - Q_c, \qquad \tau = \frac{C}{UA}$$<div class="where">\(C\): 실의 유효 열용량(공기 + 가구 + 노출된 구조체, kJ/K), \(UA\): 외피·침기의 열 손실 계수(kW/K), \(T_o\): 외기 온도, \(Q_g\): 내부 발열과 일사(kW), \(Q_c\): 냉방 열량(0–\(Q_{max}\)), \(\tau\): <span class="term">시상수</span><span class="en">(time constant)</span>. 제어 방식: <b>온–오프</b>(\(T \gt T_s + \delta/2\)이면 \(Q_{max}\), \(T \lt T_s - \delta/2\)이면 0), <b>비례(P)</b> \(Q_c = K_p (T - T_s)\), <b>비례–적분(PI)</b>(<span class="term">PI 제어</span><span class="en">(proportional-integral control)</span>) \(Q_c = K_p e + K_i\int e\,dt\)(\(e = T - T_s\)). P 제어는 정상 상태에서
+      $$T_\infty - T_s = \frac{UA\,(T_o - T_s) + Q_g}{UA + K_p}$$
+      만큼의 정상 편차를 남기고, 적분 항이 이를 없앤다. 용량 한계에서 적분이 계속 쌓이지 않도록 막는 처리(적분 와인드업 방지)가 필요하다.</div></div></div>
+    <figure class="diagram" id="fig-dt-loop">
+      <svg viewBox="0 0 880 230" role="img" aria-label="공조 제어 피드백 루프: 설정값, 비교기, 제어기, 냉방 코일, 실내, 센서와 칼만 필터">
+        <rect x="10" y="10" width="860" height="210" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <text x="60" y="86" style="fill:var(--text)">설정 T<tspan baseline-shift="sub" style="font-size:8px">s</tspan></text>
+          <circle cx="150" cy="82" r="16" class="f-elev"/><text x="150" y="87" style="fill:var(--text)">Σ</text>
+          <rect x="210" y="56" width="130" height="52" rx="9" class="f-acc-soft"/><text x="275" y="80" style="fill:var(--text);font-weight:700">제어기</text><text x="275" y="98">온–오프 · P · PI</text>
+          <rect x="400" y="56" width="130" height="52" rx="9" class="f-elev"/><text x="465" y="80" style="fill:var(--text);font-weight:700">냉방 코일</text><text x="465" y="98">0 ≤ Q<tspan baseline-shift="sub" style="font-size:8px">c</tspan> ≤ Q<tspan baseline-shift="sub" style="font-size:8px">max</tspan></text>
+          <rect x="590" y="56" width="150" height="52" rx="9" class="f-acc2-soft"/><text x="665" y="80" style="fill:var(--text);font-weight:700">실(사무실 A)</text><text x="665" y="98">C dT/dt = …</text>
+          <rect x="400" y="150" width="190" height="46" rx="9" class="f-elev"/><text x="495" y="178" style="fill:var(--text)">센서 + 필터(14.4절)</text>
+          <text x="665" y="34" style="fill:var(--accent-2)">외기 T<tspan baseline-shift="sub" style="font-size:8px">o</tspan> · 발열 Q<tspan baseline-shift="sub" style="font-size:8px">g</tspan> (외란)</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.8;fill:none" marker-end="url(#dt-ah)"><path d="M100 82H130"/><path d="M166 82H206"/><path d="M340 82H396"/><path d="M530 82H586"/><path d="M740 82H800V173H594"/><path d="M400 173H150V102"/><path d="M665 40V52"/></g>
+        <text x="138" y="122" class="t-mono">−</text><text x="804" y="78" class="t-mono">T</text>
+      </svg>
+      <figcaption><b>그림 14-7.</b> 공조 제어 루프. 센서가 잰 실온(필터를 거친 추정)을 설정값과 비교해 오차를 만들고, 제어기가 냉방 열량을 정한다. 외기와 내부 발열은 루프 밖에서 들어오는 외란이다. 트윈은 이 루프의 모델을 측정으로 보정해 설정값 스케줄이나 고장 진단에 쓴다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-dt-hvac">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>공조 제어 루프: 설정 온도 · 외기 · 제어 방식 → 실내 온도 응답</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dt-stack"><div><canvas id="dt-cv-hv" aria-label="24시간 실내 온도, 설정값 띠, 외기 온도"></canvas></div><div><canvas id="dt-cv-hq" aria-label="24시간 냉방 열량과 내부 발열"></canvas></div></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>제어 방식</span><div class="seg" id="dt-hv-c"><button data-value="onoff">온–오프</button><button data-value="p" class="on">비례(P)</button><button data-value="pi">비례–적분(PI)</button></div></div>
+          <label class="ctrl"><span><span>설정 온도 T<sub>s</sub></span> <output id="dt-hv-s-out"></output></span><input type="range" id="dt-hv-s" min="20" max="28" step="0.5" value="24"></label>
+          <label class="ctrl"><span>외기 일 최고 <output id="dt-hv-o-out"></output></span><input type="range" id="dt-hv-o" min="20" max="38" step="0.5" value="32"></label>
+          <label class="ctrl"><span><span>내부 발열 최대 Q<sub>g</sub></span> <output id="dt-hv-g-out"></output></span><input type="range" id="dt-hv-g" min="0" max="12" step="0.5" value="6"></label>
+          <label class="ctrl"><span><span>비례 이득 K<sub>p</sub></span> <output id="dt-hv-k-out"></output></span><input type="range" id="dt-hv-k" min="1" max="30" step="0.5" value="5"></label>
+          <label class="ctrl"><span><span>냉방 용량 Q<sub>max</sub></span> <output id="dt-hv-q-out"></output></span><input type="range" id="dt-hv-q" min="3" max="25" step="0.5" value="15"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">14시 실온 − 설정</span><span class="v" id="dt-hv-o-e">—</span></div>
+        <div class="stat"><span class="k">쾌적 이탈(재실 중, °C·h)</span><span class="v" id="dt-hv-o-d">—</span></div>
+        <div class="stat"><span class="k">냉방 열량(일)</span><span class="v" id="dt-hv-o-q">—</span></div>
+        <div class="stat"><span class="k">냉방 켜짐 횟수</span><span class="v" id="dt-hv-o-n">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 비례(P), K<sub>p</sub> 5 kW/K에서 오후 실온이 설정보다 약 1.6 °C 높습니다(정상 편차) — K<sub>p</sub>를 20으로 올리면 약 0.4 °C로 줄고, PI로 바꾸면 0.2 °C 안팎으로 줄어듭니다 · 온–오프는 평균은 맞지만 ±0.5 °C 사이를 오가며 하루 17번쯤 켜고 끕니다(기기 수명에 해로움) · 용량을 7 kW로 줄이면 어떤 제어로도 오후에 설정값을 지키지 못합니다 — 제어 문제가 아니라 용량 문제입니다 · 모델: 정의 14.8, C = 8,000 kJ/K, UA = 0.35 kW/K(τ ≈ 6.3 h), 외기 일교차 8 °C(15시 최고), 발열은 9–18시 재실 + 일사(13시 최고), 공조 운전 7–19시, PI의 K<sub>i</sub> = K<sub>p</sub>/2 h⁻¹, 온–오프 차등 1 °C, 1분 오일러 적분(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 14.6 (P 제어의 정상 편차)</strong> \(UA = 0.35\) kW/K, \(T_o = 32\) °C, \(T_s = 24\) °C, \(Q_g = 6\) kW, \(C = 8{,}000\) kJ/K.
+      <p><b>① 시상수</b> \(\tau = 8{,}000/0.35 = 22{,}900\) s ≈ 6.3 h. 실은 느리게 반응한다.</p>
+      <p><b>② 필요 냉방</b> 설정값을 지키려면 \(Q_c = 0.35\times8 + 6 = 8.8\) kW. 용량 15 kW면 충분하다.</p>
+      <p><b>③ P 제어의 편차</b> \(K_p = 5\): \(8.8/(0.35 + 5) = 1.64\) °C. \(K_p = 20\): \(8.8/20.35 = 0.43\) °C. 이득을 키우면 줄지만 센서 잡음도 그만큼 밸브에 실린다(14.4절의 필터가 필요한 이유).</p>
+      <p><b>④ 판단</b> 문제의 "오후 25.6 °C"는 용량 부족이 아니라 P 제어의 정상 편차일 가능성이 크다. 적분 항을 넣으면 해결된다. 트윈은 이런 진단을 측정 자료와 모델의 비교로 한다: 모델이 예측한 실온과 측정이 맞으면 모델이 쓸 만하고, 어긋나면(예: 7층 오후) 설비 이상을 의심한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="dashboard">
+    <h2>3D 센서 대시보드: 모델 위의 데이터</h2>
+    <div class="problem"><strong>60개 숫자 중 무엇이 이상한가</strong>
+      <p>B-10의 각 층에는 사무실 온도 4개, 회의실 CO₂ 1개, 공조기 진동 1개, 모두 60개 센서가 있습니다. 표로 보면 숫자의 바다입니다. 모델의 공간 위에 색으로 올리면 무엇이 보일까요?</p></div>
+    <p>센서 값을 모델 위에 그리려면 센서마다 <b>위치(공간)와 대상(자산)</b>이 정해져 있어야 합니다. IFC4는 센서를 <code>IfcSensor</code>로 표현하고 공간과 관계를 맺을 수 있으며, 측정점 이름에 의미 태그를 붙이는 공개 의미 모델(Brick, Project Haystack 같은 형태)도 쓰입니다. 13장의 공간 번호(501–1007)와 자산 태그(AHU-01–10)가 그 연결 열쇠입니다. 3D 화면은 공간적인 패턴(한 층 전체, 남쪽 실, 한 공조 계통)을 한눈에 보여 주지만, 정확한 값과 추세는 여전히 그래프로 봐야 합니다.</p>
+    <div class="sim" id="sim-dt-dash">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>3D 센서 대시보드: B-10 층별 센서 60개, 시간 슬라이더</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view dt-stack"><div><canvas id="dt-cv-3d" aria-label="B-10 층마다 센서 위치를 값의 색으로 표시한 3D 장면"></canvas></div><div><canvas id="dt-cv-sp" aria-label="선택한 센서의 24시간 추이와 현재 시각"></canvas></div></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>측정량</span><div class="seg" id="dt-db-m"><button data-value="T" class="on">온도</button><button data-value="C">CO₂</button><button data-value="V">공조기 진동</button></div></div>
+          <label class="ctrl"><span>시각 <output id="dt-db-t-out"></output></span><input type="range" id="dt-db-t" min="0" max="143" step="1" value="84"></label>
+          <label class="ctrl"><span>센서 선택</span><select id="dt-db-sel"></select></label>
+          <div class="btn-row"><button class="btn primary" id="dt-db-play">▶ 재생</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평균 / 최고</span><span class="v" id="dt-db-o-a">—</span></div>
+        <div class="stat"><span class="k">범위 밖 센서</span><span class="v" id="dt-db-o-n">—</span></div>
+        <div class="stat"><span class="k">선택 센서</span><span class="v" id="dt-db-o-s">—</span></div>
+      </div>
+      <div class="dt-msg" id="dt-db-msg">—</div>
+      <div class="sim-note">해볼 것: 끌어 돌려 보세요(터치는 가로로 끌기) · "공조기 진동"에서 10시부터 AHU-07이 노랑 → 빨강으로 바뀌다가 13시에 멈춥니다(0) — 그 뒤 "온도"로 바꾸면 7층 사무실이 오후 내내 붉어집니다: 징후 → 고장 → 영향의 순서입니다 · "CO₂"에서 7층 회의실은 오후 회의 때 1,000 ppm을 크게 넘습니다(환기 정지) · 3층 사무실 D(304)의 온도는 6시부터 한 값에 붙어 움직이지 않습니다 — 색만 보면 정상이지만 고장 난 센서입니다(마지막 절) · 장면의 점을 눌러도 선택됩니다 · 모델: 10분 간격 24시간 교육용 생성 자료(외기 27 ± 5 °C, 재실 9–18시, 공조 7–19시, AHU-07 13시 정지, T-304 고착), 쾌적 범위 22–26 °C(재실 중), CO₂ 1,000 ppm(실내 공기질 기준 형태, 현행 확인), 진동 경보 2.8 mm/s(교육용), <code>CB.orbit</code>.</div>
+    </div>
+    <div class="callout site"><strong>B-10 공조 트윈 요약(교육용)</strong> 측정점 약 700개(1분, 하루 24 MB)와 진동 24곳(엣지 특징값, 하루 0.28 MB). 온도 센서 σ 0.3 °C → 칼만 필터(q 10⁻³, r 0.09) K<sub>∞</sub> 0.10, 추정 σ 0.095 °C, 약 10분 지연. CHWP-1 진동 기준선 2.0 ± 0.15 mm/s, 3σ 관리도 + 연속 8점 규칙. AHU-05 필터 차압 250 Pa 도달 예측: 60일 직선 외삽 116일(실제 100일) → 최근 30일 109일 → 구간의 이른 쪽으로 교체 계획. 사무실 A: τ ≈ 6.3 h, 오후 냉방 8.8 kW, P 제어 편차 1.6 °C → PI. 시나리오: AHU-07 진동 징후(10시) → 정지(13시) → 7층 실온 상승·회의실 CO₂ 상승, T-304 센서 고착. 경보는 13장의 작업 지시(AHU-07 점검)로 이어진다. 구조: B-10 1차 고유 진동수 1.00 Hz(StructureBook 해석값)를 지붕 가속도로 추적(다음 절). 모든 값은 교육용이다.</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="shm">
+    <h2>구조 건전성 모니터링 맛보기</h2>
+    <div class="problem"><strong>건물의 진동수는 건강 지표가 될까</strong>
+      <p>B-10 지붕에 가속도계를 달아 바람과 미진동에 흔들리는 응답에서 1차 고유 진동수를 매일 뽑습니다. 지진 뒤 진동수가 1 % 떨어졌다면 손상일까요, 날씨 탓일까요?</p></div>
+    <p><span class="term">구조 건전성 모니터링</span><span class="en">(structural health monitoring, SHM)</span>은 구조물의 응답을 계속 재서 손상을 찾는 일입니다. 구조물의 강성이 줄면 고유 진동수가 낮아집니다. 1자유도 근사 \(f = \frac{1}{2\pi}\sqrt{k/m}\)에서 \(\Delta f/f \approx \frac12\,\Delta k/k\)이므로, 강성이 2 % 줄면 진동수는 약 1 % 줄어듭니다. 문제는 온도·습도·비구조 요소(마감·칸막이)의 강성 변화도 진동수를 그만큼 움직인다는 점입니다. 그래서 진동수를 그대로 감시하지 않고, 기준 기간에 온도와의 관계를 회귀해 그 몫을 뺀 <b>잔차</b>를 관리도로 봅니다. 교량에 대한 계산은 CivilBook <a href="../../civil/chapters/maintenance.html#shm">16장 스마트 계측</a>에서 자세히 다루며(원리 16.7, 온도 보정 회귀와 7일 이동 평균), 그 방법이 이 장의 관리도와 같습니다.</p>
+    <figure class="diagram" id="fig-dt-shm">
+      <svg viewBox="0 0 880 270" role="img" aria-label="B-10 지붕과 중간층 가속도계, 일별 고유 진동수 추적과 온도 보정 잔차">
+        <rect x="10" y="10" width="860" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(50,30)">
+          <rect x="40" y="10" width="110" height="200" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <g style="stroke:var(--accent);opacity:.5"><line x1="40" y1="30" x2="150" y2="30"/><line x1="40" y1="50" x2="150" y2="50"/><line x1="40" y1="70" x2="150" y2="70"/><line x1="40" y1="90" x2="150" y2="90"/><line x1="40" y1="110" x2="150" y2="110"/><line x1="40" y1="130" x2="150" y2="130"/><line x1="40" y1="150" x2="150" y2="150"/><line x1="40" y1="170" x2="150" y2="170"/><line x1="40" y1="190" x2="150" y2="190"/></g>
+          <path d="M150 10 C168 60 162 150 150 210" style="fill:none;stroke:var(--accent-2);stroke-width:2;stroke-dasharray:5 4"/>
+          <rect x="88" y="4" width="14" height="12" style="fill:var(--bad)"/><rect x="88" y="104" width="14" height="12" style="fill:var(--bad)"/>
+          <text x="95" y="236" text-anchor="middle" class="t-mono">가속도계(지붕 · 5층)</text>
+          <text x="172" y="60" class="t-mono" style="fill:var(--accent-2)">1차 모드</text>
+        </g>
+        <g transform="translate(330,40)">
+          <line x1="0" y1="80" x2="500" y2="80" class="s-axis"/>
+          <path d="M0 40 C60 20 120 20 180 40 C240 60 300 60 360 40 C400 28 440 30 500 44" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+          <text x="0" y="12" class="t-mono">일별 1차 진동수 f (해석값 1.00 Hz 부근): 계절 변동</text>
+          <line x1="0" y1="180" x2="500" y2="180" style="stroke:var(--text-faint)"/>
+          <line x1="0" y1="160" x2="500" y2="160" style="stroke:var(--bad);stroke-dasharray:4 3"/><line x1="0" y1="200" x2="500" y2="200" style="stroke:var(--bad);stroke-dasharray:4 3"/>
+          <path d="M0 180 L60 177 L120 183 L180 179 L240 182 L300 178 L330 181 L340 205 L380 208 L440 207 L500 209" style="fill:none;stroke:var(--accent-2);stroke-width:2"/>
+          <text x="0" y="140" class="t-mono">온도 보정 잔차 r = f − (a + bT): 손상 뒤 한계 밖</text>
+          <line x1="335" y1="100" x2="335" y2="215" style="stroke:var(--text-dim);stroke-dasharray:3 3"/><text x="340" y="112" class="t-mono">지진</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 14-8.</b> 건물 구조 건전성 모니터링(개념도). 지붕과 중간층의 가속도에서 1차 진동수를 매일 뽑으면 계절에 따라 오르내린다. 온도로 설명되는 몫을 뺀 잔차가 지진 뒤 관리 한계 밖으로 나가면 정밀 점검의 신호다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 14.7 (B-10 진동수 추적의 해상도)</strong> StructureBook 7장의 해석 모델: \(T_1 = 1.00\) s → \(f_1 = 1.00\) Hz.
+      <p><b>① 손상의 크기</b> 강성 2 % 감소 → \(\Delta f \approx 0.5\times2 = 1\) % → 0.990 Hz. 0.01 Hz의 차이다.</p>
+      <p><b>② 측정 길이</b> 푸리에 변환의 진동수 해상도는 \(\Delta f = 1/T_{rec}\)이다. 0.01 Hz를 가르려면 기록이 적어도 100 s, 실무에서는 잡음을 줄이려고 10분(600 s, 해상도 0.0017 Hz) 이상을 평균한다. 표본화는 고차 모드(약 4.8 Hz)까지 보려면 \(f_s \gt 9.6\) Hz(예제 14.2).</p>
+      <p><b>③ 판단</b> 측정 진동수는 비구조 요소의 강성 때문에 해석값과 다르게(대개 높게) 나오는 경향이 있으므로(StructureBook 7장), 기준선은 해석값이 아니라 <b>측정한 기준 기간</b>으로 잡는다. 진동수 변화는 "어딘가 달라졌다"는 신호일 뿐 위치와 원인을 알려 주지 않는다. 경보는 점검(13장 작업 지시, StructureBook 16장 안전 진단)으로 이어져야 한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="quality">
+    <h2>데이터 품질과 보안</h2>
+    <div class="problem"><strong>정상처럼 보이는 고장 센서</strong>
+      <p>B-10 3층 사무실 D의 온도는 새벽 6시부터 하루 종일 26.3 °C입니다. 쾌적 범위 안이라 경보는 없습니다. 그러나 이 값은 측정이 아니라 멈춘 센서의 마지막 값입니다. 자료의 품질은 어떻게 검사할까요?</p></div>
+    <p>트윈의 판단은 자료보다 나을 수 없습니다. 센서 고장은 흔하며 모양이 정해져 있습니다: <b>튐</b>(한 표본만 크게 벗어남), <b>고착</b>(값이 멈춤), <b>결측</b>(통신 끊김), <b>범위 밖</b>(물리적으로 불가능한 값, 오류 코드), <b>표류</b>(교정이 서서히 틀어짐), 시각 오류(시계 어긋남, 중복). 자료에는 값과 함께 <b>품질 표시</b>(정상·의심·불량·보간)를 붙여 두고, 분석과 경보가 그 표시를 따르게 합니다.</p>
+    <div class="callout def"><strong>정의 14.9 (데이터 품질 규칙, 교육용)</strong> 각 표본에 대해 ① 범위: \(z \notin [z_{min}, z_{max}]\), ② 변화율: \(|z_t - z_{t-1}|/\Delta t \gt r_{max}\), ③ 고착: 최근 \(w\)분의 표준편차 \(\lt \epsilon\), ④ 결측: 기대 시각에 값이 없음, ⑤ 이웃 비교: 같은 공간 센서와의 차이 \(\gt \delta\)가 30분 이상 지속. ①–④는 센서 하나로 검사할 수 있지만 표류는 ⑤처럼 <b>중복 측정이나 모델 예측과의 비교</b>로만 드러난다. <span class="term">데이터 품질</span><span class="en">(data quality)</span>은 완결성·정확성·적시성·일관성으로 나누어 보며, 이 장은 완결성(결측 제외 비율)과 규칙 위반 비율로 잰다.</div>
+    <div class="sim" id="sim-dt-quality">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>데이터 품질 검사: 튐 · 고착 · 결측 · 범위 밖 · 표류</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="dt-cv-dq" aria-label="12시간 온도 기록과 이웃 센서, 규칙별 품질 표시 띠, 실제 고장 구간"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span><span>변화율 한계 r<sub>max</sub></span> <output id="dt-dq-r-out"></output></span><input type="range" id="dt-dq-r" min="0.2" max="5" step="0.1" value="1"></label>
+          <label class="ctrl"><span>고착 판정 창 w <output id="dt-dq-w-out"></output></span><input type="range" id="dt-dq-w" min="5" max="120" step="5" value="20"></label>
+          <label class="ctrl"><span>이웃 비교 한계 δ <output id="dt-dq-d-out"></output></span><input type="range" id="dt-dq-d" min="0.3" max="3" step="0.1" value="1"></label>
+          <label class="check"><input type="checkbox" id="dt-dq-nb" checked> 이웃 센서(같은 실) 비교 쓰기</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">잡은 고장 종류</span><span class="v" id="dt-dq-o-d">—</span></div>
+        <div class="stat"><span class="k">잘못 표시한 시간</span><span class="v" id="dt-dq-o-f">—</span></div>
+        <div class="stat"><span class="k">완결성</span><span class="v" id="dt-dq-o-c">—</span></div>
+        <div class="stat"><span class="k">정상 표시 비율</span><span class="v" id="dt-dq-o-q">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 다섯 고장을 모두 잡는지 보세요 · 이웃 비교를 끄면 표류(8시간째부터 서서히 +2.5 °C)를 잡지 못합니다 — 값이 범위 안이고 매끄럽기 때문입니다 · 고착 창을 120분으로 늘리면 1시간짜리 고착을 놓칩니다 · 이 센서는 잡음(0.05 °C)이 있어 짧은 창에서도 정상 구간이 고착으로 찍히지 않지만, 값을 0.1 °C로 반올림해 보내는 센서라면 안정된 실내에서 잘못 표시될 수 있습니다 · 변화율 한계를 크게 하면 튐을 놓칩니다 · 모델: 정의 14.9, 1분 표본 12시간, 센서 잡음 0.05 °C, 범위 10–40 °C, 결측 판정 5분, 고장 시나리오(튐 100분, 고착 200–260분, 결측 330–355분, 오류 값 −40 °C 420–424분, 표류 480분부터)는 교육용.</div>
+    </div>
+    <p>보안은 품질의 다른 얼굴입니다. 건물 자동화망이 사무망이나 인터넷과 그대로 이어지면, 공격자가 설정값을 바꾸거나 거짓 값을 넣어 트윈의 판단을 흐릴 수 있습니다. 기본 원칙은 ① 운영 기술(OT)망과 정보 기술(IT)망의 분리와 경계에서의 통제, ② 기본 비밀번호 제거와 최소 권한, ③ 펌웨어·소프트웨어 갱신, ④ 원격 접속의 기록과 감시, ⑤ 제어 명령에 대한 범위 제한(트윈이 틀려도 위험한 값은 못 보내게)입니다. 산업 제어 시스템 보안은 IEC 62443 계열 같은 표준이 다룹니다. 재실·출입·위치 자료는 사람에 관한 정보이므로 「개인정보 보호법」(현행 확인)에 따라 수집 목적과 범위를 정하고, 가능하면 개인을 식별하지 않는 집계(인원 수, 점유 여부)로 다룹니다.</p>
+    <div class="callout warn"><strong>트윈이 틀릴 때를 대비하기</strong> 자동 제어로 가는 트윈일수록 ① 측정 품질이 나쁘면 제어를 안전한 기본값으로 되돌리고, ② 모델의 예측과 측정이 계속 어긋나면 사람에게 알리고, ③ 모든 자동 조치를 기록해 나중에 검토할 수 있게 해야 합니다. 디지털 트윈은 건물을 대신 운영하는 것이 아니라 운영자가 더 빨리, 더 근거 있게 결정하도록 돕는 도구입니다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 정보가 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="facility.html"><small>CH.13 · 시설 관리와 자산 정보</small>경보 → 작업 지시<br><span>트윈의 경보와 잔여 수명이 예지 보전과 교체 계획의 입력이 된다.</span></a>
+      <a href="gis.html"><small>CH.15 · GIS와 도시 모델</small>건물에서 도시로<br><span>여러 건물·시설의 센서 자료를 지도 위에서 잇는다.</span></a>
+      <a href="computational.html"><small>CH.16 · 계산 설계와 AI</small>회귀와 과적합<br><span>잔여 수명 회귀의 한계와 기계 학습 예측의 검증.</span></a>
+      <a href="../../site/chapters/quality.html#control-chart"><small>SiteBook CH.14 · 품질 관리</small>관리도와 판정 규칙<br><span>이상 탐지의 기준선과 3σ·연속 8점 규칙.</span></a>
+      <a href="../../civil/chapters/maintenance.html#shm"><small>CivilBook CH.16 · 유지관리</small>온도 보정 이상 탐지<br><span>교량 진동수의 회귀 잔차와 7일 이동 평균.</span></a>
+      <a href="../../structure/chapters/dynamics.html"><small>StructureBook CH.07 · 구조 동역학</small>B-10의 1.00 s<br><span>진동수 추적의 기준이 되는 모드 해석.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>디지털 모델·그림자·트윈은 물리 ↔ 모델의 자동 데이터 흐름으로 구별한다. 이름보다 "어떤 결정을, 얼마나 자주, 얼마나 정확히, 누가 조치하나"가 중요하다.</li>
+      <li>자료는 센서 → 엣지 → 네트워크 → 시계열 저장 → 분석 → 조치로 흐르고, 측정점은 공간·자산 ID로 모델에 연결한다. 양 = N × (86,400/Δt) × B, 진동은 엣지 특징값으로 수백 배 줄인다(B-10: 24 MB + 0.28 MB/일).</li>
+      <li>f<sub>s</sub> &gt; 2f<sub>max</sub>를 지키지 않으면 f<sub>a</sub> = |f − kf<sub>s</sub>|로 둔갑한다(펌프 29.67 Hz를 25 Hz로 → 4.67 Hz). 앤티앨리어싱 필터와 용도별 표본화가 필요하다.</li>
+      <li>칼만 필터: P⁻ = P + q, K = P⁻/(P⁻ + r), x̂ += K(z − x̂), P = (1 − K)P⁻. q가 작으면 매끄럽지만 늦고, 크면 잡음을 통과시킨다(q 10⁻³, r 0.09 → K<sub>∞</sub> 0.10, σ 0.3 → 0.095 °C).</li>
+      <li>이상 탐지는 기준선 대비 임계값·이동 평균(σ/√m)·관리도(3σ, 연속 8점)로 한다. 3σ 하나도 센서 500개면 하루 약 32번 거짓 경보 — 경보 피로를 계산해 규칙을 정한다.</li>
+      <li>잔여 수명은 회귀선과 예측 구간이 한계에 닿는 시각으로 추정한다. 가속하는 추세를 직선으로 보면 낙관적이다(116일 vs 실제 100일). 이른 쪽 경계로 계획하고 매번 다시 계산한다.</li>
+      <li>실온 1차 모델 C dT/dt = UA(T<sub>o</sub> − T) + Q<sub>g</sub> − Q<sub>c</sub>, τ = C/UA. P 제어는 정상 편차 (UA(T<sub>o</sub> − T<sub>s</sub>) + Q<sub>g</sub>)/(UA + K<sub>p</sub>)를 남기고 PI가 없앤다. 모델과 측정의 어긋남이 고장 진단의 단서다.</li>
+      <li>데이터 품질(튐·고착·결측·범위 밖·표류)은 규칙으로 표시하고, 표류는 이웃·모델 비교로만 잡힌다. OT망 분리·최소 권한·명령 범위 제한과 개인정보 보호가 트윈의 전제다. SHM은 Δf/f ≈ ½Δk/k와 온도 보정 잔차로 본다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 센서 값이 자동으로 3D 모델에 표시되고, 운영자가 그것을 보고 직접 설정을 바꾼다. 정의 14.1의 어느 단계인가?</p><div class="opts">
+        <button class="opt">디지털 모델</button><button class="opt" data-correct>디지털 그림자</button><button class="opt">디지털 트윈</button><button class="opt">어느 것도 아니다</button>
+      </div><div class="quiz-exp">물리 → 디지털은 자동, 디지털 → 물리는 사람의 조치다. 조치까지 자동으로 돌아가야 트윈이다.</div></div>
+      <div class="quiz-q"><p>2. 센서 1,000개를 10초마다 기록하고 기록 하나가 20 B이다. 하루 데이터 양은?</p><div class="opts">
+        <button class="opt">약 1.7 MB</button><button class="opt">약 17 MB</button><button class="opt" data-correct>약 173 MB</button><button class="opt">약 1.7 GB</button>
+      </div><div class="quiz-exp">\(1{,}000\times8{,}640\times20 = 1.73\times10^8\) B ≈ 173 MB.</div></div>
+      <div class="quiz-q"><p>3. 50 Hz 성분이 있는 신호를 60 Hz로 표본화하면 보이는 진동수는?</p><div class="opts">
+        <button class="opt">50 Hz</button><button class="opt" data-correct>10 Hz</button><button class="opt">30 Hz</button><button class="opt">110 Hz</button>
+      </div><div class="quiz-exp">나이퀴스트 진동수는 30 Hz. \(k = \operatorname{round}(50/60) = 1\), \(f_a = |50 - 60| = 10\) Hz.</div></div>
+      <div class="quiz-q"><p>4. 칼만 필터에서 측정 잡음 분산 r을 크게 가정하면?</p><div class="opts">
+        <button class="opt">이득 K가 커져 측정을 더 따라간다</button><button class="opt" data-correct>이득 K가 작아져 더 매끄럽지만 변화를 늦게 따라간다</button><button class="opt">추정 분산 P가 0이 된다</button><button class="opt">아무 영향이 없다</button>
+      </div><div class="quiz-exp">\(K = P^-/(P^- + r)\). r이 크면 K가 작아져 새 측정을 덜 반영한다. 잡음은 줄지만 지연이 는다.</div></div>
+      <div class="quiz-q"><p>5. q = 0.001, r = 0.09일 때 정상 칼만 이득은?</p><div class="opts">
+        <button class="opt">0.01</button><button class="opt" data-correct>0.10</button><button class="opt">0.33</button><button class="opt">0.90</button>
+      </div><div class="quiz-exp">\(P^-_\infty = (0.001 + \sqrt{10^{-6} + 3.6\times10^{-4}})/2 = 0.010\), \(K = 0.010/0.100 = 0.10\)(예제 14.3).</div></div>
+      <div class="quiz-q"><p>6. 기준선 σ = 0.15에서 평균이 0.3 이동했다. 9시간 이동 평균에 3σ/√m 한계를 쓸 때 한계와 이동의 관계는?</p><div class="opts">
+        <button class="opt">한계 0.45 &gt; 이동 0.3, 잡기 어렵다</button><button class="opt" data-correct>한계 0.15 &lt; 이동 0.3, 창이 채워지면 잡힌다</button><button class="opt">한계 0.05, 거짓 경보만 는다</button><button class="opt">이동 평균은 이동을 잡지 못한다</button>
+      </div><div class="quiz-exp">\(3\times0.15/\sqrt9 = 0.15\). 이동 0.3은 한계의 두 배라 창(9시간)이 채워지면 거의 확실히 잡힌다. 대신 9시간 늦다.</div></div>
+      <div class="quiz-q"><p>7. 가속하며 증가하는 열화 추세에 직선 회귀를 맞춰 한계 도달일을 예측하면 대체로?</p><div class="opts">
+        <button class="opt">실제보다 이르게 예측한다</button><button class="opt" data-correct>실제보다 늦게(낙관적으로) 예측한다</button><button class="opt">정확히 맞는다</button><button class="opt">예측 구간이 0이 된다</button>
+      </div><div class="quiz-exp">과거의 완만한 기울기가 평균에 섞여 미래의 가파른 기울기를 과소평가한다(예제 14.5: 116일 vs 100일). 최근 자료에 무게를 두고 구간의 이른 쪽을 쓴다.</div></div>
+      <div class="quiz-q"><p>8. UA = 0.5 kW/K, T<sub>o</sub> − T<sub>s</sub> = 6 K, Q<sub>g</sub> = 4 kW, K<sub>p</sub> = 6.5 kW/K인 P 제어의 정상 편차는?</p><div class="opts">
+        <button class="opt" data-correct>1.0 °C</button><button class="opt">0.5 °C</button><button class="opt">7.0 °C</button><button class="opt">0 °C</button>
+      </div><div class="quiz-exp">\((0.5\times6 + 4)/(0.5 + 6.5) = 7/7 = 1.0\) °C. 적분 항을 넣으면 0이 된다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미(교육용 생성 자료와 작은 수치 함수) ---------- */
+const DTX = {
+  font(o) { return `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`; },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = DTX.font(o); ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    if (o.halo !== false) { ctx.lineWidth = 3; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); }
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  /** 정규 난수(시드 고정 rng에서, 박스–뮬러) */
+  gauss(r) { const u = Math.max(1e-12, r()), v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); },
+  /** 표준 정규 분위수(Acklam 근사) */
+  zinv(p) {
+    const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239], b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572], c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783], d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+    const pl = 0.02425; let q, r;
+    if (p < pl) { q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    if (p > 1 - pl) return -DTX.zinv(1 - p);
+    q = p - 0.5; r = q * q; return ((((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q) / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  },
+  /** t 분포 분위수(코니시–피셔 근사, df ≥ 3에서 충분) */
+  tinv(p, df) { const z = DTX.zinv(p), z3 = z ** 3, z5 = z ** 5, z7 = z ** 7; return z + (z3 + z) / (4 * df) + (5 * z5 + 16 * z3 + 3 * z) / (96 * df * df) + (3 * z7 + 19 * z5 + 17 * z3 - 15 * z) / (384 * df ** 3); },
+  bytes(b) { return b >= 1e12 ? CB.num(b / 1e12, 2) + " TB" : b >= 1e9 ? CB.num(b / 1e9, 2) + " GB" : b >= 1e6 ? CB.num(b / 1e6, 1) + " MB" : b >= 1e3 ? CB.num(b / 1e3, 1) + " KB" : Math.round(b) + " B"; },
+  hhmm: (h) => String(Math.floor(h)).padStart(2, "0") + ":" + String(Math.round((h % 1) * 60)).padStart(2, "0"),
+};
+
+/* ---------- 1. 데이터 양 계산기 ---------- */
+(function () {
+  const DT = [1, 5, 10, 30, 60, 300, 900];
+  const gN = CB.range("dt-dv-n", (v) => v.toLocaleString("en-US") + "점", calc), gT = CB.steps("dt-dv-t", DT, (v) => (v < 60 ? v + " s" : v / 60 + "분"), 60, calc), gB = CB.range("dt-dv-b", (v) => v + " B", calc);
+  const gM = CB.range("dt-dv-m", (v) => v + "개", calc), gF = CB.range("dt-dv-f", (v) => CB.num(v / 1000, 1) + " kHz", calc), gE = CB.seg("dt-dv-e", calc), gR = CB.range("dt-dv-r", (v) => v + "일", calc);
+  let res = null;
+  function calc() {
+    const N = gN(), dt = gT(), B = gB(), M = gM(), fs = gF(), feat = gE() === "feat", keep = gR();
+    const genDay = N * (86400 / dt) * B, vibDay = feat ? M * 144 * 10 * 8 : M * 144 * fs * 2 * 2;
+    const aggDay = (N + (feat ? 0 : M)) * 96 * B; // 보존 기간 뒤 15분 평균
+    const year = (genDay + vibDay) * Math.min(365, keep) + aggDay * Math.max(0, 365 - keep);
+    const rate = N / dt + (feat ? (M * 144 * 10) / 86400 : (M * 144 * fs * 2) / 86400);
+    res = { genDay, vibDay, year };
+    CB.stat("dt-dv-o-a", DTX.bytes(genDay)); CB.stat("dt-dv-o-v", DTX.bytes(vibDay)); CB.stat("dt-dv-o-r", CB.sig(rate, 3) + "/s"); CB.stat("dt-dv-o-y", DTX.bytes(year));
+    cv.redraw();
+  }
+  const cv = CB.canvas("#dt-cv-data", (ctx, W, H) => {
+    if (!res) return; const P = CB.palette(), items = [["일반 측정/일", res.genDay, P.accent], ["진동/일", res.vibDay, P.accent2], ["1년 저장", res.year, P.ok]];
+    const x0 = 100, bw = W - x0 - 20, lmin = 3, lmax = 13, X = (v) => x0 + (bw * (Math.log10(Math.max(v, 1000)) - lmin)) / (lmax - lmin);
+    ["1 KB", "1 MB", "1 GB", "1 TB"].forEach((s, i) => { const x = x0 + (bw * (3 * i)) / (lmax - lmin); ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(x, 20); ctx.lineTo(x, H - 26); ctx.stroke(); DTX.text(ctx, s, x, H - 12, P.dim, { size: 10.5, bold: false }); });
+    const rh = (H - 50) / 3;
+    items.forEach(([n, v, c], i) => { const y = 24 + i * rh; DTX.text(ctx, n, x0 - 8, y + rh * 0.35, P.text, { size: 11.5, align: "right" }); ctx.fillStyle = c; ctx.fillRect(x0, y + rh * 0.12, Math.max(2, X(v) - x0), rh * 0.46); DTX.text(ctx, DTX.bytes(v), Math.min(X(v) + 6, W - 70), y + rh * 0.35, P.text, { size: 11, align: "left" }); });
+  }, { aspect: 0.5, minHeight: 200, maxHeight: 300 });
+  calc();
+})();
+
+/* ---------- 2. 샘플링과 앨리어싱 ---------- */
+(function () {
+  const PRE = { pump: [29.67, 25, 1], bldg: [1.0, 1, 5], line: [60, 50, 0.5] };
+  const gF = CB.range("dt-al-f", (v) => CB.num(v, 2) + " Hz", calc), gS = CB.range("dt-al-s", (v) => CB.num(v, 1) + " Hz", calc), gW = CB.range("dt-al-w", (v) => CB.num(v, 1) + " s", calc);
+  CB.seg("dt-al-pre", (k) => { const p = PRE[k]; gF.set(p[0], false); gS.set(p[1], false); gW.set(p[2], false); calc(); });
+  let res = null;
+  function calc() {
+    const f = gF(), fs = gS(), k = Math.round(f / fs), fa = Math.abs(f - k * fs);
+    res = { f, fs, k, fa, w: gW() };
+    CB.stat("dt-al-o-n", CB.num(fs / 2, 2) + " Hz"); CB.stat("dt-al-o-a", CB.num(fa, 2) + " Hz"); CB.stat("dt-al-o-r", CB.num(fs / f, 2));
+    CB.stat("dt-al-o-v", fs > 2 * f ? (fs > 5 * f ? "충분" : "경계(>2배)") : "앨리어싱");
+    cv.redraw();
+  }
+  const cv = CB.canvas("#dt-cv-alias", (ctx, W, H) => {
+    if (!res) return; const P = CB.palette(), { f, fs, k, w } = res, ph = 0.6, n = Math.min(4000, Math.max(400, Math.ceil(f * w * 40)));
+    const C = CB.chart(ctx, null, { x: [0, w], y: [-1.3, 1.3], xLabel: "시간 (s)", yLabel: "신호", yTicks: [-1, 0, 1] });
+    const line = (fn, col, wd, dash) => { ctx.save(); ctx.beginPath(); ctx.rect(C.box.x, C.box.y, C.box.w, C.box.h); ctx.clip(); ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.setLineDash(dash || []); ctx.beginPath(); for (let i = 0; i <= n; i++) { const t = (w * i) / n, x = C.X(t), y = C.Y(fn(t)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.restore(); };
+    line((t) => Math.cos(2 * Math.PI * f * t + ph), DTX.alpha(P.accent, 0.7), 1.2);
+    if (fs <= 2 * f) line((t) => Math.cos(2 * Math.PI * (f - k * fs) * t + ph), P.accent2, 2.2, [6, 4]);
+    const ns = Math.floor(w * fs);
+    if (ns <= 600) for (let j = 0; j <= ns; j++) { const t = j / fs; ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(C.X(t), C.Y(Math.cos(2 * Math.PI * f * t + ph)), ns > 150 ? 2 : 4, 0, 7); ctx.fill(); }
+    DTX.text(ctx, `f = ${CB.num(f, 2)} Hz · fs = ${CB.num(fs, 1)} Hz → 보이는 ${CB.num(res.fa, 2)} Hz`, C.box.x + 6, C.box.y + 10, P.text, { size: 11, align: "left" });
+  }, { aspect: 0.55, minHeight: 230, maxHeight: 380 });
+  calc();
+})();
+
+/* ---------- 3. 칼만 필터 ---------- */
+(function () {
+  const gQ = CB.range("dt-kf-q", (v) => "10^" + CB.num(v, 1), calc), gR = CB.range("dt-kf-r", (v) => CB.num(v, 2) + " °C (r " + CB.sig(v * v, 2) + ")", calc), gS = CB.range("dt-kf-s", (v) => CB.num(v, 2) + " °C", calc), gM = CB.range("dt-kf-m", (v) => Math.round(v * 100) + " %", calc);
+  let seed = 5, res = null;
+  document.getElementById("dt-kf-ex").addEventListener("click", () => { gQ.set(-3, false); gR.set(0.3, false); gS.set(0.3, false); gM.set(0, false); calc(); });
+  document.getElementById("dt-kf-seed").addEventListener("click", () => { seed = seed * 3 + 1; calc(); });
+  const N = 360, truth = Array.from({ length: N }, (_, t) => (t < 120 ? 26 : 24 + 2 * Math.exp(-(t - 120) / 25)) + 0.25 * Math.sin((2 * Math.PI * t) / 300));
+  function calc() {
+    const q = Math.pow(10, gQ()), r = gR() * gR(), sig = gS(), miss = gM(), rng = CB.rng(seed);
+    const z = truth.map((x) => (rng() < miss ? null : x + sig * DTX.gauss(rng)));
+    let x = z.find((v) => v != null) ?? 25, P = 1; const xs = [], Ps = [];
+    z.forEach((zk) => { if (zk == null) { P += q; } else { const o = CB.bim.kalman1D([zk], q, r, x, P); x = o.x[0]; P = o.P[0]; } xs.push(x); Ps.push(P); });
+    const Pm = (q + Math.sqrt(q * q + 4 * q * r)) / 2, K = Pm / (Pm + r);
+    let er = 0, nr = 0, ef = 0; z.forEach((v, t) => { if (v != null) { er += (v - truth[t]) ** 2; nr++; } ef += (xs[t] - truth[t]) ** 2; });
+    let lag = null; for (let t = 120; t < N; t++) if (xs[t] <= 26 - 0.63 * 2) { lag = t - 120; break; }
+    let lagT = 0; for (let t = 120; t < N; t++) if (truth[t] <= 26 - 0.63 * 2) { lagT = t - 120; break; }
+    res = { z, xs, Ps };
+    CB.stat("dt-kf-o-k", CB.num(K, 3)); CB.stat("dt-kf-o-r", CB.num(Math.sqrt(er / Math.max(1, nr)), 3) + " °C"); CB.stat("dt-kf-o-f", CB.num(Math.sqrt(ef / N), 3) + " °C");
+    CB.stat("dt-kf-o-l", lag == null ? "—" : lag + "분 (참 " + lagT + ")");
+    cv.redraw();
+  }
+  const cv = CB.canvas("#dt-cv-kal", (ctx, W, H) => {
+    if (!res) return; const P = CB.palette();
+    const C = CB.chart(ctx, null, { x: [0, N], y: [22.5, 27.5], xTicks: [0, 60, 120, 180, 240, 300, 360], xLabel: "시간 (분)", yLabel: "실내 온도 (°C)",
+      series: [{ data: truth.map((v, t) => [t, v]), color: P.text, width: 1.4, dash: [4, 3] }] });
+    ctx.save(); ctx.beginPath(); ctx.rect(C.box.x, C.box.y, C.box.w, C.box.h); ctx.clip();
+    ctx.fillStyle = DTX.alpha(P.ok, 0.18); ctx.beginPath(); res.xs.forEach((x, t) => { const y = C.Y(x + 2 * Math.sqrt(res.Ps[t])); t ? ctx.lineTo(C.X(t), y) : ctx.moveTo(C.X(t), y); }); for (let t = N - 1; t >= 0; t--) ctx.lineTo(C.X(t), C.Y(res.xs[t] - 2 * Math.sqrt(res.Ps[t]))); ctx.fill();
+    ctx.fillStyle = DTX.alpha(P.accent, 0.55); res.z.forEach((v, t) => { if (v != null) ctx.fillRect(C.X(t) - 1, C.Y(v) - 1, 2.2, 2.2); });
+    ctx.strokeStyle = P.ok; ctx.lineWidth = 2.2; ctx.beginPath(); res.xs.forEach((x, t) => (t ? ctx.lineTo(C.X(t), C.Y(x)) : ctx.moveTo(C.X(t), C.Y(x)))); ctx.stroke(); ctx.restore();
+    DTX.text(ctx, "· 측정   — 칼만 추정(±2√P)   -- 참값", C.box.x + 6, C.box.y + 10, P.dim, { size: 11, align: "left" });
+  }, { aspect: 0.6, minHeight: 250, maxHeight: 400 });
+  calc();
+})();
+
+/* ---------- 4. 이상 탐지 ---------- */
+(function () {
+  const N = 60 * 24, rng = CB.rng(21), base = [];
+  for (let h = 0; h < N; h++) { const d = h / 24; let v = 2.0 + 0.08 * Math.sin((2 * Math.PI * h) / 24) + 0.15 * DTX.gauss(rng); if (d >= 20 && d < 22) v += 0.35; if (d >= 38) v += 0.02 * (d - 38); if (d >= 50 && d < 50.25) v += 1.0; base.push(v); }
+  [8 * 24 + 5, 29 * 24 + 14, 45 * 24 + 3].forEach((i) => (base[i] += 2.2));
+  const EV = [[20 * 24, 22 * 24, "정렬 불량"], [38 * 24, N, "베어링 마모"], [50 * 24, 50 * 24 + 6, "공동 현상"]];
+  const B = base.slice(0, 7 * 24), mu = CB.mean(B), sd = CB.std(B);
+  const gM = CB.seg("dt-an-m", calc), gA = CB.range("dt-an-a", (v) => CB.num(v, 2) + " mm/s", calc), gK = CB.range("dt-an-k", (v) => CB.num(v, 1) + "σ", calc), gW = CB.range("dt-an-w", (v) => v + " h", calc), gR4 = CB.check("dt-an-r4", calc);
+  let res = null;
+  function calc() {
+    const m = gM(), A = gA(), k = gK(), w = gW(), alarm = new Array(N).fill(false), stat = base.slice();
+    if (m === "thr") base.forEach((v, i) => (alarm[i] = v > A));
+    else if (m === "ma") { let s = 0; for (let i = 0; i < N; i++) { s += base[i]; if (i >= w) s -= base[i - w]; const avg = s / Math.min(i + 1, w); stat[i] = avg; alarm[i] = i >= w - 1 && Math.abs(avg - mu) > (k * sd) / Math.sqrt(w); } }
+    else { let run = 0, side = 0; for (let i = 0; i < N; i++) { const dz = base[i] - mu, sg = Math.sign(dz); run = sg === side ? run + 1 : 1; side = sg; alarm[i] = Math.abs(dz) > k * sd || (gR4() && run >= 8 && i >= 7 * 24); } }
+    for (let i = 0; i < 7 * 24 && m !== "thr"; i++) alarm[i] = false;
+    const inEv = (i) => EV.some(([a, b]) => i >= a && i < Math.min(N, b + 24));
+    let det = 0, lagSum = 0; EV.forEach(([a, b]) => { for (let i = a; i < Math.min(N, b + 24); i++) if (alarm[i]) { det++; lagSum += i - a; break; } });
+    let fa = 0, on = 0; for (let i = 0; i < N; i++) { if (alarm[i]) on++; if (alarm[i] && !inEv(i) && !(i > 0 && alarm[i - 1] && !inEv(i - 1))) fa++; }
+    res = { alarm, stat, m, A, k, w };
+    CB.stat("dt-an-o-d", det + " / 3"); CB.stat("dt-an-o-l", det ? CB.num(lagSum / det, 1) + " h" : "—"); CB.stat("dt-an-o-f", fa + "회"); CB.stat("dt-an-o-t", CB.num((on / N) * 100, 1) + " %");
+    const msg = document.getElementById("dt-an-msg");
+    msg.className = "dt-msg" + (det === 3 && fa <= 1 ? " ok" : fa > 10 ? " bad" : "");
+    msg.innerHTML = `기준선(1–7일) μ<sub>0</sub> = ${CB.num(mu, 2)}, σ<sub>0</sub> = ${CB.num(sd, 3)} mm/s. ` + (fa > 10 ? "<b>거짓 경보가 너무 많다 — 운영자가 경보를 무시하게 된다.</b>" : det < 3 ? "<b>놓친 이상이 있다.</b> 작은 이동은 평균화나 연속 규칙으로 잡는다." : "세 이상을 모두 잡았다.");
+    cv.redraw();
+  }
+  const cv = CB.canvas("#dt-cv-an", (ctx, W, H) => {
+    if (!res) return; const P = CB.palette();
+    const C = CB.chart(ctx, null, { x: [0, 60], y: [1.3, 4.6], xTicks: [0, 10, 20, 30, 40, 50, 60], xLabel: "일", yLabel: "진동 실효값 (mm/s)",
+      bands: EV.map(([a, b]) => ({ x0: a / 24, x1: Math.min(N, b) / 24, color: DTX.alpha(P.warn, 0.2) })).concat([{ x0: 0, x1: 7, color: DTX.alpha(P.ok, 0.1) }]),
+      series: [{ data: base.map((v, i) => [i / 24, v]), color: DTX.alpha(P.accent, 0.5), width: 1 }].concat(res.m === "ma" ? [{ data: res.stat.map((v, i) => [i / 24, v]), color: P.accent, width: 1.8 }] : []),
+      hlines: res.m === "thr" ? [{ y: res.A, color: P.bad, label: "A" }] : res.m === "ma" ? [{ y: mu + (res.k * sd) / Math.sqrt(res.w), color: P.bad }, { y: mu, color: P.faint }] : [{ y: mu + res.k * sd, color: P.bad, label: "+kσ" }, { y: mu, color: P.faint }] });
+    ctx.fillStyle = P.bad; res.alarm.forEach((a, i) => { if (a) ctx.fillRect(C.X(i / 24), C.box.y + C.box.h - 6, Math.max(1, C.X(1 / 24) - C.X(0)), 6); });
+    DTX.text(ctx, "기준 기간", C.X(3.5), C.box.y + 10, P.ok, { size: 10.5 });
+    EV.forEach(([a, , n]) => DTX.text(ctx, n, C.X(a / 24) + 2, C.box.y + 24, P.warn, { size: 10, align: "left" }));
+  }, { aspect: 0.62, minHeight: 260, maxHeight: 420 });
+  calc();
+})();
+
+/* ---------- 5. 잔여 수명 추정 ---------- */
+(function () {
+  const LIM = 250, TRUE = (t) => 120 + 0.9 * t + 0.004 * t * t;
+  let seed = 9, res = null;
+  const gD = CB.range("dt-rl-d", (v) => v + "일", calc), gW = CB.range("dt-rl-w", (v) => v + "일", calc), gS = CB.range("dt-rl-s", (v) => CB.num(v, 1) + " Pa", calc), gC = CB.seg("dt-rl-c", calc);
+  document.getElementById("dt-rl-seed").addEventListener("click", () => { seed = seed * 5 + 3; calc(); });
+  function calc() {
+    const today = gD(), win = Math.min(gW(), today), sig = gS(), conf = Number(gC()), rng = CB.rng(seed);
+    const obs = []; for (let t = 0; t <= 140; t++) obs.push(TRUE(t) + sig * DTX.gauss(rng));
+    const T = [], Y = []; for (let t = Math.max(0, today - win); t <= today; t++) { T.push(t); Y.push(obs[t]); }
+    const n = T.length, mt = CB.mean(T), my = CB.mean(Y); let sxx = 0, sxy = 0; T.forEach((t, i) => { sxx += (t - mt) ** 2; sxy += (t - mt) * (Y[i] - my); });
+    const b1 = sxy / sxx, b0 = my - b1 * mt, s = Math.sqrt(T.reduce((a, t, i) => a + (Y[i] - b0 - b1 * t) ** 2, 0) / Math.max(1, n - 2));
+    const tq = DTX.tinv(1 - (1 - conf) / 2, Math.max(3, n - 2)), half = (t) => tq * s * Math.sqrt(1 + 1 / n + (t - mt) ** 2 / sxx);
+    const cross = (fn) => { for (let t = today; t <= 400; t += 0.25) if (fn(t) >= LIM) return t; return null; };
+    const tf = b1 > 0 ? (LIM - b0) / b1 : null, lo = cross((t) => b0 + b1 * t + half(t)), hi = b1 > 0 ? cross((t) => b0 + b1 * t - half(t)) : null;
+    res = { obs, today, win, b0, b1, half, tf, lo, hi };
+    CB.stat("dt-rl-o-b", CB.num(b1, 3) + " Pa/일");
+    CB.stat("dt-rl-o-t", tf != null && tf < 1000 ? `${CB.num(tf, 0)}일 (${lo != null ? CB.num(lo, 0) : "—"}–${hi != null ? CB.num(hi, 0) : ">400"})` : "도달 안 함");
+    CB.stat("dt-rl-o-r", tf != null && tf < 1000 ? CB.num(Math.max(0, tf - today), 0) + "일" : "—");
+    CB.stat("dt-rl-o-a", "100일");
+    cv.redraw();
+  }
+  const cv = CB.canvas("#dt-cv-rul", (ctx, W, H) => {
+    if (!res) return; const P = CB.palette(), xm = 150;
+    const band = [], bandL = []; for (let t = res.today; t <= xm; t++) { band.push([t, res.b0 + res.b1 * t + res.half(t)]); bandL.push([t, res.b0 + res.b1 * t - res.half(t)]); }
+    const C = CB.chart(ctx, null, { x: [0, xm], y: [80, 320], xLabel: "일", yLabel: "필터 차압 (Pa)",
+      series: [{ data: Array.from({ length: xm + 1 }, (_, t) => [t, TRUE(t)]), color: P.faint, width: 1.2, dash: [3, 3] }, { data: [[Math.max(0, res.today - res.win), res.b0 + res.b1 * Math.max(0, res.today - res.win)], [xm, res.b0 + res.b1 * xm]], color: P.accent, width: 2 }, { data: band, color: P.accent, width: 1, dash: [5, 4] }, { data: bandL, color: P.accent, width: 1, dash: [5, 4] }],
+      hlines: [{ y: LIM, color: P.bad, label: "250 Pa" }], vlines: [{ x: res.today, color: P.dim, label: "오늘" }, { x: 100, color: P.faint, label: "실제" }] });
+    ctx.fillStyle = P.accent2; for (let t = 0; t <= res.today; t++) { ctx.beginPath(); ctx.arc(C.X(t), C.Y(res.obs[t]), t >= res.today - res.win ? 2.4 : 1.5, 0, 7); ctx.fill(); }
+    if (res.tf != null && res.tf <= xm) { ctx.fillStyle = P.accent; ctx.beginPath(); ctx.arc(C.X(res.tf), C.Y(LIM), 5, 0, 7); ctx.fill(); }
+  }, { aspect: 0.6, minHeight: 250, maxHeight: 400 });
+  calc();
+})();
+
+/* ---------- 6. 공조 제어 루프 ---------- */
+(function () {
+  const gC = CB.seg("dt-hv-c", calc), gS = CB.range("dt-hv-s", (v) => CB.num(v, 1) + " °C", calc), gO = CB.range("dt-hv-o", (v) => CB.num(v, 1) + " °C", calc), gG = CB.range("dt-hv-g", (v) => CB.num(v, 1) + " kW", calc), gK = CB.range("dt-hv-k", (v) => CB.num(v, 1) + " kW/K", calc), gQ = CB.range("dt-hv-q", (v) => CB.num(v, 1) + " kW", calc);
+  const Cth = 8000, UA = 0.35;
+  let res = null;
+  function calc() {
+    const mode = gC(), Ts = gS(), Tmax = gO(), Gm = gG(), Kp = gK(), Qmax = gQ(), Ki = Kp / 2 / 3600;
+    const To = (h) => Tmax - 4 + 4 * Math.sin((2 * Math.PI * (h - 9)) / 24);
+    const Qg = (h) => (h >= 9 && h < 18 ? Gm * 0.6 : Gm * 0.08) + Gm * 0.4 * Math.max(0, Math.sin((Math.PI * (h - 7)) / 12));
+    let T = Ts + 2, I = 0, on = false, nOn = 0, E = 0, dev = 0; const TT = [], QQ = [], GG = [];
+    for (let day = 0; day < 2; day++) for (let m = 0; m < 1440; m++) {
+      const h = m / 60, run = h >= 7 && h < 19, e = T - Ts; let Q = 0;
+      if (run) {
+        if (mode === "onoff") { if (e > 0.5 && !on) { on = true; if (day) nOn++; } else if (e < -0.5) on = false; Q = on ? Qmax : 0; }
+        else if (mode === "p") Q = CB.clamp(Kp * e, 0, Qmax);
+        else { const u = Kp * e + Ki * 3600 * I; Q = CB.clamp(u, 0, Qmax); if (u === Q || (u > Qmax && e < 0) || (u < 0 && e > 0)) I += e / 60; }
+      } else { on = false; I = 0; }
+      T += (60 / Cth) * (UA * (To(h) - T) + Qg(h) - Q);
+      if (day) { TT.push([h, T]); QQ.push([h, Q]); GG.push([h, Qg(h)]); E += Q / 60; if (h >= 9 && h < 18) dev += Math.max(0, Math.abs(T - Ts) - 1) / 60; }
+    }
+    res = { TT, QQ, GG, Ts, To, Qmax };
+    CB.stat("dt-hv-o-e", CB.signed(TT[14 * 60][1] - Ts, 2) + " °C"); CB.stat("dt-hv-o-d", CB.num(dev, 2)); CB.stat("dt-hv-o-q", CB.num(E, 0) + " kWh"); CB.stat("dt-hv-o-n", mode === "onoff" ? nOn + "회" : "—");
+    cv.redraw(); cq.redraw();
+  }
+  const cv = CB.canvas("#dt-cv-hv", (ctx) => {
+    if (!res) return; const P = CB.palette();
+    CB.chart(ctx, null, { x: [0, 24], y: [18, 38], xTicks: [0, 6, 9, 12, 15, 18, 24], yLabel: "온도 (°C)", bands: [{ x0: 9, x1: 18, color: DTX.alpha(P.accent, 0.06) }],
+      series: [{ data: Array.from({ length: 97 }, (_, i) => [i / 4, res.To(i / 4)]), color: P.accent2, width: 1.4, dash: [5, 4] }, { data: res.TT, color: P.accent, width: 2.4 }],
+      hlines: [{ y: res.Ts + 1, color: P.ok, dash: [2, 3] }, { y: res.Ts - 1, color: P.ok, dash: [2, 3], label: "설정 ±1" }] });
+  }, { aspect: 0.42, minHeight: 190, maxHeight: 280 });
+  const cq = CB.canvas("#dt-cv-hq", (ctx) => {
+    if (!res) return; const P = CB.palette();
+    CB.chart(ctx, null, { x: [0, 24], y: [0, Math.max(10, res.Qmax * 1.1)], xTicks: [0, 6, 9, 12, 15, 18, 24], xLabel: "시각 (h)", yLabel: "kW",
+      series: [{ data: res.GG, color: P.warn, width: 1.4, dash: [4, 3] }, { data: res.QQ, color: P.blue, width: 1.8 }] });
+  }, { aspect: 0.3, minHeight: 150, maxHeight: 210 });
+  calc();
+})();
+
+/* ---------- 7. 3D 센서 대시보드 ---------- */
+(function () {
+  const z0 = (f) => (f <= 1 ? 0 : 5 + 4 * (f - 2)), NT = 144, rng = CB.rng(33);
+  const OFF = [[8, 4], [24, 4], [8, 20], [24, 20]];
+  const out = (h) => 27 + 5 * Math.sin((2 * Math.PI * (h - 9)) / 24);
+  const S = [];
+  for (let f = 1; f <= 10; f++) {
+    OFF.forEach((p, k) => S.push({ id: `T-${f}0${k + 1}`, m: "T", f, pos: [p[0], p[1], z0(f) + 1.5], sp: f * 100 + k + 1 }));
+    S.push({ id: `C-${f}05`, m: "C", f, pos: [4, 12, z0(f) + 1.5], sp: f * 100 + 5 });
+    S.push({ id: `V-AHU-${String(f).padStart(2, "0")}`, m: "V", f, pos: [21.7, 10, z0(f) + 1.3], sp: f * 100 + 7 });
+  }
+  S.forEach((s, si) => {
+    const k = Number(s.id.slice(-1)), south = s.m === "T" && k <= 2, west = s.m === "T" && (k === 1 || k === 3); let stuck = null;
+    s.v = Array.from({ length: NT }, (_, i) => {
+      const h = i / 6, run = h >= 7 && h < 19, fail = s.f === 7 && h >= 13;
+      if (s.m === "T") {
+        const Toff = 26 + 0.25 * (out(h) - 27); let T = run ? Toff + (24 - Toff) * (1 - Math.exp(-(h - 7) / 0.7)) : Toff;
+        if (run) T += (h >= 9 && h < 18 ? 0.4 : 0) + (south ? 0.8 * Math.max(0, Math.sin((Math.PI * (h - 9)) / 8)) : 0) + (west ? 0.6 * Math.max(0, Math.sin((Math.PI * (h - 12)) / 7)) : 0);
+        if (fail) T += (29.5 - T) * (1 - Math.exp(-(h - 13) / 2));
+        T += 0.1 * DTX.gauss(rng);
+        if (s.id === "T-304" && h >= 6) { if (stuck == null) stuck = 26.3; return stuck; }
+        return T;
+      }
+      if (s.m === "C") { const meet = (h >= 10 && h < 11) || (h >= 14 && h < 16), occ = h >= 9 && h < 18; let c = 450 + (occ ? 120 : 0) + (meet ? (fail ? 1050 : 480) * (1 - Math.exp(-((h >= 14 ? h - 14 : h - 10)) / 0.4)) : 0); if (fail && occ) c += 150; return c + 15 * DTX.gauss(rng); }
+      if (!run) return 0.2 + 0.03 * DTX.gauss(rng);
+      if (s.f === 7) { if (h >= 13) return 0.2 + 0.03 * DTX.gauss(rng); if (h >= 10) return 1.9 + 1.5 * ((h - 10) / 3) ** 2 + 0.08 * DTX.gauss(rng); }
+      return 1.9 + 0.08 * DTX.gauss(rng);
+    });
+  });
+  const gM = CB.seg("dt-db-m", () => { fillSel(); upd(); }), gT = CB.range("dt-db-t", (i) => DTX.hhmm(i / 6), upd), selEl = document.getElementById("dt-db-sel");
+  let sel = "V-AHU-07", proj = [];
+  function fillSel() { const m = gM(); const L = S.filter((s) => s.m === m); if (!L.some((s) => s.id === sel)) sel = m === "T" ? "T-701" : m === "C" ? "C-705" : "V-AHU-07"; selEl.innerHTML = L.map((s) => `<option value="${s.id}">${s.id} (${s.sp})</option>`).join(""); selEl.value = sel; }
+  selEl.addEventListener("change", () => { sel = selEl.value; upd(); });
+  const RANGE = { T: [21, 29], C: [400, 1600], V: [0, 4.5] }, UNIT = { T: " °C", C: " ppm", V: " mm/s" };
+  const bad = (m, v, h) => (m === "T" ? h >= 9 && h < 18 && (v < 22 || v > 26) : m === "C" ? v > 1000 : v > 2.8);
+  const color = (P, m, v) => { if (m === "V") return v > 2.8 ? P.bad : v > 2.3 ? P.warn : v < 0.5 ? P.faint : P.ok; const [a, b] = RANGE[m]; return CB.rgb(CB.colormap((v - a) / (b - a), m === "T" ? "diverge" : "viridis")); };
+  const els = CB.bim.model().filter((e) => e.ifc === "IfcSlab" || e.ifc === "IfcColumn");
+  const v = CB.orbit("#dt-cv-3d", { yaw: -0.7, pitch: 0.38, dist: 96, target: [16, 12, 20], fov: 0.85, aspect: 0.72, minHeight: 300, maxHeight: 480,
+    draw(V) {
+      const P = V.P, i = gT(), m = gM(); proj = [];
+      els.forEach((e) => { const b = e.box; if (e.ifc === "IfcSlab") V.poly3([[b[0], b[1], b[5]], [b[3], b[1], b[5]], [b[3], b[4], b[5]], [b[0], b[4], b[5]]], { color: P.faint, width: 0.6, alpha: 0.5, fill: P.dim, fillAlpha: 0.03 }); else if ((e.name[2] === "A" || e.name[2] === "E") && (e.name[3] === "1" || e.name[3] === "4")) V.line3([(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, b[2]], [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, b[5]], { color: P.faint, width: 0.8, alpha: 0.6 }); });
+      for (let f = 1; f <= 10; f++) V.poly3([[0, 0, z0(f) + 0.02], [32, 0, z0(f) + 0.02], [32, 24, z0(f) + 0.02], [0, 24, z0(f) + 0.02]], { color: P.faint, width: 0.5, alpha: 0.35 });
+      const L = S.filter((s) => s.m === m).map((s) => ({ s, d: V.p(s.pos) })).filter((o) => o.d).sort((a, b) => b.d[2] - a.d[2]);
+      L.forEach(({ s, d }) => { const val = s.v[i], c = color(P, m, val); V.ctx.fillStyle = c; V.ctx.beginPath(); V.ctx.arc(d[0], d[1], s.id === sel ? 8 : 5.5, 0, 7); V.ctx.fill(); V.ctx.lineWidth = s.id === sel ? 2.5 : 1; V.ctx.strokeStyle = s.id === sel ? P.accent2 : bad(m, val, i / 6) ? P.bad : P.bg; V.ctx.stroke(); proj.push({ id: s.id, x: d[0], y: d[1] }); });
+      const ss = S.find((s) => s.id === sel); if (ss) V.text3(ss.id + " " + CB.num(ss.v[i], m === "C" ? 0 : 1) + UNIT[m], [ss.pos[0], ss.pos[1], ss.pos[2] + 2.6], { color: P.accent2, bold: true, size: 12 });
+      DTX.text(V.ctx, "B-10 · " + DTX.hhmm(i / 6) + " · 외기 " + CB.num(out(i / 6), 1) + " °C", 10, 14, P.dim, { size: 11, align: "left" });
+    } });
+  const sp = CB.canvas("#dt-cv-sp", (ctx) => {
+    const P = CB.palette(), s = S.find((x) => x.id === sel); if (!s) return; const m = s.m;
+    CB.chart(ctx, null, { x: [0, 24], y: RANGE[m], xTicks: [0, 6, 12, 18, 24], yLabel: m === "T" ? "°C" : m === "C" ? "ppm" : "mm/s",
+      series: [{ data: s.v.map((y, k) => [k / 6, y]), color: P.accent, width: 1.8 }], vlines: [{ x: gT() / 6, color: P.accent2 }],
+      hlines: m === "T" ? [{ y: 26, color: P.bad, dash: [3, 3] }, { y: 22, color: P.blue, dash: [3, 3] }] : [{ y: m === "C" ? 1000 : 2.8, color: P.bad, dash: [3, 3] }] });
+    DTX.text(ctx, s.id + " · 공간 " + s.sp, 64, 12, P.text, { size: 11, align: "left" });
+  }, { aspect: 0.3, minHeight: 140, maxHeight: 200 });
+  function upd() {
+    const i = gT(), m = gM(), L = S.filter((s) => s.m === m), vals = L.map((s) => s.v[i]), mx = Math.max(...vals), arg = L[vals.indexOf(mx)], nb = L.filter((s) => bad(m, s.v[i], i / 6));
+    const ss = S.find((s) => s.id === sel);
+    CB.stat("dt-db-o-a", CB.num(CB.mean(vals), m === "C" ? 0 : 1) + " / " + CB.num(mx, m === "C" ? 0 : 1) + UNIT[m]);
+    CB.stat("dt-db-o-n", nb.length + " / " + L.length);
+    CB.stat("dt-db-o-s", ss ? CB.num(ss.v[i], m === "C" ? 0 : 2) + UNIT[m] : "—");
+    const stuck = S.find((s) => s.id === "T-304"), flat = i >= 42 && m === "T";
+    document.getElementById("dt-db-msg").innerHTML = (nb.length ? `범위 밖: <b>${nb.slice(0, 6).map((s) => s.id).join(", ")}${nb.length > 6 ? " …" : ""}</b>. 최고는 ${arg.id}(공간 ${arg.sp}).` : "모든 센서가 범위 안이다.") + (flat ? ` T-304는 06:00부터 ${CB.num(stuck.v[i], 1)} °C에서 움직이지 않는다 — 범위 안이라 경보가 없지만 고착 의심.` : "");
+    v.redraw(); sp.redraw();
+  }
+  const cvs = document.getElementById("dt-cv-3d"); let down = null;
+  cvs.addEventListener("pointerdown", (e) => (down = [e.clientX, e.clientY]));
+  cvs.addEventListener("pointerup", (e) => { if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return; const rc = cvs.getBoundingClientRect(), x = e.clientX - rc.left, y = e.clientY - rc.top; let b = null, bd = 14; proj.forEach((p) => { const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; b = p.id; } }); if (b) { sel = b; selEl.value = b; upd(); } });
+  fillSel(); upd();
+  let acc = 0; const slow = CB.loop(cvs, (dt) => { acc += dt; if (acc > 0.12) { acc = 0; gT.set((gT() + 1) % NT, false); upd(); } }); slow.stop();
+  CB.playButton("dt-db-play", () => slow.start(), () => slow.stop());
+})();
+
+/* ---------- 8. 데이터 품질 검사 ---------- */
+(function () {
+  const N = 720, rng = CB.rng(17), truth = [], z = [], nb = [];
+  for (let t = 0; t < N; t++) { const x = 24 + 0.6 * Math.sin((2 * Math.PI * (t - 120)) / 720) + (t >= 300 && t < 315 ? -0.8 * (t - 300) / 15 : t >= 315 ? -0.8 * Math.exp(-(t - 315) / 60) : 0); truth.push(x); nb.push(x + 0.15 + 0.05 * DTX.gauss(rng)); z.push(x + 0.05 * DTX.gauss(rng)); }
+  z[100] += 8; for (let t = 200; t < 260; t++) z[t] = Math.round(z[200] * 10) / 10; for (let t = 330; t < 355; t++) z[t] = null; for (let t = 420; t < 425; t++) z[t] = -40; for (let t = 480; t < N; t++) z[t] += (2.5 * (t - 480)) / 240;
+  const F = [["튐", 100, 101], ["고착", 200, 260], ["결측", 330, 355], ["범위 밖", 420, 425], ["표류", 480, N]];
+  const gR = CB.range("dt-dq-r", (v) => CB.num(v, 1) + " °C/분", calc), gW = CB.range("dt-dq-w", (v) => v + "분", calc), gD = CB.range("dt-dq-d", (v) => CB.num(v, 1) + " °C", calc), gNb = CB.check("dt-dq-nb", calc);
+  let res = null;
+  function calc() {
+    const rmax = gR(), w = gW(), dl = gD(), useNb = gNb(), fl = Array.from({ length: N }, () => []);
+    let last = null, lastT = -1, gapStart = null, over = 0;
+    for (let t = 0; t < N; t++) {
+      const v = z[t];
+      if (v == null) { if (gapStart == null) gapStart = t; if (t - gapStart >= 5) for (let k = gapStart; k <= t; k++) if (!fl[k].includes("결측")) fl[k].push("결측"); continue; }
+      gapStart = null;
+      if (v < 10 || v > 40) { fl[t].push("범위"); continue; }
+      if (last != null && Math.abs(v - last) / (t - lastT) > rmax) fl[t].push("변화율");
+      if (t >= w) { const win = []; for (let k = t - w + 1; k <= t; k++) if (z[k] != null && z[k] >= 10 && z[k] <= 40) win.push(z[k]); if (win.length >= w * 0.8 && CB.std(win) < 0.01) for (let k = t - w + 1; k <= t; k++) if (!fl[k].includes("고착")) fl[k].push("고착"); }
+      if (useNb) { over = Math.abs(v - nb[t]) > dl ? over + 1 : 0; if (over >= 30) for (let k = t - 29; k <= t; k++) if (!fl[k].includes("이웃")) fl[k].push("이웃"); }
+      last = v; lastT = t;
+    }
+    const inF = (t) => F.some(([, a, b]) => t >= a && t < b);
+    const caught = F.filter(([, a, b]) => { for (let t = a; t < Math.min(N, b + 2); t++) if (fl[t].length) return true; return false; }).map((f) => f[0]);
+    let falseM = 0, ok = 0, have = 0; for (let t = 0; t < N; t++) { if (fl[t].length && !inF(t) && !(t > 0 && inF(t - 1))) falseM++; if (z[t] != null) have++; if (!fl[t].length && z[t] != null) ok++; }
+    res = { fl };
+    CB.stat("dt-dq-o-d", caught.length + " / 5"); CB.stat("dt-dq-o-f", falseM + "분"); CB.stat("dt-dq-o-c", CB.num((have / N) * 100, 1) + " %"); CB.stat("dt-dq-o-q", CB.num((ok / N) * 100, 1) + " %");
+    cv.redraw();
+  }
+  const cv = CB.canvas("#dt-cv-dq", (ctx, W, H) => {
+    if (!res) return; const P = CB.palette(), RULES = [["범위", P.bad], ["변화율", P.accent2], ["고착", P.warn], ["결측", P.dim], ["이웃", P.accent]];
+    const box = { x: 54, y: 16, w: W - 54 - 14, h: H - 16 - 46 - RULES.length * 9 };
+    const C = CB.chart(ctx, box, { x: [0, 720], y: [21, 30], xTicks: [0, 120, 240, 360, 480, 600, 720], xLabel: "분", yLabel: "°C",
+      bands: F.map(([, a, b]) => ({ x0: a - (b - a < 3 ? 2 : 0), x1: b + (b - a < 3 ? 2 : 0), color: DTX.alpha(P.warn, 0.16) })),
+      series: [{ data: nb.map((v, t) => [t, v]), color: P.faint, width: 1 }, { data: z.map((v, t) => [t, v == null ? NaN : v]), color: P.blue, width: 1.4 }] });
+    F.forEach(([n, a]) => DTX.text(ctx, n, C.X(a) + 2, box.y + 10, P.warn, { size: 10, align: "left" }));
+    RULES.forEach(([r, c], k) => { const y = box.y + box.h + 30 + k * 9; DTX.text(ctx, r, box.x - 4, y + 3, P.dim, { size: 8.5, align: "right", bold: false }); ctx.fillStyle = c; res.fl.forEach((f, t) => { if (f.includes(r)) ctx.fillRect(C.X(t), y, Math.max(1, C.X(1) - C.X(0)) + 0.5, 6); }); });
+  }, { aspect: 0.66, minHeight: 300, maxHeight: 440 });
+  calc();
+})();
+</script>
+</body>
+</html>

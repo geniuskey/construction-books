@@ -1,0 +1,1006 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>모델 기반 물량 산출 · BIMBook</title>
+<meta name="description" content="모델에서 수량을 꺼낸다. 객체·속성·형상에서 물량을 세는 원리, 측정 단위와 겹침 공제·우선순위·개구부 문턱 규칙, 정확한 상자 교집합 공제, 접촉면을 뺀 거푸집 면적, 철근 원단위와 상세 모델, 분류 코드와 내역 연결, 2D 적산과 비교를 B-10 BIM으로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .qt-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); line-height: 1.7; overflow-wrap: anywhere; }
+  .qt-msg b { color: var(--text); }
+  .qt-msg.ok { color: var(--ok); }
+  .qt-msg.bad { color: var(--bad); }
+  .qt-msg.warn { color: var(--warn); }
+  .qt-tbl td, .qt-tbl th { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .qt-tbl td:first-child, .qt-tbl th:first-child { text-align: left; }
+  .qt-tbl tr.qt-sum td { font-weight: 700; border-top: 2px solid var(--border); }
+  .qt-tbl td.qt-pos { color: var(--bad); }
+  .qt-tbl td.qt-neg { color: var(--ok); }
+  .qt-tbl-box { padding: 4px 18px 12px; border-top: 1px solid var(--border); background: var(--surface); }
+  .qt-tbl-box .table-wrap { margin: 8px 0 0; }
+  .qt-key { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 18px; font-size: 13px; color: var(--text-dim); border-top: 1px solid var(--border); }
+  .qt-key i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .qt-map { display: grid; gap: 6px; }
+  .qt-map label { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 13.5px; color: var(--text-dim); }
+  .qt-map select { font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); max-width: 60%; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="qto">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="qt-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="qt-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <pattern id="qt-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--bad);stroke-width:2"/></pattern>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 07</div>
+    <h1 data-no-glossary>모델 기반 물량 산출</h1>
+    <p class="lead">공사비의 출발점은 수량입니다. 콘크리트 몇 m³, 거푸집 몇 m², 철근 몇 t인지 알아야 레미콘을 주문하고 단가를 곱하고 공정을 짭니다. 도면 시대에는 적산자가 평면도와 단면도를 자로 재고 부재를 하나씩 세었습니다. BIM 모델에는 부재가 이미 객체로 들어 있으니 "버튼 하나로 물량이 나온다"고들 합니다. 그런데 B-10 BIM의 상자 부피를 그대로 더하면 층당 339 m³로, SiteBook 12장이 손으로 산출한 기준층 288.7 m³보다 50 m³나 많습니다. 어느 쪽이 틀렸을까요? 이 장은 모델에서 물량을 꺼내는 원리와 측정 규칙(단위, 겹침 공제, 우선순위, 개구부 문턱)을 세우고, 상자 교집합을 정확히 계산해 B-10의 공제 후 물량을 구한 뒤, 두 숫자의 차이를 부재 하나하나의 모델링 가정까지 따라가 맞춥니다.</p>
+    <ul class="objectives">
+      <li>요소의 개수·속성·형상에서 부피·넓이·길이·질량을 산출하는 원리와 수량 세트의 역할을 설명한다.</li>
+      <li>측정 규칙의 네 요소(단위, 측정 기준선, 공제, 반올림·할증)를 적용하고, 우선순위 규칙에 따라 겹친 부피를 한 번만 배정한다.</li>
+      <li>상자 경계로 공간을 칸으로 나누어 겹침을 정확히 공제하고, 쌍별 공제가 삼중 겹침에서 틀리는 이유를 포함–배제 원리로 설명한다.</li>
+      <li>접촉면과 타설면을 뺀 거푸집 면적, 원단위와 상세 모델의 철근 물량, 개구부 공제 문턱의 효과를 계산한다.</li>
+      <li>분류 코드로 요소를 공종 내역에 연결하고, 2D 수작업 적산과 모델 기반 산출의 오차 성격(우연 vs 체계)을 비교한다.</li>
+      <li>B-10 BIM의 공제 후 물량(기준층 322.9 m³)과 SiteBook 12장의 288.7 m³ 차이를 모델링 가정별로 정확히 분해한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 정보가 없었다면</small><b>같은 도면에서 적산자마다 다른 수량이 나왔다</b></div>
+      <div class="o-body"><p>공사비를 미리 셈하는 일은 오래된 직업입니다. 영국에서는 19세기에 공사 수량을 전문으로 산출하는 <span class="term">적산</span><span class="en">(quantity surveying)</span> 전문가가 직업으로 자리 잡았고, 입찰자들이 같은 <span class="term">수량표</span><span class="en">(bill of quantities, BOQ)</span>에 각자 단가만 써 넣도록 하는 관행이 생겼습니다. 그러려면 "무엇을, 어떤 단위로, 어디서 끊어 재는가"를 모두가 똑같이 해야 했기에 측정 규칙을 표준 문서로 묶었습니다(영국의 표준 측정 방법 SMM과 그 뒤를 이은 NRM, 국내의 수량 산출 기준과 표준품셈 같은 형태 — 세부는 현행 문서 확인).</p>
+        <p>규칙이 있어도 손으로 하는 적산은 느리고 틀리기 쉬웠습니다. 평면도에서 기둥 하나를 빠뜨리거나, 보와 기둥이 만나는 접합부를 두 번 세거나, 단면도와 평면도의 슬래브 두께가 다르게 그려져 있으면 수량이 어긋났습니다. 모델 기반 물량 산출은 부재를 다시 그리지 않고 모델의 객체에서 바로 수량을 꺼내므로 빠르고 반복 가능합니다. 그러나 이 장에서 보듯 모델은 규칙을 대신 정해 주지 않습니다. 겹친 부피를 누구에게 줄지, 거푸집 면을 어떻게 셀지, 개구부를 언제 뺄지는 여전히 측정 규칙이 정하고, 모델이 그 규칙에 맞게 만들어졌는지(모델링 규약)가 결과를 좌우합니다.</p>
+        <div class="o-chain"><span>요소 · 속성 · 형상</span><i>→</i><span class="tool">측정 단위 · 공제 · 우선순위 · 접촉면 · 원단위 · 분류 코드</span><i>→</i><span>물량표 · 내역서 · 5D 원가</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="principle">
+    <h2>모델에서 물량을 꺼내는 원리</h2>
+    <div class="problem"><strong>"기둥 몇 m³?"에 답하는 세 가지 길</strong>
+      <p>B-10 BIM의 기둥 C-B2-3F를 클릭하면 이름, GlobalId, 층, 재료 C30, 단면 "800x800", 그리고 상자 좌표가 나옵니다. 이 기둥의 콘크리트 부피를 구하는 방법은 몇 가지이고, 어느 것이 믿을 만할까요?</p></div>
+    <p><span class="term">모델 기반 물량 산출</span><span class="en">(model-based quantity take-off, QTO)</span>은 BIM 모델의 요소에서 측정 규칙에 따라 수량을 계산해 집계하는 일입니다. 수량은 세 가지 출처에서 나옵니다. ① <b>개수</b> — 같은 유형의 요소를 셉니다(기둥 20개/층, 문 몇 짝). ② <b>속성</b> — 요소에 적힌 값으로 계산합니다(단면 800 × 800 × 층고, 슬래브 두께 × 면적). ③ <b>형상</b> — 요소의 솔리드에서 부피·넓이·길이를 직접 잽니다(상자라면 가로 × 세로 × 높이, 일반 솔리드는 2장의 메시 부피 <code>CB.bim.meshVolume</code>). 세 값이 같으면 모델이 일관된 것이고, 다르면 어딘가 오류가 있다는 신호입니다 — 예를 들어 속성은 "800x800"인데 형상이 700 × 700으로 그려졌다면 둘 중 하나가 틀렸습니다.</p>
+    <p>IFC는 저작 도구가 계산한 수량을 요소에 붙여 보낼 수 있도록 <span class="term">수량 세트</span><span class="en">(quantity set)</span>를 둡니다. <code>IfcElementQuantity</code>에 담기는 <code>Qto_WallBaseQuantities</code>, <code>Qto_SlabBaseQuantities</code> 같은 기본 수량 세트에는 총부피(GrossVolume)와 공제 후 부피(NetVolume) 같은 항목이 있습니다(항목 이름과 정의는 IFC 버전별 문서 확인). 그러나 "공제 후"가 어떤 규칙으로 공제한 것인지는 저작 도구마다 다를 수 있으므로, 물량 담당자는 받은 수량 세트를 그대로 믿지 말고 형상에서 다시 계산해 대조합니다. 이 장의 모든 계산은 형상(상자)에서 출발합니다.</p>
+    <figure class="diagram" id="fig-qt-flow">
+      <svg viewBox="0 0 880 300" role="img" aria-label="모델 기반 물량 산출의 흐름: 요소, 형상과 속성, 측정 규칙, 집계, 내역과 5D">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="40" width="150" height="96" rx="10" class="f-elev"/><text x="105" y="66" style="fill:var(--text);font-weight:700">① 요소</text><text x="105" y="88">IfcColumn 200</text><text x="105" y="106">IfcBeam 90 · IfcSlab 10</text><text x="105" y="124">IfcWall 40</text>
+          <rect x="205" y="40" width="150" height="96" rx="10" class="f-elev"/><text x="280" y="66" style="fill:var(--text);font-weight:700">② 형상 · 속성</text><text x="280" y="88">box → 부피 · 면</text><text x="280" y="106">section · thickness</text><text x="280" y="124">storey · material</text>
+          <rect x="380" y="40" width="170" height="96" rx="10" class="f-acc-soft"/><text x="465" y="66" style="fill:var(--accent);font-weight:700">③ 측정 규칙</text><text x="465" y="88">단위 · 기준선</text><text x="465" y="106">겹침 공제 · 우선순위</text><text x="465" y="124">개구부 문턱 · 할증</text>
+          <rect x="575" y="40" width="130" height="96" rx="10" class="f-elev"/><text x="640" y="66" style="fill:var(--text);font-weight:700">④ 집계</text><text x="640" y="88">유형 · 층 · 구역</text><text x="640" y="106">m³ · m² · t</text><text x="640" y="124">물량표</text>
+          <rect x="730" y="40" width="120" height="96" rx="10" class="f-acc2-soft"/><text x="790" y="66" style="fill:var(--accent-2);font-weight:700">⑤ 내역</text><text x="790" y="88">분류 코드</text><text x="790" y="106">× 단가</text><text x="790" y="124">5D · 기성</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.6;fill:none" marker-end="url(#qt-ah)"><path d="M182 88H201"/><path d="M357 88H376"/><path d="M552 88H571"/><path d="M707 88H726"/></g>
+        <rect x="30" y="170" width="820" height="100" rx="10" class="f-elev"/>
+        <text x="50" y="196" class="t" style="font-weight:700">같은 기둥, 세 가지 수량</text>
+        <g class="t-mono"><text x="50" y="222">개수: 20개/층 × 10층 = 200개</text><text x="50" y="244">속성: 0.8 × 0.8 × (층고 − 보 춤) = 0.64 × 3.3 = 2.112 m³ (기준층)</text><text x="50" y="264">형상: box [x0, y0, z0, x1, y1, z1] → (x1 − x0)(y1 − y0)(z1 − z0) = 2.112 m³</text></g>
+        <text x="830" y="244" text-anchor="end" class="t-dim">세 값이 같으면 일관된 모델</text>
+      </svg>
+      <figcaption><b>그림 7-1.</b> 모델 기반 물량 산출의 흐름. 요소의 형상과 속성에서 수량을 꺼내고(②), 측정 규칙(③)이 무엇을 어떻게 셀지 정하며, 집계(④)한 물량에 분류 코드로 단가를 붙이면 내역(⑤)과 5D 원가(10장)가 된다. 모델은 ①–②를, 사람과 규칙은 ③을 맡는다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 7.1 (요소 수량과 집계)</strong> 요소 \(e\)의 형상이 축 정렬 상자 \(B_e = [x_0, x_1]\times[y_0, y_1]\times[z_0, z_1]\)이면
+      <div class="formula">$$V_e = (x_1 - x_0)(y_1 - y_0)(z_1 - z_0), \qquad Q_{T, S} = \sum_{e \in T,\ \text{storey}(e) \in S} q(e)$$<div class="where">\(V_e\): 요소의 상자 부피(m³, 겹침을 빼지 않은 총부피), \(q(e)\): 측정 규칙이 정한 요소 수량(부피, 면적, 길이, 개수), \(T\): 요소 유형(<code>IfcColumn</code> 등), \(S\): 층 집합. <code>CB.bim.qto(els)</code>는 유형별 \(\sum V_e\)와 개수를 돌려준다 — 공제가 없는 <b>상자 합</b>이다. 이 장의 나머지는 \(q(e)\)를 측정 규칙에 맞게 바꾸는 일이다.</div></div></div>
+    <div class="sim" id="sim-qt-table">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>B-10 BIM 물량 집계 표: 층을 고르면 표와 3D가 함께 바뀐다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="qt-cv-table" aria-label="B-10 BIM 3D 모델, 선택한 층의 요소 강조"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>층 <output id="qt-tb-st-out"></output></span><input type="range" id="qt-tb-st" min="0" max="10" step="1" value="0"></label>
+          <div class="ctrl"><span>부피</span><div class="seg" id="qt-tb-m"><button data-value="box" class="on">상자 합</button><button data-value="net">공제 후</button></div></div>
+          <label class="check"><input type="checkbox" id="qt-tb-mep" checked> 덕트·배관도 표에 넣기</label>
+          <p class="sim-note" style="margin:0;padding:0;border:0">공제 후는 다음 절의 우선순위 규칙(기둥 &gt; 보 &gt; 슬래브 &gt; 벽)과 정확한 상자 교집합으로 계산한다.</p>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">구조 콘크리트</span><span class="v" id="qt-tb-o-v">—</span></div>
+        <div class="stat"><span class="k">층당 평균</span><span class="v" id="qt-tb-o-a">—</span></div>
+        <div class="stat"><span class="k">겹침(상자 합 − 공제 후)</span><span class="v" id="qt-tb-o-d">—</span></div>
+        <div class="stat"><span class="k">요소 수</span><span class="v" id="qt-tb-o-n">—</span></div>
+      </div>
+      <div class="qt-tbl-box"><div class="table-wrap"><table class="qt-tbl" id="qt-tb-table"><tbody><tr><td>—</td></tr></tbody></table></div></div>
+      <div class="sim-note">해볼 것: 전체(층 0)에서 상자 합 기둥 435.2 · 보 500.2 · 슬래브 1,708.2 · 벽 746.9 m³, 층당 339.0 m³를 확인하세요 · "공제 후"로 바꾸면 보와 벽만 줄고 기둥·슬래브는 그대로입니다 — B-10 BIM에서 기둥은 보 밑에서, 보·벽은 슬래브 밑에서 끊겨 있어 겹치는 상대가 보·벽뿐이기 때문입니다 · 1층은 층고가 5 m라 기둥·벽이 커서 다른 층보다 30 m³ 많습니다 · 끌어서 돌려 보세요(터치는 가로로 끌기) · 모델: <code>CB.bim.model()</code>, <code>CB.bim.qto</code>(상자 합), 공제 후는 페이지 스크립트의 칸 분할 배정(원리 7.3), 길이는 덕트·배관·보의 긴 변, 넓이는 슬래브 평면·벽 한쪽 면.</div>
+    </div>
+    <div class="callout"><strong>예제 7.1 (상자 합을 손으로)</strong> B-10 BIM 기준층(2–10층, 층고 4.0 m)과 1층(5.0 m).
+      <p><b>① 기둥</b> 상자 높이는 바닥에서 보 밑까지 \(4.0 - 0.7 = 3.3\) m → \(20 \times 0.8 \times 0.8 \times 3.3 = 42.24\) m³. 1층은 \(5.0 - 0.7 = 4.3\) m → 55.04 m³.</p>
+      <p><b>② 보</b> 상자는 슬래브 밑의 웨브 \(0.4 \times 0.49\)이고 길이는 기둥 바깥면까지: X 방향 \(4 \times 32.8\) + Y 방향 \(5 \times 24.8 = 255.2\) m → \(255.2 \times 0.4 \times 0.49 = 50.02\) m³.</p>
+      <p><b>③ 슬래브</b> \(32.8 \times 24.8 \times 0.21 = 170.82\) m³. <b>④ 벽</b> 코어 벽 상자 네 개의 길이 \(16 + 16 + 8 + 8 = 48\) m, 높이 \(4.0 - 0.21 = 3.79\) m → \(48 \times 0.4 \times 3.79 = 72.77\) m³(1층 4.79 m → 91.97).</p>
+      <p><b>⑤ 합</b> 기준층 335.85 m³, 1층 367.85 m³, 10개 층 \(367.85 + 9 \times 335.85 = 3{,}390.5\) m³ → 층당 평균 339.0 m³. <code>CB.bim.qto</code>의 435.2 · 500.2 · 1,708.2 · 746.9 m³와 같다. <b>판단</b>: 상자 합은 겹친 부피를 두 번 센 "총부피"이므로 공사 수량이 아니다. 얼마나 겹쳤는지는 다음 절에서 계산한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="rules">
+    <h2>측정 규칙: 단위, 기준선, 공제, 할증</h2>
+    <div class="problem"><strong>보의 길이는 어디서 어디까지인가</strong>
+      <p>8 m 격자의 보 길이는 8 m(기둥 중심 사이)일까요, 7.2 m(기둥 면 사이)일까요, B-10 BIM처럼 기둥 바깥면까지 이어진 32.8 m짜리 한 덩어리일까요? 세 답 모두 쓰입니다. 무엇을 쓰든 같은 부피를 두 번 세거나 빠뜨리지 않으려면 규칙이 필요합니다.</p></div>
+    <p><span class="term">측정 규칙</span><span class="en">(measurement rules)</span>은 수량을 무엇으로, 어디서 끊어, 무엇을 빼고 세는지를 정한 약속입니다. 발주자와 시공자, 적산자와 모델러가 같은 규칙을 써야 수량이 비교 가능해집니다. 규칙 문서는 나라와 발주처마다 다르고(국내 공공 공사는 표준품셈과 수량 산출 기준 형태, 영국은 NRM 형태 — 세부와 숫자는 현행 문서 확인), 프로젝트의 BIM 수행 계획(4장)이 "어느 규칙으로 모델 물량을 산출하는가"를 적어 두어야 합니다.</p>
+    <div class="callout def"><strong>정의 7.2 (측정 규칙의 네 요소)</strong>
+      <ol>
+        <li><b>측정 단위</b> — 콘크리트 m³, 거푸집 m²(콘크리트와 닿는 면), 철근 t(또는 kg), 덕트 m 또는 m², 문·창 개소. 단위는 단가의 단위와 같아야 한다.</li>
+        <li><b>측정 기준선</b> — 길이를 중심선으로 잴지(<span class="term">중심선 길이</span><span class="en">(centreline length)</span>), 부재 면 사이의 <span class="term">순길이</span><span class="en">(net length)</span>로 잴지. 중심선으로 재면 교차부가 겹쳐 세어지므로 반드시 공제 규칙과 짝을 이룬다.</li>
+        <li><b>공제</b> — 부재끼리 겹친 부피는 한 번만 세고(<span class="term">우선순위 규칙</span><span class="en">(precedence rule)</span>으로 주인을 정함), 개구부는 일정 크기 이상만 뺀다(<span class="term">개구부 공제 문턱</span><span class="en">(opening deduction threshold)</span>). 철근이 차지하는 부피처럼 작은 것은 빼지 않는 것이 흔한 관행이다(현행 기준 확인).</li>
+        <li><b>정미와 할증</b> — 도면 치수 그대로의 <span class="term">정미 수량</span><span class="en">(net quantity)</span>에 절단 손실·자투리를 고려한 <span class="term">할증</span><span class="en">(waste allowance)</span>을 곱해 주문·원가 수량을 만든다(이형철근 약 3 % 형태, 표준품셈 확인). 모델은 정미 수량을 주고, 할증은 규칙이 붙인다.</li>
+      </ol></div>
+    <p>B-10 BIM은 교육용 모델이지만 실제 모델에서도 흔한 <span class="term">모델링 규약</span><span class="en">(modelling convention)</span>을 따릅니다: 기둥은 층마다 끊어 바닥에서 보 밑까지, 보는 슬래브 밑의 웨브만 한 줄로 길게, 슬래브는 기둥 바깥면까지 한 장, 코어 벽은 바닥에서 슬래브 밑까지 네 장. 이 규약 덕분에 슬래브는 어떤 부재와도 겹치지 않고(닿기만 함), 겹침은 네 종류로 줄어듭니다(그림 7-2). 모델링 규약을 바꾸면(예: 기둥을 슬래브 밑까지, 보를 슬래브 윗면까지) 겹침의 종류와 양이 바뀌고, 그때 우선순위 규칙이 결과를 정합니다.</p>
+    <figure class="diagram" id="fig-qt-overlaps">
+      <svg viewBox="0 0 880 330" role="img" aria-label="B-10 BIM에서 생기는 네 가지 겹침: 보와 보의 교차, 벽과 기둥, 벽과 보, 벽과 벽의 모서리">
+        <rect x="10" y="10" width="860" height="310" rx="10" class="f-surface"/>
+        <text x="200" y="36" text-anchor="middle" class="t" style="font-weight:700">평면: 코어 모서리 B2 (x = 8, y = 8)</text>
+        <g transform="translate(70,52)">
+          <rect x="0" y="0" width="260" height="240" style="fill:var(--bg-elev);stroke:var(--border)"/>
+          <!-- column B2 7.6-8.4 => scale 100px/m, origin x=7.2,y=7.2 at (0,240) -->
+          <rect x="40" y="120" width="80" height="80" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.5"/>
+          <rect x="80" y="120" width="180" height="40" style="fill:var(--accent);fill-opacity:.22;stroke:var(--accent)"/>
+          <rect x="80" y="0" width="40" height="200" style="fill:var(--accent);fill-opacity:.22;stroke:var(--accent)"/>
+          <rect x="0" y="140" width="260" height="40" style="fill:none;stroke:var(--text-dim);stroke-dasharray:5 3"/>
+          <rect x="60" y="0" width="40" height="240" style="fill:none;stroke:var(--text-dim);stroke-dasharray:5 3"/>
+          <rect x="80" y="120" width="40" height="40" style="fill:url(#qt-hatch);stroke:var(--bad);stroke-width:1.5"/>
+          <text x="20" y="232" class="t-mono">C-B2 800²</text>
+          <text x="150" y="114" class="t-mono" style="fill:var(--accent)">W-CORE1 (y 8.0–8.4)</text>
+          <text x="128" y="30" class="t-mono" style="fill:var(--accent)">W-CORE3</text>
+          <text x="200" y="196" class="t-mono">G1-X2 (점선, y 7.8–8.2)</text>
+          <text x="4" y="20" class="t-mono">G1-YB (점선)</text>
+        </g>
+        <text x="200" y="312" text-anchor="middle" class="t-dim">빗금: 기둥 + 벽 두 장이 함께 차지하는 0.4 × 0.4 m 기둥 영역</text>
+        <text x="640" y="36" text-anchor="middle" class="t" style="font-weight:700">기준층 겹침(쌍별 합, m³)</text>
+        <g transform="translate(450,56)" class="t-mono">
+          <rect x="0" y="0" width="380" height="44" rx="8" class="f-elev"/><text x="12" y="19" style="fill:var(--text);font-weight:600">벽 – 기둥 6.34</text><text x="12" y="36">코어 모서리 4개 + 코어 위 기둥 C2·C3</text>
+          <rect x="0" y="54" width="380" height="44" rx="8" class="f-elev"/><text x="12" y="73" style="fill:var(--text);font-weight:600">벽 – 보 5.17</text><text x="12" y="90">X2·X3·YB·YC·YD 보가 코어 벽 위를 지남</text>
+          <rect x="0" y="108" width="380" height="44" rx="8" class="f-elev"/><text x="12" y="127" style="fill:var(--text);font-weight:600">벽 – 벽 2.43</text><text x="12" y="144">코어 모서리 0.4 × 0.4 × 3.79 × 4</text>
+          <rect x="0" y="162" width="380" height="44" rx="8" class="f-elev"/><text x="12" y="181" style="fill:var(--text);font-weight:600">보 – 보 1.57</text><text x="12" y="198">격자 교차 20곳 0.4 × 0.4 × 0.49</text>
+          <text x="0" y="232" style="fill:var(--bad);font-weight:600">쌍별 합 15.50 m³ ≠ 실제 겹침 12.92 m³</text>
+          <text x="0" y="252">슬래브: 다른 부재와 닿기만 하고 겹치지 않음</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-2.</b> B-10 BIM 기준층의 겹침. 왼쪽은 코어 모서리의 평면(1 m = 100 px). 기둥 C-B2, 벽 W-CORE1·W-CORE3, 보 G1-X2·G1-YB(보는 기둥 위 높이에만 있음)가 한 점 근처에 모인다. 오른쪽은 쌍별 겹침 부피의 합. 같은 0.4 × 0.4 m 영역을 세 요소가 함께 차지하므로 쌍별 합(15.50 m³)이 실제 공제량(12.92 m³)보다 크다 — 원리 7.3의 출발점.</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="deduction">
+    <h2>겹침 공제와 우선순위</h2>
+    <div class="problem"><strong>같은 콘크리트를 두 공종에 두 번 청구하지 않으려면</strong>
+      <p>기둥과 보가 만나는 접합부의 콘크리트는 기둥 몫일까요, 보 몫일까요? 전체 부피만 맞으면 상관없을 것 같지만, 기둥은 고강도 콘크리트이고 보는 보통 강도라면 단가가 다르고, 공정상 기둥을 먼저 치는지 보와 함께 치는지도 다릅니다. 또 겹친 쌍을 하나씩 빼면 되는 것 같지만, 세 요소가 한곳에서 겹치면 같은 부피를 두 번 빼게 됩니다.</p></div>
+    <p>겹친 부피를 정확히 한 번만 세려면(이를 <span class="term">겹침 공제</span><span class="en">(overlap deduction)</span>라 한다) 두 가지가 필요합니다. 하나는 <b>누구에게 줄지</b>를 정하는 우선순위 규칙이고, 다른 하나는 <b>정확히 얼마가 겹쳤는지</b>를 구하는 계산법입니다. 우선순위 규칙은 관행마다 다릅니다. 시공 순서를 따르는 "기둥 &gt; 보 &gt; 슬래브"(먼저 치는 수직 부재가 접합부를 가짐)가 흔하고, 바닥 판을 기준으로 삼는 "슬래브 &gt; 보 &gt; 기둥"(슬래브를 평면 전체 × 두께로 세고 보는 슬래브 아래 웨브만, 기둥은 보 밑까지 — SiteBook 12장의 슬래브·보 처리가 이 형태)도 쓰입니다. 어느 쪽이든 <b>전체 부피는 같고 유형별 배분만 달라집니다</b>.</p>
+    <figure class="diagram" id="fig-qt-priority">
+      <svg viewBox="0 0 880 300" role="img" aria-label="두 우선순위 규칙에서 접합부 콘크리트의 주인: 기둥 우선과 슬래브 우선">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <text x="225" y="36" text-anchor="middle" class="t" style="font-weight:700">기둥 &gt; 보 &gt; 슬래브</text>
+        <text x="655" y="36" text-anchor="middle" class="t" style="font-weight:700">슬래브 &gt; 보 &gt; 기둥</text>
+        <g transform="translate(55,56)">
+          <rect x="0" y="0" width="340" height="30" style="fill:var(--accent-2);fill-opacity:.25;stroke:var(--accent-2)"/>
+          <rect x="0" y="30" width="130" height="70" style="fill:var(--blue);fill-opacity:.22;stroke:var(--blue)"/>
+          <rect x="210" y="30" width="130" height="70" style="fill:var(--blue);fill-opacity:.22;stroke:var(--blue)"/>
+          <rect x="130" y="0" width="80" height="210" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.6"/>
+          <text x="170" y="120" text-anchor="middle" class="t-mono" style="fill:var(--text)">기둥</text>
+          <text x="60" y="70" text-anchor="middle" class="t-mono" style="fill:var(--blue)">보</text>
+          <text x="280" y="20" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">슬래브</text>
+          <text x="170" y="236" text-anchor="middle" class="t-mono">기둥 = 바닥 → 슬래브 윗면</text>
+        </g>
+        <g transform="translate(485,56)">
+          <rect x="0" y="0" width="340" height="30" style="fill:var(--accent-2);fill-opacity:.25;stroke:var(--accent-2)"/>
+          <rect x="0" y="30" width="340" height="70" style="fill:var(--blue);fill-opacity:.22;stroke:var(--blue)"/>
+          <rect x="130" y="100" width="80" height="110" style="fill:var(--surface-2);stroke:var(--text-dim);stroke-width:1.6"/>
+          <text x="170" y="160" text-anchor="middle" class="t-mono" style="fill:var(--text)">기둥</text>
+          <text x="60" y="70" text-anchor="middle" class="t-mono" style="fill:var(--blue)">보(웨브, 기둥 위 통과)</text>
+          <text x="280" y="20" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">슬래브(평면 전체)</text>
+          <text x="170" y="236" text-anchor="middle" class="t-mono">기둥 = 바닥 → 보 밑</text>
+        </g>
+        <line x1="440" y1="50" x2="440" y2="270" style="stroke:var(--border)"/>
+        <text x="440" y="282" text-anchor="middle" class="t-dim">두 그림의 콘크리트 총부피는 같다 — 배분만 다르다</text>
+      </svg>
+      <figcaption><b>그림 7-3.</b> 접합부 단면에서 본 두 우선순위 규칙. 왼쪽은 기둥이 접합부와 슬래브 두께까지 가지고 보·슬래브가 기둥 면에서 끊긴다. 오른쪽은 슬래브가 평면 전체를, 보가 슬래브 아래 웨브를(기둥 위를 지나며) 가지고 기둥은 보 밑에서 끝난다. B-10 BIM의 형상은 오른쪽 규약으로 그려져 있다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 7.3 (우선순위 배정과 합집합 불변)</strong> 요소들을 우선순위 \(e_1 \succ e_2 \succ \cdots \succ e_n\)으로 줄 세우면, 각 요소의 공제 후 부피는 자기보다 앞선 요소들이 차지하지 않은 부분이다.
+      <div class="formula">$$V_k^{\text{net}} = \Bigl|\,B_k \setminus \bigcup_{i \lt k} B_i\Bigr|, \qquad \sum_{k=1}^{n} V_k^{\text{net}} = \Bigl|\,\bigcup_{k=1}^{n} B_k\Bigr| \quad(\text{순서와 무관})$$
+        $$\Bigl|\bigcup_k B_k\Bigr| = \sum_i |B_i| - \sum_{i \lt j}|B_i \cap B_j| + \sum_{i \lt j \lt k}|B_i \cap B_j \cap B_k| - \cdots$$<div class="where">\(|\cdot|\): 부피. 둘째 식은 <span class="term">포함–배제 원리</span><span class="en">(inclusion–exclusion principle)</span>다. 쌍별 겹침만 빼는 <span class="term">쌍별 공제</span><span class="en">(pairwise deduction)</span>는 셋째 항 이후를 버리므로, 세 요소 이상이 겹친 곳이 있으면 합집합보다 작은 값(과공제)을 준다. 축 정렬 상자는 두 상자의 교집합도 상자이므로 쌍별 겹침은 <code>CB.bim.overlap</code>으로 정확히 구해지지만, 삼중·사중 겹침까지 다루려면 아래의 칸 분할이 간단하고 정확하다.</div></div></div>
+    <figure class="diagram" id="fig-qt-incl">
+      <svg viewBox="0 0 880 290" role="img" aria-label="세 요소가 한 영역을 공유할 때 쌍별 공제가 두 번 빼는 원리와 칸 분할 알고리즘">
+        <rect x="10" y="10" width="860" height="270" rx="10" class="f-surface"/>
+        <text x="210" y="36" text-anchor="middle" class="t" style="font-weight:700">한 칸, 세 요소</text>
+        <g transform="translate(80,56)">
+          <rect x="0" y="40" width="160" height="120" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="60" y="0" width="200" height="90" style="fill:var(--accent);fill-opacity:.18;stroke:var(--accent)"/>
+          <rect x="30" y="70" width="110" height="140" style="fill:var(--accent-2);fill-opacity:.18;stroke:var(--accent-2)"/>
+          <rect x="60" y="70" width="80" height="20" style="fill:url(#qt-hatch);stroke:var(--bad)"/>
+          <text x="10" y="58" class="t-mono" style="fill:var(--text)">A</text><text x="242" y="18" class="t-mono" style="fill:var(--accent)">B</text><text x="38" y="204" class="t-mono" style="fill:var(--accent-2)">C</text>
+          <text x="270" y="86" class="t-mono" style="fill:var(--bad)">A∩B∩C</text>
+        </g>
+        <g class="t-mono" transform="translate(30,250)"><text x="0" y="0">쌍별 공제: |A∩B| + |A∩C| + |B∩C| → 빗금을 세 번 빼고 한 번만 더해야 할 것을 놓침</text></g>
+        <text x="650" y="36" text-anchor="middle" class="t" style="font-weight:700">칸 분할 배정(정확)</text>
+        <g transform="translate(450,56)" class="t-mono">
+          <rect x="0" y="0" width="400" height="168" rx="8" class="f-elev"/>
+          <text x="14" y="24" style="fill:var(--text)">① 모든 상자의 x · y · z 경계값을 모아 정렬</text>
+          <text x="14" y="48" style="fill:var(--text)">② 이웃한 경계 사이 = 칸(작은 상자)으로 공간 분할</text>
+          <text x="14" y="72" style="fill:var(--text)">③ 칸 중심이 들어 있는 상자 중</text>
+          <text x="34" y="92" style="fill:var(--text)">우선순위가 가장 높은 요소에 칸 부피를 배정</text>
+          <text x="14" y="116" style="fill:var(--text)">④ 어느 상자에도 없으면 빈 칸(거푸집 면 판정에 씀)</text>
+          <text x="14" y="146">B-10 기준층: 경계 x·y·z → 1,071칸, 상자 38개</text>
+          <text x="14" y="162">겹친 칸 94개 → 공제 12.92 m³</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-4.</b> 삼중 겹침과 칸 분할. 세 요소가 공유하는 빗금 영역은 쌍별 공제에서 세 번 빠지지만 실제로는 두 번만 빼야 한다(한 번은 남겨야 하므로). 상자 경계로 공간을 칸으로 나누면(<span class="term">칸 분할</span><span class="en">(cell decomposition)</span>) 칸 하나는 통째로 어떤 상자의 안이거나 밖이므로, 칸마다 주인을 정하는 것만으로 몇 겹이 겹치든 정확한 배정이 된다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-qt-deduct">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>겹침 공제 실험: 우선순위와 모델링 규약을 바꾸면</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="qt-cv-deduct" aria-label="선택한 층의 구조 요소와 겹친 칸(빨강) 3D"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>층 <output id="qt-dd-st-out"></output></span><input type="range" id="qt-dd-st" min="1" max="10" step="1" value="3"></label>
+          <div class="ctrl"><span>우선순위</span><div class="seg" id="qt-dd-ord"><button data-value="cbsw" class="on">기둥 &gt; 보 &gt; 슬래브 &gt; 벽</button><button data-value="sbcw">슬래브 &gt; 보 &gt; 기둥 &gt; 벽</button><button data-value="cwbs">기둥 &gt; 벽 &gt; 보 &gt; 슬래브</button><button data-value="wcbs">벽 &gt; 기둥 &gt; 보 &gt; 슬래브</button></div></div>
+          <div class="ctrl"><span>계산 방법</span><div class="seg" id="qt-dd-m"><button data-value="sum">상자 합</button><button data-value="pair">쌍별 공제</button><button data-value="exact" class="on">정확(칸 분할)</button></div></div>
+          <label class="check"><input type="checkbox" id="qt-dd-col"> 기둥을 슬래브 밑까지 모델링(+0.49 m)</label>
+          <label class="check"><input type="checkbox" id="qt-dd-beam"> 보를 슬래브 윗면까지(전체 춤 0.7 m)</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">상자 합</span><span class="v" id="qt-dd-o-s">—</span></div>
+        <div class="stat"><span class="k">공제량</span><span class="v" id="qt-dd-o-d">—</span></div>
+        <div class="stat"><span class="k">결과 부피</span><span class="v" id="qt-dd-o-v">—</span></div>
+        <div class="stat"><span class="k">쌍별 공제의 오차</span><span class="v" id="qt-dd-o-e">—</span></div>
+      </div>
+      <div class="qt-tbl-box"><div class="table-wrap"><table class="qt-tbl" id="qt-dd-table"><tbody><tr><td>—</td></tr></tbody></table></div></div>
+      <div class="qt-msg" id="qt-dd-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(3층)에서 공제 12.92 m³, 결과 322.93 m³, 쌍별 공제는 320.35 m³로 2.58 m³를 더 뺍니다 · 우선순위를 바꾸어도 B-10 BIM 그대로는 결과 합이 같고 벽·기둥·보의 배분만 바뀝니다(기둥과 슬래브는 보와 겹치지 않음) · "기둥을 슬래브 밑까지"를 켜고 기둥 우선이면 기둥 48.51 m³, 보 43.75 m³로 SiteBook 12장의 기둥 값(48.5)과 같아집니다 · "보를 슬래브 윗면까지"를 켜면 보 우선(기둥 &gt; 보 &gt; 슬래브)에서 보 69.22, 슬래브 150.06 m³, 슬래브 우선에서는 보 48.45, 슬래브 170.82 m³ — 전체는 그대로입니다 · 빨간 칸은 두 상자 이상이 겹친 곳 · 모델: 원리 7.3, 상자 경계 좌표를 0.1 mm로 반올림해 칸을 만들고 칸 중심 포함 판정, 같은 유형끼리는 요소 번호 순.</div>
+    </div>
+    <div class="callout"><strong>예제 7.2 (기준층 공제를 손으로 검산)</strong> B-10 BIM 3층, 우선순위 기둥 &gt; 보 &gt; 슬래브 &gt; 벽.
+      <p><b>① 보–보</b> 격자 교차 20곳, X 보와 Y 보가 \(0.4 \times 0.4 \times 0.49 = 0.0784\) m³씩 겹친다 → 1.568 m³. 먼저 만든 X 보가 갖고 Y 보에서 뺀다 → 보 \(50.02 - 1.57 = 48.45\) m³.</p>
+      <p><b>② 벽–벽</b> 코어 모서리 4곳 \(0.4 \times 0.4 \times 3.79 = 0.606\) → 2.43 m³. <b>③ 벽–기둥</b> 모서리 기둥 4개는 벽 두 장과 \(0.4 \times 0.4 \times 3.3 = 0.528\)씩(쌍으로 8번 = 4.22), 코어 벽 위의 C2·C3은 벽 한 장과 \(0.8 \times 0.4 \times 3.3 = 1.056\)씩(2.11) → 쌍별 합 6.34 m³. <b>④ 벽–보</b> 5.17 m³(보 X2·X3가 벽 위 16 m를 0.2 m 폭으로, YB·YD가 8 m를 0.2 m 폭으로 지나는 것 등).</p>
+      <p><b>⑤ 쌍별 공제</b> \(335.85 - (1.57 + 2.43 + 6.34 + 5.17) = 335.85 - 15.50 = 320.35\) m³. <b>⑥ 정확한 값</b> 모서리 기둥 영역 0.4 × 0.4 m는 기둥과 벽 두 장이 함께 차지하므로(삼중) 쌍별 공제가 그 부피를 한 번 더 뺐다: 모서리 4곳 × \(0.16 \times 3.3\) = 2.11 m³, 그리고 같은 모서리의 보 높이 구간에서 벽 두 장과 보 두 줄이 겹치는 부분이 0.47 m³ → 과공제 2.58 m³. 정확한 합집합은 \(320.35 + 2.58 = 322.93\) m³.</p>
+      <p><b>⑦ 판단</b> 과공제 2.58 m³는 층당 0.8 %로 작아 보이지만 체계 오차이므로 10개 층에서 26 m³, 레미콘 약 4대 분량이다. 쌍별 공제는 겹침이 둘씩만 일어나는 단순한 모델에서만 쓴다.</p></div>
+    <div class="callout deep"><strong>칸 분할의 비용과 대안</strong> 칸 수는 축별 경계값 수의 곱 \(n_x n_y n_z\)이고 칸마다 상자 \(n\)개를 확인하므로 계산량은 \(O(n_x n_y n_z\, n)\)이다. B-10 한 층은 \(17 \times 21 \times 3\) 정도의 칸과 상자 38개로 순식간이지만, 건물 전체를 한 번에 나누면 칸이 수십만 개로 늘어난다. 실제 도구는 층·구역별로 나누거나(이 장처럼), 겹칠 수 있는 쌍만 먼저 찾고(6장의 격자 가속), 일반 솔리드는 메시 불리언(2장의 CSG)으로 교집합을 구한다. 상자가 아닌 형상(경사 보, 원형 기둥)에서는 칸 분할 대신 <span class="term">복셀</span><span class="en">(voxel)</span>(작은 정육면체 격자)로 근사하고, 복셀 크기를 줄여 가며 수렴을 확인한다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="formwork">
+    <h2>거푸집 면적: 접촉면을 뺀다</h2>
+    <div class="problem"><strong>상자의 겉넓이를 모두 더하면 왜 틀리나</strong>
+      <p>거푸집은 콘크리트를 부을 때 옆과 아래를 막는 틀입니다. 기둥 상자의 네 옆면, 보 상자의 옆면과 밑면, 슬래브 상자의 밑면과 가장자리를 모두 더하면 될까요? 벽 속에 묻힌 기둥 면, 기둥 머리에 얹힌 보 밑면, 벽 위에 얹힌 슬래브 밑면에는 거푸집을 대지 않습니다.</p></div>
+    <div class="callout def"><strong>정의 7.4 (거푸집 면적)</strong> <span class="term">거푸집 면적</span><span class="en">(formwork area)</span>은 같은 층 구조 요소들의 합집합 \(U\)의 경계면 가운데
+      <div class="formula">$$A_f = \underbrace{A_{\text{옆}}}_{\text{수직 노출면}} + \underbrace{A_{\text{밑}}}_{\text{아래를 향한 노출면, } z \gt z_0}, \qquad \text{제외: 윗면(타설면), 바닥 } z = z_0 \text{에 닿는 면, 다른 요소와 닿는 면}$$<div class="where">\(z_0\): 그 층 바닥 높이(아래층 슬래브 윗면). <span class="term">접촉면</span><span class="en">(contact face)</span>은 두 요소가 맞닿아 콘크리트끼리 이어지는 면으로 거푸집이 필요 없다. 칸 분할(원리 7.3)에서는 채운 칸과 빈 칸 사이의 면만 세면 접촉면이 저절로 빠진다. 거푸집/콘크리트 비(m²/m³)는 부재가 얇고 많을수록 커지며, 거푸집이 골조 원가에서 큰 몫을 차지하는 이유다(SiteBook 12장).</div></div></div>
+    <figure class="diagram" id="fig-qt-faces">
+      <svg viewBox="0 0 880 300" role="img" aria-label="거푸집 면의 분류: 옆면과 밑면은 거푸집, 윗면과 접촉면은 제외">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <rect x="0" y="0" width="520" height="24" style="fill:var(--surface-2);stroke:none"/>
+          <rect x="300" y="24" width="40" height="56" style="fill:var(--surface-2)"/>
+          <rect x="300" y="80" width="80" height="140" style="fill:var(--surface-2)"/>
+          <rect x="420" y="24" width="60" height="196" style="fill:var(--accent);fill-opacity:.2"/>
+          <!-- formwork lines -->
+          <g style="stroke:var(--accent-2);stroke-width:4;fill:none">
+            <path d="M0 24H300"/><path d="M300 24V80"/><path d="M340 24V80H380"/><path d="M380 80V220"/><path d="M300 80V220"/><path d="M0 0V24"/><path d="M520 0V24"/><path d="M340 24H420"/><path d="M480 24H520"/><path d="M420 24V220"/><path d="M480 24V220"/>
+          </g>
+          <g style="stroke:var(--text-dim);stroke-width:2;stroke-dasharray:5 4;fill:none"><path d="M300 80H340"/><path d="M420 24H480"/><path d="M300 220H380"/><path d="M420 220H480"/></g>
+          <path d="M0 0H520" style="stroke:var(--ok);stroke-width:3"/>
+          <text x="150" y="46" class="t-mono" text-anchor="middle">슬래브 밑</text>
+          <text x="320" y="16" class="t-mono" text-anchor="middle" style="fill:var(--ok)">윗면(타설면)</text>
+          <text x="320" y="52" class="t-mono" text-anchor="middle">보</text>
+          <text x="340" y="150" class="t-mono" text-anchor="middle">기둥</text>
+          <text x="450" y="150" class="t-mono" text-anchor="middle" style="fill:var(--accent)">벽</text>
+          <text x="340" y="242" class="t-mono" text-anchor="middle">바닥 접촉</text>
+        </g>
+        <g transform="translate(620,60)" class="t-mono">
+          <line x1="0" y1="0" x2="30" y2="0" style="stroke:var(--accent-2);stroke-width:4"/><text x="40" y="4" style="fill:var(--text)">거푸집(옆면 · 밑면)</text>
+          <line x1="0" y1="30" x2="30" y2="30" style="stroke:var(--text-dim);stroke-width:2;stroke-dasharray:5 4"/><text x="40" y="34" style="fill:var(--text)">접촉면 · 바닥 — 제외</text>
+          <line x1="0" y1="60" x2="30" y2="60" style="stroke:var(--ok);stroke-width:3"/><text x="40" y="64" style="fill:var(--text)">윗면 — 제외</text>
+          <text x="0" y="104">기준층(B-10 BIM, 정확)</text>
+          <text x="0" y="124">슬래브 밑 705.6 · 가장자리 24.2</text>
+          <text x="0" y="144">보 295.9 · 기둥 195.4 · 벽 306.7</text>
+          <text x="0" y="164" style="fill:var(--text);font-weight:600">합 1,527.7 m² (4.73 m²/m³)</text>
+          <text x="0" y="190">상자별 겉넓이 합: 1,780.5 m²</text>
+          <text x="0" y="206">→ 접촉면 252.8 m² 과다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 7-5.</b> 단면으로 본 거푸집 면의 분류(개략). 주황 굵은 선은 거푸집이 필요한 노출면, 점선은 다른 요소·아래층과 닿는 접촉면, 초록은 타설면(윗면)이다. 기둥 머리 위의 보 밑, 보·벽 위의 슬래브 밑, 벽 속에 묻힌 기둥 면은 접촉면이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-qt-form">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>거푸집 면적 산출기: 노출면만 세기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="qt-cv-form" aria-label="선택한 층의 거푸집 면(옆면 주황, 밑면 파랑) 3D"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>층 <output id="qt-fm-st-out"></output></span><input type="range" id="qt-fm-st" min="1" max="10" step="1" value="3"></label>
+          <div class="ctrl"><span>면 세는 법</span><div class="seg" id="qt-fm-m"><button data-value="box">상자별 겉넓이 합</button><button data-value="exact" class="on">접촉면 제외(정확)</button></div></div>
+          <label class="check"><input type="checkbox" id="qt-fm-top"> 슬래브 윗면도 넣기(잘못된 규칙)</label>
+          <label class="check"><input type="checkbox" id="qt-fm-col"> 기둥을 슬래브 밑까지(접합부 채움)</label>
+          <div class="ctrl"><span>3D 보기</span><div class="seg" id="qt-fm-v"><button data-value="all" class="on">모든 거푸집 면</button><button data-value="side">옆면만</button><button data-value="soffit">밑면만</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">거푸집 면적</span><span class="v" id="qt-fm-o-a">—</span></div>
+        <div class="stat"><span class="k">m²/m³</span><span class="v" id="qt-fm-o-r">—</span></div>
+        <div class="stat"><span class="k">SiteBook 1,350 m² 대비</span><span class="v" id="qt-fm-o-s">—</span></div>
+        <div class="stat"><span class="k">면 조각 수</span><span class="v" id="qt-fm-o-n">—</span></div>
+      </div>
+      <div class="qt-tbl-box"><div class="table-wrap"><table class="qt-tbl" id="qt-fm-table"><tbody><tr><td>—</td></tr></tbody></table></div></div>
+      <div class="sim-note">해볼 것: 기준층 정확 값 1,527.7 m²와 상자별 합 1,780.5 m²를 비교하세요(접촉면 252.8 m², 17 % 과다) · 슬래브 윗면을 넣으면 813 m²가 더해져 거의 두 배가 됩니다 — 타설면은 거푸집이 아닙니다 · 1층은 층고 5 m라 1,673.3 m² · 표의 부재별 비교에서 차이의 대부분은 코어 벽(BIM 306.7 vs SiteBook 151.6)입니다(마지막 절) · "기둥을 슬래브 밑까지"를 켜면 접합부 모서리 빈틈이 메워져 2.9 m² 줄어듭니다 · 모델: 정의 7.4, 칸 분할 면 판정, 층 바닥 z<sub>0</sub>에 닿는 아래면은 제외, SiteBook 값은 정의 12.1(슬래브 밑 656.0, 가장자리 23.5, 보 308.0, 기둥 211.2, 벽 151.6).</div>
+    </div>
+    <div class="callout"><strong>예제 7.3 (기준층 거푸집을 부재별로)</strong> B-10 BIM 3층, 정확한 노출면.
+      <p><b>① 슬래브 밑</b> 슬래브 평면 813.44 m²에서 슬래브 밑에 닿는 보·벽의 평면(합집합) 107.84 m²를 뺀다: 보 98.88(교차 20곳 3.2 m² 공제 후) + 벽 18.56 − 보와 겹친 9.60 → \(813.44 - 107.84 = 705.6\) m².</p>
+      <p><b>② 보 밑</b> 보 평면 98.88 m²에서 기둥 머리에 얹힌 9.60 m²(기둥 20개 × 십자 0.48 m²)와 벽 위에 얹힌 8.64 m²를 뺀다 → 80.64 m². 보 옆면 215.2 m²를 더해 보 295.9 m².</p>
+      <p><b>③ 기둥</b> \(20 \times 4 \times 0.8 \times 3.3 = 211.2\)에서 벽이 붙은 면(모서리 기둥 4개 × 2면 × 0.4 × 3.3, C2·C3 × 2면 × 0.4 × 3.3) 15.84 m²를 뺀다 → 195.36 m². <b>④ 벽</b> 306.7 m², <b>⑤ 가장자리</b> \(2(32.8 + 24.8) \times 0.21 = 24.19\) m².</p>
+      <p><b>⑥ 합과 판단</b> 1,527.7 m², 콘크리트 322.93 m³당 4.73 m²/m³로 SiteBook의 4.7 m²/m³와 비슷하다. 그러나 총량은 177 m² 많다 — 슬래브가 기둥 바깥면까지 0.4 m 더 나가 있고(+45 m²), 코어 벽을 개구부 없이 48 m 전부 모델링했기 때문(+155 m²)이다. 거푸집 단가(교육용 약 40,600원/m²)로 층당 약 720만 원 차이다.</p></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="rebar">
+    <h2>철근 물량: 원단위와 상세 모델</h2>
+    <div class="problem"><strong>철근이 그려지지 않은 모델에서 철근 몇 t?</strong>
+      <p>B-10 BIM에는 철근 객체가 없습니다(LOD 300 형태의 골조 모델). 그래도 견적에는 철근 t이 필요합니다. 콘크리트 부피에 원단위를 곱하면 될까요? 부재마다 철근 밀도가 전혀 다른데, 그 곱은 어디까지 믿을 수 있을까요?</p></div>
+    <p>철근 물량은 두 가지로 냅니다. 설계 초기에는 콘크리트 1 m³당 철근 질량인 <span class="term">철근 원단위</span><span class="en">(rebar ratio, t/m³)</span>를 곱합니다(SiteBook 12장·MaterialsBook 11장의 교육용 0.12 t/m³). 철근이 배근 상세로 정해진 뒤에는 부재별로 철근 한 가닥씩의 길이 × 단위 질량을 더하는 <span class="term">상세 물량</span><span class="en">(detailed take-off)</span>을 씁니다. 모델에 철근 객체(LOD 400 형태, 4·12장)가 있으면 그 길이를 직접 세고, 없으면 부재 형상과 배근 규칙(개수·간격·정착)으로 계산합니다 — 아래 시뮬레이터의 "상세 모델"이 이 방식의 교육용 축소판입니다.</p>
+    <div class="callout def"><strong>정의 7.5 (원단위 법과 상세 법)</strong>
+      <div class="formula">$$W_{\text{원단위}} = \rho\, V_{\text{net}}, \qquad W_{\text{상세}} = (1 + \beta)\sum_{\text{부재}}\sum_i n_i L_i m_i$$<div class="where">\(\rho\): 원단위(t/m³), \(V_{\text{net}}\): 공제 후 콘크리트 부피, \(n_i, L_i, m_i\): 철근 개수·가공 길이·단위 질량(D13 0.995, D25 3.98 kg/m), \(\beta\): 할증(약 3 % 형태). 원단위는 건물 평균이라 총량은 잘 맞아도 부재별 배분은 크게 틀린다 — 보·기둥은 진하고(200–350 kg/m³) 슬래브·벽은 연하다(50–60 kg/m³, 아래 모델 기준). 또 \(V_{\text{net}}\)이 공제 규칙에 따라 바뀌므로 원단위는 그 규칙과 함께 정의되어야 한다.</div></div></div>
+    <div class="sim" id="sim-qt-rebar">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>철근 물량: 원단위 × 부피 vs 상세 모델(교육용)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="qt-cv-rebar" aria-label="부재별 철근 질량 막대: 원단위 법과 상세 모델 비교"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>원단위 ρ <output id="qt-rb-rho-out"></output></span><input type="range" id="qt-rb-rho" min="0.06" max="0.18" step="0.005" value="0.12"></label>
+          <label class="ctrl"><span>보 하단 주근(D25) <output id="qt-rb-nb-out"></output></span><input type="range" id="qt-rb-nb" min="4" max="10" step="1" value="7"></label>
+          <label class="ctrl"><span>보 늑근 간격(D13) <output id="qt-rb-sb-out"></output></span><input type="range" id="qt-rb-sb" min="100" max="300" step="10" value="150"></label>
+          <label class="ctrl"><span>기둥 주근(D25) <output id="qt-rb-nc-out"></output></span><input type="range" id="qt-rb-nc" min="8" max="24" step="2" value="16"></label>
+          <label class="ctrl"><span>슬래브 배근 <output id="qt-rb-ks-out"></output></span><input type="range" id="qt-rb-ks" min="6" max="20" step="0.5" value="12"></label>
+          <label class="ctrl"><span>벽 D13 간격(2열·양방향) <output id="qt-rb-sw-out"></output></span><input type="range" id="qt-rb-sw" min="100" max="400" step="10" value="250"></label>
+          <div class="ctrl"><span>층</span><div class="seg" id="qt-rb-st"><button data-value="1">1층</button><button data-value="3" class="on">기준층</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">원단위 법</span><span class="v" id="qt-rb-o-a">—</span></div>
+        <div class="stat"><span class="k">상세 모델</span><span class="v" id="qt-rb-o-d">—</span></div>
+        <div class="stat"><span class="k">차이</span><span class="v" id="qt-rb-o-x">—</span></div>
+        <div class="stat"><span class="k">상세 ÷ 콘크리트</span><span class="v" id="qt-rb-o-r">—</span></div>
+      </div>
+      <div class="qt-msg" id="qt-rb-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(기준층)에서 원단위 법 38.8 t, 상세 모델 38.6 t로 총량은 거의 같지만, 막대를 보면 보는 원단위 법이 5.8 t, 상세가 16.7 t, 슬래브는 20.5 t 대 10.1 t로 두 배 넘게 어긋납니다 · 보 늑근을 100 mm로 줄이면 보만 약 1.6 t 늘어납니다 · 원단위를 0.107로 낮추면 SiteBook의 34.6 t과 같아집니다 — SiteBook은 같은 0.12에 더 작은 부피(288.7 m³)를 곱했기 때문입니다 · 모델: 보 31경간 × (하단 n-D25 × 8.4 m + 상단 연속 2-D25 × 8.4 m + 지점 위 5-D25 × 3.0 m × 2 + 늑근 D13 2.08 m × (⌊7,200/s⌋ + 1)) — MaterialsBook 예제 11.7의 G1, 기둥 20 × (n-D25 × (층고 + 이음 1.0 m) + 띠철근 D13 세트 5.1 m @150, 보 밑까지), 슬래브 kg/m² × 813.4 m²(ConcreteBook 10장 약 12 kg/m²), 벽 2열 × 2방향 D13 @s × 벽 면적(중심선 46.4 m × 높이), 할증 3 %, 모두 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 7.4 (기준층 철근: 두 방법)</strong> B-10 BIM 3층, 공제 후 콘크리트 322.93 m³.
+      <p><b>① 원단위 법</b> \(0.12 \times 322.93 = 38.75\) t. 부재별로 같은 비를 쓰면 슬래브 20.50, 보 5.81, 기둥 5.07, 벽 7.37 t.</p>
+      <p><b>② 상세 모델</b> 보: G1 한 경간 537.5 kg(MaterialsBook 예제 11.7, 할증 포함) × 31경간 = 16.66 t. 기둥: 주근 \(16 \times 5.0 \times 3.98 = 318.4\) kg + 띠철근 \(23 \times 5.1 \times 0.995 = 116.7\) kg → × 1.03 × 20개 = 8.96 t. 슬래브: \(12 \times 813.44 \times 1.03 = 10.05\) t. 벽: \(4 \times (1/0.25) \times 0.995 = 15.9\) kg/m² × \(46.4 \times 3.79\) m² × 1.03 = 2.88 t. 합 38.55 t.</p>
+      <p><b>③ 판단</b> 총량 차이는 0.5 %지만 보 철근은 원단위 법이 1/3로 낮게, 슬래브·벽은 두 배 넘게 높게 준다. 총액 견적에는 원단위로 충분하지만 <b>공종별 발주·반입 계획</b>(보 철근 가공 일정, 12장)에는 상세 물량이 필요하다. 두 방법이 거의 같은 총량을 준 것은 우연에 가깝다 — 이 건물의 부재 구성에서 0.12가 맞았을 뿐이다.</p></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="openings">
+    <h2>개구부 공제 기준</h2>
+    <div class="problem"><strong>덕트가 지나는 구멍 하나까지 빼야 하나</strong>
+      <p>6장의 간섭 검토에서 급기 덕트(1,000 × 400)가 코어 벽을 층마다 두 번 관통했습니다(20건). 해결책은 벽에 슬리브나 개구부를 내는 것입니다. 구멍만큼 콘크리트는 줄고, 거푸집은 구멍 면적만큼 줄지만 구멍 둘레의 옆면(측면)에 다시 거푸집을 대야 합니다. 이 작은 차이들을 모두 셀 가치가 있을까요?</p></div>
+    <p>측정 규칙은 대개 <b>작은 개구부는 무시하고 큰 개구부만 뺀다</b>는 형태의 문턱을 둡니다. 개구부 하나의 넓이(또는 부피)가 문턱 이하이면 콘크리트도 거푸집도 그대로 두고, 문턱을 넘으면 콘크리트에서 개구부 부피를, 거푸집에서 양면의 개구부 넓이를 빼고 개구부 둘레의 측면 거푸집을 더합니다. 문턱 값과 측면 가산 여부는 규칙 문서마다 다르므로(현행 기준 확인) 이 장은 문턱을 조절 가능한 값으로 둡니다. 작은 개구부를 무시해도 되는 이유는 두 가지입니다. 하나는 작은 구멍 하나하나를 세는 노력이 금액보다 크다는 것, 다른 하나는 거푸집에서는 빼는 면적(\(2A\))과 더하는 측면(둘레 × 두께)이 비슷해 서로 상쇄된다는 것입니다.</p>
+    <div class="callout def"><strong>원리 7.6 (개구부 문턱 규칙, 형태)</strong> 두께 \(t\)인 벽에 넓이 \(A_k\), 둘레(측면이 생기는 변의 길이 합) \(P_k\)인 개구부들이 있을 때, 문턱 \(A^*\)를 넘는 개구부만 공제한다.
+      <div class="formula">$$V = V_{\text{gross}} - t\sum_{A_k \gt A^*} A_k, \qquad A_f = A_{f,\text{gross}} - \sum_{A_k \gt A^*}\bigl(2A_k - P_k t\bigr)$$<div class="where">정사각형 개구부(한 변 \(a\), 네 변 측면)에서 거푸집 순변화 \(2a^2 - 4at\)는 \(a = 2t\)에서 0이다. 두께 0.4 m인 B-10 코어 벽에서 한 변 0.8 m보다 작은 개구부는 무시하면 거푸집을 오히려 약간 적게 세고, 큰 개구부는 많이 세게 된다.</div></div></div>
+    <figure class="diagram" id="fig-qt-open">
+      <svg viewBox="0 0 880 270" role="img" aria-label="코어 벽 입면의 개구부: 문턱보다 작은 구멍은 무시하고 큰 개구부는 공제하며 측면 거푸집을 더한다">
+        <rect x="10" y="10" width="860" height="250" rx="10" class="f-surface"/>
+        <rect x="40" y="40" width="560" height="140" style="fill:var(--accent);fill-opacity:.14;stroke:var(--accent)"/>
+        <text x="48" y="58" class="t-mono" style="fill:var(--accent)">W-CORE1 입면 16 × 3.79 m, 두께 0.4 m</text>
+        <rect x="100" y="76" width="38" height="18" style="fill:var(--bg-elev);stroke:var(--text-dim);stroke-dasharray:4 3"/>
+        <text x="119" y="110" text-anchor="middle" class="t-mono">0.04 m²</text>
+        <rect x="200" y="62" width="38" height="17" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:2"/>
+        <rect x="430" y="62" width="38" height="17" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:2"/>
+        <text x="334" y="74" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">덕트 관통 1.1 × 0.5 = 0.55 m²</text>
+        <rect x="300" y="107" width="32" height="73" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:2"/>
+        <text x="350" y="150" class="t-mono" style="fill:var(--accent-2)">문 0.9 × 2.1</text>
+        <g transform="translate(630,40)" class="t-mono">
+          <text x="0" y="12" style="fill:var(--text);font-weight:600">문턱 A* = 0.5 m²(예)</text>
+          <rect x="0" y="26" width="18" height="12" style="fill:var(--bg-elev);stroke:var(--text-dim);stroke-dasharray:4 3"/><text x="26" y="36">A ≤ A*: 무시</text>
+          <rect x="0" y="50" width="18" height="12" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:2"/><text x="26" y="60">A &gt; A*: 공제</text>
+          <text x="0" y="90">콘크리트 −tA</text>
+          <text x="0" y="110">거푸집 −2A + P·t</text>
+          <text x="0" y="130">덕트 관통 1개: −1.10 + 1.28</text>
+          <text x="0" y="146">   → 거푸집 +0.18 m²</text>
+        </g>
+        <text x="320" y="214" text-anchor="middle" class="t-dim">점선 = 문턱 이하(무시), 주황 = 공제 대상. 측면 거푸집 P·t는 개구부 둘레 × 벽 두께</text>
+      </svg>
+      <figcaption><b>그림 7-6.</b> 개구부 문턱 규칙(형태). 문턱 이하의 작은 슬리브는 무시하고, 문턱을 넘는 덕트 관통부와 문은 콘크리트와 거푸집에서 공제한다. 0.4 m 두께 벽에서는 덕트 관통부 하나의 거푸집 순변화가 +0.18 m²로, 구멍을 내면 거푸집이 오히려 늘어난다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-qt-opening">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>개구부 공제 기준: 문턱을 바꾸면 무엇이 달라지나</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="qt-cv-open" aria-label="코어 벽 입면과 개구부, 공제 여부 색 표시"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>개구부 종류</span><div class="seg" id="qt-op-k"><button data-value="duct" class="on">덕트 관통 1.1 × 0.5</button><button data-value="door">문 0.9 × 2.1</button><button data-value="sleeve">배관 슬리브 0.2 × 0.2</button></div></div>
+          <label class="ctrl"><span>개구부 수 <output id="qt-op-n-out"></output></span><input type="range" id="qt-op-n" min="0" max="8" step="1" value="2"></label>
+          <label class="ctrl"><span>문턱 A* <output id="qt-op-a-out"></output></span><input type="range" id="qt-op-a" min="0" max="2.5" step="0.05" value="0.5"></label>
+          <label class="check"><input type="checkbox" id="qt-op-jamb" checked> 공제할 때 측면 거푸집 더하기</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">콘크리트(규칙 / 정확)</span><span class="v" id="qt-op-o-v">—</span></div>
+        <div class="stat"><span class="k">거푸집(규칙 / 정확)</span><span class="v" id="qt-op-o-f">—</span></div>
+        <div class="stat"><span class="k">콘크리트 오차</span><span class="v" id="qt-op-o-ev">—</span></div>
+        <div class="stat"><span class="k">거푸집 오차</span><span class="v" id="qt-op-o-ef">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 덕트 관통 2개, 문턱 0.5 m²이면 공제되어 규칙과 정확한 값이 같습니다 · 문턱을 1.0으로 올리면 콘크리트 0.44 m³(1.8 %)를 더 세고 거푸집은 0.36 m²(0.3 %)만 덜 셉니다 — 작은 개구부는 거푸집 오차가 작습니다 · 배관 슬리브 8개는 어떤 문턱에서도 콘크리트 0.13 m³ 차이뿐입니다 · 문(0.9 × 2.1, 바닥까지 세 변 측면)은 넓어서 대부분의 문턱을 넘습니다 · 측면 가산을 끄면 큰 개구부에서 거푸집이 모자랍니다 · 모델: 원리 7.6, 벽 W-CORE1 기준층 16 × 3.79 × 0.4 m(양면 거푸집 121.28 m²), 덕트·슬리브는 네 변, 문은 세 변 측면. 문턱 값은 교육용이며 실제 값은 적용 기준을 확인한다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="quality">
+    <h2>모델 품질과 물량 정확도</h2>
+    <div class="problem"><strong>모델이 정확하면 물량도 정확한가</strong>
+      <p>물량은 모델이 그려진 대로 나옵니다. 모델러가 기둥을 보 밑에서 끊었는지 슬래브 밑까지 올렸는지, 슬래브를 기둥 바깥면까지 그렸는지 격자선에서 잘랐는지, 코어 벽에 문을 뚫었는지에 따라 수량이 몇 %씩 달라집니다. 형상은 "맞지만" 물량 목적에는 맞지 않을 수 있습니다.</p></div>
+    <p>물량 정확도는 세 가지 모델 품질에 달려 있습니다. ① <b>완결성</b> — 수량이 필요한 모든 요소가 모델에 있는가(B-10 BIM에는 계단·창호·마감·지하층이 없다). ② <b>형상과 속성의 일치</b> — 상자 크기와 <code>props.section</code>이 같은가, 재료 속성이 공종 분류에 쓸 수 있게 채워졌는가(4장의 속성 완결성). ③ <b>모델링 규약</b> — 요소를 어디서 끊고 무엇이 무엇 위에 놓이는지가 측정 규칙과 맞는가. 세 번째가 가장 놓치기 쉽습니다. 형상 검토로는 아무 문제가 없어 보여도, 규약이 측정 규칙과 다르면 물량이 체계적으로 틀립니다.</p>
+    <p>B-10 BIM에서 칸 분할을 해 보면 규약이 만든 흥미로운 결함이 하나 보입니다. 기둥은 보 밑(z₁ − 0.7)에서 끝나고, 보 춤 구간의 접합부는 폭 0.4 m인 X 보와 Y 보가 십자로만 채웁니다. 그래서 0.8 × 0.8 m 기둥 머리의 네 모서리(각 0.2 × 0.2 × 0.49 m)가 <b>비어 있습니다</b> — 기둥 하나에 0.078 m³, 층당 1.57 m³(코어 벽이 일부를 메워 실제 빈 부피는 층당 1.41 m³)의 콘크리트가 모델에서 사라졌습니다. 공교롭게도 이 값은 보–보 교차의 중복(층당 1.57 m³)과 같아서, <b>상자 합</b>으로는 보·기둥 접합부가 "맞게" 나옵니다. 공제를 정확히 하는 순간 빈틈이 드러납니다. 모델 검수 규칙(4장)에 "기둥 머리 접합부가 채워져 있는가" 같은 형상 규칙을 넣거나, 기둥을 슬래브 밑까지 모델링하고 우선순위로 정리하는 규약을 정해야 합니다.</p>
+    <div class="callout warn"><strong>모델 물량을 쓰기 전 확인할 것</strong> ① 모델링 규약 문서(무엇을 어디서 끊는가)가 측정 규칙과 맞는지. ② 같은 공간에 같은 재료의 요소가 두 번 들어 있지 않은지(복사·붙여넣기 중복은 상자 합을 두 배로 만든다). ③ 단위와 축척(mm로 그린 모델을 m로 읽으면 부피가 10⁹배). ④ 층 배정(<code>storey</code>)이 맞는지 — 층별 집계와 4D 연결(9장)이 여기에 기댄다. ⑤ 공제 전·후 물량을 함께 보고 차이가 설명되는지. ⑥ 저작 도구가 넣은 수량 세트(NetVolume 등)와 형상에서 다시 계산한 값이 같은지.</div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="cost-link">
+    <h2>분류 코드와 내역 연결</h2>
+    <div class="problem"><strong>IfcColumn은 내역서의 어느 줄인가</strong>
+      <p>내역서에는 "IfcColumn"이라는 항목이 없습니다. "철근콘크리트 공사 → 콘크리트 타설(m³) · 거푸집(m²) · 철근 가공 조립(t)"처럼 공종별로 단가가 붙습니다. 모델의 요소 하나가 내역서의 여러 줄로 갈라져야 하고, 그 연결이 빠진 요소는 견적에서 조용히 사라집니다.</p></div>
+    <p><span class="term">내역서</span><span class="en">(priced bill of quantities)</span>는 공종 항목별 수량 × 단가의 표입니다. 요소와 내역을 잇는 열쇠가 <span class="term">분류 체계</span><span class="en">(classification system)</span>입니다. 요소에 분류 코드를 붙이면(IFC에서는 <code>IfcClassificationReference</code>를 관계로 연결 — 3장), 코드별 규칙이 "이 요소에서 어떤 수량을 어떤 내역 항목으로 보낼지"를 정합니다. 국제적으로는 영국의 Uniclass, 북미의 OmniClass·MasterFormat(공종 기준, 콘크리트 공사가 03 부문) 같은 체계가 쓰이고, 국내에도 건설 정보 분류 체계가 있습니다(세부 코드는 현행 문서 확인). 이 장은 실제 코드 대신 교육용 코드 RC-C(콘크리트), RC-F(거푸집), RC-R(철근)을 씁니다.</p>
+    <figure class="diagram" id="fig-qt-class">
+      <svg viewBox="0 0 880 300" role="img" aria-label="요소 유형에서 분류 코드를 거쳐 공종 내역 항목으로 수량이 흘러가는 연결">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="40" width="150" height="40" rx="8" class="f-elev"/><text x="105" y="65" style="fill:var(--text)">IfcColumn 200</text>
+          <rect x="30" y="92" width="150" height="40" rx="8" class="f-elev"/><text x="105" y="117" style="fill:var(--text)">IfcBeam 90</text>
+          <rect x="30" y="144" width="150" height="40" rx="8" class="f-elev"/><text x="105" y="169" style="fill:var(--text)">IfcSlab 10</text>
+          <rect x="30" y="196" width="150" height="40" rx="8" class="f-elev"/><text x="105" y="221" style="fill:var(--text)">IfcWall 40</text>
+          <rect x="30" y="248" width="150" height="32" rx="8" style="fill:var(--bg-elev);stroke:var(--bad);stroke-dasharray:4 3"/><text x="105" y="269" style="fill:var(--bad)">덕트·배관 20 (미연결?)</text>
+          <rect x="300" y="110" width="170" height="90" rx="10" class="f-acc-soft"/><text x="385" y="138" style="fill:var(--accent);font-weight:700">분류 코드</text><text x="385" y="160">RC 골조 (구조 요소)</text><text x="385" y="180">→ 세 가지 수량 생성</text>
+          <rect x="600" y="50" width="240" height="50" rx="8" class="f-acc2-soft"/><text x="720" y="72" style="fill:var(--accent-2);font-weight:700">RC-C 콘크리트 m³</text><text x="720" y="90">공제 후 부피</text>
+          <rect x="600" y="125" width="240" height="50" rx="8" class="f-acc2-soft"/><text x="720" y="147" style="fill:var(--accent-2);font-weight:700">RC-F 거푸집 m²</text><text x="720" y="165">노출면(정의 7.4)</text>
+          <rect x="600" y="200" width="240" height="50" rx="8" class="f-acc2-soft"/><text x="720" y="222" style="fill:var(--accent-2);font-weight:700">RC-R 철근 t</text><text x="720" y="240">원단위 × 부피 또는 상세</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.3;fill:none" marker-end="url(#qt-ah)"><path d="M182 60L296 130"/><path d="M182 112L296 145"/><path d="M182 164L296 162"/><path d="M182 216L296 185"/><path d="M472 140L596 78"/><path d="M472 155L596 150"/><path d="M472 172L596 222"/></g>
+        <text x="385" y="250" text-anchor="middle" class="t-dim">× 단가(SiteBook 12장 일위대가) → 공종별 금액</text>
+      </svg>
+      <figcaption><b>그림 7-7.</b> 분류 코드로 요소를 내역 항목에 연결한다. 구조 요소 하나가 콘크리트·거푸집·철근 세 줄의 수량을 만들고, 분류가 빠진 요소(점선)는 견적에서 사라진다. 코드와 연결 규칙은 교육용.</figcaption>
+    </figure>
+    <div class="sim" id="sim-qt-cost">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>내역 연결: 분류 코드 → 공종별 금액(SiteBook 12장 단가)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="qt-cv-cost" aria-label="공종별 금액 막대, 요소 유형별로 쌓음"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>층 <output id="qt-cs-st-out"></output></span><input type="range" id="qt-cs-st" min="0" max="10" step="1" value="3"></label>
+          <div class="ctrl"><span>콘크리트·거푸집 수량</span><div class="seg" id="qt-cs-m"><button data-value="box">상자 합</button><button data-value="net" class="on">공제 후 · 노출면</button></div></div>
+          <div class="qt-map" id="qt-cs-map">
+            <label>기둥 <select data-ifc="IfcColumn"><option value="rc" selected>RC 골조</option><option value="none">미연결</option></select></label>
+            <label>보 <select data-ifc="IfcBeam"><option value="rc" selected>RC 골조</option><option value="none">미연결</option></select></label>
+            <label>슬래브 <select data-ifc="IfcSlab"><option value="rc" selected>RC 골조</option><option value="none">미연결</option></select></label>
+            <label>벽 <select data-ifc="IfcWall"><option value="rc" selected>RC 골조</option><option value="none">미연결</option></select></label>
+            <label>덕트·배관 <select data-ifc="MEP"><option value="mep">설비(단가 없음)</option><option value="none" selected>미연결</option></select></label>
+          </div>
+          <label class="ctrl"><span>거푸집 단가 배율 <output id="qt-cs-f-out"></output></span><input type="range" id="qt-cs-f" min="0.6" max="1.6" step="0.05" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">콘크리트 RC-C</span><span class="v" id="qt-cs-o-c">—</span></div>
+        <div class="stat"><span class="k">거푸집 RC-F</span><span class="v" id="qt-cs-o-f">—</span></div>
+        <div class="stat"><span class="k">철근 RC-R</span><span class="v" id="qt-cs-o-r">—</span></div>
+        <div class="stat"><span class="k">합계(층당)</span><span class="v" id="qt-cs-o-t">—</span></div>
+      </div>
+      <div class="qt-msg" id="qt-cs-msg"></div>
+      <div class="sim-note">해볼 것: 기준층 기본값에서 콘크리트 0.39 · 거푸집 0.62 · 철근 0.55억 원, 합계 약 1.55억 원/층으로 SiteBook 12장의 1.38억 원/층보다 12 % 많습니다(물량 차이는 마지막 절) · "상자 합"으로 바꾸면 겹침과 접촉면을 두 번 세어 약 1.69억 원이 됩니다 · 벽을 미연결로 두면 경고가 뜨고 층당 0.30억 원이 사라집니다 — 분류가 빠진 요소는 조용히 견적에서 빠집니다 · 거푸집 단가 배율을 1.3으로 올리면(노무비 상승) 거푸집이 금액의 절반 가까이 됩니다 · 모델: 수량은 이 장의 공제 후 부피·정의 7.4 노출면·원단위 0.12 t/m³, 단가는 SiteBook 표 12-1의 교육용 일위대가(콘크리트 119,450원/m³, 거푸집 40,570원/m², 철근 1,417,000원/t), 분류 코드는 교육용.</div>
+    </div>
+    <div class="callout tip"><strong>모델 물량과 내역서의 경계</strong> 모델에서 나오는 것은 <b>정미 수량</b>이다. 내역서의 수량은 여기에 할증, 모델에 없는 항목(동바리·양중·가설·이음·스페이서), 측정 규칙의 반올림이 더해진다. 그래서 실무에서는 모델 물량을 "모델 산출분"과 "수작업 보완분"으로 나누어 관리하고, 수작업 보완분이 크면 모델의 상세 수준(LOD, 4장)을 올릴지 판단한다. 5D(10장)는 이 연결 위에서 설계 변경의 금액 영향을 자동으로 다시 계산한다.</div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="compare-2d">
+    <h2>2D 적산과 모델 기반 산출의 오차</h2>
+    <div class="problem"><strong>사람이 세면 틀리고, 모델이 세면 안 틀리나</strong>
+      <p>2D 도면 적산의 오류는 부재를 빠뜨리거나 두 번 세거나 치수를 잘못 읽는 것입니다. 모델은 이런 실수를 하지 않지만, 유형 매개변수 하나가 틀리면(슬래브 유형의 두께를 200 mm로 잘못 넣으면) 그 유형을 쓰는 모든 층이 한꺼번에 틀립니다. 두 오류는 성격이 다릅니다.</p></div>
+    <p>수작업 적산의 실수는 대개 <span class="term">우연 오차</span><span class="en">(random error)</span>입니다. 항목마다 독립적으로 생기므로 항목이 많으면 일부가 서로 상쇄되고, 오차의 분포가 넓게 퍼집니다. 다만 누락은 항상 수량을 줄이고 중복은 항상 늘리므로 평균이 0이 아닐 수 있습니다. 모델 기반 산출의 오류는 대개 <span class="term">체계 오차</span><span class="en">(systematic error)</span>입니다. 같은 유형·같은 규약이 모든 인스턴스에 반복되므로 퍼짐은 작지만 한쪽으로 크게 치우칩니다. 아래 시뮬레이터는 B-10의 구조 요소 340개를 2D 적산자와 모델로 각각 400번 "세어" 오차 분포를 비교합니다.</p>
+    <div class="sim" id="sim-qt-2d">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>2D 적산 vs BIM 산출: 오차 분포(몬테카를로 400회)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="qt-cv-2d" aria-label="콘크리트 총량 오차 분포 히스토그램: 2D 적산과 BIM 산출"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>2D: 항목 누락률 <output id="qt-2d-po-out"></output></span><input type="range" id="qt-2d-po" min="0" max="0.05" step="0.0025" value="0.01"></label>
+          <label class="ctrl"><span>2D: 중복 계산률 <output id="qt-2d-pd-out"></output></span><input type="range" id="qt-2d-pd" min="0" max="0.05" step="0.0025" value="0.01"></label>
+          <label class="ctrl"><span>2D: 치수 판독 오차 σ <output id="qt-2d-sd-out"></output></span><input type="range" id="qt-2d-sd" min="0" max="0.06" step="0.0025" value="0.02"></label>
+          <label class="check"><input type="checkbox" id="qt-2d-ov"> 2D: 겹침을 공제하지 않음</label>
+          <label class="ctrl"><span>BIM: 요소 누락률 <output id="qt-2d-pm-out"></output></span><input type="range" id="qt-2d-pm" min="0" max="0.02" step="0.001" value="0.002"></label>
+          <label class="ctrl"><span>BIM: 슬래브 유형 두께 오류 <output id="qt-2d-dt-out"></output></span><input type="range" id="qt-2d-dt" min="-30" max="30" step="5" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">2D 평균 ± 표준편차</span><span class="v" id="qt-2d-o-a">—</span></div>
+        <div class="stat"><span class="k">BIM 평균 ± 표준편차</span><span class="v" id="qt-2d-o-b">—</span></div>
+        <div class="stat"><span class="k">|오차| &gt; 3 % 확률 (2D / BIM)</span><span class="v" id="qt-2d-o-p">—</span></div>
+        <div class="stat"><span class="k">참값(공제 후 전체)</span><span class="v" id="qt-2d-o-t">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 2D는 평균 근처에 넓게 퍼지고 BIM은 좁게 모입니다 · 슬래브 유형 두께를 −10 mm로 두면 BIM 분포가 통째로 약 −2.5 % 옮겨 갑니다 — 모든 층의 슬래브가 같은 유형이기 때문입니다 · 2D 누락률만 올리면 평균이 아래로, 중복률만 올리면 위로 치우칩니다 · "겹침을 공제하지 않음"을 켜면 2D 분포가 약 +4 %로 옮겨 갑니다(상자 합 3,390.5 / 3,259.4) · 모델: 항목 = B-10 구조 요소 340개의 공제 후 부피(기둥 &gt; 보 &gt; 슬래브 &gt; 벽), 2D는 항목마다 독립적으로 누락·중복·판독 오차(정규 분포)를 주고, BIM은 요소 누락과 슬래브 유형 두께 오류(모든 슬래브에 같은 비율)를 준다. 확률은 교육용 가정이며 실측 통계가 아니다.</div>
+    </div>
+    <div class="callout tip"><strong>오차의 성격에 맞는 대책</strong> 우연 오차(2D)는 두 사람이 따로 세어 맞대거나(이중 적산) 표본 검산으로 줄인다. 체계 오차(BIM)는 표본 몇 개를 손으로 세면 바로 드러난다 — 한 층의 슬래브 하나만 손으로 계산해 모델 값과 비교해도 유형 오류를 잡는다. 그래서 모델 기반 산출에서도 예제 7.1 같은 <b>손 검산</b>이 품질 관리의 핵심이다. 모델은 세는 일을 대신하지만 규칙과 검산을 대신하지는 않는다.</div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="b10">
+    <h2>B-10 물량 대조: 322.9 m³와 288.7 m³</h2>
+    <div class="problem"><strong>두 숫자 모두 맞다면</strong>
+      <p>B-10 BIM의 공제 후 기준층 콘크리트는 322.93 m³이고, SiteBook 12장의 기준층 수량은 288.7 m³입니다. 차이 34.2 m³(12 %)는 레미콘 약 6대 분량입니다. 공제를 정확히 했는데도 남는 이 차이는 어디서 왔을까요?</p></div>
+    <p>두 산출은 같은 건물을 서로 다른 가정으로 셉니다. SiteBook 정의 12.1은 교육용 단순화로 슬래브를 격자 중심선 32 × 24 m로, 보를 중심선 길이 248 m(기둥 속을 지나는 길이 포함) × 웨브 0.4 × 0.49 m로, 기둥을 바닥에서 슬래브 밑까지(3.79 m)로, 코어 벽을 개구부를 뺀 순길이 20 m로 셉니다. B-10 BIM은 슬래브를 기둥 바깥면까지 32.8 × 24.8 m로, 기둥을 보 밑까지(3.3 m), 보를 기둥 바깥면까지 이어진 웨브로, 코어 벽을 개구부 없는 네 장(48 m)으로 그렸습니다. 차이를 가정별로 떼어 내면 정확히 맞아떨어집니다(그림 7-8).</p>
+    <figure class="diagram" id="fig-qt-waterfall">
+      <svg viewBox="0 0 880 330" role="img" aria-label="B-10 BIM 공제 후 322.9 m³에서 SiteBook 288.7 m³까지 가정별 차이를 쌓은 폭포 그림">
+        <rect x="10" y="10" width="860" height="310" rx="10" class="f-surface"/>
+        <!-- scale: 270 m3 -> y=270, 330 m3 -> y=30 ; 4 px per m3 -->
+        <g class="t-mono" text-anchor="end"><text x="74" y="274">270</text><text x="74" y="194">290</text><text x="74" y="114">310</text><text x="74" y="34">330</text></g>
+        <g style="stroke:var(--grid)"><line x1="80" y1="270" x2="850" y2="270"/><line x1="80" y1="190" x2="850" y2="190"/><line x1="80" y1="110" x2="850" y2="110"/><line x1="80" y1="30" x2="850" y2="30"/></g>
+        <!-- 322.93 -> y = 270 - (322.93-270)*4 = 58.3 -->
+        <rect x="100" y="58.3" width="90" height="211.7" style="fill:var(--accent);fill-opacity:.75"/>
+        <text x="145" y="52" text-anchor="middle" class="t-mono" style="fill:var(--text)">322.9</text>
+        <text x="145" y="290" text-anchor="middle" class="t-mono">BIM 공제 후</text>
+        <!-- slab -9.54: 322.93 -> 313.39 : y 58.3 -> 96.4 -->
+        <rect x="220" y="58.3" width="90" height="38.1" style="fill:var(--ok);fill-opacity:.7"/>
+        <text x="265" y="52" text-anchor="middle" class="t-mono">−9.5</text>
+        <text x="265" y="290" text-anchor="middle" class="t-mono">슬래브 범위</text><text x="265" y="306" text-anchor="middle" class="t-mono">32.8×24.8→32×24</text>
+        <!-- walls -31.09: 313.39 -> 282.30 : y 96.4 -> 220.8 -->
+        <rect x="340" y="96.4" width="90" height="124.4" style="fill:var(--ok);fill-opacity:.7"/>
+        <text x="385" y="90" text-anchor="middle" class="t-mono">−31.1</text>
+        <text x="385" y="290" text-anchor="middle" class="t-mono">코어 벽</text><text x="385" y="306" text-anchor="middle" class="t-mono">48 m 연속→순 20 m</text>
+        <!-- +1.57 voids: 282.30 -> 283.87 : y 220.8 -> 214.5 -->
+        <rect x="460" y="214.5" width="90" height="6.3" style="fill:var(--bad);fill-opacity:.75"/>
+        <text x="505" y="208" text-anchor="middle" class="t-mono">+1.6</text>
+        <text x="505" y="290" text-anchor="middle" class="t-mono">접합부 빈틈</text><text x="505" y="306" text-anchor="middle" class="t-mono">BIM 모서리 4곳</text>
+        <!-- +4.86 double: 283.87 -> 288.73 : y 214.5 -> 195.1 -->
+        <rect x="580" y="195.1" width="90" height="19.4" style="fill:var(--bad);fill-opacity:.75"/>
+        <text x="625" y="189" text-anchor="middle" class="t-mono">+4.9</text>
+        <text x="625" y="290" text-anchor="middle" class="t-mono">접합부 중복</text><text x="625" y="306" text-anchor="middle" class="t-mono">SiteBook 보 중심선</text>
+        <rect x="700" y="195.1" width="90" height="74.9" style="fill:var(--accent-2);fill-opacity:.75"/>
+        <text x="745" y="189" text-anchor="middle" class="t-mono" style="fill:var(--text)">288.7</text>
+        <text x="745" y="290" text-anchor="middle" class="t-mono">SiteBook 12장</text>
+        <g style="stroke:var(--text-faint);stroke-dasharray:3 3"><line x1="190" y1="58.3" x2="220" y2="58.3"/><line x1="310" y1="96.4" x2="340" y2="96.4"/><line x1="430" y1="220.8" x2="460" y2="220.8"/><line x1="550" y1="214.5" x2="580" y2="214.5"/><line x1="670" y1="195.1" x2="700" y2="195.1"/></g>
+      </svg>
+      <figcaption><b>그림 7-8.</b> 기준층 콘크리트의 대조(m³, 세로축 270부터). B-10 BIM 공제 후 322.9에서 슬래브 범위(−9.5)와 코어 벽 모델링(−31.1)을 SiteBook 가정으로 바꾸고, BIM 접합부 모서리 빈틈(+1.6)과 SiteBook이 보를 중심선 길이로 세어 기둥과 겹쳐 센 접합부(+4.9)를 더하면 288.7이 된다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 7.5 (차이 34.2 m³의 분해)</strong> 기준층, 우선순위 기둥 &gt; 보 &gt; 슬래브 &gt; 벽.
+      <div class="table-wrap"><table class="qt-tbl">
+        <thead><tr><th>부재</th><th>SiteBook 12장</th><th>B-10 BIM 상자 합</th><th>B-10 BIM 공제 후</th><th>차이(BIM − SiteBook)</th></tr></thead>
+        <tbody>
+          <tr><td>슬래브</td><td>161.28 (32 × 24 × 0.21)</td><td>170.82</td><td>170.82</td><td class="qt-pos">+9.54</td></tr>
+          <tr><td>보</td><td>48.61 (248 m 중심선)</td><td>50.02</td><td>48.45</td><td class="qt-neg">−0.16</td></tr>
+          <tr><td>기둥</td><td>48.51 (H − t = 3.79 m)</td><td>42.24</td><td>42.24</td><td class="qt-neg">−6.27</td></tr>
+          <tr><td>코어 벽</td><td>30.32 (순 20 m)</td><td>72.77</td><td>61.41</td><td class="qt-pos">+31.09</td></tr>
+          <tr class="qt-sum"><td>합</td><td>288.72</td><td>335.85</td><td>322.93</td><td class="qt-pos">+34.21</td></tr>
+        </tbody></table></div>
+      <p><b>① 슬래브 +9.54</b> 면적 차이 \(813.44 - 768 = 45.44\) m² × 0.21. <b>② 코어 벽 +31.09</b> BIM은 문 없는 벽 네 장(공제 후 61.41), SiteBook은 개구부를 뺀 순길이 20 m(30.32). 코어 벽에 문과 덕트 관통부를 모델링하면 이 차이가 대부분 사라진다.</p>
+      <p><b>③ 보 + 기둥 −6.43</b> SiteBook은 보를 중심선 길이 248 m로 세었는데 그중 24.8 m가 기둥 속이다. 기둥도 슬래브 밑까지 세었으므로 접합부 \(24.8 \times 0.4 \times 0.49 = 4.86\) m³가 두 번 들어 있다(SiteBook의 거푸집 식은 순길이 \(L_n\)을 써서 이 중복이 없다). 한편 BIM은 접합부 모서리 빈틈 1.57 m³가 비어 있다. \(4.86 + 1.57 = 6.43\). 검산: 시뮬레이터에서 "기둥을 슬래브 밑까지"를 켜고 기둥 우선이면 기둥 48.51(= SiteBook), 보 43.75(= 48.61 − 4.86).</p>
+      <p><b>④ 결론</b> \(322.93 - 9.54 - 31.09 + 1.57 + 4.86 = 288.73\) m³. 상자 합 339 m³(층 평균)와 288.7 m³의 차이 가운데 겹침 공제로 설명되는 것은 층당 약 13 m³뿐이고, 나머지는 <b>모델링 가정</b>의 차이다. 두 산출 모두 각자의 가정 안에서는 맞다. 물량을 비교하려면 숫자보다 먼저 가정을 맞춰야 한다.</p></div>
+    <div class="callout site"><strong>B-10 BIM 물량(공제 후, 교육용)</strong> 우선순위 기둥 &gt; 보 &gt; 슬래브 &gt; 벽, 정확한 칸 분할 공제. 기준층(2–10층) 콘크리트 <b>322.93 m³</b>(기둥 42.24 · 보 48.45 · 슬래브 170.82 · 벽 61.41), 1층 353.01 m³, 지상 10개 층 3,259.4 m³(층당 평균 <b>325.9 m³</b>; 상자 합 3,390.5 m³에서 131.1 m³ 공제). 거푸집(접촉면·타설면 제외) 기준층 <b>1,527.7 m²</b>, 1층 1,673.3 m², 층당 평균 1,542.2 m²(4.73 m²/m³). 철근 원단위 0.12 t/m³ × 322.93 = 38.8 t/기준층. SiteBook 12장의 기준층 288.7 m³ · 1,350 m² · 34.6 t과의 차이는 슬래브 범위, 코어 벽 개구부, 접합부 처리의 모델링 가정 차이이며(예제 7.5, 7.3), 겹침 공제로 설명되는 것은 층당 12.9 m³다. 이 책의 공통 규약(CONTRIBUTING)이 쓰는 우선순위 기둥 &gt; 벽 &gt; 보 &gt; 슬래브로 바꾸어도 합은 같은 322.93 m³(10개 층 3,259.4 m³)이고 배분만 기둥 42.24 · 벽 66.12 · 보 43.75 · 슬래브 170.82 m³로 달라진다(벽이 보보다 앞서 벽 위를 지나는 보 구간을 가져감). 5D(10장)는 이 공제 후 물량을 쓴다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 정보가 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="five-d.html"><small>CH.10 · 5D 원가와 디지털 견적</small>물량 × 단가 = 5D<br><span>공제 후 물량에 일위대가를 곱하고 설계 변경마다 다시 계산한다.</span></a>
+      <a href="four-d.html"><small>CH.09 · 4D 공정 시뮬레이션</small>층별 물량 → 활동 기간<br><span>층마다 콘크리트 323 m³, 거푸집 1,528 m²가 골조 사이클을 정한다.</span></a>
+      <a href="lod.html"><small>CH.04 · LOD와 정보 요구 사항</small>모델링 규약과 검수 규칙<br><span>접합부 빈틈과 벽 개구부 누락은 검수 규칙으로 잡는다.</span></a>
+      <a href="clash.html"><small>CH.06 · 간섭 검토</small>겹침 = 간섭의 다른 얼굴<br><span>같은 재료의 겹침은 공제하고, 다른 계통의 겹침은 간섭으로 해결한다.</span></a>
+      <a href="fabrication.html"><small>CH.12 · 디지털 제작과 프리패브</small>상세 철근 물량<br><span>원단위 대신 가공표의 길이와 개수로 철근을 주문한다.</span></a>
+      <a href="../../site/chapters/estimating.html#takeoff"><small>SITEBOOK · 적산과 원가 관리</small>기준층 288.7 m³의 산출식<br><span>정의 12.1의 단순화 가정과 일위대가.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>모델 물량은 개수·속성·형상 세 출처에서 나오고, 셋이 일치하는지가 모델 품질의 첫 검사다. 수량 세트(NetVolume 등)는 형상에서 다시 계산해 대조한다.</li>
+      <li>측정 규칙의 네 요소: 단위, 측정 기준선(중심선 vs 순길이), 공제(겹침 우선순위·개구부 문턱), 정미와 할증. 모델은 정미 수량을, 규칙은 공제와 할증을 정한다.</li>
+      <li>우선순위 배정 V<sub>k</sub><sup>net</sup> = |B<sub>k</sub> \ ∪<sub>i&lt;k</sub>B<sub>i</sub>|: 합은 순서와 무관한 합집합 부피이고 유형별 배분만 바뀐다. 쌍별 공제는 삼중 겹침에서 과공제한다(B-10 기준층 2.58 m³).</li>
+      <li>축 정렬 상자는 경계값으로 공간을 칸으로 나누면 몇 겹이 겹치든 정확히 공제된다. B-10 기준층: 상자 합 335.85 → 공제 후 322.93 m³(공제 12.92), 1층 353.01, 10개 층 3,259.4 m³.</li>
+      <li>거푸집은 옆면 + 바닥 위의 밑면만 세고 타설면·바닥 접촉면·요소 간 접촉면을 뺀다. B-10 기준층 1,527.7 m²(상자별 합 1,780.5 m²보다 252.8 m² 적음), 4.73 m²/m³.</li>
+      <li>철근 원단위는 총량에는 쓸 만하지만 부재별 배분은 크게 틀린다(보 5.8 vs 16.7 t). 원단위는 그 부피를 정한 공제 규칙과 함께 정의해야 한다.</li>
+      <li>개구부는 문턱을 넘을 때만 공제하고 측면 거푸집을 더한다. 거푸집 순변화 2A − Pt는 작은 개구부에서 0에 가깝다.</li>
+      <li>분류 코드가 요소를 내역 항목으로 보낸다. 미연결 요소는 조용히 견적에서 빠진다. 2D 적산은 우연 오차, 모델 산출은 체계 오차가 주이므로 손 검산이 여전히 필요하다.</li>
+      <li>B-10 BIM 322.93 m³(어떤 우선순위든 같은 합) vs SiteBook 288.7 m³의 차이는 슬래브 범위 −9.5, 코어 벽 −31.1, 접합부 빈틈 +1.6, SiteBook 접합부 중복 +4.9로 정확히 분해된다. 숫자를 비교하기 전에 가정을 맞춘다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. B-10 BIM 기준층 기둥(800 × 800, 바닥에서 보 밑까지, 층고 4.0 m, 보 춤 0.7 m) 20개의 상자 부피 합은?</p><div class="opts">
+        <button class="opt">51.2 m³</button><button class="opt" data-correct>42.24 m³</button><button class="opt">48.51 m³</button><button class="opt">2.11 m³</button>
+      </div><div class="quiz-exp">\(20 \times 0.8^2 \times (4.0 - 0.7) = 20 \times 0.64 \times 3.3 = 42.24\) m³. 48.51은 슬래브 밑(3.79 m)까지 센 SiteBook 값, 51.2는 층고 전체, 2.11은 기둥 하나다.</div></div>
+      <div class="quiz-q"><p>2. 우선순위를 "기둥 &gt; 보 &gt; 슬래브"에서 "슬래브 &gt; 보 &gt; 기둥"으로 바꾸면 같은 층의 공제 후 콘크리트 총량은?</p><div class="opts">
+        <button class="opt">슬래브가 커지므로 늘어난다</button><button class="opt">기둥이 작아지므로 줄어든다</button><button class="opt" data-correct>그대로다 — 유형별 배분만 바뀐다</button><button class="opt">겹침이 많으면 늘고 적으면 준다</button>
+      </div><div class="quiz-exp">원리 7.3: 공제 후 부피의 합은 합집합 부피이며 순서와 무관하다. 우선순위는 겹친 부피의 주인(따라서 강도별 단가, 공종별 배분)만 정한다.</div></div>
+      <div class="quiz-q"><p>3. 세 상자 A, B, C가 모두 한 영역 X(부피 1 m³)를 공유하고 다른 겹침은 없다. 쌍별 공제는 합집합보다 얼마나 작은 값을 주나?</p><div class="opts">
+        <button class="opt">0</button><button class="opt" data-correct>1 m³</button><button class="opt">2 m³</button><button class="opt">3 m³</button>
+      </div><div class="quiz-exp">상자 합은 X를 세 번 센다. 정확히는 두 번을 빼야 하지만(한 번은 남김), 쌍별 공제는 세 쌍(AB, AC, BC)에서 세 번 뺀다. 포함–배제의 셋째 항 \(+|A\cap B\cap C| = 1\)을 놓친 만큼 과공제된다.</div></div>
+      <div class="quiz-q"><p>4. 거푸집 면적에 넣는 면은?</p><div class="opts">
+        <button class="opt">슬래브 윗면</button><button class="opt">벽 속에 묻힌 기둥 면</button><button class="opt" data-correct>보와 벽이 받치지 않는 슬래브 밑면</button><button class="opt">아래층 슬래브에 놓인 기둥 밑면</button>
+      </div><div class="quiz-exp">정의 7.4: 수직 노출면과 바닥 위의 아래 노출면(슬래브 밑·보 밑)만 센다. 윗면은 타설면, 나머지 둘은 접촉면이다.</div></div>
+      <div class="quiz-q"><p>5. B-10 BIM 기준층 거푸집을 상자별 겉넓이 합(옆면 + 바닥 위 밑면)으로 세면 1,780.5 m², 접촉면을 빼면 1,527.7 m²다. 상자별 합의 과다율은?</p><div class="opts">
+        <button class="opt">약 14 %</button><button class="opt" data-correct>약 17 %</button><button class="opt">약 25 %</button><button class="opt">약 4 %</button>
+      </div><div class="quiz-exp">\((1{,}780.5 - 1{,}527.7)/1{,}527.7 = 252.8/1{,}527.7 \approx 16.5\,\%\). 14 %는 1,780.5로 나눈 값이다. 오차는 참값(정확한 값) 기준으로 잰다.</div></div>
+      <div class="quiz-q"><p>6. 두께 0.4 m 벽에 1.1 × 0.5 m 덕트 관통 개구부(네 변 측면)를 공제하면 거푸집 면적의 순변화는?</p><div class="opts">
+        <button class="opt">−1.10 m²</button><button class="opt">−0.55 m²</button><button class="opt" data-correct>+0.18 m²</button><button class="opt">+1.28 m²</button>
+      </div><div class="quiz-exp">양면에서 \(2 \times 0.55 = 1.10\) m²를 빼고 측면 \(2(1.1 + 0.5) \times 0.4 = 1.28\) m²를 더한다: \(+0.18\) m². 작은 개구부를 무시하는 문턱 규칙이 거푸집에서 큰 오차를 만들지 않는 이유다.</div></div>
+      <div class="quiz-q"><p>7. 원단위 0.12 t/m³로 기준층 철근을 산출하면 총량은 상세 모델과 거의 같지만 부재별로 크게 틀린다. 가장 크게 과소평가되는 부재는?</p><div class="opts">
+        <button class="opt">슬래브</button><button class="opt" data-correct>보</button><button class="opt">코어 벽</button><button class="opt">모두 비슷하게 맞다</button>
+      </div><div class="quiz-exp">보는 부피(48.45 m³)에 비해 주근·늑근이 촘촘해 상세 모델 약 16.7 t인데 원단위 법은 5.8 t을 준다. 슬래브·벽은 반대로 원단위 법이 두 배 넘게 크다.</div></div>
+      <div class="quiz-q"><p>8. B-10 BIM 공제 후 기준층 322.9 m³와 SiteBook 288.7 m³의 차이에서 가장 큰 원인은?</p><div class="opts">
+        <button class="opt">겹친 부피를 공제하지 않았기 때문</button><button class="opt">슬래브를 기둥 바깥면까지 그렸기 때문</button><button class="opt" data-correct>코어 벽을 개구부 없이 48 m 전부 모델링했기 때문</button><button class="opt">SiteBook이 보를 중심선 길이로 세었기 때문</button>
+      </div><div class="quiz-exp">예제 7.5: 코어 벽 +31.1, 슬래브 범위 +9.5, 접합부 처리 −6.4 m³. 공제는 이미 했으므로 겹침은 원인이 아니다(공제량 12.9 m³는 상자 합 335.85와 322.93의 차이).</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 물량 산출 모델(교육용): 정확한 우선순위 공제와 거푸집 노출면 ---------- */
+const QT = {
+  STR: ["IfcColumn", "IfcBeam", "IfcSlab", "IfcWall"],
+  NAME: { IfcColumn: "기둥", IfcBeam: "보", IfcSlab: "슬래브", IfcWall: "벽", IfcDuctSegment: "덕트", IfcPipeSegment: "배관" },
+  R: (v) => Math.round(v * 1e4) / 1e4,
+  vol: (b) => (b[3] - b[0]) * (b[4] - b[1]) * (b[5] - b[2]),
+  z0: (st) => (st === 1 ? 0 : 5 + 4 * (st - 2)),
+  ORDERS: { cbsw: ["IfcColumn", "IfcBeam", "IfcSlab", "IfcWall"], sbcw: ["IfcSlab", "IfcBeam", "IfcColumn", "IfcWall"], wcbs: ["IfcWall", "IfcColumn", "IfcBeam", "IfcSlab"], cwbs: ["IfcColumn", "IfcWall", "IfcBeam", "IfcSlab"] },
+  model(o = {}) {
+    return CB.bim.model().map((e) => {
+      const b = e.box.slice();
+      if (o.colUp && e.ifc === "IfcColumn") b[5] = QT.R(b[5] + 0.49);
+      if (o.beamFull && e.ifc === "IfcBeam") b[5] = QT.R(b[5] + 0.21);
+      return b === e.box ? e : Object.assign({}, e, { box: b });
+    });
+  },
+  /** 정확한 우선순위 배정(좌표 압축 칸 분할). list: 요소, order: ifc 우선순위 */
+  cells(list, order) {
+    const pr = (e) => { const k = order.indexOf(e.ifc); return k < 0 ? 99 : k; };
+    const L = list.slice().sort((a, b) => pr(a) - pr(b) || a.id - b.id);
+    const ax = (i, j) => [...new Set(L.flatMap((e) => [QT.R(e.box[i]), QT.R(e.box[j])]))].sort((a, b) => a - b);
+    const xs = ax(0, 3), ys = ax(1, 4), zs = ax(2, 5), nx = xs.length - 1, ny = ys.length - 1, nz = zs.length - 1;
+    const g = new Int32Array(nx * ny * nz).fill(-1), cnt = new Uint8Array(nx * ny * nz), own = new Float64Array(L.length);
+    let union = 0;
+    for (let i = 0; i < nx; i++) { const cx = (xs[i] + xs[i + 1]) / 2, dx = xs[i + 1] - xs[i];
+      for (let j = 0; j < ny; j++) { const cy = (ys[j] + ys[j + 1]) / 2, dy = ys[j + 1] - ys[j];
+        for (let k = 0; k < nz; k++) { const cz = (zs[k] + zs[k + 1]) / 2, v = dx * dy * (zs[k + 1] - zs[k]), id = (i * ny + j) * nz + k;
+          for (let n = 0; n < L.length; n++) { const b = L[n].box;
+            if (cx > b[0] && cx < b[3] && cy > b[1] && cy < b[4] && cz > b[2] && cz < b[5]) { if (g[id] < 0) { g[id] = n; own[n] += v; union += v; } cnt[id]++; } } } } }
+    return { L, xs, ys, zs, nx, ny, nz, g, cnt, own, union };
+  },
+  /** 거푸집: 채운 칸과 빈 칸 사이의 면. 옆면·밑면(z0 위) = 거푸집, 윗면·바닥 접촉 = 제외 */
+  form(c, z0) {
+    const { xs, ys, zs, nx, ny, nz, g, L } = c, at = (i, j, k) => (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz ? -1 : g[(i * ny + j) * nz + k]);
+    const out = { side: {}, soffit: {}, top: 0, base: 0, faces: [] };
+    const add = (o, t, a) => { o[t] = (o[t] || 0) + a; };
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let k = 0; k < nz; k++) {
+      const n = at(i, j, k); if (n < 0) continue; const t = L[n].ifc;
+      const X0 = xs[i], X1 = xs[i + 1], Y0 = ys[j], Y1 = ys[j + 1], Z0 = zs[k], Z1 = zs[k + 1];
+      if (at(i - 1, j, k) < 0) { add(out.side, t, (Y1 - Y0) * (Z1 - Z0)); out.faces.push([0, X0, Y0, Z0, X0, Y1, Z1]); }
+      if (at(i + 1, j, k) < 0) { add(out.side, t, (Y1 - Y0) * (Z1 - Z0)); out.faces.push([0, X1, Y0, Z0, X1, Y1, Z1]); }
+      if (at(i, j - 1, k) < 0) { add(out.side, t, (X1 - X0) * (Z1 - Z0)); out.faces.push([1, X0, Y0, Z0, X1, Y0, Z1]); }
+      if (at(i, j + 1, k) < 0) { add(out.side, t, (X1 - X0) * (Z1 - Z0)); out.faces.push([1, X0, Y1, Z0, X1, Y1, Z1]); }
+      if (at(i, j, k - 1) < 0) { if (Math.abs(Z0 - z0) < 1e-6) out.base += (X1 - X0) * (Y1 - Y0); else { add(out.soffit, t, (X1 - X0) * (Y1 - Y0)); out.faces.push([2, X0, Y0, Z0, X1, Y1, Z0]); } }
+      if (at(i, j, k + 1) < 0) out.top += (X1 - X0) * (Y1 - Y0);
+    }
+    out.total = Object.values(out.side).reduce((a, b) => a + b, 0) + Object.values(out.soffit).reduce((a, b) => a + b, 0);
+    return out;
+  },
+  /** 쌍별(1차) 공제: 겹친 쌍마다 낮은 순위 요소에서 겹친 부피를 뺀다 */
+  pairwise(list, order) {
+    const pr = (e) => order.indexOf(e.ifc), net = new Map(list.map((e) => [e, QT.vol(e.box)]));
+    for (let a = 0; a < list.length; a++) for (let b = a + 1; b < list.length; b++) {
+      const o = CB.bim.overlap(list[a].box, list[b].box); if (!o.hard) continue;
+      const lo = pr(list[a]) > pr(list[b]) || (pr(list[a]) === pr(list[b]) && list[a].id > list[b].id) ? list[a] : list[b];
+      net.set(lo, net.get(lo) - o.volume);
+    }
+    return net;
+  },
+};
+/* ---------- 이 장의 도우미: 상자 그리기, 캐시, 표(계산 모델은 QT, 교육용) ---------- */
+Object.assign(QT, {
+  SITE: { slab: 161.28, beam: 48.61, col: 48.51, wall: 30.32, total: 288.72, f: { soffit: 656.0, edge: 23.52, beam: 308.02, col: 211.2, wall: 151.6, total: 1350.34 } },
+  PRICE: { c: 119450, f: 40570, r: 1417000 },
+  _cache: {},
+  /** 층 st의 구조 요소 칸 분할(옵션·우선순위별 캐시) */
+  storey(st, order = "cbsw", o = {}) {
+    const key = st + order + (o.colUp ? "c" : "") + (o.beamFull ? "b" : "");
+    if (QT._cache[key]) return QT._cache[key];
+    const els = QT.model(o).filter((e) => e.storey === st && QT.STR.includes(e.ifc));
+    const c = QT.cells(els, QT.ORDERS[order]);
+    c.els = els; c.byType = {}; c.boxType = {};
+    c.L.forEach((e, n) => { c.byType[e.ifc] = (c.byType[e.ifc] || 0) + c.own[n]; });
+    els.forEach((e) => { c.boxType[e.ifc] = (c.boxType[e.ifc] || 0) + QT.vol(e.box); });
+    c.sum = els.reduce((s, e) => s + QT.vol(e.box), 0);
+    c.f = QT.form(c, QT.z0(st));
+    return (QT._cache[key] = c);
+  },
+  /** 상자별 겉넓이(옆면 + 바닥 위 밑면, 접촉 포함) */
+  naiveForm(els, z0) {
+    const by = {}; let s = 0;
+    els.forEach((e) => { const b = e.box, dx = b[3] - b[0], dy = b[4] - b[1], dz = b[5] - b[2], a = 2 * (dx + dy) * dz + (Math.abs(b[2] - z0) < 1e-6 ? 0 : dx * dy); by[e.ifc] = (by[e.ifc] || 0) + a; s += a; });
+    return { by, total: s };
+  },
+  col(P, ifc) { return { IfcColumn: P.dim, IfcBeam: P.faint, IfcSlab: P.faint, IfcWall: P.accent, IfcDuctSegment: P.blue, IfcPipeSegment: P.ok }[ifc] || P.dim; },
+  /** 상자 여러 개를 면 단위로 깊이 정렬해 그린다. items: [{ box, fill, alpha, color, width }] */
+  boxes(V, items) {
+    const faces = [];
+    items.forEach((it) => {
+      const [x0, y0, z0, x1, y1, z1] = it.box, P = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
+      [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]].forEach((f) => { const pts = f.map((i) => P[i]); faces.push({ pts, d: V.depth(pts), it }); });
+    });
+    faces.sort((a, b) => b.d - a.d);
+    faces.forEach((f) => V.poly3(f.pts, { fill: f.it.fill, fillAlpha: f.it.alpha != null ? f.it.alpha : 0.5, color: f.it.color || f.it.fill, width: f.it.width || 0.6, stroke: f.it.stroke }));
+  },
+  /** 면 조각 [축, x0, y0, z0, x1, y1, z1] → 사각형 꼭짓점 */
+  facePts(f) {
+    const [a, x0, y0, z0, x1, y1, z1] = f;
+    if (a === 0) return [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]];
+    if (a === 1) return [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]];
+    return [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]];
+  },
+  m3: (v, d = 2) => CB.num(v, d) + " m³",
+  m2: (v, d = 1) => CB.num(v, d) + " m²",
+  eok: (v) => CB.num(v / 1e8, 2) + "억 원",
+  stLabel: (v) => (v === 0 ? "전체(1–10층)" : v + "층" + (v === 1 ? " (층고 5 m)" : "")),
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue("--font")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle"; ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  /** 가로 막대 묶음. rows: [{ label, parts: [{ v, color }], tot, lab }] */
+  hbars(ctx, W, H, rows, vmax, o = {}) {
+    const P = CB.palette(), narrow = W < 460, lw = narrow ? 98 : o.lw || 96, x0 = lw + 8, x1 = W - (narrow ? 70 : 92), top = o.top || 26, rh = (H - top - (o.bottom || 26)) / rows.length;
+    rows.forEach((r, i) => {
+      const y = top + i * rh + rh * 0.18, h = rh * 0.64; let x = x0;
+      QT.text(ctx, r.label, lw, y + h / 2, P.text, { align: "right", size: narrow ? 11 : 12 });
+      r.parts.forEach((p) => { const w = Math.max(0, (p.v / vmax) * (x1 - x0)); ctx.fillStyle = p.color; ctx.globalAlpha = p.alpha != null ? p.alpha : 0.8; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1; x += w; });
+      if (r.lab) QT.text(ctx, r.lab, Math.min(x + 6, x1 + 2), y + h / 2, P.dim, { align: "left", size: 11 });
+    });
+    return { x0, x1 };
+  },
+});
+
+/* ---------- 1. 물량 집계 표 ---------- */
+(function () {
+  const all = CB.bim.model();
+  const st = CB.range("qt-tb-st", QT.stLabel, go), mode = CB.seg("qt-tb-m", go), mep = CB.check("qt-tb-mep", go);
+  const v = CB.orbit("#qt-cv-table", { yaw: -0.65, pitch: 0.42, dist: 92, target: [16, 12, 19], fov: 0.85, aspect: 0.72, minHeight: 300, maxHeight: 480,
+    draw(V) {
+      const P = V.P, s = st();
+      const items = all.map((e) => { const on = s === 0 || e.storey === s; return { box: e.box, fill: QT.col(P, e.ifc), alpha: on ? (e.ifc === "IfcSlab" ? 0.28 : 0.55) : 0.05, color: on ? QT.col(P, e.ifc) : P.grid, width: on ? 0.7 : 0.4 }; });
+      QT.boxes(V, items);
+      V.text3("A/1", [0, 0, 0], { color: P.dim, size: 11, dy: 12 }); V.text3("x", [36, 0, 0], { color: P.dim, size: 11 }); V.text3("y", [0, 28, 0], { color: P.dim, size: 11 });
+    } });
+  function go() {
+    const s = st(), floors = s === 0 ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [s];
+    const els = all.filter((e) => floors.includes(e.storey)), q = CB.bim.qto(els);
+    const net = {}, form = {}; let sumBox = 0, sumNet = 0;
+    floors.forEach((f) => { const c = QT.storey(f); Object.entries(c.byType).forEach(([k, val]) => (net[k] = (net[k] || 0) + val));
+      Object.entries(c.f.side).forEach(([k, val]) => (form[k] = (form[k] || 0) + val)); Object.entries(c.f.soffit).forEach(([k, val]) => (form[k] = (form[k] || 0) + val)); sumBox += c.sum; sumNet += c.union; });
+    const types = QT.STR.concat(mep() ? ["IfcDuctSegment", "IfcPipeSegment"] : []);
+    const len = (e) => Math.max(e.box[3] - e.box[0], e.box[4] - e.box[1]);
+    const meas = (t) => { const L = els.filter((e) => e.ifc === t);
+      if (t === "IfcSlab") return CB.num(L.reduce((a, e) => a + (e.box[3] - e.box[0]) * (e.box[4] - e.box[1]), 0), 1) + " m²";
+      if (t === "IfcWall") return CB.num(L.reduce((a, e) => a + len(e) * (e.box[5] - e.box[2]), 0), 1) + " m²";
+      if (t === "IfcColumn") return CB.num(L.reduce((a, e) => a + (e.box[5] - e.box[2]), 0), 1) + " m";
+      return CB.num(L.reduce((a, e) => a + len(e), 0), 1) + " m"; };
+    const m = mode();
+    let html = `<thead><tr><th>유형</th><th>개수</th><th>${m === "box" ? "상자 부피" : "공제 후 부피"} (m³)</th><th>길이 · 넓이</th><th>거푸집 (m²)</th></tr></thead><tbody>`;
+    types.forEach((t) => { if (!q[t]) return; const str = QT.STR.includes(t), vol = m === "box" || !str ? q[t].volume : net[t] || 0;
+      html += `<tr><td>${QT.NAME[t]} <code>${t}</code></td><td>${q[t].count}</td><td>${CB.num(vol, 2)}</td><td>${meas(t)}</td><td>${str ? CB.num(form[t] || 0, 1) : "—"}</td></tr>`; });
+    const totForm = Object.values(form).reduce((a, b) => a + b, 0);
+    html += `<tr class="qt-sum"><td>구조 합계</td><td>${QT.STR.reduce((a, t) => a + (q[t] ? q[t].count : 0), 0)}</td><td>${CB.num(m === "box" ? sumBox : sumNet, 2)}</td><td></td><td>${CB.num(totForm, 1)}</td></tr></tbody>`;
+    document.getElementById("qt-tb-table").innerHTML = html;
+    const V0 = m === "box" ? sumBox : sumNet;
+    CB.stat("qt-tb-o-v", QT.m3(V0, 1)); CB.stat("qt-tb-o-a", QT.m3(V0 / floors.length, 1));
+    CB.stat("qt-tb-o-d", QT.m3(sumBox - sumNet, 2) + ` <small>${CB.num(((sumBox - sumNet) / sumBox) * 100, 1)} %</small>`);
+    CB.stat("qt-tb-o-n", els.length + "개");
+    v.redraw();
+  }
+  go();
+})();
+
+/* ---------- 2. 겹침 공제 실험 ---------- */
+(function () {
+  const st = CB.range("qt-dd-st", (x) => x + "층", go), ord = CB.seg("qt-dd-ord", go), meth = CB.seg("qt-dd-m", go), cu = CB.check("qt-dd-col", go), bf = CB.check("qt-dd-beam", go);
+  let C = null;
+  const v = CB.orbit("#qt-cv-deduct", { yaw: -0.6, pitch: 0.5, dist: 52, target: [16, 12, 11], fov: 0.85, aspect: 0.72, minHeight: 300, maxHeight: 480,
+    draw(V) {
+      if (!C) return; const P = V.P;
+      const items = C.els.map((e) => ({ box: e.box, fill: QT.col(P, e.ifc), alpha: e.ifc === "IfcSlab" ? 0.12 : 0.22, color: QT.col(P, e.ifc), width: 0.5 }));
+      const { xs, ys, zs, nx, ny, nz, cnt } = C;
+      for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let k = 0; k < nz; k++) if (cnt[(i * ny + j) * nz + k] > 1) items.push({ box: [xs[i], ys[j], zs[k], xs[i + 1], ys[j + 1], zs[k + 1]], fill: P.bad, alpha: 0.75, color: P.bad, width: 0.6 });
+      QT.boxes(V, items);
+    } });
+  function go() {
+    const s = st(), o = { colUp: cu(), beamFull: bf() };
+    C = QT.storey(s, ord(), o);
+    v.st.target = [16, 12, QT.z0(s) + 2];
+    const pw = QT.pairwise(C.els, QT.ORDERS[ord()]), pwType = {}; let pwSum = 0;
+    pw.forEach((val, e) => { pwType[e.ifc] = (pwType[e.ifc] || 0) + val; pwSum += val; });
+    const m = meth(), res = m === "sum" ? C.sum : m === "pair" ? pwSum : C.union, byT = m === "sum" ? C.boxType : m === "pair" ? pwType : C.byType;
+    let html = `<thead><tr><th>유형</th><th>상자 합</th><th>배정 부피</th><th>공제</th></tr></thead><tbody>`;
+    QT.ORDERS[ord()].forEach((t) => { const b = C.boxType[t] || 0, n = byT[t] || 0; html += `<tr><td>${QT.NAME[t]}</td><td>${CB.num(b, 2)}</td><td>${CB.num(n, 2)}</td><td class="${b - n > 1e-6 ? "qt-neg" : ""}">${b - n > 1e-6 ? "−" + CB.num(b - n, 2) : "0"}</td></tr>`; });
+    html += `<tr class="qt-sum"><td>합</td><td>${CB.num(C.sum, 2)}</td><td>${CB.num(res, 2)}</td><td>${C.sum - res > 1e-6 ? "−" + CB.num(C.sum - res, 2) : "0"}</td></tr></tbody>`;
+    document.getElementById("qt-dd-table").innerHTML = html;
+    CB.stat("qt-dd-o-s", QT.m3(C.sum)); CB.stat("qt-dd-o-d", QT.m3(C.sum - res)); CB.stat("qt-dd-o-v", QT.m3(res));
+    CB.stat("qt-dd-o-e", CB.signed(pwSum - C.union, 2) + " m³");
+    const msg = document.getElementById("qt-dd-msg"), ov = [...C.cnt].filter((x) => x > 1).length;
+    msg.className = "qt-msg " + (m === "exact" ? "ok" : m === "pair" ? "warn" : "bad");
+    msg.innerHTML = m === "sum" ? `상자 합은 겹친 칸 <b>${ov}개</b>(빨강)를 두 번 이상 셉니다: 과다 <b>${CB.num(C.sum - C.union, 2)} m³</b>.`
+      : m === "pair" ? `쌍별 공제는 겹친 쌍마다 한 번씩 뺍니다. 셋 이상이 겹친 칸을 두 번 빼서 정확한 값보다 <b>${CB.num(C.union - pwSum, 2)} m³</b> 작습니다.`
+      : `정확한 공제: 칸 ${C.nx * C.ny * C.nz}개 중 겹친 칸 ${ov}개를 우선순위가 높은 요소에 한 번만 배정했습니다. 합 <b>${CB.num(C.union, 2)} m³</b>는 우선순위와 무관합니다.`;
+    v.redraw();
+  }
+  go();
+})();
+
+/* ---------- 3. 거푸집 면적 ---------- */
+(function () {
+  const st = CB.range("qt-fm-st", (x) => x + "층", go), meth = CB.seg("qt-fm-m", go), top = CB.check("qt-fm-top", go), cu = CB.check("qt-fm-col", go), vw = CB.seg("qt-fm-v", () => v.redraw());
+  let C = null;
+  const v = CB.orbit("#qt-cv-form", { yaw: -0.6, pitch: 0.55, dist: 50, target: [16, 12, 11], fov: 0.85, aspect: 0.72, minHeight: 300, maxHeight: 480,
+    draw(V) {
+      if (!C) return; const P = V.P, w = vw(), faces = [];
+      C.f.faces.forEach((f) => { if ((w === "side" && f[0] === 2) || (w === "soffit" && f[0] !== 2)) return; const pts = QT.facePts(f); faces.push({ pts, d: V.depth(pts), c: f[0] === 2 ? P.blue : P.accent2 }); });
+      if (top()) { const s = C.els.find((e) => e.ifc === "IfcSlab").box; const pts = [[s[0], s[1], s[5]], [s[3], s[1], s[5]], [s[3], s[4], s[5]], [s[0], s[4], s[5]]]; faces.push({ pts, d: V.depth(pts), c: P.warn }); }
+      faces.sort((a, b) => b.d - a.d);
+      faces.forEach((f) => V.poly3(f.pts, { fill: f.c, fillAlpha: 0.42, color: f.c, width: 0.35 }));
+    } });
+  function go() {
+    const s = st(); C = QT.storey(s, "cbsw", { colUp: cu() }); v.st.target = [16, 12, QT.z0(s) + 2];
+    const nv = QT.naiveForm(C.els, QT.z0(s)), slabTop = (() => { const b = C.els.find((e) => e.ifc === "IfcSlab").box; return (b[3] - b[0]) * (b[4] - b[1]); })();
+    const f = C.f, ex = meth() === "exact";
+    const bim = ex ? { soffit: f.soffit.IfcSlab || 0, edge: f.side.IfcSlab || 0, beam: (f.side.IfcBeam || 0) + (f.soffit.IfcBeam || 0), col: f.side.IfcColumn || 0, wall: (f.side.IfcWall || 0) + (f.soffit.IfcWall || 0) }
+      : { soffit: (() => { const b = C.els.find((e) => e.ifc === "IfcSlab").box; return (b[3] - b[0]) * (b[4] - b[1]); })(), edge: nv.by.IfcSlab - slabTop, beam: nv.by.IfcBeam, col: nv.by.IfcColumn, wall: nv.by.IfcWall };
+    if (top()) bim.top = slabTop;
+    const tot = Object.values(bim).reduce((a, b) => a + b, 0), S = QT.SITE.f;
+    const rows = [["슬래브 밑", "soffit"], ["슬래브 가장자리", "edge"], ["보 옆 · 밑", "beam"], ["기둥", "col"], ["코어 벽", "wall"]];
+    let html = `<thead><tr><th>부재</th><th>B-10 BIM</th><th>SiteBook 12장</th><th>차이</th></tr></thead><tbody>`;
+    rows.forEach(([n, k]) => { const d = bim[k] - S[k]; html += `<tr><td>${n}</td><td>${CB.num(bim[k], 1)}</td><td>${CB.num(S[k], 1)}</td><td class="${d > 0 ? "qt-pos" : "qt-neg"}">${CB.signed(d, 1)}</td></tr>`; });
+    if (top()) html += `<tr><td>슬래브 윗면(오류)</td><td>${CB.num(bim.top, 1)}</td><td>0</td><td class="qt-pos">+${CB.num(bim.top, 1)}</td></tr>`;
+    html += `<tr class="qt-sum"><td>합</td><td>${CB.num(tot, 1)}</td><td>${CB.num(S.total, 1)}</td><td>${CB.signed(tot - S.total, 1)}</td></tr></tbody>`;
+    document.getElementById("qt-fm-table").innerHTML = html;
+    CB.stat("qt-fm-o-a", QT.m2(tot)); CB.stat("qt-fm-o-r", CB.num(tot / C.union, 2) + " m²/m³");
+    CB.stat("qt-fm-o-s", CB.signed(((tot - S.total) / S.total) * 100, 1) + " %"); CB.stat("qt-fm-o-n", (C.f.faces.length + (top() ? 1 : 0)) + "개" + (ex ? "" : " <small>(그림은 정확한 면)</small>"));
+    v.redraw();
+  }
+  go();
+})();
+
+/* ---------- 4. 철근 물량 ---------- */
+(function () {
+  const rho = CB.range("qt-rb-rho", (x) => x.toFixed(3) + " t/m³", go), nb = CB.range("qt-rb-nb", (x) => x + "개", go), sb = CB.range("qt-rb-sb", (x) => "@" + x + " mm", go),
+    nc = CB.range("qt-rb-nc", (x) => x + "개", go), ks = CB.range("qt-rb-ks", (x) => CB.num(x, 1) + " kg/m²", go), sw = CB.range("qt-rb-sw", (x) => "@" + x + " mm", go), stg = CB.seg("qt-rb-st", go);
+  const m25 = 3.98, m13 = 0.995, beta = 0.03;
+  let R = null;
+  function calc() {
+    const s = +stg(), c = QT.storey(s), H = s === 1 ? 5.0 : 4.0, Hc = H - 0.7;
+    const g1 = (nb() * 8.4 + 2 * 8.4 + 5 * 3.0 * 2) * m25 + (Math.floor(7200 / sb()) + 1) * 2.08 * m13;
+    const col = nc() * (H + 1.0) * m25 + (Math.floor((Hc * 1000) / 150) + 1) * 5.1 * m13;
+    const wallArea = 46.4 * (H - 0.21), wall = 4 * (1000 / sw()) * m13 * wallArea;
+    const det = { IfcBeam: (31 * g1 * (1 + beta)) / 1000, IfcColumn: (20 * col * (1 + beta)) / 1000, IfcSlab: (ks() * 813.44 * (1 + beta)) / 1000, IfcWall: (wall * (1 + beta)) / 1000 };
+    const rat = {}; QT.STR.forEach((t) => (rat[t] = rho() * (c.byType[t] || 0)));
+    const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+    return { c, det, rat, D: sum(det), A: sum(rat), V: c.union };
+  }
+  const cv = CB.canvas("#qt-cv-rebar", (ctx, W, H) => {
+    if (!R) return; const P = CB.palette();
+    const rows = []; ["IfcSlab", "IfcBeam", "IfcColumn", "IfcWall"].forEach((t) => {
+      rows.push({ label: QT.NAME[t] + " 원단위", parts: [{ v: R.rat[t], color: P.accent2 }], lab: CB.num(R.rat[t], 1) + " t" });
+      rows.push({ label: QT.NAME[t] + " 상세", parts: [{ v: R.det[t], color: P.accent }], lab: CB.num(R.det[t], 1) + " t · " + CB.num((R.det[t] * 1000) / Math.max(1e-9, R.c.byType[t] || 1), 0) + " kg/m³" });
+    });
+    const vmax = Math.max(4, ...Object.values(R.rat), ...Object.values(R.det)) * 1.05;
+    QT.hbars(ctx, W, H, rows, vmax, { top: 30, bottom: 12, lw: 104 });
+    QT.text(ctx, `${stg() === "1" ? "1층" : "기준층"} 부재별 철근 (t) — 주황 원단위 × 공제 후 부피, 보라 상세 모델`, W / 2, 14, P.dim, { size: 11, bold: false });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.62), minHeight: 300, maxHeight: 440 });
+  function go() {
+    R = calc(); cv.redraw();
+    CB.stat("qt-rb-o-a", CB.num(R.A, 2) + " t"); CB.stat("qt-rb-o-d", CB.num(R.D, 2) + " t");
+    CB.stat("qt-rb-o-x", CB.signed(((R.A - R.D) / R.D) * 100, 1) + " %"); CB.stat("qt-rb-o-r", CB.num(R.D / R.V, 3) + " t/m³");
+    const worst = QT.STR.map((t) => [t, R.rat[t] / Math.max(1e-9, R.det[t])]).sort((a, b) => Math.abs(Math.log(b[1])) - Math.abs(Math.log(a[1])))[0];
+    const msg = document.getElementById("qt-rb-msg"); msg.className = "qt-msg " + (Math.abs(R.A - R.D) / R.D < 0.05 ? "ok" : "warn");
+    msg.innerHTML = `총량 차이 <b>${CB.num(Math.abs(R.A - R.D), 2)} t</b> (${CB.num((Math.abs(R.A - R.D) / R.D) * 100, 1)} %). 부재별로는 ${QT.NAME[worst[0]]}에서 원단위 법이 상세의 <b>${CB.num(worst[1], 2)}배</b> — 이 모델이 맞춘 원단위는 ${CB.num(R.D / R.V, 3)} t/m³입니다.`;
+  }
+  go();
+})();
+
+/* ---------- 5. 개구부 공제 기준 ---------- */
+(function () {
+  const K = { duct: { w: 1.1, h: 0.5, sides: 4, y: 2.95, name: "덕트 관통" }, door: { w: 0.9, h: 2.1, sides: 3, y: 0, name: "문" }, sleeve: { w: 0.2, h: 0.2, sides: 4, y: 3.1, name: "배관 슬리브" } };
+  const kind = CB.seg("qt-op-k", go), n = CB.range("qt-op-n", (x) => x + "개", go), th = CB.range("qt-op-a", (x) => CB.num(x, 2) + " m²", go), jamb = CB.check("qt-op-jamb", go);
+  const L = 16, Hw = 3.79, t = 0.4;
+  let S = null;
+  function calc() {
+    const k = K[kind()], A = k.w * k.h, P = k.sides === 4 ? 2 * (k.w + k.h) : k.w + 2 * k.h, N = n(), ded = A > th();
+    const Vg = L * Hw * t, Fg = 2 * L * Hw;
+    const Vx = Vg - N * A * t, Fx = Fg - N * (2 * A - P * t);
+    const Vr = ded ? Vx : Vg, Fr = ded ? Fg - N * (2 * A - (jamb() ? P * t : 0)) : Fg;
+    return { k, A, P, N, ded, Vx, Fx, Vr, Fr };
+  }
+  const cv = CB.canvas("#qt-cv-open", (ctx, W, H) => {
+    if (!S) return; const P = CB.palette(), pad = 20, sc = Math.min((W - 2 * pad) / L, (H - 70) / Hw), x0 = (W - L * sc) / 2, y0 = 34 + Hw * sc;
+    ctx.fillStyle = QT.alpha(P.accent, 0.15); ctx.strokeStyle = P.accent; ctx.lineWidth = 1.4; ctx.fillRect(x0, y0 - Hw * sc, L * sc, Hw * sc); ctx.strokeRect(x0, y0 - Hw * sc, L * sc, Hw * sc);
+    const gap = L / (S.N + 1);
+    for (let i = 0; i < S.N; i++) { const cx = gap * (i + 1), x = x0 + (cx - S.k.w / 2) * sc, y = y0 - (S.k.y + S.k.h) * sc;
+      ctx.fillStyle = P.bg; ctx.fillRect(x, y, S.k.w * sc, S.k.h * sc);
+      ctx.strokeStyle = S.ded ? P.accent2 : P.dim; ctx.lineWidth = S.ded ? 2.2 : 1.2; ctx.setLineDash(S.ded ? [] : [4, 3]); ctx.strokeRect(x, y, S.k.w * sc, S.k.h * sc); ctx.setLineDash([]); }
+    QT.text(ctx, `W-CORE1 입면 ${L} × ${Hw} m · ${S.k.name} ${S.N}개 · 하나 ${CB.num(S.A, 2)} m² → ${S.ded ? "문턱 초과: 공제" : "문턱 이하: 무시"}`, W / 2, 16, S.ded ? P.accent2 : P.dim, { size: 12 });
+    QT.text(ctx, "바닥", x0 - 4, y0, P.dim, { align: "right", size: 10, bold: false });
+    QT.text(ctx, `정확: 콘크리트 ${CB.num(S.Vx, 3)} m³ · 거푸집 ${CB.num(S.Fx, 2)} m²`, W / 2, y0 + 20, P.dim, { size: 11, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.4), minHeight: 200, maxHeight: 340 });
+  function go() {
+    S = calc(); cv.redraw();
+    CB.stat("qt-op-o-v", CB.num(S.Vr, 3) + " / " + CB.num(S.Vx, 3) + " m³"); CB.stat("qt-op-o-f", CB.num(S.Fr, 2) + " / " + CB.num(S.Fx, 2) + " m²");
+    CB.stat("qt-op-o-ev", CB.signed(S.Vr - S.Vx, 3) + " m³ <small>" + CB.signed(((S.Vr - S.Vx) / S.Vx) * 100, 2) + " %</small>");
+    CB.stat("qt-op-o-ef", CB.signed(S.Fr - S.Fx, 2) + " m² <small>" + CB.signed(((S.Fr - S.Fx) / S.Fx) * 100, 2) + " %</small>");
+  }
+  go();
+})();
+
+/* ---------- 6. 내역 연결 ---------- */
+(function () {
+  const st = CB.range("qt-cs-st", QT.stLabel, go), mode = CB.seg("qt-cs-m", go), fk = CB.range("qt-cs-f", (x) => "× " + x.toFixed(2), go);
+  const sels = [...document.querySelectorAll("#qt-cs-map select")]; sels.forEach((s) => s.addEventListener("change", go));
+  const map = () => Object.fromEntries(sels.map((s) => [s.dataset.ifc, s.value]));
+  let R = null;
+  function calc() {
+    const s = st(), floors = s === 0 ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [s], mp = map(), net = mode() === "net";
+    const q = { c: {}, f: {}, r: {} };
+    floors.forEach((f) => { const c = QT.storey(f), nv = QT.naiveForm(c.els, QT.z0(f));
+      QT.STR.forEach((t) => { const V = net ? c.byType[t] || 0 : c.boxType[t] || 0, A = net ? (c.f.side[t] || 0) + (c.f.soffit[t] || 0) : nv.by[t] || 0;
+        q.c[t] = (q.c[t] || 0) + V; q.f[t] = (q.f[t] || 0) + A; q.r[t] = (q.r[t] || 0) + 0.12 * V; }); });
+    const pr = { c: QT.PRICE.c, f: QT.PRICE.f * fk(), r: QT.PRICE.r }, amt = { c: {}, f: {}, r: {} }, lost = { c: 0, f: 0, r: 0 };
+    ["c", "f", "r"].forEach((k) => QT.STR.forEach((t) => { const a = q[k][t] * pr[k]; if (mp[t] === "rc") amt[k][t] = a; else lost[k] += a; }));
+    const tot = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+    return { floors, amt, lost, T: tot(amt.c) + tot(amt.f) + tot(amt.r), L: lost.c + lost.f + lost.r, tot, mp };
+  }
+  const cv = CB.canvas("#qt-cv-cost", (ctx, W, H) => {
+    if (!R) return; const P = CB.palette(), cols = { IfcColumn: P.dim, IfcBeam: P.blue, IfcSlab: P.accent2, IfcWall: P.accent };
+    const nf = R.floors.length, rows = [["RC-C 콘크리트", "c"], ["RC-F 거푸집", "f"], ["RC-R 철근", "r"]].map(([lab, k]) => ({ label: lab, parts: QT.STR.filter((t) => R.amt[k][t]).map((t) => ({ v: R.amt[k][t] / nf / 1e8, color: cols[t] })), lab: CB.num(R.tot(R.amt[k]) / nf / 1e8, 2) + "억" }));
+    rows.push({ label: "SiteBook 12장", parts: [{ v: 1.384, color: P.faint }], lab: "1.38억" });
+    QT.hbars(ctx, W, H - 22, rows, Math.max(1.0, ...rows.map((r) => r.parts.reduce((a, b) => a + b.v, 0))) * 1.05, { top: 28, bottom: 8, lw: 104 });
+    QT.text(ctx, "층당 금액(억 원) — 요소 유형별로 쌓음", W / 2, 14, P.dim, { size: 11, bold: false });
+    let x = 12; const y = H - 14; QT.STR.forEach((t) => { ctx.fillStyle = cols[t]; ctx.globalAlpha = 0.8; ctx.fillRect(x, y - 5, 10, 10); ctx.globalAlpha = 1; QT.text(ctx, QT.NAME[t], x + 14, y, P.dim, { align: "left", size: 11, bold: false }); x += 62; });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.5), minHeight: 260, maxHeight: 380 });
+  function go() {
+    R = calc(); cv.redraw(); const nf = R.floors.length;
+    CB.stat("qt-cs-o-c", QT.eok(R.tot(R.amt.c) / nf)); CB.stat("qt-cs-o-f", QT.eok(R.tot(R.amt.f) / nf)); CB.stat("qt-cs-o-r", QT.eok(R.tot(R.amt.r) / nf));
+    CB.stat("qt-cs-o-t", QT.eok(R.T / nf) + ` <small>${CB.signed(((R.T / nf - 1.384e8) / 1.384e8) * 100, 0)} % vs 1.38억</small>`);
+    const msg = document.getElementById("qt-cs-msg"), un = QT.STR.filter((t) => R.mp[t] !== "rc").map((t) => QT.NAME[t]);
+    const mepNote = R.mp.MEP === "mep" ? " 덕트·배관은 설비 공종으로 연결되었지만 이 표에 단가가 없어 금액 0입니다." : " 덕트·배관 20개는 미연결(설비 내역은 별도).";
+    msg.className = "qt-msg " + (un.length ? "bad" : "ok");
+    msg.innerHTML = un.length ? `경고: <b>${un.join(", ")}</b> 요소가 내역에 연결되지 않아 층당 <b>${QT.eok(R.L / nf)}</b>이 견적에서 빠졌습니다.${mepNote}` : `구조 요소 모두 RC 골조 3공종에 연결됨.${mepNote}`;
+  }
+  go();
+})();
+
+/* ---------- 7. 2D vs BIM 오차 ---------- */
+(function () {
+  const po = CB.range("qt-2d-po", (x) => CB.num(x * 100, 2) + " %", go), pd = CB.range("qt-2d-pd", (x) => CB.num(x * 100, 2) + " %", go), sd = CB.range("qt-2d-sd", (x) => CB.num(x * 100, 2) + " %", go),
+    ov = CB.check("qt-2d-ov", go), pm = CB.range("qt-2d-pm", (x) => CB.num(x * 100, 1) + " %", go), dt = CB.range("qt-2d-dt", (x) => (x > 0 ? "+" : "") + x + " mm", go);
+  const items = []; for (let s = 1; s <= 10; s++) { const c = QT.storey(s); c.L.forEach((e, n) => items.push({ ifc: e.ifc, net: c.own[n], box: QT.vol(e.box) })); }
+  const T = items.reduce((a, it) => a + it.net, 0), NT = 400;
+  let E = null;
+  function sim() {
+    const r = CB.rng(20261107), g = () => { let u = 0, v = 0; while (u === 0) u = r(); v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    const a = [], b = [], k = (0.21 + dt() / 1000) / 0.21;
+    for (let n = 0; n < NT; n++) {
+      let s2 = 0, sb = 0;
+      items.forEach((it) => { const q = ov() ? it.box : it.net;
+        if (r() >= po()) { const m = r() < pd() ? 2 : 1; s2 += m * q * (1 + sd() * g()); }
+        if (r() >= pm()) sb += it.net * (it.ifc === "IfcSlab" ? k : 1); });
+      a.push((s2 / T - 1) * 100); b.push((sb / T - 1) * 100);
+    }
+    return { a, b };
+  }
+  const stat = (x) => { const m = CB.mean(x); return { m, s: CB.std(x), p: x.filter((v) => Math.abs(v) > 3).length / x.length }; };
+  const cv = CB.canvas("#qt-cv-2d", (ctx, W, H) => {
+    if (!E) return; const P = CB.palette();
+    const lo = Math.min(-6, ...E.a, ...E.b), hi = Math.max(6, ...E.a, ...E.b), bins = 48, w = (hi - lo) / bins;
+    const hist = (x) => { const h = new Array(bins).fill(0); x.forEach((v) => { h[Math.min(bins - 1, Math.max(0, Math.floor((v - lo) / w)))]++; }); return h; };
+    const ha = hist(E.a), hb = hist(E.b), ymax = Math.max(...ha, ...hb) * 1.1;
+    const r = CB.chart(ctx, null, { x: [lo, hi], y: [0, ymax], xLabel: "콘크리트 총량 오차 (%)", yLabel: "횟수 (400회 중)", vlines: [{ x: 0, color: P.dim, label: "참값" }, { x: -3, color: P.faint }, { x: 3, color: P.faint }] });
+    const bar = (h, c, a) => h.forEach((cnt, i) => { if (!cnt) return; const x0 = r.X(lo + i * w), x1 = r.X(lo + (i + 1) * w); ctx.fillStyle = c; ctx.globalAlpha = a; ctx.fillRect(x0 + 0.5, r.Y(cnt), Math.max(1, x1 - x0 - 1), r.Y(0) - r.Y(cnt)); ctx.globalAlpha = 1; });
+    bar(ha, P.accent2, 0.55); bar(hb, P.accent, 0.6);
+    QT.text(ctx, "■ 2D 적산", r.box.x + 8, r.box.y + 12, P.accent2, { align: "left", size: 12 }); QT.text(ctx, "■ BIM 산출", r.box.x + 8, r.box.y + 30, P.accent, { align: "left", size: 12 });
+  }, { aspect: (W) => (W < 520 ? 0.85 : 0.55), minHeight: 260, maxHeight: 400 });
+  function go() {
+    E = sim(); cv.redraw(); const A = stat(E.a), B = stat(E.b);
+    CB.stat("qt-2d-o-a", CB.signed(A.m, 2) + " ± " + CB.num(A.s, 2) + " %"); CB.stat("qt-2d-o-b", CB.signed(B.m, 2) + " ± " + CB.num(B.s, 2) + " %");
+    CB.stat("qt-2d-o-p", CB.num(A.p * 100, 0) + " % / " + CB.num(B.p * 100, 0) + " %"); CB.stat("qt-2d-o-t", QT.m3(T, 1));
+  }
+  go();
+})();
+</script>
+</body>
+</html>

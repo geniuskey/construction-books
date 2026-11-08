@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>형상 모델링과 파라메트릭 · BIMBook</title>
+<meta name="description" content="컴퓨터 속의 건물. 좌표계와 부동소수점 정밀도, 4 × 4 동차 변환 행렬과 합성 순서, 경계 표현·CSG·돌출·회전·스윕·메시, 발산 정리로 구하는 메시 부피, 파라메트릭 패밀리와 구속 조건, 허용 오차를 B-10 BIM의 기둥·보·벽으로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .gm-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .gm-msg b { color: var(--text); }
+  .gm-msg.ok { color: var(--ok); }
+  .gm-msg.bad { color: var(--bad); font-weight: 600; }
+  .gm-msg.warn { color: var(--warn); font-weight: 600; }
+  .gm-mat { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; font: 600 13px var(--mono); padding: 10px 18px; border-top: 1px solid var(--border); background: var(--bg-elev); max-width: 460px; }
+  .gm-mat span { text-align: right; padding: 3px 8px; border-radius: 4px; background: var(--surface); font-variant-numeric: tabular-nums; }
+  .gm-mat span.gm-t { color: var(--accent-2); }
+  .gm-mat span.gm-r { color: var(--accent); }
+  .gm-matwrap { display: flex; flex-wrap: wrap; gap: 0 18px; align-items: center; border-top: 1px solid var(--border); background: var(--bg-elev); }
+  .gm-matwrap .gm-mat { border-top: 0; flex: 1 1 260px; }
+  .gm-matwrap .gm-lab { font: 13px var(--mono); color: var(--text-dim); padding: 0 18px 8px; flex: 1 1 200px; }
+  .gm-two > div + div { border-top: 1px solid var(--border); }
+  .gm-tbl td, .gm-tbl th { font-variant-numeric: tabular-nums; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="geometry">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="gm-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="gm-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="gm-ah-or" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="gm-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 02</div>
+    <h1 data-no-glossary>형상 모델링과 파라메트릭</h1>
+    <p class="lead">1장에서 B-10 BIM의 요소는 상자 \([x_0, y_0, z_0, x_1, y_1, z_1]\) 하나로 표현되었습니다. 그런데 컴퓨터는 이 상자를 어디에, 어떤 단위로, 얼마나 정밀하게 기억할까요? 같은 기둥 200개는 정말 200번 그려졌을까요? 둥근 기둥이나 휘어진 덕트, 개구부가 뚫린 벽은 어떻게 표현하고, 그 부피는 어떻게 계산할까요? 이 장은 BIM 형상의 뼈대 — <b>좌표계와 정밀도</b>, <b>4 × 4 변환 행렬</b>, <b>경계 표현·CSG·스윕·메시</b>, <b>발산 정리로 구하는 메시 부피</b>, <b>매개변수와 구속 조건으로 형상을 만드는 파라메트릭 모델링</b>, <b>허용 오차</b> — 를 B-10 BIM의 기둥·보·벽·덕트로 직접 계산합니다.</p>
+    <ul class="objectives">
+      <li>요소 로컬 → 층 → 프로젝트 → 지도로 이어지는 좌표계 계층을 설명하고, 좌표 크기에 따른 부동소수점 정밀도(ulp)를 계산한다.</li>
+      <li>이동·회전·축척을 동차 좌표의 4 × 4 행렬로 쓰고, 합성 순서에 따라 결과가 달라지는 것을 계산으로 보인다.</li>
+      <li>경계 표현(B-rep), CSG, 돌출·회전·스윕, 삼각형 메시의 특징과 쓰임을 비교한다.</li>
+      <li>발산 정리로 닫힌 메시의 부피 \(V = \tfrac16\sum \mathbf p\cdot(\mathbf q\times\mathbf r)\)와 겉넓이를 구하고, 법선 뒤집힘·구멍이 결과를 어떻게 망치는지 판정한다.</li>
+      <li>매개변수, 구속 조건, 유형·인스턴스 매개변수, 의존 그래프로 파라메트릭 객체(창, B-10 보)를 설계한다.</li>
+      <li>허용 오차로 겹침·맞닿음·분리를 판정하고, 정밀도와 허용 오차의 관계를 설명한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 형상이 없었다면</small><b>컴퓨터는 "벽"을 몰랐고, 벽 하나를 고치면 모두 다시 그려야 했다</b></div>
+      <div class="o-body"><p>1963년 서덜랜드의 스케치패드는 이미 두 가지 중요한 생각을 담고 있었습니다. 하나는 한 번 정의한 도형(마스터)을 여러 곳에 놓는 <b>인스턴스</b>, 다른 하나는 "이 두 선은 평행하다" 같은 <b>구속 조건</b>을 컴퓨터가 풀어 주는 것입니다. 1970년대에는 대학 연구실들에서 입체를 면·모서리·꼭짓점으로 기억하는 경계 표현과, 기본 입체를 합·차·교로 조합하는 구성적 입체 기하(CSG)가 정리되었습니다(형태). 1980년대 후반에는 기계 설계 분야에서 매개변수와 구속 조건으로 형상을 정의하는 파라메트릭 CAD가 상용화되었고(형태), BIM 저작 도구는 이 생각을 벽·문·창·보 같은 건축 객체에 적용했습니다.</p>
+        <p>이런 기반이 없으면 컴퓨터 속 건물은 선의 모음일 뿐입니다. 경간이 바뀌면 보 90개를 하나씩 다시 그리고, 창 폭이 바뀌면 같은 창 30개를 모두 고치며, 부피는 사람이 따로 계산해야 합니다. 형상 모델링은 "모양"을 계산할 수 있는 데이터로, 파라메트릭은 "설계 의도"를 다시 계산할 수 있는 규칙으로 바꿉니다.</p>
+        <div class="o-chain"><span>선 · 호 · 글자</span><i>→</i><span class="tool">좌표계 · 4 × 4 행렬 · 솔리드 · 메시 · 매개변수 · 구속</span><i>→</i><span>계산되는 형상 · 다시 생성되는 설계</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="coordinates">
+    <h2>좌표계와 단위, 그리고 정밀도</h2>
+    <div class="problem"><strong>기둥 모서리의 좌표는 몇인가</strong>
+      <p>3층 기둥 C-B2의 한 모서리는 기둥 자신의 원점에서 (0.4, 0.4, 0) m, 3층 바닥에서 보면 (8.4, 8.4, 0) m, 건물 원점(격자 A/1, 1층 바닥)에서 (8.4, 8.4, 9.0) m, 지도에서는 E 약 203,456, N 약 551,830 m입니다. 같은 점의 좌표가 넷입니다. 어느 것을 저장해야 할까요? 지도 좌표를 그대로 저장하면 무슨 문제가 생길까요?</p></div>
+    <p>BIM은 오른손 <span class="term">좌표계</span><span class="en">(coordinate system)</span>를 씁니다. x축에서 y축으로 오른손 손가락을 감으면 엄지가 z축(위)입니다. 이 책의 모델 좌표는 원점이 격자 A/1의 1층 바닥, x는 A → E, y는 1 → 4, z는 위가 +이고 단위는 m입니다(단면 치수 속성은 mm). 요소는 자기 원점을 기준으로 정의되고(<span class="term">로컬 좌표</span><span class="en">(local coordinates)</span>), 층·건물·대지로 올라가며 배치 변환이 겹쳐져 <span class="term">전역 좌표</span><span class="en">(global coordinates)</span>가 됩니다. 건물을 지도에 올리는 마지막 변환이 <span class="term">지리 참조</span><span class="en">(georeferencing)</span>입니다(15장).</p>
+    <figure class="diagram" id="fig-gm-frames">
+      <svg viewBox="0 0 880 320" role="img" aria-label="좌표계 계층: 요소 로컬, 층, 프로젝트(건물), 지도 좌표와 각 단계의 변환">
+        <rect x="10" y="10" width="860" height="300" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="40" width="180" height="120" rx="10" class="f-elev"/><text x="120" y="62" style="fill:var(--text);font-weight:600">① 요소 로컬</text>
+          <rect x="246" y="40" width="180" height="120" rx="10" class="f-elev"/><text x="336" y="62" style="fill:var(--text);font-weight:600">② 층</text>
+          <rect x="462" y="40" width="180" height="120" rx="10" class="f-acc-soft"/><text x="552" y="62" style="fill:var(--text);font-weight:600">③ 프로젝트(건물)</text>
+          <rect x="678" y="40" width="180" height="120" rx="10" class="f-acc2-soft"/><text x="768" y="62" style="fill:var(--text);font-weight:600">④ 지도</text>
+          <text x="120" y="96">기둥 중심 = 원점</text><text x="120" y="118">모서리 (0.4, 0.4, 0)</text><text x="120" y="140">패밀리 정의</text>
+          <text x="336" y="96">격자 A/1 = 원점</text><text x="336" y="118">(8.4, 8.4, 0)</text><text x="336" y="140">층 바닥 z = 0</text>
+          <text x="552" y="96">A/1, 1층 바닥</text><text x="552" y="118">(8.4, 8.4, 9.0)</text><text x="552" y="140">모델 저장 좌표</text>
+          <text x="768" y="96">E, N (가상)</text><text x="768" y="118">≈ (203,456, 551,830)</text><text x="768" y="140">toMap: θ 12°, s</text>
+        </g>
+        <g style="stroke:var(--accent);stroke-width:1.8;fill:none" marker-end="url(#gm-ah-acc)"><path d="M212 100H242"/><path d="M428 100H458"/><path d="M644 100H674"/></g>
+        <g class="t-mono" text-anchor="middle" style="fill:var(--accent)"><text x="227" y="186">T(8, 8, 0)</text><text x="443" y="186">T(0, 0, 9)</text><text x="659" y="186">헬머트</text></g>
+        <g transform="translate(70,214)">
+          <path d="M0 70L60 40" style="stroke:var(--bad);stroke-width:2" marker-end="url(#gm-ah-bad)"/><path d="M0 70L60 92" style="stroke:var(--ok);stroke-width:2" marker-end="url(#gm-ah)"/><path d="M0 70V8" style="stroke:var(--blue);stroke-width:2" marker-end="url(#gm-ah)"/>
+          <g class="t-mono"><text x="66" y="40" style="fill:var(--bad)">x (A → E)</text><text x="66" y="98" style="fill:var(--ok)">y (1 → 4)</text><text x="8" y="8" style="fill:var(--blue)">z (위)</text></g>
+        </g>
+        <text x="250" y="244" class="t-dim">오른손 좌표계: x × y = z. 길이 m(모델), 단면 mm(속성), 각도 °</text>
+        <text x="250" y="270" class="t-dim">p<tspan dy="4" style="font-size:9px">지도</tspan><tspan dy="-4"> = G · M</tspan><tspan dy="4" style="font-size:9px">층</tspan><tspan dy="-4"> · M</tspan><tspan dy="4" style="font-size:9px">배치</tspan><tspan dy="-4"> · p</tspan><tspan dy="4" style="font-size:9px">로컬</tspan></text>
+      </svg>
+      <figcaption><b>그림 2-1.</b> 좌표계 계층. 기둥 C-B2-3F의 한 모서리가 단계마다 다른 좌표를 가진다. 모델은 ③의 로컬 좌표(원점 가까이, 작은 수)로 저장하고, 지도 좌표는 변환 \(G\)(지리 참조, 15장)로 계산한다. 화살표 아래는 각 단계를 잇는 변환이다.</figcaption>
+    </figure>
+    <p>왜 지도 좌표를 그대로 저장하지 않을까요? 컴퓨터는 실수를 <span class="term">부동소수점</span><span class="en">(floating point)</span>으로 저장합니다. IEEE 754 형식의 배정밀도(64비트)는 유효 숫자가 약 15–16자리, 단정밀도(32비트)는 약 7자리입니다. 그래픽 장치는 속도를 위해 단정밀도를 쓰는 일이 많습니다. 유효 숫자 자리가 정해져 있으므로 <b>수가 클수록 표현할 수 있는 간격이 넓어집니다</b>.</p>
+    <div class="callout def"><strong>정의 2.1 (좌표 정밀도, ulp)</strong> 크기 \(|x|\)인 수 근처에서 부동소수점이 구별할 수 있는 가장 작은 간격(unit in the last place)은
+      <div class="formula">$$\text{ulp}(x) = 2^{\lfloor \log_2 |x| \rfloor - m}, \qquad m = 52\ (\text{배정밀도}),\ \ m = 23\ (\text{단정밀도})$$<div class="where">반올림 오차는 최대 \(\text{ulp}/2\)다. 지도 좌표 \(E \approx 203{,}450\) m는 \(2^{17} \le E \lt 2^{18}\)이므로 단정밀도 ulp \(= 2^{17-23} = 2^{-6} = 0.0156\) m — 1.6 cm 간격으로만 점을 놓을 수 있다. 같은 점을 로컬 좌표(최대 약 41 m, \(2^5 \le x \lt 2^6\))로 두면 ulp \(= 2^{-18} \approx 3.8\) μm다.</div></div></div>
+    <div class="sim" id="sim-gm-precision">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>좌표 크기와 정밀도: 원점에서 멀어질수록 거칠어지는 격자</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gm-cv-prec" aria-label="원점에서 떨어진 거리에 따라 단정밀도로 저장한 작은 모따기 상세가 격자에 붙어 일그러지는 모습"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>원점에서 거리 X₀ <output id="gm-pr-x-out"></output></span><input type="range" id="gm-pr-x" min="0" max="7" step="0.0005" value="5.3085"></label>
+          <div class="ctrl"><span>저장 형식</span><div class="seg" id="gm-pr-f"><button data-value="32" class="on">단정밀도(32비트)</button><button data-value="64">배정밀도(64비트)</button></div></div>
+          <label class="ctrl"><span>상세 크기(모따기 한 변) <output id="gm-pr-d-out"></output></span><input type="range" id="gm-pr-d" min="5" max="100" step="1" value="20"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">ulp(단정밀도)</span><span class="v" id="gm-pr-o-32">—</span></div>
+        <div class="stat"><span class="k">ulp(배정밀도)</span><span class="v" id="gm-pr-o-64">—</span></div>
+        <div class="stat"><span class="k">점 위치 최대 오차</span><span class="v" id="gm-pr-o-e">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="gm-pr-o-j">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값 X₀ ≈ 203,450 m(B-10의 가상 E 좌표)에서 단정밀도로 저장한 20 mm 모따기가 1.6 cm 격자에 붙어 일그러집니다 · X₀를 41 m(10<sup>1.6</sup>)로 줄이면 오차가 마이크로미터 수준으로 사라집니다 · 배정밀도로 바꾸면 10<sup>7</sup> m에서도 문제가 없습니다 — 그러나 화면 출력 단계에서 단정밀도로 바뀌는 경우가 많아, 형상은 원점 가까이 두고 지리 참조는 변환으로 따로 둡니다 · 모델: 정의 2.1, 단정밀도 반올림은 <code>Math.fround</code>, 상세는 80 mm 정사각형 모서리를 모따기한 팔각형(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 2.1 (지도 좌표로 저장한 기둥)</strong> B-10의 원점이 지도 좌표 \(E_0 = 203{,}450\) m에 있다. 기둥 모서리 \(x = 8.4\) m를 지도 좌표 그대로 단정밀도로 저장한다.
+      <p><b>① ulp</b> \(203{,}458 \in [2^{17}, 2^{18})\) → \(2^{-6} = 0.015625\) m. 저장 가능한 값은 …, 203,458.390625, 203,458.40625, … 이고 목표값 203,458.4는 0.0063 m 떨어진 203,458.40625로 저장된다.</p>
+      <p><b>② 영향</b> 오차 최대 7.8 mm. 기둥 크기(800 mm)에는 작아 보이지만, 줄눈(10–20 mm), 철근 피복, 간섭 허용 오차(수 mm)와 같은 크기다. 같은 면에 있어야 할 두 요소가 서로 다른 격자로 반올림되면 틈이나 겹침이 생긴다(8절).</p>
+      <p><b>③ 판단</b> 모델은 프로젝트 원점 근처의 로컬 좌표로 만들고, 지도 위치는 원점의 지도 좌표·회전·축척 계수를 변환으로 기록한다. IFC도 이런 지도 변환 정보를 따로 담는 방식을 둔다(15장). 측량 성과를 받으면 큰 좌표를 빼서 원점을 옮긴 뒤 모델에 넣는다.</p></div>
+    <div class="callout warn"><strong>단위 사고</strong> mm로 만든 모델을 m로 읽으면 길이가 1,000배, 부피는 10⁹배가 됩니다. 반대로 m 모델을 mm로 읽으면 건물이 장난감 크기가 됩니다. 교환 파일에는 단위가 적혀 있어야 하고(IFC는 프로젝트 단위를 명시), 받는 쪽은 기둥 하나의 크기 같은 아는 값으로 단위를 확인해야 합니다. 각도도 도(°)와 라디안을 섞으면 같은 사고가 납니다.</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="transforms">
+    <h2>변환과 4 × 4 행렬</h2>
+    <div class="problem"><strong>기둥 200개를 하나로</strong>
+      <p>B-10의 기둥은 모두 800 × 800입니다. 기둥 하나를 정의해 두고 격자점 20곳, 10개 층에 놓으면 200개가 됩니다. "놓는다"를 계산으로 쓰면 무엇일까요? 건물 전체를 12° 돌려 지도에 올릴 때와 돌린 뒤 옮길 때는 결과가 같을까요?</p></div>
+    <p>형상을 옮기고(이동), 돌리고(회전), 키우는(축척) 연산을 <span class="term">변환</span><span class="en">(transformation)</span>이라 합니다. 회전과 축척은 3 × 3 행렬의 곱으로 쓸 수 있지만 이동은 덧셈이라 행렬 곱 하나로 묶이지 않습니다. 그래서 점 \((x, y, z)\)에 1을 붙인 <span class="term">동차 좌표</span><span class="en">(homogeneous coordinates)</span> \((x, y, z, 1)\)를 쓰면 이동까지 4 × 4 행렬 하나로 표현되고, 여러 변환을 행렬 곱으로 합칠 수 있습니다.</p>
+    <div class="callout def"><strong>정의 2.2 (동차 변환 행렬)</strong> 점 \(\mathbf p = (x, y, z, 1)^\mathsf T\)의 변환은 \(\mathbf p' = M\mathbf p\)이다. 기본 행렬은
+      <div class="formula">$$T(t_x, t_y, t_z) = \begin{bmatrix}1&0&0&t_x\\0&1&0&t_y\\0&0&1&t_z\\0&0&0&1\end{bmatrix},\quad R_z(\theta) = \begin{bmatrix}\cos\theta&-\sin\theta&0&0\\ \sin\theta&\cos\theta&0&0\\0&0&1&0\\0&0&0&1\end{bmatrix},\quad S(k) = \begin{bmatrix}k&0&0&0\\0&k&0&0\\0&0&k&0\\0&0&0&1\end{bmatrix}$$<div class="where">왼쪽 위 3 × 3 블록이 회전·축척(선형 부분), 오른쪽 열이 이동이다. 회전은 z축 둘레 반시계(위에서 볼 때)가 +. 회전과 이동만으로 된 변환은 길이·각도·부피를 보존하는 <span class="term">강체 변환</span><span class="en">(rigid transformation)</span>, 축척까지 포함한 일반 형태는 <span class="term">아핀 변환</span><span class="en">(affine transformation)</span>이다. 선형 부분의 행렬식 \(\det\)이 부피 배율이다(\(S(k)\)는 \(k^3\)). 엔진: <code>CB.bim.mat</code>의 <code>T</code>, <code>Rz</code>, <code>S</code>, <code>mul</code>, <code>apply</code>.</div></div></div>
+    <div class="callout def"><strong>원리 2.3 (합성과 순서)</strong> \(M = A\,B\)를 점에 적용하면 \(M\mathbf p = A(B\mathbf p)\) — <b>오른쪽 행렬이 먼저</b> 적용된다. 행렬 곱은 일반적으로 교환 법칙이 성립하지 않으므로 \(AB \ne BA\)이다.
+      <div class="formula">$$T(10,0,0)\,R_z(90^\circ)\,(1, 0, 0) = (10, 1, 0), \qquad R_z(90^\circ)\,T(10,0,0)\,(1, 0, 0) = (0, 11, 0)$$<div class="where">앞의 것은 "제자리에서 돌린 뒤 옮김", 뒤의 것은 "옮긴 뒤 원점을 중심으로 돌림"이다. 객체 배치는 보통 \(M = T\,R\,S\)(축척 → 회전 → 이동) 순서로 쓴다. 점 \(\mathbf c\)를 중심으로 돌리려면 \(T(\mathbf c)\,R\,T(-\mathbf c)\).</div></div></div>
+    <figure class="diagram" id="fig-gm-order">
+      <svg viewBox="0 0 880 300" role="img" aria-label="변환 순서 비교: 회전 후 이동과 이동 후 회전의 결과가 다른 모습">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="180" y="0" text-anchor="middle" class="t" style="font-weight:700">T · R : 돌린 뒤 옮김 → (10, 1)</text>
+          <line x1="0" y1="200" x2="360" y2="200" class="s-axis"/><line x1="20" y1="230" x2="20" y2="20" class="s-axis"/>
+          <rect x="20" y="180" width="40" height="20" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="20" y="160" width="20" height="40" style="fill:var(--accent-soft);stroke:var(--accent);stroke-dasharray:4 3"/>
+          <rect x="300" y="160" width="20" height="40" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:1.8"/>
+          <path d="M40 150H290" style="stroke:var(--accent-2);stroke-width:1.6;fill:none" marker-end="url(#gm-ah-or)"/>
+          <text x="165" y="142" text-anchor="middle" class="t-mono">② T(10, 0)</text><text x="70" y="172" class="t-mono" style="fill:var(--accent)">① R 90°</text>
+          <circle cx="300" cy="180" r="4" style="fill:var(--bad)"/><text x="306" y="176" class="t-mono" style="fill:var(--bad)">(10, 1)</text>
+          <text x="60" y="216" class="t-mono">원래 상자(점 (1, 0))</text>
+        </g>
+        <line x1="440" y1="30" x2="440" y2="280" style="stroke:var(--border)"/>
+        <g transform="translate(470,40)">
+          <text x="180" y="0" text-anchor="middle" class="t" style="font-weight:700">R · T : 옮긴 뒤 돌림 → (0, 11)</text>
+          <line x1="0" y1="200" x2="370" y2="200" class="s-axis"/><line x1="40" y1="230" x2="40" y2="10" class="s-axis"/>
+          <rect x="40" y="180" width="40" height="20" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="240" y="180" width="40" height="20" style="fill:var(--accent-soft);stroke:var(--accent);stroke-dasharray:4 3"/>
+          <rect x="20" y="20" width="20" height="40" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:1.8"/>
+          <path d="M80 172H232" style="stroke:var(--accent);stroke-width:1.6;fill:none" marker-end="url(#gm-ah-acc)"/>
+          <path d="M260 176A200 200 0 0 0 52 28" style="stroke:var(--accent-2);stroke-width:1.6;fill:none;stroke-dasharray:6 4" marker-end="url(#gm-ah-or)"/>
+          <text x="156" y="164" text-anchor="middle" class="t-mono" style="fill:var(--accent)">① T(10, 0)</text><text x="200" y="80" class="t-mono" style="fill:var(--accent-2)">② 원점 중심 R 90°</text>
+          <circle cx="40" cy="20" r="4" style="fill:var(--bad)"/><text x="48" y="16" class="t-mono" style="fill:var(--bad)">(0, 11)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-2.</b> 원리 2.3의 두 순서(평면, 축척 1칸 = 1 m의 개략). 같은 두 변환이라도 회전이 원점을 중심으로 일어나므로, 옮긴 뒤 돌리면 상자가 원점 둘레로 크게 휘돈다. 변환 행렬을 읽을 때는 항상 "어느 것이 먼저인가"를 오른쪽부터 읽는다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-gm-matrix">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>변환 행렬 놀이터: 이동·회전·축척과 합성 순서</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gm-cv-mat" aria-label="원래 기둥 상자(회색 점선)와 변환된 상자(주황), 좌표축"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>x 이동 <output id="gm-mx-tx-out"></output></span><input type="range" id="gm-mx-tx" min="-8" max="16" step="0.5" value="8"></label>
+          <label class="ctrl"><span>y 이동 <output id="gm-mx-ty-out"></output></span><input type="range" id="gm-mx-ty" min="-8" max="16" step="0.5" value="8"></label>
+          <label class="ctrl"><span>z 이동 <output id="gm-mx-tz-out"></output></span><input type="range" id="gm-mx-tz" min="0" max="13" step="0.5" value="9"></label>
+          <label class="ctrl"><span>회전 θ(z축) <output id="gm-mx-r-out"></output></span><input type="range" id="gm-mx-r" min="-180" max="180" step="1" value="0"></label>
+          <label class="ctrl"><span>축척 k <output id="gm-mx-k-out"></output></span><input type="range" id="gm-mx-k" min="0.5" max="2" step="0.05" value="1"></label>
+          <div class="ctrl"><span>합성 순서 M =</span><div class="seg" id="gm-mx-o"><button data-value="TRS" class="on">T · R · S</button><button data-value="RTS">R · T · S</button><button data-value="STR">S · T · R</button></div></div>
+        </div>
+      </div>
+      <div class="gm-matwrap"><div class="gm-mat" id="gm-mx-m"></div><div class="gm-lab" id="gm-mx-lab"></div></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">모서리 (0.4, 0.4, 0) →</span><span class="v" id="gm-mx-o-p">—</span></div>
+        <div class="stat"><span class="k">det(선형 부분)</span><span class="v" id="gm-mx-o-d">—</span></div>
+        <div class="stat"><span class="k">부피 2.112 m³ →</span><span class="v" id="gm-mx-o-v">—</span></div>
+        <div class="stat"><span class="k">T·R·S와 차이(모서리)</span><span class="v" id="gm-mx-o-x">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값은 기둥 패밀리(800 × 800 × 3.3 m, 원점 = 기둥 바닥 중심)를 격자 B/2, 3층에 놓는 T(8, 8, 9) — 모서리가 (8.4, 8.4, 9.0)이 되어 C-B2-3F와 같습니다 · 회전을 90°로 두고 순서를 R · T · S로 바꾸면 기둥이 원점 둘레로 돌아 (−8.4, 8.4) 부근으로 갑니다 · S · T · R은 이동 거리까지 k배가 됩니다(k = 1.5이면 (12.6, 12.6, 13.5)) · 축척 k에서 det = k³, 부피 = 2.112k³ · 행렬의 주황 칸이 이동, 보라 칸이 회전·축척입니다 · 모델: <code>CB.bim.mat</code>(T, Rz, S, mul, apply), <code>CB.orbit</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 2.2 (기둥 C-B2-3F의 배치 행렬)</strong> 기둥 패밀리는 로컬 상자 \([-0.4, -0.4, 0, 0.4, 0.4, 3.3]\)이다. 격자 B/2(\(x = 8, y = 8\)), 3층 바닥(\(z = 9\))에 놓는다.
+      <p><b>① 행렬</b> 회전·축척 없음 → \(M = T(8, 8, 9)\). 모서리 \((0.4, 0.4, 0, 1)\) → \((8.4, 8.4, 9.0)\), 꼭대기 \((0.4, 0.4, 3.3)\) → \((8.4, 8.4, 12.3)\). B-10 BIM의 상자 \([7.6, 7.6, 9, 8.4, 8.4, 12.3]\)과 같다.</p>
+      <p><b>② 지도로</b> 건물 전체를 12° 돌리고 원점을 \((E_0, N_0)\)로 옮기는 변환은 \(G = T(E_0, N_0, 0)\,R_z(12^\circ)\,S(0.99993)\)의 형태다(15장, 축척은 수평 성분에만 적용하는 것이 정확하지만 여기서는 개략). 모서리의 지도 좌표는 \(G\,M\,\mathbf p\).</p>
+      <p><b>③ 판단</b> 200개 기둥은 같은 형상 정의 하나 + 배치 행렬 200개다. 저장량이 줄고, 패밀리를 고치면 200개가 함께 바뀐다. 반대로 한 기둥만 다르게 하려면 새 유형을 만들거나 그 인스턴스의 매개변수를 바꿔야 한다(6절). IFC에서도 형상 정의를 공유하고 배치(<code>IfcLocalPlacement</code>)와 표현 사상(<code>IfcMappedItem</code>)으로 재사용하는 방식을 둔다.</p></div>
+    <div class="callout deep"><strong>거울상과 법선</strong> 축척 \(S\)에 음수를 넣으면(예: x만 −1) 거울상이 되고 \(\det \lt 0\)이다. 거울상은 형상의 "안팎" 방향(면의 꼭짓점 순서)을 뒤집으므로, 그대로 두면 메시의 법선이 안쪽을 향해 부피가 음수로 계산된다(4절). 좌우 대칭 창호를 거울 복사로 만든 뒤 물량이 이상해지는 흔한 원인이다. 도구는 보통 \(\det \lt 0\)이면 면 순서를 다시 뒤집어 준다.</div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="representations">
+    <h2>형상 표현: 경계 표현, CSG, 스윕, 메시</h2>
+    <div class="problem"><strong>기둥 하나를 기억하는 네 가지 방법</strong>
+      <p>800 × 800 × 3.3 m 기둥을 컴퓨터에 기억시키려 합니다. 꼭짓점 8개와 면 6개를 적을 수도, "800 × 800 사각형을 3.3 m 밀어 올린 것"이라고 적을 수도, "상자 하나에서 아무것도 빼지 않은 것"이라고 적을 수도, 삼각형 12개로 적을 수도 있습니다. 무엇이 다르고, 각각 언제 유리할까요?</p></div>
+    <p>솔리드(속이 찬 입체)를 표현하는 방법은 크게 넷입니다. <span class="term">경계 표현</span><span class="en">(boundary representation, B-rep)</span>은 입체를 둘러싼 면, 면을 이루는 모서리, 모서리 끝의 꼭짓점과 그 연결 관계(위상)로 기억합니다. <span class="term">구성적 입체 기하</span><span class="en">(constructive solid geometry, CSG)</span>는 상자·원기둥 같은 기본 입체를 합·차·교로 조합한 나무 구조로 기억합니다. <span class="term">스윕</span><span class="en">(sweep)</span>은 2D 단면(프로파일)을 경로를 따라 움직인 자취로 기억하며, 직선으로 밀면 <span class="term">돌출</span><span class="en">(extrusion)</span>, 축 둘레로 돌리면 <span class="term">회전체</span><span class="en">(revolution)</span>입니다. <span class="term">메시</span><span class="en">(mesh)</span>는 표면을 작은 다각형(대개 삼각형)으로 나눈 근사입니다.</p>
+    <figure class="diagram" id="fig-gm-reps">
+      <svg viewBox="0 0 880 320" role="img" aria-label="네 가지 형상 표현: 경계 표현, CSG 나무, 돌출·회전·스윕, 삼각형 메시">
+        <rect x="10" y="10" width="860" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(24,30)">
+          <rect x="0" y="0" width="196" height="264" rx="10" class="f-elev"/>
+          <text x="98" y="24" text-anchor="middle" class="t" style="font-weight:700">경계 표현(B-rep)</text>
+          <path d="M50 200V90L100 64L150 90V200L100 226Z M50 90L100 116L150 90 M100 116V226" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5"/>
+          <g style="fill:var(--accent-2)"><circle cx="50" cy="90" r="3.5"/><circle cx="100" cy="64" r="3.5"/><circle cx="150" cy="90" r="3.5"/><circle cx="100" cy="116" r="3.5"/><circle cx="50" cy="200" r="3.5"/><circle cx="150" cy="200" r="3.5"/><circle cx="100" cy="226" r="3.5"/></g>
+          <text x="98" y="248" text-anchor="middle" class="t-mono">꼭짓점 8 · 모서리 12 · 면 6</text>
+        </g>
+        <g transform="translate(236,30)">
+          <rect x="0" y="0" width="196" height="264" rx="10" class="f-elev"/>
+          <text x="98" y="24" text-anchor="middle" class="t" style="font-weight:700">CSG</text>
+          <g class="t-mono" text-anchor="middle">
+            <circle cx="98" cy="66" r="20" class="f-acc-soft"/><text x="98" y="71" style="fill:var(--text);font-size:15px">−</text>
+            <rect x="24" y="130" width="70" height="40" rx="6" class="f-elev"/><text x="59" y="155" style="fill:var(--text)">벽 상자</text>
+            <rect x="104" y="130" width="70" height="40" rx="6" class="f-acc2-soft"/><text x="139" y="155" style="fill:var(--text)">개구부</text>
+          </g>
+          <path d="M86 84L62 128M110 84L134 128" style="stroke:var(--text-dim);stroke-width:1.4;fill:none"/>
+          <text x="98" y="210" text-anchor="middle" class="t-mono">결과 = 벽 − 개구부</text>
+          <text x="98" y="248" text-anchor="middle" class="t-mono">합 ∪ · 차 − · 교 ∩</text>
+        </g>
+        <g transform="translate(448,30)">
+          <rect x="0" y="0" width="196" height="264" rx="10" class="f-elev"/>
+          <text x="98" y="24" text-anchor="middle" class="t" style="font-weight:700">돌출 · 회전 · 스윕</text>
+          <path d="M30 120H70V90H30Z" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:1.6"/>
+          <path d="M70 90L100 60V90L70 120M30 90L60 60H100" style="fill:none;stroke:var(--accent);stroke-dasharray:4 3"/>
+          <path d="M50 105V40" style="stroke:var(--accent);stroke-width:1.4" marker-end="url(#gm-ah-acc)"/>
+          <text x="112" y="80" class="t-mono">돌출(높이 h)</text>
+          <line x1="40" y1="140" x2="40" y2="200" style="stroke:var(--text-dim);stroke-dasharray:6 3 2 3"/>
+          <rect x="62" y="150" width="22" height="40" style="fill:var(--accent-2-soft);stroke:var(--accent-2)"/>
+          <path d="M84 196A44 12 0 1 1 74 198" style="fill:none;stroke:var(--accent);stroke-width:1.4" marker-end="url(#gm-ah-acc)"/>
+          <text x="112" y="176" class="t-mono">회전(축, 각도)</text>
+          <path d="M30 240H120V214" style="fill:none;stroke:var(--accent);stroke-width:5;opacity:.35"/>
+          <text x="128" y="236" class="t-mono">스윕(경로)</text>
+        </g>
+        <g transform="translate(660,30)">
+          <rect x="0" y="0" width="196" height="264" rx="10" class="f-elev"/>
+          <text x="98" y="24" text-anchor="middle" class="t" style="font-weight:700">삼각형 메시</text>
+          <path d="M50 200V90L100 64L150 90V200L100 226Z M50 90L100 116L150 90 M100 116V226 M50 90L150 90 M50 200L100 116 M150 200L100 116 M100 64L100 116" style="fill:none;stroke:var(--text-dim);stroke-width:1.2"/>
+          <path d="M50 200L100 116L100 226Z" style="fill:var(--bad);opacity:.25"/>
+          <text x="98" y="248" text-anchor="middle" class="t-mono">삼각형 12(상자) · 근사</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-3.</b> 네 가지 형상 표현. B-rep은 정확한 면과 위상을, CSG는 만든 과정(설계 의도)을, 스윕은 단면 + 경로라는 짧은 정의를, 메시는 어떤 모양이든 담을 수 있는 범용 근사를 준다. 실제 BIM 도구는 이들을 섞어 쓰고, 화면 표시와 교환을 위해 대개 메시로 바꾼다.</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="gm-tbl">
+      <caption>표 2-1. 형상 표현의 비교와 IFC의 대응 형태(3장)</caption>
+      <thead><tr><th>표현</th><th>저장하는 것</th><th>장점</th><th>약점</th><th>IFC 형태</th></tr></thead>
+      <tbody>
+        <tr><td>B-rep</td><td>면·모서리·꼭짓점·위상</td><td>정확한 면, 곡면 가능</td><td>자료 구조가 복잡</td><td><code>IfcFacetedBrep</code>, <code>IfcAdvancedBrep</code></td></tr>
+        <tr><td>CSG·불리언</td><td>기본 입체와 연산 나무</td><td>설계 의도, 편집 쉬움</td><td>표시·질의 때 평가 필요</td><td><code>IfcBooleanResult</code>, <code>IfcBooleanClippingResult</code></td></tr>
+        <tr><td>스윕</td><td>프로파일 + 경로(높이·축)</td><td>짧고 매개변수화 쉬움</td><td>모양 종류가 제한</td><td><code>IfcExtrudedAreaSolid</code>, <code>IfcRevolvedAreaSolid</code>, <code>IfcSweptDiskSolid</code></td></tr>
+        <tr><td>메시</td><td>꼭짓점 목록 + 삼각형 목록</td><td>범용, 빠른 표시</td><td>근사, 크기 큼, 의도 없음</td><td><code>IfcTriangulatedFaceSet</code>, <code>IfcPolygonalFaceSet</code></td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout def"><strong>원리 2.4 (스윕 입체의 부피, 파푸스 정리)</strong> 넓이 \(A\), 도심 \(\bar{\mathbf c}\)인 단면을 경로를 따라 단면에 수직으로 움직이면 부피는 "넓이 × 도심이 지나간 길이"다.
+      <div class="formula">$$V_{\text{돌출}} = A\,h, \qquad V_{\text{회전}} = A\,\bar r\,\theta, \qquad V_{\text{스윕}} = A\,L_{\bar c}$$<div class="where">\(\bar r\): 회전축에서 도심까지 거리, \(\theta\): 회전각(rad). 회전체 공식이 <span class="term">파푸스 정리</span><span class="en">(Pappus's centroid theorem)</span>다. \(L_{\bar c}\): 도심이 지나간 경로 길이. 꺾인 경로에서 연귀(miter)로 이으면 바깥은 길고 안쪽은 짧아지므로, 도심이 경로에서 \(\bar u\)만큼 안쪽(꺾이는 쪽)에 있으면 90° 꺾임 하나마다 \(2\bar u\)만큼 짧다. 단면이 경로의 곡률 반지름보다 크면 스스로 겹쳐 공식이 맞지 않는다.</div></div></div>
+    <div class="sim" id="sim-gm-sweep">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>돌출·회전·스윕 만들기: 단면 점을 끌면 솔리드와 부피가 다시 계산된다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view gm-two"><div><canvas id="gm-cv-prof" aria-label="단면 프로파일 편집기. 꼭짓점을 끌어 모양을 바꿈"></canvas></div><div><canvas id="gm-cv-sw" aria-label="프로파일로 만든 돌출, 회전, 스윕 솔리드의 3D 메시"></canvas></div></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>연산</span><div class="seg" id="gm-sw-op"><button data-value="ext" class="on">돌출</button><button data-value="rev">회전</button><button data-value="swp">스윕(ㄱ자 경로)</button></div></div>
+          <label class="ctrl"><span id="gm-sw-p-lab">높이 h <output id="gm-sw-p-out"></output></span><input type="range" id="gm-sw-p" min="0.2" max="4" step="0.05" value="2"></label>
+          <label class="ctrl"><span>회전 분할 수 n <output id="gm-sw-n-out"></output></span><input type="range" id="gm-sw-n" min="3" max="64" step="1" value="24"></label>
+          <div class="btn-row"><button class="btn" id="gm-sw-rect">직사각형 단면</button><button class="btn" id="gm-sw-l">ㄱ자 단면</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">단면 넓이 A</span><span class="v" id="gm-sw-o-a">—</span></div>
+        <div class="stat"><span class="k">도심 (ū, v̄)</span><span class="v" id="gm-sw-o-c">—</span></div>
+        <div class="stat"><span class="k">공식 부피</span><span class="v" id="gm-sw-o-f">—</span></div>
+        <div class="stat"><span class="k">메시 부피(발산 정리)</span><span class="v" id="gm-sw-o-m">—</span></div>
+      </div>
+      <div class="gm-msg" id="gm-sw-msg"></div>
+      <div class="sim-note">해볼 것: 위 편집기에서 점 다섯 개를 끌어 단면을 바꾸세요(m 단위) · 돌출은 메시 부피가 A·h와 정확히 같습니다 · 회전은 단면을 z축(편집기의 세로축 u = 0) 둘레로 돌리며, 분할 수 n이 작으면 메시가 내접 다각형이 되어 부피가 작게 나옵니다(n = 6에서 약 −17 %, n = 24에서 약 −1.1 %) · 스윕은 경로 10 m → 6 m의 ㄱ자에서 연귀로 잇습니다 — 단면을 오른쪽(+u, 꺾이는 안쪽)으로 옮기면 부피가 줄어듭니다 · 점이 교차해 단면이 꼬이면 경고가 나옵니다 · 모델: 원리 2.4, 메시는 페이지 스크립트(뚜껑은 귀 자르기 삼각 분할), 부피는 <code>CB.bim.meshVolume</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 2.3 (보 웨브, 슬리브, 덕트)</strong>
+      <p><b>① 돌출</b> B-10 큰보의 슬래브 아래 웨브 단면 0.4 × 0.49 m를 순경간 7.2 m 돌출: \(V = 0.196 \times 7.2 = 1.411\) m³.</p>
+      <p><b>② 회전</b> 축에서 0.4–0.6 m, 높이 1 m인 직사각형(\(A = 0.2\), \(\bar r = 0.5\))을 한 바퀴: \(V = 0.2 \times 0.5 \times 2\pi = 0.628\) m³ = \(\pi(0.6^2 - 0.4^2)\times 1\). 24분할 메시는 내접 다각형이라 \(\tfrac{24}{2\pi}\sin\tfrac{2\pi}{24} = 0.989\)배, 0.621 m³.</p>
+      <p><b>③ 스윕</b> B-10 급기 덕트 1.0 × 0.4 m가 10 m 간 뒤 90° 꺾여 6 m 더 간다. 단면 도심이 경로 위에 있으면 \(V = 0.4 \times 16 = 6.4\) m³. 같은 단면을 꺾이는 안쪽으로 0.2 m 치우쳐 그리면 \(0.4 \times (16 - 0.4) = 6.24\) m³.</p>
+      <p><b>④ 판단</b> 스윕 정의는 "단면 + 경로" 몇 개의 숫자뿐이라 매개변수화(6절)하기 좋고, 물량은 공식으로 바로 나온다. 메시로 바꾸면 곡면은 분할 수만큼의 근사 오차를 갖는다 — 원형 덕트·배관·원형 기둥의 물량을 메시에서 뽑을 때 주의해야 한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="csg">
+    <h2>CSG와 불리언 연산: 벽에 덕트 구멍 내기</h2>
+    <div class="problem"><strong>코어 벽에 뚫린 덕트 관통부</strong>
+      <p>1장에서 B-10의 급기 덕트가 코어 벽 W-CORE3·4를 층마다 관통했습니다(20건). 설계자는 벽에 덕트보다 사방 100 mm 큰 개구부를 내기로 했습니다. 벽 모델은 어떻게 바뀌고, 벽 콘크리트는 얼마나 줄까요?</p></div>
+    <p>CSG의 기본 연산은 집합 연산인 <span class="term">불리언 연산</span><span class="en">(Boolean operation)</span>입니다. 합(∪)은 두 입체를 합치고, 차(−)는 한 입체에서 다른 입체를 빼고, 교(∩)는 겹친 부분만 남깁니다. BIM 도구의 "개구부", "자르기", "결합"은 대부분 불리언 연산이며, 결과는 원래 객체(벽)와 빼는 객체(개구부)의 관계로 함께 기억됩니다. IFC는 벽과 개구부를 따로 두고 "이 개구부가 이 벽을 뚫는다"는 관계 엔터티로 잇는 방식을 씁니다(3장).</p>
+    <div class="callout def"><strong>정의 2.5 (불리언 연산과 부피)</strong> 입체 \(A\), \(B\)와 겹친 부분 \(A\cap B\)에 대해
+      <div class="formula">$$V(A\cup B) = V(A) + V(B) - V(A\cap B), \quad V(A - B) = V(A) - V(A\cap B), \quad V(A\cap B) = \prod_{k=x,y,z} \max\!\big(0,\ \min(a_k^1, b_k^1) - \max(a_k^0, b_k^0)\big)$$<div class="where">마지막 식은 두 입체가 축에 나란한 상자(AABB)일 때의 교집합 부피로, <code>CB.bim.overlap(a, b).volume</code>이 계산한다. 일반 입체의 불리언은 면과 면의 교선을 구하는 복잡한 계산이며, 수치 오차 때문에 실패하기도 한다(8절). 간섭 검토(6장)와 물량 공제(7장)가 같은 교집합 계산을 쓴다.</div></div></div>
+    <figure class="diagram" id="fig-gm-csg">
+      <svg viewBox="0 0 880 290" role="img" aria-label="벽 상자와 개구부 상자의 합, 차, 교 결과">
+        <rect x="10" y="10" width="860" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">A 벽 · B 개구부</text>
+          <rect x="20" y="30" width="120" height="160" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="50" y="70" width="110" height="40" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:1.6"/>
+          <text x="80" y="214" text-anchor="middle" class="t-mono">입면(벽 면에서 본 것)</text>
+        </g>
+        <g transform="translate(240,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">A ∪ B</text>
+          <path d="M20 30H140V70H160V110H140V190H20Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <text x="80" y="214" text-anchor="middle" class="t-mono">V_A + V_B − V_A∩B</text>
+        </g>
+        <g transform="translate(450,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">A − B</text>
+          <path d="M20 30H140V70H50V110H140V190H20Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <rect x="50" y="70" width="90" height="40" style="fill:none;stroke:var(--bad);stroke-dasharray:4 3"/>
+          <text x="80" y="214" text-anchor="middle" class="t-mono">V_A − V_A∩B</text>
+        </g>
+        <g transform="translate(660,40)">
+          <text x="80" y="0" text-anchor="middle" class="t" style="font-weight:700">A ∩ B</text>
+          <rect x="20" y="30" width="120" height="160" style="fill:none;stroke:var(--text-faint);stroke-dasharray:4 3"/>
+          <rect x="50" y="70" width="90" height="40" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6"/>
+          <text x="80" y="214" text-anchor="middle" class="t-mono">겹친 부분 = 간섭 부피</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-4.</b> 불리언 연산(정의 2.5). 개구부 B가 벽 A의 오른쪽 끝을 넘어가도 차 연산은 A 안의 부분만 뺀다. 교집합 \(A\cap B\)는 간섭 검토에서는 "겹친 부피", 물량에서는 "중복으로 센 부피", 개구부에서는 "빼는 부피"로 이름만 바뀌어 나타난다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-gm-csg">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>CSG 불리언: 코어 벽 W-CORE3-3F와 덕트 개구부</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gm-cv-csg" aria-label="코어 벽 상자와 개구부 상자의 3D 장면, 연산 결과 강조"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>연산</span><div class="seg" id="gm-cs-op"><button data-value="diff" class="on">A − B</button><button data-value="union">A ∪ B</button><button data-value="inter">A ∩ B</button></div></div>
+          <label class="ctrl"><span>개구부 중심 y(벽 길이 방향) <output id="gm-cs-y-out"></output></span><input type="range" id="gm-cs-y" min="-1" max="9" step="0.05" value="4"></label>
+          <label class="ctrl"><span>개구부 중심 높이 z <output id="gm-cs-z-out"></output></span><input type="range" id="gm-cs-z" min="0" max="4.2" step="0.05" value="3.45"></label>
+          <label class="ctrl"><span>사방 여유 <output id="gm-cs-c-out"></output></span><input type="range" id="gm-cs-c" min="0" max="300" step="10" value="100"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">V(A) 벽</span><span class="v" id="gm-cs-o-a">—</span></div>
+        <div class="stat"><span class="k">V(B) 개구부 상자</span><span class="v" id="gm-cs-o-b">—</span></div>
+        <div class="stat"><span class="k">V(A ∩ B)</span><span class="v" id="gm-cs-o-i">—</span></div>
+        <div class="stat"><span class="k">결과 부피</span><span class="v" id="gm-cs-o-r">—</span></div>
+      </div>
+      <div class="gm-msg" id="gm-cs-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(덕트 1.0 × 0.4 m + 사방 100 mm → 개구부 1.2 × 0.6 m, 중심 높이 3층 바닥 위 3.45 m)에서 A − B = 12.128 − 0.288 = 11.840 m³ · 개구부를 위로 올리면 벽 윗면(3.79 m)을 넘는 부분은 빼지 않습니다 — 결과는 교집합만큼만 줄어듭니다 · 여유를 0으로 하면 개구부가 덕트와 같아져 시공 오차를 받을 틈이 없습니다(8절) · 개구부를 벽 끝 밖(y &lt; 0)으로 옮기면 교집합 0, 아무것도 빠지지 않습니다 · 모델: 벽 = W-CORE3-3F의 로컬 상자 [0, 0, 0, 0.4, 8, 3.79], 개구부 상자는 벽 두께보다 길게(x −0.3–0.7), 교집합은 <code>CB.bim.overlap</code>, 정의 2.5.</div>
+    </div>
+    <div class="callout"><strong>예제 2.4 (덕트 관통부 개구부)</strong> W-CORE3-3F: 두께 0.4, 길이 8, 높이 3.79 m → \(V_A = 12.128\) m³. 덕트 1.0 × 0.4 m, 사방 여유 0.1 m → 개구부 1.2 × 0.6 m.
+      <p><b>① 교집합</b> 벽 두께 방향 0.4, 길이 방향 1.2, 높이 방향 0.6(개구부 3.15–3.75 m, 벽 0–3.79 m 안) → \(V_{A\cap B} = 0.288\) m³.</p>
+      <p><b>② 차</b> \(V_{A-B} = 12.128 - 0.288 = 11.840\) m³(2.4 % 감소). 10개 층 × 벽 2개 = 20곳이면 5.76 m³.</p>
+      <p><b>③ 판단</b> 개구부를 별도 객체로 두면 "덕트–벽 관통 20건"은 간섭 목록에서 "개구부로 해결됨"으로 분류할 수 있고(6장), 물량은 개구부 공제 기준(작은 개구부는 공제하지 않는 규칙 형태, 7장)에 따라 다시 계산된다. 벽 상자에서 직접 깎아 버리면 이 관계 정보가 사라진다 — CSG가 "만든 과정"을 남기는 이유다.</p></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="mesh">
+    <h2>메시와 부피·넓이: 발산 정리</h2>
+    <div class="problem"><strong>삼각형 수만 개짜리 메시의 부피</strong>
+      <p>다른 도구에서 받은 장비 모델이 삼각형 메시뿐입니다. 콘크리트 기초의 부피를 메시에서 계산해야 합니다. 삼각형만 가지고 부피를 어떻게 구할까요? 계산했더니 부피가 음수로 나왔다면 무엇이 잘못된 걸까요?</p></div>
+    <p>삼각형 메시는 꼭짓점 좌표 목록 \(V\)와, 각 삼각형이 어느 꼭짓점 셋으로 이루어졌는지 적은 면 목록 \(F\)로 저장합니다. 꼭짓점 순서가 면의 앞뒤를 정합니다. 바깥에서 보아 반시계 순서로 적으면 오른손 법칙으로 구한 <span class="term">법선</span><span class="en">(normal)</span>이 바깥을 향합니다. 모든 모서리가 정확히 두 삼각형에 공유되어 구멍이 없고, 모든 법선이 일관되게 바깥을 향한 메시를 <span class="term">닫힌 메시</span><span class="en">(watertight mesh)</span>라 합니다. 부피는 닫힌 메시에서만 뜻이 있습니다.</p>
+    <div class="callout def"><strong>원리 2.6 (발산 정리로 구하는 메시 부피와 넓이)</strong> <span class="term">발산 정리</span><span class="en">(divergence theorem)</span>에서 벡터장 \(\mathbf F = \mathbf x/3\)(발산 = 1)을 쓰면 \(V = \tfrac13\oint \mathbf x\cdot\mathbf n\,dA\)이다. 삼각형 \((\mathbf p, \mathbf q, \mathbf r)\)마다 계산하면
+      <div class="formula">$$V = \frac16\sum_{\triangle}\mathbf p\cdot(\mathbf q\times\mathbf r), \qquad A = \frac12\sum_{\triangle}\big|(\mathbf q-\mathbf p)\times(\mathbf r-\mathbf p)\big|$$<div class="where">각 항은 원점과 삼각형이 이루는 사면체의 <b>부호 있는 부피</b>다. 바깥 법선이면 원점에서 먼 면은 +, 가까운 면은 −로 더해져 몸체 바깥 부분이 지워진다. 닫힌 메시에서는 원점 위치와 무관하다. 법선을 모두 뒤집으면 부호가 바뀌어 \(-V\), 일부만 뒤집히거나 면이 빠지면(열린 메시) 원점 위치에 따라 값이 달라지는 엉뚱한 수가 나온다. 엔진: <code>CB.bim.meshVolume(V, F)</code>, <code>CB.bim.meshArea(V, F)</code>, <code>CB.bim.boxMesh(box)</code>.</div></div></div>
+    <figure class="diagram" id="fig-gm-div">
+      <svg viewBox="0 0 880 290" role="img" aria-label="원점과 각 삼각형이 이루는 부호 있는 사면체로 부피를 더하는 원리">
+        <rect x="10" y="10" width="860" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(60,40)">
+          <path d="M120 40L280 60L300 200L140 220Z" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5"/>
+          <circle cx="0" cy="210" r="5" style="fill:var(--text)"/><text x="-6" y="236" class="t-mono" style="fill:var(--text)">원점 O</text>
+          <path d="M0 210L280 60M0 210L300 200" style="stroke:var(--accent-2);stroke-dasharray:5 3;fill:none"/>
+          <path d="M280 60L300 200L230 110Z" style="fill:var(--accent-2-soft);stroke:var(--accent-2);stroke-width:1.8"/>
+          <path d="M268 132L330 118" style="stroke:var(--ok);stroke-width:2" marker-end="url(#gm-ah)"/><text x="334" y="116" class="t-mono" style="fill:var(--ok)">n (바깥)</text>
+          <text x="236" y="150" class="t-mono" style="fill:var(--accent-2)">p q r</text>
+          <text x="150" y="20" class="t-mono">먼 면: + 사면체</text>
+          <text x="20" y="120" class="t-mono">가까운 면: − 사면체</text>
+          <path d="M120 40L140 220" style="stroke:var(--bad);stroke-width:2.2"/>
+        </g>
+        <g transform="translate(470,48)" class="t-mono">
+          <text x="0" y="0" style="fill:var(--text);font-weight:600">상자 2 × 3 × 4 m (boxMesh)</text>
+          <text x="0" y="28">꼭짓점 8 · 삼각형 12 · 모서리 18</text>
+          <text x="0" y="52">V − E + F = 8 − 18 + 12 = 2 (닫힘)</text>
+          <text x="0" y="76" style="fill:var(--accent)">ΣV = 24.000 m³ · ΣA = 52.000 m²</text>
+          <text x="0" y="110" style="fill:var(--bad)">모든 면 뒤집기 → −24.000</text>
+          <text x="0" y="134" style="fill:var(--bad)">면 하나 빼기 → 원점에 따라 달라짐</text>
+          <text x="0" y="168">원기둥 r = 1, n각형 근사:</text>
+          <text x="0" y="192">V_n / V = (n / 2π) sin(2π / n)</text>
+          <text x="0" y="216">n = 12 → 0.955, n = 24 → 0.989</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-5.</b> 발산 정리 부피(원리 2.6). 원점 O와 각 삼각형이 이루는 사면체의 부피를 법선 방향에 따라 부호를 붙여 더한다. 닫힌 메시에서는 원점 쪽 면의 음수 사면체가 바깥 부분을 정확히 지운다. 오른쪽은 이 장의 예제 값이다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-gm-mesh">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>메시 부피 계산: 발산 정리 vs 해석해, 법선을 뒤집으면</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gm-cv-mesh" aria-label="삼각형 메시 3D 장면. 뒤집힌 면은 빨강, 빠진 면은 비어 있음"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>모양</span><div class="seg" id="gm-ms-s"><button data-value="box" class="on">상자</button><button data-value="prism">n각기둥</button><button data-value="cyl">원기둥 근사</button><button data-value="sph">구 근사</button></div></div>
+          <label class="ctrl"><span>분할 수 n <output id="gm-ms-n-out"></output></span><input type="range" id="gm-ms-n" min="3" max="64" step="1" value="12"></label>
+          <div class="ctrl"><span>메시 결함</span><div class="seg" id="gm-ms-d"><button data-value="none" class="on">없음</button><button data-value="flipall">모든 법선 뒤집기</button><button data-value="flip1">면 하나 뒤집기</button><button data-value="hole">면 하나 빼기</button></div></div>
+          <label class="ctrl"><span>원점 이동(메시를 x로) <output id="gm-ms-o-out"></output></span><input type="range" id="gm-ms-o" min="0" max="20" step="0.5" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">메시 부피 ΣV</span><span class="v" id="gm-ms-o-v">—</span></div>
+        <div class="stat"><span class="k">해석해 부피</span><span class="v" id="gm-ms-o-a">—</span></div>
+        <div class="stat"><span class="k">메시 넓이 / 해석해</span><span class="v" id="gm-ms-o-s">—</span></div>
+        <div class="stat"><span class="k">V − E + F</span><span class="v" id="gm-ms-o-e">—</span></div>
+      </div>
+      <div class="gm-msg" id="gm-ms-msg"></div>
+      <div class="sim-note">해볼 것: 상자(2 × 3 × 4 m)는 정확히 24 m³, 52 m² · "모든 법선 뒤집기"는 −24 · "면 하나 뒤집기"와 "면 하나 빼기"는 원점 이동을 움직이면 값이 따라 변합니다 — 결함 있는 메시는 위치에 따라 다른 답을 내므로, 부피가 음수이거나 이동에 따라 변하면 메시를 의심하세요 · 원기둥(r = 1, h = 2)은 n = 12에서 해석해 2π의 95.5 %, n = 64에서 99.8 % · 구(r = 1.5)는 같은 n에서 오차가 더 큽니다 · n각기둥은 근사가 아니라 정확한 n각기둥 부피와 비교합니다 · 모델: 원리 2.6, <code>CB.bim.boxMesh</code>·<code>meshVolume</code>·<code>meshArea</code>, 원기둥·구 메시와 오일러 수 계산은 페이지 스크립트.</div>
+    </div>
+    <div class="callout"><strong>예제 2.5 (메시 검사 세 단계)</strong> 받은 메시의 부피를 믿기 전에 확인한다.
+      <p><b>① 닫힘</b> 모든 모서리가 정확히 두 삼각형에 공유되는가. 구멍이 없고 손잡이(구멍 뚫린 고리)가 없는 입체면 \(V - E + F = 2\)(오일러 공식). 상자 메시: \(8 - 18 + 12 = 2\).</p>
+      <p><b>② 방향</b> 공유 모서리를 두 삼각형이 서로 반대 방향으로 지나는가(일관된 법선). 부피가 음수면 전체가 뒤집힌 것이다.</p>
+      <p><b>③ 근사 오차</b> 원형 기둥(지름 0.8 m, 높이 3.3 m)을 16각형으로 근사하면 \(\tfrac{16}{2\pi}\sin\tfrac{2\pi}{16} = 0.974\)배, 1.659 → 1.616 m³로 2.6 % 작다. 200개면 약 8.5 m³ 차이.</p>
+      <p><b>④ 판단</b> 메시 물량은 "닫힘·방향·근사"를 확인한 뒤에만 쓴다. 가능하면 원래의 스윕·B-rep 정의(정확한 공식)에서 물량을 뽑고, 메시는 표시와 간섭 검토용으로 쓴다.</p></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="parametric">
+    <h2>파라메트릭 모델링: 매개변수, 구속 조건, 패밀리</h2>
+    <div class="problem"><strong>같은 창 30개의 폭을 바꾸면</strong>
+      <p>B-10 외벽에 같은 창 W1(1.8 × 1.5 m)이 층마다 30개쯤 들어간다고 합시다. 발주자가 창 폭을 2.0 m로 넓혀 달라고 합니다. 30개를 하나씩 다시 그려야 할까요? 넓힌 창이 기둥 사이에 들어가는지, 유리 한 장이 너무 커지지 않는지는 누가 확인할까요?</p></div>
+    <p><span class="term">파라메트릭 모델링</span><span class="en">(parametric modeling)</span>은 형상을 좌표가 아니라 <span class="term">매개변수</span><span class="en">(parameter)</span>와 규칙으로 정의합니다. 창은 "폭 W, 높이 H, 문틀 두께 f, 중간 문설주 수 n"으로 정의되고, 유리 크기·문틀 길이·개구부 크기는 이 값에서 계산됩니다. 매개변수가 만족해야 할 관계가 <span class="term">구속 조건</span><span class="en">(constraint)</span>이며, 기하 구속(평행, 맞닿음, 대칭)과 치수 구속(유리 폭 ≥ 0.3 m 같은 부등식)이 있습니다. 같은 규칙으로 만들어지는 객체의 묶음을 이 책은 <span class="term">패밀리</span><span class="en">(family)</span>, 그 안에서 매개변수 값을 정한 하나를 <span class="term">유형</span><span class="en">(type)</span>이라 부릅니다(도구마다 이름이 다르다).</p>
+    <div class="callout def"><strong>정의 2.7 (파라메트릭 객체)</strong> 매개변수 벡터 \(\mathbf p\)에서 형상과 파생값을 만드는 규칙의 묶음
+      <div class="formula">$$G = f(\mathbf p), \qquad g_i(\mathbf p) \le 0\ \ (\text{부등식 구속}), \qquad h_j(\mathbf p) = 0\ \ (\text{등식 구속}), \qquad \mathbf p = (\mathbf p_{\text{유형}},\ \mathbf p_{\text{인스턴스}})$$<div class="where"><span class="term">유형 매개변수</span><span class="en">(type parameter)</span>는 같은 유형의 모든 객체가 공유하고(창 폭·높이), <span class="term">인스턴스 매개변수</span><span class="en">(instance parameter)</span>는 객체마다 다르다(창대 높이, 위치). 유형 매개변수를 바꾸면 그 유형의 인스턴스 전체가 다시 생성된다. 구속을 어기는 값은 거부하거나 경고한다.</div></div></div>
+    <div class="callout def"><strong>정의 2.8 (의존 그래프)</strong> 매개변수와 파생값을 노드, "이 값은 저 값으로 계산된다"를 방향 있는 간선으로 그린 그래프가 <span class="term">의존 그래프</span><span class="en">(dependency graph)</span>다. 값이 바뀌면 위상 정렬 순서로 그 아래 노드만 다시 계산한다. 그래프에 순환(A가 B로, B가 A로 계산)이 있으면 정해진 값이 없으므로 모델링 오류다.</div>
+    <figure class="diagram" id="fig-gm-param">
+      <svg viewBox="0 0 880 320" role="img" aria-label="창 패밀리의 매개변수와 B-10 보의 의존 그래프">
+        <rect x="10" y="10" width="860" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(36,40)">
+          <text x="150" y="0" text-anchor="middle" class="t" style="font-weight:700">창 패밀리 W(W, H, f, n)</text>
+          <rect x="40" y="30" width="220" height="180" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <rect x="52" y="42" width="92" height="156" style="fill:var(--bg-elev);stroke:var(--text-dim)"/>
+          <rect x="156" y="42" width="92" height="156" style="fill:var(--bg-elev);stroke:var(--text-dim)"/>
+          <path d="M40 228H260" style="stroke:var(--accent-2)" marker-start="url(#gm-ah-or)" marker-end="url(#gm-ah-or)"/><text x="150" y="246" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">W (유형)</text>
+          <path d="M276 30V210" style="stroke:var(--accent-2)" marker-start="url(#gm-ah-or)" marker-end="url(#gm-ah-or)"/><text x="284" y="124" class="t-mono" style="fill:var(--accent-2)">H</text>
+          <text x="98" y="124" text-anchor="middle" class="t-mono">유리 b_g</text><text x="150" y="20" text-anchor="middle" class="t-mono">문틀 f · 문설주 n = 1</text>
+          <text x="150" y="272" text-anchor="middle" class="t-mono">b_g = (W − (n + 2) f) / (n + 1) ≥ 0.3 m</text>
+        </g>
+        <line x1="380" y1="30" x2="380" y2="290" style="stroke:var(--border)"/>
+        <g transform="translate(400,40)" class="t-mono" text-anchor="middle">
+          <text x="220" y="0" class="t" style="font-weight:700">B-10 보의 의존 그래프</text>
+          <rect x="10" y="40" width="110" height="36" rx="8" class="f-acc2-soft"/><text x="65" y="63" style="fill:var(--text)">격자 위치</text>
+          <rect x="160" y="40" width="110" height="36" rx="8" class="f-elev"/><text x="215" y="63" style="fill:var(--text)">경간 L</text>
+          <rect x="310" y="40" width="130" height="36" rx="8" class="f-elev"/><text x="375" y="63" style="fill:var(--text)">춤 h = ⌈L/12⌉</text>
+          <rect x="160" y="130" width="110" height="36" rx="8" class="f-elev"/><text x="215" y="153" style="fill:var(--text)">보 밑 높이</text>
+          <rect x="310" y="130" width="130" height="36" rx="8" class="f-elev"/><text x="375" y="153" style="fill:var(--text)">보 물량</text>
+          <rect x="160" y="210" width="110" height="36" rx="8" class="f-elev"/><text x="215" y="233" style="fill:var(--text)">덕트 간섭</text>
+          <rect x="310" y="210" width="130" height="36" rx="8" class="f-elev"/><text x="375" y="233" style="fill:var(--text)">천장 높이</text>
+        </g>
+        <g style="stroke:var(--accent);stroke-width:1.6;fill:none" marker-end="url(#gm-ah-acc)">
+          <path d="M520 98H556"/><path d="M670 98H706"/><path d="M775 116L672 168"/><path d="M775 116V166"/><path d="M615 206V246"/><path d="M670 186L706 246"/>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-6.</b> 파라메트릭 객체(정의 2.7–2.8). 왼쪽: 창 패밀리는 W, H, f, n으로 정의되고 유리 폭 \(b_g\)는 파생값이다. 오른쪽: B-10 보는 격자 → 경간 → 춤 → 보 밑 높이 → 덕트 간섭·천장 높이로 이어진다. 격자 하나를 옮기면 화살표를 따라 아래가 모두 다시 계산된다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-gm-window">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>파라메트릭 창 패밀리: 매개변수를 바꾸면 형상이 다시 생성되고 구속을 검사한다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gm-cv-win" aria-label="기둥과 보 사이 벽에 놓인 창의 입면. 구속 위반 부분은 빨강"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>유형</span><div class="seg" id="gm-wn-t"><button data-value="W1" class="on">W1 1.8 × 1.5</button><button data-value="W2">W2 3.0 × 1.8</button><button data-value="W3">W3 1.2 × 2.4</button></div></div>
+          <label class="ctrl"><span>폭 W(유형) <output id="gm-wn-w-out"></output></span><input type="range" id="gm-wn-w" min="0.6" max="8" step="0.05" value="1.8"></label>
+          <label class="ctrl"><span>높이 H(유형) <output id="gm-wn-h-out"></output></span><input type="range" id="gm-wn-h" min="0.6" max="3.4" step="0.05" value="1.5"></label>
+          <label class="ctrl"><span>문틀 두께 f(유형) <output id="gm-wn-f-out"></output></span><input type="range" id="gm-wn-f" min="30" max="150" step="5" value="70"></label>
+          <label class="ctrl"><span>중간 문설주 수 n(유형) <output id="gm-wn-n-out"></output></span><input type="range" id="gm-wn-n" min="0" max="5" step="1" value="1"></label>
+          <label class="ctrl"><span>창대 높이 s(인스턴스) <output id="gm-wn-s-out"></output></span><input type="range" id="gm-wn-s" min="0" max="2.5" step="0.05" value="0.9"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">유리 한 장 b × h</span><span class="v" id="gm-wn-o-g">—</span></div>
+        <div class="stat"><span class="k">유리 넓이 / 창 넓이</span><span class="v" id="gm-wn-o-a">—</span></div>
+        <div class="stat"><span class="k">문틀 길이</span><span class="v" id="gm-wn-o-l">—</span></div>
+        <div class="stat"><span class="k">인스턴스 30개 유리</span><span class="v" id="gm-wn-o-t">—</span></div>
+      </div>
+      <div class="gm-msg" id="gm-wn-msg"></div>
+      <div class="sim-note">해볼 것: W1에서 유리 두 장이 각 0.795 × 1.36 m(예제 2.6) · 폭을 4 m로 넓히면 유리 한 장이 1.5 m를 넘어 경고가 나옵니다 — 문설주를 늘려 해결해 보세요 · 문설주를 5개로 하고 폭을 1.2 m로 줄이면 유리 폭이 0.3 m 미만이 됩니다 · 창대 높이(인스턴스)를 2.0 m로 올리면 창 윗면이 보 밑(층 바닥 위 3.3 m)을 넘습니다 · 폭 7.2 m를 넘으면 기둥 사이(순간격)에 들어가지 않습니다 · 모델: 정의 2.7, 기준층 층고 4.0 m·보 춤 0.7 m·기둥 0.8 m·격자 8 m(B-10), 구속 규칙(유리 폭 0.3–1.5 m, 유리 한 장 ≤ 3.0 m², 문틀 ≥ 50 mm)은 교육용 예시이며 실제 기준은 제품·설계 조건에 따른다.</div>
+    </div>
+    <div class="callout"><strong>예제 2.6 (창 유형 W1)</strong> \(W = 1.8\), \(H = 1.5\), \(f = 0.07\) m, 문설주 \(n = 1\)(문설주 폭 = \(f\)).
+      <p><b>① 유리</b> 폭 \(b_g = (1.8 - 3\times0.07)/2 = 0.795\) m, 높이 \(h_g = 1.5 - 2\times0.07 = 1.36\) m, 두 장 \(2 \times 0.795 \times 1.36 = 2.162\) m² — 창 넓이 2.7 m²의 80.1 %.</p>
+      <p><b>② 구속 검사</b> \(0.3 \le 0.795 \le 1.5\) ✓, 한 장 1.08 m² ≤ 3.0 ✓, 창대 0.9 + 1.5 = 2.4 ≤ 3.3(보 밑) ✓, 폭 1.8 ≤ 7.2(기둥 사이 순간격) ✓.</p>
+      <p><b>③ 변경</b> 폭을 2.0 m로 하면 \(b_g = 0.895\) m, 유형 매개변수이므로 W1 인스턴스 30개가 모두 다시 생성되고 유리 넓이 합이 \(30 \times 2.162 = 64.9\)에서 \(30 \times 2.434 = 73.0\) m²로 바뀐다. 사람이 고칠 곳은 값 하나다.</p>
+      <p><b>④ 판단</b> 파라메트릭의 힘은 "다시 그리지 않는다"보다 <b>설계 의도와 검사 규칙이 객체에 들어 있다</b>는 데 있다. 대신 패밀리의 규칙이 틀리면 모든 인스턴스가 틀리므로, 패밀리는 프로젝트 전에 검수된 라이브러리로 관리한다(4장).</p></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="b10-family">
+    <h2>B-10 기둥·보를 패밀리로</h2>
+    <div class="problem"><strong>격자 하나를 옮기면</strong>
+      <p>평면 계획이 바뀌어 B-10의 격자 C를 16 m에서 17.6 m로 옮기면 B–C 경간이 9.6 m가 됩니다. 이 경간의 보는 얼마나 깊어져야 하고, 그 아래를 지나는 덕트와는 어떻게 될까요?</p></div>
+    <p>B-10 BIM의 360개 요소는 몇 개의 유형에서 나옵니다: 기둥 유형 하나(800 × 800, 인스턴스 200), 큰보 유형 하나(400 × 700, 90), 슬래브(210, 10), 코어 벽(400, 40), 덕트(1,000 × 400, 10), 배관(DN 100, 10). 기둥 인스턴스의 매개변수는 격자점, 바닥 층, "윗면 = 위층 바닥 − 보 춤"이고, 보 인스턴스는 양 끝 격자와 층을 가집니다. 여기에 예비 설계의 경험 규칙 하나를 넣어 봅니다. 보 춤을 경간의 1/12로 정하고 50 mm 단위로 올립니다(교육용 규칙 — 실제 보 춤은 처짐·휨·전단 설계로 정한다, ConcreteBook).</p>
+    <div class="callout def"><strong>정의 2.9 (B-10 보 춤 규칙, 교육용)</strong>
+      <div class="formula">$$h = 0.05\left\lceil \frac{L/12}{0.05} \right\rceil\ \text{m}, \qquad V_{\text{웨브}} = b\,(h - t_s)\,(L - c), \qquad \text{덕트 간섭: } h \gt d_{\text{top}}$$<div class="where">\(L\): 경간(격자 간격), \(b = 0.4\) m, 슬래브 \(t_s = 0.21\) m, 기둥 폭 \(c = 0.8\) m, \(d_{\text{top}}\): 위층 바닥에서 덕트 윗면까지 깊이(기본 0.35 m, 덕트를 0.95 m로 내리면 0.75 m). \(L = 8\) m → \(8/12 = 0.667\) → 0.70 m, B-10의 보 춤과 같다.</div></div></div>
+    <div class="sim" id="sim-gm-beam">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>파라메트릭 보: 격자를 끌면 경간·춤·물량·간섭이 다시 계산된다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gm-cv-beam" aria-label="B-10 기준층 평면 격자. 격자 머리를 끌면 보 춤이 색과 숫자로 갱신됨, 덕트와 간섭하는 보는 빨강"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>덕트 중심 깊이(위층 바닥 아래) <output id="gm-bm-d-out"></output></span><input type="range" id="gm-bm-d" min="0.55" max="1.15" step="0.05" value="0.95"></label>
+          <label class="ctrl"><span>춤 규칙 L / k의 k <output id="gm-bm-k-out"></output></span><input type="range" id="gm-bm-k" min="8" max="16" step="0.5" value="12"></label>
+          <div class="btn-row"><button class="btn" id="gm-bm-reset">B-10 격자(8 m)</button><button class="btn" id="gm-bm-c">C를 17.6 m로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 경간</span><span class="v" id="gm-bm-o-l">—</span></div>
+        <div class="stat"><span class="k">최대 보 춤</span><span class="v" id="gm-bm-o-h">—</span></div>
+        <div class="stat"><span class="k">보 웨브 콘크리트(층당)</span><span class="v" id="gm-bm-o-v">—</span></div>
+        <div class="stat"><span class="k">덕트–보 간섭(층당)</span><span class="v" id="gm-bm-o-c">—</span></div>
+      </div>
+      <div class="gm-msg" id="gm-bm-msg"></div>
+      <div class="sim-note">해볼 것: 격자 머리(B·C·D, 2·3의 동그라미)를 끌어 보세요(0.4 m 단위) · 기본 B-10(덕트 0.95 m)은 모든 보가 700 mm, 덕트–보 간섭 0 · "C를 17.6 m로"는 B–C 경간 9.6 m → 그 경간의 X 방향 보가 800 mm가 되지만, 덕트와 교차하는 Y 방향 보는 8 m 경간 그대로라 간섭 0입니다 · 격자 3을 끌어 2–3 간격을 9.2 m 이상으로 벌리면 Y 방향 보가 800 mm로 깊어져 덕트와 다시 부딪힙니다(층당 3) · 덕트 깊이를 0.55 m(기본 모델)로 올리면 700 mm 보와 모두 간섭합니다(층당 3) · k를 10으로 하면 같은 경간에서 보가 깊어집니다 · 모델: 정의 2.9, X 방향 보는 1·2·3·4 선, Y 방향 보는 A–E 선, 덕트는 y = 12 m 근처 복도(2–3 사이 중앙)를 x 0.5–31.5 m로 지나며 그 구간의 Y 방향 보와 교차, 물량은 웨브(슬래브 아래)만.</div>
+    </div>
+    <div class="callout"><strong>예제 2.7 (격자 C를 1.6 m 옮기기)</strong> 격자 C: 16 → 17.6 m. B–C 경간 9.6 m, C–D 경간 6.4 m.
+      <p><b>① 춤</b> B–C: \(9.6/12 = 0.80\) → 0.80 m. C–D: \(6.4/12 = 0.533\) → 0.55 m. 나머지 8 m 경간 0.70 m.</p>
+      <p><b>② 물량</b> X 방향 보 B–C 한 경간: \(0.4 \times (0.80 - 0.21)\times(9.6 - 0.8) = 2.077\) m³(전에는 \(0.4 \times 0.49 \times 7.2 = 1.411\)). C–D: \(0.4 \times 0.34 \times 5.6 = 0.762\) m³. 네 줄의 X 방향 보에서 층당 \(4 \times (2.077 + 0.762 - 2 \times 1.411) = +0.064\) m³ — 경간을 옮겨도 총량은 거의 같다.</p>
+      <p><b>③ 간섭</b> 덕트는 y = 12 m에서 x 방향으로 가므로 X 방향 보와는 나란하고, Y 방향 보(격자 B·C·D 선)와 교차한다. Y 방향 보의 경간(8 m)은 그대로라 춤 0.70 m, 덕트를 0.95 m로 내린 상태(윗면 깊이 0.75 m)에서 간섭 0. 그러나 격자 2–3 간격을 9.6 m로 벌리면 Y 방향 보가 0.80 m가 되어 덕트 윗면(0.75 m)보다 깊어지고 층당 3건의 간섭이 되살아난다.</p>
+      <p><b>④ 판단</b> 파라메트릭 모델에서는 격자 하나의 변경이 의존 그래프를 따라 물량과 간섭까지 자동으로 번진다. 좋은 점은 "다시 계산된다"는 것, 위험한 점은 "아무도 모르게 바뀐다"는 것이다. 그래서 변경 뒤에는 간섭 검토(6장)와 모델 버전 비교(5장)로 무엇이 바뀌었는지 확인한다.</p></div>
+    <div class="callout site"><strong>B-10 BIM의 형상 정의</strong> B-10 BIM은 모든 요소를 축에 나란한 상자로 단순화한 교육용 모델이다. 유형 6개(기둥 800 × 800, 큰보 400 × 700, 슬래브 210, 코어 벽 400, 급기 덕트 1,000 × 400, 스프링클러 DN 100)에서 인스턴스 360개가 나오고, 기둥 인스턴스는 \(T(x_i, y_j, z_k)\) 배치 행렬 하나로 놓인다(예제 2.2). 기둥 상자 높이는 보 밑까지(1층 4.3 m, 그 위 3.3 m), 보는 슬래브를 포함한 춤 0.7 m에서 슬래브 0.21 m를 뺀 0.49 m 웨브 상자, 슬래브는 기둥 바깥면까지 32.8 × 24.8 m다. 기둥 윗면과 보 밑면은 같은 높이로 <b>맞닿아</b> 있고(8절), 코어 벽과 그 위치의 기둥·보는 <b>겹쳐</b> 있다(C-B2-3F와 벽 하나가 0.528 m³). 이 겹침 때문에 상자 합 층당 약 339 m³가 합집합으로는 약 322.9 m³가 된다(1장, 7장). 모든 값은 교육용 가정이다.</div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="tolerance">
+    <h2>정밀도와 허용 오차: 맞닿음인가 겹침인가</h2>
+    <div class="problem"><strong>기둥 윗면 12.3 m, 보 밑면 12.3 m</strong>
+      <p>B-10 BIM에서 3층 기둥 C-B2의 윗면과 그 위 보 G1-YB의 밑면은 모두 z = 12.3 m입니다. 둘은 겹친 걸까요, 맞닿은 걸까요? 좌표가 12.300000001과 12.299999999로 저장되었다면 판정이 달라질까요?</p></div>
+    <p>컴퓨터의 좌표는 정확한 실수가 아니므로, "같다"를 "차이가 어떤 값보다 작다"로 바꿔 판정해야 합니다. 그 값이 <span class="term">허용 오차</span><span class="en">(tolerance)</span>입니다. 모델링 도구는 점이 같은 점인지, 면이 같은 면 위에 있는지를 내부 허용 오차로 판정하고, 간섭 검토는 사용자가 정한 허용 오차로 "무시할 만한 겹침"을 걸러냅니다. 허용 오차는 좌표 정밀도(1절의 ulp)보다 충분히 커야 하고, 시공 정밀도(수 mm)보다는 작아야 의미가 있습니다.</p>
+    <div class="callout def"><strong>정의 2.10 (허용 오차로 하는 접촉 판정)</strong> 두 상자의 침투 깊이 \(d\)(겹치면 +, 떨어지면 − 간격, <code>CB.bim.overlap</code>의 <code>depth</code>), 허용 오차 \(\varepsilon\), 유지 여유 \(c\)에 대해
+      <div class="formula">$$\text{겹침: } d \gt \varepsilon, \qquad \text{맞닿음: } |d| \le \varepsilon, \qquad \text{근접(소프트): } -c \le d \lt -\varepsilon, \qquad \text{분리: } d \lt -c$$<div class="where">\(\varepsilon\)는 수치 오차를 흡수하는 값(이 책의 예: 0.1–1 mm), \(c\)는 유지보수·단열·시공 여유처럼 비워 둬야 하는 거리(6장의 소프트 간섭). 엔진의 <code>overlap(a, b, tol)</code>은 모든 축에서 겹침 길이가 \(10^{-9}\) m를 넘을 때만 hard로 보고, 떨어져 있어도 <code>tol</code> 안이면 soft로 표시한다.</div></div></div>
+    <figure class="diagram" id="fig-gm-tol">
+      <svg viewBox="0 0 880 260" role="img" aria-label="두 요소 사이 간격에 따른 겹침, 맞닿음, 근접, 분리 판정 구간">
+        <rect x="10" y="10" width="860" height="240" rx="10" class="f-surface"/>
+        <g transform="translate(60,60)">
+          <line x1="0" y1="80" x2="760" y2="80" class="s-axis"/>
+          <rect x="0" y="40" width="240" height="40" style="fill:var(--bad);opacity:.18"/>
+          <rect x="240" y="40" width="80" height="40" style="fill:var(--ok);opacity:.3"/>
+          <rect x="320" y="40" width="240" height="40" style="fill:var(--warn);opacity:.2"/>
+          <rect x="560" y="40" width="200" height="40" style="fill:var(--surface-2)"/>
+          <g class="t-mono" text-anchor="middle" style="fill:var(--text)"><text x="120" y="65">겹침(하드)</text><text x="280" y="65">맞닿음</text><text x="440" y="65">근접(소프트)</text><text x="660" y="65">분리</text></g>
+          <g class="t-mono" text-anchor="middle"><text x="240" y="104">−ε</text><text x="280" y="104">0</text><text x="320" y="104">+ε</text><text x="560" y="104">c</text><text x="740" y="104">간격 g = −d →</text></g>
+          <line x1="280" y1="30" x2="280" y2="90" style="stroke:var(--text);stroke-dasharray:3 3"/>
+          <text x="280" y="20" text-anchor="middle" class="t-mono" style="fill:var(--text)">기둥 윗면 = 보 밑면</text>
+          <text x="20" y="150" class="t-dim">ε: 수치 오차 흡수(0.1–1 mm) · c: 비워 둘 여유(덕트 단열·유지보수 등, 6장) · 좌표 정밀도 ulp ≪ ε ≪ 시공 오차</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 2-7.</b> 허용 오차와 판정 구간(정의 2.10). 간격이 정확히 0인 맞닿음은 좌표가 아주 조금만 어긋나도 겹침이나 틈으로 바뀌므로, \(\pm\varepsilon\) 띠로 감싸 "맞닿음"으로 판정한다. 같은 띠가 너무 넓으면 진짜 간섭을 놓친다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-gm-tol">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>허용 오차와 맞닿음 판정: 간격, ε, 좌표 크기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="gm-cv-tol" aria-label="두 상자의 접합부를 확대한 그림과 저장된 좌표 격자, 판정 구간 띠"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>설계 간격 g <output id="gm-tl-g-out"></output></span><input type="range" id="gm-tl-g" min="-20" max="40" step="0.1" value="0"></label>
+          <label class="ctrl"><span>허용 오차 ε <output id="gm-tl-e-out"></output></span><input type="range" id="gm-tl-e" min="0" max="10" step="0.1" value="0.5"></label>
+          <label class="ctrl"><span>유지 여유 c <output id="gm-tl-c-out"></output></span><input type="range" id="gm-tl-c" min="0" max="50" step="1" value="25"></label>
+          <label class="ctrl"><span>접합부 좌표 크기 X₀ <output id="gm-tl-x-out"></output></span><input type="range" id="gm-tl-x" min="1" max="7" step="0.0005" value="1.0899"></label>
+          <div class="ctrl"><span>저장 형식</span><div class="seg" id="gm-tl-f"><button data-value="64" class="on">배정밀도</button><button data-value="32">단정밀도</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">저장 후 간격</span><span class="v" id="gm-tl-o-g">—</span></div>
+        <div class="stat"><span class="k">판정(정의 2.10)</span><span class="v" id="gm-tl-o-j">—</span></div>
+        <div class="stat"><span class="k">엔진 overlap</span><span class="v" id="gm-tl-o-o">—</span></div>
+        <div class="stat"><span class="k">ulp(X₀)</span><span class="v" id="gm-tl-o-u">—</span></div>
+      </div>
+      <div class="gm-msg" id="gm-tl-msg"></div>
+      <div class="sim-note">해볼 것: 기본값은 기둥 윗면과 보 밑면(z ≈ 12.3 m, 간격 0) — 맞닿음 · 간격을 −0.3 mm로 하면 ε = 0.5 mm 안이라 여전히 맞닿음이지만 ε를 0으로 하면 겹침입니다 · 간격 10 mm는 여유 25 mm 안의 근접(소프트) · 좌표 크기를 10<sup>5.3</sup>(지도 좌표)로 키우고 단정밀도로 바꾸면 2 mm 간격이 0이나 15.6 mm로 반올림되어 판정이 뒤집힙니다 — 허용 오차는 좌표 정밀도보다 커야 합니다 · 모델: 정의 2.10, 두 상자 [X₀ − 1, 0, 0, X₀, 1, 1]과 [X₀ + g, 0, 0, X₀ + g + 1, 1, 1]의 x 좌표를 저장 형식으로 반올림, 엔진 판정은 <code>CB.bim.overlap(a, b, c)</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 2.8 (B-10의 맞닿음과 겹침)</strong>
+      <p><b>① 기둥–보</b> C-B2-3F \(z_1 = 12.3\), G1-YB-3F \(z_0 = 12.3\) → 겹침 길이 0, \(d = 0\). 엔진은 hard가 아니라고 보고(\(10^{-9}\) 미만), 정의 2.10에서는 맞닿음. 간섭 검토에서 기둥–보 쌍을 검사하지 않거나 맞닿음을 제외하는 규칙이 필요한 이유다.</p>
+      <p><b>② 기둥–벽</b> C-B2-3F와 W-CORE1-3F: x 8.0–8.4, y 8.0–8.4, z 9.0–12.3 겹침 → \(V = 0.4 \times 0.4 \times 3.3 = 0.528\) m³, \(d = 0.4\) m. 이것은 오류가 아니라 같은 콘크리트로 일체 타설되는 <b>결합</b>이며, 모델링 규칙(우선순위: 기둥 > 벽 형태)으로 물량에서 한 번만 센다(7장).</p>
+      <p><b>③ 덕트–보</b> DU-SA-3F(z 12.25–12.65)와 G1-YB-3F(12.3–12.79): \(d = 0.35\) m ≫ ε → 진짜 하드 간섭(6장).</p>
+      <p><b>④ 판단</b> 같은 "겹침"도 결합(의도된 것), 맞닿음(수치상 0), 간섭(설계 오류)으로 뜻이 다르다. 형상만으로는 구별할 수 없고, 요소의 종류와 관계(정보)가 있어야 판정 규칙을 세울 수 있다 — 형상과 정보가 함께 있어야 하는 이유다.</p></div>
+  </section>
+
+  <section id="uses">
+    <h2>이 형상이 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="ifc.html"><small>CH.03 · IFC와 데이터 모델</small>돌출·불리언·메시의 IFC 표현<br><span>IfcExtrudedAreaSolid, 배치와 표현 사상으로 형상을 교환한다.</span></a>
+      <a href="lod.html"><small>CH.04 · LOD와 정보 요구 사항</small>상자에서 철근까지<br><span>같은 기둥의 형상 상세를 단계별로 높인다.</span></a>
+      <a href="clash.html"><small>CH.06 · 간섭 검토</small>overlap · 허용 오차<br><span>정의 2.10의 판정을 모든 요소 쌍에 적용한다.</span></a>
+      <a href="qto.html"><small>CH.07 · 모델 기반 물량 산출</small>교집합 공제 · 메시 부피<br><span>339 → 322.9 m³, 겹침과 측정 규칙을 정한다.</span></a>
+      <a href="reality-capture.html"><small>CH.11 · 현실 캡처</small>강체 변환 · 지도 좌표<br><span>측량점과 모델을 4 × 4 변환으로 맞춘다.</span></a>
+      <a href="computational.html"><small>CH.16 · 계산 설계와 AI</small>의존 그래프 · 매개변수 공간<br><span>격자 경간을 매개변수로 두고 최적안을 찾는다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>좌표는 요소 로컬 → 층 → 프로젝트 → 지도의 계층으로 잇는다. 모델은 원점 근처 로컬 좌표로 저장하고 지도 위치는 변환으로 둔다 — E ≈ 203,450 m에서 단정밀도 ulp는 1.56 cm, 41 m 이내에서는 3.8 μm다.</li>
+      <li>동차 좌표 (x, y, z, 1)와 4 × 4 행렬로 이동·회전·축척을 하나의 곱으로 쓴다. M = AB는 B가 먼저: T(10,0,0)R<sub>z</sub>(90°)(1,0,0) = (10,1,0), R<sub>z</sub>(90°)T(10,0,0)(1,0,0) = (0,11,0).</li>
+      <li>선형 부분의 행렬식이 부피 배율(S(k) → k³)이고, 음수면 거울상이라 메시 법선이 뒤집힌다. 기둥 200개는 형상 하나 + 배치 행렬 200개다.</li>
+      <li>B-rep은 면과 위상, CSG는 조합 과정, 스윕은 단면 + 경로, 메시는 범용 근사를 준다. 스윕 부피는 넓이 × 도심 경로 길이(파푸스), 회전체 메시는 분할 수만큼 작게 나온다(24분할 −1.1 %).</li>
+      <li>불리언: V(A∪B) = V<sub>A</sub> + V<sub>B</sub> − V(A∩B), V(A−B) = V<sub>A</sub> − V(A∩B). W-CORE3-3F 12.128 − 개구부 0.288 = 11.840 m³.</li>
+      <li>닫힌 메시의 부피 V = ⅙Σ p·(q×r), 넓이 = ½Σ|(q−p)×(r−p)|. 법선을 모두 뒤집으면 −V, 구멍이나 일부 뒤집힘이 있으면 원점에 따라 값이 바뀐다. V − E + F = 2로 닫힘을 확인한다.</li>
+      <li>파라메트릭 객체는 매개변수·구속·파생값·의존 그래프로 설계 의도를 담는다. 유형 매개변수는 모든 인스턴스에, 인스턴스 매개변수는 하나에 적용된다. B-10 보 춤 규칙(교육용) h = ⌈L/12⌉<sub>50 mm</sub>: 8 m → 700, 9.6 m → 800 mm.</li>
+      <li>"같다"는 허용 오차로 판정한다: 겹침 d &gt; ε, 맞닿음 |d| ≤ ε, 근접 −c ≤ d &lt; −ε. 기둥 윗면 = 보 밑면은 맞닿음, 기둥–벽 0.528 m³는 결합, 덕트–보 0.35 m는 간섭 — 구별하려면 형상과 정보가 함께 필요하다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 지도 좌표 E ≈ 203,450 m를 단정밀도(가수 23비트)로 저장할 때 구별할 수 있는 가장 작은 간격은?</p><div class="opts">
+        <button class="opt">약 0.004 mm</button><button class="opt">약 1 mm</button><button class="opt" data-correct>약 15.6 mm</button><button class="opt">약 1 m</button>
+      </div><div class="quiz-exp">\(2^{17} \le 203{,}450 \lt 2^{18}\) → ulp = \(2^{17-23} = 2^{-6} = 0.015625\) m. 0.004 mm는 41 m 근처의 값이다. 그래서 형상은 로컬 좌표로 둔다.</div></div>
+      <div class="quiz-q"><p>2. 점 (1, 0, 0)에 \(R_z(90^\circ)\,T(10, 0, 0)\)을 적용한 결과는?</p><div class="opts">
+        <button class="opt">(10, 1, 0)</button><button class="opt" data-correct>(0, 11, 0)</button><button class="opt">(11, 0, 0)</button><button class="opt">(1, 10, 0)</button>
+      </div><div class="quiz-exp">오른쪽 T가 먼저: (11, 0, 0), 그다음 원점 중심 90° 회전: (0, 11, 0). (10, 1, 0)은 \(T\,R_z\) 순서의 결과다.</div></div>
+      <div class="quiz-q"><p>3. 변환 \(S(1.5)\)를 적용한 기둥(2.112 m³)의 부피는?</p><div class="opts">
+        <button class="opt">3.168 m³</button><button class="opt">4.752 m³</button><button class="opt" data-correct>7.128 m³</button><button class="opt">2.112 m³</button>
+      </div><div class="quiz-exp">부피 배율은 선형 부분의 행렬식 \(1.5^3 = 3.375\). \(2.112 \times 3.375 = 7.128\) m³.</div></div>
+      <div class="quiz-q"><p>4. 축에서 0.4–0.6 m, 높이 1 m인 직사각형 단면을 z축 둘레로 180° 회전한 입체의 부피는?</p><div class="opts">
+        <button class="opt">0.628 m³</button><button class="opt" data-correct>0.314 m³</button><button class="opt">0.1 m³</button><button class="opt">0.157 m³</button>
+      </div><div class="quiz-exp">파푸스: \(V = A\bar r\theta = 0.2 \times 0.5 \times \pi = 0.314\) m³. 한 바퀴(2π)면 0.628 m³.</div></div>
+      <div class="quiz-q"><p>5. 벽(12.128 m³)과 개구부 상자(1.2 × 0.6 × 1.0 = 0.72 m³)가 0.288 m³만큼 겹친다. 벽 − 개구부의 부피는?</p><div class="opts">
+        <button class="opt">11.408 m³</button><button class="opt" data-correct>11.840 m³</button><button class="opt">12.560 m³</button><button class="opt">12.128 m³</button>
+      </div><div class="quiz-exp">\(V(A-B) = V_A - V(A\cap B) = 12.128 - 0.288\). 개구부 상자 전체(0.72)를 빼면 벽 밖으로 나간 부분까지 빼는 오류다.</div></div>
+      <div class="quiz-q"><p>6. 메시 부피가 −24 m³로 나왔다. 가장 그럴듯한 원인은?</p><div class="opts">
+        <button class="opt">원점이 메시 밖에 있다</button><button class="opt" data-correct>모든 면의 꼭짓점 순서가 뒤집혀 법선이 안쪽을 향한다</button><button class="opt">단위가 mm다</button><button class="opt">삼각형이 너무 적다</button>
+      </div><div class="quiz-exp">닫힌 메시의 발산 정리 부피는 원점과 무관하고, 법선이 모두 안쪽이면 부호만 바뀐다. 거울 복사(det &lt; 0) 뒤 면 순서를 고치지 않으면 생긴다.</div></div>
+      <div class="quiz-q"><p>7. 창 유형 W1의 폭(유형 매개변수)을 1.8 m에서 2.0 m로 바꾸면?</p><div class="opts">
+        <button class="opt">선택한 창 하나만 넓어진다</button><button class="opt" data-correct>W1 유형의 모든 인스턴스가 다시 생성되고 유리 크기 등 파생값과 구속 검사가 갱신된다</button><button class="opt">창대 높이도 함께 바뀐다</button><button class="opt">W2, W3 유형도 함께 바뀐다</button>
+      </div><div class="quiz-exp">유형 매개변수는 그 유형의 모든 인스턴스가 공유한다. 창대 높이는 인스턴스 매개변수라 그대로이고, 다른 유형은 영향이 없다.</div></div>
+      <div class="quiz-q"><p>8. B-10 BIM의 3층 기둥 윗면(z = 12.3)과 보 밑면(z = 12.3)을 허용 오차 ε = 0.5 mm로 판정하면?</p><div class="opts">
+        <button class="opt">하드 간섭</button><button class="opt" data-correct>맞닿음</button><button class="opt">소프트 간섭</button><button class="opt">분리</button>
+      </div><div class="quiz-exp">침투 깊이 \(d = 0\), \(|d| \le \varepsilon\)이므로 맞닿음. 엔진 overlap도 hard가 아니다. 덕트–보(d = 0.35 m)는 하드 간섭, 기둥–벽(0.528 m³)은 결합으로 구별한다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미: 글자, 3D 면 그리기, 메시 만들기(교육용, 계산은 CB.bim) ---------- */
+const GMX = {
+  font(o) { return `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`; },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = GMX.font(o); ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    if (o.halo !== false) { ctx.lineWidth = 3; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); }
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  M: CB.bim.mat,
+  corners: (b) => [[b[0], b[1], b[2]], [b[3], b[1], b[2]], [b[3], b[4], b[2]], [b[0], b[4], b[2]], [b[0], b[1], b[5]], [b[3], b[1], b[5]], [b[3], b[4], b[5]], [b[0], b[4], b[5]]],
+  QUADS: [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]],
+  /** 꼭짓점 8개로 된 육면체(변환된 상자 포함)를 면 정렬로 그린다 */
+  hexa(V, pts, op) { GMX.QUADS.map((q) => q.map((i) => pts[i])).sort((a, b) => V.depth(b) - V.depth(a)).forEach((f) => V.poly3(f, op)); },
+  wire(V, pts, op) { [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]].forEach(([i, j]) => V.line3(pts[i], pts[j], op)); },
+  /** 삼각형 메시 그리기(깊이 정렬). mark(i) → 색 바꿀 면 */
+  mesh(V, Vs, F, op = {}) {
+    const P = V.P, list = F.map((f, i) => ({ i, pts: f.map((k) => Vs[k]) })).map((o) => ({ ...o, d: V.depth(o.pts) })).sort((a, b) => b.d - a.d);
+    list.forEach(({ i, pts }) => { const bad = op.mark && op.mark(i); V.poly3(pts, { fill: bad ? P.bad : op.fill || P.accent, fillAlpha: bad ? 0.55 : op.alpha || 0.22, color: bad ? P.bad : op.line || P.accent, width: bad ? 1.6 : 0.6, alpha: 0.75 }); });
+  },
+  /** 다각형 넓이(부호)와 도심 */
+  poly(P) { let A = 0, cx = 0, cy = 0; P.forEach((p, i) => { const q = P[(i + 1) % P.length], c = p[0] * q[1] - q[0] * p[1]; A += c; cx += (p[0] + q[0]) * c; cy += (p[1] + q[1]) * c; }); A /= 2; return { A, cx: A ? cx / (6 * A) : 0, cy: A ? cy / (6 * A) : 0 }; },
+  /** 단순 다각형 여부(변끼리 교차 없음) */
+  simple(P) {
+    const n = P.length, cr = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue;
+      const a = P[i], b = P[(i + 1) % n], c = P[j], d = P[(j + 1) % n];
+      if (cr(a, b, c) * cr(a, b, d) < 0 && cr(c, d, a) * cr(c, d, b) < 0) return false;
+    }
+    return true;
+  },
+  /** 귀 자르기 삼각 분할(반시계 단순 다각형) → [[i, j, k]] */
+  ear(P) {
+    const idx = P.map((_, i) => i), out = [], cr = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    const inside = (p, a, b, c) => cr(a, b, p) >= 0 && cr(b, c, p) >= 0 && cr(c, a, p) >= 0;
+    let guard = 0;
+    while (idx.length > 3 && guard++ < 500) {
+      let cut = false;
+      for (let k = 0; k < idx.length; k++) {
+        const i0 = idx[(k + idx.length - 1) % idx.length], i1 = idx[k], i2 = idx[(k + 1) % idx.length], a = P[i0], b = P[i1], c = P[i2];
+        if (cr(a, b, c) <= 1e-12) continue;
+        if (idx.some((j) => j !== i0 && j !== i1 && j !== i2 && inside(P[j], a, b, c))) continue;
+        out.push([i0, i1, i2]); idx.splice(k, 1); cut = true; break;
+      }
+      if (!cut) break;
+    }
+    if (idx.length === 3) out.push([idx[0], idx[1], idx[2]]);
+    return out;
+  },
+  /** 고리(ring) 목록으로 만든 스윕 메시. closed면 마지막과 처음을 잇고 뚜껑 없음 */
+  rings(R, prof, closed) {
+    const m = prof.length, V = [].concat(...R), F = [], nr = R.length, last = closed ? nr : nr - 1;
+    for (let r = 0; r < last; r++) { const r2 = (r + 1) % nr; for (let i = 0; i < m; i++) { const j = (i + 1) % m, a = r * m + i, b = r * m + j, c = r2 * m + j, d = r2 * m + i; F.push([a, b, c], [a, c, d]); } }
+    if (!closed) { const T = GMX.ear(prof); T.forEach(([i, j, k]) => { F.push([i, k, j]); F.push([(nr - 1) * m + i, (nr - 1) * m + j, (nr - 1) * m + k]); }); }
+    if (CB.bim.meshVolume(V, F) < 0) F.forEach((f) => f.reverse());
+    return { V, F };
+  },
+  ulp: (x, m) => Math.pow(2, Math.floor(Math.log2(Math.max(Math.abs(x), 1e-300))) - m),
+  len(v) { const a = Math.abs(v); return a >= 1 ? CB.num(v, 3) + " m" : a >= 1e-3 ? CB.num(v * 1000, 3) + " mm" : a >= 1e-6 ? CB.num(v * 1e6, 3) + " μm" : a >= 1e-9 ? CB.num(v * 1e9, 3) + " nm" : a === 0 ? "0" : v.toExponential(2).replace("e-", "e−") + " m"; },
+};
+
+/* ---------- 1. 좌표 크기와 정밀도 ---------- */
+(function () {
+  const gx = CB.range("gm-pr-x", (v) => { const X = Math.pow(10, v); return X >= 1000 ? Math.round(X).toLocaleString("en-US") + " m" : CB.num(X, 2) + " m"; }, () => upd());
+  const gf = CB.seg("gm-pr-f", () => upd());
+  const gd = CB.range("gm-pr-d", (v) => v + " mm", () => upd());
+  let R = null;
+  const shape = (d) => { const s = 40, c = d / 1000, a = s / 1000; return [[-a + c, -a], [a - c, -a], [a, -a + c], [a, a - c], [a - c, a], [-a + c, a], [-a, a - c], [-a, -a + c]]; };
+  const cv = CB.canvas("#gm-cv-prec", (ctx, W, H) => {
+    if (!R) return; const P = CB.palette(), half = 0.06, sc = Math.min(W, H) / (2 * half) * 0.9, cx = W / 2, cy = H / 2;
+    const X = (u) => cx + u * sc, Y = (v) => cy - v * sc, u = R.ulp;
+    if (u * sc >= 5) { ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); const k0 = Math.ceil((R.X0 - half) / u), k1 = Math.floor((R.X0 + half) / u);
+      for (let k = k0; k <= k1 && k - k0 < 400; k++) { const p = k * u - R.X0; ctx.moveTo(X(p), 0); ctx.lineTo(X(p), H); ctx.moveTo(0, Y(p)); ctx.lineTo(W, Y(p)); } ctx.stroke(); }
+    ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = P.dim; ctx.lineWidth = 1.4; ctx.beginPath(); R.exact.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])))); ctx.closePath(); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = P.accent2; ctx.globalAlpha = 0.18; ctx.beginPath(); R.stored.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])))); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = P.accent2; ctx.lineWidth = 2; ctx.stroke();
+    R.stored.forEach((p) => { ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), 3, 0, 7); ctx.fill(); });
+    GMX.text(ctx, "점선: 설계 형상 · 주황: 저장된 형상 · 회색 격자: 표현 가능한 좌표(ulp " + GMX.len(u) + ")", 10, 14, P.dim, { align: "left", size: 10.5, bold: false });
+    GMX.text(ctx, "120 × 120 mm 창", W - 10, H - 12, P.faint, { align: "right", size: 10.5, bold: false });
+  }, { aspect: 0.62, minHeight: 240, maxHeight: 420 });
+  function upd() {
+    const X0 = Math.pow(10, gx()), f32 = gf() === "32", fr = f32 ? Math.fround : (v) => v;
+    const exact = shape(gd()), stored = exact.map(([a, b]) => [fr(X0 + a) - X0, fr(X0 + b) - X0]);
+    const err = Math.max(...exact.map((p, i) => Math.hypot(stored[i][0] - p[0], stored[i][1] - p[1])));
+    R = { X0, exact, stored, ulp: GMX.ulp(X0, f32 ? 23 : 52) };
+    CB.stat("gm-pr-o-32", GMX.len(GMX.ulp(X0, 23))); CB.stat("gm-pr-o-64", GMX.len(GMX.ulp(X0, 52))); CB.stat("gm-pr-o-e", GMX.len(err));
+    CB.stat("gm-pr-o-j", err < 1e-4 ? "문제 없음" : err < 1e-3 ? "주의" : "상세 깨짐");
+    cv.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 2. 변환 행렬 놀이터 ---------- */
+(function () {
+  const M = GMX.M, gs = {};
+  [["tx", "gm-mx-tx"], ["ty", "gm-mx-ty"], ["tz", "gm-mx-tz"]].forEach(([k, id]) => (gs[k] = CB.range(id, (v) => CB.num(v, 1) + " m", () => upd())));
+  gs.r = CB.range("gm-mx-r", (v) => v + "°", () => upd()); gs.k = CB.range("gm-mx-k", (v) => CB.num(v, 2), () => upd());
+  const go = CB.seg("gm-mx-o", () => upd());
+  const FAM = [-0.4, -0.4, 0, 0.4, 0.4, 3.3];
+  let Mx = M.I();
+  const build = (o) => { const T = M.T(gs.tx(), gs.ty(), gs.tz()), R = M.Rz(gs.r()), S = M.S(gs.k()); return o === "TRS" ? M.mul(T, M.mul(R, S)) : o === "RTS" ? M.mul(R, M.mul(T, S)) : M.mul(S, M.mul(T, R)); };
+  const v = CB.orbit("#gm-cv-mat", { yaw: -0.75, pitch: 0.45, dist: 40, target: [5, 5, 4], fov: 0.85, aspect: 0.66, minHeight: 280, maxHeight: 460,
+    draw(V) {
+      const P = V.P;
+      for (let i = -8; i <= 16; i += 4) { V.line3([i, -8, 0], [i, 16, 0], { color: P.grid, width: 1 }); V.line3([-8, i, 0], [16, i, 0], { color: P.grid, width: 1 }); }
+      V.line3([0, 0, 0], [6, 0, 0], { color: P.bad, width: 2 }); V.line3([0, 0, 0], [0, 6, 0], { color: P.ok, width: 2 }); V.line3([0, 0, 0], [0, 0, 6], { color: P.blue, width: 2 });
+      V.text3("x", [6.6, 0, 0], { color: P.bad }); V.text3("y", [0, 6.6, 0], { color: P.ok }); V.text3("z", [0, 0, 6.6], { color: P.blue });
+      GMX.wire(V, GMX.corners(FAM), { color: P.dim, width: 1.2, dash: [4, 3] });
+      const pts = GMX.corners(FAM).map((p) => M.apply(Mx, p));
+      GMX.hexa(V, pts, { fill: P.accent2, fillAlpha: 0.35, color: P.accent2, width: 1.4 });
+      V.dot3(pts[6], { color: P.bad, r: 4 }); V.text3("(0.4, 0.4, 0) →", pts[6], { color: P.text, size: 10.5, dx: 8, align: "left" });
+    } });
+  function upd() {
+    Mx = build(go());
+    const box = document.getElementById("gm-mx-m");
+    box.innerHTML = Mx.map((r, i) => r.map((x, j) => `<span class="${i < 3 && j === 3 ? "gm-t" : i < 3 && j < 3 ? "gm-r" : ""}">${CB.num(x, 3)}</span>`).join("")).join("");
+    const o = go(), names = { TRS: "T · R<sub>z</sub> · S", RTS: "R<sub>z</sub> · T · S", STR: "S · T · R<sub>z</sub>" };
+    document.getElementById("gm-mx-lab").innerHTML = `M = ${names[o]}<br>T(${CB.num(gs.tx(), 1)}, ${CB.num(gs.ty(), 1)}, ${CB.num(gs.tz(), 1)}) · R<sub>z</sub>(${gs.r()}°) · S(${CB.num(gs.k(), 2)})<br>오른쪽 행렬이 먼저 적용된다`;
+    const p = M.apply(Mx, [0.4, 0.4, 0]), q = M.apply(build("TRS"), [0.4, 0.4, 0]);
+    const det = Mx[0][0] * (Mx[1][1] * Mx[2][2] - Mx[1][2] * Mx[2][1]) - Mx[0][1] * (Mx[1][0] * Mx[2][2] - Mx[1][2] * Mx[2][0]) + Mx[0][2] * (Mx[1][0] * Mx[2][1] - Mx[1][1] * Mx[2][0]);
+    CB.stat("gm-mx-o-p", "(" + p.map((x) => CB.num(x, 2)).join(", ") + ")"); CB.stat("gm-mx-o-d", CB.num(det, 3)); CB.stat("gm-mx-o-v", CB.num(2.112 * det, 3) + " m³");
+    CB.stat("gm-mx-o-x", CB.num(Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]), 2) + " m");
+    v.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 3. 돌출·회전·스윕 ---------- */
+(function () {
+  const RECT = [[0.4, 0], [0.6, 0], [0.6, 1], [0.5, 1], [0.4, 1]], LSH = [[0.2, 0], [1.0, 0], [1.0, 0.3], [0.5, 0.3], [0.2, 0.9]];
+  const DEF = [[0.2, 0], [0.8, 0], [0.8, 0.5], [0.5, 0.9], [0.2, 0.6]];
+  const gop = CB.seg("gm-sw-op", () => { setParam(); upd(); });
+  const fmtP = (v) => (gop() === "ext" ? CB.num(v, 2) + " m" : gop() === "rev" ? Math.round(v) + "°" : "L₁ " + CB.num(v, 1) + " m");
+  const gp = CB.range("gm-sw-p", (v) => fmtP(v), () => upd());
+  const gn = CB.range("gm-sw-n", (v) => v, () => upd());
+  function setParam() {
+    const o = gop(), el = gp.el, lab = document.getElementById("gm-sw-p-lab");
+    if (o === "ext") { el.min = 0.2; el.max = 4; el.step = 0.05; gp.set(2, false); lab.firstChild.textContent = "높이 h "; }
+    else if (o === "rev") { el.min = 30; el.max = 360; el.step = 5; gp.set(360, false); lab.firstChild.textContent = "회전각 θ "; pts().forEach((p) => (p.x = Math.max(0.05, p.x))); }
+    else { el.min = 2; el.max = 12; el.step = 0.5; gp.set(10, false); lab.firstChild.textContent = "첫 구간 길이(둘째 6 m) "; }
+  }
+  const pl = CB.plane("#gm-cv-prof", { x: [-0.3, 1.5], y: [-0.25, 1.15], aspect: 0.5, minHeight: 180, maxHeight: 280, gridStep: 0.1, axisLabels: false,
+    points: DEF.map(([x, y]) => ({ x, y, snap: 0.05, constrain: (p) => { if (gop() === "rev") p.x = Math.max(0.05, p.x); } })),
+    onDrag: () => upd(),
+    draw(P, api) {
+      const pal = P.P, ps = api.points.map((p) => [p.x, p.y]);
+      P.poly(ps, { color: pal.accent2, fill: CB.isDark() ? "rgba(255,169,77,0.15)" : "rgba(232,89,12,0.12)", width: 2 });
+      const g = GMX.poly(ps); P.dot(g.cx, g.cy, { color: pal.accent, r: 4 });
+      if (gop() === "rev") { P.line(0, -0.25, 0, 1.15, { color: pal.blue, width: 2, dash: [8, 4, 2, 4] }); P.text("회전축", 0.02, 1.08, { color: pal.blue, size: 11 }); }
+      if (gop() === "swp") { P.line(0, -0.25, 0, 1.15, { color: pal.blue, width: 1.5, dash: [4, 4] }); P.text("경로(u = 0) · +u = 꺾이는 안쪽", 0.02, 1.08, { color: pal.blue, size: 11 }); }
+      P.text("u →", 1.4, -0.18, { color: pal.dim, size: 11 }); P.text("v ↑", -0.27, 1.08, { color: pal.dim, size: 11 });
+    } });
+  const pts = () => pl.points;
+  let mesh = null, cen = [0, 0, 0], ext = 6;
+  const v = CB.orbit("#gm-cv-sw", { yaw: -0.7, pitch: 0.45, dist: 8, target: [0, 0, 0.5], fov: 0.85, aspect: 0.6, minHeight: 240, maxHeight: 400,
+    draw(V) { if (!mesh) return; const P = V.P; GMX.mesh(V, mesh.V, mesh.F, { fill: P.accent, alpha: 0.2 });
+      V.line3([0, 0, 0], [1, 0, 0], { color: P.bad, width: 2 }); V.line3([0, 0, 0], [0, 1, 0], { color: P.ok, width: 2 }); V.line3([0, 0, 0], [0, 0, 1], { color: P.blue, width: 2 }); } });
+  document.getElementById("gm-sw-rect").addEventListener("click", () => { RECT.forEach(([x, y], i) => { pts()[i].x = x; pts()[i].y = y; }); pl.redraw(); upd(); });
+  document.getElementById("gm-sw-l").addEventListener("click", () => { LSH.forEach(([x, y], i) => { pts()[i].x = x; pts()[i].y = y; }); pl.redraw(); upd(); });
+  function upd() {
+    let prof = pts().map((p) => [p.x, p.y]); const g0 = GMX.poly(prof), msg = document.getElementById("gm-sw-msg");
+    if (g0.A < 0) prof = prof.slice().reverse();
+    const A = Math.abs(g0.A), ok = GMX.simple(prof) && A > 1e-4, o = gop(), p = gp(), n = gn();
+    CB.stat("gm-sw-o-a", CB.num(A, 4) + " m²"); CB.stat("gm-sw-o-c", "(" + CB.num(g0.cx, 3) + ", " + CB.num(g0.cy, 3) + ")");
+    if (!ok) { mesh = null; msg.className = "gm-msg bad"; msg.textContent = "단면의 변이 서로 교차하거나 넓이가 0입니다 — 점을 옮겨 단순 다각형을 만드세요."; CB.stat("gm-sw-o-f", "—"); CB.stat("gm-sw-o-m", "—"); v.redraw(); pl.redraw(); return; }
+    let R = [], closed = false, Vf;
+    if (o === "ext") { R = [prof.map(([u, w]) => [u, w, 0]), prof.map(([u, w]) => [u, w, p])]; Vf = A * p; cen = [g0.cx, g0.cy, p / 2]; ext = Math.max(1.6, p); }
+    else if (o === "rev") { const th = (p * Math.PI) / 180, full = p >= 359.9, N = Math.max(3, Math.round((n * p) / 360)), K = full ? N : N + 1; closed = full;
+      for (let k = 0; k < K; k++) { const f = (th * k) / N; R.push(prof.map(([u, w]) => [u * Math.cos(f), u * Math.sin(f), w])); }
+      Vf = A * g0.cx * th; cen = [0, 0, 0.5]; ext = 2.4; }
+    else { const L1 = p, L2 = 6; R = [prof.map(([u, w]) => [0, u, w]), prof.map(([u, w]) => [L1 - u, u, w]), prof.map(([u, w]) => [L1 - u, L2, w])]; Vf = A * (L1 + L2 - 2 * g0.cx); cen = [L1 / 2, 2.5, 0.5]; ext = Math.max(L1, 6) * 0.95; }
+    mesh = GMX.rings(R, prof, closed);
+    const Vm = CB.bim.meshVolume(mesh.V, mesh.F);
+    CB.stat("gm-sw-o-f", CB.num(Vf, 4) + " m³"); CB.stat("gm-sw-o-m", CB.num(Vm, 4) + " m³");
+    msg.className = "gm-msg"; msg.innerHTML = `${o === "ext" ? "V = A·h" : o === "rev" ? "V = A·ū·θ (파푸스)" : "V = A·(L₁ + L₂ − 2ū) (연귀 이음)"} = <b>${CB.num(Vf, 4)}</b> m³ · 메시 ${mesh.F.length}개 삼각형 → <b>${CB.num(Vm, 4)}</b> m³ (차이 ${CB.num(((Vm - Vf) / Vf) * 100, 2)} %)`;
+    v.set({ target: cen, dist: ext * 2.6 }); pl.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 4. CSG 불리언: 벽 − 개구부 ---------- */
+(function () {
+  const A = [0, 0, 0, 0.4, 8, 3.79];
+  const gop = CB.seg("gm-cs-op", () => upd());
+  const gy = CB.range("gm-cs-y", (v) => CB.num(v, 2) + " m", () => upd()), gz = CB.range("gm-cs-z", (v) => CB.num(v, 2) + " m", () => upd()), gc = CB.range("gm-cs-c", (v) => v + " mm", () => upd());
+  let B = null, I = null;
+  const v = CB.orbit("#gm-cv-csg", { yaw: -1.05, pitch: 0.32, dist: 15, target: [0.2, 4, 1.9], fov: 0.85, aspect: 0.66, minHeight: 260, maxHeight: 440,
+    draw(V) {
+      if (!B) return; const P = V.P, o = gop(), cA = GMX.corners(A), cB = GMX.corners(B);
+      if (o === "diff") { GMX.hexa(V, cA, { fill: P.accent, fillAlpha: 0.2, color: P.accent, width: 1 }); GMX.wire(V, cB, { color: P.accent2, width: 1.2, dash: [4, 3] }); if (I) GMX.hexa(V, GMX.corners(I), { fill: P.bad, fillAlpha: 0.55, color: P.bad, width: 1.6 }); }
+      else if (o === "union") { GMX.hexa(V, cA, { fill: P.accent, fillAlpha: 0.22, color: P.accent, width: 1 }); GMX.hexa(V, cB, { fill: P.accent, fillAlpha: 0.22, color: P.accent, width: 1 }); }
+      else { GMX.wire(V, cA, { color: P.dim, width: 1, dash: [4, 3] }); GMX.wire(V, cB, { color: P.accent2, width: 1, dash: [4, 3] }); if (I) GMX.hexa(V, GMX.corners(I), { fill: P.accent2, fillAlpha: 0.6, color: P.accent2, width: 1.6 }); }
+      V.text3("A 벽 W-CORE3-3F", [0.2, 0, 3.79 + 0.4], { color: P.accent, size: 11, align: "left" });
+      V.text3("B 개구부", [0.7, (B[1] + B[4]) / 2, B[5] + 0.3], { color: P.accent2, size: 11 });
+    } });
+  function upd() {
+    const c = gc() / 1000, w = 1.0 + 2 * c, h = 0.4 + 2 * c, y = gy(), z = gz();
+    B = [-0.3, y - w / 2, z - h / 2, 0.7, y + w / 2, z + h / 2];
+    const ov = CB.bim.overlap(A, B), vol = (b) => (b[3] - b[0]) * (b[4] - b[1]) * (b[5] - b[2]);
+    I = ov.volume > 0 ? [0, 1, 2].map((k) => Math.max(A[k], B[k])).concat([0, 1, 2].map((k) => Math.min(A[k + 3], B[k + 3]))) : null;
+    const VA = vol(A), VB = vol(B), VI = ov.volume, o = gop(), Vr = o === "diff" ? VA - VI : o === "union" ? VA + VB - VI : VI;
+    CB.stat("gm-cs-o-a", CB.num(VA, 3) + " m³"); CB.stat("gm-cs-o-b", CB.num(VB, 3) + " m³"); CB.stat("gm-cs-o-i", CB.num(VI, 3) + " m³"); CB.stat("gm-cs-o-r", CB.num(Vr, 3) + " m³");
+    const inside = I && Math.abs(VI - 0.4 * w * h) < 1e-9, msg = document.getElementById("gm-cs-msg");
+    msg.className = "gm-msg" + (I ? "" : " warn");
+    msg.innerHTML = !I ? "개구부가 벽과 겹치지 않습니다 — 차 연산은 아무것도 빼지 않습니다." : `개구부 ${CB.num(w, 2)} × ${CB.num(h, 2)} m · 벽 두께 0.4 m 구간만 교집합 → <b>${CB.num(VI, 3)} m³</b>${inside ? "" : " (개구부 일부가 벽 밖으로 나가 그만큼은 빼지 않음)"}`;
+    v.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 5. 메시 부피 ---------- */
+(function () {
+  const gs = CB.seg("gm-ms-s", () => upd()), gd = CB.seg("gm-ms-d", () => upd());
+  const gn = CB.range("gm-ms-n", (v) => v, () => upd()), go = CB.range("gm-ms-o", (v) => CB.num(v, 1) + " m", () => upd());
+  function prism(n, r, h) {
+    const V = [], F = [];
+    for (let i = 0; i < n; i++) { const a = (2 * Math.PI * i) / n; V.push([r * Math.cos(a), r * Math.sin(a), 0]); }
+    for (let i = 0; i < n; i++) V.push([V[i][0], V[i][1], h]);
+    V.push([0, 0, 0], [0, 0, h]); const c0 = 2 * n, c1 = 2 * n + 1;
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; F.push([i, j, n + j], [i, n + j, n + i], [c0, j, i], [c1, n + i, n + j]); }
+    return { V, F };
+  }
+  function sphere(n, r) {
+    const m = Math.max(2, Math.round(n / 2)), V = [[0, 0, -r]], F = [];
+    for (let k = 1; k < m; k++) { const t = -Math.PI / 2 + (Math.PI * k) / m; for (let i = 0; i < n; i++) { const a = (2 * Math.PI * i) / n; V.push([r * Math.cos(t) * Math.cos(a), r * Math.cos(t) * Math.sin(a), r * Math.sin(t)]); } }
+    V.push([0, 0, r]); const top = V.length - 1, id = (k, i) => 1 + (k - 1) * n + (i % n);
+    for (let i = 0; i < n; i++) F.push([0, id(1, i + 1), id(1, i)]);
+    for (let k = 1; k < m - 1; k++) for (let i = 0; i < n; i++) F.push([id(k, i), id(k, i + 1), id(k + 1, i + 1)], [id(k, i), id(k + 1, i + 1), id(k + 1, i)]);
+    for (let i = 0; i < n; i++) F.push([top, id(m - 1, i), id(m - 1, i + 1)]);
+    return { V, F };
+  }
+  let cur = null;
+  const v = CB.orbit("#gm-cv-mesh", { yaw: -0.7, pitch: 0.42, dist: 11, target: [1, 1, 1], fov: 0.85, aspect: 0.66, minHeight: 260, maxHeight: 440,
+    draw(V) { if (!cur) return; const P = V.P; GMX.mesh(V, cur.V, cur.F, { mark: (i) => cur.bad.includes(i) });
+      V.dot3([0, 0, 0], { color: P.text, r: 4 }); V.text3("원점 O", [0, 0, 0], { color: P.text, size: 11, dy: 14 }); } });
+  function upd() {
+    const s = gs(), n = gn(), ox = go(); let m, Va, Aa;
+    if (s === "box") { m = CB.bim.boxMesh([0, 0, 0, 2, 3, 4]); Va = 24; Aa = 52; }
+    else if (s === "prism") { m = prism(n, 1, 2); Va = (n / 2) * Math.sin((2 * Math.PI) / n) * 2; Aa = n * Math.sin((2 * Math.PI) / n) + n * 2 * Math.sin(Math.PI / n) * 2; }
+    else if (s === "cyl") { m = prism(n, 1, 2); Va = 2 * Math.PI; Aa = 6 * Math.PI; }
+    else { m = sphere(n, 1.5); Va = (4 / 3) * Math.PI * 1.5 ** 3; Aa = 4 * Math.PI * 1.5 ** 2; }
+    let V = m.V.map((p) => [p[0] + ox, p[1], p[2]]), F = m.F.map((f) => f.slice()), bad = [];
+    const d = gd();
+    if (d === "flipall") { F.forEach((f) => f.reverse()); bad = F.map((_, i) => i); }
+    else if (d === "flip1") { F[0].reverse(); bad = [0]; }
+    else if (d === "hole") F = F.slice(1);
+    const Vm = CB.bim.meshVolume(V, F), Am = CB.bim.meshArea(V, F);
+    const used = new Set(F.flat()), edges = new Set(); F.forEach((f) => f.forEach((a, i) => { const b = f[(i + 1) % 3]; edges.add(Math.min(a, b) + "-" + Math.max(a, b)); }));
+    const chi = used.size - edges.size + F.length;
+    cur = { V, F, bad };
+    CB.stat("gm-ms-o-v", CB.num(Vm, 3) + " m³"); CB.stat("gm-ms-o-a", CB.num(Va, 3) + " m³ (" + CB.num((Vm / Va) * 100, 1) + " %)");
+    CB.stat("gm-ms-o-s", CB.num(Am, 2) + " / " + CB.num(Aa, 2) + " m²"); CB.stat("gm-ms-o-e", used.size + " − " + edges.size + " + " + F.length + " = " + chi);
+    const msg = document.getElementById("gm-ms-msg");
+    msg.className = "gm-msg" + (d === "none" ? "" : " bad");
+    msg.innerHTML = d === "none" ? `닫힌 메시(삼각형 ${F.length}개, V − E + F = ${chi}). 원점을 옮겨도 부피는 그대로입니다.` : d === "flipall" ? "모든 법선이 안쪽 → 부피의 부호만 바뀝니다(−V). 원점을 옮겨도 −V 그대로." : d === "flip1" ? "면 하나만 뒤집힘 → 원점을 옮기면 부피가 변합니다. 메시가 일관되게 정렬되지 않았다는 신호입니다." : `면 하나가 빠짐(열린 메시, V − E + F = ${chi}) → 원점 위치에 따라 값이 달라지는 뜻 없는 수입니다.`;
+    v.set({ target: s === "box" ? [1 + ox / 2, 1.5, 2] : [ox / 2, 0, s === "sph" ? 0 : 1], dist: 11 + ox * 0.9 });
+  }
+  upd();
+})();
+
+/* ---------- 6. 파라메트릭 창 패밀리 ---------- */
+(function () {
+  const TYPES = { W1: [1.8, 1.5, 1], W2: [3.0, 1.8, 2], W3: [1.2, 2.4, 0] };
+  const gw = CB.range("gm-wn-w", (v) => CB.num(v, 2) + " m", () => upd()), gh = CB.range("gm-wn-h", (v) => CB.num(v, 2) + " m", () => upd());
+  const gf = CB.range("gm-wn-f", (v) => v + " mm", () => upd()), gn = CB.range("gm-wn-n", (v) => v + "개", () => upd()), gs = CB.range("gm-wn-s", (v) => CB.num(v, 2) + " m", () => upd());
+  const gt = CB.seg("gm-wn-t", (t) => { const [w, h, n] = TYPES[t]; gw.set(w, false); gh.set(h, false); gn.set(n, false); gf.set(70, false); upd(); });
+  let R = null;
+  const cv = CB.canvas("#gm-cv-win", (ctx, W, H) => {
+    if (!R) return; const P = CB.palette(), sc = Math.min((W - 30) / 9.2, (H - 40) / 4.4), ox = W / 2 - 4 * sc, oy = H - 22;
+    const X = (x) => ox + x * sc, Y = (z) => oy - z * sc, rect = (x0, z0, x1, z1, fill, a, line) => { ctx.globalAlpha = a; ctx.fillStyle = fill; ctx.fillRect(X(x0), Y(z1), (x1 - x0) * sc, (z1 - z0) * sc); ctx.globalAlpha = 1; if (line) { ctx.strokeStyle = line; ctx.lineWidth = 1.2; ctx.strokeRect(X(x0), Y(z1), (x1 - x0) * sc, (z1 - z0) * sc); } };
+    rect(-0.4, 0, 8.4, 3.3, P.faint, 0.08); rect(-0.4, 0, 0.4, 4, P.dim, 0.55, P.dim); rect(7.6, 0, 8.4, 4, P.dim, 0.55, P.dim); rect(-0.4, 3.3, 8.4, 4, P.dim, 0.35, P.dim);
+    ctx.strokeStyle = P.axis; ctx.beginPath(); ctx.moveTo(X(-0.6), Y(0)); ctx.lineTo(X(8.6), Y(0)); ctx.stroke();
+    const { w, h, f, n, s, bg, viol } = R, x0 = 4 - w / 2, x1 = 4 + w / 2;
+    rect(x0, s, x1, s + h, viol.frame || viol.top || viol.wide ? P.bad : P.accent, 0.75);
+    const hg = h - 2 * f;
+    for (let i = 0; i <= n; i++) { const gx = x0 + f + i * (bg + f); rect(gx, s + f, gx + Math.max(bg, 0.001), s + f + Math.max(hg, 0.001), viol.pane ? P.bad : P.blue, viol.pane ? 0.35 : 0.22, viol.pane ? P.bad : P.blue); }
+    if (viol.top) { ctx.strokeStyle = P.bad; ctx.lineWidth = 2; ctx.setLineDash([6, 3]); ctx.beginPath(); ctx.moveTo(X(-0.4), Y(3.3)); ctx.lineTo(X(8.4), Y(3.3)); ctx.stroke(); ctx.setLineDash([]); }
+    GMX.text(ctx, "W " + CB.num(w, 2) + " m", X(4), Y(s) + 12, P.accent2, { size: 11 });
+    GMX.text(ctx, "보 밑 3.30", X(8.4) - 4, Y(3.3) - 8, P.dim, { size: 10, align: "right", bold: false });
+    GMX.text(ctx, "s " + CB.num(s, 2), X(0.4) + 4, Y(s / 2), P.dim, { size: 10, align: "left", bold: false });
+    GMX.text(ctx, "기둥", X(0), Y(2), P.text, { size: 10 }); GMX.text(ctx, "기둥", X(8), Y(2), P.text, { size: 10 });
+  }, { aspect: 0.55, minHeight: 220, maxHeight: 420 });
+  function upd() {
+    const w = gw(), h = gh(), f = gf() / 1000, n = gn(), s = gs(), bg = (w - (n + 2) * f) / (n + 1), hg = h - 2 * f;
+    const viol = { pane: bg < 0.3 || bg > 1.5 || bg * hg > 3.0 || hg < 0.3, frame: f < 0.05, top: s + h > 3.3 + 1e-9, wide: w > 7.2 + 1e-9 };
+    R = { w, h, f, n, s, bg, viol };
+    const ga = Math.max(0, bg) * Math.max(0, hg) * (n + 1), L = 2 * (w + h) + n * Math.max(0, hg);
+    CB.stat("gm-wn-o-g", (n + 1) + " × " + CB.num(bg, 3) + " × " + CB.num(hg, 2)); CB.stat("gm-wn-o-a", CB.num(ga, 3) + " m² (" + CB.num((ga / (w * h)) * 100, 1) + " %)");
+    CB.stat("gm-wn-o-l", CB.num(L, 2) + " m"); CB.stat("gm-wn-o-t", CB.num(30 * ga, 1) + " m²");
+    const errs = []; if (bg < 0.3) errs.push(`유리 폭 ${CB.num(bg, 3)} m &lt; 0.3 m(문설주를 줄이거나 폭을 넓히세요)`); if (bg > 1.5) errs.push(`유리 폭 ${CB.num(bg, 2)} m &gt; 1.5 m(문설주를 늘리세요)`);
+    if (bg * hg > 3.0) errs.push(`유리 한 장 ${CB.num(bg * hg, 2)} m² &gt; 3.0 m²`); if (hg < 0.3) errs.push("유리 높이 &lt; 0.3 m");
+    if (viol.frame) errs.push("문틀 &lt; 50 mm"); if (viol.top) errs.push(`창 윗면 ${CB.num(s + h, 2)} m &gt; 보 밑 3.30 m(창대 높이 또는 H)`); if (viol.wide) errs.push(`폭 ${CB.num(w, 2)} m &gt; 기둥 사이 7.20 m`);
+    const msg = document.getElementById("gm-wn-msg"); msg.className = "gm-msg " + (errs.length ? "bad" : "ok");
+    msg.innerHTML = errs.length ? "구속 위반: " + errs.join(" · ") : `구속 만족 · 파생값: b<sub>g</sub> = (W − (n + 2)f)/(n + 1) = ${CB.num(bg, 3)} m, h<sub>g</sub> = H − 2f = ${CB.num(hg, 2)} m`;
+    cv.redraw();
+  }
+  upd();
+})();
+
+/* ---------- 7. 파라메트릭 보: 격자 → 경간 → 춤 → 물량·간섭 ---------- */
+(function () {
+  const X0 = [0, 8, 16, 24, 32], Y0 = [0, 8, 16, 24], XL = "ABCDE", YL = "1234";
+  const gd = CB.range("gm-bm-d", (v) => CB.num(v, 2) + " m", () => upd()), gk = CB.range("gm-bm-k", (v) => CB.num(v, 1), () => upd());
+  const depth = (L) => 0.05 * Math.ceil((L / gk()) / 0.05 - 1e-9);
+  const pts0 = () => [1, 2, 3].map((i) => ({ x: X0[i], y: 27, gx: i, snap: 0.4, lock: "y", r: 8 })).concat([1, 2].map((j) => ({ x: -3, y: Y0[j], gy: j, snap: 0.4, lock: "x", r: 8 })));
+  const clampP = (p, ps) => {
+    if (p.gx != null) { const xs = [0].concat(ps.filter((q) => q.gx != null).map((q) => q.x)).concat([32]); const lo = p.gx === 1 ? 0 : ps.find((q) => q.gx === p.gx - 1).x, hi = p.gx === 3 ? 32 : ps.find((q) => q.gx === p.gx + 1).x; p.x = CB.clamp(Math.round(p.x / 0.4) * 0.4, lo + 2.4, hi - 2.4); p.y = 27; void xs; }
+    else { const lo = p.gy === 1 ? 0 : ps.find((q) => q.gy === 1).y, hi = p.gy === 2 ? 24 : ps.find((q) => q.gy === 2).y; p.y = CB.clamp(Math.round(p.y / 0.4) * 0.4, lo + 2.4, hi - 2.4); p.x = -3; }
+  };
+  let G = null;
+  const grid = (ps) => ({ xs: [0].concat([1, 2, 3].map((i) => ps.find((q) => q.gx === i).x)).concat([32]), ys: [0].concat([1, 2].map((j) => ps.find((q) => q.gy === j).y)).concat([24]) });
+  const pl = CB.plane("#gm-cv-beam", { x: [-5.5, 35], y: null, cy: 12.8, aspect: 0.84, minHeight: 280, maxHeight: 520, grid: false, axes: false,
+    points: pts0(), onDrag: () => upd(),
+    draw(P, api) {
+      const pal = P.P, ps = api.points; ps.forEach((p) => clampP(p, ps)); const { xs, ys } = grid(ps); const dtop = gd() - 0.2, yd = (ys[1] + ys[2]) / 2;
+      const col = (h, bad) => (bad ? pal.bad : h > 0.75 ? pal.warn : h < 0.65 ? pal.ok : pal.dim);
+      xs.forEach((x, i) => { P.line(x, -1.5, x, 25.5, { color: pal.faint, width: 1, dash: [8, 3, 2, 3] }); P.text(XL[i], x, 27, { color: pal.text, align: "center", bold: true, size: 12 }); });
+      ys.forEach((y, j) => { P.line(-1.5, y, 33.5, y, { color: pal.faint, width: 1, dash: [8, 3, 2, 3] }); P.text(YL[j], -3, y, { color: pal.text, align: "center", bold: true, size: 12 }); });
+      P.poly([[0.5, yd - 0.5], [31.5, yd - 0.5], [31.5, yd + 0.5], [0.5, yd + 0.5]], { color: pal.blue, fill: CB.isDark() ? "rgba(91,140,255,0.25)" : "rgba(47,111,224,0.18)", width: 1 });
+      P.text("덕트(윗면 깊이 " + CB.num(dtop, 2) + " m)", 1, yd + 1.3, { color: pal.blue, size: 10.5 });
+      ys.forEach((y) => { for (let i = 0; i < 4; i++) { const L = xs[i + 1] - xs[i], h = depth(L); P.line(xs[i], y, xs[i + 1], y, { color: col(h, false), width: 2 + h * 6 }); if (P.unit * L > 34) P.text(Math.round(h * 1000) + "", (xs[i] + xs[i + 1]) / 2, y + 0.9, { color: pal.text, align: "center", size: 10 }); } });
+      xs.forEach((x, i) => { for (let j = 0; j < 3; j++) { const L = ys[j + 1] - ys[j], h = depth(L), hit = i >= 1 && i <= 3 && yd > ys[j] && yd < ys[j + 1] && h > dtop + 1e-9; P.line(x, ys[j], x, ys[j + 1], { color: col(h, hit), width: 2 + h * 6 }); if (P.unit * L > 34) P.text(Math.round(h * 1000) + "", x + 0.7, (ys[j] + ys[j + 1]) / 2 - (j === 1 ? 2.2 : 0), { color: hit ? pal.bad : pal.text, size: 10 }); if (hit) P.dot(x, yd, { color: pal.bad, r: 6 }); } });
+      xs.forEach((x) => ys.forEach((y) => P.poly([[x - 0.4, y - 0.4], [x + 0.4, y - 0.4], [x + 0.4, y + 0.4], [x - 0.4, y + 0.4]], { color: pal.text, fill: pal.dim, width: 1 })));
+      G = { xs, ys, yd, dtop };
+    } });
+  document.getElementById("gm-bm-reset").addEventListener("click", () => { pl.points.forEach((p) => { if (p.gx != null) p.x = X0[p.gx]; else p.y = Y0[p.gy]; }); upd(); });
+  document.getElementById("gm-bm-c").addEventListener("click", () => { pl.points.forEach((p) => { if (p.gx != null) p.x = X0[p.gx]; else p.y = Y0[p.gy]; }); pl.points.find((p) => p.gx === 2).x = 17.6; upd(); });
+  function upd() {
+    pl.redraw(); if (!G) return;
+    const { xs, ys, yd, dtop } = G, segs = [];
+    ys.forEach(() => { for (let i = 0; i < 4; i++) segs.push(xs[i + 1] - xs[i]); });
+    xs.forEach(() => { for (let j = 0; j < 3; j++) segs.push(ys[j + 1] - ys[j]); });
+    const Lm = Math.max(...segs), hm = depth(Lm), Vw = segs.reduce((s, L) => s + 0.4 * Math.max(0, depth(L) - 0.21) * (L - 0.8), 0);
+    let clash = 0; [1, 2, 3].forEach((i) => { for (let j = 0; j < 3; j++) if (yd > ys[j] && yd < ys[j + 1] && depth(ys[j + 1] - ys[j]) > dtop + 1e-9) clash++; });
+    CB.stat("gm-bm-o-l", CB.num(Lm, 1) + " m"); CB.stat("gm-bm-o-h", Math.round(hm * 1000) + " mm"); CB.stat("gm-bm-o-v", CB.num(Vw, 2) + " m³"); CB.stat("gm-bm-o-c", clash + "건");
+    const msg = document.getElementById("gm-bm-msg"); msg.className = "gm-msg " + (clash ? "bad" : "");
+    msg.innerHTML = `격자 X ${xs.map((x) => CB.num(x, 1)).join(" · ")} / Y ${ys.map((y) => CB.num(y, 1)).join(" · ")} → 최대 경간 ${CB.num(Lm, 1)} m → 춤 ${Math.round(hm * 1000)} mm → 웨브 ${CB.num(Vw, 2)} m³/층 → 덕트(윗면 깊이 ${CB.num(dtop, 2)} m)와 교차하는 Y 방향 보 ${clash ? "<b>" + clash + "건 간섭</b>" : "간섭 없음"}`;
+  }
+  upd();
+})();
+
+/* ---------- 8. 허용 오차와 맞닿음 판정 ---------- */
+(function () {
+  const gg = CB.range("gm-tl-g", (v) => CB.num(v, 1) + " mm", () => upd()), ge = CB.range("gm-tl-e", (v) => CB.num(v, 1) + " mm", () => upd()), gc = CB.range("gm-tl-c", (v) => v + " mm", () => upd());
+  const gx = CB.range("gm-tl-x", (v) => { const X = Math.pow(10, v); return X >= 1000 ? Math.round(X).toLocaleString("en-US") + " m" : CB.num(X, 2) + " m"; }, () => upd());
+  const gf = CB.seg("gm-tl-f", () => upd());
+  let R = null;
+  const cv = CB.canvas("#gm-cv-tol", (ctx, W, H) => {
+    if (!R) return; const P = CB.palette(), span = Math.max(0.06, 4 * R.u, Math.abs(R.gs) * 2.4, R.c * 1.4), sc = (W - 40) / span, cx = W / 2 - (R.gs * sc) / 2 + 0, cy = H * 0.5;
+    const X = (d) => cx + d * sc;
+    const bands = [[-span, -R.e, P.bad, 0.12], [-R.e, R.e, P.ok, 0.25], [R.e, R.c, P.warn, 0.15]];
+    bands.forEach(([a, b, c, al]) => { if (b <= a) return; ctx.globalAlpha = al; ctx.fillStyle = c; ctx.fillRect(X(a), H - 34, (b - a) * sc, 14); ctx.globalAlpha = 1; });
+    GMX.text(ctx, "간격 판정 띠: 빨강 겹침 · 초록 맞닿음 · 노랑 근접", 10, H - 8, P.faint, { align: "left", size: 10, bold: false });
+    if (R.u * sc >= 4) { ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); const k0 = Math.ceil(-span / R.u), k1 = Math.floor(span / R.u); for (let k = k0; k <= k1 && k - k0 < 300; k++) { ctx.moveTo(X(k * R.u + R.off), 20); ctx.lineTo(X(k * R.u + R.off), H - 40); } ctx.stroke(); }
+    ctx.globalAlpha = 0.5; ctx.fillStyle = P.dim; ctx.fillRect(X(-span), cy - 60, X(R.a1) - X(-span), 120); ctx.fillStyle = P.accent; ctx.fillRect(X(R.b0), cy - 45, X(span) - X(R.b0), 90); ctx.globalAlpha = 1;
+    ctx.strokeStyle = P.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(R.a1), cy - 60); ctx.lineTo(X(R.a1), cy + 60); ctx.stroke();
+    ctx.strokeStyle = P.accent; ctx.beginPath(); ctx.moveTo(X(R.b0), cy - 45); ctx.lineTo(X(R.b0), cy + 45); ctx.stroke();
+    ctx.setLineDash([4, 3]); ctx.strokeStyle = P.accent2; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(X(0), 22); ctx.lineTo(X(0), H - 40); ctx.moveTo(X(R.g), 22); ctx.lineTo(X(R.g), H - 40); ctx.stroke(); ctx.setLineDash([]);
+    GMX.text(ctx, "A(기둥 등)", X(-span) + 8, cy - 70, P.text, { align: "left", size: 11 }); GMX.text(ctx, "B(보 등)", X(span) - 8, cy - 55, P.accent, { align: "right", size: 11 });
+    GMX.text(ctx, "점선: 설계 위치 · 실선: 저장된 위치 · 창 폭 " + GMX.len(span * 2), 10, 12, P.dim, { align: "left", size: 10.5, bold: false });
+  }, { aspect: 0.5, minHeight: 220, maxHeight: 360 });
+  function upd() {
+    const g = gg() / 1000, e = ge() / 1000, c = gc() / 1000, X0 = Math.pow(10, gx()), f32 = gf() === "32", fr = f32 ? Math.fround : (x) => x;
+    const A1 = fr(X0), B0 = fr(X0 + g), gs = B0 - A1, d = -gs;
+    const j = d > e ? "겹침(하드)" : Math.abs(d) <= e ? "맞닿음" : gs <= c ? "근접(소프트)" : "분리";
+    const ov = CB.bim.overlap([fr(X0 - 1), 0, 0, A1, 1, 1], [B0, 0, 0, fr(X0 + g + 1), 1, 1], c);
+    const u = GMX.ulp(X0, f32 ? 23 : 52);
+    R = { g, gs, e, c, u, a1: A1 - X0, b0: B0 - X0, off: 0 };
+    CB.stat("gm-tl-o-g", (gs >= 0 ? "" : "−") + GMX.len(Math.abs(gs))); CB.stat("gm-tl-o-j", j); CB.stat("gm-tl-o-o", ov.hard ? "hard" : ov.soft ? "soft" : "없음"); CB.stat("gm-tl-o-u", GMX.len(u));
+    const msg = document.getElementById("gm-tl-msg"), flipped = Math.abs(gs - g) > 1e-6;
+    msg.className = "gm-msg " + (flipped ? "warn" : j.startsWith("겹침") ? "bad" : "");
+    msg.innerHTML = flipped ? `저장 반올림으로 간격이 ${CB.num(g * 1000, 2)} mm → <b>${CB.num(gs * 1000, 2)} mm</b>로 바뀌었습니다(ulp ${GMX.len(u)} &gt; ε ${CB.num(e * 1000, 1)} mm?). 허용 오차가 좌표 정밀도보다 작으면 판정을 믿을 수 없습니다.` : `침투 깊이 d = ${CB.num(d * 1000, 2)} mm, ε = ${CB.num(e * 1000, 1)} mm, c = ${CB.num(c * 1000, 0)} mm → <b>${j}</b>. 엔진 <code>overlap(a, b, c)</code>: ${ov.hard ? "hard" : ov.soft ? "soft(여유 안)" : "간섭 아님"}.`;
+    cv.redraw();
+  }
+  upd();
+})();
+</script>
+</body>
+</html>

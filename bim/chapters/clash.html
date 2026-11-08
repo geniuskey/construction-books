@@ -1,0 +1,974 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>간섭 검토 · BIMBook</title>
+<meta name="description" content="짓기 전에 부딪혀 본다. 하드·소프트·4D·워크플로 간섭, 경계 상자 겹침과 침투 깊이·허용 오차, 간섭 매트릭스와 그룹화, 덕트 높이와 천장고의 trade-off, 해결 워크플로와 슬리브·개구부, 격자 가속을 B-10 BIM의 80건으로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .cl-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .cl-msg b { color: var(--text); }
+  .cl-msg.ok { color: var(--ok); }
+  .cl-msg.bad { color: var(--bad); font-weight: 600; }
+  .cl-tbl td, .cl-tbl th { font-variant-numeric: tabular-nums; font-size: 13.5px; padding: 7px 10px; }
+  .cl-tbl td.cl-ok { color: var(--ok); font-weight: 700; }
+  .cl-tbl td.cl-bad { color: var(--bad); font-weight: 700; }
+  .cl-tbl tbody tr.cl-row { cursor: pointer; }
+  .cl-tbl tbody tr.cl-row:hover td { background: var(--accent-soft); }
+  .cl-tbl tbody tr.cl-sel td { background: var(--accent-2-soft); }
+  .cl-mono { font-family: var(--mono); font-size: 12.5px; }
+  .cl-kb { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; padding: 12px; background: var(--canvas-bg); }
+  .cl-kc { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 6px; min-height: 150px; }
+  .cl-kc h4 { margin: 0 0 6px !important; font-size: 12px !important; text-align: center; color: var(--text-dim); }
+  .cl-kc h4 b { display: block; font: 700 18px var(--mono); color: var(--text); }
+  .cl-chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+  .cl-chip { width: 12px; height: 12px; border-radius: 3px; background: var(--text-faint); }
+  .cl-chip.cl-c1 { background: var(--bad); } .cl-chip.cl-c2 { background: var(--warn); } .cl-chip.cl-c3 { background: var(--accent); } .cl-chip.cl-c4 { background: var(--blue); } .cl-chip.cl-c5 { background: var(--ok); }
+  .cl-chip.cl-re { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+  @media (max-width: 560px) {
+    .cl-kb { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cl-kc { min-height: 96px; }
+  }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="clash">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="cl-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="cl-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="cl-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 06</div>
+    <h1 data-no-glossary>간섭 검토</h1>
+    <p class="lead">5장의 연합 모델을 겹치자 B-10 BIM에서 빨간 상자 80개가 나타났습니다. 급기 덕트가 큰보를 30번, 스프링클러 주관이 큰보를 30번 뚫고, 덕트가 코어 벽을 20번 지나갑니다. 현장에서 이것을 발견했다면 덕트를 떼어 내고 다시 제작해야 했을 것입니다. 이 장은 컴퓨터가 간섭을 찾는 원리(축 정렬 경계 상자의 겹침, 침투 깊이와 겹침 부피, 허용 오차)부터, 찾은 간섭을 규칙으로 거르고 묶어 해결할 이슈로 만드는 일, 덕트를 내릴수록 천장이 낮아지는 trade-off, 담당·상태·재검토로 이어지는 해결 워크플로, 슬리브와 개구부로 관통부를 처리하는 법, 그리고 요소가 수만 개일 때 계산을 빠르게 하는 격자 가속까지 B-10으로 직접 계산합니다.</p>
+    <ul class="objectives">
+      <li>하드·소프트(여유 거리)·4D·워크플로 간섭을 구분하고, 각각을 무엇으로 찾는지 말한다.</li>
+      <li>경계 상자(AABB)의 축별 겹침으로 하드·소프트 판정, 침투 깊이, 겹침 부피, 간격을 계산하고, AABB가 둥글거나 기울어진 부재에서 거짓 간섭을 내는 까닭을 설명한다.</li>
+      <li>간섭 매트릭스로 검사할 분야 쌍과 허용 오차를 정하고, B-10의 덕트–보 30, 배관–보 30, 덕트–코어 벽 20건을 재현한다.</li>
+      <li>덕트 높이를 바꿀 때 간섭 수와 천장고가 어떻게 맞바뀌는지 곡선으로 보고, 가능한 범위를 찾는다.</li>
+      <li>근접 간섭을 이슈로 묶고, 담당·상태·재검토 주기로 해결 워크플로를 운영하며, 경로 변경·높이 조정·슬리브·개구부 가운데 해결안을 고른다.</li>
+      <li>모든 쌍 비교 n(n − 1)/2와 격자·정렬 스윕 같은 광역 단계 가속의 비교 횟수와 시간을 비교한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 정보가 없었다면</small><b>덕트는 현장에서 보를 만나고 나서야 멈췄다</b></div>
+      <div class="o-body"><p>2D 도면 시대의 간섭 검토는 "겹쳐 그리기"였습니다. 구조·기계·전기·소방 도면을 라이트 테이블 위에 겹쳐 놓거나 CAD 도면층을 겹쳐 보며 사람이 눈으로 부딪히는 곳을 찾았습니다. 그러나 평면도는 높이를, 단면도는 몇 곳만 보여 주므로 천장 속처럼 설비가 몰리는 곳은 놓치기 쉬웠고, 문제는 덕트를 매다는 날 현장에서 드러나 철거·재제작·공기 지연으로 이어졌습니다.</p>
+        <p>3D 모델이 생기자 컴퓨터가 모든 요소 쌍의 공간 겹침을 계산할 수 있게 되었습니다. 간섭 검토는 BIM이 설계·시공 조정에서 가장 먼저, 가장 널리 쓰인 활용 가운데 하나입니다. 그러나 계산이 내놓는 수천 건의 "빨간 점"을 의미 있는 이슈로 바꾸고 해결까지 끌고 가는 것은 여전히 사람과 절차의 몫입니다.</p>
+        <div class="o-chain"><span>연합 모델(공유된 판들)</span><i>→</i><span class="tool">AABB 겹침 · 허용 오차 · 매트릭스 · 그룹화 · 해결 워크플로</span><i>→</i><span>짓기 전에 해결된 관통부 · 천장고 · 재작업 감소</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="types">
+    <h2>간섭의 종류</h2>
+    <div class="problem"><strong>부딪히지 않아도 간섭인가</strong>
+      <p>덕트와 보 사이가 2 cm 떨어져 있습니다. 모델에서는 겹치지 않지만, 덕트에 보온재를 감고 행거를 달 공간이 없습니다. 또 덕트와 보가 전혀 가깝지 않은데, 덕트를 먼저 달면 그 위의 스프링클러 배관을 설치할 수 없습니다. 이것들도 간섭일까요?</p></div>
+    <div class="callout def"><strong>정의 6.1 (간섭과 간섭 검토)</strong> <span class="term">간섭 검토</span><span class="en">(clash detection)</span>는 연합 모델의 요소 쌍 가운데 공간·시간·절차상 함께 있을 수 없는 것을 찾아 조정 이슈로 만드는 일이다. 간섭은 네 가지로 나눈다.
+      <ul>
+        <li><span class="term">하드 간섭</span><span class="en">(hard clash)</span> — 두 요소의 형상이 실제로 겹친다. 덕트가 보를 관통한다.</li>
+        <li><span class="term">소프트 간섭</span><span class="en">(soft clash, clearance clash)</span> — 겹치지는 않지만 정해진 <span class="term">여유 공간</span><span class="en">(clearance zone)</span> 안으로 들어온다. 보온·행거·점검·교체·시공 공차를 위한 공간이 부족하다.</li>
+        <li><span class="term">4D 간섭</span><span class="en">(4D clash, time-based clash)</span> — 같은 시간에 같은 공간을 쓰려 한다. 작업 공간, 가설재, 양중 경로가 겹친다(9장).</li>
+        <li><span class="term">워크플로 간섭</span><span class="en">(workflow clash)</span> — 형상과 시간은 문제가 없어도 작업 순서·자재 반입·승인 같은 절차가 서로를 막는다. 덕트를 먼저 매달면 그 위 배관을 설치할 수 없다.</li>
+      </ul></div>
+    <figure class="diagram" id="fig-cl-types">
+      <svg viewBox="0 0 880 260" role="img" aria-label="간섭의 네 종류: 하드, 소프트, 4D, 워크플로">
+        <rect x="10" y="10" width="860" height="240" rx="10" class="f-surface"/>
+        <g text-anchor="middle"><text x="115" y="38" class="t" style="font-weight:700">하드</text><text x="330" y="38" class="t" style="font-weight:700">소프트(여유 거리)</text><text x="550" y="38" class="t" style="font-weight:700">4D(시간)</text><text x="765" y="38" class="t" style="font-weight:700">워크플로(절차)</text></g>
+        <rect x="80" y="60" width="40" height="120" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="40" y="95" width="150" height="40" style="fill:color-mix(in srgb, var(--blue) 25%, transparent);stroke:var(--blue)"/>
+        <rect x="80" y="95" width="40" height="40" style="fill:var(--bad);opacity:.75"/>
+        <text x="115" y="210" text-anchor="middle" class="t-mono">형상이 겹침 · 깊이 &gt; 0</text>
+        <rect x="290" y="60" width="40" height="120" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="336" y="95" width="100" height="40" style="fill:color-mix(in srgb, var(--blue) 25%, transparent);stroke:var(--blue)"/>
+        <rect x="270" y="76" width="80" height="88" style="fill:none;stroke:var(--bad);stroke-dasharray:5 4"/>
+        <text x="333" y="190" text-anchor="middle" class="t-mono" style="fill:var(--bad)">여유 공간 침범</text>
+        <text x="330" y="210" text-anchor="middle" class="t-mono">간격 &lt; 여유 t</text>
+        <g class="t-mono"><rect x="470" y="60" width="160" height="18" rx="3" style="fill:color-mix(in srgb, var(--warn) 35%, transparent)"/><text x="476" y="73" style="fill:var(--text)">G2 골조 9층 54–60주</text>
+          <rect x="520" y="86" width="110" height="18" rx="3" style="fill:color-mix(in srgb, var(--accent) 30%, transparent)"/><text x="526" y="99" style="fill:var(--text)">커튼월 9층 58주–</text>
+          <rect x="520" y="60" width="40" height="44" style="fill:none;stroke:var(--bad);stroke-width:2"/>
+          <text x="550" y="130" text-anchor="middle">같은 층 · 같은 주</text><text x="550" y="148" text-anchor="middle">양중·작업 공간 충돌</text></g>
+        <text x="550" y="210" text-anchor="middle" class="t-mono">공간 ∩ 시간 ≠ ∅</text>
+        <g class="t-mono"><rect x="690" y="64" width="150" height="20" rx="3" style="fill:color-mix(in srgb, var(--ok) 30%, transparent)"/><text x="696" y="78" style="fill:var(--text)">② 스프링클러 주관(위)</text>
+          <rect x="690" y="110" width="150" height="26" rx="3" style="fill:color-mix(in srgb, var(--blue) 30%, transparent)"/><text x="696" y="127" style="fill:var(--text)">① 덕트 먼저 매닮(아래)</text>
+          <path d="M765 106V90" style="stroke:var(--bad);stroke-width:2;fill:none" marker-end="url(#cl-ah-bad)"/><text x="770" y="160" text-anchor="middle" style="fill:var(--bad)">손이 닿지 않음</text></g>
+        <text x="765" y="210" text-anchor="middle" class="t-mono">순서·반입·승인이 막힘</text>
+        <g style="stroke:var(--border)"><line x1="220" y1="30" x2="220" y2="230"/><line x1="440" y1="30" x2="440" y2="230"/><line x1="660" y1="30" x2="660" y2="230"/></g>
+      </svg>
+      <figcaption><b>그림 6-1.</b> 간섭의 네 종류. 하드·소프트 간섭은 형상 계산으로, 4D 간섭은 형상에 공정 시간을 더해(9장), 워크플로 간섭은 시공 순서·물류 검토로 찾는다. 기하 계산만으로는 오른쪽 두 종류를 찾지 못한다.</figcaption>
+    </figure>
+    <p>이 장의 계산은 대부분 하드·소프트 간섭입니다. 그러나 간섭 검토 보고서에 "0건"이 찍혔다고 조정이 끝난 것이 아님을 기억해야 합니다. 형상 검사는 모델에 있는 것만 봅니다. 모델에 없는 행거·보온재·점검구·시공 순서는 여유 공간(소프트)과 4D·워크플로 검토로 메워야 합니다.</p>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="b10-section">
+    <h2>B-10의 천장 속: 높이로 본 간섭</h2>
+    <div class="problem"><strong>보 춤 0.70 m 안에 덕트 0.40 m가 들어갔다</strong>
+      <p>B-10의 기준층 층고는 4.0 m(1층 5.0 m), 큰보 춤은 슬래브를 포함해 0.70 m입니다. 급기 덕트(1,000 × 400)의 중심은 천장(위층 슬래브 윗면) 아래 0.55 m, 스프링클러 주관(φ100)의 중심은 0.35 m에 그려져 있습니다. 덕트와 배관은 보와 얼마나 겹칠까요?</p></div>
+    <figure class="diagram" id="fig-cl-section">
+      <svg viewBox="0 0 880 300" role="img" aria-label="B-10 기준층 단면: 슬래브, 큰보, 덕트와 배관의 높이 관계">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <rect x="60" y="40" width="560" height="21" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <rect x="300" y="61" width="40" height="49" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <line x1="60" y1="110" x2="620" y2="110" style="stroke:var(--text-faint);stroke-dasharray:3 3"/>
+        <rect x="120" y="75" width="440" height="40" style="fill:color-mix(in srgb, var(--blue) 22%, transparent);stroke:var(--blue);stroke-width:1.6"/>
+        <rect x="300" y="75" width="40" height="35" style="fill:var(--bad);opacity:.8"/>
+        <circle cx="420" cy="75" r="5" style="fill:var(--ok)"/>
+        <g class="t-mono">
+          <text x="70" y="55" style="fill:var(--text)">슬래브 0.21</text>
+          <text x="345" y="100" style="fill:var(--bad);font-weight:700">겹침 0.35</text>
+          <text x="130" y="132" style="fill:var(--blue)">덕트 1,000 × 400 · 중심 −0.55</text>
+          <text x="350" y="31" style="fill:var(--ok)">배관 φ100 · 중심 −0.35 (다른 단면 y = 4 m)</text>
+          
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1" class="t-mono">
+          <line x1="650" y1="40" x2="650" y2="260"/><line x1="642" y1="40" x2="658" y2="40"/><line x1="642" y1="61" x2="658" y2="61"/><line x1="642" y1="75" x2="658" y2="75"/><line x1="642" y1="110" x2="658" y2="110"/><line x1="642" y1="115" x2="658" y2="115"/><line x1="642" y1="260" x2="658" y2="260"/>
+        </g>
+        <g class="t-mono">
+          <text x="664" y="44">0 (위층 슬래브 윗면)</text><text x="664" y="64">−0.21 슬래브 하단</text><text x="664" y="80">−0.35 덕트 윗면</text><text x="664" y="104">−0.70 보 하단</text><text x="664" y="122">−0.75 덕트 하단</text><text x="664" y="264">−4.00 바닥(층고)</text>
+        </g>
+        <rect x="120" y="142" width="440" height="40" style="fill:none;stroke:var(--accent);stroke-dasharray:6 4"/>
+        <text x="130" y="198" class="t-mono" style="fill:var(--accent)">해결 예: 덕트 0.95 m로 내림 → 윗면 −0.75(보 하단과 0.05 간격), 하단 −1.15</text>
+        <line x1="60" y1="212" x2="620" y2="212" style="stroke:var(--warn);stroke-width:2"/>
+        <text x="70" y="230" class="t-mono" style="fill:var(--warn)">천장 마감면 = 덕트 하단 − 0.15(교육용 천장 여유) → 바닥에서 2.70 m</text>
+        <line x1="60" y1="260" x2="620" y2="260" style="stroke:var(--text-dim);stroke-width:2"/>
+      </svg>
+      <figcaption><b>그림 6-2.</b> B-10 기준층 천장 속의 높이(단위 m, 위층 슬래브 윗면 기준, 수직 축척 과장). 덕트(−0.35 ~ −0.75)는 보(−0.21 ~ −0.70)와 0.35 m 겹치고, 배관(−0.30 ~ −0.40)은 보 춤 안에 통째로 들어간다. 천장 여유 0.15 m는 이 책의 교육용 가정(보온·행거·천장 틀)이다.</figcaption>
+    </figure>
+    <div class="callout"><strong>예제 6.1 (3층 덕트와 B열 보의 겹침)</strong> 3층의 위 슬래브 윗면은 z = 13 m다.
+      <p><b>① 두 상자</b> 덕트 DU-SA-3F: x 0.5–31.5, y 11.5–12.5, z 13 − 0.55 ∓ 0.2 = 12.25–12.65. 보 G1-YB-3F(x = 8 m 격자, Y 방향): x 7.8–8.2, y −0.4–24.4, z 13 − 0.70 = 12.30 ~ 13 − 0.21 = 12.79.</p>
+      <p><b>② 축별 겹침</b> \(d_x = \min(31.5, 8.2) - \max(0.5, 7.8) = 0.4\), \(d_y = \min(12.5, 24.4) - \max(11.5, -0.4) = 1.0\), \(d_z = \min(12.65, 12.79) - \max(12.25, 12.30) = 0.35\) m. 셋 다 양수이므로 <b>하드 간섭</b>.</p>
+      <p><b>③ 깊이와 부피</b> 침투 깊이 = min(0.4, 1.0, 0.35) = <b>0.35 m</b>(덕트를 0.35 m 이상 내려야 빠진다), 겹침 부피 = 0.4 × 1.0 × 0.35 = <b>0.14 m³</b>.</p>
+      <p><b>④ 판단</b> 덕트는 x = 0.5–31.5 m로 뻗으므로 x = 8·16·24 m의 Y 방향 보 3개와 겹치고, x = 0·32 m의 보(가장자리, x −0.2–0.2와 31.8–32.2)와는 0.3 m 떨어진다. 층마다 3건, 10개 층에서 <b>30건</b>. 같은 계산을 배관(y 3.95–4.05, z −0.30 ~ −0.40)에 하면 \(d_z = 0.10\), 깊이 0.10 m, 부피 0.4 × 0.1 × 0.1 = 0.004 m³로 역시 층마다 3건, 30건이다.</p></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="aabb">
+    <h2>판정 알고리즘: 축 정렬 경계 상자</h2>
+    <div class="problem"><strong>삼각형 수십만 개를 모두 비교할 수 없다</strong>
+      <p>보 하나는 삼각형 12개, 곡면 배관은 수백 개로 그려집니다. 요소 수천 개의 모든 삼각형 쌍을 교차 검사하면 계산이 끝나지 않습니다. 먼저 "확실히 안 부딪히는 쌍"을 싸게 걸러 낼 방법이 필요합니다.</p></div>
+    <p>요소를 감싸는 가장 작은 직육면체 가운데 모서리가 좌표축과 나란한 것을 <span class="term">경계 상자</span><span class="en">(axis-aligned bounding box, AABB)</span>라 합니다. 최솟값 \((x_0, y_0, z_0)\)과 최댓값 \((x_1, y_1, z_1)\) 여섯 숫자로 정해지고, 두 AABB가 겹치는지는 축마다 구간이 겹치는지만 보면 됩니다. B-10 BIM의 요소는 모두 상자이므로 이 책에서는 AABB 판정이 곧 형상 판정입니다.</p>
+    <div class="callout def"><strong>원리 6.2 (AABB 겹침 판정)</strong> 두 상자 \(A, B\)의 축 \(k \in \{x, y, z\}\) 방향 겹침 길이를
+      <div class="formula">$$d_k = \min\left(A_k^{\max}, B_k^{\max}\right) - \max\left(A_k^{\min}, B_k^{\min}\right)$$
+      $$\text{하드: } d_x, d_y, d_z > 0, \qquad \text{깊이 } \delta = \min_k d_k, \qquad V = d_x\, d_y\, d_z$$
+      $$\text{소프트: 하드가 아니고 } d_k > -t \ (\text{모든 } k), \qquad \text{간격 } g = \sqrt{\textstyle\sum_k \min(d_k, 0)^2}$$<div class="where">\(d_k > 0\)이면 그 축에서 구간이 겹치고, \(d_k \lt 0\)이면 \(|d_k|\)만큼 떨어져 있다. 세 축 모두 겹쳐야 상자가 겹친다(한 축이라도 떨어져 있으면 분리). <span class="term">침투 깊이</span><span class="en">(penetration depth)</span> \(\delta\)는 상자를 떼어 내려면 움직여야 하는 최소 거리, \(V\)는 <span class="term">겹침 부피</span><span class="en">(overlap volume)</span>, \(t\)는 <span class="term">허용 오차</span><span class="en">(tolerance)</span>(여유 거리), \(g\)는 떨어진 상자 사이의 최단 거리다. 맞닿은 경우(\(d_k = 0\))는 하드 간섭이 아니다. 이 식이 <code>CB.bim.overlap(a, b, t)</code>의 구현이다.</div></div></div>
+    <figure class="diagram" id="fig-cl-intervals">
+      <svg viewBox="0 0 860 250" role="img" aria-label="두 상자의 x축과 z축 투영 구간이 모두 겹칠 때만 상자가 겹친다">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g transform="translate(30,0)">
+          <line x1="80" y1="200" x2="400" y2="200" class="s-axis"/><line x1="80" y1="200" x2="80" y2="30" class="s-axis"/>
+          <rect x="130" y="80" width="160" height="70" style="fill:color-mix(in srgb, var(--text-dim) 18%, transparent);stroke:var(--text-dim)"/>
+          <rect x="240" y="120" width="120" height="60" style="fill:color-mix(in srgb, var(--blue) 18%, transparent);stroke:var(--blue)"/>
+          <rect x="240" y="120" width="50" height="30" style="fill:var(--bad);opacity:.8"/>
+          <line x1="130" y1="212" x2="290" y2="212" style="stroke:var(--text-dim);stroke-width:4"/><line x1="240" y1="222" x2="360" y2="222" style="stroke:var(--blue);stroke-width:4"/>
+          <line x1="240" y1="232" x2="290" y2="232" style="stroke:var(--bad);stroke-width:4"/><text x="300" y="236" class="t-mono" style="fill:var(--bad)">dₓ &gt; 0</text>
+          <line x1="66" y1="80" x2="66" y2="150" style="stroke:var(--text-dim);stroke-width:4"/><line x1="56" y1="120" x2="56" y2="180" style="stroke:var(--blue);stroke-width:4"/>
+          <line x1="46" y1="120" x2="46" y2="150" style="stroke:var(--bad);stroke-width:4"/><text x="20" y="112" class="t-mono" style="fill:var(--bad)">d_z</text>
+          <text x="240" y="44" text-anchor="middle" class="t" style="font-weight:700">두 축 모두 겹침 → 하드</text>
+        </g>
+        <g transform="translate(440,0)">
+          <line x1="40" y1="200" x2="360" y2="200" class="s-axis"/><line x1="40" y1="200" x2="40" y2="30" class="s-axis"/>
+          <rect x="80" y="80" width="140" height="70" style="fill:color-mix(in srgb, var(--text-dim) 18%, transparent);stroke:var(--text-dim)"/>
+          <rect x="250" y="110" width="90" height="60" style="fill:color-mix(in srgb, var(--blue) 18%, transparent);stroke:var(--blue)"/>
+          <rect x="220" y="62" width="30" height="106" style="fill:none;stroke:var(--warn);stroke-dasharray:4 3"/>
+          <line x1="80" y1="212" x2="220" y2="212" style="stroke:var(--text-dim);stroke-width:4"/><line x1="250" y1="222" x2="340" y2="222" style="stroke:var(--blue);stroke-width:4"/>
+          <line x1="220" y1="232" x2="250" y2="232" style="stroke:var(--warn);stroke-width:2"/><text x="256" y="238" class="t-mono" style="fill:var(--warn)">dₓ &lt; 0 → 분리(간격 |dₓ|)</text>
+          <text x="200" y="44" text-anchor="middle" class="t" style="font-weight:700">한 축이 떨어짐 → 하드 아님</text>
+          <text x="200" y="64" text-anchor="middle" class="t-mono" style="fill:var(--warn)">|dₓ| &lt; t 이면 소프트</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 6-3.</b> AABB 판정은 축별 구간 겹침의 곱셈이다(그림은 x–z 두 축). 왼쪽은 두 축 모두 겹쳐 하드 간섭(빨강 = 겹친 부분), 오른쪽은 x축에서 떨어져 하드가 아니지만 그 간격이 허용 오차 t보다 작으면 소프트 간섭이다.</figcaption>
+    </figure>
+    <p>AABB는 빠르지만 정직하게 한계를 말해야 합니다. 상자는 요소를 <b>감싸는</b> 것이므로 실제 형상보다 크고, 그 차이에서 <span class="term">허위 간섭</span><span class="en">(false positive clash)</span>이 생깁니다. 원형 배관의 AABB는 정사각형이라 모서리에서 실제로는 닿지 않는 요소와 겹친다고 판정하고, 대각선으로 놓인 배관·가새·경사 덕트의 AABB는 부재보다 훨씬 커서 근처의 모든 것과 겹친다고 판정합니다. 반대로 AABB가 겹치지 않으면 실제 형상도 절대 겹치지 않습니다(놓침이 없다). 그래서 실무 도구는 AABB를 1차 걸러 내기(광역 단계)로 쓰고, 통과한 쌍만 실제 메시·솔리드로 다시 검사합니다(세부 단계). 아래 시뮬레이터에서 두 경우를 직접 확인하세요. 기울어진 사각형끼리의 정확한 판정은 <span class="term">분리 축 정리</span><span class="en">(separating axis theorem, SAT)</span>로 합니다 — 두 볼록 도형은 어떤 축에 투영한 구간이 겹치지 않으면 분리되어 있고, 사각형 둘이면 네 변의 법선 방향만 검사하면 됩니다.</p>
+    <figure class="diagram" id="fig-cl-false">
+      <svg viewBox="0 0 860 220" role="img" aria-label="원형 배관과 대각선 부재의 AABB가 만드는 허위 간섭">
+        <rect x="10" y="10" width="840" height="200" rx="10" class="f-surface"/>
+        <rect x="60" y="60" width="120" height="110" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <circle cx="215" cy="56" r="40" style="fill:color-mix(in srgb, var(--ok) 25%, transparent);stroke:var(--ok);stroke-width:1.6"/>
+        <rect x="175" y="16" width="80" height="80" style="fill:none;stroke:var(--ok);stroke-dasharray:4 3"/>
+        <rect x="175" y="60" width="5" height="36" style="fill:var(--bad)"/>
+        <text x="120" y="196" text-anchor="middle" class="t-mono">원형 배관: 상자 모서리만 겹침 → 허위</text>
+        <rect x="360" y="110" width="130" height="70" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+        <polygon points="380,40 395,30 560,150 545,160" style="fill:color-mix(in srgb, var(--blue) 25%, transparent);stroke:var(--blue);stroke-width:1.6"/>
+        <rect x="380" y="30" width="180" height="130" style="fill:none;stroke:var(--blue);stroke-dasharray:4 3"/>
+        <rect x="380" y="110" width="110" height="50" style="fill:var(--bad);opacity:.45"/>
+        <text x="470" y="196" text-anchor="middle" class="t-mono">사선 배관: AABB가 크다 → 허위 가능</text>
+        <g class="t-mono"><text x="620" y="60" style="fill:var(--text);font-weight:700">AABB의 성질</text><text x="620" y="84">겹치지 않음 → 실제도 겹치지 않음</text><text x="620" y="104">겹침 → 실제는 겹칠 수도 아닐 수도</text><text x="620" y="128" style="fill:var(--accent)">→ 1차 걸러 내기(광역 단계)</text><text x="620" y="148" style="fill:var(--accent)">→ 통과 쌍만 정밀 검사(세부 단계)</text></g>
+      </svg>
+      <figcaption><b>그림 6-4.</b> AABB의 허위 간섭. 점선이 AABB, 빨강이 AABB끼리 겹친 부분이다. 원형 단면은 모서리, 사선 부재는 상자의 빈 부분에서 실제와 다른 판정이 나온다. 놓치는 간섭은 없으므로 1차 걸러 내기로 안전하다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-cl-aabb">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>AABB 겹침 놀이터: 축별 겹침, 깊이, 부피와 허위 간섭</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cl-cv-aabb" aria-label="두 상자를 끌어 축별 겹침 구간을 보는 단면 평면"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>요소 B의 형상</span><div class="seg" id="cl-ab-m"><button data-value="box" class="on">상자</button><button data-value="round">원형 배관</button><button data-value="diag">사선 배관</button></div></div>
+          <label class="ctrl"><span>B 폭(지름·길이) <output id="cl-ab-w-out"></output></span><input type="range" id="cl-ab-w" min="0.2" max="4" step="0.05" value="1.6"></label>
+          <label class="ctrl"><span>B 높이(두께) <output id="cl-ab-h-out"></output></span><input type="range" id="cl-ab-h" min="0.1" max="2" step="0.05" value="0.6"></label>
+          <label class="ctrl"><span>y 방향 겹침 d_y(공통) <output id="cl-ab-y-out"></output></span><input type="range" id="cl-ab-y" min="0.1" max="2" step="0.05" value="1"></label>
+          <label class="ctrl"><span>허용 오차 t <output id="cl-ab-t-out"></output></span><input type="range" id="cl-ab-t" min="0" max="0.5" step="0.01" value="0.1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">dₓ · d_z</span><span class="v" id="cl-ab-o-d">—</span></div>
+        <div class="stat"><span class="k">깊이 δ · 부피 V</span><span class="v" id="cl-ab-o-v">—</span></div>
+        <div class="stat"><span class="k">AABB 판정 · 간격</span><span class="v" id="cl-ab-o-a">—</span></div>
+        <div class="stat"><span class="k">실제 형상 판정</span><span class="v" id="cl-ab-o-r">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 점(요소 중심)을 끌어 B를 A(보 단면, 0.4 × 0.7 m를 키운 회색 상자) 쪽으로 옮기세요 · 두 축의 투영 막대가 모두 빨강일 때만 하드입니다 · 한 축만 떨어뜨려 간격이 t보다 작으면 소프트 · 「원형 배관」으로 바꿔 A의 모서리 근처에 두면 AABB는 하드인데 실제는 떨어진 허위 간섭이 나옵니다 · 「사선 배관」은 AABB가 훨씬 커져 허위가 더 쉽게 생깁니다 · 모델: 원리 6.2(<code>CB.bim.overlap</code>), 실제 판정은 원–사각형 최근접점, 사각형–사각형 분리 축 정리(페이지의 교육용 함수). 단위 m.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="checker">
+    <h2>간섭 매트릭스와 B-10 검토</h2>
+    <div class="problem"><strong>모든 것을 모든 것과 검사하면 560건</strong>
+      <p>B-10 BIM 요소 360개의 모든 쌍(64,620쌍)을 검사하면 하드 간섭이 560건 나옵니다. 그 가운데 480건은 보끼리, 보와 벽, 벽과 기둥이 만나는 <b>접합부</b>입니다. 구조 모델이 원래 그렇게 그려진 것이지 문제가 아닙니다. 무엇을 무엇과 검사해야 할까요?</p></div>
+    <p>그래서 간섭 검토는 <span class="term">간섭 매트릭스</span><span class="en">(clash matrix)</span>로 시작합니다. 분야(또는 요소 유형) × 분야 표의 칸마다 검사 여부, 간섭 종류, 허용 오차를 정한 것으로 BEP의 일부가 됩니다. 같은 분야 안의 접합부는 보통 작성 팀이 자체 품질 검사로 다루고, 조정 검토는 분야 사이를 봅니다. 아래 표는 B-10의 교육용 매트릭스입니다.</p>
+    <figure class="diagram" id="fig-cl-matrix">
+      <svg viewBox="0 0 860 250" role="img" aria-label="B-10 교육용 간섭 매트릭스: 분야 쌍별 검사 여부, 종류, 허용 오차, 결과">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g class="t" style="font-weight:700" text-anchor="middle"><text x="300" y="44">구조 S</text><text x="450" y="44">건축 A 천장</text><text x="600" y="44">기계 M 덕트</text><text x="750" y="44">소방 F 배관</text></g>
+        <g class="t" style="font-weight:700"><text x="40" y="86">구조 S</text><text x="40" y="132">건축 A 천장</text><text x="40" y="178">기계 M 덕트</text><text x="40" y="224">소방 F 배관</text></g>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="230" y="60" width="140" height="40" rx="6" class="f-elev"/><text x="300" y="78">자체 검사</text><text x="300" y="92">접합부 480 제외</text>
+          <rect x="380" y="60" width="140" height="40" rx="6" class="f-elev"/><text x="450" y="85">H, t = 0 → 0</text>
+          <rect x="530" y="60" width="140" height="40" rx="6" style="fill:color-mix(in srgb, var(--bad) 14%, transparent);stroke:var(--bad)"/><text x="600" y="78" style="fill:var(--bad)">H + S 50 mm</text><text x="600" y="92" style="fill:var(--bad)">보 30 · 벽 20</text>
+          <rect x="680" y="60" width="140" height="40" rx="6" style="fill:color-mix(in srgb, var(--bad) 14%, transparent);stroke:var(--bad)"/><text x="750" y="78" style="fill:var(--bad)">H + S 25 mm</text><text x="750" y="92" style="fill:var(--bad)">보 30</text>
+          <rect x="380" y="106" width="140" height="40" rx="6" class="f-elev"/><text x="450" y="131">—</text>
+          <rect x="530" y="106" width="140" height="40" rx="6" class="f-elev"/><text x="600" y="124">S 100 mm</text><text x="600" y="138">천장고안에 따라</text>
+          <rect x="680" y="106" width="140" height="40" rx="6" class="f-elev"/><text x="750" y="131">H → 0</text>
+          <rect x="530" y="152" width="140" height="40" rx="6" class="f-elev"/><text x="600" y="177">자체 검사</text>
+          <rect x="680" y="152" width="140" height="40" rx="6" class="f-elev"/><text x="750" y="170">H + S 50 mm</text><text x="750" y="184">→ 0</text>
+          <rect x="680" y="198" width="140" height="34" rx="6" class="f-elev"/><text x="750" y="220">자체 검사</text>
+        </g>
+        <text x="240" y="160" class="t-mono">H = 하드, S = 소프트(여유 거리 t)</text><text x="240" y="178" class="t-mono">대칭이므로 위 삼각형만</text><text x="240" y="196" class="t-mono">허용 오차 값은 교육용</text>
+      </svg>
+      <figcaption><b>그림 6-5.</b> B-10의 교육용 간섭 매트릭스. 칸마다 검사 종류와 허용 오차를 정하고, 기본 판(덕트 0.55 m)의 하드 간섭 결과를 적었다. 허용 오차의 실제 값은 프로젝트의 BEP와 분야별 시공 요구로 정한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-cl-check">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>간섭 검토기: B-10 BIM에서 규칙별 간섭 찾기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cl-cv-check" aria-label="B-10 BIM 3D 장면, 간섭 위치는 빨강, 선택한 간섭은 주황, 끌어서 회전"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>검사 규칙</span><div class="seg" id="cl-ck-r"><button data-value="db" class="on">덕트–보</button><button data-value="pb">배관–보</button><button data-value="dw">덕트–코어 벽</button><button data-value="all">세 규칙</button><button data-value="every">전체 대 전체</button></div></div>
+          <label class="ctrl"><span>허용 오차 t(소프트) <output id="cl-ck-t-out"></output></span><input type="range" id="cl-ck-t" min="0" max="0.6" step="0.01" value="0"></label>
+          <label class="ctrl"><span>보기 층 <output id="cl-ck-f-out"></output></span><input type="range" id="cl-ck-f" min="0" max="10" step="1" value="0"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">간섭(하드 / 소프트)</span><span class="v" id="cl-ck-o-n">—</span></div>
+        <div class="stat"><span class="k">겹침 부피 합</span><span class="v" id="cl-ck-o-v">—</span></div>
+        <div class="stat"><span class="k">최대 침투 깊이</span><span class="v" id="cl-ck-o-d">—</span></div>
+        <div class="stat"><span class="k">선택한 간섭</span><span class="v" id="cl-ck-o-s">—</span></div>
+      </div>
+      <div class="table-wrap" style="margin:0;border-left:0;border-right:0;border-radius:0;max-height:250px;overflow-y:auto"><table class="cl-tbl"><thead><tr><th>#</th><th>요소 A</th><th>요소 B</th><th>종류</th><th class="num">깊이 m</th><th class="num">부피 m³</th><th>중심 (x, y, z)</th></tr></thead><tbody id="cl-ck-rows"></tbody></table></div>
+      <div class="sim-note">해볼 것: 덕트–보 30건(층마다 x = 8·16·24 m), 배관–보 30건, 덕트–코어 벽 20건을 확인하세요 · 표의 행을 누르면 그 간섭이 주황으로 선택되고 3D가 그 층을 보여 줍니다 · 덕트–보에서 t를 0.31 m 이상으로 올리면 가장자리 보(x = 0·32 m)와의 소프트 간섭 20건이 더해집니다 · 「전체 대 전체」는 하드 560건 가운데 480건이 구조 접합부임을 보여 줍니다 — 매트릭스 없이 검사하면 진짜 문제 80건이 묻힙니다 · 모델: <code>CB.bim.model()</code>, <code>CB.bim.clashes</code>(경계에서 간격 = t는 통과로 보도록 t − 10⁻⁹ 사용), 전체 대 전체는 i &lt; j 쌍의 <code>CB.bim.overlap</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 6.2 (덕트–코어 벽 20건은 오류인가)</strong> 덕트 DU-SA-nF(y 11.5–12.5)는 코어 벽 W-CORE3(x 8.0–8.4, y 8–16)와 W-CORE4(x 23.6–24.0)를 지난다.
+      <p><b>① 겹침</b> \(d_x = 0.4\)(벽 두께), \(d_y = 1.0\)(덕트 폭), 벽은 층 전체 높이이므로 \(d_z = 0.4\)(덕트 높이 전체). 깊이 0.4 m, 부피 0.16 m³, 층마다 2건, <b>20건</b>.</p>
+      <p><b>② 성격</b> 급기 덕트가 코어(계단·승강기·샤프트) 안의 복도로 공기를 보내려면 코어 벽을 반드시 지나야 한다. 이것은 설계 의도대로의 <span class="term">관통부</span><span class="en">(penetration)</span>이고, 해결은 덕트를 피하는 것이 아니라 벽에 <span class="term">개구부</span><span class="en">(opening)</span>를 내고 내화 충전·방화 댐퍼 같은 조치를 정하는 것이다.</p>
+      <p><b>③ 모델링</b> IFC에서는 개구부를 <code>IfcOpeningElement</code>로 만들고 <code>IfcRelVoidsElement</code>로 벽에 연결한다. 개구부가 모델에 들어가면 실제 형상 검사에서는 간섭이 사라지지만, 이 장의 AABB 판정은 벽을 여전히 꽉 찬 상자로 본다. 그래서 검토 규칙에 "승인된 개구부 안의 겹침은 제외"를 넣어야 한다(해결 방법 절).</p>
+      <p><b>④ 판단</b> 80건 가운데 20건은 "오류"가 아니라 "조정해야 할 관통부"다. 간섭 보고서는 건수가 아니라 <b>성격</b>으로 분류해 읽는다.</p></div>
+    <div class="callout site"><strong>B-10 BIM 간섭 검토 결과(기본 판)</strong> <code>CB.bim.clashes</code>로 얻은 하드 간섭: 덕트–보 <b>30건</b>(층당 3, x = 8·16·24 m의 Y 방향 큰보, 깊이 0.35 m, 부피 각 0.14 m³), 배관–보 <b>30건</b>(층당 3, 깊이 0.10 m, 부피 각 0.004 m³), 덕트–코어 벽 <b>20건</b>(층당 2, 관통부, 깊이 0.40 m, 부피 각 0.16 m³). 합계 80건, 겹침 부피 합 7.52 m³. 덕트–기둥, 덕트–슬래브, 배관–기둥, 덕트–배관은 0건이다. 전체 대 전체 검사의 나머지 480건(보–보 200, 보–벽 140, 벽–기둥 100, 벽–벽 40)은 구조 모델 안의 접합부다.</div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="soft">
+    <h2>소프트 간섭과 여유 공간</h2>
+    <div class="problem"><strong>덕트를 내려 하드 간섭을 없앴더니</strong>
+      <p>덕트를 천장 아래 0.95 m로 내리자 덕트–보 하드 간섭이 0이 되었습니다. 그런데 덕트 윗면과 보 하단 사이는 50 mm뿐이고, 덕트 아래 천장판까지도 120 mm입니다. 보온재·행거·플랜지를 둘 공간은 충분할까요?</p></div>
+    <div class="callout def"><strong>정의 6.3 (여유 공간과 소프트 간섭 검사)</strong> 요소 둘레에 시공·운영에 필요한 두께 \(t\)의 여유 공간을 두고, 다른 요소가 그 안에 들어오면 소프트 간섭으로 본다. AABB에서는 원리 6.2의 \(d_k > -t\) 조건과 같다. 여유 공간의 근거는 ① 보온·마감 두께(모델에 없는 층), ② 행거·지지대·플랜지, ③ 점검·교체를 위한 접근 공간(장비 앞 작업 공간, 점검구), ④ 시공 오차와 처짐이다. 여유 공간을 모델에 별도의 투명 요소로 그려 두는 방식도 쓴다. 값은 제조사·발주자 요구와 BEP로 정하며, 이 장의 값은 교육용이다.</div>
+    <div class="sim" id="sim-cl-soft">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>여유 공간 두께와 소프트 간섭의 계단</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cl-cv-soft" aria-label="여유 공간 두께에 따른 소프트 간섭 수 계단 곡선과 상대 요소별 막대"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>덕트 둘레 여유 공간 t <output id="cl-sf-t-out"></output></span><input type="range" id="cl-sf-t" min="0" max="0.7" step="0.01" value="0.1"></label>
+          <div class="ctrl"><span>덕트 높이(천장 아래)</span><div class="seg" id="cl-sf-d"><button data-value="0.95" class="on">0.95 m</button><button data-value="1.00">1.00 m</button><button data-value="1.05">1.05 m</button></div></div>
+          <div class="ctrl"><span>천장판 높이(교육용 건축 모델)</span><div class="seg" id="cl-sf-c"><button data-value="0">없음</button><button data-value="2.6">2.6 m</button><button data-value="2.7" class="on">2.7 m</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">소프트 간섭 합계</span><span class="v" id="cl-sf-o-n">—</span></div>
+        <div class="stat"><span class="k">보 · 천장 · 슬래브</span><span class="v" id="cl-sf-o-b">—</span></div>
+        <div class="stat"><span class="k">하드(코어 벽 관통부)</span><span class="v" id="cl-sf-o-h">—</span></div>
+        <div class="stat"><span class="k">덕트–보 최소 간격</span><span class="v" id="cl-sf-o-g">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 덕트 0.95 m, 천장 2.7 m에서 t를 0에서 올리면 계단이 네 번 생깁니다 — 0.05 m 초과 큰보 30, 0.12 m 초과 천장판 18(2–10층), 0.30 m 초과 가장자리 보 20, 0.54 m 초과 슬래브 10 · 덕트를 1.00 m로 내리면 보 계단은 0.10 m로 밀리지만 천장 계단이 0.07 m로 당겨집니다 — 위아래 여유를 나눠 가지는 셈입니다 · 천장판을 없애면 천장 쪽 계단이 사라집니다(모델에 없는 것은 검사되지 않는다) · 모델: <code>CB.bim.model({ ductDrop })</code> + 5장의 교육용 천장 모델, <code>CB.bim.clashes</code>의 허용 오차, 코어 벽 20건은 관통부로 따로 셈.</div>
+    </div>
+    <p>계단 모양은 소프트 간섭 검사의 본질을 보여 줍니다. 여유 공간 두께를 조금 바꾸면 간섭 수가 수십 건씩 뛰고, 그 대부분은 같은 원인(같은 덕트와 같은 줄의 보)이 층마다 되풀이된 것입니다. 그래서 허용 오차를 정할 때는 "몇 건이 나오나"가 아니라 "이 두께가 무엇을 위한 공간인가"를 근거로 삼아야 합니다. 덕트 위 50 mm는 플랜지와 행거 볼트에는 빠듯할 수 있고, 덕트 아래 120 mm는 보온과 천장 틀에 쓰입니다.</p>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="trade-off">
+    <h2>덕트 높이와 천장고의 trade-off</h2>
+    <div class="problem"><strong>간섭 0과 천장고 2.7 m를 함께 얻을 수 있나</strong>
+      <p>발주자는 사무 공간의 천장고 2.7 m를 원합니다(교육용 요구). 덕트를 내리면 보와의 간섭은 사라지지만 천장도 함께 내려갑니다. 두 조건을 모두 만족하는 덕트 높이는 얼마일까요?</p></div>
+    <div class="callout def"><strong>원리 6.4 (덕트 높이 – 천장고, 이 장의 가정)</strong> 덕트 중심이 위층 슬래브 윗면 아래 \(e\)(= <code>ductDrop</code>)에 있으면 덕트 하단 깊이는 \(e + 0.20\) m(덕트 높이 0.40의 절반)이다. 천장 마감면은 덕트 하단에서 천장 여유 \(c\)만큼 아래이고, 바닥에서 천장 마감면까지가 <span class="term">천장고</span><span class="en">(ceiling height)</span> \(H_c\)다(바닥 마감 두께는 무시).
+      <div class="formula">$$H_c = h - (e + 0.20) - c, \qquad \text{보와 여유 } s\text{ 확보: } e - 0.20 \ge 0.70 + s$$<div class="where">\(h\): 층고(2–10층 4.0 m, 1층 5.0 m), \(c\): 천장 여유(보온·행거·천장 틀, 교육용 0.15 m), \(s\): 보 하단과 덕트 윗면의 최소 간격. 왼쪽 식은 \(e\)가 커질수록 천장고가 줄고, 오른쪽 식은 \(e \ge 0.90 + s\)를 요구한다. 두 식을 함께 만족하는 \(e\)의 범위가 가능 영역이다. \(s = 0.05\), \(c = 0.15\), 목표 \(H_c \ge 2.70\)이면 \(e \ge 0.95\)이고 \(e \le 4.0 - 0.20 - 0.15 - 2.70 = 0.95\) — 가능 영역은 \(e = 0.95\) m 한 점뿐이다.</div></div></div>
+    <div class="sim" id="sim-cl-drop">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>덕트 높이 조정: 간섭 수와 천장고 곡선</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cl-cv-drop" aria-label="덕트 높이에 따른 간섭 수 계단 곡선과 천장고 직선, 가능 영역"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>덕트 중심 깊이 e (ductDrop) <output id="cl-dp-e-out"></output></span><input type="range" id="cl-dp-e" min="0.3" max="1.4" step="0.01" value="0.55"></label>
+          <label class="ctrl"><span>보와의 최소 간격 s <output id="cl-dp-s-out"></output></span><input type="range" id="cl-dp-s" min="0" max="0.15" step="0.01" value="0.05"></label>
+          <label class="ctrl"><span>천장 여유 c <output id="cl-dp-c-out"></output></span><input type="range" id="cl-dp-c" min="0.1" max="0.3" step="0.01" value="0.15"></label>
+          <label class="ctrl"><span>목표 천장고(교육용) <output id="cl-dp-g-out"></output></span><input type="range" id="cl-dp-g" min="2.4" max="3.2" step="0.05" value="2.7"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">하드 · 간격 부족(s 이내)</span><span class="v" id="cl-dp-o-n">—</span></div>
+        <div class="stat"><span class="k">천장고 2–10층 / 1층</span><span class="v" id="cl-dp-o-h">—</span></div>
+        <div class="stat"><span class="k">가능 영역 e</span><span class="v" id="cl-dp-o-w">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="cl-dp-o-j">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값 e = 0.55 m에서 간섭 30건(덕트–보), 천장고 3.10 m · e를 0.45 m 미만으로 올리면 덕트 윗면이 슬래브에 닿아 슬래브 간섭 10건이 더해집니다 · e = 0.90 m에서 하드는 0이지만 덕트가 보에 맞닿아 간격 부족 30건 · e = 0.95 m에서 둘 다 0, 천장고 2.70 m로 목표에 딱 맞습니다 · 목표를 2.80 m로 올리면 가능 영역이 사라집니다 — 덕트를 납작하게 바꾸거나(해결 방법 절) 층고를 키워야 합니다 · 모델: 곡선은 e를 0.01 m씩 바꾸며 <code>CB.bim.model({ ductDrop: e })</code>를 다시 만들고 <code>CB.bim.clashes</code>(덕트 대 보·슬래브)로 센 값, 천장고는 원리 6.4.</div>
+    </div>
+    <div class="callout"><strong>예제 6.3 (가능 영역 찾기)</strong> 보와 간격 s = 0.05 m, 천장 여유 c = 0.15 m, 목표 천장고 2.70 m.
+      <p><b>① 간섭 조건</b> 덕트 윗면 깊이 \(e - 0.20 \ge 0.70 + 0.05\) → \(e \ge 0.95\) m.</p>
+      <p><b>② 천장 조건</b> \(4.0 - (e + 0.20) - 0.15 \ge 2.70\) → \(e \le 0.95\) m.</p>
+      <p><b>③ 결과</b> \(e = 0.95\) m 한 점. 이때 2–10층 천장고 2.70 m, 1층 3.70 m. 시공 오차가 조금만 나도 둘 중 하나가 깨지는 <b>여유 없는 해</b>다.</p>
+      <p><b>④ 판단</b> 가능 영역이 한 점이라는 것은 설계 여유가 없다는 경고다. 덕트 단면을 1,600 × 280으로 납작하게 바꾸면 덕트 높이가 0.12 m 줄어 같은 간격에서 천장고 2.82 m(예제 6.5)를 얻는다. 이 판단을 설계 초기에 하려고 간섭 검토를 한다 — 덕트를 매다는 날에는 선택지가 없다.</p></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="grouping">
+    <h2>간섭 그룹화, 중복과 허위 걸러 내기</h2>
+    <div class="problem"><strong>80건을 80번 회의할 것인가</strong>
+      <p>덕트–보 30건은 사실 "덕트가 보 아래로 지나가야 한다"는 결정 하나로 모두 풀립니다. 반대로 3층 B열의 덕트–보 간섭과 덕트–코어 벽 간섭은 0.2 m 떨어진 같은 자리의 문제입니다. 간섭을 어떻게 묶어야 회의와 결정의 단위가 될까요?</p></div>
+    <p>간섭 검토 도구의 출력은 "요소 쌍"이지만, 사람이 결정하는 단위는 "문제"입니다. 그래서 출력을 다듬는 세 단계를 거칩니다. ① <span class="term">중복 간섭</span><span class="en">(duplicate clash)</span> 제거 — 같은 쌍이 A–B, B–A로 두 번 나오거나, 한 요소가 여러 조각으로 나뉘어 같은 자리에서 여러 번 나오는 것을 하나로 합친다. ② 허위 간섭 걸러 내기 — AABB의 모서리 효과, 승인된 개구부·슬리브 안의 겹침, 같은 분야 접합부를 규칙으로 뺀다. ③ <span class="term">간섭 그룹</span><span class="en">(clash group)</span> 만들기 — 가까운 간섭, 같은 원인의 간섭을 묶어 하나의 <span class="term">조정 이슈</span><span class="en">(coordination issue)</span>로 만든다. 묶는 방법은 거리(반경 r 안의 간섭을 사슬처럼 연결), 위치(층·구역·격자 줄), 원인(같은 요소, 같은 규칙)이 있다.</p>
+    <div class="sim" id="sim-cl-group">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>간섭 그룹화: 반경과 규칙으로 80건을 이슈로 묶기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cl-cv-group" aria-label="B-10 간섭 80건의 x–z 입면 위치를 그룹 색으로 칠한 그림과 반경별 이슈 수 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>묶음 반경 r <output id="cl-gr-r-out"></output></span><input type="range" id="cl-gr-r" min="0" max="17" step="0.1" value="0.5"></label>
+          <div class="ctrl"><span>묶는 범위</span><div class="seg" id="cl-gr-m"><button data-value="any" class="on">규칙 무관</button><button data-value="same">같은 규칙끼리</button></div></div>
+          <label class="check"><input type="checkbox" id="cl-gr-z"> 층을 무시(기준층 대표 이슈)</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">간섭 → 이슈</span><span class="v" id="cl-gr-o-n">—</span></div>
+        <div class="stat"><span class="k">가장 큰 이슈</span><span class="v" id="cl-gr-o-m">—</span></div>
+        <div class="stat"><span class="k">회의 단위 감소</span><span class="v" id="cl-gr-o-p">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: r = 0.5 m(규칙 무관)이면 같은 자리의 덕트–보와 덕트–코어 벽(0.20 m 거리)이 합쳐져 60개 이슈 · r를 4.0 m 넘게 키우면 층마다 되풀이된 간섭이 세로로 이어져 6개(같은 규칙끼리면 8개) · 8 m를 넘기면 줄 전체가 하나로 붙어 결정 단위로는 너무 큽니다 · 「층을 무시」를 켜면 r가 작아도 기준층 대표 이슈로 정리됩니다(같은 규칙끼리 8개, 규칙 무관 6개) — 반복되는 층의 문제는 기준층에서 한 번 결정합니다 · 모델: 간섭 중심 사이 3D 거리 ≤ r면 같은 그룹(단일 연결 군집, 경계 비교에 10⁻⁶ m 여유), 위 그림은 x–z 입면(○ 덕트–보, △ 배관–보, □ 덕트–벽).</div>
+    </div>
+    <div class="callout"><strong>예제 6.4 (우선순위 정하기)</strong> 기준층 대표 이슈 8개(덕트–보 3, 배관–보 3, 덕트–벽 2)를 이 장의 교육용 기준(① 구조 영향, ② 영향 층수, ③ 겹침 부피, ④ 후속 공종 대기)으로 정렬한다.
+      <p><b>① 1순위: 덕트–보 3</b> 해결안(덕트 내리기)이 천장고를 바꾸므로 건축·발주자 결정이 필요하고, 10개 층 모두 영향, 부피 0.14 m³씩 가장 크다.</p>
+      <p><b>② 2순위: 덕트–코어 벽 2</b> 관통부는 피할 수 없고 코어 벽 개구부는 구조 검토가 필요하다. 골조 공정(9장)이 진행되기 전에 개구부 위치를 확정해야 한다 — 콘크리트를 부은 뒤에는 코어 드릴링이 된다.</p>
+      <p><b>③ 3순위: 배관–보 3</b> φ100 배관은 보 슬리브로 풀 수 있고 부피는 0.004 m³씩 작다. 다만 슬리브도 타설 전에 넣어야 하므로 골조 공정에 묶여 있다.</p>
+      <p><b>④ 판단</b> 우선순위는 건수나 부피만이 아니라 <b>결정의 비용</b>(누가 결정해야 하나, 되돌릴 수 있나)과 <b>공정의 마감</b>(언제까지 정해야 하나)으로 정한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="workflow">
+    <h2>해결 워크플로: 담당, 상태, 재검토</h2>
+    <div class="problem"><strong>지난주에 고쳤다는데 왜 또 나오나</strong>
+      <p>기계 팀은 덕트를 내렸다고 합니다. 그런데 이번 주 간섭 검토에도 같은 간섭이 나왔습니다. 기계 팀이 고친 판이 아직 공유되지 않았을 수도, 덕트를 내리면서 새로 배관과 부딪혔을 수도 있습니다. 이슈는 어떻게 추적해야 할까요?</p></div>
+    <figure class="diagram" id="fig-cl-flow">
+      <svg viewBox="0 0 880 250" role="img" aria-label="간섭 해결 워크플로: 공유, 연합, 검출, 걸러 내기와 그룹화, 이슈 배정, 원본 수정, 재검토, 종결 또는 재오픈">
+        <rect x="10" y="10" width="860" height="230" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="40" width="130" height="50" rx="10" class="f-elev"/><text x="95" y="62" style="fill:var(--text);font-weight:600">① 판 공유</text><text x="95" y="80">CDE(5장)</text>
+          <rect x="190" y="40" width="130" height="50" rx="10" class="f-elev"/><text x="255" y="62" style="fill:var(--text);font-weight:600">② 연합·검출</text><text x="255" y="80">매트릭스 규칙</text>
+          <rect x="350" y="40" width="150" height="50" rx="10" class="f-elev"/><text x="425" y="62" style="fill:var(--text);font-weight:600">③ 걸러 내기·그룹</text><text x="425" y="80">중복·허위 제거</text>
+          <rect x="530" y="40" width="150" height="50" rx="10" class="f-acc-soft"/><text x="605" y="62" style="fill:var(--text);font-weight:600">④ 이슈 배정</text><text x="605" y="80">담당·기한·BCF</text>
+          <rect x="710" y="40" width="140" height="50" rx="10" class="f-elev"/><text x="780" y="62" style="fill:var(--text);font-weight:600">⑤ 원본 수정</text><text x="780" y="80">작성 팀·새 판</text>
+          <rect x="530" y="160" width="150" height="50" rx="10" class="f-acc2-soft"/><text x="605" y="182" style="fill:var(--text);font-weight:600">⑥ 재검토</text><text x="605" y="200">다음 교환 주기</text>
+          <rect x="710" y="160" width="140" height="50" rx="10" style="fill:color-mix(in srgb, var(--ok) 14%, transparent);stroke:var(--ok)"/><text x="780" y="182" style="fill:var(--ok);font-weight:600">종결</text><text x="780" y="200">해결 확인</text>
+          <rect x="300" y="160" width="160" height="50" rx="10" style="fill:color-mix(in srgb, var(--bad) 12%, transparent);stroke:var(--bad)"/><text x="380" y="182" style="fill:var(--bad);font-weight:600">재오픈 · 새 간섭</text><text x="380" y="200">수정이 덜 됨·새로 생김</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.6;fill:none" marker-end="url(#cl-ah)"><path d="M162 65H186"/><path d="M322 65H346"/><path d="M502 65H526"/><path d="M682 65H706"/><path d="M780 92V120H605V156"/><path d="M682 185H706"/><path d="M528 185H464"/></g>
+        <path d="M380 158V120H605" style="stroke:var(--bad);stroke-width:1.6;stroke-dasharray:5 4;fill:none"/>
+        <path d="M300 185H95V94" style="stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 4;fill:none" marker-end="url(#cl-ah-acc)"/>
+        <text x="190" y="226" class="t-mono" style="fill:var(--accent)">다음 교환 주기에 다시 ①부터</text>
+      </svg>
+      <figcaption><b>그림 6-6.</b> 간섭 해결 워크플로. 연합 모델에서 찾은 간섭은 걸러 내고 묶어 이슈로 배정하고, 작성 팀이 <b>원본 모델</b>을 고쳐 새 판으로 공유하면 다음 교환 주기의 재검토에서 종결하거나 다시 연다. 수정이 새 간섭을 만들 수도 있다.</figcaption>
+    </figure>
+    <p>이슈는 제목, 위치(카메라 시점), 관련 요소의 GlobalId, 담당, 기한, 상태, 의견 기록을 갖습니다. 도구 사이에 이슈를 주고받는 개방형 표준으로 buildingSMART의 <span class="term">BIM 협업 형식</span><span class="en">(BIM Collaboration Format, BCF)</span>이 있습니다. BCF는 모델 전체가 아니라 이슈(토픽), 시점, 요소 ID, 의견만 담아, 각 팀이 자기 저작 도구에서 해당 요소를 바로 찾아 고칠 수 있게 합니다. 이슈를 GlobalId로 요소에 묶으므로 요소를 지우고 다시 그리면 이슈가 길을 잃는다는 5장의 경고가 여기서도 그대로 적용됩니다. 상태는 보통 신규 → 배정 → 해결 중 → 해결 제출(재검토 대기) → 종결이고, 재검토에서 실패하면 다시 엽니다. 정기 <span class="term">조정 회의</span><span class="en">(coordination meeting)</span>에서는 새 이슈의 담당과 기한을 정하고 지난 이슈의 종결을 확인합니다.</p>
+    <div class="sim" id="sim-cl-board">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>해결 워크플로 보드: 상태 칸반과 남은 이슈 곡선</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><div class="cl-kb" id="cl-bd-kb"></div><canvas id="cl-cv-board" aria-label="주별 남은 이슈 수 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>보드 시점(주) <output id="cl-bd-w-out"></output></span><input type="range" id="cl-bd-w" min="0" max="16" step="1" value="4"></label>
+          <label class="ctrl"><span>초기 이슈 수 <output id="cl-bd-n-out"></output></span><input type="range" id="cl-bd-n" min="8" max="120" step="1" value="80"></label>
+          <label class="ctrl"><span>해결 능력(이슈/주) <output id="cl-bd-c-out"></output></span><input type="range" id="cl-bd-c" min="2" max="30" step="1" value="12"></label>
+          <div class="ctrl"><span>재검토 주기</span><div class="seg" id="cl-bd-r"><button data-value="1">매주</button><button data-value="2" class="on">2주</button><button data-value="4">4주</button></div></div>
+          <label class="ctrl"><span>재오픈 확률 <output id="cl-bd-p-out"></output></span><input type="range" id="cl-bd-p" min="0" max="0.5" step="0.01" value="0.15"></label>
+          <label class="ctrl"><span>수정이 새 간섭을 만들 확률 <output id="cl-bd-q-out"></output></span><input type="range" id="cl-bd-q" min="0" max="0.4" step="0.01" value="0.1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">해당 주의 미종결</span><span class="v" id="cl-bd-o-o">—</span></div>
+        <div class="stat"><span class="k">모두 종결되는 주</span><span class="v" id="cl-bd-o-z">—</span></div>
+        <div class="stat"><span class="k">재오픈 · 새 간섭(누계)</span><span class="v" id="cl-bd-o-r">—</span></div>
+        <div class="stat"><span class="k">해결 작업 총량</span><span class="v" id="cl-bd-o-t">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(80개, 주 12개, 2주 재검토)에서 남은 이슈가 계단처럼 줄어듭니다 — 해결해도 재검토 전에는 종결되지 않기 때문입니다. 재오픈과 새 간섭이 꼬리를 만들어 16주 안에 0이 되지 않습니다 · 재오픈과 새 간섭 확률을 0으로 두면 언제 끝나는지 보세요 · 재검토를 4주로 늘리면 계단이 커지고 종결이 늦어집니다(5장 교환 주기와 같은 이야기) · 초기 이슈를 8개(그룹화한 대표 이슈)로 줄이면 몇 주 만에 끝납니다 · 재오픈 확률 0.4는 "고쳤다는데 또 나오는" 프로젝트입니다 · 보드의 주황 테두리 칩은 재오픈된 이슈 · 모델: 매주 배정 → 능력만큼 해결 제출 → 재검토 주마다 확률적으로 종결·재오픈·새 간섭(시드 고정 난수, 교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="resolve">
+    <h2>해결 방법: 경로, 높이, 슬리브, 개구부</h2>
+    <div class="problem"><strong>누가 움직여야 하나</strong>
+      <p>덕트와 보가 부딪히면 덕트를 옮길까요, 보에 구멍을 낼까요? 보에 구멍을 내면 천장고는 지키지만 구조 성능이 걱정되고, 덕트를 내리면 천장이 내려갑니다. 해결은 언제나 무엇인가를 내주는 선택입니다.</p></div>
+    <figure class="diagram" id="fig-cl-fixes">
+      <svg viewBox="0 0 880 250" role="img" aria-label="간섭 해결 방법 네 가지의 단면 스케치: 덕트 내리기, 납작 덕트, 보 슬리브, 벽 개구부">
+        <rect x="10" y="10" width="860" height="230" rx="10" class="f-surface"/>
+        <g text-anchor="middle" class="t" style="font-weight:700"><text x="115" y="36">① 높이 조정</text><text x="330" y="36">② 단면 변경(납작 덕트)</text><text x="550" y="36">③ 보 관통 슬리브</text><text x="765" y="36">④ 벽 개구부</text></g>
+        <g>
+          <rect x="40" y="50" width="150" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="95" y="64" width="40" height="34" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="60" y="104" width="110" height="34" style="fill:color-mix(in srgb, var(--blue) 25%, transparent);stroke:var(--blue)"/>
+          <line x1="40" y1="160" x2="190" y2="160" style="stroke:var(--warn);stroke-width:2"/><text x="115" y="180" text-anchor="middle" class="t-mono">천장 ↓ 2.70 m</text>
+          <rect x="255" y="50" width="150" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="310" y="64" width="40" height="34" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="262" y="104" width="136" height="22" style="fill:color-mix(in srgb, var(--blue) 25%, transparent);stroke:var(--blue)"/>
+          <line x1="255" y1="148" x2="405" y2="148" style="stroke:var(--warn);stroke-width:2"/><text x="330" y="180" text-anchor="middle" class="t-mono">1,600 × 280 · 천장 2.82 m</text>
+          <rect x="475" y="50" width="150" height="14" style="fill:var(--surface-2);stroke:var(--text-dim)"/><rect x="520" y="64" width="60" height="90" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <circle cx="550" cy="100" r="13" style="fill:var(--bg-elev);stroke:var(--accent-2);stroke-width:2"/><circle cx="550" cy="100" r="8" style="fill:var(--ok)"/>
+          <text x="550" y="180" text-anchor="middle" class="t-mono">φ150 ≤ 보 춤/3 (형태)</text>
+          <rect x="745" y="50" width="40" height="120" style="fill:var(--surface-2);stroke:var(--text-dim)"/>
+          <rect x="700" y="95" width="130" height="30" style="fill:color-mix(in srgb, var(--blue) 25%, transparent);stroke:var(--blue)"/>
+          <rect x="745" y="90" width="40" height="40" style="fill:none;stroke:var(--accent-2);stroke-width:2;stroke-dasharray:4 3"/>
+          <text x="765" y="190" text-anchor="middle" class="t-mono">IfcOpeningElement</text>
+        </g>
+        <g class="t-mono" text-anchor="middle"><text x="115" y="214">간섭 0 · 천장고 손해</text><text x="330" y="214">마찰 손실 검토(등가 지름)</text><text x="550" y="214">구조 설계자 확인 · 타설 전 설치</text><text x="765" y="214">구조 검토 · 내화 충전</text></g>
+      </svg>
+      <figcaption><b>그림 6-7.</b> 간섭 해결의 네 가지 길. 대부분의 해결은 다른 성능(천장고, 압력 손실, 구조 내력, 내화)을 내준다. 실무에서는 경로를 아예 바꾸는(다른 복도·샤프트로 돌리는) 방법도 있다.</figcaption>
+    </figure>
+    <p>보에 구멍을 내는 <span class="term">슬리브</span><span class="en">(sleeve)</span>는 콘크리트를 붓기 전에 관을 묻어 둔 통로입니다. 보 관통은 구조 설계자가 판단할 일이며, 실무에서는 "구멍 지름은 보 춤의 일정 비율(예: 1/3) 이하, 높이는 춤의 가운데 부분, 지점(기둥 면)에서 일정 거리(예: 춤의 2배) 이상 떨어진 곳" 같은 지침 형태를 쓰는 경우가 많습니다. 아래 시뮬레이터는 이 형태를 교육용 판정 규칙으로 씁니다 — 실제 기준과 보강 방법은 설계 기준과 구조 설계자 확인이 필요합니다. 덕트 단면을 바꿀 때는 같은 풍량을 같은 압력 손실로 보낼 수 있는지가 문제입니다. 사각 덕트의 <span class="term">등가 지름</span><span class="en">(equivalent diameter)</span> \(D_e = 1.30\,(ab)^{0.625}/(a+b)^{0.25}\)(같은 풍량에서 같은 마찰 손실을 내는 원형 덕트의 지름)을 쓰면 비교할 수 있습니다.</p>
+    <div class="callout"><strong>예제 6.5 (납작 덕트로 바꾸기)</strong> 원래 덕트 1,000 × 400 mm.
+      <p><b>① 원래 등가 지름</b> \(D_e = 1.30\times(400{,}000)^{0.625}/(1{,}400)^{0.25} = 1.30\times3{,}172/6.117 \approx 674\) mm.</p>
+      <p><b>② 같은 넓이의 납작 덕트</b> 1,600 × 250(넓이 같은 0.40 m²)은 \(D_e \approx 629\) mm로 작아져 마찰 손실이 커진다. 넓이가 같아도 납작할수록 둘레가 길어지기 때문이다. 1,600 × 280이면 \(D_e \approx 672\) mm로 원래와 거의 같다.</p>
+      <p><b>③ 천장고</b> 높이 0.28 m 덕트의 윗면을 보 하단 아래 0.05 m(깊이 0.75)에 두면 하단 깊이 1.03 m, 천장고 4.0 − 1.03 − 0.15 = <b>2.82 m</b>. 1,000 × 400을 내린 경우(2.70 m)보다 0.12 m 높다.</p>
+      <p><b>④ 판단</b> 납작 덕트는 넓이 1.6 m의 폭이 복도(y 11.2–12.8)를 더 차지하고, 종횡비(1,600/280 ≈ 5.7)가 커서 소음·제작 측면의 검토가 필요하다(권장 종횡비는 기준·제조사 형태, 현행 확인). 천장고 0.12 m를 얻는 대신 무엇을 내주는지 기계 팀과 함께 판단한다.</p></div>
+    <div class="sim" id="sim-cl-fix">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>해결안 비교: 고친 모델로 다시 검사하기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cl-cv-fix" aria-label="해결안을 적용한 B-10 3층의 3D 장면: 남은 간섭 빨강, 개구부·슬리브 주황 윤곽"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>덕트–보 (30)</span><div class="seg" id="cl-fx-d"><button data-value="none">그대로</button><button data-value="drop" class="on">내리기 0.95</button><button data-value="flat">납작 1,600 × 280</button><button data-value="hole">보 개구부</button></div></div>
+          <div class="ctrl"><span>배관–보 (30)</span><div class="seg" id="cl-fx-p"><button data-value="none">그대로</button><button data-value="sleeve" class="on">슬리브 φ150</button><button data-value="lower">보 아래로</button></div></div>
+          <div class="ctrl"><span>덕트–코어 벽 (20)</span><div class="seg" id="cl-fx-w"><button data-value="none">그대로</button><button data-value="open" class="on">개구부 모델링</button></div></div>
+          <div class="ctrl"><span>보기 층</span><div class="seg" id="cl-fx-v"><button data-value="3" class="on">3층</button><button data-value="all">전체</button></div></div>
+        </div>
+      </div>
+      <div class="cl-msg" id="cl-fx-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">남은 하드 간섭</span><span class="v" id="cl-fx-o-n">—</span></div>
+        <div class="stat"><span class="k">승인 관통부(개구부·슬리브)</span><span class="v" id="cl-fx-o-p">—</span></div>
+        <div class="stat"><span class="k">구조 검토 항목</span><span class="v" id="cl-fx-o-s">—</span></div>
+        <div class="stat"><span class="k">천장고 2–10층</span><span class="v" id="cl-fx-o-h">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본 조합(내리기 · 슬리브 · 개구부)은 남은 간섭 0, 관통부 50개, 천장고 2.70 m · 「납작」으로 바꾸면 2.82 m · 「보 개구부」는 천장고 3.10 m를 지키지만 개구부 높이(0.50 m)가 보 춤 0.70 m의 1/3을 크게 넘어 30건이 구조 판정 불가로 남습니다 · 배관을 「보 아래로」 내리면 슬리브는 필요 없지만 덕트를 내리지 않았을 때 천장고를 깎습니다 · 개구부를 모델링하지 않으면 관통부 20건이 계속 간섭으로 보고됩니다 · 모델: 고친 요소로 <code>CB.bim.clashes</code>를 다시 돌리고, 승인된 개구부·슬리브 상자 안에 완전히 들어가는 겹침은 제외(교육용 규칙). 보 관통 판정: 구멍 높이 ≤ 춤/3, 중심이 춤의 가운데 1/3, 기둥 면에서 춤의 2배 이상(형태).</div>
+    </div>
+    <div class="callout site"><strong>B-10의 해결안(교육용)</strong> 덕트를 천장 아래 0.95 m로 내리고(덕트–보 30 → 0, 2–10층 천장고 2.70 m, 1층 3.70 m), 스프링클러 주관은 경간 중앙(기둥 면에서 3.6 m)에서 보에 φ150 슬리브 30개로 관통하며(150/700 = 0.21 ≤ 1/3), 코어 벽에 1.1 × 0.5 m 개구부 20개를 모델링한다(구조 검토·내화 충전 대상). 결과: 하드 간섭 0, 승인 관통부 50개, 구조 검토 항목 20(코어 벽 개구부). 이 판이 5장 버전 비교의 판 2이며, 7장의 물량과 9장의 4D는 이 판에서 출발한다.</div>
+  </section>
+
+  <!-- =============================================================== 10 -->
+  <section id="acceleration">
+    <h2>계산을 빠르게: 광역 단계와 격자</h2>
+    <div class="problem"><strong>요소가 10만 개라면</strong>
+      <p>B-10은 요소 360개라 모든 쌍 64,620개를 비교해도 순식간입니다. 대형 병원·공장 모델은 요소가 수십만 개입니다. 10만 개면 모든 쌍이 약 50억 개 — 한 쌍에 10 ns가 걸려도 50초이고, 실제 형상 검사는 그보다 훨씬 비쌉니다. 어떻게 줄일까요?</p></div>
+    <p>간섭 검토 알고리즘은 두 단계로 나뉩니다. <span class="term">광역 단계</span><span class="en">(broad phase)</span>는 서로 멀리 떨어진 쌍을 아주 싸게 버려 후보 쌍을 줄이고, <span class="term">세부 단계</span><span class="en">(narrow phase)</span>는 남은 후보만 AABB나 실제 형상으로 정밀하게 검사합니다. 광역 단계의 대표적인 방법이 공간을 같은 크기의 칸으로 나누는 <span class="term">균일 격자</span><span class="en">(uniform grid)</span>와, 한 축으로 정렬해 구간이 겹치는 것만 보는 <span class="term">정렬 스윕</span><span class="en">(sort and sweep)</span>입니다. 나무 구조(BVH, 옥트리)도 널리 쓰입니다.</p>
+    <div class="callout def"><strong>원리 6.5 (격자 광역 단계의 비교 횟수)</strong> 요소 \(n\)개를 모든 쌍으로 비교하면
+      <div class="formula">$$N_{\text{all}} = \frac{n(n-1)}{2} \sim O(n^2), \qquad N_{\text{grid}} \le \sum_{c}\frac{m_c(m_c-1)}{2}$$<div class="where">격자에서는 각 요소를 자기 AABB가 걸친 칸들에 등록하고, 같은 칸에 있는 요소끼리만 비교한다(\(m_c\): 칸 \(c\)의 요소 수, 여러 칸에서 만나는 쌍은 한 번만 센다). 요소가 공간에 고르게 퍼져 있고 칸 크기가 요소 크기와 비슷하면 거의 \(O(n)\)에 가깝다. 칸이 너무 작으면 긴 요소(슬래브·보·덕트)가 수많은 칸에 등록되고, 너무 크면 한 칸에 많이 몰려 다시 \(O(n^2)\)에 가까워진다. 정렬 스윕은 정렬 \(O(n \log n)\) 뒤 x 구간이 겹치는 쌍만 본다.</div></div></div>
+    <figure class="diagram" id="fig-cl-grid">
+      <svg viewBox="0 0 860 250" role="img" aria-label="균일 격자에 요소를 등록하고 같은 칸의 요소끼리만 비교하는 광역 단계">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <g style="stroke:var(--border)">
+          <line x1="60" y1="40" x2="60" y2="220"/><line x1="120" y1="40" x2="120" y2="220"/><line x1="180" y1="40" x2="180" y2="220"/><line x1="240" y1="40" x2="240" y2="220"/><line x1="300" y1="40" x2="300" y2="220"/><line x1="360" y1="40" x2="360" y2="220"/><line x1="420" y1="40" x2="420" y2="220"/>
+          <line x1="60" y1="40" x2="420" y2="40"/><line x1="60" y1="100" x2="420" y2="100"/><line x1="60" y1="160" x2="420" y2="160"/><line x1="60" y1="220" x2="420" y2="220"/>
+        </g>
+        <rect x="128" y="108" width="40" height="40" style="fill:color-mix(in srgb, var(--blue) 25%, transparent);stroke:var(--blue)"/>
+        <rect x="150" y="125" width="20" height="28" style="fill:color-mix(in srgb, var(--text-dim) 25%, transparent);stroke:var(--text-dim)"/>
+        <rect x="186" y="50" width="160" height="16" style="fill:color-mix(in srgb, var(--ok) 25%, transparent);stroke:var(--ok)"/>
+        <rect x="370" y="170" width="30" height="30" style="fill:color-mix(in srgb, var(--text-dim) 25%, transparent);stroke:var(--text-dim)"/>
+        <rect x="70" y="180" width="30" height="24" style="fill:color-mix(in srgb, var(--text-dim) 25%, transparent);stroke:var(--text-dim)"/>
+        <rect x="120" y="100" width="60" height="60" style="fill:none;stroke:var(--bad);stroke-width:2"/>
+        <g class="t-mono"><text x="440" y="70" style="fill:var(--text);font-weight:700">모든 쌍: 5개 → 10쌍</text><text x="440" y="92">격자: 같은 칸의 쌍만 → 1쌍(빨간 칸)</text>
+          <text x="440" y="120">긴 요소(초록)는 칸 3개에 등록</text><text x="440" y="142">→ 칸이 작을수록 등록 수 증가</text>
+          <text x="440" y="172" style="fill:var(--accent)">칸 크기 ≈ 전형적인 요소 크기가 좋다</text>
+          <text x="440" y="196">B-10: 기둥 0.8 m · 보 32.8 m · 슬래브 32.8 × 24.8 m</text><text x="440" y="216">→ 크기가 들쭉날쭉하면 격자 하나로는 부족</text></g>
+      </svg>
+      <figcaption><b>그림 6-8.</b> 균일 격자 광역 단계. 각 요소를 AABB가 걸친 칸에 등록하고 같은 칸에 있는 쌍만 세부 검사한다. 건물 모델은 요소 크기가 크게 달라(기둥과 슬래브) 칸 크기 선택이 중요하다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-cl-grid">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>격자 가속: 비교 횟수와 계산 시간 재기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cl-cv-grid" aria-label="모든 쌍, 균일 격자, 정렬 스윕의 비교 횟수와 측정 시간 막대, 칸 크기별 비교 횟수 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>B-10 복제 수(나란히 배치) <output id="cl-gd-k-out"></output></span><input type="range" id="cl-gd-k" min="1" max="8" step="1" value="4"></label>
+          <label class="ctrl"><span>격자 칸 크기 <output id="cl-gd-s-out"></output></span><input type="range" id="cl-gd-s" min="1" max="40" step="1" value="8"></label>
+          <div class="btn-row"><button class="btn" id="cl-gd-run">다시 측정</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">요소 n · 모든 쌍</span><span class="v" id="cl-gd-o-n">—</span></div>
+        <div class="stat"><span class="k">격자 후보 쌍 · 시간</span><span class="v" id="cl-gd-o-g">—</span></div>
+        <div class="stat"><span class="k">정렬 스윕 후보 · 시간</span><span class="v" id="cl-gd-o-s">—</span></div>
+        <div class="stat"><span class="k">찾은 하드 쌍(세 방법)</span><span class="v" id="cl-gd-o-f">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 복제 4개(요소 1,440개)에서 모든 쌍은 약 104만 번 비교하지만 격자(칸 8 m)는 그 몇 % 만 봅니다 · 세 방법이 찾은 쌍의 수(구조 접합부 포함, 복제 하나당 560)가 같은지 확인하세요 — 가속은 결과를 바꾸지 않아야 합니다 · 칸을 1 m로 줄이면 후보 쌍은 더 줄지만 긴 슬래브·보가 수백 칸에 등록되어 등록·중복 제거 비용이 커지고(시간을 비교해 보세요), 40 m로 키우면 한 칸에 건물 하나가 통째로 들어가 후보가 다시 늘어납니다 · 요소가 수천 개 수준이면 모든 쌍도 몇 ms면 끝납니다 — 가속의 가치는 n²이 커지는 대형 모델과 비싼 세부 검사에서 드러납니다 · 아래 곡선은 칸 크기별 후보 쌍 수 · 모델: 요소 상자를 Float64Array에 담은 페이지의 교육용 구현, 시간은 이 브라우저에서 <code>performance.now()</code>로 잰 값(기기마다 다르다).</div>
+    </div>
+  </section>
+
+  <section id="uses">
+    <h2>이 정보가 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="cde.html"><small>CH.05 · 공통 데이터 환경과 정보 관리</small>공유된 판들의 연합<br><span>간섭 검토의 입력은 CDE의 공유 상태 판들이고, 결과 이슈는 원본 팀에 돌아간다.</span></a>
+      <a href="qto.html"><small>CH.07 · 모델 기반 물량 산출</small>겹침 부피와 공제<br><span>구조 접합부 480건의 겹침 부피가 물량 중복 계산의 원인이다.</span></a>
+      <a href="analysis.html"><small>CH.08 · 모델 기반 설계 분석</small>천장고 규정 검토<br><span>덕트 높이 → 천장고 → 규칙 판정은 규칙 기반 검토의 한 예다.</span></a>
+      <a href="four-d.html"><small>CH.09 · 4D 공정 시뮬레이션</small>4D 간섭<br><span>작업 공간 상자에 시간 구간을 더하면 같은 겹침 판정으로 시간 간섭을 찾는다.</span></a>
+      <a href="fabrication.html"><small>CH.12 · 디지털 제작과 프리패브</small>덕트 스풀과 슬리브<br><span>간섭이 해결된 판이어야 공장에서 덕트를 잘라 만들 수 있다.</span></a>
+      <a href="computational.html"><small>CH.16 · 계산 설계와 AI</small>경로 자동 탐색<br><span>간섭 수와 천장고를 목적 함수로 두면 설비 경로를 최적화할 수 있다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>간섭은 하드(형상 겹침), 소프트(여유 공간 침범), 4D(같은 시간·같은 공간), 워크플로(절차가 막힘)로 나눈다. 형상 검사가 0건이어도 모델에 없는 것과 시간·절차의 간섭은 남는다.</li>
+      <li>AABB 판정: 축마다 d<sub>k</sub> = min(최대) − max(최소). 세 축 모두 양수면 하드, 깊이 δ = min d<sub>k</sub>, 부피 V = d<sub>x</sub>d<sub>y</sub>d<sub>z</sub>. 하드가 아니고 모두 d<sub>k</sub> &gt; −t면 소프트.</li>
+      <li>AABB는 놓치지 않지만 원형·사선 부재에서 허위 간섭을 낸다. 그래서 광역 단계(AABB)로 거르고 세부 단계(실제 형상)로 확인한다.</li>
+      <li>간섭 매트릭스로 검사할 분야 쌍과 허용 오차를 정한다. B-10 기본 판: 덕트–보 30(층당 3, x = 8·16·24 m, 깊이 0.35 m), 배관–보 30(깊이 0.10 m), 덕트–코어 벽 20(관통부). 전체 대 전체 560건 가운데 480건은 구조 접합부다.</li>
+      <li>덕트 높이 e와 천장고 H<sub>c</sub> = h − (e + 0.20) − c는 맞바뀐다. s = 0.05, c = 0.15, 목표 2.70 m이면 가능 영역은 e = 0.95 m 한 점 — 납작 덕트(1,600 × 280)로 2.82 m를 얻는다.</li>
+      <li>소프트 간섭은 여유 두께에 따라 계단처럼 뛴다(B-10 해결 판: 0.05 보, 0.12 천장, 0.30 가장자리 보, 0.54 슬래브). 두께는 건수가 아니라 공간의 용도로 정한다.</li>
+      <li>간섭은 중복 제거 → 허위 제거 → 그룹화로 이슈가 되고(80 → 기준층 대표 8), 담당·상태·재검토(BCF)로 추적한다. 수정은 원본 모델에서, 종결은 다음 교환의 재검토에서.</li>
+      <li>모든 쌍 비교는 n(n − 1)/2로 커진다. 격자·정렬 스윕 같은 광역 단계는 결과를 바꾸지 않고 비교 횟수를 크게 줄이며, 칸 크기는 요소 크기에 맞춘다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 덕트와 보가 30 mm 떨어져 있고 여유 공간 50 mm를 요구한다. 이 간섭의 종류는?</p><div class="opts">
+        <button class="opt">하드 간섭</button><button class="opt" data-correct>소프트 간섭</button><button class="opt">4D 간섭</button><button class="opt">간섭 아님</button>
+      </div><div class="quiz-exp">형상은 겹치지 않지만(하드 아님) 간격 30 mm가 여유 50 mm보다 작아 여유 공간을 침범한다.</div></div>
+      <div class="quiz-q"><p>2. 상자 A = [0, 0, 0, 2, 2, 2], B = [1, 1, 1.5, 3, 3, 3]의 침투 깊이와 겹침 부피는?</p><div class="opts">
+        <button class="opt">깊이 1, 부피 1</button><button class="opt" data-correct>깊이 0.5, 부피 0.5</button><button class="opt">깊이 0.5, 부피 1.5</button><button class="opt">깊이 1, 부피 0.5</button>
+      </div><div class="quiz-exp">\(d_x = 2 - 1 = 1\), \(d_y = 1\), \(d_z = 2 - 1.5 = 0.5\). 깊이 = min = 0.5, 부피 = 1 × 1 × 0.5 = 0.5.</div></div>
+      <div class="quiz-q"><p>3. AABB 판정에 대해 옳은 것은?</p><div class="opts">
+        <button class="opt">AABB가 겹치면 실제 형상도 반드시 겹친다</button><button class="opt" data-correct>AABB가 겹치지 않으면 실제 형상도 겹치지 않는다</button><button class="opt">원형 배관에서는 AABB가 실제보다 작다</button><button class="opt">사선 부재일수록 AABB가 정확하다</button>
+      </div><div class="quiz-exp">AABB는 형상을 감싸므로 겹치지 않으면 형상도 분리되어 있다(놓침 없음). 겹치는 경우는 허위일 수 있어 세부 단계에서 확인한다.</div></div>
+      <div class="quiz-q"><p>4. B-10 덕트–보 간섭이 층마다 3건인 까닭은?</p><div class="opts">
+        <button class="opt">덕트가 X 방향 보 4개 가운데 3개와 겹쳐서</button><button class="opt" data-correct>덕트(x 0.5–31.5 m)가 x = 8·16·24 m의 Y 방향 보와 겹치고, x = 0·32 m의 가장자리 보와는 떨어져 있어서</button><button class="opt">코어 벽이 보 2개를 가려서</button><button class="opt">허용 오차가 0.3 m여서</button>
+      </div><div class="quiz-exp">가장자리 보는 x −0.2–0.2, 31.8–32.2라 덕트 끝과 0.3 m 떨어져 하드가 아니다. 허용 오차를 0.31 m 이상 주면 소프트로 20건이 더해진다.</div></div>
+      <div class="quiz-q"><p>5. 원리 6.4에서 층고 4.0 m, 천장 여유 0.15 m, 덕트 중심 깊이 e = 1.05 m이면 천장고는?</p><div class="opts">
+        <button class="opt">2.80 m</button><button class="opt" data-correct>2.60 m</button><button class="opt">2.95 m</button><button class="opt">2.75 m</button>
+      </div><div class="quiz-exp">\(H_c = 4.0 - (1.05 + 0.20) - 0.15 = 2.60\) m. 간섭은 없지만 목표 2.70 m에 못 미친다.</div></div>
+      <div class="quiz-q"><p>6. 덕트–코어 벽 20건을 다루는 가장 알맞은 방법은?</p><div class="opts">
+        <button class="opt">모두 오류이므로 덕트를 코어 밖으로 돌린다</button><button class="opt">허용 오차를 키워 보고서에서 없앤다</button><button class="opt" data-correct>계획된 관통부로 보고 벽 개구부(IfcOpeningElement)와 내화 조치를 정하고 구조 검토한다</button><button class="opt">무시한다</button>
+      </div><div class="quiz-exp">코어 안으로 급기를 보내려면 벽을 지나야 한다. 관통부는 "해결할 오류"가 아니라 "조정할 개구부"다.</div></div>
+      <div class="quiz-q"><p>7. 간섭 80건을 기준층 대표 이슈 8개로 묶었을 때 얻는 가장 큰 이점은?</p><div class="opts">
+        <button class="opt">겹침 부피가 줄어든다</button><button class="opt" data-correct>같은 원인의 반복 간섭을 한 번의 결정으로 풀어 회의·추적 단위가 줄어든다</button><button class="opt">하드 간섭이 소프트 간섭이 된다</button><button class="opt">재검토가 필요 없어진다</button>
+      </div><div class="quiz-exp">간섭의 물리량은 그대로다. 결정 단위가 줄어 관리 부담이 줄 뿐, 해결 뒤 재검토로 모든 층의 종결을 확인해야 한다.</div></div>
+      <div class="quiz-q"><p>8. 요소 10,000개를 모든 쌍으로 비교하면 비교 횟수는 약 얼마인가?</p><div class="opts">
+        <button class="opt">약 1만</button><button class="opt">약 10만</button><button class="opt" data-correct>약 5,000만</button><button class="opt">약 1억</button>
+      </div><div class="quiz-exp">\(n(n-1)/2 = 10{,}000\times9{,}999/2 \approx 5\times10^{7}\). 광역 단계(격자 등)는 이 수를 결과를 바꾸지 않고 줄인다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미: 상자 그리기, 교육용 천장 모델, 경계 안전 간섭 검사 ---------- */
+const CLX = {
+  E: [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]],
+  C: (b) => [[b[0], b[1], b[2]], [b[3], b[1], b[2]], [b[3], b[4], b[2]], [b[0], b[4], b[2]], [b[0], b[1], b[5]], [b[3], b[1], b[5]], [b[3], b[4], b[5]], [b[0], b[4], b[5]]],
+  H: (k) => (k === 0 ? 0 : 5 + 4 * (k - 1)),
+  D: ["IfcDuctSegment"], Pp: ["IfcPipeSegment"], B: ["IfcBeam"], W: ["IfcWall"],
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  /** 간섭 검사: 간격 = t인 경계는 통과로 보고(t − 10⁻⁶), t = 0이면 하드만 */
+  clash: (els, A, B, t = 0) => CB.bim.clashes(els, A, B, t > 0 ? t - 1e-6 : -1e-6),
+  hull(pts) {
+    const p = pts.map((q) => [q[0], q[1]]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    p.forEach((q) => { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); });
+    for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  },
+  edges(V, boxes, color, width = 1, alpha = 1, dash) {
+    const ctx = V.ctx; ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.globalAlpha = alpha; ctx.setLineDash(dash || []); ctx.beginPath();
+    boxes.forEach((b) => { const q = CLX.C(b).map(V.p); if (q.some((v) => !v)) return; CLX.E.forEach(([i, j]) => { ctx.moveTo(q[i][0], q[i][1]); ctx.lineTo(q[j][0], q[j][1]); }); });
+    ctx.stroke(); ctx.restore();
+  },
+  fill(V, boxes, color, alpha) {
+    const ctx = V.ctx; ctx.save(); ctx.fillStyle = color; ctx.globalAlpha = alpha; ctx.beginPath();
+    boxes.forEach((b) => { const q = CLX.C(b).map(V.p); if (q.some((v) => !v)) return; CLX.hull(q).forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); });
+    ctx.fill(); ctx.restore();
+  },
+  axis(b) { const d = [b[3] - b[0], b[4] - b[1], b[5] - b[2]], k = d.indexOf(Math.max(...d)), c = [0, 1, 2].map((i) => (b[i] + b[i + 3]) / 2), a = c.slice(), e = c.slice(); a[k] = b[k]; e[k] = b[k + 3]; return [a, e]; },
+  pipes(V, boxes, color, width = 2.2, alpha = 1) {
+    const ctx = V.ctx; ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.globalAlpha = alpha; ctx.beginPath();
+    boxes.forEach((b) => { const [a, e] = CLX.axis(b), A = V.p(a), B = V.p(e); if (!A || !B) return; ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); });
+    ctx.stroke(); ctx.restore();
+  },
+  /** 5장과 같은 교육용 건축 모델: 코어 2경간을 뺀 경간마다 두께 30 mm 천장판 */
+  ceilings(hc, floors = 10) {
+    const out = [];
+    for (let k = 0; k < floors; k++) for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
+      if ((i === 1 || i === 2) && j === 1) continue;
+      const z = CLX.H(k) + hc, name = `CL-${"ABCD"[i]}${j + 1}-${k + 1}F`;
+      out.push({ id: 1000 + out.length, guid: CB.bim.guid("IfcCovering" + name), ifc: "IfcCovering", name, storey: k + 1, box: [8 * i + 0.4, 8 * j + 0.4, z, 8 * i + 7.6, 8 * j + 7.6, z + 0.03], material: "Gypsum board", props: {} });
+    }
+    return out;
+  },
+  scene(V, els, o = {}) {
+    const P = V.P, g = (t) => els.filter((e) => e.ifc === t).map((e) => e.box), a = o.alpha ?? 1;
+    CLX.edges(V, g("IfcSlab"), P.faint, 1, 0.55 * a);
+    CLX.fill(V, g("IfcCovering"), P.faint, 0.2 * a); CLX.edges(V, g("IfcCovering"), P.faint, 0.8, 0.6 * a);
+    CLX.edges(V, g("IfcColumn").concat(g("IfcBeam")), P.dim, 0.8, 0.45 * a);
+    CLX.fill(V, g("IfcWall"), P.accent, 0.08 * a); CLX.edges(V, g("IfcWall"), P.accent, 0.8, 0.45 * a);
+    CLX.fill(V, g("IfcDuctSegment"), P.blue, 0.3 * a); CLX.edges(V, g("IfcDuctSegment"), P.blue, 1.1, 0.9 * a);
+    CLX.pipes(V, g("IfcPipeSegment"), P.ok, 2.2, a);
+  },
+  ovBox: (a, b) => [0, 1, 2].map((k) => Math.max(a[k], b[k])).concat([0, 1, 2].map((k) => Math.min(a[k + 3], b[k + 3]))),
+  inside: (s, b, eps = 1e-6) => [0, 1, 2].every((k) => s[k] >= b[k] - eps && s[k + 3] <= b[k + 3] + eps),
+  hdr(V, s) { const ctx = V.ctx; ctx.save(); ctx.font = `600 12px ${getComputedStyle(document.body).getPropertyValue("--font")}`; ctx.fillStyle = V.P.dim; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(s, 10, 8); ctx.restore(); },
+  txt(ctx, s, x, y, color, o = {}) { ctx.save(); ctx.font = `${o.bold ? "600 " : ""}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono ? "--mono" : "--font")}`; ctx.fillStyle = color; ctx.textAlign = o.align || "left"; ctx.textBaseline = o.base || "middle"; ctx.fillText(s, x, y); ctx.restore(); },
+  KO: { IfcBeam: "보", IfcWall: "코어 벽", IfcSlab: "슬래브", IfcColumn: "기둥", IfcDuctSegment: "덕트", IfcPipeSegment: "배관", IfcCovering: "천장" },
+};
+
+/* ---------- 1. AABB 겹침 놀이터 ---------- */
+(function () {
+  const A = { cx: 2.6, cy: 2.4, w: 2.4, h: 1.4 };
+  const gm = CB.seg("cl-ab-m", () => pl.redraw()), gw = CB.range("cl-ab-w", (v) => CB.num(v, 2) + " m", () => pl.redraw()), gh = CB.range("cl-ab-h", (v) => CB.num(v, 2) + " m", () => pl.redraw());
+  const gy = CB.range("cl-ab-y", (v) => CB.num(v, 2) + " m", () => pl.redraw()), gt = CB.range("cl-ab-t", (v) => CB.num(v, 2) + " m", () => pl.redraw());
+  const ANG = (35 * Math.PI) / 180;
+  function shapeB(p) {
+    const m = gm(), w = gw(), h = gh();
+    if (m === "round") { const r = w / 2; return { kind: "round", r, c: [p.x, p.y], bb: [p.x - r, p.y - r, p.x + r, p.y + r] }; }
+    if (m === "diag") {
+      const L = 1.5 * w, T = Math.max(0.1, h * 0.5), u = [Math.cos(ANG), Math.sin(ANG)], n = [-u[1], u[0]];
+      const pts = [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([a, b]) => [p.x + (a * L * u[0]) / 2 + (b * T * n[0]) / 2, p.y + (a * L * u[1]) / 2 + (b * T * n[1]) / 2]);
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+      return { kind: "diag", pts, u, n, bb: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] };
+    }
+    return { kind: "box", bb: [p.x - w / 2, p.y - h / 2, p.x + w / 2, p.y + h / 2] };
+  }
+  const aBox = (p) => [p.x - A.w / 2, p.y - A.h / 2, p.x + A.w / 2, p.y + A.h / 2];
+  function real(a, s) {
+    if (s.kind === "box") return null;
+    if (s.kind === "round") { const qx = CB.clamp(s.c[0], a[0], a[2]), qy = CB.clamp(s.c[1], a[1], a[3]); return Math.hypot(s.c[0] - qx, s.c[1] - qy) < s.r - 1e-9; }
+    const Apts = [[a[0], a[1]], [a[2], a[1]], [a[2], a[3]], [a[0], a[3]]];
+    return ![[1, 0], [0, 1], s.u, s.n].some((ax) => { const pa = Apts.map((q) => q[0] * ax[0] + q[1] * ax[1]), pb = s.pts.map((q) => q[0] * ax[0] + q[1] * ax[1]); return Math.min(Math.max(...pa), Math.max(...pb)) - Math.max(Math.min(...pa), Math.min(...pb)) <= 1e-9; });
+  }
+  const pl = CB.plane("#cl-cv-aabb", { x: [-0.6, 7.4], cy: 2.45, aspect: 0.66, minHeight: 260, maxHeight: 460, axes: false, gridStep: 1,
+    points: [{ x: 2.6, y: 2.4, label: "A", color: CB.color("text-dim") }, { x: 4.4, y: 2.95, label: "B" }],
+    onDrag: () => {},
+    draw(P, api) {
+      const pal = P.P, pa = api.points[0], pb = api.points[1], a = aBox(pa), s = shapeB(pb), b = s.bb, t = gt(), dy = gy();
+      const dx = Math.min(a[2], b[2]) - Math.max(a[0], b[0]), dz = Math.min(a[3], b[3]) - Math.max(a[1], b[1]);
+      const ov = CB.bim.overlap([a[0], 0, a[1], a[2], dy, a[3]], [b[0], 0, b[1], b[2], dy, b[3]], t > 0 ? t - 1e-9 : -1e-9);
+      const rect = (r, op) => P.poly([[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], op);
+      rect(a, { fill: CLX.alpha(pal.dim, 0.22), color: pal.dim, width: 1.6 });
+      if (t > 0) rect([b[0] - t, b[1] - t, b[2] + t, b[3] + t], { fill: false, color: pal.warn, width: 1.2, dash: [4, 4] });
+      if (s.kind === "round") { P.circle(s.c[0], s.c[1], s.r, { fill: CLX.alpha(pal.ok, 0.28), color: pal.ok, width: 1.8 }); rect(b, { fill: false, color: pal.ok, width: 1.2, dash: [5, 4] }); }
+      else if (s.kind === "diag") { P.poly(s.pts, { fill: CLX.alpha(pal.blue, 0.28), color: pal.blue, width: 1.8 }); rect(b, { fill: false, color: pal.blue, width: 1.2, dash: [5, 4] }); }
+      else rect(b, { fill: CLX.alpha(pal.blue, 0.25), color: pal.blue, width: 1.8 });
+      if (ov.hard) rect([Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.min(a[2], b[2]), Math.min(a[3], b[3])], { fill: CLX.alpha(pal.bad, 0.7), color: pal.bad, width: 1.2 });
+      // 축 투영 막대
+      const y0 = P.y0 + 0.12, seg = (x1, x2, y, c, w) => P.line(x1, y, x2, y, { color: c, width: w });
+      seg(a[0], a[2], y0 + 0.24, pal.dim, 5); seg(b[0], b[2], y0 + 0.12, pal.blue, 5); if (dx > 0) seg(Math.max(a[0], b[0]), Math.min(a[2], b[2]), y0, pal.bad, 5);
+      const x0 = P.x0 + 0.12, vs = (z1, z2, x, c) => P.line(x, z1, x, z2, { color: c, width: 5 });
+      vs(a[1], a[3], x0 + 0.24, pal.dim); vs(b[1], b[3], x0 + 0.12, pal.blue); if (dz > 0) vs(Math.max(a[1], b[1]), Math.min(a[3], b[3]), x0, pal.bad);
+      P.text("x 투영", P.x1 - 0.1, y0 + 0.18, { color: pal.dim, size: 11, align: "right" }); P.text("z 투영", x0 + 0.38, P.y1 - 0.2, { color: pal.dim, size: 11 });
+      const r = real(a, s), aabbS = ov.hard ? "하드" : ov.soft ? "소프트" : "없음";
+      CB.stat("cl-ab-o-d", `${CB.num(dx, 2)} · ${CB.num(dz, 2)} m`);
+      CB.stat("cl-ab-o-v", ov.hard ? `${CB.num(ov.depth, 2)} m · ${CB.num(ov.volume, 3)} m³` : "— · 0");
+      CB.stat("cl-ab-o-a", `${aabbS} · ${ov.hard ? "0" : CB.num(ov.gap, 2) + " m"}`);
+      CB.stat("cl-ab-o-r", r === null ? "상자 = AABB" : r ? "겹침" : ov.hard ? "<span style=\"color:var(--bad)\">떨어짐 → 허위</span>" : "떨어짐");
+    } });
+})();
+
+/* ---------- 2. 간섭 검토기 ---------- */
+(function () {
+  const m = CB.bim.model();
+  const gr = CB.seg("cl-ck-r", calc), gt = CB.range("cl-ck-t", (v) => CB.num(v, 2) + " m", calc), gf = CB.range("cl-ck-f", (v) => (v ? v + "층" : "전체"), () => { sel = -1; view(); draw(); });
+  let R = [], sel = -1;
+  function calc() {
+    const r = gr(), t = gt();
+    if (r === "every") {
+      R = []; const tt = t > 0 ? t - 1e-6 : -1e-6;
+      for (let i = 0; i < m.length; i++) for (let j = i + 1; j < m.length; j++) { const o = CB.bim.overlap(m[i].box, m[j].box, tt); if (o.hard || o.soft) R.push({ a: m[i], b: m[j], type: o.hard ? "hard" : "soft", depth: o.depth, volume: o.volume, center: [0, 1, 2].map((k) => (Math.max(m[i].box[k], m[j].box[k]) + Math.min(m[i].box[k + 3], m[j].box[k + 3])) / 2) }); }
+    } else {
+      const S = { db: [[CLX.D, CLX.B]], pb: [[CLX.Pp, CLX.B]], dw: [[CLX.D, CLX.W]], all: [[CLX.D, CLX.B], [CLX.Pp, CLX.B], [CLX.D, CLX.W]] }[r];
+      R = [].concat(...S.map(([a, b]) => CLX.clash(m, a, b, t)));
+    }
+    sel = -1; draw();
+  }
+  function draw() {
+    const f = gf(), L = R.filter((c) => !f || c.a.storey === f), h = L.filter((c) => c.type === "hard");
+    CB.stat("cl-ck-o-n", `${L.filter((c) => c.type === "hard").length} / ${L.filter((c) => c.type === "soft").length}`);
+    CB.stat("cl-ck-o-v", CB.num(h.reduce((s, c) => s + c.volume, 0), 2) + " m³");
+    CB.stat("cl-ck-o-d", h.length ? CB.num(Math.max(...h.map((c) => c.depth)), 2) + " m" : "—");
+    CB.stat("cl-ck-o-s", sel >= 0 ? `${R[sel].a.name} × ${R[sel].b.name}` : "—");
+    let body = L.slice(0, 150).map((c) => { const i = R.indexOf(c); return `<tr class="cl-row${i === sel ? " cl-sel" : ""}" data-i="${i}"><td>${i + 1}</td><td class="cl-mono">${c.a.name}</td><td class="cl-mono">${c.b.name}</td><td>${c.type === "hard" ? "하드" : "소프트"}</td><td class="num">${CB.num(c.depth, 3)}</td><td class="num">${CB.num(c.volume, 3)}</td><td class="cl-mono">${c.center.map((x) => CB.num(x, 2)).join(", ")}</td></tr>`; }).join("");
+    if (L.length > 150) body += `<tr><td colspan="7">… 외 ${L.length - 150}건</td></tr>`;
+    if (gr() === "every") { const by = {}; L.forEach((c) => { const k = [CLX.KO[c.a.ifc], CLX.KO[c.b.ifc]].sort().join("–"); by[k] = (by[k] || 0) + 1; }); body = `<tr><td colspan="7"><b>유형별</b> ${Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + " " + v).join(" · ")}</td></tr>` + body; }
+    document.getElementById("cl-ck-rows").innerHTML = body || `<tr><td colspan="7">간섭 없음</td></tr>`;
+    v.redraw();
+  }
+  function view() { const f = gf(); if (sel >= 0) v.set({ target: R[sel].center.slice(), dist: 30 }); else if (f) v.set({ target: [16, 12, CLX.H(f - 1) + 2.5], dist: 50 }); else v.set({ target: [16, 12, 20], dist: 88 }); }
+  document.getElementById("cl-ck-rows").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-i]"); if (!tr) return; sel = +tr.dataset.i; gf.set(R[sel].a.storey, false); view(); draw(); });
+  const v = CB.orbit("#cl-cv-check", { yaw: -0.65, pitch: 0.38, dist: 88, target: [16, 12, 20], fov: 0.9, aspect: 0.72, minHeight: 300, maxHeight: 500,
+    draw(V) {
+      const P = V.P, f = gf(), keep = (e) => !f || e.storey === f, L = R.filter((c) => keep(c.a));
+      CLX.scene(V, m.filter(keep), { alpha: f ? 1 : 0.8 });
+      const hb = L.filter((c) => c.type === "hard").map((c) => CLX.ovBox(c.a.box, c.b.box));
+      CLX.fill(V, hb, P.bad, 0.75); CLX.edges(V, hb, P.bad, 1.4, 1);
+      L.filter((c) => c.type === "soft").forEach((c) => V.dot3(c.center, { color: P.warn, r: 3 }));
+      if (!f) L.filter((c) => c.type === "hard").forEach((c) => V.dot3(c.center, { color: P.bad, r: 2.4 }));
+      if (sel >= 0) { CLX.edges(V, [R[sel].a.box, R[sel].b.box], P.accent2, 2.6, 1); V.dot3(R[sel].center, { color: P.accent2, r: 5 }); }
+      CLX.hdr(V, `${f ? f + "층" : "전체"} · 간섭 ${L.length}건 (빨강 하드, 노랑 점 소프트)`);
+    } });
+  calc();
+})();
+
+/* ---------- 3. 소프트 간섭 계단 ---------- */
+(function () {
+  const gt = CB.range("cl-sf-t", (v) => CB.num(v, 2) + " m", () => cv.redraw()), gd = CB.seg("cl-sf-d", build), gc = CB.seg("cl-sf-c", build);
+  const TG = ["IfcBeam", "IfcSlab", "IfcCovering", "IfcColumn", "IfcPipeSegment"];
+  let curve = [], els = [];
+  const count = (t) => { const c = CLX.clash(els, CLX.D, TG, t).filter((x) => x.type === "soft"); const o = { beam: 0, cov: 0, slab: 0, oth: 0 }; c.forEach((x) => { const k = { IfcBeam: "beam", IfcCovering: "cov", IfcSlab: "slab" }[x.b.ifc] || "oth"; o[k]++; }); o.n = c.length; return o; };
+  function build() {
+    els = CB.bim.model({ ductDrop: +gd() }); if (+gc()) els = els.concat(CLX.ceilings(+gc()));
+    curve = []; for (let t = 0; t <= 0.7001; t += 0.005) curve.push([t, count(t)]);
+    cv.redraw();
+  }
+  const cv = CB.canvas("#cl-cv-soft", (ctx, W, H) => {
+    if (!curve.length) return;
+    const P = CB.palette(), t = gt(), c = count(t), ymax = Math.max(10, ...curve.map((q) => q[1].n)) * 1.1, h1 = Math.round(H * 0.68) - 40;
+    CB.chart(ctx, { x: 58, y: 16, w: W - 58 - 16, h: h1 }, { x: [0, 0.7], y: [0, ymax], xLabel: "여유 공간 t (m)", yLabel: "소프트 간섭",
+      series: [{ data: curve.map((q) => [q[0], q[1].beam]), color: P.dim, width: 1.4, dash: [4, 3] }, { data: curve.map((q) => [q[0], q[1].cov]), color: P.accent, width: 1.4, dash: [4, 3] }, { data: curve.map((q) => [q[0], q[1].n]), color: P.warn, width: 2.6 }],
+      vlines: [{ x: t, color: P.accent2, label: "t" }] });
+    const lx = W - 16 - 110, ly = 16 + h1 - 14; CLX.txt(ctx, "합계", lx, ly, P.warn, { bold: true }); CLX.txt(ctx, "보", lx + 38, ly, P.dim); CLX.txt(ctx, "천장", lx + 62, ly, P.accent);
+    // 현재 t의 막대
+    const y = 16 + h1 + 58, bw = W - 58 - 16, parts = [["보", c.beam, P.dim], ["천장", c.cov, P.accent], ["슬래브", c.slab, P.blue], ["기타", c.oth, P.faint]], tot = Math.max(1, c.n);
+    let x = 58; CLX.txt(ctx, `t = ${CB.num(t, 2)} m에서 ${c.n}건`, 58, y - 12, P.text, { bold: true });
+    parts.forEach(([k, n, col]) => { if (!n) return; const w = (bw * n) / Math.max(tot, 80); ctx.fillStyle = col; ctx.fillRect(x, y, w, 22); if (w > 46) CLX.txt(ctx, `${k} ${n}`, x + 6, y + 11, P.bg, { size: 11, bold: true }); x += w; });
+    ctx.strokeStyle = P.border; ctx.strokeRect(58, y, (bw * 80) / Math.max(tot, 80), 22);
+    CB.stat("cl-sf-o-n", c.n + "건"); CB.stat("cl-sf-o-b", `${c.beam} · ${c.cov} · ${c.slab}`);
+    CB.stat("cl-sf-o-h", CLX.clash(els, CLX.D, CLX.W, 0).length + "건"); CB.stat("cl-sf-o-g", CB.num(+gd() - 0.2 - 0.7, 2) + " m");
+  }, { aspect: (w) => (w < 500 ? 0.9 : 0.6), maxHeight: 440 });
+  build();
+})();
+
+/* ---------- 4. 덕트 높이와 천장고 ---------- */
+(function () {
+  const ge = CB.range("cl-dp-e", (v) => CB.num(v, 2) + " m", () => cv.redraw()), gs = CB.range("cl-dp-s", (v) => CB.num(v, 2) + " m", build);
+  const gc = CB.range("cl-dp-c", (v) => CB.num(v, 2) + " m", () => cv.redraw()), gg = CB.range("cl-dp-g", (v) => CB.num(v, 2) + " m", () => cv.redraw());
+  const TG = ["IfcBeam", "IfcSlab"];
+  let curve = [];
+  const at = (e, s) => { const els = CB.bim.model({ ductDrop: e }), c = CLX.clash(els, CLX.D, TG, s); return { hard: c.filter((x) => x.type === "hard").length, soft: c.filter((x) => x.type === "soft").length }; };
+  function build() { const s = gs(); curve = []; for (let i = 30; i <= 140; i++) { const e = i / 100; curve.push([e, at(e, s)]); } cv.redraw(); }
+  const CH = (e, h) => h - (e + 0.2) - gc();
+  const cv = CB.canvas("#cl-cv-drop", (ctx, W, H) => {
+    if (!curve.length) return;
+    const P = CB.palette(), e = ge(), s = gs(), g = gg(), bw = W - 58 - 16, h1 = Math.round(H * 0.45) - 26;
+    const ok = curve.filter(([x, c]) => c.hard + c.soft === 0 && CH(x, 4.0) >= g - 1e-9).map((q) => q[0]);
+    const bands = ok.length ? [{ x0: ok[0] - 0.005, x1: ok[ok.length - 1] + 0.005, color: CLX.alpha(P.ok, 0.2) }] : [];
+    CB.chart(ctx, { x: 58, y: 16, w: bw, h: h1 }, { x: [0.3, 1.4], y: [0, 45], yLabel: "간섭(건)", bands,
+      series: [{ data: curve.map(([x, c]) => [x, c.hard]), color: P.bad, width: 2.4 }, { data: curve.map(([x, c]) => [x, c.hard + c.soft]), color: P.warn, width: 1.6, dash: [5, 4] }], vlines: [{ x: e, color: P.accent2 }] });
+    CLX.txt(ctx, "하드", 66, 26, P.bad, { bold: true }); CLX.txt(ctx, `하드 + 간격 < ${CB.num(s, 2)} m`, 104, 26, P.warn);
+    const top2 = 16 + h1 + 26, h2 = H - top2 - 46;
+    CB.chart(ctx, { x: 58, y: top2, w: bw, h: h2 }, { x: [0.3, 1.4], y: [2.0, 4.6], xLabel: "덕트 중심 깊이 e (m, 위층 슬래브 윗면 아래)", yLabel: "천장고 m", bands,
+      series: [{ data: [[0.3, CH(0.3, 4)], [1.4, CH(1.4, 4)]], color: P.accent, width: 2.4 }, { data: [[0.3, CH(0.3, 5)], [1.4, CH(1.4, 5)]], color: P.dim, width: 1.6, dash: [5, 4] }],
+      hlines: [{ y: g, color: P.ok, label: "목표 " + CB.num(g, 2) + " m" }], vlines: [{ x: e, color: P.accent2 }] });
+    CLX.txt(ctx, "2–10층(층고 4.0)", 66, top2 + 10, P.accent, { bold: true }); CLX.txt(ctx, "1층(5.0)", 66, top2 + 26, P.dim);
+    const c = at(e, s), hc = CH(e, 4), hc1 = CH(e, 5);
+    CB.stat("cl-dp-o-n", `${c.hard} · ${c.soft}`); CB.stat("cl-dp-o-h", `${CB.num(hc, 2)} / ${CB.num(hc1, 2)} m`);
+    CB.stat("cl-dp-o-w", ok.length ? `${CB.num(ok[0], 2)}–${CB.num(ok[ok.length - 1], 2)} m` : "없음");
+    CB.stat("cl-dp-o-j", c.hard ? "간섭" : c.soft ? "간격 부족" : hc < g - 1e-9 ? "천장고 부족" : "<span style=\"color:var(--ok)\">가능</span>");
+  }, { aspect: (w) => (w < 500 ? 1.05 : 0.68), maxHeight: 500 });
+  build();
+})();
+
+/* ---------- 5. 간섭 그룹화 ---------- */
+(function () {
+  const m = CB.bim.model();
+  const CL = [].concat(CLX.clash(m, CLX.D, CLX.B).map((c) => ({ ...c, rule: 0 })), CLX.clash(m, CLX.Pp, CLX.B).map((c) => ({ ...c, rule: 1 })), CLX.clash(m, CLX.D, CLX.W).map((c) => ({ ...c, rule: 2 })));
+  const gr = CB.range("cl-gr-r", (v) => CB.num(v, 1) + " m", () => cv.redraw()), gm = CB.seg("cl-gr-m", () => { curve = null; cv.redraw(); }), gz = CB.check("cl-gr-z", () => { curve = null; cv.redraw(); });
+  let curve = null;
+  function groups(r, same, flat) {
+    const N = CL.length, p = [...Array(N).keys()], f = (i) => (p[i] === i ? i : (p[i] = f(p[i])));
+    for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+      if (same && CL[i].rule !== CL[j].rule) continue;
+      const a = CL[i].center, b = CL[j].center, d = Math.hypot(a[0] - b[0], a[1] - b[1], flat ? 0 : a[2] - b[2]);
+      if (d <= r + 1e-6) p[f(i)] = f(j);
+    }
+    return CL.map((_, i) => f(i));
+  }
+  const cv = CB.canvas("#cl-cv-group", (ctx, W, H) => {
+    const P = CB.palette(), r = gr(), same = gm() === "same", flat = gz(), g = groups(r, same, flat), ids = [...new Set(g)];
+    const size = {}; g.forEach((k) => (size[k] = (size[k] || 0) + 1));
+    const cols = [P.accent, P.accent2, P.ok, P.blue, P.warn, P.bad, P.dim, P.red, P.green];
+    const h1 = Math.round(H * 0.62), X = (x) => 46 + ((x + 1) / 34) * (W - 62), Z = (z) => h1 - 16 - (z / 42) * (h1 - 40);
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1;
+    for (let k = 0; k <= 10; k++) { const z = CLX.H(k); ctx.beginPath(); ctx.moveTo(X(-1), Z(z)); ctx.lineTo(X(33), Z(z)); ctx.stroke(); if (k % 2 === 1 || k === 0) CLX.txt(ctx, k + 1 + "F", 8, Z(z) - 8, P.faint, { size: 10, mono: true }); }
+    [0, 8, 16, 24, 32].forEach((x, i) => { ctx.beginPath(); ctx.moveTo(X(x), Z(0)); ctx.lineTo(X(x), Z(41)); ctx.stroke(); CLX.txt(ctx, "ABCDE"[i], X(x), h1 - 4, P.faint, { size: 10, align: "center", mono: true }); });
+    CL.forEach((c, i) => {
+      const col = cols[ids.indexOf(g[i]) % cols.length], x = X(c.center[0]) + (c.rule === 1 ? 7 : c.rule === 2 ? 3 : -3), y = Z(c.center[2]);
+      ctx.fillStyle = col; ctx.strokeStyle = col; ctx.beginPath();
+      if (c.rule === 0) ctx.arc(x, y, 4.2, 0, 7); else if (c.rule === 1) { ctx.moveTo(x, y - 5); ctx.lineTo(x + 5, y + 4); ctx.lineTo(x - 5, y + 4); ctx.closePath(); } else ctx.rect(x - 4, y - 4, 8, 8);
+      ctx.fill();
+    });
+    CLX.txt(ctx, "x–z 입면(y 방향으로 겹쳐 봄) · 색 = 이슈", 46, 10, P.dim, { size: 11 });
+    if (!curve) { curve = []; for (let rr = 0; rr <= 17.0001; rr += 0.1) curve.push([rr, new Set(groups(rr, same, flat)).size]); }
+    CB.chart(ctx, { x: 46, y: h1 + 10, w: W - 62, h: H - h1 - 50 }, { x: [0, 17], y: [0, 85], xLabel: "반경 r (m)", yLabel: "이슈", series: [{ data: curve, color: P.accent, width: 2 }], points: [{ x: r, y: ids.length, color: P.accent2, r: 5 }], yTicks: [0, 20, 40, 60, 80] });
+    const mx = Math.max(...Object.values(size));
+    CB.stat("cl-gr-o-n", `${CL.length} → ${ids.length}`); CB.stat("cl-gr-o-m", mx + "건"); CB.stat("cl-gr-o-p", CB.num(100 * (1 - ids.length / CL.length), 0) + " %");
+  }, { aspect: (w) => (w < 500 ? 1.15 : 0.72), maxHeight: 520 });
+})();
+
+/* ---------- 6. 해결 워크플로 보드 ---------- */
+(function () {
+  const gw = CB.range("cl-bd-w", (v) => v + "주", show), gn = CB.range("cl-bd-n", (v) => v + "개", run), gc = CB.range("cl-bd-c", (v) => v + "개/주", run);
+  const gr = CB.seg("cl-bd-r", run), gp = CB.range("cl-bd-p", (v) => CB.num(v, 2), run), gq = CB.range("cl-bd-q", (v) => CB.num(v, 2), run);
+  const COLS = ["신규", "배정", "해결 중", "해결 제출", "종결"], WK = 16;
+  let snaps = [], stats = {};
+  function run() {
+    const r = CB.rng(5), cap = gc(), R = +gr(), p = gp(), q = gq(); let iss = Array.from({ length: gn() }, () => ({ st: 0, re: false }));
+    snaps = [iss.map((x) => ({ ...x }))]; let reo = 0, nw = 0, work = 0, zero = null;
+    for (let w = 1; w <= WK; w++) {
+      iss.forEach((x) => { if (x.st === 0) x.st = 1; });
+      iss.forEach((x) => { if (x.st === 2) { x.st = 3; work++; } });
+      iss.filter((x) => x.st === 1).slice(0, cap).forEach((x) => (x.st = 2));
+      if (w % R === 0) {
+        const add = [];
+        iss.forEach((x) => { if (x.st !== 3) return; if (r() < p) { x.st = 1; x.re = true; reo++; } else x.st = 4; if (r() < q) { add.push({ st: 0, re: false }); nw++; } });
+        iss = iss.concat(add);
+      }
+      snaps.push(iss.map((x) => ({ ...x })));
+      if (zero === null && iss.every((x) => x.st === 4)) zero = w;
+    }
+    stats = { reo, nw, work, zero }; show();
+  }
+  function show() {
+    const w = gw(), s = snaps[w] || [];
+    document.getElementById("cl-bd-kb").innerHTML = COLS.map((nm, k) => { const it = s.filter((x) => x.st === k); return `<div class="cl-kc"><h4>${nm}<b>${it.length}</b></h4><div class="cl-chips">${it.slice(0, 40).map((x) => `<span class="cl-chip cl-c${k + 1}${x.re ? " cl-re" : ""}"></span>`).join("")}${it.length > 40 ? `<small>+${it.length - 40}</small>` : ""}</div></div>`; }).join("");
+    CB.stat("cl-bd-o-o", s.filter((x) => x.st !== 4).length + "개"); CB.stat("cl-bd-o-z", stats.zero ? stats.zero + "주" : "16주 안에 안 됨");
+    CB.stat("cl-bd-o-r", `${stats.reo} · ${stats.nw}`); CB.stat("cl-bd-o-t", stats.work + "건");
+    cv.redraw();
+  }
+  const cv = CB.canvas("#cl-cv-board", (ctx, W, H) => {
+    if (!snaps.length) return; const P = CB.palette(), data = snaps.map((s, w) => [w, s.filter((x) => x.st !== 4).length]), ymax = Math.max(10, ...data.map((d) => d[1])) * 1.1;
+    const R = +gr(), vl = []; for (let w = R; w <= WK; w += R) vl.push({ x: w, color: CLX.alpha(P.accent2, 0.5), dash: [2, 4] });
+    vl.push({ x: gw(), color: P.accent2, label: "보드" });
+    CB.chart(ctx, null, { x: [0, WK], y: [0, ymax], xLabel: "주(점선 = 재검토)", yLabel: "미종결 이슈", series: [{ data, color: P.bad, width: 2.4 }], vlines: vl });
+  }, { aspect: (w) => (w < 500 ? 0.62 : 0.4), maxHeight: 280, minHeight: 180 });
+  run();
+})();
+
+/* ---------- 7. 해결안 비교 ---------- */
+(function () {
+  const gd = CB.seg("cl-fx-d", calc), gp = CB.seg("cl-fx-p", calc), gw = CB.seg("cl-fx-w", calc), gv = CB.seg("cl-fx-v", () => { view(); v.redraw(); });
+  let R = { els: [], left: [], ops: [] };
+  function calc() {
+    const d = gd(), p = gp(), w = gw();
+    let els = CB.bim.model({ ductDrop: d === "drop" ? 0.95 : 0.55, pipeDrop: p === "lower" ? 0.8 : 0.35 });
+    if (d === "flat") els = els.map((e) => { if (e.ifc !== "IfcDuctSegment") return e; const z1 = CLX.H(e.storey); return { ...e, box: [0.5, 11.2, z1 - 1.03, 31.5, 12.8, z1 - 0.75], props: { ...e.props, size: "1600x280" } }; });
+    const ops = [];
+    if (w === "open") CLX.clash(els, CLX.D, CLX.W).forEach((c) => { const b = c.b.box, a = c.a.box; ops.push({ kind: "wall", host: c.b, box: [b[0], a[1] - 0.05, a[2] - 0.05, b[3], a[4] + 0.05, a[5] + 0.05] }); });
+    if (p === "sleeve") CLX.clash(els, CLX.Pp, CLX.B).forEach((c) => { const b = c.b.box, a = c.a.box, yc = (a[1] + a[4]) / 2, zc = (a[2] + a[5]) / 2; ops.push({ kind: "sleeve", host: c.b, box: [b[0], yc - 0.075, zc - 0.075, b[3], yc + 0.075, zc + 0.075] }); });
+    if (d === "hole") CLX.clash(els, CLX.D, CLX.B).forEach((c) => { const b = c.b.box, a = c.a.box; ops.push({ kind: "beam", host: c.b, box: [b[0], a[1] - 0.05, a[2] - 0.05, b[3], a[4] + 0.05, a[5] + 0.05] }); });
+    // 보 관통 판정(형태): 높이 ≤ 춤/3, 중심이 춤의 가운데 1/3, 기둥 면에서 춤의 2배 이상
+    ops.forEach((o) => {
+      if (o.kind === "wall") { o.ok = null; return; }
+      const top = o.host.box[5] + 0.21, dep = 0.7, hh = o.box[5] - o.box[2], zc = (o.box[2] + o.box[5]) / 2, dz = top - zc, yc = (o.box[1] + o.box[4]) / 2;
+      const dCol = Math.min(...[0, 8, 16, 24].map((g) => Math.abs(yc - g))) - 0.4;
+      o.ok = hh <= dep / 3 + 1e-9 && dz >= dep / 3 - 1e-9 && dz <= (2 * dep) / 3 + 1e-9 && dCol >= 2 * dep - 1e-9;
+      o.why = `높이 ${CB.num(hh, 2)}/${dep} m, 중심 깊이 ${CB.num(dz, 2)} m, 기둥 면에서 ${CB.num(dCol, 1)} m`;
+    });
+    const all = CLX.clash(els, CLX.D.concat(CLX.Pp), ["IfcBeam", "IfcWall", "IfcSlab", "IfcColumn"]);
+    const left = all.filter((c) => !ops.some((o) => o.host === c.b && CLX.inside(CLX.ovBox(c.a.box, c.b.box), o.box)));
+    R = { els, left, ops };
+    const nWall = ops.filter((o) => o.kind === "wall").length, bad = ops.filter((o) => o.ok === false), good = ops.filter((o) => o.ok === true);
+    const dB = d === "drop" ? 1.15 : d === "flat" ? 1.03 : 0.75, pB = p === "lower" ? 0.85 : 0.4, hc = 4.0 - Math.max(dB, pB) - 0.15;
+    CB.stat("cl-fx-o-n", left.length + "건"); CB.stat("cl-fx-o-p", `${ops.length}개`); CB.stat("cl-fx-o-s", `${nWall + bad.length}<small>${bad.length ? "불가 " + bad.length : ""}</small>`); CB.stat("cl-fx-o-h", CB.num(hc, 2) + " m");
+    const msg = [];
+    if (left.length) { const by = {}; left.forEach((c) => { const k = CLX.KO[c.a.ifc] + "–" + CLX.KO[c.b.ifc]; by[k] = (by[k] || 0) + 1; }); msg.push("남은 간섭: " + Object.entries(by).map(([k, n]) => `${k} ${n}`).join(", ")); }
+    if (good.length) msg.push(`슬리브·보 관통 ${good.length}개 판정 통과(${good[0].why})`);
+    if (bad.length) msg.push(`<b>보 관통 ${bad.length}개 판정 불가</b>(${bad[0].why} — 춤/3 = 0.23 m 초과, 보강·재설계 필요)`);
+    if (nWall) msg.push(`코어 벽 개구부 ${nWall}개: 구조 검토·내화 충전 대상`);
+    if (d === "flat") msg.push("납작 덕트 1,600 × 280: 등가 지름 약 672 mm(원래 674 mm), 종횡비 검토");
+    if (hc < 2.7 - 1e-9) msg.push(`천장고 ${CB.num(hc, 2)} m < 목표 2.70 m`);
+    const el = document.getElementById("cl-fx-msg"); el.className = "cl-msg " + (left.length || bad.length ? "bad" : "ok"); el.innerHTML = msg.join(" · ") || "남은 간섭 없음.";
+    v.redraw();
+  }
+  function view() { if (gv() === "3") v.set({ target: [16, 12, 11.5], dist: 40 }); else v.set({ target: [16, 12, 20], dist: 88 }); }
+  const v = CB.orbit("#cl-cv-fix", { yaw: -0.6, pitch: 0.42, dist: 40, target: [16, 12, 11.5], fov: 0.9, aspect: 0.72, minHeight: 300, maxHeight: 500,
+    draw(V) {
+      const P = V.P, f = gv() === "3" ? 3 : 0, keep = (e) => !f || e.storey === f;
+      CLX.scene(V, R.els.filter(keep), { alpha: f ? 1 : 0.8 });
+      const ob = R.ops.filter((o) => keep(o.host));
+      CLX.edges(V, ob.filter((o) => o.ok !== false).map((o) => o.box), P.accent2, 1.8, 1);
+      CLX.fill(V, ob.filter((o) => o.ok === false).map((o) => o.box), P.bad, 0.35); CLX.edges(V, ob.filter((o) => o.ok === false).map((o) => o.box), P.bad, 1.8, 1, [4, 3]);
+      const lb = R.left.filter((c) => keep(c.a)).map((c) => CLX.ovBox(c.a.box, c.b.box)); CLX.fill(V, lb, P.bad, 0.8); CLX.edges(V, lb, P.bad, 1.4, 1);
+      CLX.hdr(V, `${f ? "3층" : "전체"} · 남은 간섭 ${R.left.length}건 · 주황 윤곽 = 개구부·슬리브`);
+    } });
+  calc();
+})();
+
+/* ---------- 8. 격자 가속 ---------- */
+(function () {
+  const gk = CB.range("cl-gd-k", (v) => v + "개", () => { curve = null; go(); }), gs = CB.range("cl-gd-s", (v) => v + " m", () => go());
+  const base = CB.bim.model();
+  let res = null, curve = null;
+  function boxes(k) { const n = base.length * k, B = new Float64Array(n * 6); for (let c = 0; c < k; c++) base.forEach((e, i) => { const o = (c * base.length + i) * 6; for (let j = 0; j < 6; j++) B[o + j] = e.box[j] + (j % 3 === 0 ? 40 * c : 0); }); return { n, B }; }
+  const hit = (B, i, j) => { const a = i * 6, b = j * 6; for (let k = 0; k < 3; k++) if (Math.min(B[a + k + 3], B[b + k + 3]) - Math.max(B[a + k], B[b + k]) <= 1e-9) return false; return true; };
+  function brute({ n, B }) { let f = 0; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (hit(B, i, j)) f++; return { tests: (n * (n - 1)) / 2, f }; }
+  function grid({ n, B }, s, count) {
+    const cells = new Map();
+    for (let i = 0; i < n; i++) { const o = i * 6; const a = [0, 1, 2].map((k) => Math.floor(B[o + k] / s)), b = [0, 1, 2].map((k) => Math.floor(B[o + k + 3] / s));
+      for (let x = a[0]; x <= b[0]; x++) for (let y = a[1]; y <= b[1]; y++) for (let z = a[2]; z <= b[2]; z++) { const key = x * 1e6 + y * 1e3 + z; let L = cells.get(key); if (!L) cells.set(key, (L = [])); L.push(i); } }
+    const seen = new Set(); let f = 0;
+    cells.forEach((L) => { for (let p = 0; p < L.length; p++) for (let q = p + 1; q < L.length; q++) { const key = L[p] * n + L[q]; if (seen.has(key)) continue; seen.add(key); if (!count && hit(B, L[p], L[q])) f++; } });
+    return { tests: seen.size, f };
+  }
+  function sweep({ n, B }) {
+    const idx = [...Array(n).keys()].sort((i, j) => B[i * 6] - B[j * 6]); let act = [], tests = 0, f = 0;
+    idx.forEach((i) => { const x0 = B[i * 6]; act = act.filter((j) => B[j * 6 + 3] > x0 + 1e-9); act.forEach((j) => { tests++; if (hit(B, i, j)) f++; }); act.push(i); });
+    return { tests, f };
+  }
+  const time = (fn) => { const t0 = performance.now(), r = fn(); r.ms = performance.now() - t0; return r; };
+  function go() {
+    const D = boxes(gk()), s = gs();
+    res = { n: D.n, b: time(() => brute(D)), g: time(() => grid(D, s)), w: time(() => sweep(D)) };
+    if (!curve) { curve = [1, 2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 32, 40].map((c) => [c, grid(D, c, true).tests]); }
+    cv.redraw();
+  }
+  document.getElementById("cl-gd-run").addEventListener("click", go);
+  const cv = CB.canvas("#cl-cv-grid", (ctx, W, H) => {
+    if (!res) return;
+    const P = CB.palette(), rows = [["모든 쌍", res.b, P.bad], ["균일 격자", res.g, P.accent], ["정렬 스윕", res.w, P.ok]], lmax = Math.log10(Math.max(10, res.b.tests)) + 0.3;
+    const x0 = 86, bw = W - x0 - 16;
+    CLX.txt(ctx, "세부 검사한 쌍(로그 축) · 측정 시간", x0, 14, P.dim, { size: 11 });
+    rows.forEach(([k, r, col], i) => { const y = 30 + i * 34, w = (bw * Math.log10(Math.max(1, r.tests))) / lmax; ctx.fillStyle = CLX.alpha(col, 0.75); ctx.fillRect(x0, y, Math.max(2, w), 24); CLX.txt(ctx, k, x0 - 8, y + 12, P.text, { align: "right", size: 12 });
+      const lab = `${CB.sig(r.tests, 3)} · ${CB.num(r.ms, 1)} ms`; CLX.txt(ctx, lab, w > bw * 0.55 ? x0 + 8 : x0 + w + 8, y + 12, w > bw * 0.55 ? P.bg : P.text, { size: 11, mono: true, bold: true }); });
+    if (curve) {
+      const ymax = Math.max(...curve.map((c) => c[1]), res.b.tests) * 1.1;
+      CB.chart(ctx, { x: 64, y: 150, w: W - 64 - 16, h: H - 150 - 46 }, { x: [1, 40], y: [1, ymax], logY: true, xLabel: "격자 칸 크기 (m)", yLabel: "후보 쌍",
+        series: [{ data: curve, color: P.accent, width: 2 }], hlines: [{ y: res.b.tests, color: P.bad, label: "모든 쌍" }], vlines: [{ x: gs(), color: P.accent2 }] });
+    }
+    CB.stat("cl-gd-o-n", `${res.n} · ${CB.sig(res.b.tests, 3)}`); CB.stat("cl-gd-o-g", `${CB.sig(res.g.tests, 3)} · ${CB.num(res.g.ms, 1)} ms`);
+    CB.stat("cl-gd-o-s", `${CB.sig(res.w.tests, 3)} · ${CB.num(res.w.ms, 1)} ms`);
+    CB.stat("cl-gd-o-f", res.b.f === res.g.f && res.g.f === res.w.f ? `${res.b.f} ✓ 일치` : `${res.b.f} / ${res.g.f} / ${res.w.f}`);
+  }, { aspect: (w) => (w < 500 ? 1.1 : 0.66), maxHeight: 480 });
+  go();
+})();
+
+</script>
+</body>
+</html>

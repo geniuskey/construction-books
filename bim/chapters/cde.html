@@ -1,0 +1,1064 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>공통 데이터 환경과 정보 관리 · BIMBook</title>
+<meta name="description" content="모두가 같은 모델을 본다. ISO 19650의 정보 컨테이너와 작업 중·공유·게시·보관 상태, 승인 관문과 수정 번호, 명명 규칙과 메타데이터, 연합 모델, GlobalId 버전 비교와 감사 추적, 접근 권한, 교환 주기를 B-10 BIM으로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .cd-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .cd-msg b { color: var(--text); }
+  .cd-msg.ok { color: var(--ok); }
+  .cd-msg.bad { color: var(--bad); font-weight: 600; }
+  .cd-tbl td, .cd-tbl th { font-variant-numeric: tabular-nums; font-size: 13.5px; padding: 7px 10px; }
+  .cd-tbl td.cd-ok { color: var(--ok); font-weight: 700; }
+  .cd-tbl td.cd-bad { color: var(--bad); font-weight: 700; }
+  .cd-tbl tr.cd-broken td { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+  .cd-tbl tr.cd-future td { opacity: .4; }
+  .cd-mono { font-family: var(--mono); font-size: 12.5px; }
+  .cd-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 12px; background: var(--canvas-bg); }
+  .cd-col { border: 1px dashed var(--border); border-radius: 10px; padding: 8px 6px; min-height: 230px; background: var(--surface); display: flex; flex-direction: column; gap: 6px; transition: border-color .15s, background .15s; }
+  .cd-col.cd-hot { border-color: var(--accent); background: var(--accent-soft); }
+  .cd-col h4 { margin: 0 0 4px !important; font-size: 13px !important; text-align: center; color: var(--text-dim); }
+  .cd-col h4 small { display: block; font-weight: 400; font-size: 11px; font-family: var(--mono); color: var(--text-faint); }
+  .cd-card { border: 1px solid var(--border); border-left: 4px solid var(--text-dim); border-radius: 8px; padding: 6px 7px; background: var(--bg-elev); font-size: 12px; line-height: 1.4; cursor: grab; touch-action: none; user-select: none; overflow-wrap: anywhere; }
+  .cd-card b { display: block; font-size: 12.5px; color: var(--text); }
+  .cd-card .cd-mono { font-size: 10.5px; color: var(--text-dim); }
+  .cd-card.cd-sel { border-color: var(--accent-2); box-shadow: 0 0 0 2px var(--accent-2-soft); border-left-color: var(--accent-2); }
+  .cd-card.cd-flag { border-left-color: var(--bad); }
+  .cd-card.cd-drag { opacity: .55; }
+  .cd-name { width: 100%; box-sizing: border-box; font: 600 14px var(--mono); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); }
+  .cd-name:focus { outline: none; border-color: var(--accent); }
+  .cd-fields { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding: 14px 12px 6px; background: var(--canvas-bg); }
+  .cd-field { border-radius: 8px; border: 1px solid var(--border); padding: 6px 4px; text-align: center; font-size: 11px; color: var(--text-dim); background: var(--surface); min-width: 0; }
+  .cd-field b { display: block; font: 700 13px var(--mono); color: var(--text); overflow-wrap: anywhere; }
+  .cd-field.cd-ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+  .cd-field.cd-bad { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+  .cd-grid { display: grid; grid-template-columns: minmax(84px, 1.3fr) repeat(4, minmax(0, 1fr)); gap: 4px; padding: 12px; background: var(--canvas-bg); font-size: 12.5px; }
+  .cd-grid .cd-h { font-weight: 700; color: var(--text-dim); text-align: center; align-self: end; font-size: 12px; }
+  .cd-grid .cd-r { color: var(--text); align-self: center; font-size: 12.5px; line-height: 1.3; }
+  .cd-cell { font: 600 12px var(--mono); border: 1px solid var(--border); border-radius: 7px; padding: 7px 2px; cursor: pointer; background: var(--surface); color: var(--text-faint); }
+  .cd-cell.cd-r1 { background: color-mix(in srgb, var(--blue) 14%, transparent); color: var(--blue); border-color: var(--blue); }
+  .cd-cell.cd-r2 { background: color-mix(in srgb, var(--accent-2) 16%, transparent); color: var(--accent-2); border-color: var(--accent-2); }
+  .cd-scen { list-style: none; padding: 10px 18px !important; margin: 0 !important; display: grid; gap: 4px; font-size: 13.5px; border-top: 1px solid var(--border); background: var(--bg-elev); }
+  .cd-scen li { margin: 0 !important; color: var(--text-dim); }
+  .cd-scen li b.cd-ok { color: var(--ok); } .cd-scen li b.cd-bad { color: var(--bad); }
+  .cd-pad { padding: 14px 16px; background: var(--canvas-bg); }
+  @media (max-width: 560px) {
+    .cd-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cd-col { min-height: 140px; }
+    .cd-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .cd-grid { font-size: 11px; grid-template-columns: minmax(64px, 1.1fr) repeat(4, minmax(0, 1fr)); }
+    .cd-grid .cd-r { font-size: 11px; }
+  }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="cde">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="cd-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="cd-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="cd-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+      <marker id="cd-ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 05</div>
+    <h1 data-no-glossary>공통 데이터 환경과 정보 관리</h1>
+    <p class="lead">B-10 BIM은 한 사람이 만드는 모델이 아닙니다. 구조 팀은 기둥·보·슬래브·코어 벽을, 기계 팀은 급기 덕트를, 소방 팀은 스프링클러 주관을, 건축 팀은 천장을 각자의 모델로 만듭니다. 구조 팀이 기둥을 키운 새 모델을 메일로 보냈는데 기계 팀이 지난주 파일 위에서 덕트를 그리고 있다면, 간섭 검토도 물량도 틀린 모델 위에서 이루어집니다. 이 장은 "누가, 언제, 어떤 상태의, 어느 판의 정보를 보는가"를 관리하는 <b>공통 데이터 환경(CDE)</b>을 다룹니다. ISO 19650의 정보 컨테이너와 네 상태(작업 중 → 공유 → 게시 → 보관), 승인 관문과 수정 번호, 명명 규칙과 메타데이터, 분야별 모델을 겹쳐 보는 연합 모델, GlobalId로 두 판을 비교하는 버전 비교와 감사 추적, 역할과 상태에 따른 접근 권한, 모델 교환 주기를 B-10 프로젝트로 직접 계산합니다.</p>
+    <ul class="objectives">
+      <li>점대점 파일 교환과 중앙의 공통 데이터 환경이 어떻게 다른지, 정보 관리가 왜 필요한지 설명한다.</li>
+      <li>ISO 19650의 정보 컨테이너와 네 상태, 검토·승인 관문을 상태 기계로 표현하고 허용·금지 전이를 판정한다.</li>
+      <li>명명 규칙의 필드와 상태 코드·수정 번호 같은 메타데이터를 구분하고, 파일 이름을 규칙으로 검사한다.</li>
+      <li>분야별 모델을 공유 좌표로 겹친 연합 모델에서 간섭이 어떻게 나타나고, 기준 높이가 어긋나면 무엇이 숨는지 확인한다.</li>
+      <li>GlobalId로 두 판의 모델을 비교해 추가·삭제·변경 요소를 찾고, 해시 체인이 기록 조작을 드러내는 원리를 설명한다.</li>
+      <li>역할 × 상태 접근 권한을 최소 권한 원칙으로 설계하고, 교환 주기와 재작업의 균형점을 계산한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 정보가 없었다면</small><b>"최종_진짜최종_수정2"는 몇 번째 판인가</b></div>
+      <div class="o-body"><p>종이 도면 시대에도 정보 관리는 있었습니다. 도면마다 번호와 개정 기호를 붙이고, 고친 곳에 구름 표시를 그리고, 도면 대장(drawing register)에 누구에게 몇 번째 판을 보냈는지 적었습니다. 그러나 파일을 메일과 공유 폴더로 주고받기 시작하자 사본이 순식간에 불어났습니다. 같은 이름의 파일이 사람마다 다른 내용을 담고, 어느 판으로 견적하고 시공했는지 나중에 아무도 증명하지 못하는 일이 흔해졌습니다.</p>
+        <p>영국은 2007년 BS 1192(건축·엔지니어링·건설 정보의 협업 생산 실무 규정)에서 공통 데이터 환경과 명명 규칙의 틀을 제시했고, 이 흐름이 PAS 1192-2(2013)를 거쳐 2018년 국제 표준 ISO 19650-1·-2로 이어졌습니다. 핵심은 소프트웨어가 아니라 규칙입니다. 정보마다 이름과 상태와 판을 붙이고, 상태를 바꿀 때마다 검토·승인을 거치고, 그 모든 과정을 기록으로 남기는 것입니다.</p>
+        <div class="o-chain"><span>분야별 모델·도면·문서</span><i>→</i><span class="tool">정보 컨테이너 · 상태와 승인 · 명명 규칙 · 버전 비교 · 접근 권한</span><i>→</i><span>단일 정보원 · 연합 모델 · 감사 추적</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="why">
+    <h2>정보 관리의 필요성</h2>
+    <div class="problem"><strong>간섭 검토는 어느 파일로 했나요?</strong>
+      <p>설비 팀 폴더에 <code>B10_구조.ifc</code>, <code>B10_구조_최종.ifc</code>, <code>B10_구조_최종_수정(0312).ifc</code>가 있습니다. 지난주 간섭 검토 보고서는 50건이라는데, 구조 팀은 "그건 옛날 파일"이라고 합니다. 누가 틀렸는지 가리려면 무엇이 필요할까요?</p></div>
+    <p><span class="term">정보 관리</span><span class="en">(information management)</span>는 프로젝트에 필요한 정보를 정하고, 만들고, 검토하고, 공유하고, 쓰고, 보관하는 과정을 규칙으로 다스리는 일입니다. BIM에서 모델은 정보 그 자체이므로 모델 파일 하나하나가 관리 대상입니다. 정보 관리가 없으면 세 가지 문제가 생깁니다. ① <b>사본의 표류</b> — 같은 모델의 사본이 사람마다 다른 판이 된다. ② <b>상태의 불명</b> — 지금 보고 있는 모델이 작성 중인 초안인지, 조정용으로 공유된 것인지, 시공에 써도 되는 승인본인지 모른다. ③ <b>책임의 공백</b> — 누가 언제 무엇을 고쳤고 누가 승인했는지 기록이 없어, 문제가 생기면 원인을 거슬러 올라갈 수 없다.</p>
+    <figure class="diagram" id="fig-cd-hub">
+      <svg viewBox="0 0 860 300" role="img" aria-label="점대점 파일 교환과 중앙 공통 데이터 환경의 비교">
+        <rect x="10" y="10" width="840" height="280" rx="10" class="f-surface"/>
+        <text x="215" y="38" text-anchor="middle" class="t" style="font-weight:700">점대점 교환(메일·개인 폴더)</text>
+        <g style="stroke:var(--text-faint);stroke-width:1.3">
+          <line x1="215" y1="80" x2="320" y2="140"/><line x1="215" y1="80" x2="290" y2="245"/><line x1="215" y1="80" x2="140" y2="245"/><line x1="215" y1="80" x2="110" y2="140"/>
+          <line x1="320" y1="140" x2="290" y2="245"/><line x1="320" y1="140" x2="140" y2="245"/><line x1="320" y1="140" x2="110" y2="140"/>
+          <line x1="290" y1="245" x2="140" y2="245"/><line x1="290" y1="245" x2="110" y2="140"/><line x1="140" y1="245" x2="110" y2="140"/>
+        </g>
+        <g class="t-mono" text-anchor="middle">
+          <circle cx="215" cy="80" r="26" class="f-elev"/><text x="215" y="78" style="fill:var(--text)">구조</text><text x="215" y="92">v3</text>
+          <circle cx="320" cy="140" r="26" class="f-elev"/><text x="320" y="138" style="fill:var(--text)">기계</text><text x="320" y="152" style="fill:var(--bad)">v1</text>
+          <circle cx="290" cy="245" r="26" class="f-elev"/><text x="290" y="243" style="fill:var(--text)">소방</text><text x="290" y="257" style="fill:var(--bad)">v2</text>
+          <circle cx="140" cy="245" r="26" class="f-elev"/><text x="140" y="243" style="fill:var(--text)">건축</text><text x="140" y="257">v3</text>
+          <circle cx="110" cy="140" r="26" class="f-elev"/><text x="110" y="138" style="fill:var(--text)">시공</text><text x="110" y="152" style="fill:var(--bad)">v2</text>
+        </g>
+        <text x="215" y="282" text-anchor="middle" class="t-dim">경로 n(n − 1)/2 = 10 · 사본 5개 · 판 3종</text>
+        <line x1="430" y1="30" x2="430" y2="270" style="stroke:var(--border)"/>
+        <text x="645" y="38" text-anchor="middle" class="t" style="font-weight:700">공통 데이터 환경(CDE)</text>
+        <rect x="575" y="125" width="140" height="56" rx="12" class="f-acc-soft"/>
+        <text x="645" y="149" text-anchor="middle" class="t" style="font-weight:700">CDE</text>
+        <text x="645" y="168" text-anchor="middle" class="t-mono">상태 · 판 · 권한 · 기록</text>
+        <g style="stroke:var(--accent);stroke-width:1.6" marker-end="url(#cd-ah-acc)">
+          <line x1="645" y1="96" x2="645" y2="121"/><line x1="745" y1="135" x2="719" y2="145"/><line x1="725" y1="226" x2="700" y2="184"/><line x1="565" y1="226" x2="590" y2="184"/><line x1="545" y1="135" x2="571" y2="145"/>
+        </g>
+        <g class="t-mono" text-anchor="middle">
+          <circle cx="645" cy="72" r="24" class="f-elev"/><text x="645" y="76" style="fill:var(--text)">구조</text>
+          <circle cx="770" cy="128" r="24" class="f-elev"/><text x="770" y="132" style="fill:var(--text)">기계</text>
+          <circle cx="740" cy="246" r="24" class="f-elev"/><text x="740" y="250" style="fill:var(--text)">소방</text>
+          <circle cx="550" cy="246" r="24" class="f-elev"/><text x="550" y="250" style="fill:var(--text)">건축</text>
+          <circle cx="520" cy="128" r="24" class="f-elev"/><text x="520" y="132" style="fill:var(--text)">시공</text>
+        </g>
+        <text x="645" y="282" text-anchor="middle" class="t-dim">경로 n = 5 · 원본 1개 · 모두 같은 판을 참조</text>
+      </svg>
+      <figcaption><b>그림 5-1.</b> 정보 교환의 두 방식. 왼쪽은 참여자끼리 파일을 직접 주고받아 경로가 n(n − 1)/2로 늘고 사본마다 판이 달라진다(빨강은 최신이 아닌 판). 오른쪽은 모든 참여자가 하나의 관리된 저장소에서 상태와 판이 붙은 원본을 참조한다.</figcaption>
+    </figure>
+    <p>CDE의 목표는 흔히 <span class="term">단일 정보원</span><span class="en">(single source of truth)</span>이라고 부르는 상태입니다. 주의할 점은 "파일 하나"가 아니라 "어느 정보가 최신이고 어떤 용도로 써도 되는지에 대한 합의된 단일 기준"이라는 뜻이라는 것입니다. 모델은 여전히 분야마다 따로 있고, 각 분야의 이전 판도 지워지지 않습니다. 다만 그 모두에 이름·상태·판·작성자가 붙어 있어, 누구나 같은 질문에 같은 답을 얻습니다.</p>
+    <div class="sim" id="sim-cd-drift">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>사본의 표류: 메일 배포 vs 중앙 참조</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cd-cv-drift" aria-label="주별 최신 판을 쓰는 참여자 비율과 유통 중인 판의 수"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>참여자 수 n <output id="cd-dr-n-out"></output></span><input type="range" id="cd-dr-n" min="3" max="30" step="1" value="8"></label>
+          <label class="ctrl"><span>메일 수신·반영 확률 q <output id="cd-dr-q-out"></output></span><input type="range" id="cd-dr-q" min="0.5" max="1" step="0.01" value="0.85"></label>
+          <label class="ctrl"><span>CDE에서 내려받아 계속 쓰는 습관 h <output id="cd-dr-h-out"></output></span><input type="range" id="cd-dr-h" min="0" max="0.5" step="0.01" value="0.05"></label>
+          <div class="btn-row"><button class="btn" id="cd-dr-seed">다른 난수로 다시</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최신 판 사용률(메일)</span><span class="v" id="cd-dr-o-e">—</span></div>
+        <div class="stat"><span class="k">최신 판 사용률(CDE)</span><span class="v" id="cd-dr-o-c">—</span></div>
+        <div class="stat"><span class="k">유통 중인 판 수(메일, 최대)</span><span class="v" id="cd-dr-o-v">—</span></div>
+        <div class="stat"><span class="k">낡은 판 작업(사람·주, 메일 / CDE)</span><span class="v" id="cd-dr-o-w">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 메일 배포는 매주 15–20 % 안팎의 참여자가 낡은 판으로 일합니다 · q를 0.6으로 낮추면 유통 중인 판의 종류가 늘어납니다 · 참여자를 30명으로 늘리면 판의 종류가 더 늘어납니다(누군가는 반드시 놓친다) · CDE에서도 h를 0.3으로 두면 내려받은 사본이 다시 표류합니다 — 도구보다 "원본을 참조한다"는 규칙이 중요합니다 · 모델: 작성자가 20주 동안 매주 새 판을 낸다. 메일은 각 참여자에게 확률 q로 도착해 반영되고, CDE는 매주 원본을 열되 확률 h로 지난 사본을 계속 쓴다(교육용 확률 모형, 시드 고정 난수).</div>
+    </div>
+    <div class="callout tip"><strong>CDE는 제품 이름이 아니다</strong> CDE는 특정 소프트웨어가 아니라 "정보 컨테이너를 모으고, 관리하고, 퍼뜨리는 합의된 정보원과 그 관리 절차"입니다. 실제로는 문서 관리 시스템, 모델 서버, 이슈 관리 도구 등 여러 기술을 조합해 구현하기도 합니다. 어떤 도구를 쓰든 이 장의 규칙(상태, 승인, 이름, 판, 권한, 기록)이 지켜지는지가 핵심입니다.</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="iso19650">
+    <h2>ISO 19650의 틀: 역할, 요구 사항, 정보 컨테이너</h2>
+    <div class="problem"><strong>누가 정보를 요구하고, 누가 납품하나</strong>
+      <p>발주자는 "BIM으로 해 주세요"라고만 했습니다. 설계 총괄은 구조·기계·소방 협력사에게 무엇을, 언제까지, 어떤 형식으로 받아야 할까요? 그리고 받은 것을 무엇이라고 불러야 할까요?</p></div>
+    <p>ISO 19650 시리즈는 BIM을 이용한 정보 관리의 국제 표준입니다. 1부는 개념과 원칙, 2부는 자산의 납품 단계(설계·시공), 3부는 운영 단계, 4부는 정보 교환, 5부는 보안을 고려한 접근을 다룹니다(각 부의 판본은 현행 확인). 이 표준은 정보를 <b>요구하는 쪽</b>과 <b>납품하는 쪽</b>의 관계로 프로젝트를 봅니다. 정보를 요구하고 계약을 맺는 쪽(발주자, appointing party), 발주자와 직접 계약해 정보 납품을 총괄하는 <span class="term">주관 수급인</span><span class="en">(lead appointed party)</span>, 그 아래에서 실제로 정보를 만드는 수급인(appointed party)과 <span class="term">작업 팀</span><span class="en">(task team)</span>이 있고, 주관 수급인과 그 수급인들을 묶어 납품 팀(delivery team)이라 합니다. 한국어 번역어는 이 책의 것이며, 국내 번역본·지침의 용어는 현행 확인이 필요합니다.</p>
+    <figure class="diagram" id="fig-cd-roles">
+      <svg viewBox="0 0 860 280" role="img" aria-label="B-10 설계 단계의 ISO 19650 역할 구조: 발주자, 주관 수급인, 작업 팀">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <rect x="330" y="26" width="200" height="48" rx="10" class="f-acc2-soft"/>
+        <text x="430" y="46" text-anchor="middle" class="t" style="font-weight:700">발주자</text><text x="430" y="64" text-anchor="middle" class="t-mono">appointing party · 정보 요구</text>
+        <rect x="330" y="104" width="200" height="48" rx="10" class="f-acc-soft"/>
+        <text x="430" y="124" text-anchor="middle" class="t" style="font-weight:700">설계 총괄(주관 수급인)</text><text x="430" y="142" text-anchor="middle" class="t-mono">lead appointed party</text>
+        <g style="stroke:var(--text-dim);stroke-width:1.5;fill:none" marker-end="url(#cd-ah)"><path d="M430 74V100"/><path d="M430 152V170H130V188"/><path d="M430 170H330V188"/><path d="M430 170H530V188"/><path d="M430 170H730V188"/></g>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="60" y="190" width="140" height="56" rx="9" class="f-elev"/><text x="130" y="212" style="fill:var(--text);font-weight:600">건축 작업 팀</text><text x="130" y="230">ARC · 천장</text>
+          <rect x="260" y="190" width="140" height="56" rx="9" class="f-elev"/><text x="330" y="212" style="fill:var(--text);font-weight:600">구조 작업 팀</text><text x="330" y="230">STR · 골조 340개</text>
+          <rect x="460" y="190" width="140" height="56" rx="9" class="f-elev"/><text x="530" y="212" style="fill:var(--text);font-weight:600">기계 작업 팀</text><text x="530" y="230">MEP · 덕트 10개</text>
+          <rect x="660" y="190" width="140" height="56" rx="9" class="f-elev"/><text x="730" y="212" style="fill:var(--text);font-weight:600">소방 작업 팀</text><text x="730" y="230">FPE · 배관 10개</text>
+        </g>
+        <rect x="40" y="96" width="250" height="64" rx="8" style="fill:none;stroke:var(--accent);stroke-dasharray:4 3"/>
+        <text x="52" y="118" class="t-mono" style="fill:var(--accent)">납품 팀 = 주관 수급인 + 작업 팀들</text>
+        <text x="52" y="138" class="t-mono">정보 요구 → 계획 → 생산 → 검토 → 납품</text>
+        <text x="600" y="120" class="t-mono">요구 사항: 조직(OIR) · 자산(AIR)</text><text x="600" y="138" class="t-mono">프로젝트(PIR) · 교환(EIR) — 4장</text>
+      </svg>
+      <figcaption><b>그림 5-2.</b> B-10 설계 단계의 역할 구조(교육용). 발주자가 정보 요구 사항을 내면 설계 총괄(주관 수급인)이 납품 계획을 세우고 분야별 작업 팀이 모델을 만든다. 시공 단계에서는 시공사가 주관 수급인이 되고 전문 협력사가 작업 팀이 된다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 5.1 (공통 데이터 환경)</strong> <span class="term">공통 데이터 환경</span><span class="en">(common data environment, CDE)</span>은 프로젝트나 자산에 관한 정보의 합의된 정보원으로, 정보 컨테이너 하나하나를 관리된 절차에 따라 모으고, 관리하고, 퍼뜨리는 곳이다. 그 안의 모든 정보는 상태(작업 중·공유·게시·보관), 판(수정 번호), 작성자, 권한, 이력을 갖는다.</div>
+    <div class="callout def"><strong>정의 5.2 (정보 컨테이너)</strong> <span class="term">정보 컨테이너</span><span class="en">(information container)</span>는 파일이나 시스템·응용 프로그램 저장 구조에서 꺼낼 수 있는, 이름이 붙은 지속적인 정보 묶음이다. 모델 파일(예: 구조 IFC), 도면 한 장, 시방서, 일람표, 회의록뿐 아니라 데이터베이스 안의 레코드 집합도 정보 컨테이너가 될 수 있다. 컨테이너는 <b>이름</b>(정체성)과 <b>메타데이터</b>(상태·판·분류·설명)로 관리된다.</div>
+    <figure class="diagram" id="fig-cd-container">
+      <svg viewBox="0 0 860 250" role="img" aria-label="정보 컨테이너의 구성: 내용, 고정된 이름, 바뀌는 메타데이터, 이력">
+        <rect x="10" y="10" width="840" height="230" rx="10" class="f-surface"/>
+        <rect x="40" y="40" width="330" height="170" rx="12" class="f-elev"/>
+        <rect x="40" y="40" width="330" height="40" rx="12" class="f-acc-soft"/>
+        <text x="205" y="66" text-anchor="middle" class="t-mono" style="fill:var(--accent);font-size:13px;font-weight:700">B10-STR-ZZ-ZZ-M3-S-0001</text>
+        <text x="60" y="104" class="t" style="font-weight:600">내용(content)</text>
+        <text x="60" y="126" class="t-mono">IfcColumn 200 · IfcBeam 90 · IfcSlab 10</text>
+        <text x="60" y="144" class="t-mono">IfcWall 40 → 요소 340개, 각자 GlobalId</text>
+        <text x="60" y="172" class="t" style="font-weight:600">이름은 판이 바뀌어도 그대로</text>
+        <text x="60" y="194" class="t-mono">P01.1 → P01 → P02 → C01 모두 같은 이름</text>
+        <rect x="420" y="40" width="190" height="170" rx="12" class="f-acc2-soft"/>
+        <text x="515" y="64" text-anchor="middle" class="t" style="font-weight:700">메타데이터</text>
+        <g class="t-mono"><text x="436" y="90">상태: 공유(Shared)</text><text x="436" y="110">상태 코드: S1 조정용</text><text x="436" y="130">수정: P02</text><text x="436" y="150">설명: 구조 골조 모델</text><text x="436" y="170">분류·작성자·날짜</text><text x="436" y="190">보안 등급</text></g>
+        <rect x="650" y="40" width="170" height="170" rx="12" class="f-elev"/>
+        <text x="735" y="64" text-anchor="middle" class="t" style="font-weight:700">이력(감사 추적)</text>
+        <g class="t-mono"><text x="664" y="90">03-02 생성 P01.1</text><text x="664" y="110">03-06 공유 P01</text><text x="664" y="130">03-16 공유 P02</text><text x="664" y="150">03-20 게시 C01</text><text x="664" y="170">… 누가·언제·무엇</text></g>
+        <g style="stroke:var(--text-faint);stroke-width:1.4;fill:none" marker-end="url(#cd-ah)"><path d="M372 125H416"/><path d="M612 125H646"/></g>
+      </svg>
+      <figcaption><b>그림 5-3.</b> 정보 컨테이너의 구성. 내용(모델 요소들)과 이름은 컨테이너의 정체성이고, 상태·수정·설명 같은 메타데이터는 절차에 따라 바뀐다. 바뀔 때마다 이력이 쌓인다.</figcaption>
+    </figure>
+    <p>요구 사항의 흐름은 4장에서 다룬 것과 이어집니다. 발주자는 조직(OIR)·자산(AIR)·프로젝트(PIR) 정보 요구 사항을 바탕으로 수급인에게 교환 정보 요구 사항(EIR)을 주고, 납품 팀은 BIM 수행 계획(BEP)과 정보 납품 계획(어떤 컨테이너를 언제 누가 낼지 적은 목록)으로 답합니다. 그 계획에 적힌 컨테이너들이 CDE 안에서 상태를 바꾸며 흘러가는 것이 이 장의 주제입니다. 국내에서도 국토교통부의 건설산업 BIM 기본지침·시행지침, 조달청의 BIM 지침 같은 문서가 발주자 요구와 성과품 관리 방식을 정합니다(이름만 인용, 세부 내용과 판본은 현행 확인).</p>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="states">
+    <h2>네 상태와 승인 관문</h2>
+    <div class="problem"><strong>초안을 시공 도면처럼 쓰지 않으려면</strong>
+      <p>기계 팀이 작성 중이던 덕트 모델을 현장 협력사가 내려받아 덕트를 제작했습니다. 그 모델은 아직 아무도 검토하지 않은 초안이었습니다. CDE는 이 사고를 어떻게 막을까요?</p></div>
+    <div class="callout def"><strong>정의 5.3 (CDE의 네 상태)</strong> CDE 안의 정보 컨테이너는 네 상태 가운데 하나에 있다.
+      <ul>
+        <li><span class="term">작업 중 상태</span><span class="en">(work in progress, WIP)</span> — 작업 팀이 만들고 고치는 중인 정보. 그 작업 팀만 보고 고친다.</li>
+        <li><span class="term">공유 상태</span><span class="en">(shared state)</span> — 작업 팀의 검토를 통과해 다른 작업 팀과 주관 수급인이 참조·조정에 쓸 수 있게 된 정보. 고칠 수 없고, 고치려면 작업 중에서 새 판을 만든다.</li>
+        <li><span class="term">게시 상태</span><span class="en">(published state)</span> — 검토·승인을 거쳐 다음 용도(시공·제작·운영 등)에 쓰도록 허가된 정보.</li>
+        <li><span class="term">보관 상태</span><span class="en">(archived state)</span> — 공유·게시되었던 모든 판과 그 이력의 기록. 대체된 판도 지우지 않고 남긴다.</li>
+      </ul></div>
+    <figure class="diagram" id="fig-cd-states">
+      <svg viewBox="0 0 880 270" role="img" aria-label="CDE 상태 흐름: 작업 중, 공유, 게시, 보관과 관문">
+        <rect x="10" y="10" width="860" height="250" rx="10" class="f-surface"/>
+        <g text-anchor="middle">
+          <rect x="30" y="80" width="170" height="80" rx="12" class="f-elev"/><text x="115" y="112" class="t" style="font-weight:700">작업 중(WIP)</text><text x="115" y="134" class="t-mono">작업 팀만 · S0 · P01.1</text>
+          <rect x="250" y="80" width="170" height="80" rx="12" class="f-acc-soft"/><text x="335" y="112" class="t" style="font-weight:700">공유(Shared)</text><text x="335" y="134" class="t-mono">납품 팀 참조 · S1–S4 · P01</text>
+          <rect x="470" y="80" width="170" height="80" rx="12" class="f-acc2-soft"/><text x="555" y="112" class="t" style="font-weight:700">게시(Published)</text><text x="555" y="134" class="t-mono">다음 용도 허가 · A1 · C01</text>
+          <rect x="690" y="80" width="160" height="80" rx="12" class="f-elev" style="stroke-dasharray:5 3"/><text x="770" y="112" class="t" style="font-weight:700">보관(Archived)</text><text x="770" y="134" class="t-mono">이력 · 읽기 전용</text>
+        </g>
+        <g style="stroke:var(--ok);stroke-width:2.2;fill:none" marker-end="url(#cd-ah-ok)"><path d="M202 112H246"/><path d="M422 112H466"/><path d="M642 112H686"/></g>
+        <g class="t-mono" text-anchor="middle"><text x="224" y="66" style="fill:var(--ok)">검토</text><text x="224" y="78" style="fill:var(--ok)">check</text><text x="444" y="60" style="fill:var(--ok)">검토·승인</text><text x="444" y="74" style="fill:var(--ok)">authorize·accept</text><text x="664" y="72" style="fill:var(--ok)">대체·종료</text></g>
+        <path d="M335 162C335 214 115 214 115 164" style="stroke:var(--accent);stroke-width:1.8;fill:none" marker-end="url(#cd-ah-acc)"/>
+        <text x="225" y="226" text-anchor="middle" class="t-mono" style="fill:var(--accent)">의견 반영 → 새 판 P02.1</text>
+        <path d="M555 162C555 246 115 246 115 166" style="stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 4;fill:none"/>
+        <text x="440" y="252" text-anchor="middle" class="t-mono" style="fill:var(--accent)">다음 수정은 다시 작업 중에서 시작</text>
+        <path d="M115 78C115 30 555 30 555 76" style="stroke:var(--bad);stroke-width:1.8;stroke-dasharray:6 4;fill:none" marker-end="url(#cd-ah-bad)"/>
+        <text x="335" y="36" text-anchor="middle" class="t-mono" style="fill:var(--bad)">✕ 관문 건너뛰기(작업 중 → 게시) 금지</text>
+      </svg>
+      <figcaption><b>그림 5-4.</b> CDE의 상태 흐름(ISO 19650-1의 개념도를 바탕으로 한 교육용 그림). 초록 화살표의 관문을 지날 때마다 검토·승인이 필요하고, 공유·게시된 정보는 제자리에서 고치지 않고 작업 중에서 새 판을 만든다. 상태 코드(S0, S1, A1)와 수정 번호(P01, C01)는 영국 국가 부속서의 형태다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 5.4 (상태 전이 규칙, 이 책의 상태 기계)</strong> 상태 사이의 이동은 <span class="term">승인 관문</span><span class="en">(approval gate)</span>을 지나는 <span class="term">상태 기계</span><span class="en">(state machine)</span>로 표현하며, 다음 규칙을 따른다.
+      <div class="table-wrap"><table class="cd-tbl">
+        <thead><tr><th>전이</th><th>판정</th><th>관문과 승인자</th><th>결과</th></tr></thead>
+        <tbody>
+          <tr><td>작업 중 → 공유</td><td class="cd-ok">허용</td><td>검토(check): 명명·메타데이터·품질 검사, 작업 팀 리더</td><td>P01.2 → P01, S0 → S1–S4</td></tr>
+          <tr><td>공유 → 게시</td><td class="cd-ok">허용</td><td>검토·승인(review·authorize): 주관 수급인, 발주자 수락(accept). 미해결 의견이 없어야 함</td><td>P02 → C01, 상태 코드 A1</td></tr>
+          <tr><td>공유·게시 → 작업 중</td><td class="cd-ok">허용</td><td>새 수정 시작(원래 판은 그 자리에 남고 대체되면 보관)</td><td>P02 → P03.1, S0</td></tr>
+          <tr><td>공유·게시 → 보관</td><td class="cd-ok">허용</td><td>대체·철회·종료, 정보 관리자</td><td>읽기 전용 이력</td></tr>
+          <tr><td>작업 중 → 게시</td><td class="cd-bad">금지</td><td>관문 건너뛰기</td><td>—</td></tr>
+          <tr><td>작업 중 → 보관</td><td class="cd-bad">금지</td><td>공유된 적 없는 초안은 기록 대상이 아님</td><td>—</td></tr>
+          <tr><td>게시 → 공유</td><td class="cd-bad">금지</td><td>게시본을 되돌리지 않는다(새 판으로)</td><td>—</td></tr>
+          <tr><td>보관 → 어디로든</td><td class="cd-bad">금지</td><td>이력은 고치지 않는다</td><td>—</td></tr>
+        </tbody></table></div>
+      ISO 19650은 상태와 관문의 개념을 정하고, 세부 절차·코드는 국가 부속서와 프로젝트의 BEP가 정한다. 이 표는 그 개념을 교육용 상태 기계로 옮긴 것이다.</div>
+    <p>상태와 함께 붙는 메타데이터 두 가지가 <span class="term">상태 코드</span><span class="en">(status code, suitability code)</span>와 <span class="term">수정 번호</span><span class="en">(revision code)</span>입니다. 상태 코드는 "이 정보를 무엇에 써도 되는가"를, 수정 번호는 "몇 번째 판인가"를 말합니다. 영국 국가 부속서(BS EN ISO 19650-2 NA)의 형태를 예로 들면 다음과 같습니다. 코드 구성은 판본마다 다르므로 현행 확인이 필요하고, 국내 프로젝트는 발주자 지침과 BEP의 코드를 따릅니다.</p>
+    <div class="table-wrap"><table class="cd-tbl">
+      <thead><tr><th>상태</th><th>상태 코드(형태)</th><th>뜻</th><th>수정 번호(형태)</th></tr></thead>
+      <tbody>
+        <tr><td>작업 중</td><td class="cd-mono">S0</td><td>초기 상태, 작업 중</td><td class="cd-mono">P01.1, P01.2, …</td></tr>
+        <tr><td>공유</td><td class="cd-mono">S1 · S2 · S3 · S4</td><td>조정용 · 정보 제공용 · 검토·의견용 · 단계 승인용</td><td class="cd-mono">P01, P02, …</td></tr>
+        <tr><td>공유(승인 요청)</td><td class="cd-mono">S6 · S7</td><td>프로젝트 정보 모델(PIM) · 자산 정보 모델(AIM) 승인용</td><td class="cd-mono">P0n</td></tr>
+        <tr><td>게시</td><td class="cd-mono">A1, A2, … · B1, …</td><td>승인·수락(단계별) · 의견부 부분 승인</td><td class="cd-mono">C01, C02, …</td></tr>
+        <tr><td>게시(준공)</td><td class="cd-mono">CR</td><td>준공 기록</td><td class="cd-mono">C0n</td></tr>
+      </tbody></table></div>
+    <div class="sim" id="sim-cd-state">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>CDE 상태 기계: 컨테이너를 끌어 상태를 바꾼다</h3></div>
+      <div class="sim-body">
+        <div class="sim-view">
+          <div class="cd-board" id="cd-st-board">
+            <div class="cd-col" data-state="WIP"><h4>작업 중<small>WIP</small></h4></div>
+            <div class="cd-col" data-state="Shared"><h4>공유<small>Shared</small></h4></div>
+            <div class="cd-col" data-state="Published"><h4>게시<small>Published</small></h4></div>
+            <div class="cd-col" data-state="Archived"><h4>보관<small>Archived</small></h4></div>
+          </div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>선택한 컨테이너에 할 일 (카드를 다른 칸으로 끌어도 된다)</span>
+            <div class="btn-row">
+              <button class="btn" id="cd-st-share">검토 후 공유</button>
+              <button class="btn" id="cd-st-pub">승인 후 게시</button>
+              <button class="btn" id="cd-st-rev">새 수정 시작</button>
+              <button class="btn" id="cd-st-arc">보관</button>
+              <button class="btn" id="cd-st-skip">작업 중 → 게시 시도</button>
+              <button class="btn" id="cd-st-fix">결함·의견 해결</button>
+              <button class="btn" id="cd-st-reset">처음으로</button>
+            </div></div>
+        </div>
+      </div>
+      <div class="cd-msg" id="cd-st-msg">카드를 눌러 고른 뒤 단추를 누르거나, 카드를 끌어 다른 상태 칸에 놓으세요.</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">선택</span><span class="v" id="cd-st-o-sel">—</span></div>
+        <div class="stat"><span class="k">허용 / 거부된 전이</span><span class="v" id="cd-st-o-n">—</span></div>
+        <div class="stat"><span class="k">보관 기록(대체된 판)</span><span class="v" id="cd-st-o-a">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기계 모델(빨간 띠, 메타데이터 결함)을 공유로 끌면 검토에서 거부됩니다 — 「결함·의견 해결」 뒤에 다시 해 보세요 · 건축 천장 모델은 미해결 간섭 의견 18건 때문에 게시가 거부됩니다(연합 모델 절의 A–M 간섭) · 게시된 구조 도면에 「새 수정 시작」을 누르면 C01은 보관 기록으로 가고 작업 중에서 다음 판이 시작됩니다 · 보관 칸의 카드는 어디로도 움직이지 않습니다 · 모델: 원리 5.4의 교육용 상태 기계, 수정 번호는 영국 부속서 형태(Pnn.v → Pnn → Cnn).</div>
+    </div>
+    <div class="callout"><strong>예제 5.1 (구조 모델 한 판의 일생)</strong> B-10 구조 모델 <code>B10-STR-ZZ-ZZ-M3-S-0001</code>을 따라간다.
+      <p><b>① 작업 중</b> 구조 팀이 3월 2일 P01.1을 만들고 5일 P01.2로 저장한다. 이 판들은 구조 팀만 본다. 기계 팀은 아직 이 모델의 존재만 알 뿐 내용을 볼 수 없다.</p>
+      <p><b>② 공유</b> 6일 팀 리더가 이름·메타데이터·요소 수(340개)·좌표 원점을 검사하고 S1(조정용) P01로 공유한다. 기계·소방 팀은 이것을 참조해 연합 모델을 만든다. P01.1·P01.2는 판 번호에서 사라지고 P01 하나가 공유된다.</p>
+      <p><b>③ 의견과 새 판</b> 10일 간섭 검토로 50건(덕트–보 30, 덕트–코어 벽 20)이 나오자 구조 팀은 작업 중에서 P02.1을 시작해 코어 벽 개구부를 넣고 16일 P02로 공유한다(S4 단계 승인용). 공유된 P01은 고치지 않았다 — 그래서 "10일 검토는 P01로 했다"는 사실이 남는다.</p>
+      <p><b>④ 게시</b> 20일 설계 총괄이 승인하고 발주자가 수락해 C01(A1)로 게시한다. 대체된 P01·P02는 보관 기록에 남는다.</p>
+      <p><b>⑤ 판단</b> 문제 상자의 사고는 ① 단계 정보가 현장으로 간 것이다. 협력사가 게시 상태만 볼 수 있었다면(접근 권한 절) 초안으로 제작하는 일은 일어나지 않았다. 상태는 표시가 아니라 <b>권한과 묶인 관문</b>이어야 한다.</p></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="naming">
+    <h2>명명 규칙과 메타데이터</h2>
+    <div class="problem"><strong>이름만 보고 무엇인지 알 수 있을까</strong>
+      <p><code>구조모델_최종.ifc</code>는 어느 프로젝트의, 누가 만든, 몇 층의, 어떤 종류의 정보일까요? 파일이 수천 개가 되면 이름이 곧 색인입니다.</p></div>
+    <p><span class="term">명명 규칙</span><span class="en">(naming convention)</span>은 정보 컨테이너의 이름을 정해진 필드로 짓는 규칙입니다. 영국 국가 부속서의 형태는 일곱 필드를 하이픈으로 잇습니다. <b>프로젝트–원작성자–볼륨/시스템–층/위치–유형–역할–번호</b>. 각 필드의 코드 목록은 프로젝트가 BEP에서 정합니다. 아래 코드는 이 책의 B-10 프로젝트를 위한 <b>교육용 코드 목록</b>입니다.</p>
+    <figure class="diagram" id="fig-cd-name">
+      <svg viewBox="0 0 880 250" role="img" aria-label="파일 이름 B10-MEP-ZZ-03-M3-M-0003의 일곱 필드 분해">
+        <rect x="10" y="10" width="860" height="230" rx="10" class="f-surface"/>
+        <g text-anchor="middle" style="font-family:var(--mono);font-size:22px;font-weight:700">
+          <text x="110" y="70" style="fill:var(--accent)">B10</text><text x="160" y="70" style="fill:var(--text-faint)">-</text>
+          <text x="215" y="70" style="fill:var(--accent-2)">MEP</text><text x="268" y="70" style="fill:var(--text-faint)">-</text>
+          <text x="320" y="70" style="fill:var(--text)">ZZ</text><text x="368" y="70" style="fill:var(--text-faint)">-</text>
+          <text x="420" y="70" style="fill:var(--text)">03</text><text x="468" y="70" style="fill:var(--text-faint)">-</text>
+          <text x="520" y="70" style="fill:var(--blue)">M3</text><text x="568" y="70" style="fill:var(--text-faint)">-</text>
+          <text x="615" y="70" style="fill:var(--accent-2)">M</text><text x="660" y="70" style="fill:var(--text-faint)">-</text>
+          <text x="730" y="70" style="fill:var(--text)">0003</text>
+        </g>
+        <g style="stroke:var(--text-faint);stroke-width:1.2"><line x1="110" y1="80" x2="110" y2="110"/><line x1="215" y1="80" x2="215" y2="140"/><line x1="320" y1="80" x2="320" y2="110"/><line x1="420" y1="80" x2="420" y2="140"/><line x1="520" y1="80" x2="520" y2="110"/><line x1="615" y1="80" x2="615" y2="140"/><line x1="730" y1="80" x2="730" y2="110"/></g>
+        <g class="t-mono" text-anchor="middle">
+          <text x="110" y="126" style="fill:var(--text);font-weight:700">프로젝트</text><text x="110" y="142">B-10 신축</text>
+          <text x="215" y="156" style="fill:var(--text);font-weight:700">원작성자</text><text x="215" y="172">기계 설계사</text>
+          <text x="320" y="126" style="fill:var(--text);font-weight:700">볼륨/시스템</text><text x="320" y="142">ZZ 전체</text>
+          <text x="420" y="156" style="fill:var(--text);font-weight:700">층/위치</text><text x="420" y="172">3층</text>
+          <text x="520" y="126" style="fill:var(--text);font-weight:700">유형</text><text x="520" y="142">M3 3D 모델</text>
+          <text x="615" y="156" style="fill:var(--text);font-weight:700">역할</text><text x="615" y="172">M 기계</text>
+          <text x="730" y="126" style="fill:var(--text);font-weight:700">번호</text><text x="730" y="142">일련번호 4자리</text>
+        </g>
+        <rect x="80" y="192" width="720" height="36" rx="8" class="f-acc2-soft"/>
+        <text x="440" y="215" text-anchor="middle" class="t-mono" style="fill:var(--text)">이름에 넣지 않는 것: 상태(공유) · 상태 코드(S1) · 수정 번호(P02) · 날짜 → 메타데이터</text>
+      </svg>
+      <figcaption><b>그림 5-5.</b> 명명 규칙의 일곱 필드(영국 국가 부속서 형태, 코드는 이 책의 교육용 목록). 이름은 컨테이너의 정체성이므로 판이 바뀌어도 그대로이고, 판과 상태는 메타데이터로 관리한다.</figcaption>
+    </figure>
+    <div class="table-wrap"><table class="cd-tbl">
+      <thead><tr><th>필드</th><th>B-10 교육용 코드</th><th>규칙</th></tr></thead>
+      <tbody>
+        <tr><td>프로젝트</td><td class="cd-mono">B10</td><td>프로젝트마다 하나</td></tr>
+        <tr><td>원작성자</td><td class="cd-mono">ARC 건축 · STR 구조 · MEP 기계 · FPE 소방 · GCN 시공사</td><td>3자, 조직 단위</td></tr>
+        <tr><td>볼륨/시스템</td><td class="cd-mono">ZZ 여러 볼륨 · XX 해당 없음 · T1 지상 타워</td><td>2자</td></tr>
+        <tr><td>층/위치</td><td class="cd-mono">01–10 · RF 지붕 · ZZ 여러 층 · XX 해당 없음</td><td>2자(3F처럼 쓰지 않는다)</td></tr>
+        <tr><td>유형</td><td class="cd-mono">M3 3D 모델 · M2 2D 모델 · DR 도면 · SP 시방서 · RP 보고서 · SH 일람표 · CA 계산서 · MI 회의록</td><td>2자</td></tr>
+        <tr><td>역할</td><td class="cd-mono">A 건축 · S 구조 · M 기계 · E 전기 · P 위생·소화 · K 발주자 · W 시공사</td><td>1자, 원작성자와 맞아야 함(권고)</td></tr>
+        <tr><td>번호</td><td class="cd-mono">0001–9999</td><td>4자리 숫자</td></tr>
+      </tbody></table></div>
+    <p>이름에 넣지 않는 정보는 <span class="term">메타데이터</span><span class="en">(metadata)</span>로 붙입니다. 상태, 상태 코드, 수정 번호, 제목·설명, 분류 코드(3장), 작성자, 날짜, 보안 등급 등입니다. 이렇게 나누는 까닭은 정체성과 상태를 분리하기 위해서입니다. 수정 번호를 이름에 넣으면(<code>…-0001-P02</code>) 판이 바뀔 때마다 이름이 바뀌어 다른 컨테이너처럼 보이고, 그 이름을 참조하던 연합 모델과 이슈 기록의 연결이 끊어집니다.</p>
+    <div class="sim" id="sim-cd-name">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>명명 규칙 검사기: 필드별 통과·실패와 메타데이터 일관성</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view">
+          <div class="cd-pad"><input class="cd-name" id="cd-nm-in" type="text" value="B10-MEP-ZZ-03-M3-M-0003" spellcheck="false" autocomplete="off" aria-label="검사할 파일 이름"></div>
+          <div class="cd-fields" id="cd-nm-fields"></div>
+          <div class="table-wrap" style="margin:0;border:0;border-radius:0"><table class="cd-tbl"><tbody id="cd-nm-rows"></tbody></table></div>
+        </div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>예시 이름</span><div class="btn-row">
+            <button class="btn" data-cd-nm="B10-MEP-ZZ-03-M3-M-0003">좋은 예</button>
+            <button class="btn" data-cd-nm="B10-STR-ZZ-3F-M3-S-001">층·번호 오류</button>
+            <button class="btn" data-cd-nm="b10_구조모델_최종.ifc">관습 이름</button>
+            <button class="btn" data-cd-nm="B10-STR-ZZ-ZZ-M3-S-0001-P02">판을 이름에</button>
+            <button class="btn" data-cd-nm="B10-ARC-ZZ-RF-DR-S-0101">역할 불일치</button>
+          </div></div>
+          <div class="ctrl"><span>메타데이터: 상태</span><div class="seg" id="cd-nm-st"><button data-value="WIP">작업 중</button><button data-value="Shared" class="on">공유</button><button data-value="Published">게시</button></div></div>
+          <label class="ctrl"><span>상태 코드</span><select id="cd-nm-sc"><option>S0</option><option selected>S1</option><option>S2</option><option>S3</option><option>S4</option><option>A1</option><option>B1</option><option>CR</option></select></label>
+          <label class="ctrl"><span>수정 번호</span><select id="cd-nm-rv"><option>P01.1</option><option>P01.2</option><option selected>P02</option><option>C01</option><option>C02</option></select></label>
+        </div>
+      </div>
+      <div class="cd-msg" id="cd-nm-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">필드 통과</span><span class="v" id="cd-nm-o-f">—</span></div>
+        <div class="stat"><span class="k">메타데이터 일관성</span><span class="v" id="cd-nm-o-m">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="cd-nm-o-v">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 「층·번호 오류」는 층 3F(코드 03이어야 함)와 번호 001(4자리)이 실패합니다 · 「판을 이름에」는 필드가 8개가 되어 실패합니다 — P02는 메타데이터로 · 상태를 게시로 바꾸고 상태 코드가 S1이면 일관성 실패, A1·C01로 고치면 통과합니다 · 직접 이름을 입력해 보세요(소문자·공백·밑줄도 검사) · 모델: 이 책의 교육용 코드 목록과 규칙(영국 국가 부속서 형태). 실제 코드는 프로젝트 BEP를 따른다.</div>
+    </div>
+    <div class="callout"><strong>예제 5.2 (이름 세 개 검사)</strong> 교육용 규칙으로 판정한다.
+      <p><b>① <code>B10-FPE-ZZ-07-M3-P-0002</code></b> 일곱 필드, FPE(소방)는 원작성자 목록에 있고 07은 층 코드, M3은 3D 모델, 역할 P(위생·소화)는 FPE와 맞는다. <b>통과</b>.</p>
+      <p><b>② <code>B10-STR-ZZ-B1-M3-S-0004</code></b> 형식은 맞지만 B-10 BIM은 지상 1–10층만 다루므로 B1(지하 1층)은 이 프로젝트의 층 코드 목록에 없다. <b>실패</b> — 지하층을 모델에 넣기로 했다면 BEP의 코드 목록부터 고친다.</p>
+      <p><b>③ <code>B10-MEP-ZZ-ZZ-M3-M-0001</code>, 상태 공유, 상태 코드 S0</b> 이름은 통과하지만 S0은 작업 중의 코드다. 공유 상태라면 S1–S4 가운데 용도에 맞는 코드를 붙여야 한다. <b>메타데이터 불일치</b>.</p>
+      <p><b>④ 판단</b> 명명 검사는 사람이 하면 반드시 틀린다. CDE의 업로드 관문(작업 중 → 공유의 check)에 이 검사를 자동으로 넣는 것이 정보 관리의 첫 자동화다.</p></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="federation">
+    <h2>연합 모델: 합치지 않고 겹친다</h2>
+    <div class="problem"><strong>네 팀의 모델을 하나로 합쳐 버리면?</strong>
+      <p>설계 총괄이 네 분야 모델을 한 파일로 합쳐 고치기 시작했습니다. 다음 주 구조 팀이 새 판을 공유하면, 합쳐진 파일의 구조 부분은 누가 어떻게 갱신해야 할까요?</p></div>
+    <div class="callout def"><strong>정의 5.5 (연합 모델과 공유 좌표)</strong> <span class="term">연합 모델</span><span class="en">(federated model)</span>은 분야별 모델을 하나로 병합하지 않고, 같은 좌표계에서 겹쳐 참조하는 모델이다. 각 분야 모델의 소유와 수정 책임은 작성 작업 팀에 남고, 연합 모델은 공유 상태의 판들을 불러와 조정(간섭 검토, 공간 조율)에만 쓴다. 겹치려면 모든 모델이 같은 원점·축 방향·높이 기준을 써야 하는데, 이를 <span class="term">공유 좌표</span><span class="en">(shared coordinates)</span>라 한다. B-10의 원점은 격자 A/1 교점, z = 0은 1층 바닥이다(지도 좌표 연결은 15장).</div>
+    <figure class="diagram" id="fig-cd-fed">
+      <svg viewBox="0 0 860 260" role="img" aria-label="분야별 모델이 공유 좌표로 연합 모델에 참조되는 구조">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="30" width="170" height="44" rx="8" class="f-elev"/><text x="115" y="50" style="fill:var(--text);font-weight:600">구조 S · P02</text><text x="115" y="66">기둥·보·슬래브·코어 벽</text>
+          <rect x="30" y="84" width="170" height="44" rx="8" class="f-elev"/><text x="115" y="104" style="fill:var(--text);font-weight:600">건축 A · P01</text><text x="115" y="120">천장(IfcCovering)</text>
+          <rect x="30" y="138" width="170" height="44" rx="8" class="f-elev"/><text x="115" y="158" style="fill:var(--text);font-weight:600">기계 M · P03</text><text x="115" y="174">급기 덕트</text>
+          <rect x="30" y="192" width="170" height="44" rx="8" class="f-elev"/><text x="115" y="212" style="fill:var(--text);font-weight:600">소방 F · P01</text><text x="115" y="228">스프링클러 주관</text>
+        </g>
+        <g style="stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 4;fill:none" marker-end="url(#cd-ah-acc)"><path d="M202 52C280 52 300 120 356 126"/><path d="M202 106C270 106 300 126 356 130"/><path d="M202 160C270 160 300 136 356 134"/><path d="M202 214C280 214 300 142 356 138"/></g>
+        <text x="270" y="250" text-anchor="middle" class="t-mono" style="fill:var(--accent)">참조(링크) — 복사·병합 아님</text>
+        <rect x="360" y="90" width="200" height="90" rx="12" class="f-acc-soft"/>
+        <text x="460" y="120" text-anchor="middle" class="t" style="font-weight:700">연합 모델</text>
+        <text x="460" y="142" text-anchor="middle" class="t-mono">공유 좌표: 원점 A/1, z = 0</text>
+        <text x="460" y="160" text-anchor="middle" class="t-mono">판 조합 기록(S P02 + M P03 …)</text>
+        <g style="stroke:var(--text-dim);stroke-width:1.5;fill:none" marker-end="url(#cd-ah)"><path d="M562 120H620"/><path d="M562 150H620"/></g>
+        <g class="t-mono">
+          <rect x="624" y="90" width="206" height="40" rx="8" class="f-elev"/><text x="636" y="114" style="fill:var(--text)">간섭 검토(6장) → 이슈</text>
+          <rect x="624" y="140" width="206" height="40" rx="8" class="f-elev"/><text x="636" y="164" style="fill:var(--text)">이슈는 원본 팀이 원본에서 해결</text>
+        </g>
+        <path d="M727 182C727 236 300 236 215 214" style="stroke:var(--accent-2);stroke-width:1.4;fill:none" marker-end="url(#cd-ah)"/>
+      </svg>
+      <figcaption><b>그림 5-6.</b> 연합 모델. 각 분야 모델은 CDE에서 공유된 판을 링크로 불러오고, 연합 모델은 어떤 판들을 겹쳤는지 기록한다. 조정에서 나온 이슈는 연합 모델이 아니라 원본 모델을 작성한 팀이 고쳐 새 판으로 공유한다.</figcaption>
+    </figure>
+    <p>연합 모델의 장점은 책임이 분명하다는 것입니다. 간섭이 나와도 연합 모델에서 덕트를 옮기지 않습니다. 기계 팀이 자기 모델에서 옮겨 새 판을 공유하면, 연합 모델은 링크된 판만 바꿔 다시 검사합니다. 그래서 연합 모델에는 "어떤 판들의 조합인가"가 반드시 기록되어야 합니다. 간섭 수는 각 모델 안에는 없고 <b>조합</b>에서만 생깁니다. 아래 시뮬레이터에서 B-10의 네 분야 모델을 하나씩 겹쳐 보세요. 건축의 천장 모델은 이 장에서 만든 교육용 모델로, 코어를 뺀 경간마다 두께 30 mm의 천장판(<code>IfcCovering</code>)을 층 바닥에서 정한 높이에 둡니다.</p>
+    <div class="sim" id="sim-cd-fed">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>연합 모델 조립: 분야 모델을 켜면 간섭이 나타난다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cd-cv-fed" aria-label="B-10 BIM의 분야별 모델과 간섭 위치를 보여 주는 3D 장면, 끌어서 회전"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>불러올 분야 모델</span>
+            <label class="check"><input type="checkbox" id="cd-fd-s" checked> 구조 S (340개)</label>
+            <label class="check"><input type="checkbox" id="cd-fd-a"> 건축 A 천장 (100개, 교육용)</label>
+            <label class="check"><input type="checkbox" id="cd-fd-m" checked> 기계 M 덕트 (10개)</label>
+            <label class="check"><input type="checkbox" id="cd-fd-f"> 소방 F 배관 (10개)</label></div>
+          <div class="ctrl"><span>건축 설계안의 천장고</span><div class="seg" id="cd-fd-hc"><button data-value="2.7">2.7 m</button><button data-value="3.0">3.0 m</button><button data-value="3.3" class="on">3.3 m</button></div></div>
+          <div class="ctrl"><span>기계 모델의 높이 기준 오차</span><div class="seg" id="cd-fd-dz"><button data-value="0" class="on">0</button><button data-value="-0.5">−0.5 m</button><button data-value="0.3">+0.3 m</button></div></div>
+          <div class="ctrl"><span>보기</span><div class="seg" id="cd-fd-v"><button data-value="all" class="on">전체</button><button data-value="3">3층만</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">S–M (덕트–보·벽·슬래브)</span><span class="v" id="cd-fd-o-sm">—</span></div>
+        <div class="stat"><span class="k">S–F (배관–보)</span><span class="v" id="cd-fd-o-sf">—</span></div>
+        <div class="stat"><span class="k">A–M · A–F (천장)</span><span class="v" id="cd-fd-o-a">—</span></div>
+        <div class="stat"><span class="k">연합 모델 간섭 합계</span><span class="v" id="cd-fd-o-t">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 분야 모델을 하나만 켜면 간섭은 0입니다 — 간섭은 조합에서 생깁니다 · S와 M을 켜면 50건(덕트–보 30, 덕트–코어 벽 20), F까지 켜면 80건 · A를 켜고 천장고 3.3 m이면 2–10층에서 천장판이 덕트 아래쪽을 파고들어 18건이 더해집니다(1층은 층고 5.0 m라 없음) · 기계 모델의 높이 기준을 −0.5 m 틀리게 하면 덕트–보 30건이 사라집니다 — 간섭이 해결된 것이 아니라 <b>숨은</b> 것입니다 · +0.3 m면 슬래브 간섭 10건이 새로 생깁니다 · 모델: <code>CB.bim.model()</code> + 교육용 천장 모델, 판정은 <code>CB.bim.clashes</code>(하드 간섭, 허용 오차 0). 빨간 상자 = 겹친 부분.</div>
+    </div>
+    <div class="callout"><strong>예제 5.3 (기준 높이가 틀린 기계 모델)</strong> 기계 팀이 높이 기준을 "1층 바닥 마감면"이 아니라 그보다 0.5 m 낮은 다른 기준으로 잡아, 모든 덕트가 연합 모델에서 0.5 m 아래에 놓였다.
+      <p><b>① 원래 위치</b> 3층(바닥 9 m, 위 슬래브 13 m) 덕트 중심은 13 − 0.55 = 12.45 m, 덕트 12.25–12.65 m. 큰보 하단은 13 − 0.70 = 12.30 m → z 방향 겹침 12.65 − 12.30 = 0.35 m > 0, 간섭.</p>
+      <p><b>② 0.5 m 내려간 위치</b> 덕트 11.75–12.15 m. 보 하단 12.30 m보다 0.15 m 아래 → z 방향 겹침 12.15 − 12.30 = −0.15 m, 간섭 없음. 10개 층 × 3 = <b>30건이 사라진다</b>. 코어 벽은 층 전체 높이라 20건은 그대로.</p>
+      <p><b>③ 판단</b> 연합 모델의 결과는 좌표가 맞을 때만 의미가 있다. 공유 전 검토(check)에 "기준점 표식 요소의 좌표 확인"(예: 각 모델의 A/1 기둥 하단이 (0, 0, 0)인가)을 넣어야 한다. 좌표 오류는 거짓 간섭보다 <b>숨은 간섭</b>이 더 위험하다 — 현장에서야 드러나기 때문이다.</p></div>
+    <div class="callout site"><strong>B-10 BIM의 분야 모델</strong> 이 책은 B-10 BIM 요소 360개를 네 분야 모델로 나누어 쓴다. 구조 S 340개(기둥 200, 보 90, 슬래브 10, 코어 벽 40, 코어 벽은 내력벽이므로 구조 모델), 기계 M 덕트 10개, 소방 F 스프링클러 주관 10개, 그리고 이 장에서 정의한 건축 A 천장판 100개(층당 10경간, 코어 2경간 제외, 교육용). 기본 연합(S + M + F)의 하드 간섭은 덕트–보 30, 배관–보 30, 덕트–코어 벽 20, 합계 80건으로 6장의 결과와 같다. 덕트–코어 벽 20건은 오류가 아니라 계획된 관통부이므로 6장에서 개구부·슬리브로 처리한다.</div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="versions">
+    <h2>버전 비교와 감사 추적</h2>
+    <div class="problem"><strong>P02와 C01은 무엇이 다른가</strong>
+      <p>구조 모델의 새 판이 공유되었습니다. 요소 360개를 눈으로 비교할 수는 없습니다. 무엇이 추가되고, 무엇이 없어지고, 무엇이 바뀌었는지 기계적으로 찾으려면 각 요소를 무엇으로 알아봐야 할까요?</p></div>
+    <div class="callout def"><strong>정의 5.6 (GlobalId로 하는 버전 비교)</strong> 두 판의 요소 집합을 GlobalId(3장)로 짝짓는다. 판 1의 ID 집합을 \(G_1\), 판 2의 집합을 \(G_2\)라 하면
+      <div class="formula">$$\text{추가} = G_2 \setminus G_1, \qquad \text{삭제} = G_1 \setminus G_2, \qquad \text{공통} = G_1 \cap G_2$$<div class="where">공통 요소는 다시 형상(경계 상자 좌표, 허용 오차 이내 비교)과 속성(이름, 재료, 속성 세트)을 비교해 <b>형상 변경</b>, <b>속성만 변경</b>, <b>변경 없음</b>으로 나눈다. 이것이 <span class="term">버전 비교</span><span class="en">(version comparison, diff)</span>다. 짝짓기 키가 이름이면 이름을 고친 요소가 "삭제 + 추가"로 잘못 보인다. GlobalId는 요소가 살아 있는 동안 바뀌지 않아야 하는 정체성이다.</div></div></div>
+    <figure class="diagram" id="fig-cd-diff">
+      <svg viewBox="0 0 860 240" role="img" aria-label="두 판의 GlobalId 집합 벤 다이어그램: 삭제, 공통(변경, 불변), 추가">
+        <rect x="10" y="10" width="840" height="220" rx="10" class="f-surface"/>
+        <circle cx="330" cy="120" r="95" style="fill:color-mix(in srgb, var(--bad) 10%, transparent);stroke:var(--bad);stroke-width:1.6"/>
+        <circle cx="490" cy="120" r="95" style="fill:color-mix(in srgb, var(--ok) 10%, transparent);stroke:var(--ok);stroke-width:1.6"/>
+        <text x="300" y="34" text-anchor="middle" class="t" style="fill:var(--bad);font-weight:700">판 1 (P02) G₁</text>
+        <text x="520" y="34" text-anchor="middle" class="t" style="fill:var(--ok);font-weight:700">판 2 (C01) G₂</text>
+        <g text-anchor="middle" class="t-mono">
+          <text x="280" y="114" style="fill:var(--bad);font-weight:700">삭제</text><text x="280" y="132">G₁ − G₂</text><text x="280" y="150">DU-SA-10F</text>
+          <text x="410" y="96" style="fill:var(--warn);font-weight:700">형상 변경</text><text x="410" y="112">덕트 9 · 기둥 3</text>
+          <text x="410" y="138" style="fill:var(--accent);font-weight:700">속성 변경</text><text x="410" y="154">벽 4 · 배관 10(이름)</text>
+          <text x="410" y="180">불변 333</text>
+          <text x="540" y="114" style="fill:var(--ok);font-weight:700">추가</text><text x="540" y="132">G₂ − G₁</text><text x="540" y="150">개구부 20 · 덕트 2</text>
+        </g>
+        <g class="t-mono"><text x="620" y="70">짝짓기 키 = GlobalId</text><text x="620" y="90">→ 이름이 바뀌어도 같은 요소</text><text x="620" y="130">요소를 지우고 다시 그리면</text><text x="620" y="150">→ 새 GlobalId = 삭제 + 추가</text></g>
+      </svg>
+      <figcaption><b>그림 5-7.</b> GlobalId 집합으로 본 버전 비교. 교집합의 요소만 형상·속성을 비교한다. 숫자는 아래 시뮬레이터의 B-10 설계 변경 시나리오(교육용)다.</figcaption>
+    </figure>
+    <p>아래 시뮬레이터의 판 2는 교육용 설계 변경 시나리오입니다. ① 기계: 급기 덕트를 천장 아래 0.95 m로 내림(6장의 해결안), ② 구조: 1–3층 C2 열 기둥 <code>C-C2</code>를 800 → 900 mm로 키움, ③ 구조: 코어 벽 관통 개구부(<code>IfcOpeningElement</code>) 20개 추가, ④ 기계: 10층 덕트를 운반 길이 때문에 두 토막으로 나눔(원래 요소를 지우고 새로 그림), ⑤ 소방: 배관 이름을 <code>SP-MAIN-nF</code>에서 <code>FP-SPR-nF</code>로 바꿈(GlobalId 유지), ⑥ 구조: 1층 코어 벽 4개에 내화 속성 추가.</p>
+    <div class="sim" id="sim-cd-diff">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>모델 버전 비교: 두 판의 B-10을 GlobalId로 짝짓기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cd-cv-diff" aria-label="버전 비교 결과를 색으로 보여 주는 B-10 3D 장면"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>짝짓기 키</span><div class="seg" id="cd-df-key"><button data-value="guid" class="on">GlobalId</button><button data-value="name">이름</button></div></div>
+          <div class="ctrl"><span>강조</span><div class="seg" id="cd-df-f"><button data-value="all" class="on">모든 변경</button><button data-value="add">추가</button><button data-value="del">삭제</button><button data-value="geo">형상</button><button data-value="prop">속성</button></div></div>
+          <div class="ctrl"><div class="ctrl-row"><span class="key" style="color:var(--ok)">추가</span><span class="key" style="color:var(--bad)">삭제</span><span class="key" style="color:var(--warn)">형상 변경</span><span class="key" style="color:var(--accent)">속성 변경</span></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">판 1 / 판 2 요소</span><span class="v" id="cd-df-o-n">—</span></div>
+        <div class="stat"><span class="k">추가 / 삭제</span><span class="v" id="cd-df-o-ad">—</span></div>
+        <div class="stat"><span class="k">형상 / 속성 변경</span><span class="v" id="cd-df-o-gp">—</span></div>
+        <div class="stat"><span class="k">변경 없음</span><span class="v" id="cd-df-o-u">—</span></div>
+      </div>
+      <div class="table-wrap" style="margin:0;border-left:0;border-right:0;border-radius:0;max-height:260px;overflow-y:auto"><table class="cd-tbl"><thead><tr><th>구분</th><th>이름</th><th>GlobalId</th><th>내용</th></tr></thead><tbody id="cd-df-rows"></tbody></table></div>
+      <div class="sim-note">해볼 것: GlobalId로 짝지으면 추가 22 · 삭제 1 · 형상 변경 12 · 속성 변경 14입니다 · 짝짓기 키를 이름으로 바꾸면 이름만 바뀐 배관 10개가 삭제 10 + 추가 10으로 둔갑합니다(추가 32 · 삭제 11) · 「속성」만 강조하면 3D에서는 아무 모양 변화가 없는 요소들이 보입니다 — 속성 변경은 눈으로 찾을 수 없습니다 · 10층 덕트는 GlobalId로도 삭제 1 + 추가 2입니다: 요소를 지우고 다시 그리면 정체성이 끊깁니다 · 모델: 판 1 = <code>CB.bim.model()</code>, 판 2 = <code>model({ ductDrop: 0.95 })</code> + 위 ②–⑥(페이지의 교육용 변경), 형상은 상자 좌표 1 mm 허용 오차로 비교.</div>
+    </div>
+    <div class="callout"><strong>예제 5.4 (변경 수를 손으로 세기)</strong> 시나리오 ①–⑥을 GlobalId 기준으로 센다.
+      <p><b>① 형상 변경</b> 덕트 10개 가운데 10층 덕트는 ④에서 지워졌으므로 9개, 기둥 C-C2 1–3층 3개 → <b>12</b>.</p>
+      <p><b>② 속성 변경</b> 1층 코어 벽 4개(내화 속성) + 배관 10개(이름) → <b>14</b>. 기둥 3개는 단면 속성도 바뀌었지만 형상 변경으로 한 번만 센다.</p>
+      <p><b>③ 추가·삭제</b> 개구부 20 + 덕트 토막 2 = <b>추가 22</b>, 10층 덕트 <b>삭제 1</b>. 판 2 요소 수 = 360 − 1 + 22 = 381.</p>
+      <p><b>④ 판단</b> 버전 비교는 검토자의 눈을 "바뀐 26개 + 새로 생긴 22개"로 모은다. 그러나 ④처럼 요소를 다시 그리는 작업 습관은 이력을 끊는다 — 10층 덕트에 붙어 있던 이슈·공정 연결(9장)·원가 연결(10장)이 새 덕트로 따라가지 않는다. 가능하면 요소를 <b>나누되 원래 GlobalId를 한쪽에 물려주는</b> 방식으로 고친다.</p></div>
+    <p>버전 비교가 "무엇이 바뀌었나"에 답한다면, <span class="term">감사 추적</span><span class="en">(audit trail)</span>은 "누가, 언제, 어떤 권한으로 바꾸었나"에 답합니다. CDE는 생성·저장·검토·공유·승인·열람·보관 같은 행위를 모두 기록합니다. 이 기록이 분쟁(설계 변경 책임, 공기 지연 원인)에서 증거가 되려면 기록 자체를 나중에 고칠 수 없어야 합니다. 그 원리 가운데 하나가 <span class="term">해시 체인</span><span class="en">(hash chain)</span>입니다.</p>
+    <div class="callout def"><strong>원리 5.7 (해시 체인)</strong> 기록 \(r_i\)마다 앞 기록의 해시 \(h_{i-1}\)과 자기 내용을 함께 해시한 값을 저장한다.
+      <div class="formula">$$h_i = H\left(h_{i-1} \,\Vert\, r_i\right), \qquad h_0 = \text{고정된 시작값}$$<div class="where">\(H\)는 해시 함수, \(\Vert\)는 이어 붙이기. 기록 하나의 글자만 바뀌어도 그 기록의 해시가 바뀌고, 뒤의 모든 해시가 저장된 값과 어긋난다. 그래서 조작을 숨기려면 그 뒤 기록을 모두 다시 계산해야 하고, 해시 값을 따로(다른 사람·다른 시스템에) 보관해 두면 그것도 막힌다. 실제 위변조 방지에는 SHA-256 같은 암호학적 해시를 쓴다.</div></div></div>
+    <div class="sim" id="sim-cd-audit">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>감사 추적 타임라인: 기록을 조작하면 사슬이 끊어진다</h3></div>
+      <div class="sim-body">
+        <div class="sim-view"><div class="table-wrap" style="margin:0;border:0;border-radius:0"><table class="cd-tbl"><thead><tr><th>#</th><th>시각</th><th>행위자</th><th>행위</th><th>판·코드</th><th>저장 해시</th><th>검증</th></tr></thead><tbody id="cd-au-rows"></tbody></table></div></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>재생 시점(기록 번호) <output id="cd-au-t-out"></output></span><input type="range" id="cd-au-t" min="1" max="10" step="1" value="10"></label>
+          <div class="ctrl"><span>조작해 보기</span><div class="btn-row">
+            <button class="btn" id="cd-au-edit">기록 5의 이슈 수 50 → 5로</button>
+            <button class="btn" id="cd-au-time">기록 8의 시각을 앞당김</button>
+            <button class="btn" id="cd-au-del">기록 8(승인) 삭제</button>
+            <button class="btn" id="cd-au-forge">조작 후 뒤 해시까지 다시 계산</button>
+            <button class="btn primary" id="cd-au-reset">원래 기록</button>
+          </div></div>
+        </div>
+      </div>
+      <div class="cd-msg" id="cd-au-msg">—</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">기록 수</span><span class="v" id="cd-au-o-n">—</span></div>
+        <div class="stat"><span class="k">검증 통과 / 실패</span><span class="v" id="cd-au-o-v">—</span></div>
+        <div class="stat"><span class="k">재생 시점의 상태</span><span class="v" id="cd-au-o-s">—</span></div>
+        <div class="stat"><span class="k">마지막 해시(외부 보관값)</span><span class="v" id="cd-au-o-h">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 재생 시점을 4로 옮기면 그때 이 컨테이너는 공유 P01(S1)이었습니다 · 기록 5의 이슈 수를 고치면 기록 5부터 뒤가 모두 빨강입니다 · 기록 8을 지우면 9의 앞 해시가 맞지 않습니다 · 「뒤 해시까지 다시 계산」하면 사슬 안은 모두 통과하지만 마지막 해시가 외부에 보관해 둔 값과 달라 조작이 드러납니다 · 모델: 교육용 해시 FNV-1a 32비트(16진 8자리), 기록 내용은 교육용 시나리오(예제 5.1).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="access">
+    <h2>접근 권한과 보안</h2>
+    <div class="problem"><strong>모두에게 모든 권한을 주면 편하지 않을까</strong>
+      <p>"협업이니까 다 열어 두자"는 제안이 나왔습니다. 그러면 시공사가 검토 전 모델로 제작하고, 누군가 공유본을 제자리에서 덮어쓰고, 보관 기록이 고쳐질 수 있습니다. 어떤 역할에 어떤 상태의 정보를 어디까지 열어야 할까요?</p></div>
+    <p>CDE의 권한은 사람 단위가 아니라 역할과 상태의 조합으로 정합니다. 이를 <span class="term">역할 기반 접근 제어</span><span class="en">(role-based access control, RBAC)</span>라 하고, 설계 원칙은 <span class="term">최소 권한 원칙</span><span class="en">(principle of least privilege)</span> — 일에 필요한 만큼만 연다 — 입니다. CDE에서는 상태 자체가 권한의 관문이므로, 역할 × 상태 표 하나가 정보 관리 규칙의 상당 부분을 대신합니다. 시설의 보안이 중요한 자산(공공 기반 시설, 보안 시설 등)은 ISO 19650-5가 다루는 <span class="term">보안 중시 접근</span><span class="en">(security-minded approach)</span>에 따라 민감 정보의 범위를 정하고 공유 범위를 더 좁힙니다.</p>
+    <div class="callout def"><strong>원리 5.8 (상태별 권한, 교육용 권장안)</strong> ① 작업 중은 작성 작업 팀만 읽고 쓴다. ② 공유는 납품 팀(다른 작업 팀·주관 수급인)이 읽고, 아무도 제자리에서 쓰지 않는다. ③ 게시는 다음 용도의 사용자(발주자·시공사 포함)가 읽고, 아무도 쓰지 않는다. ④ 보관은 감사 목적의 역할(발주자·정보 관리자)이 읽고, 아무도 쓰지 않는다. 고치는 일은 언제나 작업 중에서 새 판으로 한다.</div>
+    <div class="sim" id="sim-cd-access">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>접근 권한 매트릭스: 역할 × 상태 칸을 눌러 권한을 바꾼다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><div class="cd-grid" id="cd-ac-grid"></div></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>칸을 누를 때마다 없음 → 읽기(R) → 읽기·쓰기(RW)</span></div>
+          <div class="ctrl"><span>미리 정한 안</span><div class="btn-row">
+            <button class="btn" id="cd-ac-rec">권장안</button>
+            <button class="btn" id="cd-ac-open">모두 RW</button>
+            <button class="btn" id="cd-ac-none">모두 없음</button>
+            <button class="btn" id="cd-ac-read">모두 읽기</button>
+          </div></div>
+        </div>
+      </div>
+      <ul class="cd-scen" id="cd-ac-scen"></ul>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">시나리오 충족</span><span class="v" id="cd-ac-o-s">—</span></div>
+        <div class="stat"><span class="k">작업 중 밖의 쓰기 권한</span><span class="v" id="cd-ac-o-w">—</span></div>
+        <div class="stat"><span class="k">열린 칸(R 이상)</span><span class="v" id="cd-ac-o-o">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 「모두 RW」는 업무 시나리오 3개(열람)는 되지만 막아야 할 시나리오 6개가 모두 뚫립니다 · 「모두 없음」은 안전하지만 협업이 멈춥니다 · 「모두 읽기」도 기계 팀이 구조 팀의 초안을 보고, 시공사가 검토 전 모델을 봅니다 · 권장안에서 시공사의 공유 칸을 R로 바꾸면 무엇이 깨지는지 보세요 · 모델: 원리 5.8과 교육용 시나리오 10개. 쓰기(RW)는 내용 수정, 상태 이동은 관문(원리 5.4)이 따로 다룬다.</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="cadence">
+    <h2>협업 리듬: 모델은 얼마나 자주 교환하나</h2>
+    <div class="problem"><strong>매일 공유하면 좋을까, 매달 공유하면 좋을까</strong>
+      <p>매일 공유하면 검토·업로드·연합·간섭 실행에 시간이 너무 듭니다. 한 달에 한 번 공유하면 그사이 쌓인 충돌이 다른 작업 위에 굳어져 고치는 데 더 큰 비용이 듭니다. 균형점은 어디일까요?</p></div>
+    <p><span class="term">정보 교환 주기</span><span class="en">(information exchange interval)</span>는 BEP와 정보 납품 계획에서 정합니다(예: 주 1회 조정 회의 전 공유, 단계 마감 전 게시). 그 주기를 직관이 아니라 비용으로 따져 볼 수 있습니다. 교환마다 드는 고정 노력과, 교환 사이에 발견되지 않은 충돌이 커지는 재작업의 합을 최소로 만드는 주기를 찾는 것입니다. 아래 모형은 재고 관리의 경제적 주문량(EOQ)과 같은 꼴입니다.</p>
+    <div class="callout def"><strong>원리 5.9 (교환 주기의 비용 모형, 교육용)</strong> 설계 기간 \(N\)주 동안 분야 사이 충돌이 주당 \(\lambda\)건씩 생기고, 충돌은 다음 교환(주기 \(T\)주)에서 발견된다. 충돌 하나를 고치는 노력은 기본 \(c_0\)에, 발견까지 지난 주마다 \(k\)씩 늘어난다(그 위에 다른 작업이 쌓이므로). 교환 한 번의 노력은 \(E\)다. 평균 발견 지연은 \(T/2\)이므로 총 노력은
+      <div class="formula">$$C(T) = \frac{N}{T}\,E + \lambda N\left(c_0 + \frac{kT}{2}\right), \qquad T^{*} = \sqrt{\frac{2E}{\lambda k}}$$<div class="where">\(C\): 사람·시간(h), \(E\): 교환 1회 노력(검토·업로드·연합·간섭 실행·회의, h), \(\lambda\): 충돌 발생률(건/주), \(k\): 지연 1주당 재작업 증가(h/건·주), \(c_0\): 즉시 발견했을 때의 수정 노력(h/건). \(dC/dT = 0\)에서 최적 주기 \(T^*\)가 나온다. 충돌이 많고(λ↑) 빨리 굳을수록(k↑) 자주, 교환이 비쌀수록(E↑) 드물게 교환한다. 교환을 자동화해 \(E\)를 줄이면 최적 주기가 짧아진다.</div></div></div>
+    <div class="sim" id="sim-cd-cadence">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>정보 교환 주기: 교환 비용과 재작업의 균형</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cd-cv-cad" aria-label="교환 주기에 따른 총 노력 곡선과 미발견 충돌의 톱니 모양 시간 변화"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>교환 주기 T <output id="cd-cd-t-out"></output></span><input type="range" id="cd-cd-t" min="0.5" max="8" step="0.5" value="4"></label>
+          <label class="ctrl"><span>충돌 발생률 λ <output id="cd-cd-l-out"></output></span><input type="range" id="cd-cd-l" min="1" max="20" step="1" value="6"></label>
+          <label class="ctrl"><span>지연 1주당 재작업 증가 k <output id="cd-cd-k-out"></output></span><input type="range" id="cd-cd-k" min="0.2" max="5" step="0.1" value="1.5"></label>
+          <label class="ctrl"><span>교환 1회 노력 E <output id="cd-cd-e-out"></output></span><input type="range" id="cd-cd-e" min="2" max="60" step="1" value="16"></label>
+          <label class="ctrl"><span>기본 수정 노력 c₀ <output id="cd-cd-c-out"></output></span><input type="range" id="cd-cd-c" min="0.5" max="6" step="0.5" value="2"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">총 노력 C(T)</span><span class="v" id="cd-cd-o-c">—</span></div>
+        <div class="stat"><span class="k">최적 주기 T*</span><span class="v" id="cd-cd-o-t">—</span></div>
+        <div class="stat"><span class="k">C(T*) · 절감</span><span class="v" id="cd-cd-o-s">—</span></div>
+        <div class="stat"><span class="k">평균 발견 지연</span><span class="v" id="cd-cd-o-d">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 월 1회(T = 4주)는 884 h, 최적 주기 약 1.9주는 753 h입니다 · E를 4 h로 줄이면(공유·연합·간섭 실행 자동화) T*가 약 0.9주로 짧아집니다 · λ를 2로 줄이면(설계 초기의 명확한 공간 배분) 드물게 교환해도 됩니다 · 아래 그래프의 톱니는 교환 사이에 쌓이는 미발견 충돌 수(기댓값 λ·경과 시간)입니다 · 모델: 원리 5.9, 설계 기간 N = 26주, 모든 값은 교육용.</div>
+    </div>
+    <div class="callout"><strong>예제 5.5 (B-10 설계 조정 주기)</strong> 기본 설계 26주, 충돌 λ = 6건/주, k = 1.5 h/건·주, c₀ = 2 h/건, 교환 1회 E = 16 h(네 팀 공유 검토 각 2 h, 연합·간섭 실행 4 h, 조정 회의 4 h).
+      <p><b>① 최적 주기</b> \(T^* = \sqrt{2\times16/(6\times1.5)} = \sqrt{3.56} = 1.89\) 주.</p>
+      <p><b>② 비교</b> 월 1회(T = 4): \(C = 26/4\times16 + 6\times26\times(2 + 1.5\times4/2) = 104 + 780 = 884\) h. 격주(T = 2): \(208 + 156\times3.5 = 754\) h. 매주(T = 1): \(416 + 156\times2.75 = 845\) h.</p>
+      <p><b>③ 판단</b> 이 조건에서는 <b>격주 교환</b>이 월 1회보다 약 130 h(15 %) 적다. 최적점 근처의 곡선은 평평하므로 1.9주를 고집할 필요는 없고, 회의 일정에 맞춰 2주로 둔다. 교환 노력을 자동화해 E를 줄이면 주 1회가 더 나은 쪽으로 바뀐다 — 정보 관리 자동화의 효과가 <b>협업 리듬</b>을 바꾼다.</p></div>
+  </section>
+
+  <!-- =============================================================== 9 -->
+  <section id="b10-cde">
+    <h2>B-10 프로젝트의 CDE</h2>
+    <p>이 장의 규칙을 B-10 설계 단계에 모으면 다음 표가 됩니다. 이 표가 BEP의 정보 관리 부분의 뼈대이며, 이후 장(간섭·물량·4D·5D·FM)은 모두 이 CDE의 <b>게시된 판</b> 또는 조정용으로 <b>공유된 판</b>에서 정보를 꺼냅니다.</p>
+    <div class="table-wrap"><table class="cd-tbl">
+      <thead><tr><th>항목</th><th>B-10 설계 단계(교육용)</th><th>절</th></tr></thead>
+      <tbody>
+        <tr><td>컨테이너</td><td class="cd-mono">B10-STR-ZZ-ZZ-M3-S-0001 · B10-MEP-ZZ-ZZ-M3-M-0001 · B10-FPE-ZZ-ZZ-M3-P-0001 · B10-ARC-ZZ-ZZ-M3-A-0001</td><td>명명 규칙</td></tr>
+        <tr><td>상태와 관문</td><td>작업 중 → (팀 리더 검토) → 공유 S1 → (주관 수급인 승인·발주자 수락) → 게시 A1 → 보관</td><td>네 상태</td></tr>
+        <tr><td>공유 좌표</td><td>원점 격자 A/1, x = A→E, y = 1→4, z = 1층 바닥 0, 단위 m</td><td>연합 모델</td></tr>
+        <tr><td>연합 조합</td><td>S + A + M + F, 기본 간섭 80건(천장고 3.3 m안이면 +18)</td><td>연합 모델</td></tr>
+        <tr><td>버전 비교</td><td>GlobalId 기준, 형상 1 mm 허용, 공유마다 비교 보고</td><td>버전 비교</td></tr>
+        <tr><td>권한</td><td>원리 5.8 권장안(시공사는 게시만)</td><td>접근 권한</td></tr>
+        <tr><td>교환 주기</td><td>격주 공유 → 연합·간섭 → 조정 회의(예제 5.5)</td><td>협업 리듬</td></tr>
+      </tbody></table></div>
+    <div class="callout site"><strong>B-10 CDE의 숫자</strong> 구조 모델 한 컨테이너에 요소 340개, 전체 연합 360개(천장 포함 460개). 첫 연합(S + M + F)에서 하드 간섭 80건이 나오고, 판 2(덕트 0.95 m 내림, 코어 벽 개구부 20개)에서 덕트–보 30건이 사라지며 덕트–코어 벽 20건은 개구부로 처리된다(6장). 판 1 → 판 2의 버전 비교는 추가 22 · 삭제 1 · 형상 변경 12 · 속성 변경 14. 이 판들의 이력이 감사 추적에 해시 체인으로 남는다.</div>
+    <div class="callout warn"><strong>흔한 실패</strong> ① CDE를 "큰 공유 폴더"로만 쓴다 — 상태·승인·권한이 없으면 메일 교환과 다르지 않다. ② 공유본을 제자리에서 덮어쓴다 — 이전 검토의 근거가 사라진다. ③ 연합 모델에서 직접 고친다 — 원본과 어긋난다. ④ 판 번호를 파일 이름에 넣는다 — 링크가 끊어진다. ⑤ 좌표 기준 확인 없이 공유한다 — 간섭이 숨는다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 정보가 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="ifc.html"><small>CH.03 · IFC와 데이터 모델</small>GlobalId가 정체성<br><span>버전 비교와 이슈 연결은 요소의 GlobalId가 판을 넘어 유지될 때만 성립한다.</span></a>
+      <a href="lod.html"><small>CH.04 · LOD와 정보 요구 사항</small>EIR → BEP → 납품 계획<br><span>무엇을 언제 어느 상태로 낼지 정한 계획이 CDE의 컨테이너 목록이 된다.</span></a>
+      <a href="clash.html"><small>CH.06 · 간섭 검토</small>연합 모델의 80건<br><span>공유된 판들을 겹친 연합 모델에서 간섭을 찾고, 이슈를 원본 팀에 돌려보낸다.</span></a>
+      <a href="qto.html"><small>CH.07 · 모델 기반 물량 산출</small>게시된 판으로 산출<br><span>물량은 어느 판에서 뽑았는지 기록되어야 설계 변경 때 차이를 설명할 수 있다.</span></a>
+      <a href="four-d.html"><small>CH.09 · 4D 공정 시뮬레이션</small>GlobalId–활동 연결<br><span>요소를 다시 그리면 공정 연결이 끊긴다(예제 5.4).</span></a>
+      <a href="facility.html"><small>CH.13 · 시설 관리와 자산 정보</small>PIM → AIM 인수<br><span>보관된 이력과 게시된 준공 모델이 운영 단계의 자산 정보가 된다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>정보 관리는 정보를 정하고, 만들고, 검토하고, 공유하고, 보관하는 과정을 규칙으로 다스리는 일이다. 점대점 교환은 사본의 표류·상태 불명·책임 공백을 낳는다.</li>
+      <li>CDE는 특정 제품이 아니라 정보 컨테이너를 관리된 절차로 모으고 퍼뜨리는 합의된 정보원이다. 컨테이너는 이름(정체성)과 메타데이터(상태·판·분류)로 관리된다.</li>
+      <li>네 상태: 작업 중(작업 팀만) → 검토 → 공유(납품 팀 참조, 수정 불가) → 검토·승인 → 게시(다음 용도) → 보관(이력). 관문 건너뛰기·보관 기록 수정은 금지, 고치는 일은 작업 중의 새 판으로.</li>
+      <li>명명 규칙은 프로젝트–원작성자–볼륨–층–유형–역할–번호(영국 부속서 형태). 상태 코드(S0, S1–S4, A1…)와 수정 번호(P01.1 → P01 → C01)는 이름이 아니라 메타데이터다.</li>
+      <li>연합 모델은 분야 모델을 병합하지 않고 공유 좌표로 겹친다. B-10: S + M = 50건, + F = 80건, 천장 3.3 m안이면 +18. 높이 기준이 0.5 m 틀리면 덕트–보 30건이 숨는다.</li>
+      <li>버전 비교는 GlobalId 집합의 차(추가·삭제)와 교집합의 형상·속성 비교다. 이름으로 짝지으면 이름 변경이 삭제 + 추가로 보이고, 요소를 다시 그리면 정체성이 끊긴다.</li>
+      <li>감사 추적은 누가·언제·무엇을 기록하고, 해시 체인 h<sub>i</sub> = H(h<sub>i−1</sub> ‖ r<sub>i</sub>)는 기록 조작을 뒤따르는 모든 해시의 불일치로 드러낸다.</li>
+      <li>권한은 역할 × 상태로 최소 권한을 준다. 교환 주기는 C(T) = (N/T)E + λN(c₀ + kT/2)의 균형, T* = √(2E/(λk)) — B-10 예에서 약 2주.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. ISO 19650 CDE의 네 상태를 정보가 흐르는 순서대로 쓴 것은?</p><div class="opts">
+        <button class="opt">공유 → 작업 중 → 게시 → 보관</button><button class="opt" data-correct>작업 중 → 공유 → 게시 → 보관</button><button class="opt">작업 중 → 게시 → 공유 → 보관</button><button class="opt">작업 중 → 보관 → 공유 → 게시</button>
+      </div><div class="quiz-exp">작업 팀 안에서 만들고(작업 중), 검토를 거쳐 납품 팀에 공유하고, 승인을 거쳐 게시하며, 공유·게시된 판의 이력은 보관한다.</div></div>
+      <div class="quiz-q"><p>2. 작업 중인 모델을 곧바로 게시 상태로 옮기는 전이가 금지되는 가장 중요한 이유는?</p><div class="opts">
+        <button class="opt">파일 크기가 커서</button><button class="opt">게시 상태에는 IFC만 둘 수 있어서</button><button class="opt" data-correct>검토(check)와 검토·승인(authorize·accept) 관문을 건너뛰어, 아무도 확인하지 않은 정보가 시공·제작에 쓰이기 때문</button><button class="opt">작업 중 모델에는 GlobalId가 없어서</button>
+      </div><div class="quiz-exp">상태는 표시가 아니라 관문이다. 게시는 "다음 용도에 써도 된다"는 허가이므로 검토와 승인을 거쳐야 한다.</div></div>
+      <div class="quiz-q"><p>3. 다음 가운데 명명 규칙의 이름 필드가 아니라 메타데이터로 관리해야 하는 것은?</p><div class="opts">
+        <button class="opt">원작성자 STR</button><button class="opt">층 03</button><button class="opt" data-correct>수정 번호 P02</button><button class="opt">유형 M3</button>
+      </div><div class="quiz-exp">수정 번호와 상태 코드는 판이 바뀔 때마다 바뀐다. 이름에 넣으면 같은 컨테이너가 판마다 다른 이름이 되어 링크가 끊어진다.</div></div>
+      <div class="quiz-q"><p>4. 교육용 규칙으로 <code>B10-STR-ZZ-3F-M3-S-001</code>을 검사하면 실패하는 필드는?</p><div class="opts">
+        <button class="opt">원작성자와 역할</button><button class="opt" data-correct>층/위치(3F)와 번호(001)</button><button class="opt">프로젝트와 유형</button><button class="opt">실패하는 필드가 없다</button>
+      </div><div class="quiz-exp">층 코드는 두 자리 03이어야 하고 번호는 4자리(0001)여야 한다. 나머지 필드는 코드 목록에 있다.</div></div>
+      <div class="quiz-q"><p>5. B-10 연합 모델에서 구조 S와 소방 F만 불러오면 하드 간섭은 몇 건인가? (허용 오차 0)</p><div class="opts">
+        <button class="opt">0건</button><button class="opt">20건</button><button class="opt" data-correct>30건</button><button class="opt">80건</button>
+      </div><div class="quiz-exp">스프링클러 주관(y = 4 m)이 층마다 x = 8·16·24 m의 Y 방향 큰보 3개를 지나 10개 층 × 3 = 30건. 덕트가 없으므로 덕트–보·덕트–벽은 나오지 않는다.</div></div>
+      <div class="quiz-q"><p>6. 판 2에서 배관 10개의 이름만 바뀌었다(GlobalId는 유지). 이름을 키로 버전 비교하면 이 배관들은 어떻게 보이나?</p><div class="opts">
+        <button class="opt">속성 변경 10</button><button class="opt">변경 없음</button><button class="opt" data-correct>삭제 10 + 추가 10</button><button class="opt">형상 변경 10</button>
+      </div><div class="quiz-exp">이름이 키이면 옛 이름은 판 2에 없고(삭제), 새 이름은 판 1에 없다(추가). GlobalId로 짝지어야 같은 요소의 속성 변경으로 바르게 보인다.</div></div>
+      <div class="quiz-q"><p>7. 원리 5.9에서 E = 8 h, λ = 4건/주, k = 1 h/건·주일 때 최적 교환 주기 T*는?</p><div class="opts">
+        <button class="opt">1주</button><button class="opt" data-correct>2주</button><button class="opt">4주</button><button class="opt">8주</button>
+      </div><div class="quiz-exp">\(T^* = \sqrt{2E/(\lambda k)} = \sqrt{16/4} = 2\) 주.</div></div>
+      <div class="quiz-q"><p>8. 해시 체인으로 남긴 감사 기록에서 기록 5의 내용 한 글자를 고치면 어떻게 되나?</p><div class="opts">
+        <button class="opt">기록 5만 검증에 실패한다</button><button class="opt" data-correct>기록 5의 해시가 바뀌어 기록 5와 그 뒤 모든 기록의 사슬 검증이 실패한다</button><button class="opt">아무 변화가 없다</button><button class="opt">기록 1–4가 실패한다</button>
+      </div><div class="quiz-exp">\(h_i = H(h_{i-1}\Vert r_i)\)이므로 \(h_5\)가 바뀌면 \(h_6, h_7, \dots\)도 모두 달라진다. 뒤를 다시 계산해 숨겨도 외부에 보관한 마지막 해시와 달라진다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미: 상자 그리기(투영 윤곽 채우기·모서리), 교육용 천장 모델 ---------- */
+const CDX = {
+  E: [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]],
+  C: (b) => [[b[0], b[1], b[2]], [b[3], b[1], b[2]], [b[3], b[4], b[2]], [b[0], b[4], b[2]], [b[0], b[1], b[5]], [b[3], b[1], b[5]], [b[3], b[4], b[5]], [b[0], b[4], b[5]]],
+  H: (k) => (k === 0 ? 0 : 5 + 4 * (k - 1)),
+  S: ["IfcColumn", "IfcBeam", "IfcSlab", "IfcWall"],
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  hull(pts) {
+    const p = pts.map((q) => [q[0], q[1]]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    p.forEach((q) => { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); });
+    for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  },
+  edges(V, boxes, color, width = 1, alpha = 1, dash) {
+    const ctx = V.ctx; ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.globalAlpha = alpha; ctx.setLineDash(dash || []); ctx.beginPath();
+    boxes.forEach((b) => { const q = CDX.C(b).map(V.p); if (q.some((v) => !v)) return; CDX.E.forEach(([i, j]) => { ctx.moveTo(q[i][0], q[i][1]); ctx.lineTo(q[j][0], q[j][1]); }); });
+    ctx.stroke(); ctx.restore();
+  },
+  fill(V, boxes, color, alpha) {
+    const ctx = V.ctx; ctx.save(); ctx.fillStyle = color; ctx.globalAlpha = alpha; ctx.beginPath();
+    boxes.forEach((b) => { const q = CDX.C(b).map(V.p); if (q.some((v) => !v)) return; CDX.hull(q).forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); });
+    ctx.fill(); ctx.restore();
+  },
+  axis(b) { const d = [b[3] - b[0], b[4] - b[1], b[5] - b[2]], k = d.indexOf(Math.max(...d)), c = [0, 1, 2].map((i) => (b[i] + b[i + 3]) / 2), a = c.slice(), e = c.slice(); a[k] = b[k]; e[k] = b[k + 3]; return [a, e]; },
+  pipes(V, boxes, color, width = 2.2, alpha = 1) {
+    const ctx = V.ctx; ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.globalAlpha = alpha; ctx.beginPath();
+    boxes.forEach((b) => { const [a, e] = CDX.axis(b), A = V.p(a), B = V.p(e); if (!A || !B) return; ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); });
+    ctx.stroke(); ctx.restore();
+  },
+  /** 교육용 건축 모델: 코어 2경간을 뺀 경간마다 두께 30 mm 천장판(IfcCovering), 층 바닥에서 hc 높이 */
+  ceilings(hc, floors = 10) {
+    const out = [];
+    for (let k = 0; k < floors; k++) for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
+      if ((i === 1 || i === 2) && j === 1) continue;
+      const z = CDX.H(k) + hc, name = `CL-${"ABCD"[i]}${j + 1}-${k + 1}F`;
+      out.push({ id: 1000 + out.length, guid: CB.bim.guid("IfcCovering" + name), ifc: "IfcCovering", name, storey: k + 1, box: [8 * i + 0.4, 8 * j + 0.4, z, 8 * i + 7.6, 8 * j + 7.6, z + 0.03], material: "Gypsum board", props: { predefinedType: "CEILING" } });
+    }
+    return out;
+  },
+  /** 기본 장면: 구조 회색, 벽 accent 반투명, 덕트 blue, 배관 ok, 천장 faint */
+  scene(V, els, o = {}) {
+    const P = V.P, g = (t) => els.filter((e) => e.ifc === t).map((e) => e.box), a = o.alpha ?? 1;
+    CDX.edges(V, g("IfcSlab"), P.faint, 1, 0.55 * a);
+    CDX.fill(V, g("IfcCovering"), P.faint, 0.22 * a); CDX.edges(V, g("IfcCovering"), P.faint, 0.8, 0.6 * a);
+    CDX.edges(V, g("IfcColumn").concat(g("IfcBeam")), P.dim, 0.8, 0.45 * a);
+    CDX.fill(V, g("IfcWall"), P.accent, 0.08 * a); CDX.edges(V, g("IfcWall"), P.accent, 0.8, 0.45 * a);
+    CDX.fill(V, g("IfcDuctSegment"), P.blue, 0.3 * a); CDX.edges(V, g("IfcDuctSegment"), P.blue, 1.1, 0.9 * a);
+    CDX.pipes(V, g("IfcPipeSegment"), P.ok, 2.2, a);
+  },
+  ovBox: (a, b) => [0, 1, 2].map((k) => Math.max(a[k], b[k])).concat([0, 1, 2].map((k) => Math.min(a[k + 3], b[k + 3]))),
+  hdr(V, s, o = {}) { const ctx = V.ctx; ctx.save(); ctx.font = `600 12px ${getComputedStyle(document.body).getPropertyValue("--font")}`; ctx.fillStyle = V.P.dim; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(s, 10, 8); ctx.restore(); },
+};
+
+/* ---------- 1. 사본의 표류 ---------- */
+(function () {
+  let seed = 11;
+  const gn = CB.range("cd-dr-n", (v) => v + "명", () => cv.redraw()), gq = CB.range("cd-dr-q", (v) => v.toFixed(2), () => cv.redraw()), gh = CB.range("cd-dr-h", (v) => v.toFixed(2), () => cv.redraw());
+  document.getElementById("cd-dr-seed").addEventListener("click", () => { seed = (seed * 7 + 3) % 9973; cv.redraw(); });
+  function sim() {
+    const r = CB.rng(seed), n = gn(), q = gq(), h = gh(), W = 20; let em = Array(n).fill(1), cd = Array(n).fill(1);
+    const E = [], C = [], Vs = []; let sE = 0, sC = 0, aE = 0, aC = 0, mx = 1;
+    for (let w = 2; w <= W + 1; w++) {
+      em = em.map((v) => (r() < q ? w : v)); cd = cd.map((v) => (r() < h ? v : w));
+      const le = em.filter((v) => v === w).length, lc = cd.filter((v) => v === w).length, nv = new Set(em).size;
+      E.push([w - 1, (100 * le) / n]); C.push([w - 1, (100 * lc) / n]); Vs.push([w - 1, nv]);
+      sE += n - le; sC += n - lc; aE += le / n; aC += lc / n; mx = Math.max(mx, nv);
+    }
+    return { E, C, Vs, sE, sC, aE: aE / W, aC: aC / W, mx };
+  }
+  const cv = CB.canvas("#cd-cv-drift", (ctx, W, H) => {
+    const P = CB.palette(), s = sim(), bw = W - 58 - 16, h1 = Math.round(H * 0.5) - 28;
+    CB.chart(ctx, { x: 58, y: 18, w: bw, h: h1 }, { x: [1, 20], y: [0, 100], yLabel: "최신 판 사용 %", xTicks: [1, 5, 10, 15, 20],
+      series: [{ data: s.E, color: P.bad, width: 2 }, { data: s.C, color: P.accent, width: 2.4 }] });
+    const top2 = 18 + h1 + 30, h2 = H - top2 - 44;
+    CB.chart(ctx, { x: 58, y: top2, w: bw, h: h2 }, { x: [1, 20], y: [0, Math.max(4, s.mx + 1)], xLabel: "주(매주 새 판)", yLabel: "판 수", xTicks: [1, 5, 10, 15, 20],
+      series: [{ data: s.Vs, color: P.warn, width: 2 }] });
+    ctx.font = "12px " + getComputedStyle(document.body).getPropertyValue("--font"); ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.fillStyle = P.bad; ctx.fillText("메일 배포", 66, 22); ctx.fillStyle = P.accent; ctx.fillText("CDE 참조", 140, 22); ctx.fillStyle = P.warn; ctx.fillText("메일: 유통 중인 판의 종류", 66, top2 + 4);
+    CB.stat("cd-dr-o-e", CB.num(100 * s.aE, 0) + " %"); CB.stat("cd-dr-o-c", CB.num(100 * s.aC, 0) + " %");
+    CB.stat("cd-dr-o-v", s.mx + "종"); CB.stat("cd-dr-o-w", s.sE + " / " + s.sC);
+  }, { aspect: (w) => (w < 500 ? 0.95 : 0.62), maxHeight: 460 });
+})();
+
+/* ---------- 2. CDE 상태 기계 ---------- */
+(function () {
+  const INIT = () => [
+    { id: "s", t: "구조 모델", name: "B10-STR-ZZ-ZZ-M3-S-0001", state: "WIP", n: 1, v: 2, pub: 0, sc: "S0", meta: true, issues: 0 },
+    { id: "m", t: "기계 모델", name: "B10-MEP-ZZ-ZZ-M3-M-0001", state: "WIP", n: 1, v: 3, pub: 0, sc: "S0", meta: false, issues: 0 },
+    { id: "a", t: "건축 천장 모델", name: "B10-ARC-ZZ-ZZ-M3-A-0001", state: "Shared", n: 2, v: 0, pub: 0, sc: "S1", meta: true, issues: 18 },
+    { id: "d", t: "구조 도면 3층", name: "B10-STR-ZZ-03-DR-S-0103", state: "Published", n: 2, v: 0, pub: 1, sc: "A1", meta: true, issues: 0 },
+  ];
+  const KO = { WIP: "작업 중", Shared: "공유", Published: "게시", Archived: "보관" };
+  let cs = INIT(), sel = "s", journal = [], nOk = 0, nNo = 0;
+  const p2 = (x) => String(x).padStart(2, "0");
+  const rev = (c) => (c.state === "WIP" ? `P${p2(c.n)}.${c.v}` : c.state === "Shared" ? `P${p2(c.n)}` : c.state === "Published" ? `C${p2(c.pub)}` : c.lastRev);
+  const board = document.getElementById("cd-st-board"), msgEl = document.getElementById("cd-st-msg");
+  const msg = (cls, html) => { msgEl.className = "cd-msg " + cls; msgEl.innerHTML = html; };
+  function go(c, to) {
+    const from = c.state, r0 = rev(c);
+    const allow = (s) => { nOk++; msg("ok", `<b>허용</b> · ${c.t}: ${KO[from]} → ${KO[to]} · ${s}`); };
+    const deny = (s) => { nNo++; msg("bad", `거부 · ${c.t}: ${KO[from]} → ${KO[to]} · ${s}`); };
+    if (from === to) { msg("", `${c.t}는 이미 ${KO[to]} 상태입니다.`); return render(); }
+    if (from === "Archived") deny("보관된 기록은 읽기 전용 이력입니다. 어디로도 옮기지 않습니다.");
+    else if (from === "WIP" && to === "Shared") {
+      if (!c.meta) deny("검토(check) 실패: 메타데이터의 설명·상태 코드가 비어 있습니다. 「결함·의견 해결」 뒤 다시 시도하세요.");
+      else { c.state = "Shared"; c.v = 0; c.sc = "S1"; allow(`${r0} → ${rev(c)}, 상태 코드 S1(조정용). 승인자: 작업 팀 리더(검토).`); }
+    } else if (from === "WIP" && to === "Published") deny("관문 건너뛰기 금지. 검토를 거쳐 먼저 공유해야 합니다.");
+    else if (from === "WIP" && to === "Archived") deny("공유된 적 없는 초안은 보관 기록 대상이 아닙니다(작업 팀 안에서 정리).");
+    else if (from === "Shared" && to === "Published") {
+      if (c.issues > 0) deny(`검토·승인 거부: 미해결 의견 ${c.issues}건이 남아 있습니다.`);
+      else { journal.push(`${c.name} ${r0}`); c.pub++; c.state = "Published"; c.sc = "A" + c.pub; allow(`${r0} → ${rev(c)}, 상태 코드 ${c.sc}. 주관 수급인 승인(authorize) → 발주자 수락(accept). ${r0}은 대체되어 보관 기록으로.`); }
+    } else if ((from === "Shared" || from === "Published") && to === "WIP") {
+      journal.push(`${c.name} ${r0}`); c.n++; c.v = 1; c.state = "WIP"; c.sc = "S0";
+      allow(`새 수정 시작: ${r0}은 제자리에서 고치지 않고 이력으로 남깁니다. 작업 중에서 ${rev(c)}(S0).`);
+    } else if ((from === "Shared" || from === "Published") && to === "Archived") {
+      c.lastRev = r0; c.state = "Archived"; c.sc = "—"; journal.push(`${c.name} ${r0}`); allow(`${r0}을 보관(대체·철회·종료). 처리: 정보 관리자. 이제 읽기 전용입니다.`);
+    } else if (from === "Published" && to === "Shared") deny("게시본은 공유로 되돌리지 않습니다. 고치려면 작업 중에서 새 판을 만드세요.");
+    render();
+  }
+  function render() {
+    board.querySelectorAll(".cd-card").forEach((e) => e.remove());
+    cs.forEach((c) => {
+      const d = document.createElement("div"); d.className = "cd-card" + (c.id === sel ? " cd-sel" : "") + (!c.meta || c.issues ? " cd-flag" : ""); d.dataset.id = c.id;
+      d.innerHTML = `<b>${c.t}</b><span class="cd-mono">${c.name}</span><br><span class="cd-mono">${rev(c)} · ${c.sc}${!c.meta ? " · 메타 결함" : ""}${c.issues ? " · 의견 " + c.issues : ""}</span>`;
+      board.querySelector(`[data-state="${c.state}"]`).append(d);
+    });
+    const c = cs.find((x) => x.id === sel);
+    CB.stat("cd-st-o-sel", c ? `${c.t} · ${rev(c)}` : "—"); CB.stat("cd-st-o-n", `${nOk} / ${nNo}`); CB.stat("cd-st-o-a", journal.length ? journal.length + "건 · " + journal[journal.length - 1].split(" ").pop() : "0건");
+  }
+  let drag = null;
+  board.addEventListener("pointerdown", (e) => { const d = e.target.closest(".cd-card"); if (!d) return; drag = { id: d.dataset.id, x: e.clientX, y: e.clientY, el: d, moved: false }; d.setPointerCapture(e.pointerId); });
+  board.addEventListener("pointermove", (e) => {
+    if (!drag) return; if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) { drag.moved = true; drag.el.classList.add("cd-drag"); }
+    board.querySelectorAll(".cd-col").forEach((c) => c.classList.remove("cd-hot"));
+    const t = document.elementFromPoint(e.clientX, e.clientY), col = t && t.closest(".cd-col"); if (drag.moved && col) col.classList.add("cd-hot");
+  });
+  const end = (e) => {
+    if (!drag) return; const dd = drag; drag = null; board.querySelectorAll(".cd-col").forEach((c) => c.classList.remove("cd-hot"));
+    sel = dd.id; if (!dd.moved) return render();
+    const t = document.elementFromPoint(e.clientX, e.clientY), col = t && t.closest(".cd-col");
+    if (col) go(cs.find((c) => c.id === dd.id), col.dataset.state); else render();
+  };
+  board.addEventListener("pointerup", end); board.addEventListener("pointercancel", () => { drag = null; render(); });
+  const cur = () => cs.find((c) => c.id === sel);
+  document.getElementById("cd-st-share").addEventListener("click", () => go(cur(), "Shared"));
+  document.getElementById("cd-st-pub").addEventListener("click", () => go(cur(), "Published"));
+  document.getElementById("cd-st-rev").addEventListener("click", () => go(cur(), "WIP"));
+  document.getElementById("cd-st-arc").addEventListener("click", () => go(cur(), "Archived"));
+  document.getElementById("cd-st-skip").addEventListener("click", () => { const c = cur(); if (c.state !== "WIP") { msg("", "이 단추는 작업 중인 컨테이너에 씁니다. 구조 모델이나 기계 모델을 고르세요."); return; } go(c, "Published"); });
+  document.getElementById("cd-st-fix").addEventListener("click", () => { const c = cur(); const was = !c.meta || c.issues; c.meta = true; c.issues = 0; msg(was ? "ok" : "", was ? `${c.t}: 결함·의견을 해결했습니다(작성 팀이 원본을 고친 것으로 가정).` : `${c.t}에는 해결할 결함이 없습니다.`); render(); });
+  document.getElementById("cd-st-reset").addEventListener("click", () => { cs = INIT(); sel = "s"; journal = []; nOk = nNo = 0; msg("", "처음 상태로 되돌렸습니다."); render(); });
+  render();
+})();
+
+/* ---------- 3. 명명 규칙 검사기(교육용 코드 목록) ---------- */
+(function () {
+  const ORG = { ARC: "건축", STR: "구조", MEP: "기계", FPE: "소방", GCN: "시공사" }, VOL = { ZZ: "여러 볼륨", XX: "해당 없음", T1: "지상 타워" };
+  const TYP = { M3: "3D 모델", M2: "2D 모델", DR: "도면", SP: "시방서", RP: "보고서", SH: "일람표", CA: "계산서", MI: "회의록" };
+  const ROL = { A: "건축", S: "구조", M: "기계", E: "전기", P: "위생·소화", K: "발주자", W: "시공사" }, ROLEOF = { ARC: ["A"], STR: ["S"], MEP: ["M", "E"], FPE: ["P"], GCN: ["W"] };
+  const LV = (v) => (/^(0[1-9]|10)$/.test(v) ? v.replace(/^0/, "") + "층" : { RF: "지붕", ZZ: "여러 층", XX: "해당 없음" }[v]);
+  const F = [
+    { k: "프로젝트", t: (v) => (v === "B10" ? [true, "B-10 신축"] : [false, "프로젝트 코드는 B10"]) },
+    { k: "원작성자", t: (v) => (ORG[v] ? [true, ORG[v]] : [false, "목록: " + Object.keys(ORG).join(", ")]) },
+    { k: "볼륨", t: (v) => (VOL[v] ? [true, VOL[v]] : [false, "목록: ZZ, XX, T1"]) },
+    { k: "층", t: (v) => (LV(v) ? [true, LV(v)] : [false, /^\d$|^\dF$|^B\d$/i.test(v) ? "두 자리 층 코드(01–10, RF)를 쓴다" : "목록: 01–10, RF, ZZ, XX"]) },
+    { k: "유형", t: (v) => (TYP[v] ? [true, TYP[v]] : [false, "목록: " + Object.keys(TYP).join(", ")]) },
+    { k: "역할", t: (v) => (ROL[v] ? [true, ROL[v]] : [false, "목록: " + Object.keys(ROL).join(", ")]) },
+    { k: "번호", t: (v) => (/^\d{4}$/.test(v) ? [true, "일련번호"] : [false, "4자리 숫자(0001–9999)"]) },
+  ];
+  const inp = document.getElementById("cd-nm-in"), gst = CB.seg("cd-nm-st", run), sc = document.getElementById("cd-nm-sc"), rv = document.getElementById("cd-nm-rv");
+  [inp, sc, rv].forEach((e) => e.addEventListener(e === inp ? "input" : "change", run));
+  document.querySelectorAll("[data-cd-nm]").forEach((b) => b.addEventListener("click", () => { inp.value = b.dataset.cdNm; run(); }));
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  function run() {
+    let s = inp.value.trim(); const notes = [];
+    const ext = s.match(/\.(ifc|pdf|dwg|rvt|nwd|xlsx|docx)$/i); if (ext) { s = s.slice(0, -ext[0].length); notes.push(`확장자 ${ext[0]}는 이름 필드가 아니므로 떼고 검사`); }
+    if (/\s/.test(s)) notes.push("공백 금지"); if (/_/.test(s)) notes.push("구분자는 하이픈(-)만, 밑줄 금지"); if (/[a-z]/.test(s)) notes.push("영문 대문자만");
+    if (/[^A-Za-z0-9_\-\s]/.test(s)) notes.push("한글·특수 문자 금지(시스템 호환)");
+    const parts = s.split("-"); if (parts.length !== 7) notes.push(`필드 ${parts.length}개 — 7개여야 함${parts.length > 7 ? " (수정 번호·날짜 같은 메타데이터를 이름에 넣지 않는다)" : ""}`);
+    const res = F.map((f, i) => { const v = parts[i] ?? ""; const [ok, why] = v ? f.t(v) : [false, "비어 있음"]; return { k: f.k, v, ok, why }; });
+    if (res[1].ok && res[5].ok && !ROLEOF[res[1].v].includes(res[5].v)) { res[5].ok = false; res[5].why = `원작성자 ${res[1].v}(${ORG[res[1].v]})와 역할 ${res[5].v}(${ROL[res[5].v]})가 맞지 않음`; }
+    const nOk = res.filter((r) => r.ok).length;
+    document.getElementById("cd-nm-fields").innerHTML = res.map((r) => `<div class="cd-field ${r.ok ? "cd-ok" : "cd-bad"}"><b>${esc(r.v || "∅")}</b>${r.k}</div>`).join("");
+    document.getElementById("cd-nm-rows").innerHTML = res.map((r) => `<tr><td>${r.k}</td><td class="cd-mono">${esc(r.v || "∅")}</td><td class="${r.ok ? "cd-ok" : "cd-bad"}">${r.ok ? "✓" : "✕"}</td><td>${esc(r.why)}</td></tr>`).join("");
+    const st = gst(), c = sc.value, r = rv.value; let mOk = true, mWhy = "";
+    if (st === "WIP") { if (c !== "S0") { mOk = false; mWhy = "작업 중의 상태 코드는 S0"; } else if (!/^P\d\d\.\d+$/.test(r)) { mOk = false; mWhy = "작업 중의 수정 번호는 P01.1 꼴"; } }
+    if (st === "Shared") { if (!/^S[1-4]$/.test(c)) { mOk = false; mWhy = "공유의 상태 코드는 S1–S4(용도)"; } else if (!/^P\d\d$/.test(r)) { mOk = false; mWhy = "공유의 수정 번호는 P01 꼴"; } }
+    if (st === "Published") { if (!/^(A\d|B\d|CR)$/.test(c)) { mOk = false; mWhy = "게시의 상태 코드는 A1·B1·CR 꼴"; } else if (!/^C\d\d$/.test(r)) { mOk = false; mWhy = "게시의 수정 번호는 C01 꼴"; } }
+    const all = nOk === 7 && parts.length === 7 && !notes.some((n) => !n.startsWith("확장자"));
+    CB.stat("cd-nm-o-f", `${nOk} / 7`); CB.stat("cd-nm-o-m", mOk ? "일관" : "불일치");
+    CB.stat("cd-nm-o-v", all && mOk ? "통과" : !all ? "이름 실패" : "메타데이터 실패");
+    const m = document.getElementById("cd-nm-msg"); m.className = "cd-msg " + (all && mOk ? "ok" : "bad");
+    m.innerHTML = (all && mOk ? "<b>통과</b> — 이 이름과 메타데이터로 공유 관문(check)을 지날 수 있습니다." : "실패 — ") + [...notes, ...(mOk ? [] : ["메타데이터: " + mWhy])].map(esc).join(" · ");
+  }
+  run();
+})();
+
+/* ---------- 4. 연합 모델 조립 ---------- */
+(function () {
+  const base = CB.bim.model();
+  const cS = CB.check("cd-fd-s", calc), cA = CB.check("cd-fd-a", calc), cM = CB.check("cd-fd-m", calc), cF = CB.check("cd-fd-f", calc);
+  const gh = CB.seg("cd-fd-hc", calc), gz = CB.seg("cd-fd-dz", calc), gv = CB.seg("cd-fd-v", () => { view(); calc(); });
+  let R = { els: [], cl: [] };
+  function calc() {
+    const dz = +gz(), els = [];
+    if (cS()) els.push(...base.filter((e) => CDX.S.includes(e.ifc)));
+    if (cA()) els.push(...CDX.ceilings(+gh()));
+    if (cM()) els.push(...base.filter((e) => e.ifc === "IfcDuctSegment").map((e) => ({ ...e, box: [e.box[0], e.box[1], e.box[2] + dz, e.box[3], e.box[4], e.box[5] + dz] })));
+    if (cF()) els.push(...base.filter((e) => e.ifc === "IfcPipeSegment"));
+    const hard = (a, b) => CB.bim.clashes(els, a, b, 0).filter((c) => c.type === "hard");
+    const D = ["IfcDuctSegment"], Pp = ["IfcPipeSegment"], Cv = ["IfcCovering"];
+    const sm = hard(D, CDX.S), sf = hard(Pp, CDX.S), am = hard(D, Cv), af = hard(Pp, Cv), mf = hard(D, Pp), sa = hard(Cv, CDX.S);
+    const cl = [...sm, ...sf, ...am, ...af, ...mf, ...sa];
+    R = { els, cl };
+    const by = (arr) => { const o = {}; arr.forEach((c) => { const k = { IfcBeam: "보", IfcWall: "벽", IfcSlab: "슬래브", IfcColumn: "기둥" }[c.b.ifc] || c.b.ifc; o[k] = (o[k] || 0) + 1; }); return Object.entries(o).map(([k, v]) => k + " " + v).join(" · "); };
+    CB.stat("cd-fd-o-sm", cS() && cM() ? `${sm.length}<small>${sm.length ? by(sm) : ""}</small>` : "—");
+    CB.stat("cd-fd-o-sf", cS() && cF() ? String(sf.length) : "—");
+    CB.stat("cd-fd-o-a", cA() && (cM() || cF()) ? `${am.length} · ${af.length}` : "—");
+    CB.stat("cd-fd-o-t", cl.length + "건");
+    v.redraw();
+  }
+  function view() { if (gv() === "3") v.set({ target: [16, 12, 11], dist: 52 }); else v.set({ target: [16, 12, 20], dist: 88 }); }
+  const v = CB.orbit("#cd-cv-fed", { yaw: -0.65, pitch: 0.38, dist: 88, target: [16, 12, 20], fov: 0.9, aspect: 0.72, minHeight: 300, maxHeight: 500,
+    draw(V) {
+      const fl = gv() === "3" ? 3 : 0, keep = (e) => !fl || e.storey === fl;
+      CDX.scene(V, R.els.filter(keep), { alpha: fl ? 1 : 0.8 });
+      const cl = R.cl.filter((c) => keep(c.a)), P = V.P, bx = cl.map((c) => CDX.ovBox(c.a.box, c.b.box));
+      CDX.fill(V, bx, P.bad, 0.75); CDX.edges(V, bx, P.bad, 1.6, 1);
+      if (!fl) cl.forEach((c) => V.dot3(c.center, { color: P.bad, r: 2.6 }));
+      CDX.hdr(V, `불러온 요소 ${R.els.length}개 · 간섭 ${R.cl.length}건${fl ? " (3층 표시)" : ""}`);
+    } });
+  calc();
+})();
+
+/* ---------- 5. 버전 비교(GlobalId vs 이름) ---------- */
+(function () {
+  const v1 = CB.bim.model(), raw = CB.bim.model({ ductDrop: 0.95 });
+  const v2 = raw.filter((e) => e.name !== "DU-SA-10F").map((e) => {
+    const c = { ...e, box: e.box.slice(), props: { ...e.props } };
+    if (/^C-C2-[123]F$/.test(e.name)) { c.box = [15.55, 7.55, c.box[2], 16.45, 8.45, c.box[5]]; c.props.section = "900x900"; }
+    if (/^W-CORE\d-1F$/.test(e.name)) c.props.fireRating = "2시간";
+    if (e.ifc === "IfcPipeSegment") c.name = e.name.replace("SP-MAIN", "FP-SPR");
+    return c;
+  });
+  const d10 = raw.find((e) => e.name === "DU-SA-10F");
+  [["A", [d10.box[0], 15.9]], ["B", [16.1, d10.box[3]]]].forEach(([s, [x0, x1]]) => v2.push({ id: 900 + v2.length, guid: CB.bim.guid("DU-SA-10F-" + s + "-v2"), ifc: "IfcDuctSegment", name: "DU-SA-10F-" + s, storey: 10, box: [x0, d10.box[1], d10.box[2], x1, d10.box[4], d10.box[5]], material: d10.material, props: { ...d10.props } }));
+  CB.bim.clashes(raw, ["IfcDuctSegment"], ["IfcWall"]).forEach((c) => {
+    const w = c.b.box, d = c.a.box;
+    v2.push({ id: 950 + v2.length, guid: CB.bim.guid("IfcOpeningElement" + w.join(",")), ifc: "IfcOpeningElement", name: "OP-" + c.b.name, storey: c.b.storey, box: [w[0], d[1] - 0.05, d[2] - 0.05, w[3], d[4] + 0.05, d[5] + 0.05], material: "", props: { host: c.b.name, size: "1100x500" } });
+  });
+  const sortJ = (o) => JSON.stringify(Object.keys(o).sort().reduce((a, k) => ((a[k] = o[k]), a), {}));
+  function diff(key) {
+    const m1 = new Map(v1.map((e) => [e[key], e])), m2 = new Map(v2.map((e) => [e[key], e])), out = [];
+    v2.forEach((e) => { if (!m1.has(e[key])) out.push({ k: "add", e }); });
+    v1.forEach((e) => {
+      if (!m2.has(e[key])) { out.push({ k: "del", e }); return; }
+      const f = m2.get(e[key]), geo = e.box.some((x, i) => Math.abs(x - f.box[i]) > 1e-3), why = [];
+      if (e.name !== f.name) why.push(`이름 ${e.name} → ${f.name}`); if (e.material !== f.material) why.push("재료");
+      if (sortJ(e.props) !== sortJ(f.props)) why.push("속성 " + Object.keys({ ...e.props, ...f.props }).filter((k) => e.props[k] !== f.props[k]).map((k) => `${k}: ${e.props[k] ?? "∅"} → ${f.props[k] ?? "∅"}`).join(", "));
+      if (geo) { const dz = f.box[2] - e.box[2]; out.push({ k: "geo", e: f, old: e, why: (Math.abs(dz) > 1e-3 ? `z ${CB.signed(dz, 2)} m` : "단면 상자 변경") + (why.length ? " · " + why.join(" · ") : "") }); }
+      else if (why.length) out.push({ k: "prop", e: f, old: e, why: why.join(" · ") });
+    });
+    return out;
+  }
+  const gk = CB.seg("cd-df-key", upd), gf = CB.seg("cd-df-f", upd);
+  const LAB = { add: "추가", del: "삭제", geo: "형상", prop: "속성" };
+  let D = [];
+  function upd() {
+    D = diff(gk()); const n = (k) => D.filter((d) => d.k === k).length;
+    CB.stat("cd-df-o-n", `${v1.length} / ${v2.length}`); CB.stat("cd-df-o-ad", `${n("add")} / ${n("del")}`); CB.stat("cd-df-o-gp", `${n("geo")} / ${n("prop")}`);
+    CB.stat("cd-df-o-u", String(v1.length - n("del") - n("geo") - n("prop")));
+    const f = gf(), rows = D.filter((d) => f === "all" || d.k === f);
+    const col = { add: "var(--ok)", del: "var(--bad)", geo: "var(--warn)", prop: "var(--accent)" };
+    document.getElementById("cd-df-rows").innerHTML = rows.map((d) => `<tr><td style="color:${col[d.k]};font-weight:700">${LAB[d.k]}</td><td class="cd-mono">${d.e.name}</td><td class="cd-mono">${d.e.guid.slice(0, 10)}…</td><td>${d.k === "add" ? d.e.ifc + (d.e.props.host ? " · 숙주 " + d.e.props.host : "") : d.k === "del" ? d.e.ifc + " 판 2에 없음" : d.why}</td></tr>`).join("");
+    v.redraw();
+  }
+  const v = CB.orbit("#cd-cv-diff", { yaw: -0.6, pitch: 0.36, dist: 86, target: [16, 12, 20], fov: 0.9, aspect: 0.72, minHeight: 300, maxHeight: 500,
+    draw(V) {
+      const P = V.P, f = gf(), on = (k) => f === "all" || f === k, ch = new Set(D.filter((d) => d.k !== "del").map((d) => d.e.guid + d.e.name));
+      CDX.edges(V, v2.filter((e) => !ch.has(e.guid + e.name) && e.ifc !== "IfcSlab").map((e) => e.box), P.faint, 0.7, 0.35);
+      CDX.edges(V, v2.filter((e) => e.ifc === "IfcSlab").map((e) => e.box), P.faint, 0.7, 0.25);
+      const B = (k) => D.filter((d) => d.k === k).map((d) => d.e.box), dim = (k) => (on(k) ? 1 : 0.15);
+      CDX.fill(V, B("add"), P.ok, 0.55 * dim("add")); CDX.edges(V, B("add"), P.ok, 1.4, dim("add"));
+      CDX.edges(V, B("del"), P.bad, 2, dim("del"), [5, 4]);
+      CDX.fill(V, B("geo"), P.warn, 0.45 * dim("geo")); CDX.edges(V, B("geo"), P.warn, 1.4, dim("geo"));
+      if (on("geo")) CDX.edges(V, D.filter((d) => d.k === "geo").map((d) => d.old.box), P.warn, 1, 0.5, [3, 3]);
+      CDX.fill(V, B("prop"), P.accent, 0.4 * dim("prop")); CDX.edges(V, B("prop"), P.accent, 1.6, dim("prop"));
+      CDX.hdr(V, `판 1 → 판 2 · 짝짓기 키: ${gk() === "guid" ? "GlobalId" : "이름"}`);
+    } });
+  upd();
+})();
+
+/* ---------- 6. 감사 추적과 해시 체인 ---------- */
+(function () {
+  const BASE = [
+    ["03-02 09:10", "구조 팀(작성자)", "생성", "P01.1 · S0", "작업 중"],
+    ["03-05 17:40", "구조 팀(작성자)", "수정 저장", "P01.2 · S0", "작업 중"],
+    ["03-06 10:00", "구조 팀 리더", "검토 통과 → 공유", "P01 · S1", "공유"],
+    ["03-09 14:20", "기계 팀", "연합 모델에 참조(열람)", "P01 · S1", "공유"],
+    ["03-10 11:00", "BIM 조정자", "간섭 이슈 50건 등록", "P01 · S1", "공유"],
+    ["03-13 16:30", "구조 팀(작성자)", "새 수정 시작", "P02.1 · S0", "작업 중"],
+    ["03-16 09:00", "구조 팀 리더", "검토 통과 → 공유", "P02 · S4", "공유"],
+    ["03-20 15:00", "설계 총괄(주관 수급인)", "승인(authorize)", "P02 · S4", "공유"],
+    ["03-20 16:10", "발주자", "수락(accept) → 게시", "C01 · A1", "게시"],
+    ["03-20 16:11", "시스템", "P01·P02 대체 → 보관 기록", "C01 · A1", "게시"],
+  ];
+  const fnv = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, "0"); };
+  const H0 = "00000000", body = (r) => r.f.join("|");
+  const seal = (recs) => { let p = H0; recs.forEach((r) => { r.prev = p; r.h = fnv(p + "|" + body(r)); p = r.h; }); return recs; };
+  let recs, ext, note = "";
+  const reset = () => { recs = seal(BASE.map((f) => ({ f: f.slice() }))); ext = recs[recs.length - 1].h; note = "원래 기록입니다. 모든 고리가 이어져 있습니다."; };
+  const gt = CB.range("cd-au-t", (v) => "기록 " + v, draw);
+  function verify() { let p = H0; return recs.map((r) => { const ok = r.prev === p && r.h === fnv(p + "|" + body(r)); p = fnv(p + "|" + body(r)); return ok; }); }
+  function draw() {
+    gt.el.max = recs.length; if (gt() > recs.length) gt.set(recs.length, false);
+    const ok = verify(), t = Math.min(gt(), recs.length), firstBad = ok.indexOf(false);
+    document.getElementById("cd-au-rows").innerHTML = recs.map((r, i) => `<tr class="${!ok[i] ? "cd-broken" : ""}${i >= t ? " cd-future" : ""}"><td>${i + 1}</td><td class="cd-mono">${r.f[0]}</td><td>${r.f[1]}</td><td>${r.f[2]}</td><td class="cd-mono">${r.f[3]}</td><td class="cd-mono">${r.h}</td><td class="${ok[i] ? "cd-ok" : "cd-bad"}">${ok[i] ? "✓" : "✕"}</td></tr>`).join("");
+    const nOk = ok.filter(Boolean).length, last = recs[recs.length - 1].h, extOk = last === ext;
+    CB.stat("cd-au-o-n", recs.length + "건"); CB.stat("cd-au-o-v", `${nOk} / ${recs.length - nOk}`);
+    CB.stat("cd-au-o-s", `${recs[t - 1].f[4]} · ${recs[t - 1].f[3]}`); CB.stat("cd-au-o-h", `${last} ${extOk ? "= 보관값" : "≠ " + ext}`);
+    const m = document.getElementById("cd-au-msg");
+    const bad = firstBad >= 0 || !extOk; m.className = "cd-msg " + (bad ? "bad" : "ok");
+    m.innerHTML = note + (firstBad >= 0 ? ` 검증: 기록 ${firstBad + 1}부터 사슬이 끊어졌습니다.` : !extOk ? " 사슬 안은 모두 통과하지만 마지막 해시가 외부에 보관해 둔 값과 다릅니다 → 조작 발견." : "");
+  }
+  const tamper = (fn, s) => { fn(); note = s; draw(); };
+  document.getElementById("cd-au-edit").addEventListener("click", () => tamper(() => { const r = recs.find((x) => /간섭 이슈/.test(x.f[2])); if (r) r.f[2] = "간섭 이슈 5건 등록"; }, "기록 5의 내용을 고쳤습니다(저장 해시는 그대로)."));
+  document.getElementById("cd-au-time").addEventListener("click", () => tamper(() => { const r = recs.find((x) => /^승인/.test(x.f[2])); if (r) r.f[0] = "03-19 09:00"; }, "승인 시각을 하루 앞당겼습니다."));
+  document.getElementById("cd-au-del").addEventListener("click", () => tamper(() => { const i = recs.findIndex((x) => /^승인/.test(x.f[2])); if (i >= 0) recs.splice(i, 1); }, "승인 기록을 지웠습니다."));
+  document.getElementById("cd-au-forge").addEventListener("click", () => tamper(() => { const r = recs.find((x) => /간섭 이슈/.test(x.f[2])); if (r) r.f[2] = "간섭 이슈 5건 등록"; seal(recs); }, "기록 5를 고친 뒤 뒤따르는 해시를 모두 다시 계산했습니다."));
+  document.getElementById("cd-au-reset").addEventListener("click", () => { reset(); gt.set(recs.length, false); draw(); });
+  reset(); draw();
+})();
+
+/* ---------- 7. 접근 권한 매트릭스 ---------- */
+(function () {
+  const ROLES = ["작성 작업 팀(구조)", "다른 작업 팀(기계)", "주관 수급인", "발주자", "시공사", "정보 관리자"], ST = ["작업 중", "공유", "게시", "보관"];
+  const REC = [[2, 1, 1, 0], [0, 1, 1, 0], [0, 1, 1, 0], [0, 0, 1, 1], [0, 0, 1, 0], [0, 1, 1, 1]];
+  const SC = [
+    ["구조 팀이 자기 작업 중 모델을 고친다", true, (M) => M[0][0] === 2],
+    ["기계 팀이 구조 팀의 작업 중 모델을 연다", false, (M) => M[1][0] >= 1],
+    ["기계 팀이 공유된 구조 모델을 참조한다", true, (M) => M[1][1] >= 1],
+    ["주관 수급인이 공유 모델을 제자리에서 고친다", false, (M) => M[2][1] === 2],
+    ["시공사가 검토 전(공유) 모델로 제작한다", false, (M) => M[4][1] >= 1],
+    ["시공사가 게시 모델을 연다", true, (M) => M[4][2] >= 1],
+    ["발주자가 게시 모델을 연다", true, (M) => M[3][2] >= 1],
+    ["구조 팀이 게시본을 덮어쓴다", false, (M) => M[0][2] === 2],
+    ["누군가 보관 기록을 고친다", false, (M) => M.some((r) => r[3] === 2)],
+    ["정보 관리자가 감사를 위해 보관 기록을 연다", true, (M) => M[5][3] >= 1],
+  ];
+  let M = REC.map((r) => r.slice());
+  const grid = document.getElementById("cd-ac-grid");
+  function draw() {
+    grid.innerHTML = `<div></div>` + ST.map((s) => `<div class="cd-h">${s}</div>`).join("") +
+      ROLES.map((r, i) => `<div class="cd-r">${r}</div>` + ST.map((_, j) => `<button class="cd-cell cd-r${M[i][j]}" data-i="${i}" data-j="${j}" aria-label="${r} ${ST[j]}">${["—", "R", "RW"][M[i][j]]}</button>`).join("")).join("");
+    let met = 0;
+    document.getElementById("cd-ac-scen").innerHTML = SC.map(([t, want, test]) => { const got = test(M), ok = got === want; if (ok) met++; return `<li><b class="${ok ? "cd-ok" : "cd-bad"}">${ok ? (want ? "✓ 허용" : "✓ 차단") : want ? "⚠ 막힘" : "⚠ 뚫림"}</b> ${t}</li>`; }).join("");
+    let w = 0, o = 0; M.forEach((r) => r.forEach((c, j) => { if (c === 2 && j > 0) w++; if (c) o++; }));
+    CB.stat("cd-ac-o-s", `${met} / ${SC.length}`); CB.stat("cd-ac-o-w", w + "칸"); CB.stat("cd-ac-o-o", `${o} / 24`);
+  }
+  grid.addEventListener("click", (e) => { const b = e.target.closest(".cd-cell"); if (!b) return; const i = +b.dataset.i, j = +b.dataset.j; M[i][j] = (M[i][j] + 1) % 3; draw(); });
+  const preset = (fn) => () => { M = ROLES.map((_, i) => ST.map((_, j) => fn(i, j))); draw(); };
+  document.getElementById("cd-ac-rec").addEventListener("click", preset((i, j) => REC[i][j]));
+  document.getElementById("cd-ac-open").addEventListener("click", preset(() => 2));
+  document.getElementById("cd-ac-none").addEventListener("click", preset(() => 0));
+  document.getElementById("cd-ac-read").addEventListener("click", preset(() => 1));
+  draw();
+})();
+
+/* ---------- 8. 정보 교환 주기 ---------- */
+(function () {
+  const N = 26;
+  const gt = CB.range("cd-cd-t", (v) => CB.num(v, 1) + "주", () => cv.redraw()), gl = CB.range("cd-cd-l", (v) => v + "건/주", () => cv.redraw());
+  const gk = CB.range("cd-cd-k", (v) => CB.num(v, 1) + " h/건·주", () => cv.redraw()), ge = CB.range("cd-cd-e", (v) => v + " h", () => cv.redraw()), gc = CB.range("cd-cd-c", (v) => CB.num(v, 1) + " h/건", () => cv.redraw());
+  const cost = (T) => (N / T) * ge() + gl() * N * (gc() + (gk() * T) / 2);
+  const cv = CB.canvas("#cd-cv-cad", (ctx, W, H) => {
+    const P = CB.palette(), T = gt(), Ts = Math.sqrt((2 * ge()) / (gl() * gk())), bw = W - 64 - 16, h1 = Math.round(H * 0.55) - 30;
+    const data = [], ex = [], rw = []; for (let t = 0.25; t <= 8.0001; t += 0.05) { data.push([t, cost(t)]); ex.push([t, (N / t) * ge()]); rw.push([t, gl() * N * (gc() + (gk() * t) / 2)]); }
+    const ymax = Math.max(...data.map((d) => d[1]).filter((y, i) => data[i][0] >= 0.5)) * 1.05;
+    CB.chart(ctx, { x: 64, y: 16, w: bw, h: h1 }, { x: [0.25, 8], y: [0, ymax], yLabel: "총 노력 h", xTicks: [1, 2, 3, 4, 5, 6, 7, 8],
+      series: [{ data: ex, color: P.dim, width: 1.4, dash: [4, 4] }, { data: rw, color: P.warn, width: 1.4, dash: [4, 4] }, { data, color: P.accent, width: 2.6 }],
+      vlines: [{ x: Math.min(8, Math.max(0.25, Ts)), color: P.ok, label: "T*" }], points: [{ x: T, y: cost(T), color: P.accent2, r: 5 }] });
+    ctx.font = (W < 500 ? "10.5px " : "12px ") + getComputedStyle(document.body).getPropertyValue("--font"); ctx.textAlign = "right"; ctx.textBaseline = "top";
+    ctx.fillStyle = P.dim; ctx.fillText("교환 노력 (N/T)·E", W - 22, 20); ctx.fillStyle = P.warn; ctx.fillText("재작업 λN(c₀ + kT/2)", W - 22, 36); ctx.fillStyle = P.accent; ctx.fillText("합계 C(T)", W - 22, 52);
+    const top2 = 16 + h1 + 30, h2 = H - top2 - 44, saw = []; let mx = 0;
+    for (let t = 0; t <= N; t += 0.02) { const y = gl() * (t % T); saw.push([t, y]); mx = Math.max(mx, y); }
+    CB.chart(ctx, { x: 64, y: top2, w: bw, h: h2 }, { x: [0, N], y: [0, Math.max(5, mx * 1.1)], xLabel: "교환 주기 T(위) · 설계 경과 주(아래)", yLabel: "미발견 충돌", series: [{ data: saw, color: P.bad, width: 1.6 }] });
+    const c = cost(T), cs = cost(Ts);
+    CB.stat("cd-cd-o-c", CB.sig(c, 3) + " h"); CB.stat("cd-cd-o-t", CB.num(Ts, 2) + "주");
+    CB.stat("cd-cd-o-s", `${CB.sig(cs, 3)} h · −${CB.sig(c - cs, 3)} h (${CB.num((100 * (c - cs)) / c, 0)} %)`); CB.stat("cd-cd-o-d", CB.num(T / 2, 2) + "주");
+  }, { aspect: (w) => (w < 500 ? 1.0 : 0.66), maxHeight: 500 });
+})();
+
+</script>
+</body>
+</html>

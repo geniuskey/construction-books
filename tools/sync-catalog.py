@@ -60,6 +60,14 @@ LOCAL_BOOKS = [{
     'status': 'published', 'level': '건축·토목 4학년·현장 신입', 'stage': 'delivery', 'slug': 'site', 'legacyUrl': None,
     'color': '#e8590c', 'colorDark': '#ffa94d', 'motif': 'crane',
     'topics': ['계약·가설', '공종별 시공', 'CPM·PERT', '자원·공기 단축', '적산·원가', 'EVM', '품질·안전', '생산성'],
+}, {
+    'id': 'bimbook', 'code': 'BIM', 'title': 'BIMBook', 'subtitle': 'BIM·디지털 건설 교과서',
+    'headline': '건물을 짓기 전에 컴퓨터 속에서 한 번 짓는다',
+    'description': '형상 모델링과 파라메트릭, IFC 데이터 모델과 LOD, 공통 데이터 환경, 간섭 검토, 모델 기반 물량 산출과 설계 분석, 4D 공정·5D 원가, 측량·드론·스캔, 디지털 제작, 시설 관리와 디지털 트윈, GIS와 계산 설계까지 — 모델을 돌리고 데이터를 꺼내 보며 기준 모델 B-10 BIM의 요소 360개로 익히는 BIM·디지털 건설 교과서.',
+    'url': 'https://construction.euiyun.com/bim/', 'repo': 'https://github.com/geniuskey/construction-books', 'field': 'construction',
+    'status': 'published', 'level': '건축·토목 3–4학년·BIM 실무 입문', 'stage': 'delivery', 'slug': 'bim', 'legacyUrl': None,
+    'color': '#5f3dc4', 'colorDark': '#b197fc', 'motif': 'bim',
+    'topics': ['형상·파라메트릭', 'IFC·LOD', 'CDE·정보 관리', '간섭 검토', '물량·분석', '4D·5D', '점군·제작', '디지털 트윈·GIS'],
 }]
 books = LOCAL_BOOKS
 catalog = []

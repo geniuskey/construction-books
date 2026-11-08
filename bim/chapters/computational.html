@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>계산 설계와 AI · BIMBook</title>
+<meta name="description" content="컴퓨터가 함께 설계한다. 데이터 흐름 그래프, B-10 구조 그리드의 매개변수 탐색과 유전 알고리즘, 파레토 전선, 공사비 회귀와 과적합, 외삽과 데이터 편향, 생성 매스, 분류기의 정밀도·재현율과 검증 책임을 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .cp-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .cp-msg b { color: var(--text); }
+  .cp-msg.ok { color: var(--ok); font-weight: 600; }
+  .cp-msg.bad { color: var(--bad); font-weight: 600; }
+  .cp-msg.warn { color: var(--warn); font-weight: 600; }
+  .cp-tbl td, .cp-tbl th { font-variant-numeric: tabular-nums; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="computational">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="cp-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="cp-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="cp-ah-or" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 16</div>
+    <h1 data-no-glossary>계산 설계와 AI</h1>
+    <p class="lead">B-10의 기둥 간격은 왜 8 m일까요? 6 m면 보가 얕아져 천장이 높아지지만 기둥이 늘고, 10 m면 공간은 트이지만 보가 깊어집니다. 손으로는 두세 안을 비교하고 결정하지만, 컴퓨터는 수백 안을 만들고 평가할 수 있습니다. 이 장은 설계 규칙을 <b>계산할 수 있는 그래프</b>로 적는 비주얼 프로그래밍에서 출발해, B-10 구조 그리드의 매개변수 공간을 격자 탐색과 유전 알고리즘으로 훑고, 서로 다투는 두 목적의 파레토 전선을 그립니다. 이어 공사비를 데이터로 예측하는 회귀와 그 함정(과적합, 외삽, 편향)을 실험하고, 생성 매스와 분류기의 오류를 계산합니다. 결론은 하나입니다. 컴퓨터는 대안을 늘리고 계산을 빠르게 하지만, <b>무엇을 최적화할지 정하고 결과를 검증하고 책임지는 것은 사람</b>입니다.</p>
+    <ul class="objectives">
+      <li>데이터 흐름 그래프(노드·연결·위상 순서)로 설계 규칙을 적고, 입력이 바뀔 때 다시 계산되는 범위를 설명한다.</li>
+      <li>목적 함수·제약·설계 변수를 정하고, 격자 탐색으로 B-10 그리드(경간 → 보 춤 L/12, 기둥 수·크기, 콘크리트, 자유 공간)를 평가한다.</li>
+      <li>유전 알고리즘(선택·교차·변이·엘리트)으로 큰 설계 공간을 탐색하고, 결과가 난수와 설정에 따라 달라짐을 확인한다.</li>
+      <li>두 목적 사이의 지배 관계와 파레토 전선을 구하고, 가중합으로 고른 해의 의미와 한계를 설명한다.</li>
+      <li>공사비 회귀에서 예측 구간과 과적합(학습·검증 오차)을 계산하고, 외삽과 데이터 편향의 위험을 실험으로 보인다.</li>
+      <li>분류기의 정밀도·재현율과 기저율의 관계, 생성형 AI 결과의 검증과 책임을 확인된 사실 범위에서 설명한다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 정보가 없었다면</small><b>대안은 늘 세 개뿐이었다</b></div>
+      <div class="o-body"><p>1963년 이반 서덜랜드(Ivan Sutherland)는 MIT 박사 논문의 스케치패드(Sketchpad)에서 화면에 그린 선에 "평행", "같은 길이" 같은 구속 조건을 걸면 컴퓨터가 그림을 고쳐 그리게 했습니다. 도면을 규칙의 결과로 보는 생각, 즉 파라메트릭 설계(2장)의 출발점으로 꼽힙니다. 1970년대 존 홀랜드(John Holland)는 생물의 진화를 흉내 낸 유전 알고리즘을 체계화했고, 이 방법은 해를 식으로 풀 수 없는 공학 최적화에 널리 쓰이게 됩니다.</p>
+        <p>컴퓨터가 없던 설계실에서 대안 하나를 평가하려면 도면을 다시 그리고 물량과 구조를 다시 계산해야 했습니다. 그래서 대안은 경험으로 고른 두세 개였고, 그 밖의 더 나은 안은 존재하는지조차 알 수 없었습니다. 계산 설계는 대안을 만들고 평가하는 비용을 거의 0으로 줄였습니다. 대신 새로운 질문이 생겼습니다. 무엇을 "좋다"고 계산할 것인가, 그리고 계산을 믿어도 되는가.</p>
+        <div class="o-chain"><span>설계 규칙 · 데이터 · 목적</span><i>→</i><span class="tool">데이터 흐름 그래프 · 탐색·최적화 · 파레토 · 회귀·분류</span><i>→</i><span>대안 집합 · 근거 있는 선택 · 검증된 예측</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="dataflow">
+    <h2>비주얼 프로그래밍과 데이터 흐름 그래프</h2>
+    <div class="problem"><strong>경간을 바꾸면 무엇이 따라 바뀌나</strong>
+      <p>B-10의 X 방향 경간 수를 4에서 5로 바꾸면 경간, 보 춤, 기둥 크기, 콘크리트 물량, 천장고가 줄줄이 바뀝니다. 이 연쇄를 사람이 매번 기억해 고치는 대신, 규칙을 한 번 적어 두고 컴퓨터가 따라가게 할 수 있을까요?</p></div>
+    <p>계산 설계의 첫걸음은 설계 규칙을 <b>입력 → 처리 → 출력</b>의 연결로 적는 것입니다. 상자(노드)는 계산 하나, 선(연결)은 데이터의 흐름입니다. 이런 그림을 <span class="term">데이터 흐름 그래프</span><span class="en">(dataflow graph)</span>라 하고, 노드를 끌어다 연결해 프로그램을 만드는 방식을 <span class="term">비주얼 프로그래밍</span><span class="en">(visual programming)</span>이라 합니다. BIM 도구와 함께 쓰는 Grasshopper, Dynamo 같은 환경이 이 방식이며, 같은 그래프를 Python 같은 텍스트 스크립트로 적을 수도 있습니다. 어느 쪽이든 원리는 같습니다.</p>
+    <figure class="diagram" id="fig-cp-loop">
+      <svg viewBox="0 0 860 260" role="img" aria-label="계산 설계의 순환: 매개변수, 생성, 평가, 선택과 사람의 판단">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="40" y="90" width="150" height="70" rx="10" class="f-elev"/><text x="115" y="118" style="fill:var(--text);font-weight:700">① 매개변수</text><text x="115" y="140">경간 · 층수 · 창 비율</text>
+          <rect x="250" y="90" width="150" height="70" rx="10" class="f-elev"/><text x="325" y="118" style="fill:var(--text);font-weight:700">② 생성</text><text x="325" y="140">규칙 → 형상·물량</text>
+          <rect x="460" y="90" width="150" height="70" rx="10" class="f-elev"/><text x="535" y="118" style="fill:var(--text);font-weight:700">③ 평가</text><text x="535" y="140">목적 함수 · 제약</text>
+          <rect x="670" y="90" width="150" height="70" rx="10" class="f-acc-soft"/><text x="745" y="118" style="fill:var(--accent);font-weight:700">④ 선택</text><text x="745" y="140">사람의 판단</text>
+        </g>
+        <g style="stroke:var(--accent);stroke-width:2.2;fill:none" marker-end="url(#cp-ah-acc)"><path d="M192 125H246"/><path d="M402 125H456"/><path d="M612 125H666"/></g>
+        <path d="M535 162V210H115V164" style="stroke:var(--accent-2);stroke-width:2;fill:none;stroke-dasharray:6 4" marker-end="url(#cp-ah-or)"/>
+        <text x="325" y="230" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">탐색·최적화: 다음 매개변수를 고른다(격자 · 경사 하강 · 유전 알고리즘)</text>
+        <text x="745" y="60" text-anchor="middle" class="t-dim">목적·제약을 정하고</text><text x="745" y="78" text-anchor="middle" class="t-dim">결과를 검증·책임</text>
+      </svg>
+      <figcaption><b>그림 16-1.</b> 계산 설계의 순환. 매개변수로 형상과 물량을 생성하고, 목적 함수와 제약으로 평가하며, 탐색 알고리즘이 다음 후보를 고른다. 무엇을 평가할지 정하고 최종 안을 고르는 일은 사람에게 남는다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 16.1 (데이터 흐름 그래프와 위상 순서)</strong> 데이터 흐름 그래프는 노드(계산)와 방향 있는 연결(출력 → 입력)로 이루어지며, 되먹임 고리가 없는 방향 그래프(DAG)여야 한다. 노드는 모든 입력이 준비된 뒤에만 계산할 수 있으므로, 선행 노드가 항상 먼저 오는 <span class="term">위상 정렬</span><span class="en">(topological sort)</span> 순서로 계산한다. 입력 하나가 바뀌면 그 노드에서 연결을 따라 닿는 <b>하류 노드만</b> 다시 계산하면 된다(나머지는 이전 값을 재사용). 고리가 있으면 계산 순서가 정해지지 않으므로 도구는 이를 오류로 막는다.</div>
+    <figure class="diagram" id="fig-cp-dag">
+      <svg viewBox="0 0 860 280" role="img" aria-label="B-10 그리드 규칙의 데이터 흐름 그래프: 입력 노드에서 경간, 보 춤, 물량, 천장고 노드로 이어지는 연결">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="40" width="110" height="36" rx="7" class="f-acc2-soft"/><text x="85" y="63" style="fill:var(--text)">X 경간 수 nₓ</text>
+          <rect x="30" y="96" width="110" height="36" rx="7" class="f-acc2-soft"/><text x="85" y="119" style="fill:var(--text)">Y 경간 수 n_y</text>
+          <rect x="30" y="152" width="110" height="36" rx="7" class="f-acc2-soft"/><text x="85" y="175" style="fill:var(--text)">층고 H</text>
+          <rect x="30" y="208" width="110" height="36" rx="7" class="f-acc2-soft"/><text x="85" y="231" style="fill:var(--text)">규칙 L/12</text>
+          <rect x="210" y="40" width="120" height="36" rx="7" class="f-elev"/><text x="270" y="63" style="fill:var(--text)">경간 32/nₓ</text>
+          <rect x="210" y="96" width="120" height="36" rx="7" class="f-elev"/><text x="270" y="119" style="fill:var(--text)">경간 24/n_y</text>
+          <rect x="400" y="68" width="120" height="36" rx="7" class="f-elev"/><text x="460" y="91" style="fill:var(--text)">보 춤 h</text>
+          <rect x="400" y="124" width="120" height="36" rx="7" class="f-elev"/><text x="460" y="147" style="fill:var(--text)">기둥 크기 c</text>
+          <rect x="590" y="68" width="120" height="36" rx="7" class="f-elev"/><text x="650" y="91" style="fill:var(--text)">콘크리트 V</text>
+          <rect x="590" y="160" width="120" height="36" rx="7" class="f-elev"/><text x="650" y="183" style="fill:var(--text)">천장고</text>
+          <rect x="740" y="110" width="90" height="36" rx="7" class="f-acc-soft"/><text x="785" y="133" style="fill:var(--accent)">점수 J</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.4;fill:none" marker-end="url(#cp-ah)">
+          <path d="M140 58H206"/><path d="M140 114H206"/><path d="M330 58L396 82"/><path d="M330 114L396 90"/><path d="M140 226C300 226 340 100 396 96"/><path d="M330 114L396 138"/><path d="M520 86H586"/><path d="M520 142L586 92"/><path d="M520 92L586 172"/><path d="M140 170C380 210 500 178 586 178"/><path d="M710 86L736 120"/><path d="M710 178L736 136"/>
+        </g>
+        <text x="430" y="258" text-anchor="middle" class="t-dim">nₓ를 바꾸면 nₓ에서 닿는 노드만 다시 계산 — Y 경간 노드는 그대로</text>
+      </svg>
+      <figcaption><b>그림 16-2.</b> B-10 그리드 규칙의 데이터 흐름 그래프(개략). 주황은 입력, 보라는 출력이다. 규칙(L/12)도 노드이므로 규칙을 바꾸면 보 춤 아래쪽이 모두 갱신된다. 시뮬레이터는 이 그래프를 실제로 계산한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-cp-graph">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>데이터 흐름 그래프: 입력을 바꾸면 하류만 다시 계산</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-graph" aria-label="입력, 경간, 보 춤, 슬래브, 기둥, 물량, 천장고 노드와 연결, 다시 계산된 노드 강조"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>X 경간 수 <output id="cp-gr-nx-out"></output></span><input type="range" id="cp-gr-nx" min="2" max="8" step="1" value="4"></label>
+          <label class="ctrl"><span>Y 경간 수 <output id="cp-gr-ny-out"></output></span><input type="range" id="cp-gr-ny" min="2" max="6" step="1" value="3"></label>
+          <label class="ctrl"><span>층수 <output id="cp-gr-nf-out"></output></span><input type="range" id="cp-gr-nf" min="1" max="20" step="1" value="10"></label>
+          <label class="ctrl"><span>기준층 층고 H <output id="cp-gr-h-out"></output></span><input type="range" id="cp-gr-h" min="3.4" max="5" step="0.1" value="4"></label>
+          <div class="ctrl"><span>보 춤 규칙 노드</span><div class="seg" id="cp-gr-rule"><button data-value="10">L/10</button><button data-value="12" class="on">L/12</button><button data-value="15">L/15</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">다시 계산한 노드</span><span class="v" id="cp-gr-o-n">—</span></div>
+        <div class="stat"><span class="k">보 춤 · 기둥</span><span class="v" id="cp-gr-o-h">—</span></div>
+        <div class="stat"><span class="k">콘크리트 / 층 · 전체</span><span class="v" id="cp-gr-o-v">—</span></div>
+        <div class="stat"><span class="k">천장고</span><span class="v" id="cp-gr-o-c">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(4 × 3, L/12)에서 B-10의 숫자(보 700 mm, 기둥 800 mm, 슬래브 210 mm, 층당 약 252 m³, 천장고 2.70 m)를 확인하세요 · 층수만 바꾸면 "전체 콘크리트"와 "기둥 크기"쪽 노드만 주황으로 다시 계산됩니다 · 규칙 노드를 L/15로 바꾸면 보 춤 아래가 모두 갱신되고 천장고가 올라갑니다 — 그러나 L/15가 안전한지는 그래프가 판단하지 않습니다 · 모델: 정의 16.1, 원리 16.2의 교육용 경험 규칙(StructureBook 1장 형태).</div>
+    </div>
+    <div class="callout warn"><strong>그래프는 규칙을 실행할 뿐 검증하지 않는다</strong> 데이터 흐름 그래프는 적힌 규칙을 빠르고 일관되게 실행한다. 규칙 자체가 틀리면 틀린 결과를 빠르고 일관되게 만든다. 보 춤 L/12는 경험값이지 설계가 아니다. 그래프에 넣은 규칙마다 출처와 적용 범위를 적고, 최종 부재 크기는 구조 해석·설계(8장, StructureBook)로 확인한다.</div>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="param-space">
+    <h2>매개변수 공간 탐색</h2>
+    <div class="problem"><strong>B-10의 8 m 그리드는 최선인가</strong>
+      <p>평면 32 × 24 m는 그대로 두고 X·Y 방향 경간 수만 바꾸면 8 × 6 = 48가지 그리드가 나옵니다. 모두 계산해 보면 8 m 그리드는 어디쯤일까요? "최선"이란 무엇을 기준으로 한 말일까요?</p></div>
+    <p>계산 설계는 질문을 세 부분으로 나눕니다. 바꿀 수 있는 것이 <span class="term">설계 변수</span><span class="en">(design variable)</span>, 넘으면 안 되는 조건이 <span class="term">제약 조건</span><span class="en">(constraint)</span>, 좋고 나쁨을 숫자 하나로 적은 것이 <span class="term">목적 함수</span><span class="en">(objective function)</span>입니다. 설계 변수가 가질 수 있는 모든 값의 집합이 <span class="term">설계 공간</span><span class="en">(design space)</span>이며, 이 공간을 정해진 간격으로 빠짐없이 계산하는 방법이 <span class="term">격자 탐색</span><span class="en">(grid search)</span>입니다. 변수가 둘이고 값이 몇십 개면 격자 탐색이 가장 정직합니다. 모든 후보를 보았으니 최적을 놓치지 않습니다.</p>
+    <div class="callout def"><strong>원리 16.2 (B-10 그리드의 교육용 평가 모델)</strong> 평면 32 × 24 m, 10층, 기준층 층고 \(H = 4.0\) m, 경간 \(a_i\)(X), \(b_j\)(Y).
+      <div class="formula">$$h = \left\lceil \frac{L}{12} \right\rceil_{50},\quad b_w = \left\lceil 0.55h \right\rceil_{50},\quad t = \max\!\left(150,\ \left[\frac{L_{\text{long}}}{38}\right]_{10}\right),\quad c = \left\lceil \sqrt{\frac{N_u}{0.5 f_{ck}}} \right\rceil_{50}$$
+      $$V = \sum_{\text{판}} a_i b_j t + \sum_{\text{보}} b_w(h - t)L + N_c\,c^2(H - h_{\max}), \qquad \text{천장고} = H - 0.6 - h_{\max}$$
+      $$F = 100\left(1 - \frac{N_{\text{int}}}{35}\right), \qquad J = w\,\frac{V}{V_{B10}} + (1 - w)\left(1 - \frac{F}{100}\right) \ \to\ \min$$<div class="where">\(\lceil\ \rceil_{50}\): 50 mm 단위 올림(보 춤 최소 450 mm), \([\ ]_{10}\): 10 mm 반올림. \(N_u = 10 \times A_t \times (1.2(24t + 1.5) + 1.6 \times 2.5) \times 1.2\) kN(기여 면적 \(A_t\)가 가장 큰 기둥, 보·기둥 자중 20 % 가산), \(f_{ck} = 30\) MPa, 기둥은 모두 같은 크기. \(N_{\text{int}}\): 내부 기둥 수(평면 자유도의 교육용 지표, 최대 그리드 8 × 6의 35개 기준), \(V_{B10} = 252.1\) m³/층. 제약: 천장고 ≥ 최소 천장고. 보 춤 L/12·폭 0.55h·기둥식은 StructureBook 1장의 경험값 형태를 따르고, 슬래브는 정사각형 판의 경간/38을 직사각형 판에는 보수적으로 긴 경간에 적용했다(교육용). 코어 벽은 물량에서 뺐다.</div></div></div>
+    <div class="sim" id="sim-cp-grid">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>구조 그리드 격자 탐색: 48가지 그리드의 히트맵</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-grid" aria-label="X 경간 수와 Y 경간 수 격자의 점수 히트맵, 제약 위반 칸 빗금, 최적 칸 표시"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>칠할 값</span><div class="seg" id="cp-gs-met"><button data-value="J" class="on">점수 J</button><button data-value="V">콘크리트</button><button data-value="F">자유 공간</button><button data-value="C">천장고</button></div></div>
+          <label class="ctrl"><span>원가 가중치 w <output id="cp-gs-w-out"></output></span><input type="range" id="cp-gs-w" min="0" max="1" step="0.05" value="0.5"></label>
+          <label class="ctrl"><span>최소 천장고 <output id="cp-gs-ch-out"></output></span><input type="range" id="cp-gs-ch" min="2.3" max="3" step="0.05" value="2.6"></label>
+          <label class="ctrl"><span>보 춤 규칙 L/k의 k <output id="cp-gs-k-out"></output></span><input type="range" id="cp-gs-k" min="10" max="16" step="1" value="12"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최적 그리드</span><span class="v" id="cp-gs-o-b">—</span></div>
+        <div class="stat"><span class="k">점수 J (B-10)</span><span class="v" id="cp-gs-o-j">—</span></div>
+        <div class="stat"><span class="k">콘크리트 · 자유 공간</span><span class="v" id="cp-gs-o-v">—</span></div>
+        <div class="stat"><span class="k">보 · 기둥 · 천장고</span><span class="v" id="cp-gs-o-h">—</span></div>
+        <div class="stat"><span class="k">제약 만족 후보</span><span class="v" id="cp-gs-o-n">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(w = 0.5, 천장고 2.6 m)의 최적은 5 × 4 그리드(6.4 × 6 m, J 0.575)로, B-10의 4 × 3(J 0.586)보다 조금 낫습니다 · w를 0.3으로 내리면(자유 공간을 더 중시) B-10의 8 m 그리드가 최적이 됩니다 · "천장고"로 칠해 보면 경간 수가 3 이하인 열이 모두 빗금입니다 — 10.67 m 경간의 보 춤 900 mm가 천장고 2.5 m를 만들기 때문입니다 · "최적"은 w와 제약을 정한 사람의 선택을 따라 움직입니다 · 모델: 원리 16.2(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 16.1 (B-10 그리드 한 칸을 손으로)</strong> nₓ = 4, n<sub>y</sub> = 3 → 경간 8 × 8 m.
+      <p><b>① 부재</b> 보 춤 8,000/12 = 667 → 700 mm, 폭 0.55 × 700 = 385 → 400 mm. 슬래브 8,000/38 = 210.5 → 210 mm. 기둥: \(q = 1.2(24 \times 0.21 + 1.5) + 4.0 = 11.85\) kN/m², \(N_u = 10 \times 64 \times 11.85 \times 1.2 = 9{,}099\) kN → \(\sqrt{9.099\times10^6/15} = 779\) → 800 mm. B-10의 400 × 700 보, 210 mm 슬래브, 800 × 800 기둥과 같다.</p>
+      <p><b>② 물량(층당)</b> 슬래브 768 × 0.21 = 161.3 m³, 보 (4 × 32 + 5 × 24) × 0.4 × 0.49 = 48.6 m³, 기둥 20 × 0.64 × 3.3 = 42.2 m³ → <b>252.1 m³</b>. 7장 B-10 BIM의 상자 합(층당 339 m³)보다 작은 것은 코어 벽을 빼고 보·슬래브 겹침을 뺐기 때문이다.</p>
+      <p><b>③ 점수</b> 천장고 4.0 − 0.6 − 0.7 = 2.70 m(제약 2.6 만족). 내부 기둥 3 × 2 = 6 → F = 82.9. w = 0.5: J = 0.5 × 1 + 0.5 × 0.171 = <b>0.586</b>.</p>
+      <p><b>④ 판단</b> 5 × 4 그리드는 콘크리트를 19 % 줄이지만(203.4 m³) 내부 기둥이 12개로 두 배다. 사무실 배치의 자유를 얼마로 칠지(w)가 결론을 바꾼다. 점수가 0.011 차이일 때 "5 × 4가 낫다"고 말하려면 모델의 오차가 그보다 작다는 근거가 있어야 한다 — 이 교육용 모델에는 그런 근거가 없다.</p></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="optimization">
+    <h2>최적화: 경사 하강과 유전 알고리즘</h2>
+    <div class="problem"><strong>후보가 수천조 개라면</strong>
+      <p>그리드 선을 1 m 간격의 아무 위치에나 둘 수 있게 하면, X 방향 내부 후보 31곳과 Y 방향 23곳의 켜고 끄기 조합은 2<sup>54</sup> ≈ 1.8 × 10<sup>16</sup>가지입니다. 1초에 백만 개를 평가해도 500년이 걸립니다. 모두 보지 않고 좋은 안을 찾을 수 있을까요?</p></div>
+    <p><span class="term">최적화</span><span class="en">(optimization)</span>는 제약을 지키며 목적 함수를 가장 작게(또는 크게) 하는 설계 변수를 찾는 일입니다. 목적 함수가 매끄럽고 미분할 수 있으면 <span class="term">경사 하강법</span><span class="en">(gradient descent)</span>이 빠릅니다. 현재 점에서 함수가 가장 빨리 줄어드는 방향(기울기의 반대)으로 조금씩 움직입니다. 그러나 그리드 선의 개수처럼 변수가 정수이거나, 보 춤의 50 mm 올림처럼 함수가 계단 모양이면 기울기가 없고, 골짜기가 여러 개면 가까운 골짜기(국소 최적)에 갇힙니다.</p>
+    <figure class="diagram" id="fig-cp-landscape">
+      <svg viewBox="0 0 860 280" role="img" aria-label="목적 함수 지형 위의 격자 탐색 점, 경사 하강 경로, 유전 알고리즘 개체군 비교">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <path d="M40 120C90 130 120 210 170 200C220 190 240 110 300 100C360 92 380 170 430 190C480 210 520 230 570 236C620 240 650 160 700 140C750 120 790 150 820 130" style="fill:none;stroke:var(--text-dim);stroke-width:2.4"/>
+        <text x="170" y="222" text-anchor="middle" class="t-mono">국소 최적</text><text x="570" y="256" text-anchor="middle" class="t-mono" style="fill:var(--ok)">전역 최적</text>
+        <circle cx="570" cy="236" r="5" style="fill:var(--ok)"/>
+        <g style="fill:var(--accent)"><circle cx="60" cy="125" r="3.5"/><circle cx="140" cy="172" r="3.5"/><circle cx="220" cy="190" r="3.5"/><circle cx="300" cy="100" r="3.5"/><circle cx="380" cy="160" r="3.5"/><circle cx="460" cy="200" r="3.5"/><circle cx="540" cy="234" r="3.5"/><circle cx="620" cy="225" r="3.5"/><circle cx="700" cy="140" r="3.5"/><circle cx="780" cy="146" r="3.5"/></g>
+        <text x="60" y="40" class="t-mono" style="fill:var(--accent)">● 격자 탐색: 고른 간격, 간격 사이를 놓칠 수 있음</text>
+        <g style="fill:none;stroke:var(--accent-2);stroke-width:2" marker-end="url(#cp-ah-or)"><path d="M100 140L128 172"/><path d="M130 176L158 196"/></g>
+        <circle cx="96" cy="136" r="5" style="fill:var(--accent-2)"/>
+        <text x="60" y="60" class="t-mono" style="fill:var(--accent-2)">→ 경사 하강: 빠르지만 시작점 근처 골짜기에 갇힘</text>
+        <g style="fill:var(--bad);opacity:.8"><circle cx="410" cy="178" r="4"/><circle cx="470" cy="204" r="4"/><circle cx="520" cy="226" r="4"/><circle cx="590" cy="234" r="4"/><circle cx="640" cy="190" r="4"/><circle cx="250" cy="150" r="4"/></g>
+        <text x="60" y="80" class="t-mono" style="fill:var(--bad)">● 유전 알고리즘: 여러 점이 함께, 좋은 곳으로 모임(보장은 없음)</text>
+      </svg>
+      <figcaption><b>그림 16-3.</b> 목적 함수 지형(1차원 개략)과 세 가지 탐색. 격자 탐색은 빠짐없이 보지만 변수가 늘면 후보 수가 폭발하고, 경사 하강은 매끄러운 함수에서 빠르지만 국소 최적에 갇히며, 유전 알고리즘은 개체군으로 넓게 탐색하지만 최적을 보장하지 않는다.</figcaption>
+    </figure>
+    <p><span class="term">유전 알고리즘</span><span class="en">(genetic algorithm, GA)</span>은 후보 해를 비트열(유전자)로 적고, 여러 후보(개체군)를 세대마다 진화시킵니다. 기울기가 필요 없고, 정수·계단 함수·제약 위반 벌점이 섞인 문제에도 쓸 수 있어 생성 설계에 자주 쓰입니다. 대신 결과가 난수에 따라 달라지고, 찾은 해가 최적이라는 보장이 없습니다.</p>
+    <figure class="diagram" id="fig-cp-ga">
+      <svg viewBox="0 0 860 270" role="img" aria-label="유전 알고리즘의 선택, 교차, 변이 연산을 비트열로 보인 그림">
+        <rect x="10" y="10" width="840" height="250" rx="10" class="f-surface"/>
+        <g class="t" style="font-weight:700" text-anchor="middle"><text x="140" y="38">① 선택(토너먼트)</text><text x="430" y="38">② 교차(균등)</text><text x="720" y="38">③ 변이</text></g>
+        <g class="t-mono">
+          <text x="40" y="76">A 0010010001 J 0.62</text><text x="40" y="100">B 0100100100 J 0.59</text><text x="40" y="124">C 1001001010 J 0.71</text>
+          <text x="40" y="160" style="fill:var(--accent)">두 개를 뽑아 더 좋은(J 작은)</text><text x="40" y="180" style="fill:var(--accent)">쪽을 부모로 → B</text>
+          <text x="330" y="76">부모 1  0100100100</text><text x="330" y="100">부모 2  0010010001</text><text x="330" y="124">동전    1101001011</text>
+          <text x="330" y="160" style="fill:var(--accent)">자식    0100010100</text><text x="330" y="182">동전 1 → 부모 1, 0 → 부모 2의 비트</text>
+          <text x="610" y="76">자식    0100010100</text><text x="610" y="100">변이율 2 %로 비트 뒤집기</text><text x="610" y="124" style="fill:var(--bad)">결과    0100011100</text>
+          <text x="610" y="160">비트 1 = 그 위치(1 m 간격)에</text><text x="610" y="182">그리드 선이 있다</text>
+        </g>
+        <text x="430" y="234" text-anchor="middle" class="t-dim">④ 엘리트: 가장 좋은 두 개체는 그대로 다음 세대로 → 최고 점수가 세대를 거치며 나빠지지 않는다</text>
+      </svg>
+      <figcaption><b>그림 16-4.</b> 이 장 유전 알고리즘의 연산(교육용 구현). 유전자 54비트(X 31 + Y 23)가 1 m 간격 위치의 그리드 선 유무를 나타낸다. 선택 → 교차 → 변이 → 평가를 세대마다 되풀이한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>정의 16.3 (유전 알고리즘 — 이 장의 구현)</strong> ① 초기 개체군 N개를 무작위로 만든다(비트가 1일 확률 0.12). ② 각 개체를 해독해 그리드를 만들고 원리 16.2의 \(J\)에 벌점(경간 3 m 미만, 천장고 미달)을 더한다. ③ 상위 2개를 그대로 남기고(엘리트), 나머지는 토너먼트 선택(무작위 두 개 중 더 나은 쪽) 두 번으로 부모를 고르고 균등 교차로 자식을 만든 뒤 비트마다 확률 \(p_m\)으로 뒤집는다. ④ G세대 되풀이. 난수는 시드로 고정해 같은 설정이면 같은 결과가 나온다(재현성).</div>
+    <div class="sim" id="sim-cp-ga">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>유전 알고리즘: 1 m 간격 자유 그리드 최적화</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-ga" aria-label="선택한 세대의 최고 그리드 평면과 세대별 최고·평균 점수 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>개체 수 N <output id="cp-ga-n-out"></output></span><input type="range" id="cp-ga-n" min="10" max="200" step="10" value="60"></label>
+          <label class="ctrl"><span>변이율(비트당) <output id="cp-ga-pm-out"></output></span><input type="range" id="cp-ga-pm" min="0" max="0.1" step="0.005" value="0.02"></label>
+          <label class="ctrl"><span>세대 수 G <output id="cp-ga-g-out"></output></span><input type="range" id="cp-ga-g" min="10" max="150" step="10" value="80"></label>
+          <label class="ctrl"><span>난수 시드 <output id="cp-ga-s-out"></output></span><input type="range" id="cp-ga-s" min="1" max="30" step="1" value="7"></label>
+          <label class="ctrl"><span>원가 가중치 w <output id="cp-ga-w-out"></output></span><input type="range" id="cp-ga-w" min="0" max="1" step="0.05" value="0.5"></label>
+          <div class="ctrl"><span>코어 격자선</span><div class="seg" id="cp-ga-core"><button data-value="free" class="on">자유</button><button data-value="fix">x 8·24, y 8·16 고정</button></div></div>
+          <label class="ctrl"><span>볼 세대 <output id="cp-ga-v-out"></output></span><input type="range" id="cp-ga-v" min="0" max="1" step="0.01" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">이 세대까지 최고 J</span><span class="v" id="cp-ga-o-j">—</span></div>
+        <div class="stat"><span class="k">X 경간 (m)</span><span class="v" id="cp-ga-o-x">—</span></div>
+        <div class="stat"><span class="k">Y 경간 (m)</span><span class="v" id="cp-ga-o-y">—</span></div>
+        <div class="stat"><span class="k">콘크리트 · 기둥</span><span class="v" id="cp-ga-o-v">—</span></div>
+        <div class="stat"><span class="k">평가 횟수</span><span class="v" id="cp-ga-o-e">—</span></div>
+      </div>
+      <div class="cp-msg" id="cp-ga-msg"></div>
+      <div class="sim-note">해볼 것: 시드만 바꿔 다섯 번 돌려 보세요 — 같은 설정에서도 다른 답이 나오고, 격자 탐색의 균등 그리드 최적(w = 0.5에서 J 0.575)에 못 미치는 경우가 많습니다 · 변이율 0이면 초기 개체군의 비트 조합만 섞여 일찍 멈추고, 0.1이면 좋은 해가 계속 깨집니다 · 코어 격자선을 고정하면 탐색 공간이 줄어 B-10의 8 m 그리드로 모이기 쉽습니다 · "볼 세대"를 끌어 진화 과정을 되돌려 보세요 · 모델: 정의 16.3, 원리 16.2, <code>CB.rng</code> 시드 고정.</div>
+    </div>
+    <div class="callout tip"><strong>최적화 결과를 쓰는 법</strong> ① 같은 문제를 시드를 바꿔 여러 번 돌려 결과의 흩어짐을 본다. ② 작은 문제(격자 탐색이 가능한 부분 공간)에서 알고리즘이 정답을 찾는지 먼저 확인한다. ③ 최적해만 보지 말고 점수가 비슷한 상위 안 여러 개를 함께 검토한다 — 모델 오차보다 작은 점수 차이는 의미가 없다. ④ 목적 함수에 빠진 것(시공성, 설비 경로, 임대 평면)이 없는지 사람이 본다.</div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="pareto">
+    <h2>다목적 설계와 파레토 전선</h2>
+    <div class="problem"><strong>싸고 밝은 건물</strong>
+      <p>같은 연면적 7,680 m²를 담는 건물을 바닥판을 얇고 길게 만들면 창가 자리가 늘어 밝지만 외피가 커져 비싸고, 두껍고 뭉툭하게 만들면 싸지만 가운데가 어둡습니다. 두 목적을 숫자 하나로 합치지 않고 비교할 수 있을까요?</p></div>
+    <p>목적이 둘 이상이면 "가장 좋은 안" 하나가 없을 수 있습니다. 대신 "적어도 지면 안 되는 안"은 가려낼 수 있습니다. 안 A가 모든 목적에서 B보다 나쁘지 않고 적어도 하나에서 더 좋으면 A가 B를 <span class="term">지배</span><span class="en">(dominance)</span>한다고 합니다. 어떤 안에도 지배되지 않는 안들의 집합이 <span class="term">파레토 전선</span><span class="en">(Pareto front)</span>입니다(이탈리아 경제학자 빌프레도 파레토의 이름). 전선 위에서 한 목적을 개선하려면 반드시 다른 목적을 희생해야 합니다.</p>
+    <figure class="diagram" id="fig-cp-pareto">
+      <svg viewBox="0 0 860 290" role="img" aria-label="비용과 채광 두 목적 평면 위의 후보 점, 지배 영역, 파레토 전선">
+        <rect x="10" y="10" width="840" height="270" rx="10" class="f-surface"/>
+        <path d="M80 240H500" class="s-axis" marker-end="url(#cp-ah)"/><path d="M80 240V30" class="s-axis" marker-end="url(#cp-ah)"/>
+        <text x="500" y="262" text-anchor="end" class="t-mono">공사비 지수 (작을수록 좋음) →</text>
+        <text x="58" y="140" text-anchor="middle" class="t-mono" transform="rotate(-90 58 140)">채광 지표 (클수록 좋음) →</text>
+        <path d="M120 200L170 150L240 110L330 80L450 60" style="fill:none;stroke:var(--accent);stroke-width:2.6"/>
+        <g style="fill:var(--accent)"><circle cx="120" cy="200" r="5"/><circle cx="170" cy="150" r="5"/><circle cx="240" cy="110" r="5"/><circle cx="330" cy="80" r="5"/><circle cx="450" cy="60" r="5"/></g>
+        <rect x="240" y="110" width="250" height="125" style="fill:var(--accent-soft);stroke:none"/>
+        <g style="fill:var(--text-faint)"><circle cx="290" cy="170" r="4"/><circle cx="350" cy="140" r="4"/><circle cx="420" cy="200" r="4"/><circle cx="200" cy="210" r="4"/><circle cx="380" cy="110" r="4"/><circle cx="460" cy="150" r="4"/></g>
+        <text x="300" y="160" class="t-mono">B: A에 지배됨</text><text x="246" y="104" class="t-mono" style="fill:var(--accent)">A</text>
+        <text x="360" y="225" class="t-mono" style="fill:var(--accent)">A가 지배하는 영역</text>
+        <g class="t-mono"><text x="560" y="70" style="fill:var(--text);font-weight:700">지배 (최소화 f₁, 최대화 f₂)</text>
+          <text x="560" y="96">A ≻ B ⇔ f₁(A) ≤ f₁(B), f₂(A) ≥ f₂(B)</text><text x="560" y="116">         이고 적어도 하나는 엄격</text>
+          <text x="560" y="150" style="fill:var(--accent)">— 파레토 전선 = 지배되지 않는 안</text>
+          <text x="560" y="180">가중합 w·f₁ − (1−w)·f₂의 최적은</text><text x="560" y="200">전선 위의 한 점(볼록한 부분만)</text></g>
+      </svg>
+      <figcaption><b>그림 16-5.</b> 두 목적의 지배와 파레토 전선. 점 A는 오른쪽 아래 사각형(더 비싸고 더 어두운 안)을 모두 지배한다. 전선 위의 안들 사이에서는 어느 쪽도 다른 쪽을 지배하지 않으며, 그중 하나를 고르는 것은 가치 판단이다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 16.4 (교육용 매스 평가: 공사비 지수와 채광 지표)</strong> 바닥판 폭 \(W\), 깊이 \(D\), 창 면적비 \(r\)(외벽 중 창의 비율). 층수 \(n = \text{round}(7{,}680/WD)\), 층고 4 m.
+      <div class="formula">$$f_p = 1 - \frac{\max(0, W - 12)\,\max(0, D - 12)}{WD}, \qquad \text{채광 } = 100\,f_p\,\frac{g(r)}{g(0.8)},\ \ g(r) = \frac{r}{r + 0.25}$$
+      $$C = \frac{0.022\,nWD + 2(W + D)\cdot 4n\,[0.004(1 - r) + 0.007r] + 0.003\,WD}{nWD}\,\bigl(1 + 0.01\max(0, n - 10)\bigr)$$<div class="where">\(f_p\): 외벽에서 6 m 안쪽(창가 띠)의 바닥 비율 — 자연광이 창 높이의 약 2배 깊이까지 든다는 경험칙(교육용). 공사비 \(C\)는 연면적 1 m²당 억 원(골조·내부 0.022, 벽 0.004, 커튼월 0.007, 지붕 0.003억 원/m², 10층 초과 층당 1 % 할증 — 모두 교육용 가정)이며, B-10 형태(32 × 24 m, 10층, r = 0.5)를 100으로 한 지수로 쓴다. 운영 에너지(냉난방)는 넣지 않았다.</div></div></div>
+    <div class="sim" id="sim-cp-pareto">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>파레토 전선: 공사비 대 채광</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-pareto" aria-label="무작위 매스 후보의 공사비 지수와 채광 지표 산점도, 파레토 전선과 가중합 선택점"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>후보 수 <output id="cp-pa-n-out"></output></span><input type="range" id="cp-pa-n" min="20" max="400" step="10" value="150"></label>
+          <label class="ctrl"><span>난수 시드 <output id="cp-pa-s-out"></output></span><input type="range" id="cp-pa-s" min="1" max="30" step="1" value="3"></label>
+          <label class="ctrl"><span>원가 가중치 w <output id="cp-pa-w-out"></output></span><input type="range" id="cp-pa-w" min="0" max="1" step="0.05" value="0.5"></label>
+          <label class="ctrl"><span>창 면적비 상한 <output id="cp-pa-r-out"></output></span><input type="range" id="cp-pa-r" min="0.3" max="0.8" step="0.05" value="0.8"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">전선 위 안</span><span class="v" id="cp-pa-o-n">—</span></div>
+        <div class="stat"><span class="k">가중합 선택 안</span><span class="v" id="cp-pa-o-d">—</span></div>
+        <div class="stat"><span class="k">공사비 · 채광</span><span class="v" id="cp-pa-o-c">—</span></div>
+        <div class="stat"><span class="k">B-10 형태</span><span class="v" id="cp-pa-o-b">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 회색 점은 지배된 안, 보라 점과 선이 파레토 전선, 주황 원이 가중합으로 고른 안입니다 · w를 0에서 1로 옮기면 선택 안이 전선을 따라 "밝고 비싼" 끝에서 "어둡고 싼" 끝으로 이동합니다 — 어느 w도 전선 밖의 점을 고르지 않습니다 · 후보 수를 늘리면 전선이 촘촘해지지만 모양은 거의 같습니다 · 창 면적비 상한을 0.4로 낮추면(예: 에너지 기준) 전선 전체가 아래로 내려옵니다 · B-10 형태(검은 사각형)는 전선에 가까운가요? · 모델: 원리 16.4, W 20–60 m, D 10–30 m, r 0.2–상한 균등 무작위.</div>
+    </div>
+    <div class="callout"><strong>예제 16.2 (지배 판정)</strong> 세 안. P: 공사비 98, 채광 70. Q: 공사비 104, 채광 66. R: 공사비 110, 채광 88.
+      <p><b>① P와 Q</b> P가 더 싸고(98 ≤ 104) 더 밝다(70 ≥ 66) → P가 Q를 지배. Q는 탈락.</p>
+      <p><b>② P와 R</b> P가 싸지만 R이 밝다 → 서로 지배하지 않음. 둘 다 전선 후보.</p>
+      <p><b>③ 판단</b> P와 R 중 무엇을 고를지는 계산이 아니라 "채광 18점을 공사비 12 % 더 들여 살 가치가 있나"라는 판단이다. 파레토 분석의 쓸모는 답을 주는 데가 아니라 <b>따질 가치가 없는 안(Q)을 지우고 진짜 맞바꿈을 드러내는</b> 데 있다.</p></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="regression">
+    <h2>기계 학습 맛보기: 공사비 회귀와 과적합</h2>
+    <div class="problem"><strong>연면적만 알면 공사비를 알 수 있나</strong>
+      <p>기획 단계에는 도면이 없어 물량을 셀 수 없습니다. 비슷한 건물 수십 동의 연면적과 공사비가 있다면, 그 관계를 데이터에서 배워 B-10(지상 연면적 7,680 m²)의 공사비를 추정할 수 있을까요? 그 추정은 얼마나 믿을 만할까요?</p></div>
+    <p>데이터에서 입력과 출력의 관계를 배워 새 입력의 출력을 예측하는 방법을 <span class="term">기계 학습</span><span class="en">(machine learning)</span>이라 합니다. 출력이 숫자면 <span class="term">회귀</span><span class="en">(regression)</span>, 범주(합격/불합격, 오류/정상)면 <span class="term">분류</span><span class="en">(classification)</span>입니다. 가장 오래되고 지금도 기본인 회귀가 최소 제곱 직선입니다(르장드르 1805년, 가우스). 복잡한 신경망도 "데이터에 맞춘 함수로 새 입력을 예측한다"는 점에서 같은 질문 — 얼마나 맞나, 어디까지 믿나 — 을 피할 수 없습니다.</p>
+    <div class="callout def"><strong>정의 16.5 (최소 제곱 회귀와 예측 구간)</strong> 데이터 \((x_i, y_i)\), \(i = 1..n\)에 직선 \(\hat y = a + bx\)를 맞추면
+      <div class="formula">$$b = \frac{S_{xy}}{S_{xx}},\quad a = \bar y - b\bar x,\qquad s^2 = \frac{\sum (y_i - \hat y_i)^2}{n - 2},\qquad \hat y_0 \pm t_{0.975,\,n-2}\; s\sqrt{1 + \frac{1}{n} + \frac{(x_0 - \bar x)^2}{S_{xx}}}$$<div class="where">\(S_{xx} = \sum(x_i - \bar x)^2\), \(S_{xy} = \sum(x_i - \bar x)(y_i - \bar y)\). 마지막 식은 새 건물 하나의 공사비가 95 % 확률로 들어갈 <span class="term">예측 구간</span><span class="en">(prediction interval)</span>이다. 근호 안의 1은 개별 건물의 흩어짐, \(1/n\)과 마지막 항은 직선 자체의 불확실성이며, \(x_0\)가 데이터의 평균에서 멀수록 넓어진다. 이 구간은 <b>모델의 모양(직선)이 맞다는 가정</b> 아래에서만 성립한다. 다항식 \(p\)차에도 같은 방식(\(n - p - 1\) 자유도)이 쓰인다.</div></div></div>
+    <div class="callout"><strong>예제 16.3 (다섯 동으로 B-10 추정)</strong> 교육용 데이터: 연면적(천 m²) 2, 4, 6, 8, 10 → 공사비(억 원) 70, 128, 180, 232, 300.
+      <p><b>① 직선</b> \(\bar x = 6\), \(\bar y = 182\), \(S_{xx} = 40\), \(S_{xy} = 1{,}128\) → \(b = 28.2\) 억 원/천 m², \(a = 182 - 169.2 = 12.8\) 억 원.</p>
+      <p><b>② 예측</b> B-10(7.68): \(\hat y = 12.8 + 28.2 \times 7.68 = 229.4\) 억 원.</p>
+      <p><b>③ 구간</b> 잔차 0.8, 2.4, −2.0, −6.4, 5.2 → \(s^2 = 78.4/3 = 26.1\), \(s = 5.11\). \(t_{0.975,3} = 3.182\). 반폭 \(3.182 \times 5.11 \times \sqrt{1 + 0.2 + 1.68^2/40} = 3.182 \times 5.11 \times 1.127 = 18.3\) → <b>229 ± 18억 원</b>. SiteBook의 B-10 BAC 244억 원은 구간 안이다.</p>
+      <p><b>④ 외삽</b> 3만 m²(30)이면 \(\hat y = 858.8\), 반폭 \(3.182 \times 5.11 \times \sqrt{1.2 + 24^2/40} = 64\) → 859 ± 64억 원. 그러나 이 장의 교육용 "진짜" 공사비 곡선(규모가 커지면 m²당 비용이 오르는 형태)에서 3만 m²는 1,225억 원이다. 예측 구간 밖이다 — 구간은 데이터의 흩어짐만 반영하고, 범위 밖에서 모델 모양이 틀리는 것은 반영하지 못한다.</p></div>
+    <p>모델이 데이터를 너무 단순하게 따라가면 <span class="term">과소적합</span><span class="en">(underfitting)</span>, 데이터의 잡음까지 따라가면 <span class="term">과적합</span><span class="en">(overfitting)</span>입니다. 과적합 모델은 학습에 쓴 점에는 잘 맞지만 새 점에서 크게 틀립니다. 그래서 데이터를 학습용과 <span class="term">검증 데이터</span><span class="en">(validation data)</span>로 나눠, 학습에 쓰지 않은 점에서의 오차로 모델을 고릅니다.</p>
+    <figure class="diagram" id="fig-cp-overfit">
+      <svg viewBox="0 0 860 280" role="img" aria-label="과소적합, 적정, 과적합 곡선 비교와 모델 복잡도에 따른 학습 오차·검증 오차 곡선">
+        <rect x="10" y="10" width="840" height="260" rx="10" class="f-surface"/>
+        <g class="t" style="font-weight:700" text-anchor="middle"><text x="105" y="36">과소적합</text><text x="275" y="36">적정</text><text x="445" y="36">과적합</text><text x="690" y="36">오차 대 복잡도</text></g>
+        <g id="cp-dots" style="fill:var(--accent)"><circle cx="40" cy="190" r="3.5"/><circle cx="70" cy="170" r="3.5"/><circle cx="95" cy="168" r="3.5"/><circle cx="120" cy="140" r="3.5"/><circle cx="145" cy="122" r="3.5"/><circle cx="170" cy="90" r="3.5"/></g>
+        <path d="M35 160H175" style="stroke:var(--accent-2);stroke-width:2.2"/>
+        <g transform="translate(170,0)" style="fill:var(--accent)"><circle cx="40" cy="190" r="3.5"/><circle cx="70" cy="170" r="3.5"/><circle cx="95" cy="168" r="3.5"/><circle cx="120" cy="140" r="3.5"/><circle cx="145" cy="122" r="3.5"/><circle cx="170" cy="90" r="3.5"/></g>
+        <path d="M205 195C250 175 290 160 345 88" style="fill:none;stroke:var(--accent-2);stroke-width:2.2"/>
+        <g transform="translate(340,0)" style="fill:var(--accent)"><circle cx="40" cy="190" r="3.5"/><circle cx="70" cy="170" r="3.5"/><circle cx="95" cy="168" r="3.5"/><circle cx="120" cy="140" r="3.5"/><circle cx="145" cy="122" r="3.5"/><circle cx="170" cy="90" r="3.5"/></g>
+        <path d="M378 190C388 150 400 175 410 170C420 160 428 182 435 168C445 140 455 110 460 140C468 160 478 100 485 122C495 140 505 60 515 90" style="fill:none;stroke:var(--accent-2);stroke-width:2.2"/>
+        <text x="445" y="236" text-anchor="middle" class="t-mono">점은 모두 지나지만 사이에서 출렁임</text>
+        <path d="M570 220H820" class="s-axis"/><path d="M570 220V50" class="s-axis"/>
+        <path d="M580 70C640 140 700 175 810 190" style="fill:none;stroke:var(--accent);stroke-width:2.2"/>
+        <path d="M580 80C640 150 670 160 700 158C740 156 780 120 810 70" style="fill:none;stroke:var(--bad);stroke-width:2.2"/>
+        <text x="760" y="205" class="t-mono" style="fill:var(--accent)">학습 오차</text><text x="752" y="98" class="t-mono" style="fill:var(--bad)">검증 오차</text>
+        <line x1="700" y1="50" x2="700" y2="220" style="stroke:var(--ok);stroke-dasharray:4 3"/><text x="704" y="60" class="t-mono" style="fill:var(--ok)">적정</text>
+        <text x="695" y="242" text-anchor="middle" class="t-mono">모델 복잡도(다항식 차수) →</text>
+      </svg>
+      <figcaption><b>그림 16-6.</b> 과소적합·적정·과적합(같은 여섯 점)과 오차 곡선. 복잡도를 올리면 학습 오차는 계속 줄지만, 학습에 쓰지 않은 검증 오차는 어느 지점부터 다시 커진다. 모델은 검증 오차가 작은 쪽에서 고른다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-cp-reg">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>공사비 회귀: 예측 구간과 과적합</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-reg" aria-label="연면적–공사비 학습 데이터, 진짜 곡선, 다항식 회귀 곡선과 예측 구간, 차수별 학습·검증 오차 그래프"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>다항식 차수 <output id="cp-rg-d-out"></output></span><input type="range" id="cp-rg-d" min="1" max="9" step="1" value="1"></label>
+          <label class="ctrl"><span>학습 데이터 수 n <output id="cp-rg-n-out"></output></span><input type="range" id="cp-rg-n" min="8" max="60" step="1" value="20"></label>
+          <label class="ctrl"><span>잡음(표준 편차) <output id="cp-rg-e-out"></output></span><input type="range" id="cp-rg-e" min="0" max="0.25" step="0.01" value="0.1"></label>
+          <label class="ctrl"><span>난수 시드 <output id="cp-rg-s-out"></output></span><input type="range" id="cp-rg-s" min="1" max="30" step="1" value="4"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">학습 RMSE</span><span class="v" id="cp-rg-o-tr">—</span></div>
+        <div class="stat"><span class="k">검증 RMSE</span><span class="v" id="cp-rg-o-te">—</span></div>
+        <div class="stat"><span class="k">B-10 예측 (95 % 구간)</span><span class="v" id="cp-rg-o-p">—</span></div>
+        <div class="stat"><span class="k">진짜 값</span><span class="v" id="cp-rg-o-t">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 차수 1에서 B-10 예측과 구간을 진짜 값(243.9억 원)과 비교하세요 · 차수를 9로, 데이터 수를 10으로 두면 학습 RMSE는 거의 0인데 검증 RMSE가 크게 뛰고 곡선이 점 사이에서 출렁입니다 · 오른쪽 작은 그래프는 같은 데이터에서 차수 1–9의 학습(보라)·검증(빨강) 오차입니다 — 검증 오차가 가장 작은 차수를 찾으세요 · 잡음을 0으로 하면 2차가 진짜 곡선과 겹칩니다 · 모델: 교육용 진짜 곡선 c(A) = 10 + 0.027A + 4.5 × 10⁻⁷A²(억 원, A m²) × (1 + 잡음), 학습 A는 1,500–15,000 m² 균등, 검증 데이터 300개, 체비쇼프 기저 최소 제곱, 정의 16.5(t 분위는 근사식).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="bias">
+    <h2>건설 데이터의 특성과 편향</h2>
+    <div class="problem"><strong>잘 맞던 모델이 왜 틀렸나</strong>
+      <p>회사에 쌓인 50동의 공사비로 만든 모델이 검증 오차 5 %로 훌륭했습니다. 그런데 처음 맡은 3만 m² 업무 시설의 예측이 20 % 넘게 낮게 나왔습니다. 데이터에 무엇이 빠져 있었을까요?</p></div>
+    <p>건설 데이터는 기계 학습이 기대하는 "많고 고르고 서로 독립인 데이터"와 거리가 멉니다. 프로젝트마다 하나뿐이고(같은 건물을 두 번 짓지 않는다), 수가 적고, 기록 방식이 회사·시기마다 다르며, 끝난 프로젝트만 남습니다. 이런 데이터로 만든 모델에는 <span class="term">데이터 편향</span><span class="en">(data bias)</span>이 쉽게 숨어듭니다.</p>
+    <ul>
+      <li><b>표본 범위</b> — 작은 건물만 있는 데이터로 큰 건물을 예측하면 <span class="term">외삽</span><span class="en">(extrapolation)</span>이다. 데이터 범위 밖에서는 모델의 모양이 검증된 적이 없다.</li>
+      <li><b>구성의 섞임</b> — 창고·공장처럼 단위 공사비가 다른 용도가 섞이면 업무 시설의 예측이 낮아진다. 용도를 변수로 넣거나 따로 모델을 만든다.</li>
+      <li><b>시점</b> — 몇 년 전 공사비는 물가 변동만큼 낮다. 건설공사비지수 같은 물가 지수로 기준 시점을 맞춘다(지수 선택은 현행 확인).</li>
+      <li><b>생존·보고 편향</b> — 중단된 프로젝트, 분쟁 중인 프로젝트의 데이터는 빠지기 쉽고, 계획 금액과 실제 금액이 섞여 기록되기도 한다.</li>
+      <li><b>분포 이동</b> — 공법·기준·시장이 바뀌면 과거 관계가 미래에 그대로 성립하지 않는다.</li>
+    </ul>
+    <div class="sim" id="sim-cp-bias">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>외삽과 편향 실험: 학습 데이터가 말해 주지 않는 것</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-bias" aria-label="학습 범위 띠, 학습 데이터, 진짜 업무 시설 곡선, 모델 곡선, 질의 점의 예측과 오차"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>학습 범위 하한 <output id="cp-bi-lo-out"></output></span><input type="range" id="cp-bi-lo" min="1000" max="15000" step="500" value="1500"></label>
+          <label class="ctrl"><span>학습 범위 상한 <output id="cp-bi-hi-out"></output></span><input type="range" id="cp-bi-hi" min="3000" max="30000" step="500" value="8000"></label>
+          <label class="ctrl"><span>질의 연면적 <output id="cp-bi-q-out"></output></span><input type="range" id="cp-bi-q" min="1000" max="30000" step="500" value="30000"></label>
+          <div class="ctrl"><span>데이터 구성</span><div class="seg" id="cp-bi-mix"><button data-value="office" class="on">업무 시설만</button><button data-value="mixed">창고 30 % 섞임</button><button data-value="old">절반이 옛 가격</button></div></div>
+          <div class="ctrl"><span>모델</span><div class="seg" id="cp-bi-mod"><button data-value="1" class="on">직선</button><button data-value="2">2차</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">예측</span><span class="v" id="cp-bi-o-p">—</span></div>
+        <div class="stat"><span class="k">진짜(업무 시설)</span><span class="v" id="cp-bi-o-t">—</span></div>
+        <div class="stat"><span class="k">오차</span><span class="v" id="cp-bi-o-e">—</span></div>
+        <div class="stat"><span class="k">학습 범위 대비</span><span class="v" id="cp-bi-o-r">—</span></div>
+      </div>
+      <div class="cp-msg" id="cp-bi-msg"></div>
+      <div class="sim-note">해볼 것: 기본값(학습 1,500–8,000 m², 질의 3만 m², 직선)에서 예측이 진짜보다 약 21 % 낮습니다 · 상한을 30,000으로 넓히면 오차가 크게 줄어듭니다 — 데이터가 질문을 덮어야 합니다 · 질의를 7,680(B-10)으로 옮기면 범위 안이라 직선도 잘 맞습니다 · "창고 30 % 섞임"은 범위 안에서도 예측을 낮추고, "절반이 옛 가격"(0.78배)도 그렇습니다 — 이 편향은 학습 범위를 넓혀도 사라지지 않습니다 · 2차 모델은 범위 밖에서 더 나을 수도, 더 엉뚱할 수도 있습니다 · 모델: 진짜 곡선은 회귀 시뮬레이터와 같고, 창고 단가 0.55배, 옛 가격 0.78배(교육용), 데이터 40개, 잡음 6 %.</div>
+    </div>
+    <div class="callout warn"><strong>높은 검증 점수가 보증하지 않는 것</strong> 검증 데이터가 학습 데이터와 같은 범위·같은 편향에서 뽑혔다면, 검증 점수는 그 범위 안의 성능만 말한다. 새 프로젝트가 범위 밖(규모, 용도, 지역, 시점)이면 검증 점수는 아무것도 보증하지 않는다. 예측을 쓸 때는 ① 질문이 학습 범위 안인지, ② 데이터에 무엇이 빠졌는지, ③ 모델이 틀렸을 때 누가 어떻게 알아차리는지를 함께 적는다.</div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="massing">
+    <h2>생성 매스</h2>
+    <div class="problem"><strong>같은 면적, 가장 작은 외피</strong>
+      <p>B-10의 프로그램(지상 연면적 7,680 m²)을 48 × 40 m 대지에 담으려 합니다. 바닥판 크기, 층수, 저층부와 고층부(셋백)를 어떻게 하면 용적률·건폐율·높이 제한을 지키면서 외피 면적을 가장 작게 할 수 있을까요?</p></div>
+    <p><span class="term">생성 설계</span><span class="en">(generative design)</span>는 규칙과 목적·제약을 주면 컴퓨터가 많은 대안을 만들어 평가하고 추리는 방식입니다. 건물 초기 단계의 <span class="term">매스</span><span class="en">(massing)</span> 검토가 대표적입니다. 매스 하나의 연면적, 외피 면적, 용적률·건폐율은 형상에서 바로 계산되므로, 수백 안을 몇 초 만에 비교할 수 있습니다. 외피 면적은 공사비(외벽은 비싼 공종)와 에너지(열손실 면적)에 함께 영향을 주므로 같은 면적이면 작을수록 유리한 경우가 많습니다.</p>
+    <div class="callout def"><strong>정의 16.6 (매스 지표)</strong> 대지 넓이 \(A_s\), 층 \(k\)의 바닥 넓이 \(A_k\), 건축 면적(가장 큰 바닥) \(A_b\), 벽 면적 \(A_w\), 지붕 면적 \(A_r\).
+      <div class="formula">$$\text{연면적 } GFA = \sum_k A_k, \qquad \text{용적률} = \frac{GFA}{A_s}, \qquad \text{건폐율} = \frac{A_b}{A_s}, \qquad \text{외피 계수} = \frac{A_w + A_r}{GFA}$$<div class="where">용적률·건폐율의 법정 산정 방식(지하층·필로티 등 제외 항목)과 한도는 용도 지역과 조례에 따라 다르다(현행 법령 확인). 이 장의 한도(용적률 800 %, 건폐율 60 %, 높이 60 m)는 교육용 가정이다. 셋백 위 지붕(저층부 옥상)도 외피로 센다.</div></div></div>
+    <div class="sim" id="sim-cp-mass">
+      <div class="sim-head"><span class="sim-tag three">3D</span><h3>생성 매스: 매개변수 → 연면적·외피, 그리고 자동 생성</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-mass" aria-label="대지 위 저층부와 고층부 매스의 3차원 모습"></canvas><span class="hint">끌어서 돌리기</span></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>바닥판 폭 W <output id="cp-ms-w-out"></output></span><input type="range" id="cp-ms-w" min="12" max="48" step="1" value="32"></label>
+          <label class="ctrl"><span>바닥판 깊이 D <output id="cp-ms-d-out"></output></span><input type="range" id="cp-ms-d" min="10" max="40" step="1" value="24"></label>
+          <label class="ctrl"><span>층수 <output id="cp-ms-n-out"></output></span><input type="range" id="cp-ms-n" min="1" max="20" step="1" value="10"></label>
+          <label class="ctrl"><span>저층부 층수(셋백 아래) <output id="cp-ms-p-out"></output></span><input type="range" id="cp-ms-p" min="0" max="10" step="1" value="0"></label>
+          <label class="ctrl"><span>고층부 들임 <output id="cp-ms-s-out"></output></span><input type="range" id="cp-ms-s" min="0" max="8" step="1" value="0"></label>
+          <div class="btn-row"><button class="btn primary" id="cp-ms-gen">자동 생성(무작위 400안)</button><button class="btn" id="cp-ms-b10">B-10으로</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">연면적</span><span class="v" id="cp-ms-o-g">—</span></div>
+        <div class="stat"><span class="k">용적률 · 건폐율</span><span class="v" id="cp-ms-o-f">—</span></div>
+        <div class="stat"><span class="k">높이</span><span class="v" id="cp-ms-o-h">—</span></div>
+        <div class="stat"><span class="k">외피 면적</span><span class="v" id="cp-ms-o-e">—</span></div>
+        <div class="stat"><span class="k">외피 계수</span><span class="v" id="cp-ms-o-k">—</span></div>
+      </div>
+      <div class="cp-msg" id="cp-ms-msg"></div>
+      <div class="sim-note">해볼 것: 기본값은 B-10 형태(32 × 24 m, 10층, 1층 5 m·나머지 4 m, 높이 41 m)로 연면적 7,680 m², 외피 5,360 m², 외피 계수 0.70입니다 · "자동 생성"은 연면적 7,680 m² ± 3 %, 대지·높이·용적률·건폐율 제약을 지키는 무작위 400안 중 외피가 가장 작은 안으로 슬라이더를 옮깁니다 — 생성된 안이 B-10보다 외피가 작은가요, 그런데 그 안이 사무실로 쓰기 좋은가요(깊은 바닥판 = 어두운 가운데, 16.4절) · 셋백을 넣으면 같은 연면적에 외피가 늘어납니다 · 모델: 정의 16.6, 대지 48 × 40 m(교육용).</div>
+    </div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="genai">
+    <h2>생성형 AI와 BIM: 분류, 검증, 책임</h2>
+    <div class="problem"><strong>AI가 찾아낸 "오류 요소" 30개</strong>
+      <p>B-10 BIM의 요소 360개 가운데 속성 오류가 있는 요소를 AI 분류기가 표시해 줍니다. 표시된 30개 가운데 진짜 오류는 몇 개일까요? 표시되지 않은 330개는 안심해도 될까요?</p></div>
+    <p>AI 도구가 내놓는 판단은 대개 "확률 점수가 기준을 넘었다"는 분류입니다. 분류의 결과는 네 칸으로 나뉩니다. 오류를 오류로(참 양성 TP), 정상을 오류로(거짓 양성 FP), 오류를 정상으로(거짓 음성 FN), 정상을 정상으로(참 음성 TN). 표시된 것 가운데 진짜 비율이 <span class="term">정밀도</span><span class="en">(precision)</span>, 진짜 오류 가운데 잡아낸 비율이 <span class="term">재현율</span><span class="en">(recall)</span>입니다.</p>
+    <figure class="diagram" id="fig-cp-confusion">
+      <svg viewBox="0 0 860 260" role="img" aria-label="혼동 행렬: 참 양성, 거짓 양성, 거짓 음성, 참 음성과 정밀도, 재현율 식">
+        <rect x="10" y="10" width="840" height="240" rx="10" class="f-surface"/>
+        <text x="230" y="40" text-anchor="middle" class="t" style="font-weight:700">실제</text>
+        <g class="t-mono" text-anchor="middle"><text x="170" y="64">오류</text><text x="300" y="64">정상</text><text x="62" y="118">표시함</text><text x="62" y="188">표시 안 함</text></g>
+        <rect x="110" y="76" width="120" height="70" style="fill:color-mix(in srgb,var(--ok) 22%,transparent);stroke:var(--ok)"/><text x="170" y="116" text-anchor="middle" class="t" style="font-weight:700">TP</text>
+        <rect x="240" y="76" width="120" height="70" style="fill:color-mix(in srgb,var(--warn) 22%,transparent);stroke:var(--warn)"/><text x="300" y="108" text-anchor="middle" class="t" style="font-weight:700">FP</text><text x="300" y="128" text-anchor="middle" class="t-mono">헛수고</text>
+        <rect x="110" y="152" width="120" height="70" style="fill:color-mix(in srgb,var(--bad) 22%,transparent);stroke:var(--bad)"/><text x="170" y="184" text-anchor="middle" class="t" style="font-weight:700">FN</text><text x="170" y="204" text-anchor="middle" class="t-mono">놓친 오류</text>
+        <rect x="240" y="152" width="120" height="70" class="f-elev"/><text x="300" y="192" text-anchor="middle" class="t" style="font-weight:700">TN</text>
+        <g class="t-mono"><text x="420" y="90" style="fill:var(--text);font-weight:700">정밀도 = TP / (TP + FP)</text><text x="420" y="110">표시한 것 중 진짜 비율 — 낮으면 검토 부담</text>
+          <text x="420" y="150" style="fill:var(--text);font-weight:700">재현율 = TP / (TP + FN)</text><text x="420" y="170">진짜 오류 중 잡은 비율 — 낮으면 놓친 오류</text>
+          <text x="420" y="210" style="fill:var(--accent)">기준(임계값)을 낮추면 재현율 ↑ 정밀도 ↓</text></g>
+      </svg>
+      <figcaption><b>그림 16-7.</b> 분류 결과의 네 칸(혼동 행렬)과 두 지표. 거짓 양성은 사람의 검토 시간을, 거짓 음성은 현장에서 드러날 오류를 만든다. 둘 사이의 비중은 오류의 대가에 따라 사람이 정한다.</figcaption>
+    </figure>
+    <div class="callout def"><strong>원리 16.7 (기저율과 정밀도)</strong> 전체 \(N\)개 중 오류 비율(기저율)이 \(p\), 분류기가 오류를 표시할 확률이 \(TPR\)(재현율), 정상을 잘못 표시할 확률이 \(FPR\)이면
+      <div class="formula">$$\text{정밀도} = \frac{p\,TPR}{p\,TPR + (1 - p)\,FPR}$$<div class="where">오류가 드물면(\(p\)가 작으면) \(FPR\)이 작아도 거짓 양성이 진짜보다 많아진다. 예: \(N = 360\), \(p = 3\,\%\)(약 11개), \(TPR = 0.69\), \(FPR = 0.067\) → TP ≈ 7.5, FP ≈ 23 → 정밀도 약 24 %. 이 장의 시뮬레이터는 점수가 정상 N(0, 1), 오류 N(d′, 1)을 따른다고 보는 교육용 모델로 이 값을 계산한다.</div></div></div>
+    <div class="sim" id="sim-cp-clf">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>분류 임계값과 검증 부담: B-10 요소 360개</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cp-cv-clf" aria-label="정상과 오류 요소의 점수 분포, 임계값 선, 정밀도–재현율 곡선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>오류 비율(기저율) p <output id="cp-cl-p-out"></output></span><input type="range" id="cp-cl-p" min="0.01" max="0.3" step="0.01" value="0.03"></label>
+          <label class="ctrl"><span>분류기 분리도 d′ <output id="cp-cl-d-out"></output></span><input type="range" id="cp-cl-d" min="0.5" max="4" step="0.1" value="2"></label>
+          <label class="ctrl"><span>임계값 τ <output id="cp-cl-t-out"></output></span><input type="range" id="cp-cl-t" min="-1" max="5" step="0.05" value="1.5"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">표시(검토 대상)</span><span class="v" id="cp-cl-o-f">—</span></div>
+        <div class="stat"><span class="k">정밀도</span><span class="v" id="cp-cl-o-p">—</span></div>
+        <div class="stat"><span class="k">재현율</span><span class="v" id="cp-cl-o-r">—</span></div>
+        <div class="stat"><span class="k">놓친 오류 FN</span><span class="v" id="cp-cl-o-m">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(p 3 %, d′ 2, τ 1.5)에서 표시된 약 31개 중 진짜 오류는 약 7.5개(정밀도 24 %), 놓친 오류는 약 3개입니다 · τ를 0.5로 낮추면 놓친 오류는 1개 미만이 되지만 검토할 요소가 100개를 넘습니다 · 분리도를 4로 올리면(훨씬 좋은 분류기) 두 지표가 함께 좋아집니다 · p를 20 %로 올리면 같은 분류기의 정밀도가 크게 오릅니다 — 정밀도는 분류기만이 아니라 데이터의 기저율에 달려 있습니다 · 모델: 원리 16.7, 기댓값 계산(<code>CB.normCdf</code>), 교육용.</div>
+    </div>
+    <p>대규모 언어 모델 같은 <span class="term">생성형 AI</span><span class="en">(generative AI)</span>는 학습한 데이터의 통계적 패턴에서 그럴듯한 다음 단어(토큰)·이미지·코드를 만들어 내도록 학습된 모델입니다. 건설에서 확인된 범위의 쓰임은 다음과 같은 "초안" 작업입니다. 시방서·회의록·질의응답 문서의 요약과 검색, 반복적인 스크립트(IFC 질의, 데이터 흐름 그래프의 코드 노드)의 초안, 이미지 생성 도구에 의한 초기 콘셉트 이미지. 이 결과에는 다음 성질이 있습니다.</p>
+    <ul>
+      <li><b>그럴듯하지만 틀릴 수 있다.</b> 존재하지 않는 기준 조항이나 잘못된 수치를 자신 있게 만들어 낼 수 있다(흔히 "환각"이라 부른다). 문장이 매끄러운 것과 내용이 맞는 것은 별개다.</li>
+      <li><b>같은 질문에 다른 답이 나올 수 있다.</b> 결과를 재현하려면 입력·모델·설정을 기록한다.</li>
+      <li><b>학습 시점 이후의 개정을 모를 수 있다.</b> 기준·법령·단가는 원문과 현행본으로 확인한다.</li>
+      <li><b>이미지는 모델이 아니다.</b> 생성된 건물 그림에는 요소·속성·치수·구조 성립 여부가 없다. BIM으로 옮기려면 사람이 다시 모델링하고 검토한다.</li>
+      <li><b>입력한 자료가 밖으로 나갈 수 있다.</b> 계약상 비밀인 도면·원가를 외부 서비스에 넣기 전에 계약과 회사 보안 규정을 확인한다.</li>
+    </ul>
+    <div class="callout def"><strong>원리 16.8 (계산 결과의 검증과 책임)</strong> 계산 설계·기계 학습·생성형 AI의 결과를 설계와 시공에 쓸 때는 다음을 지킨다.
+      <ol>
+        <li><b>독립 검증</b> — 결과를 만든 방법과 다른 방법으로 확인한다: 규칙 기반 검사(4장 IDS), 물량 대조(7장), 구조 해석(8장), 손계산 예제, 범위 검사(단위·크기).</li>
+        <li><b>범위 명시</b> — 데이터와 모델이 다루는 범위(규모, 용도, 시점)와 가정을 결과와 함께 적고, 범위 밖이면 경고한다.</li>
+        <li><b>기록</b> — 입력, 모델·도구 버전, 설정, 시드, 사람이 고친 부분을 남겨 재현할 수 있게 한다(5장 CDE의 감사 추적).</li>
+        <li><b>사람의 책임</b> — 설계 도서에 서명하고 책임지는 것은 자격을 갖춘 사람과 조직이다. 도구가 만든 결과도 그 사람이 검토하고 승인한 결과로 다룬다. AI에 관한 제도(예: 유럽 연합의 AI 법, 국내 인공지능 기본법)가 정비되고 있으므로 적용 의무는 현행 규정을 확인한다.</li>
+      </ol></div>
+    <div class="callout site"><strong>B-10과 계산 설계</strong> 이 장의 평가 모델(원리 16.2)에서 B-10의 4 × 3 그리드(8 × 8 m)는 보 400 × 700, 슬래브 210 mm, 기둥 800 × 800, 층당 콘크리트 252.1 m³(코어 벽 제외, 겹침 제외), 천장고 2.70 m, 내부 기둥 6개(자유 공간 82.9), w = 0.5에서 J = 0.586이다. 같은 모델의 격자 탐색 최적은 w = 0.5에서 5 × 4(6.4 × 6 m, 203.4 m³, J 0.575), w = 0.3에서 B-10 자신(J 0.420)이다. 매스 B-10(32 × 24 m, 10층, 높이 41 m)은 연면적 7,680 m², 대지 48 × 40 m(교육용)에서 용적률 400 %, 건폐율 40 %, 외피 5,360 m². 공사비 회귀의 교육용 진짜 곡선은 B-10에서 243.9억 원으로 SiteBook의 BAC 244억 원과 맞췄다. 모든 계수는 교육용이며 실제 설계·견적에 쓰지 않는다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 정보가 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="geometry.html"><small>CH.02 · 형상 모델링과 파라메트릭</small>규칙으로 만든 형상<br><span>파라메트릭 패밀리가 데이터 흐름 그래프의 노드가 된다.</span></a>
+      <a href="lod.html"><small>CH.04 · LOD와 정보 요구 사항</small>IDS로 검증<br><span>AI·스크립트가 만든 속성도 규칙 기반 검사를 통과해야 한다.</span></a>
+      <a href="qto.html"><small>CH.07 · 모델 기반 물량 산출</small>목적 함수의 물량<br><span>최적화가 줄인 콘크리트는 공제 규칙을 적용한 물량으로 다시 확인한다.</span></a>
+      <a href="five-d.html"><small>CH.10 · 5D 원가</small>예측과 적산<br><span>기획 단계 회귀 추정은 설계가 진행되면 모델 물량 × 단가로 바뀐다.</span></a>
+      <a href="gis.html"><small>CH.15 · GIS와 도시 모델</small>일조를 평가 기준으로<br><span>매스 생성의 목적 함수에 그림자·일조 시간을 넣는다.</span></a>
+      <a href="../../structure/chapters/overview.html"><small>StructureBook CH.01 · 건축 구조의 이해</small>부재 크기 가정<br><span>보 춤 L/12, 슬래브 L/38, 기둥 축력비 같은 경험값의 출처.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>데이터 흐름 그래프는 설계 규칙을 노드와 연결(DAG)로 적고 위상 순서로 계산하며, 입력이 바뀌면 하류 노드만 다시 계산한다. 그래프는 규칙을 실행할 뿐 규칙의 옳음을 검증하지 않는다.</li>
+      <li>계산 설계의 질문 = 설계 변수 + 제약 + 목적 함수. 변수가 적으면 격자 탐색이 정직하다. B-10 모델: 8 × 8 m 그리드는 보 700, 기둥 800, 252.1 m³/층, 천장고 2.70 m, J(w 0.5) 0.586.</li>
+      <li>"최적"은 가중치와 제약을 따라 움직인다(w 0.5 → 5 × 4, w 0.3 → B-10). 모델 오차보다 작은 점수 차이는 의미가 없다.</li>
+      <li>경사 하강은 매끄러운 함수에서 빠르지만 국소 최적에 갇히고, 유전 알고리즘(선택·교차·변이·엘리트)은 정수·계단·벌점 문제를 넓게 탐색하지만 최적을 보장하지 않는다. 시드를 바꿔 여러 번 돌리고 작은 문제에서 검증한다.</li>
+      <li>A가 B를 지배 ⇔ 모든 목적에서 나쁘지 않고 하나 이상에서 좋다. 파레토 전선은 지배되지 않는 안의 집합이며, 그중 선택은 가치 판단이다. 가중합은 전선의 볼록한 부분만 찾는다.</li>
+      <li>회귀의 예측 구간 ŷ₀ ± t·s√(1 + 1/n + (x₀ − x̄)²/Sₓₓ)는 모델 모양이 맞을 때만 성립한다. 과적합은 학습 오차가 아니라 검증 오차로 드러난다.</li>
+      <li>건설 데이터는 적고, 프로젝트마다 다르며, 범위·용도·시점·생존 편향이 있다. 외삽과 구성 편향은 높은 검증 점수로 보이지 않는다.</li>
+      <li>분류의 정밀도는 기저율에 달려 있다(p 3 %, 재현율 69 %, 오탐률 6.7 % → 정밀도 약 24 %). 생성형 AI의 결과는 초안이며 독립 검증·범위 명시·기록을 거쳐 사람이 책임진다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. 데이터 흐름 그래프에서 "층수" 입력만 바꿨다. 다시 계산해야 하는 노드는?</p><div class="opts">
+        <button class="opt">그래프의 모든 노드</button><button class="opt" data-correct>층수에서 연결을 따라 닿는 하류 노드만</button><button class="opt">층수 노드 하나만</button><button class="opt">입력 노드 전부</button>
+      </div><div class="quiz-exp">위상 순서로 계산하는 DAG에서는 바뀐 노드에서 닿는 하류만 다시 계산하고 나머지 값은 재사용한다.</div></div>
+      <div class="quiz-q"><p>2. 경간 9.0 m인 보의 춤을 경험값 L/12로 정하고 50 mm 단위로 올리면? 층고 4.0 m, 설비 0.6 m일 때 천장고는?</p><div class="opts">
+        <button class="opt">700 mm, 2.70 m</button><button class="opt" data-correct>750 mm, 2.65 m</button><button class="opt">800 mm, 2.60 m</button><button class="opt">750 mm, 3.25 m</button>
+      </div><div class="quiz-exp">9,000/12 = 750 → 750 mm. 천장고 = 4.0 − 0.6 − 0.75 = 2.65 m. 경험값이므로 최종 크기는 해석·설계로 확인한다.</div></div>
+      <div class="quiz-q"><p>3. 원리 16.2에서 B-10(J = 0.586)과 5 × 4 그리드(J = 0.575)의 비교로 가장 적절한 결론은?</p><div class="opts">
+        <button class="opt">5 × 4가 확실히 더 좋은 설계다</button><button class="opt">B-10 설계는 틀렸다</button><button class="opt" data-correct>점수 차가 작고 가중치·모델 가정에 민감하므로, 가정을 바꿔 보고 다른 기준(배치·시공성)과 함께 판단한다</button><button class="opt">유전 알고리즘을 돌려야만 결론을 낼 수 있다</button>
+      </div><div class="quiz-exp">w를 0.3으로 바꾸면 B-10이 최적이 된다. 모델 오차보다 작은 점수 차이로 우열을 말할 수 없다.</div></div>
+      <div class="quiz-q"><p>4. 유전 알고리즘에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">항상 전역 최적해를 찾는다</button><button class="opt">목적 함수의 기울기가 반드시 필요하다</button><button class="opt" data-correct>정수·계단 함수에도 쓸 수 있지만, 난수와 설정에 따라 결과가 달라지고 최적을 보장하지 않는다</button><button class="opt">변이율이 클수록 항상 좋은 해를 찾는다</button>
+      </div><div class="quiz-exp">GA는 기울기 없이 개체군으로 탐색하는 발견적 방법이다. 시드를 바꿔 여러 번 돌리고, 작은 문제에서 정답과 비교해 검증한다.</div></div>
+      <div class="quiz-q"><p>5. 두 목적(공사비 최소, 채광 최대)에서 안 P(100, 70)와 안 Q(95, 75)가 있다. 옳은 것은?</p><div class="opts">
+        <button class="opt">P가 Q를 지배한다</button><button class="opt" data-correct>Q가 P를 지배한다</button><button class="opt">서로 지배하지 않는다</button><button class="opt">가중치 없이는 판단할 수 없다</button>
+      </div><div class="quiz-exp">Q가 더 싸고(95 ≤ 100) 더 밝다(75 ≥ 70). Q가 P를 지배하므로 P는 파레토 전선에 들 수 없다.</div></div>
+      <div class="quiz-q"><p>6. 다항식 차수를 높였더니 학습 오차는 0에 가까워졌지만 검증 오차가 커졌다. 이 현상은?</p><div class="opts">
+        <button class="opt">과소적합</button><button class="opt" data-correct>과적합</button><button class="opt">외삽</button><button class="opt">기저율 오류</button>
+      </div><div class="quiz-exp">모델이 잡음까지 따라가 학습하지 않은 점에서 틀리는 과적합이다. 모델은 검증 오차가 작은 복잡도에서 고른다.</div></div>
+      <div class="quiz-q"><p>7. 1,500–8,000 m² 업무 시설로 학습한 공사비 직선 모델로 30,000 m² 건물을 예측할 때 가장 큰 위험은?</p><div class="opts">
+        <button class="opt">예측 구간이 너무 넓다</button><button class="opt" data-correct>데이터 범위 밖의 외삽이라 모델 모양이 검증된 적이 없고, 예측 구간도 그 오차를 반영하지 못한다</button><button class="opt">학습 데이터 수가 너무 많다</button><button class="opt">직선 모델은 항상 과적합한다</button>
+      </div><div class="quiz-exp">예측 구간은 모델 모양이 맞다는 가정에서의 흩어짐만 반영한다. 범위 밖에서 관계가 휘면(규모 할증 등) 체계적으로 틀린다.</div></div>
+      <div class="quiz-q"><p>8. 요소 1,000개 중 오류가 2 %(20개)인 모델에서, 재현율 90 %, 오탐률 5 %인 분류기가 표시한 요소 중 진짜 오류의 비율(정밀도)은?</p><div class="opts">
+        <button class="opt">약 90 %</button><button class="opt">약 95 %</button><button class="opt" data-correct>약 27 %</button><button class="opt">약 5 %</button>
+      </div><div class="quiz-exp">TP = 20 × 0.9 = 18, FP = 980 × 0.05 = 49 → 18/67 ≈ 27 %. 오류가 드물면 좋은 분류기도 표시의 대부분이 거짓 양성이다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미: 글자 그리기, B-10 그리드 평가 모델(원리 16.2, 교육용) ---------- */
+const CPX = (function () {
+  const ceil50 = (mm) => Math.ceil(mm / 50 - 1e-9) * 50;
+  /** 경간 배열(m) → 부재·물량·지표. rule: L/rule, H: 층고 */
+  function evalGrid(ax, by, rule = 12, H = 4.0) {
+    const depth = (L) => Math.max(450, ceil50((L * 1000) / rule)), width = (h) => Math.max(300, ceil50(0.55 * h));
+    const slab = (a, b) => Math.max(150, Math.round((Math.max(a, b) * 1000) / 38 / 10) * 10);
+    let Vs = 0, A = 0;
+    ax.forEach((a) => by.forEach((b) => { const t = slab(a, b) / 1000; Vs += a * b * t; A += a * b; }));
+    const tAvg = Vs / A, nx1 = ax.length + 1, ny1 = by.length + 1;
+    let Vb = 0, hmax = 0;
+    ax.forEach((a) => { const h = depth(a), b = width(h); hmax = Math.max(hmax, h); Vb += ny1 * (b / 1000) * (h / 1000 - tAvg) * a; });
+    by.forEach((L) => { const h = depth(L), b = width(h); hmax = Math.max(hmax, h); Vb += nx1 * (b / 1000) * (h / 1000 - tAvg) * L; });
+    let At = 0;
+    for (let i = 0; i < nx1; i++) for (let j = 0; j < ny1; j++) At = Math.max(At, (((ax[i - 1] || 0) + (ax[i] || 0)) / 2) * (((by[j - 1] || 0) + (by[j] || 0)) / 2));
+    const q = 1.2 * (24 * tAvg + 1.5) + 1.6 * 2.5, Nu = 10 * At * q * 1.2, c = Math.max(400, ceil50(Math.sqrt((Nu * 1000) / 15)));
+    const Nc = nx1 * ny1, Vc = Nc * (c / 1000) ** 2 * (H - hmax / 1000), V = Vs + Vb + Vc, Nint = (nx1 - 2) * (ny1 - 2);
+    return { Vs, Vb, Vc, V, tAvg, hmax, c, Nc, Nint, F: Math.max(0, 100 * (1 - Nint / 35)), ceil: H - 0.6 - hmax / 1000, At, Nu, t: Math.round(tAvg * 1000) };
+  }
+  const V0 = evalGrid([8, 8, 8, 8], [8, 8, 8]).V;
+  const J = (r, w, ch) => w * (r.V / V0) + (1 - w) * (1 - r.F / 100) + (r.ceil < ch - 1e-9 ? 1 + (ch - r.ceil) * 2 : 0);
+  function text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = `${o.bold === false ? "" : "600 "}${o.size || 11}px ${getComputedStyle(document.body).getPropertyValue(o.mono ? "--mono" : "--font")}`;
+    ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    if (o.halo) { ctx.lineWidth = 3; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); }
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  }
+  const alpha = (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`;
+  /** 그리드 평면 그리기(32 × 24 m) */
+  function plan(ctx, box, ax, by, r, o = {}) {
+    const P = CB.palette(), s = Math.min(box.w / 34, box.h / 26), ox = box.x + (box.w - 32 * s) / 2, oy = box.y + (box.h - 24 * s) / 2;
+    const X = (x) => ox + x * s, Y = (y) => oy + (24 - y) * s;
+    ctx.fillStyle = alpha(P.text, 0.04); ctx.fillRect(X(0), Y(24), 32 * s, 24 * s);
+    if (o.core) { ctx.fillStyle = alpha(P.accent, 0.18); ctx.fillRect(X(8), Y(16), 16 * s, 8 * s); }
+    const xs = [0], ys = [0]; ax.forEach((a) => xs.push(xs[xs.length - 1] + a)); by.forEach((b) => ys.push(ys[ys.length - 1] + b));
+    ctx.strokeStyle = P.dim;
+    xs.forEach((x, i) => { if (i < xs.length - 1) { const h = Math.max(450, Math.ceil(ax[i] * 1000 / 12 / 50 - 1e-9) * 50); ctx.lineWidth = 1 + h / 400; ys.forEach((y) => { ctx.beginPath(); ctx.moveTo(X(x), Y(y)); ctx.lineTo(X(xs[i + 1]), Y(y)); ctx.stroke(); }); } });
+    ys.forEach((y, j) => { if (j < ys.length - 1) { const h = Math.max(450, Math.ceil(by[j] * 1000 / 12 / 50 - 1e-9) * 50); ctx.lineWidth = 1 + h / 400; xs.forEach((x) => { ctx.beginPath(); ctx.moveTo(X(x), Y(y)); ctx.lineTo(X(x), Y(ys[j + 1])); ctx.stroke(); }); } });
+    const cs = Math.max(3, (r.c / 1000) * s);
+    xs.forEach((x) => ys.forEach((y) => { ctx.fillStyle = P.text; ctx.fillRect(X(x) - cs / 2, Y(y) - cs / 2, cs, cs); }));
+    ax.forEach((a, i) => text(ctx, CB.num(a, a % 1 ? 1 : 0), X(xs[i] + a / 2), Y(0) + 11, P.dim, { size: 10, mono: true }));
+    by.forEach((b, j) => text(ctx, CB.num(b, b % 1 ? 1 : 0), X(0) - 12, Y(ys[j] + b / 2), P.dim, { size: 10, mono: true }));
+    return { X, Y, s };
+  }
+  return { evalGrid, V0, J, text, alpha, plan, ceil50 };
+})();
+
+/* ---------- 1. 데이터 흐름 그래프 ---------- */
+(function () {
+  const NODES = [
+    { id: "nx", name: "X 경간 수", col: 0, deps: [] }, { id: "ny", name: "Y 경간 수", col: 0, deps: [] }, { id: "nf", name: "층수", col: 0, deps: [] }, { id: "H", name: "층고 H", col: 0, deps: [] }, { id: "rule", name: "보 규칙", col: 0, deps: [] },
+    { id: "Lx", name: "X 경간", col: 1, deps: ["nx"], f: (v) => 32 / v.nx }, { id: "Ly", name: "Y 경간", col: 1, deps: ["ny"], f: (v) => 24 / v.ny }, { id: "Nc", name: "기둥 수/층", col: 1, deps: ["nx", "ny"], f: (v) => (v.nx + 1) * (v.ny + 1) },
+    { id: "h", name: "보 춤", col: 2, deps: ["Lx", "Ly", "rule"], f: (v) => Math.max(450, CPX.ceil50((Math.max(v.Lx, v.Ly) * 1000) / v.rule)) },
+    { id: "t", name: "슬래브 t", col: 2, deps: ["Lx", "Ly"], f: (v) => Math.max(150, Math.round((Math.max(v.Lx, v.Ly) * 1000) / 38 / 10) * 10) },
+    { id: "c", name: "기둥 크기", col: 2, deps: ["Lx", "Ly", "t", "nf"], f: (v) => { const q = 1.2 * (24 * v.t / 1000 + 1.5) + 4; return Math.max(400, CPX.ceil50(Math.sqrt((v.nf * v.Lx * v.Ly * q * 1.2 * 1000) / 15))); } },
+    { id: "V", name: "콘크리트/층", col: 3, deps: ["nx", "ny", "Lx", "Ly", "h", "t", "c", "Nc", "H"], f: (v) => { const t = v.t / 1000, hb = v.h / 1000, bw = Math.max(300, CPX.ceil50(0.55 * v.h)) / 1000; return 768 * t + bw * (hb - t) * ((v.ny + 1) * 32 + (v.nx + 1) * 24) + v.Nc * (v.c / 1000) ** 2 * (v.H - hb); } },
+    { id: "ceil", name: "천장고", col: 3, deps: ["H", "h"], f: (v) => v.H - 0.6 - v.h / 1000 },
+    { id: "Vt", name: "콘크리트 전체", col: 4, deps: ["V", "nf"], f: (v) => v.V * v.nf },
+    { id: "F", name: "자유 공간", col: 4, deps: ["nx", "ny"], f: (v) => Math.max(0, 100 * (1 - ((v.nx - 1) * (v.ny - 1)) / 35)) },
+  ];
+  const byId = {}; NODES.forEach((n) => (byId[n.id] = n));
+  let val = {}, dirty = new Set(), first = true, initial = true;
+  const inputs = { nx: CB.range("cp-gr-nx", (x) => x + "", () => run("nx")), ny: CB.range("cp-gr-ny", (x) => x + "", () => run("ny")), nf: CB.range("cp-gr-nf", (x) => x + "층", () => run("nf")), H: CB.range("cp-gr-h", (x) => x.toFixed(1) + " m", () => run("H")) };
+  const rule = CB.seg("cp-gr-rule", () => run("rule"));
+  function run(changed) {
+    const prev = val; val = { nx: inputs.nx(), ny: inputs.ny(), nf: inputs.nf(), H: inputs.H(), rule: Number(rule()) };
+    // 하류 집합(위상 순서는 NODES 순서)
+    const down = new Set([changed]);
+    NODES.forEach((n) => { if (n.deps.some((d) => down.has(d))) down.add(n.id); });
+    dirty = new Set();
+    NODES.forEach((n) => { if (!n.f) { if (first || n.id === changed) dirty.add(n.id); return; } if (first || down.has(n.id)) { val[n.id] = n.f(val); dirty.add(n.id); } else val[n.id] = prev[n.id]; });
+    first = false;
+    CB.stat("cp-gr-o-n", `${[...dirty].filter((d) => byId[d].f).length} / ${NODES.filter((n) => n.f).length}`);
+    if (initial) { dirty = new Set(); initial = false; }
+    CB.stat("cp-gr-o-h", `${val.h} · ${val.c} mm`);
+    CB.stat("cp-gr-o-v", `${CB.num(val.V, 1)} · ${CB.sig(val.Vt, 4)} m³`);
+    CB.stat("cp-gr-o-c", CB.num(val.ceil, 2) + " m");
+    cv.redraw();
+  }
+  const fmt = { nx: (x) => x, ny: (x) => x, nf: (x) => x + "층", H: (x) => x.toFixed(1) + " m", rule: (x) => "L/" + x, Lx: (x) => CB.num(x, 2) + " m", Ly: (x) => CB.num(x, 2) + " m", Nc: (x) => x + "개", h: (x) => x + " mm", t: (x) => x + " mm", c: (x) => x + " mm", V: (x) => CB.num(x, 1) + " m³", ceil: (x) => CB.num(x, 2) + " m", Vt: (x) => CB.sig(x, 4) + " m³", F: (x) => CB.num(x, 1) };
+  const cv = CB.canvas("#cp-cv-graph", (ctx, W, H) => {
+    if (val.V == null) return;
+    const P = CB.palette(), vert = W < 560, cols = [0, 1, 2, 3, 4].map((c) => NODES.filter((n) => n.col === c)), pos = {};
+    const nw = vert ? Math.min(118, (W - 20) / 3 - 8) : Math.min(120, (W - 40) / 5 - 14), nh = 40;
+    cols.forEach((list, c) => list.forEach((n, k) => {
+      if (!vert) { const cw = (W - 20) / 5, rh = (H - 20) / 5; pos[n.id] = { x: 10 + c * cw + (cw - nw) / 2, y: 10 + (k + (5 - list.length) / 2) * rh + (rh - nh) / 2 }; }
+      else { const rh = (H - 10) / 5, cw = (W - 10) / list.length; pos[n.id] = { x: 5 + k * cw + (cw - nw) / 2, y: 6 + c * rh + (rh - nh) / 2 }; }
+    }));
+    NODES.forEach((n) => n.deps.forEach((d) => {
+      const a = pos[d], b = pos[n.id], hot = dirty.has(d) && dirty.has(n.id);
+      ctx.strokeStyle = hot ? P.accent2 : P.faint; ctx.lineWidth = hot ? 1.8 : 1; ctx.beginPath();
+      if (!vert) { ctx.moveTo(a.x + nw, a.y + nh / 2); ctx.bezierCurveTo(a.x + nw + 30, a.y + nh / 2, b.x - 30, b.y + nh / 2, b.x, b.y + nh / 2); }
+      else { ctx.moveTo(a.x + nw / 2, a.y + nh); ctx.bezierCurveTo(a.x + nw / 2, a.y + nh + 20, b.x + nw / 2, b.y - 20, b.x + nw / 2, b.y); }
+      ctx.stroke();
+    }));
+    NODES.forEach((n) => {
+      const p = pos[n.id], d = dirty.has(n.id), inp = !n.f;
+      ctx.fillStyle = d ? CPX.alpha(P.accent2, 0.2) : P.elev; ctx.strokeStyle = d ? P.accent2 : inp ? P.accent : P.border; ctx.lineWidth = d ? 2 : 1.2;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x, p.y, nw, nh, 7) : ctx.rect(p.x, p.y, nw, nh); ctx.fill(); ctx.stroke();
+      CPX.text(ctx, n.name, p.x + nw / 2, p.y + 12, P.dim, { size: 10, bold: false });
+      CPX.text(ctx, String(fmt[n.id](val[n.id])), p.x + nw / 2, p.y + 28, P.text, { size: 11.5, mono: true });
+    });
+    CPX.text(ctx, "주황 = 이번 변경으로 다시 계산", W - 6, H - 6, P.accent2, { size: 10, align: "right", baseline: "bottom" });
+  }, { aspect: (w) => (w < 560 ? 1.15 : 0.55), maxHeight: 520, minHeight: 300 });
+  run("nx");
+})();
+
+/* ---------- 2. 격자 탐색 히트맵 ---------- */
+(function () {
+  const met = CB.seg("cp-gs-met", draw), gw = CB.range("cp-gs-w", (v) => v.toFixed(2), draw), gch = CB.range("cp-gs-ch", (v) => v.toFixed(2) + " m", draw), gk = CB.range("cp-gs-k", (v) => "L/" + v, draw);
+  function draw() { cv.redraw(); }
+  const cv = CB.canvas("#cp-cv-grid", (ctx, W, H) => {
+    const P = CB.palette(), w = gw(), ch = gch(), k = gk(), m = met(), cells = [];
+    let best = null, nOk = 0;
+    for (let nx = 1; nx <= 8; nx++) for (let ny = 1; ny <= 6; ny++) {
+      const r = CPX.evalGrid(Array(nx).fill(32 / nx), Array(ny).fill(24 / ny), k), ok = r.ceil >= ch - 1e-9, j = CPX.J(r, w, ch);
+      cells.push({ nx, ny, r, ok, j }); if (ok) { nOk++; if (!best || j < best.j) best = { nx, ny, r, j }; }
+    }
+    const val = (c) => (m === "J" ? c.j : m === "V" ? c.r.V : m === "F" ? c.r.F : c.r.ceil);
+    const okc = cells.filter((c) => c.ok), vs = (m === "C" ? cells : okc).map(val), lo = Math.min(...vs), hi = Math.max(...vs);
+    const box = { x: 56, y: 14, w: W - 70, h: H - 56 }, cw = box.w / 8, rh = box.h / 6;
+    cells.forEach((c) => {
+      const x = box.x + (c.nx - 1) * cw, y = box.y + (6 - c.ny) * rh;
+      if (!c.ok && m !== "C") { ctx.fillStyle = P.surface; ctx.fillRect(x + 1, y + 1, cw - 2, rh - 2); ctx.save(); ctx.beginPath(); ctx.rect(x + 1, y + 1, cw - 2, rh - 2); ctx.clip(); ctx.strokeStyle = P.faint; for (let t = -rh; t < cw; t += 8) { ctx.beginPath(); ctx.moveTo(x + t, y + rh); ctx.lineTo(x + t + rh, y); ctx.stroke(); } ctx.restore(); return; }
+      let tt = hi > lo ? (val(c) - lo) / (hi - lo) : 0.5; if (m === "J" || m === "V") tt = 1 - tt;
+      ctx.fillStyle = CB.rgb(CB.colormap(tt)); ctx.fillRect(x + 1, y + 1, cw - 2, rh - 2);
+      if (!c.ok) { ctx.strokeStyle = P.bad; ctx.lineWidth = 1.5; ctx.strokeRect(x + 3, y + 3, cw - 6, rh - 6); }
+      const s = m === "J" ? c.j.toFixed(3) : m === "V" ? CB.num(c.r.V, 0) : m === "F" ? CB.num(c.r.F, 0) : c.r.ceil.toFixed(2);
+      if (cw > 34) CPX.text(ctx, s, x + cw / 2, y + rh / 2, tt > 0.55 ? "#222" : "#fff", { size: cw > 60 ? 11 : 9, mono: true });
+    });
+    const outline = (nx, ny, col, wd) => { ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.strokeRect(box.x + (nx - 1) * cw + 1.5, box.y + (6 - ny) * rh + 1.5, cw - 3, rh - 3); };
+    outline(4, 3, P.accent2, 3); if (best) outline(best.nx, best.ny, P.bad, 3);
+    for (let nx = 1; nx <= 8; nx++) CPX.text(ctx, nx + "", box.x + (nx - 0.5) * cw, box.y + box.h + 12, P.dim, { size: 10.5, mono: true });
+    for (let ny = 1; ny <= 6; ny++) CPX.text(ctx, ny + "", box.x - 12, box.y + (6 - ny + 0.5) * rh, P.dim, { size: 10.5, mono: true });
+    CPX.text(ctx, "X 경간 수 nₓ (경간 32/nₓ m)", box.x + box.w / 2, box.y + box.h + 30, P.dim, { size: 11, bold: false });
+    ctx.save(); ctx.translate(16, box.y + box.h / 2); ctx.rotate(-Math.PI / 2); CPX.text(ctx, "Y 경간 수", 0, 0, P.dim, { size: 11, bold: false }); ctx.restore();
+    CPX.text(ctx, "■ B-10", W - 90, H - 8, P.accent2, { size: 10.5, align: "left", baseline: "bottom" }); CPX.text(ctx, "■ 최적", W - 40, H - 8, P.bad, { size: 10.5, align: "left", baseline: "bottom" });
+    const b10 = cells.find((c) => c.nx === 4 && c.ny === 3);
+    if (best) {
+      CB.stat("cp-gs-o-b", `${best.nx} × ${best.ny} (${CB.num(32 / best.nx, 2)} × ${CB.num(24 / best.ny, 2)} m)`);
+      CB.stat("cp-gs-o-j", `${best.j.toFixed(3)} (${b10.ok ? b10.j.toFixed(3) : "제약 위반"})`);
+      CB.stat("cp-gs-o-v", `${CB.num(best.r.V, 1)} m³ · ${CB.num(best.r.F, 1)}`);
+      CB.stat("cp-gs-o-h", `${best.r.hmax} · ${best.r.c} · ${best.r.ceil.toFixed(2)} m`);
+    } else ["cp-gs-o-b", "cp-gs-o-j", "cp-gs-o-v", "cp-gs-o-h"].forEach((id) => CB.stat(id, "해 없음"));
+    CB.stat("cp-gs-o-n", nOk + " / 48");
+  }, { aspect: 0.72, maxHeight: 440, minHeight: 280 });
+})();
+
+/* ---------- 3. 유전 알고리즘 ---------- */
+(function () {
+  const NX = 31, NY = 23, NB = NX + NY;
+  let res = null;
+  const gn = CB.range("cp-ga-n", (v) => v + "", go), gpm = CB.range("cp-ga-pm", (v) => (v * 100).toFixed(1) + " %", go), gg = CB.range("cp-ga-g", (v) => v + "", go);
+  const gs = CB.range("cp-ga-s", (v) => v + "", go), gw = CB.range("cp-ga-w", (v) => v.toFixed(2), go), core = CB.seg("cp-ga-core", go);
+  const gv = CB.range("cp-ga-v", (v) => (res ? Math.round(v * (res.hist.length - 1)) : 0) + "세대", () => show());
+  function decode(g, fix) {
+    const xs = [0], ys = [0];
+    for (let i = 0; i < NX; i++) if (g[i] || (fix && (i + 1 === 8 || i + 1 === 24))) xs.push(i + 1);
+    xs.push(32);
+    for (let j = 0; j < NY; j++) if (g[NX + j] || (fix && (j + 1 === 8 || j + 1 === 16))) ys.push(j + 1);
+    ys.push(24);
+    return { ax: xs.slice(1).map((x, i) => x - xs[i]), by: ys.slice(1).map((y, i) => y - ys[i]) };
+  }
+  function fit(g, w, fix) {
+    const { ax, by } = decode(g, fix), r = CPX.evalGrid(ax, by), mn = Math.min(...ax, ...by);
+    let pen = mn < 3 ? (3 - mn) * 0.5 : 0; if (r.ceil < 2.6 - 1e-9) pen += 1 + (2.6 - r.ceil) * 2;
+    return { J: w * (r.V / CPX.V0) + (1 - w) * (1 - r.F / 100) + pen, r, ax, by, pen };
+  }
+  function run() {
+    const N = gn(), pm = gpm(), G = gg(), w = gw(), fix = core() === "fix", R = CB.rng(gs() * 7919 + 13);
+    let pop = Array.from({ length: N }, () => Array.from({ length: NB }, () => (R() < 0.12 ? 1 : 0)));
+    const hist = []; let best = null, evals = 0;
+    for (let gen = 0; gen < G; gen++) {
+      const sc = pop.map((g) => ({ g, f: fit(g, w, fix) })); evals += N;
+      sc.sort((a, b) => a.f.J - b.f.J);
+      if (!best || sc[0].f.J < best.f.J) best = { g: sc[0].g.slice(), f: sc[0].f, gen };
+      hist.push({ best: best.f.J, mean: sc.reduce((s, x) => s + Math.min(x.f.J, 2), 0) / N, bf: best.f, evals });
+      const next = [sc[0].g.slice()]; if (N > 1) next.push(sc[1].g.slice());
+      const tour = () => { const a = sc[Math.floor(R() * N)], b = sc[Math.floor(R() * N)]; return a.f.J < b.f.J ? a.g : b.g; };
+      while (next.length < N) { const p1 = tour(), p2 = tour(), c = p1.map((v, k) => (R() < 0.5 ? v : p2[k])); for (let k = 0; k < NB; k++) if (R() < pm) c[k] = 1 - c[k]; next.push(c); }
+      pop = next;
+    }
+    // 균등 그리드 최적(비교용)
+    let ub = Infinity; for (let nx = 1; nx <= 8; nx++) for (let ny = 1; ny <= 6; ny++) { const r = CPX.evalGrid(Array(nx).fill(32 / nx), Array(ny).fill(24 / ny)); if (r.ceil >= 2.6 - 1e-9) ub = Math.min(ub, CPX.J(r, w, 2.6)); }
+    res = { hist, best, fix, ub, w };
+  }
+  function go() { run(); gv.set(gv(), false); show(); }
+  function show() {
+    if (!res) return;
+    const g = Math.round(gv() * (res.hist.length - 1)), h = res.hist[g], f = h.bf;
+    document.getElementById("cp-ga-v-out").textContent = g + "세대";
+    CB.stat("cp-ga-o-j", h.best.toFixed(3) + (f.pen > 0 ? " (벌점)" : ""));
+    CB.stat("cp-ga-o-x", f.ax.join(", ")); CB.stat("cp-ga-o-y", f.by.join(", "));
+    CB.stat("cp-ga-o-v", CB.num(f.r.V, 1) + " m³ · " + f.r.Nc + "개 " + f.r.c + "mm");
+    CB.stat("cp-ga-o-e", h.evals.toLocaleString("en-US"));
+    const m = document.getElementById("cp-ga-msg"), last = res.hist[res.hist.length - 1].best;
+    if (last <= res.ub + 1e-9) { m.className = "cp-msg ok"; m.innerHTML = `최종 최고 J ${last.toFixed(3)} — 균등 그리드 격자 탐색의 최적(${res.ub.toFixed(3)})과 같거나 낫습니다. 다른 시드에서도 그런지 확인하세요.`; }
+    else { m.className = "cp-msg warn"; m.innerHTML = `최종 최고 J ${last.toFixed(3)} — 균등 그리드 최적(${res.ub.toFixed(3)})보다 나쁩니다. GA는 더 넓은 공간을 탐색하지만 좋은 안을 놓칠 수 있습니다.`; }
+    cv.redraw();
+  }
+  const cv = CB.canvas("#cp-cv-ga", (ctx, W, H) => {
+    if (!res) return;
+    const P = CB.palette(), g = Math.round(gv() * (res.hist.length - 1)), f = res.hist[g].bf;
+    const ph = H * 0.52;
+    CPX.plan(ctx, { x: 30, y: 8, w: W - 60, h: ph - 16 }, f.ax, f.by, f.r, { core: res.fix });
+    CPX.text(ctx, g + "세대의 최고 그리드", W - 8, 12, P.dim, { size: 10.5, align: "right" });
+    const ys = res.hist.map((h) => h.mean).concat(res.hist.map((h) => h.best)), lo = Math.max(0, Math.min(...ys) - 0.02), hi = Math.min(2, Math.max(...ys) + 0.02);
+    CB.chart(ctx, { x: 56, y: ph + 6, w: W - 72, h: H - ph - 44 }, { x: [0, Math.max(1, res.hist.length - 1)], y: [lo, hi], xLabel: "세대", yLabel: "J", series: [{ data: res.hist.map((h, k) => [k, h.mean]), color: P.faint, width: 1.5 }, { data: res.hist.map((h, k) => [k, h.best]), color: P.accent, width: 2.4 }], hlines: isFinite(res.ub) ? [{ y: res.ub, color: P.bad, label: "균등 그리드 최적" }] : [], vlines: [{ x: g, color: P.accent2 }] });
+  }, { aspect: (w) => (w < 560 ? 1.1 : 0.85), maxHeight: 560, minHeight: 360 });
+  go();
+})();
+
+/* ---------- 4. 파레토 전선 ---------- */
+(function () {
+  const gn = CB.range("cp-pa-n", (v) => v + "개", draw), gs = CB.range("cp-pa-s", (v) => v + "", draw), gw = CB.range("cp-pa-w", (v) => v.toFixed(2), draw), gr = CB.range("cp-pa-r", (v) => v.toFixed(2), draw);
+  const g = (r) => r / (r + 0.25);
+  function evalM(W, D, r) {
+    const n = Math.max(1, Math.round(7680 / (W * D))), GFA = n * W * D;
+    const fp = 1 - (Math.max(0, W - 12) * Math.max(0, D - 12)) / (W * D), day = (100 * fp * g(r)) / g(0.8);
+    const cost = ((0.022 * GFA + 2 * (W + D) * 4 * n * (0.004 * (1 - r) + 0.007 * r) + 0.003 * W * D) / GFA) * (1 + 0.01 * Math.max(0, n - 10));
+    return { W, D, r, n, GFA, day, cost };
+  }
+  const REF = evalM(32, 24, 0.5).cost;
+  function draw() { cv.redraw(); }
+  const cv = CB.canvas("#cp-cv-pareto", (ctx, Wc, Hc) => {
+    const P = CB.palette(), R = CB.rng(gs() * 104729 + 1), N = gn(), rmax = gr(), w = gw();
+    const pts = []; for (let k = 0; k < N; k++) { const m = evalM(Math.round(R.range(20, 60)), Math.round(R.range(10, 30)), R.range(0.2, rmax)); m.ci = (100 * m.cost) / REF; pts.push(m); }
+    pts.forEach((a) => (a.dom = pts.some((b) => b !== a && b.ci <= a.ci && b.day >= a.day && (b.ci < a.ci || b.day > a.day))));
+    const front = pts.filter((p) => !p.dom).sort((a, b) => a.ci - b.ci);
+    const cMin = Math.min(...pts.map((p) => p.ci)), cMax = Math.max(...pts.map((p) => p.ci)), dMin = Math.min(...pts.map((p) => p.day)), dMax = Math.max(...pts.map((p) => p.day));
+    // 가중합(정규화) 선택
+    const sc = (p) => w * ((p.ci - cMin) / (cMax - cMin || 1)) - (1 - w) * ((p.day - dMin) / (dMax - dMin || 1));
+    const pick = pts.reduce((b, p) => (sc(p) < sc(b) ? p : b), pts[0]);
+    const b10 = evalM(32, 24, Math.min(0.5, rmax)); b10.ci = (100 * b10.cost) / REF;
+    const res = CB.chart(ctx, { x: 58, y: 14, w: Wc - 74, h: Hc - 60 }, { x: [Math.floor(Math.min(cMin, b10.ci) - 2), Math.ceil(Math.max(cMax, b10.ci) + 2)], y: [0, 105], xLabel: "공사비 지수 (B-10 형태 r 0.5 = 100)", yLabel: "채광 지표", series: [{ data: front.map((p) => [p.ci, p.day]), color: P.accent, width: 2 }] });
+    pts.forEach((p) => { ctx.fillStyle = p.dom ? P.faint : P.accent; ctx.beginPath(); ctx.arc(res.X(p.ci), res.Y(p.day), p.dom ? 2.6 : 4, 0, 7); ctx.fill(); });
+    ctx.strokeStyle = P.accent2; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(res.X(pick.ci), res.Y(pick.day), 8, 0, 7); ctx.stroke();
+    ctx.fillStyle = P.text; ctx.fillRect(res.X(b10.ci) - 5, res.Y(b10.day) - 5, 10, 10);
+    CPX.text(ctx, "B-10 형태", res.X(b10.ci) + 8, res.Y(b10.day) + 12, P.text, { size: 10.5, align: "left", halo: true });
+    CB.stat("cp-pa-o-n", front.length + " / " + N);
+    CB.stat("cp-pa-o-d", `${pick.W}×${pick.D} m · ${pick.n}층 · r ${pick.r.toFixed(2)}`);
+    CB.stat("cp-pa-o-c", `${CB.num(pick.ci, 1)} · ${CB.num(pick.day, 1)}`);
+    CB.stat("cp-pa-o-b", `${CB.num(b10.ci, 1)} · ${CB.num(b10.day, 1)}`);
+  }, { aspect: 0.66, maxHeight: 440, minHeight: 280 });
+})();
+
+/* ---------- 회귀 공통: 진짜 곡선, 체비쇼프 최소 제곱, t 분위 ---------- */
+const CPR = (function () {
+  const truth = (A) => 10 + 0.027 * A + 4.5e-7 * A * A;
+  const xs = (A) => A / 15000 - 1;
+  const basis = (x, p) => { const T = [1, x]; for (let k = 2; k <= p; k++) T.push(2 * x * T[k - 1] - T[k - 2]); return T.slice(0, p + 1); };
+  function fit(data, p) {
+    const n = data.length, m = p + 1, A = Array.from({ length: m }, () => Array(m).fill(0)), b = Array(m).fill(0);
+    data.forEach(([X, y]) => { const f = basis(xs(X), p); for (let i = 0; i < m; i++) { b[i] += f[i] * y; for (let j = 0; j < m; j++) A[i][j] += f[i] * f[j]; } });
+    for (let i = 0; i < m; i++) A[i][i] += 1e-9;
+    const Ai = CB.mat.inv(A); if (!Ai) return null;
+    const c = CB.mat.apply(Ai, b), f = (X) => basis(xs(X), p).reduce((s, v, i) => s + v * c[i], 0);
+    const sse = data.reduce((s, [X, y]) => s + (y - f(X)) ** 2, 0), dof = n - m, s2 = dof > 0 ? sse / dof : NaN;
+    const se = (X) => { const g = basis(xs(X), p), v = CB.mat.apply(Ai, g).reduce((s, q, i) => s + q * g[i], 0); return Math.sqrt(s2 * (1 + v)); };
+    return { f, se, dof, rmse: Math.sqrt(sse / n) };
+  }
+  /** t 분위(0.975) 근사(A&S 26.7.5) */
+  const t975 = (v) => { const z = 1.959964; if (!(v > 0)) return NaN; return z + (z ** 3 + z) / (4 * v) + (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * v * v) + (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * v ** 3); };
+  const gauss = (R) => { let u = 0, v = 0; while (u === 0) u = R(); v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  return { truth, fit, t975, gauss };
+})();
+
+/* ---------- 5. 공사비 회귀와 과적합 ---------- */
+(function () {
+  const gd = CB.range("cp-rg-d", (v) => v + "차", draw), gn = CB.range("cp-rg-n", (v) => v + "개", draw), ge = CB.range("cp-rg-e", (v) => (v * 100).toFixed(0) + " %", draw), gs = CB.range("cp-rg-s", (v) => v + "", draw);
+  function draw() { cv.redraw(); }
+  const cv = CB.canvas("#cp-cv-reg", (ctx, W, H) => {
+    const P = CB.palette(), R = CB.rng(gs() * 2654435761 % 4294967295 || 1), n = gn(), e = ge(), d = gd();
+    const train = [], test = [];
+    for (let k = 0; k < n; k++) { const A = R.range(1500, 15000); train.push([A, CPR.truth(A) * (1 + e * CPR.gauss(R))]); }
+    const R2 = CB.rng(991); for (let k = 0; k < 300; k++) { const A = R2.range(1500, 15000); test.push([A, CPR.truth(A) * (1 + e * CPR.gauss(R2))]); }
+    const rm = (f, D) => Math.sqrt(D.reduce((s, [A, y]) => s + (y - f(A)) ** 2, 0) / D.length);
+    const curves = []; for (let p = 1; p <= 9; p++) { const m = p < n - 1 ? CPR.fit(train, p) : null; curves.push(m ? [p, m.rmse, rm(m.f, test)] : [p, NaN, NaN]); }
+    const m = d < n - 1 ? CPR.fit(train, d) : null;
+    const split = W > 520, mw = split ? W * 0.68 : W, mh = split ? H : H * 0.66;
+    const res = CB.chart(ctx, { x: 58, y: 14, w: mw - 72, h: mh - 58 }, { x: [0, 20000], y: [0, 800], xLabel: "지상 연면적 (m²)", yLabel: "공사비 (억 원)", series: [] });
+    ctx.save(); ctx.beginPath(); ctx.rect(res.box.x, res.box.y, res.box.w, res.box.h); ctx.clip();
+    if (m) {
+      const t = CPR.t975(m.dof);
+      if (isFinite(t)) { ctx.fillStyle = CPX.alpha(P.accent, 0.13); ctx.beginPath(); for (let A = 0; A <= 20000; A += 200) ctx.lineTo(res.X(A), res.Y(m.f(A) + t * m.se(A))); for (let A = 20000; A >= 0; A -= 200) ctx.lineTo(res.X(A), res.Y(m.f(A) - t * m.se(A))); ctx.closePath(); ctx.fill(); }
+      ctx.strokeStyle = P.accent; ctx.lineWidth = 2.4; ctx.beginPath(); for (let A = 0; A <= 20000; A += 50) { const y = m.f(A); const Y = res.Y(CB.clamp(y, -1000, 2000)); A ? ctx.lineTo(res.X(A), Y) : ctx.moveTo(res.X(A), Y); } ctx.stroke();
+    }
+    ctx.strokeStyle = P.ok; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.8; ctx.beginPath(); for (let A = 0; A <= 20000; A += 200) A ? ctx.lineTo(res.X(A), res.Y(CPR.truth(A))) : ctx.moveTo(res.X(A), res.Y(CPR.truth(A))); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = CPX.alpha(P.text, 0.06); ctx.fillRect(res.X(1500), res.box.y, res.X(15000) - res.X(1500), res.box.h);
+    train.forEach(([A, y]) => { ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(res.X(A), res.Y(y), 3.6, 0, 7); ctx.fill(); });
+    ctx.restore();
+    ctx.strokeStyle = P.bad; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(res.X(7680), res.box.y); ctx.lineTo(res.X(7680), res.box.y + res.box.h); ctx.stroke(); ctx.setLineDash([]);
+    CPX.text(ctx, "B-10", res.X(7680) + 4, res.box.y + 10, P.bad, { size: 10.5, align: "left" });
+    CPX.text(ctx, "-- 진짜 곡선", res.box.x + 6, res.box.y + 10, P.ok, { size: 10.5, align: "left" });
+    // 오차 대 차수
+    const ib = split ? { x: mw + 40, y: 24, w: W - mw - 52, h: H - 80 } : { x: 58, y: mh + 18, w: W - 72, h: H - mh - 58 };
+    const ev = curves.flatMap((c) => [c[1], c[2]]).filter(isFinite), top = Math.min(Math.max(...ev, 1) * 1.1, 200);
+    CB.chart(ctx, ib, { x: [1, 9], y: [0, top], xTicks: [1, 3, 5, 7, 9], xLabel: "차수", series: [{ data: curves.filter((c) => isFinite(c[1])).map((c) => [c[0], c[1]]), color: P.accent, width: 2 }, { data: curves.filter((c) => isFinite(c[2])).map((c) => [c[0], Math.min(c[2], top * 1.5)]), color: P.bad, width: 2 }], vlines: [{ x: d, color: P.accent2 }] });
+    CPX.text(ctx, "RMSE (억 원)", ib.x, ib.y - 10, P.dim, { size: 10, align: "left", bold: false });
+    if (m) {
+      const t = CPR.t975(m.dof), y0 = m.f(7680), hw = t * m.se(7680);
+      CB.stat("cp-rg-o-tr", CB.num(m.rmse, 1) + " 억"); CB.stat("cp-rg-o-te", CB.num(rm(m.f, test), 1) + " 억");
+      CB.stat("cp-rg-o-p", isFinite(hw) ? `${CB.num(y0, 0)} ± ${CB.num(hw, 0)} 억` : CB.num(y0, 0) + " 억 (자유도 부족)");
+    } else { CB.stat("cp-rg-o-tr", "자료 부족"); CB.stat("cp-rg-o-te", "—"); CB.stat("cp-rg-o-p", "차수 &lt; n − 1 필요"); }
+    CB.stat("cp-rg-o-t", CB.num(CPR.truth(7680), 1) + " 억");
+  }, { aspect: (w) => (w > 520 ? 0.55 : 1.15), maxHeight: 460, minHeight: 300 });
+})();
+
+/* ---------- 6. 외삽과 편향 ---------- */
+(function () {
+  const glo = CB.range("cp-bi-lo", (v) => CB.sig(v, 3) + " m²", draw), ghi = CB.range("cp-bi-hi", (v) => CB.sig(v, 3) + " m²", draw), gq = CB.range("cp-bi-q", (v) => CB.sig(v, 3) + " m²", draw);
+  const mix = CB.seg("cp-bi-mix", draw), mod = CB.seg("cp-bi-mod", draw);
+  function draw() { cv.redraw(); }
+  const cv = CB.canvas("#cp-cv-bias", (ctx, W, H) => {
+    const P = CB.palette(), R = CB.rng(4242), lo = Math.min(glo(), ghi() - 1000), hi = Math.max(ghi(), lo + 1000), q = gq(), mx = mix(), p = Number(mod());
+    const data = [];
+    for (let k = 0; k < 40; k++) { const A = lo + (hi - lo) * R(); let y = CPR.truth(A) * (1 + 0.06 * CPR.gauss(R)), tag = 0; const u = R(); if (mx === "mixed" && u < 0.3) { y *= 0.55; tag = 1; } if (mx === "old" && u < 0.5) { y *= 0.78; tag = 2; } data.push([A, y, tag]); }
+    const m = CPR.fit(data.map((d) => [d[0], d[1]]), p), pred = m ? m.f(q) : NaN, tru = CPR.truth(q), err = (pred - tru) / tru;
+    const res = CB.chart(ctx, { x: 58, y: 14, w: W - 74, h: H - 58 }, { x: [0, 31000], y: [0, 1400], bands: [{ x0: lo, x1: hi, color: CPX.alpha(P.accent, 0.08) }], xLabel: "지상 연면적 (m²)", yLabel: "공사비 (억 원)",
+      series: [{ data: Array.from({ length: 63 }, (_, k) => [k * 500, CPR.truth(k * 500)]), color: P.ok, width: 1.8, dash: [6, 4] }, { data: m ? Array.from({ length: 63 }, (_, k) => [k * 500, m.f(k * 500)]) : [], color: P.accent, width: 2.4 }] });
+    data.forEach(([A, y, tag]) => { ctx.fillStyle = tag === 1 ? P.blue : tag === 2 ? P.warn : P.accent2; ctx.beginPath(); ctx.arc(res.X(A), res.Y(y), 3.5, 0, 7); ctx.fill(); });
+    ctx.strokeStyle = P.bad; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(res.X(q), res.Y(Math.min(1400, Math.max(0, pred)))); ctx.lineTo(res.X(q), res.Y(Math.min(1400, tru))); ctx.stroke();
+    ctx.fillStyle = P.bad; ctx.beginPath(); ctx.arc(res.X(q), res.Y(CB.clamp(pred, 0, 1400)), 5, 0, 7); ctx.fill();
+    CPX.text(ctx, "학습 범위", res.X((lo + hi) / 2), res.box.y + 10, P.accent, { size: 10.5 });
+    CPX.text(ctx, "-- 진짜(업무)", res.box.x + 6, res.box.y + 28, P.ok, { size: 10.5, align: "left" });
+    if (mx !== "office") CPX.text(ctx, mx === "mixed" ? "● 창고" : "● 옛 가격", res.box.x + 6, res.box.y + 44, mx === "mixed" ? P.blue : P.warn, { size: 10.5, align: "left" });
+    CB.stat("cp-bi-o-p", CB.num(pred, 0) + " 억"); CB.stat("cp-bi-o-t", CB.num(tru, 0) + " 억"); CB.stat("cp-bi-o-e", (err >= 0 ? "+" : "−") + CB.num(Math.abs(err) * 100, 1) + " %");
+    const out = q < lo ? lo - q : q > hi ? q - hi : 0;
+    CB.stat("cp-bi-o-r", out ? "범위 밖 " + CB.sig(out, 3) + " m²" : "범위 안");
+    const msg = document.getElementById("cp-bi-msg");
+    if (out && Math.abs(err) > 0.1) { msg.className = "cp-msg bad"; msg.innerHTML = "<b>외삽</b> — 질의가 학습 범위 밖이고 오차가 " + CB.num(Math.abs(err) * 100, 0) + " %입니다. 이 모델은 이 질문에 답할 근거가 없습니다."; }
+    else if (out) { msg.className = "cp-msg warn"; msg.innerHTML = "외삽이지만 이번에는 오차가 작습니다 — 우연일 수 있고, 데이터만으로는 그 사실을 알 수 없습니다."; }
+    else if (Math.abs(err) > 0.1) { msg.className = "cp-msg bad"; msg.innerHTML = "범위 안인데도 오차가 " + CB.num(Math.abs(err) * 100, 0) + " %입니다 — 데이터 구성(용도·시점)의 편향입니다."; }
+    else { msg.className = "cp-msg ok"; msg.innerHTML = "범위 안, 편향 없는 데이터 — 오차 " + CB.num(Math.abs(err) * 100, 1) + " %."; }
+  }, { aspect: 0.62, maxHeight: 440, minHeight: 280 });
+})();
+
+/* ---------- 7. 생성 매스 (3D) ---------- */
+(function () {
+  const SW = 48, SD = 40, LIM = { far: 8, bcr: 0.6, h: 60 };
+  const gw = CB.range("cp-ms-w", (v) => v + " m", upd), gd = CB.range("cp-ms-d", (v) => v + " m", upd), gn = CB.range("cp-ms-n", (v) => v + "층", upd);
+  const gp = CB.range("cp-ms-p", (v) => v + "층", upd), gsb = CB.range("cp-ms-s", (v) => v + " m", upd);
+  const zf = (k) => (k === 0 ? 0 : 5 + 4 * (k - 1)); // k층 바닥 높이
+  function mass(W, D, n, pf, s) {
+    pf = Math.min(pf, n); const Wt = Math.max(4, W - 2 * s), Dt = Math.max(4, D - 2 * s), hasT = n > pf && s > 0 && pf > 0;
+    const GFA = pf * W * D + (n - pf) * (hasT ? Wt * Dt : W * D), H = zf(n);
+    let Aw, Ar;
+    if (hasT) { Aw = 2 * (W + D) * zf(pf) + 2 * (Wt + Dt) * (H - zf(pf)); Ar = W * D; } else { Aw = 2 * (W + D) * H; Ar = W * D; }
+    return { W, D, n, pf, s: hasT ? s : 0, Wt, Dt, GFA, H, Aw, Ar, env: Aw + Ar, far: GFA / (SW * SD), bcr: (W * D) / (SW * SD), ok: W <= SW && D <= SD && H <= LIM.h && GFA / (SW * SD) <= LIM.far && (W * D) / (SW * SD) <= LIM.bcr };
+  }
+  const cur = () => mass(gw(), gd(), gn(), gp(), gsb());
+  function upd() {
+    const m = cur();
+    CB.stat("cp-ms-o-g", CB.sig(m.GFA, 4) + " m²"); CB.stat("cp-ms-o-f", CB.num(m.far * 100, 0) + " % · " + CB.num(m.bcr * 100, 0) + " %");
+    CB.stat("cp-ms-o-h", m.H + " m"); CB.stat("cp-ms-o-e", CB.sig(m.env, 4) + " m²"); CB.stat("cp-ms-o-k", CB.num(m.env / m.GFA, 3));
+    const msg = document.getElementById("cp-ms-msg"), bad = [];
+    if (m.far > LIM.far) bad.push("용적률"); if (m.bcr > LIM.bcr) bad.push("건폐율"); if (m.H > LIM.h) bad.push("높이");
+    if (bad.length) { msg.className = "cp-msg bad"; msg.innerHTML = "교육용 한도 초과: " + bad.join(", ") + " (용적률 800 %, 건폐율 60 %, 높이 60 m 가정)"; }
+    else { msg.className = "cp-msg ok"; msg.innerHTML = "제약 만족 · 목표 연면적 7,680 m² 대비 " + CB.signed(((m.GFA - 7680) / 7680) * 100, 1) + " %"; }
+    v.redraw();
+  }
+  function box(V, P, x0, y0, z0, x1, y1, z1, col, a) {
+    const f = [[[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], [[x1, y1, z0], [x0, y1, z0], [x0, y1, z1], [x1, y1, z1]], [[x0, y1, z0], [x0, y0, z0], [x0, y0, z1], [x0, y1, z1]], [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]]];
+    return f.map((pts) => ({ pts, col, a }));
+  }
+  const v = CB.orbit("#cp-cv-mass", { yaw: -0.7, pitch: 0.45, dist: 150, target: [0, 0, 18], fov: 0.85, aspect: 0.72, minHeight: 300, maxHeight: 480,
+    draw(V) {
+      const P = V.P, m = cur();
+      V.poly3([[-SW / 2, -SD / 2, 0], [SW / 2, -SD / 2, 0], [SW / 2, SD / 2, 0], [-SW / 2, SD / 2, 0]], { fill: P.ok, fillAlpha: 0.12, color: P.ok, width: 1.4, dash: [5, 4] });
+      const faces = [];
+      const zp = zf(m.s > 0 ? m.pf : m.n);
+      faces.push(...box(V, P, -m.W / 2, -m.D / 2, 0, m.W / 2, m.D / 2, zp, P.accent2, 0.55));
+      if (m.s > 0) faces.push(...box(V, P, -m.Wt / 2, -m.Dt / 2, zp, m.Wt / 2, m.Dt / 2, m.H, P.accent, 0.5));
+      faces.forEach((f) => (f.d = V.depth(f.pts))); faces.sort((a, b) => b.d - a.d);
+      faces.forEach((f) => V.poly3(f.pts, { fill: f.col, fillAlpha: f.a, color: P.dim, width: 0.9 }));
+      for (let k = 1; k < m.n; k++) { const z = zf(k), inT = m.s > 0 && k >= m.pf, w = inT ? m.Wt : m.W, d = inT ? m.Dt : m.D; V.poly3([[-w / 2, -d / 2, z], [w / 2, -d / 2, z], [w / 2, d / 2, z], [-w / 2, d / 2, z]], { color: P.faint, width: 0.6, stroke: true }); }
+      V.line3([0, 0, m.H], [0, 0, LIM.h], { color: P.bad, width: 1, dash: [3, 3] }); V.text3("높이 한도 60 m", [0, 0, LIM.h + 2], { color: P.bad, size: 11 });
+      V.text3("대지 48 × 40 m", [SW / 2, -SD / 2 - 4, 0], { color: P.ok, size: 11 });
+    } });
+  document.getElementById("cp-ms-gen").addEventListener("click", () => {
+    const R = CB.rng(2026); let best = null;
+    for (let k = 0; k < 400; k++) {
+      const W = Math.round(R.range(12, 48)), D = Math.round(R.range(10, 40)), n = Math.round(R.range(1, 20)), pf = R() < 0.5 ? 0 : Math.round(R.range(1, 6)), s = pf ? Math.round(R.range(1, 6)) : 0;
+      const m = mass(W, D, n, pf, s); if (!m.ok || Math.abs(m.GFA - 7680) / 7680 > 0.03) continue;
+      if (!best || m.env < best.env) best = m;
+    }
+    if (best) { gw.set(best.W, false); gd.set(best.D, false); gn.set(best.n, false); gp.set(best.pf, false); gsb.set(best.s, false); }
+    upd();
+  });
+  document.getElementById("cp-ms-b10").addEventListener("click", () => { gw.set(32, false); gd.set(24, false); gn.set(10, false); gp.set(0, false); gsb.set(0, false); upd(); });
+  upd();
+})();
+
+/* ---------- 8. 분류 임계값과 검증 부담 ---------- */
+(function () {
+  const N = 360;
+  const gp = CB.range("cp-cl-p", (v) => (v * 100).toFixed(0) + " % (" + CB.num(N * v, 1) + "개)", draw), gd = CB.range("cp-cl-d", (v) => v.toFixed(1), draw), gt = CB.range("cp-cl-t", (v) => v.toFixed(2), draw);
+  function draw() { cv.redraw(); }
+  const stats = (p, d, t) => { const tpr = 1 - CB.normCdf(t - d), fpr = 1 - CB.normCdf(t), TP = N * p * tpr, FP = N * (1 - p) * fpr, FN = N * p - TP; return { tpr, fpr, TP, FP, FN, prec: TP + FP > 1e-9 ? TP / (TP + FP) : NaN }; };
+  const cv = CB.canvas("#cp-cv-clf", (ctx, W, H) => {
+    const P = CB.palette(), p = gp(), d = gd(), t = gt(), s = stats(p, d, t);
+    const split = W > 520, bw = split ? W * 0.6 : W, bh = split ? H : H * 0.55;
+    const top = Math.max(N * (1 - p), N * p) * CB.normPdf(0) * 1.08;
+    const res = CB.chart(ctx, { x: 52, y: 14, w: bw - 64, h: bh - 56 }, { x: [-4, 8], y: [0, top], xLabel: "분류기 점수", yLabel: "요소 수 밀도",
+      series: [{ data: Array.from({ length: 121 }, (_, k) => { const x = -4 + k * 0.1; return [x, N * (1 - p) * CB.normPdf(x)]; }), color: P.dim, width: 2 }, { data: Array.from({ length: 121 }, (_, k) => { const x = -4 + k * 0.1; return [x, N * p * CB.normPdf(x, d)]; }), color: P.bad, width: 2.4 }], vlines: [{ x: t, color: P.accent2, label: "τ", width: 2, dash: [] }] });
+    ctx.fillStyle = CPX.alpha(P.accent2, 0.08); ctx.fillRect(res.X(t), res.box.y, res.box.x + res.box.w - res.X(t), res.box.h);
+    CPX.text(ctx, "정상 " + CB.num(N * (1 - p), 0), res.X(0), res.Y(N * (1 - p) * CB.normPdf(0)) - 10, P.dim, { size: 10.5 });
+    CPX.text(ctx, "오류 " + CB.num(N * p, 1), res.X(d), Math.max(res.box.y + 10, res.Y(N * p * CB.normPdf(0)) - 10), P.bad, { size: 10.5 });
+    CPX.text(ctx, "표시 →", res.X(t) + 6, res.box.y + 24, P.accent2, { size: 10.5, align: "left" });
+    // 정밀도–재현율 곡선
+    const ib = split ? { x: bw + 44, y: 24, w: W - bw - 56, h: H - 80 } : { x: 52, y: bh + 16, w: W - 64, h: H - bh - 56 };
+    const pr = []; for (let tt = 6; tt >= -3; tt -= 0.05) { const q = stats(p, d, tt); if (isFinite(q.prec)) pr.push([q.tpr, q.prec]); }
+    CB.chart(ctx, ib, { x: [0, 1], y: [0, 1], xLabel: "재현율", xTicks: [0, 0.5, 1], yTicks: [0, 0.5, 1], series: [{ data: pr, color: P.accent, width: 2 }], points: isFinite(s.prec) ? [{ x: s.tpr, y: s.prec, color: P.accent2, r: 5 }] : [] });
+    CPX.text(ctx, "정밀도", ib.x, ib.y - 10, P.dim, { size: 10, align: "left", bold: false });
+    CB.stat("cp-cl-o-f", CB.num(s.TP + s.FP, 1) + "개");
+    CB.stat("cp-cl-o-p", isFinite(s.prec) ? CB.num(s.prec * 100, 1) + " %" : "—");
+    CB.stat("cp-cl-o-r", CB.num(s.tpr * 100, 1) + " %");
+    CB.stat("cp-cl-o-m", CB.num(s.FN, 1) + "개");
+  }, { aspect: (w) => (w > 520 ? 0.52 : 1.1), maxHeight: 440, minHeight: 280 });
+})();
+</script>
+</body>
+</html>

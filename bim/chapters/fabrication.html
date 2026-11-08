@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>디지털 제작과 프리패브 · BIMBook</title>
+<meta name="description" content="모델에서 공장으로. DfMA, 철근 가공표와 굽힘 공제, 정척 절단 최적화(FFD), 모듈 분할과 운송 제약, 공차 누적의 최악·RSS·몬테카를로, 덕트 스풀 분할, CNC 경로, 조립 순서와 QR 추적을 B-10 BIM으로 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .fb-tbl td, .fb-tbl th { font-variant-numeric: tabular-nums; }
+  .fb-tbl td.fb-num { text-align: right; font-family: var(--mono); }
+  .fb-tbl tr.fb-sum td { font-weight: 700; border-top: 2px solid var(--border); }
+  .fb-msg { padding: 10px 18px; font-size: 14px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); min-height: 1.6em; line-height: 1.7; overflow-wrap: anywhere; }
+  .fb-msg b { color: var(--text); }
+  .fb-msg.ok { color: var(--ok); }
+  .fb-msg.bad { color: var(--bad); font-weight: 600; }
+  .fb-msg.warn { color: var(--warn); font-weight: 600; }
+  .fb-msg code { overflow-wrap: anywhere; }
+  .sim .table-wrap { margin: 0; border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; }
+</style>
+<link rel="stylesheet" href="../../shared/css/book-shell.css">
+<script defer src="../../shared/js/book-shell.js" data-book="bim"></script>
+</head>
+<body data-chapter="fabrication">
+<main class="chapter">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <marker id="fb-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--text-dim)"/></marker>
+      <marker id="fb-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="fb-ah-2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker>
+      <marker id="fb-ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    </defs>
+  </svg>
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 12</div>
+    <h1 data-no-glossary>디지털 제작과 프리패브</h1>
+    <p class="lead">11장은 현장을 재서 모델로 가져왔습니다. 이 장은 반대로 모델에서 <b>공장으로</b> 갑니다. 모델이 충분히 정확하면 도면을 사람이 다시 읽고 손으로 치수를 옮겨 적을 필요 없이, 철근 가공기·강재 절단기·덕트 성형기가 모델의 데이터를 바로 받아 부재를 만들 수 있습니다. 그러려면 설계가 처음부터 '만들고 조립하기 쉽게' 되어 있어야 하고(DfMA), 모델의 형상은 가공표·절단 목록·NC 데이터로 바뀌어야 하며, 정척 철근을 얼마나 버리지 않고 자를지, 모듈을 트럭에 실을 수 있게 어떻게 나눌지, 공장에서 만든 부재들의 작은 오차가 현장에서 쌓여 맞지 않는 일은 없을지를 계산해야 합니다. 이 장은 B-10 BIM의 큰보 G1 철근, 기준층 바닥, 급기 덕트를 공장 데이터로 바꾸며 그 계산을 차례로 합니다.</p>
+    <ul class="objectives">
+      <li>DfMA의 원리(부품 수 줄이기, 표준화, 반복, 공차를 고려한 설계)를 설명하고, 탈현장 시공의 스펙트럼에서 B-10의 선택지를 비교한다.</li>
+      <li>모델의 배근에서 철근 가공표(형상 코드, 치수, 절단 길이, 개수, 질량)를 만들고 굽힘 공제를 계산한다.</li>
+      <li>정척 철근의 1차원 절단 재고 문제를 순서대로 자르기와 최초 적합 감소(FFD)로 풀어 손실률을 비교하고, 정척 길이 선택의 영향을 판단한다.</li>
+      <li>B-10 기준층을 모듈로 나눠 모듈 수·유형 수와 운송 제약(폭·높이·길이, 형태)을 판정한다.</li>
+      <li>공차 누적을 최악 조건법·RSS·몬테카를로로 계산하고 분포 가정과 치우침의 영향을 설명한다.</li>
+      <li>덕트 스풀 분할, CNC 공구 경로, 조립 순서와 QR·ID 추적을 계산하고 모델의 GUID와 잇는다.</li>
+    </ul>
+    <div class="origin">
+      <div class="o-head"><small>이 정보가 없었다면</small><b>공장은 도면을 다시 그려야 했다</b></div>
+      <div class="o-body"><p>설계 도면은 '무엇을 지을지'를 말하지만 '어떻게 자르고 굽힐지'는 말하지 않습니다. 그래서 철근 가공 업체는 배근도를 보고 가공표를 손으로 다시 만들었고, 철골 제작사는 설계 도면에서 제작 도면을 새로 그렸으며, 덕트 업체는 현장 치수를 실측한 뒤에야 공장 제작을 시작했습니다. 같은 정보를 세 번, 네 번 옮겨 적는 동안 오기가 생기고, 현장에서 맞지 않는 부재는 잘라 내고 덧대는 재작업이 되었습니다.</p>
+        <p>제조업에서는 1980년대에 부스로이드(G. Boothroyd)와 듀허스트(P. Dewhurst)가 '조립하기 쉬운 설계'를 부품 수와 조립 시간으로 평가하는 방법을 체계화했고, 이것이 제조·조립을 고려한 설계(DfMA)로 알려졌습니다. 건설에서는 BIM이 그 정보의 통로가 되었습니다. 모델의 배근이 가공표가 되고, 모델의 강재가 NC 파일이 되고, 모델의 덕트가 스풀 도면이 되면, 공장은 도면을 다시 그리지 않고 모델을 '읽어서' 만들 수 있습니다.</p>
+        <div class="o-chain"><span>BIM 요소(형상·속성·GUID)</span><i>→</i><span class="tool">가공표 · 절단 최적화 · 모듈 분할 · 공차 누적 · 스풀 · NC · 조립 순서</span><i>→</i><span>공장 제작 · 운송 · 조립 · 추적</span></div></div>
+    </div>
+  </header>
+
+  <!-- =============================================================== 1 -->
+  <section id="dfma">
+    <h2>DfMA: 만들고 조립하기 쉬운 설계</h2>
+    <div class="problem"><strong>같은 바닥, 다른 부품 수</strong>
+      <p>B-10 기준층 바닥을 공장에서 만든다면, 크기가 제각각인 조각 30개로 나눌 수도 있고 같은 크기 20개로 나눌 수도 있습니다. 바닥 면적은 같습니다. 무엇이 달라질까요?</p></div>
+    <p><span class="term">DfMA</span><span class="en">(design for manufacture and assembly)</span>는 설계 단계에서 제작과 조립의 쉬움을 함께 따지는 설계 방식입니다. 건설에서는 부재를 공장에서 만들어 현장에서 조립하는 <span class="term">탈현장 시공</span><span class="en">(off-site construction, OSC)</span>과 함께 쓰이며, 영국 RIBA는 설계 업무 단계에 DfMA 관점을 덧붙인 지침(DfMA Overlay)을 내기도 했습니다. 탈현장 시공의 정도는 철근 선조립·PC 부재 같은 <b>부재</b>, 벽체·커튼월 유닛 같은 <b>패널</b>, 방 단위 상자인 <b>3차원 모듈</b>로 나뉩니다(SiteBook 16장, StructureBook 13장).</p>
+    <div class="callout def"><strong>원리 12.1 (DfMA의 다섯 가지 습관)</strong> ① <b>부품 수를 줄인다</b> — 접합과 취급이 부품 수에 비례해 는다. ② <b>표준화·반복</b> — 같은 부재를 많이 만들수록 지그·거푸집·프로그램을 다시 쓰고 학습 효과가 생긴다. ③ <b>격자에 맞춘다</b> — 모듈 경계를 구조 격자·코어와 맞춰 잘린 조각을 없앤다. ④ <b>운송과 양중이 크기를 정한다</b> — 도로·크레인의 한계 안에서 가장 큰 부재. ⑤ <b>공차를 설계한다</b> — 오차가 모이는 곳에 조정 이음을 둔다. 제조업의 조립성 평가에서는 이상적인 부품 수 \(N_{min}\)과 부품당 이상 조립 시간 3초로 설계 효율 \(E = 3N_{min}/t_{total}\)을 계산한다(부스로이드·듀허스트 형태). 건설에서는 숫자보다 '부품을 줄이고 반복하라'는 생각을 빌린다.</div>
+    <figure class="diagram" id="fig-fb-spectrum">
+      <svg viewBox="0 0 880 300" role="img" aria-label="탈현장 시공의 스펙트럼: 현장 타설, 부재, 패널, 3차원 모듈로 갈수록 공장 비율과 운송 크기가 커진다">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <g class="t-mono" text-anchor="middle">
+            <rect x="0" y="0" width="180" height="110" rx="10" class="f-elev"/><text x="90" y="26" style="fill:var(--text);font-weight:700">현장 타설</text><text x="90" y="50">거푸집·철근·타설</text><text x="90" y="70">모두 현장</text><text x="90" y="94" style="fill:var(--accent)">B-10 기본안</text>
+            <rect x="200" y="0" width="180" height="110" rx="10" class="f-elev"/><text x="290" y="26" style="fill:var(--text);font-weight:700">부재(1D)</text><text x="290" y="50">철근 가공·선조립</text><text x="290" y="70">PC 보·기둥, 철골</text><text x="290" y="94" style="fill:var(--accent)">이 장 3·4·8절</text>
+            <rect x="400" y="0" width="180" height="110" rx="10" class="f-elev"/><text x="490" y="26" style="fill:var(--text);font-weight:700">패널(2D)</text><text x="490" y="50">PC 바닥판·벽체</text><text x="490" y="70">커튼월 유닛, 덕트 스풀</text><text x="490" y="94" style="fill:var(--accent)">이 장 7·9절</text>
+            <rect x="600" y="0" width="180" height="110" rx="10" class="f-elev"/><text x="690" y="26" style="fill:var(--text);font-weight:700">모듈(3D)</text><text x="690" y="50">방 단위 상자</text><text x="690" y="70">마감·설비까지 공장</text><text x="690" y="94" style="fill:var(--accent)">이 장 5절</text>
+          </g>
+          <line x1="0" y1="150" x2="780" y2="150" style="stroke:var(--accent);stroke-width:3" marker-end="url(#fb-ah-acc)"/>
+          <text x="0" y="140" class="t-mono" style="fill:var(--accent)">공장 비율 · 품질 관리 · 공기 단축 →</text>
+          <line x1="780" y1="190" x2="0" y2="190" style="stroke:var(--accent-2);stroke-width:3" marker-end="url(#fb-ah-2)"/>
+          <text x="780" y="214" text-anchor="end" class="t-mono" style="fill:var(--accent-2)">← 설계 변경의 자유 · 운송 부담 작음</text>
+          <text x="390" y="246" text-anchor="middle" class="t-dim">오른쪽으로 갈수록 설계를 일찍 확정해야 하고, 모델의 정확도가 공장의 정확도가 된다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-1.</b> 탈현장 시공의 스펙트럼. 공장으로 옮기는 일이 많을수록 품질과 공기는 좋아지지만 설계 확정이 빨라야 하고 운송·양중·접합이 새 문제가 된다. 어느 쪽이든 공장이 받는 것은 모델에서 나온 데이터다.</figcaption>
+    </figure>
+    <p>DfMA의 효과는 '공장에서 만든다'는 사실보다 <b>정보가 끊기지 않는다</b>는 데서 나옵니다. 모델의 요소가 GUID(3장)를 가진 채 가공표의 한 줄, NC 파일 하나, 운송 목록의 한 항목, 설치 기록의 한 칸으로 이어지면, 어떤 부재가 언제 어디서 만들어져 어디에 설치되었는지를 끝까지 추적할 수 있습니다(9절).</p>
+    <figure class="diagram" id="fig-fb-flow">
+      <svg viewBox="0 0 880 300" role="img" aria-label="BIM 요소에서 철근 가공표, 강재 NC 데이터, 덕트 스풀 도면, 모듈 제작 도면으로 이어지는 제작 데이터 흐름">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="100" width="170" height="90" rx="10" class="f-acc-soft"/><text x="115" y="130" style="fill:var(--accent);font-weight:700">BIM 요소</text><text x="115" y="152">형상 · 속성 · GUID</text><text x="115" y="172">(LOD 400 상세, 4장)</text>
+          <rect x="270" y="28" width="250" height="50" rx="9" class="f-elev"/><text x="395" y="50" style="fill:var(--text);font-weight:700">철근 가공표</text><text x="395" y="68">형상 코드 · 절단 길이 · 개수</text>
+          <rect x="270" y="92" width="250" height="50" rx="9" class="f-elev"/><text x="395" y="114" style="fill:var(--text);font-weight:700">강재 NC 데이터</text><text x="395" y="132">절단 · 구멍 · 마킹(DSTV 등)</text>
+          <rect x="270" y="156" width="250" height="50" rx="9" class="f-elev"/><text x="395" y="178" style="fill:var(--text);font-weight:700">덕트·배관 스풀 도면</text><text x="395" y="196">이음 위치 · 길이 · 번호</text>
+          <rect x="270" y="220" width="250" height="50" rx="9" class="f-elev"/><text x="395" y="242" style="fill:var(--text);font-weight:700">모듈·PC 제작 도면</text><text x="395" y="260">분할 · 인양점 · 매립물</text>
+          <rect x="600" y="60" width="250" height="60" rx="10" class="f-elev"/><text x="725" y="86" style="fill:var(--text);font-weight:700">공장 기계</text><text x="725" y="106">가공기 · CNC · 로봇</text>
+          <rect x="600" y="170" width="250" height="60" rx="10" class="f-acc2-soft"/><text x="725" y="196" style="fill:var(--accent-2);font-weight:700">추적</text><text x="725" y="216">QR·ID → 운송 · 설치 · 검사</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.5;fill:none" marker-end="url(#fb-ah)">
+          <path d="M200 130C235 130 235 54 266 54"/><path d="M200 140C235 140 235 118 266 118"/><path d="M200 150C235 150 235 182 266 182"/><path d="M200 160C235 160 235 246 266 246"/>
+          <path d="M520 54C560 54 560 86 596 88"/><path d="M520 118C560 118 560 96 596 94"/><path d="M520 182C560 182 560 104 596 100"/><path d="M520 246C560 246 560 206 596 202"/><path d="M725 120V166"/>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-2.</b> 모델에서 제작 데이터로. 같은 요소가 공종에 따라 다른 제작 데이터가 된다. 강재 가공 기계에 절단·구멍 정보를 넘기는 파일 형식으로는 독일 강구조 협회의 DSTV NC 형식 등이 쓰이고, 일반 CNC 기계는 G 코드(ISO 6983 형태)로 움직인다. 어느 형식이든 모델의 GUID를 함께 실어 보내야 추적이 이어진다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== 2 -->
+  <section id="rebar-schedule">
+    <h2>철근 가공표: 배근에서 절단 길이로</h2>
+    <div class="problem"><strong>8.4 m라고 적힌 철근은 몇 m로 잘라야 하나</strong>
+      <p>ConcreteBook 16장의 G1 배근은 "하단 4-D25, 상단 연속 2-D25, 지점 상단 추가 4-D25, 스터럽 D13@150"입니다. 철근 가공 공장은 이 문장이 아니라 "마크 B1, D25, 직선, 8,400 mm, 4개"라는 표를 받아야 합니다. 갈고리가 붙은 철근의 바깥 치수를 그대로 더해 자르면 왜 길어질까요?</p></div>
+    <p>철근 가공 공장은 정척 철근을 잘라(절단) 굽혀(가공) 묶음으로 현장에 보냅니다. 그 지시서가 <span class="term">철근 가공표</span><span class="en">(bar bending schedule, BBS)</span>입니다. 한 줄에 마크, 호칭, <span class="term">형상 코드</span><span class="en">(shape code)</span>, 치수(A, B, C …), <span class="term">절단 길이</span><span class="en">(cut length)</span>, 개수, 질량을 적습니다. 형상 코드는 '직선', '한쪽 90° 갈고리', '폐합 스터럽'처럼 자주 쓰는 모양에 번호를 붙인 것으로, 영국 BS 8666이나 ISO 3766 같은 표준의 형상 번호 체계가 있습니다(형태, 이 장의 코드 S0·L2·ST는 교육용 기호). 모델의 철근 요소가 형상과 치수를 갖고 있으면 가공표는 질의 결과로 자동으로 나옵니다.</p>
+    <div class="callout def"><strong>원리 12.2 (굽힘 공제)</strong> 가공표의 치수는 철근 <b>바깥면</b>까지 잰다. 굽힌 부분의 실제 길이는 철근 중심선의 원호이므로, 바깥 치수를 그대로 더하면 굽힘마다 길이가 남는다. 안쪽 굽힘 반지름 \(r\), 지름 \(d_b\)인 철근의 90° 굽힘 하나에서
+      <div class="formula">$$L_{cut} = \sum \text{바깥 치수} - n_{90}\,\Delta_{90}, \qquad \Delta_{90} = 2(r + d_b) - \frac{\pi}{2}\left(r + \frac{d_b}{2}\right)$$<div class="where">\(n_{90}\): 90° 굽힘 수. \(r = 3d_b\)이면 \(\Delta_{90} = 8d_b - 1.5708\times3.5d_b \approx 2.5d_b\)(D25에서 약 64 mm). 굽힘 최소 반지름은 철근 지름에 따라 기준이 정한다(KDS 철근 상세의 표준 갈고리 형태: D25 이하 내면 반지름 \(3d_b\) 형태, 현행 확인). 공장마다 굽힘 기계의 실제 늘음을 반영한 공제표를 쓰므로, 이 식은 원리를 보이는 기하학적 값이다. 정확한 공제는 가공 업체와 맞춘다.</div></div></div>
+    <figure class="diagram" id="fig-fb-shape">
+      <svg viewBox="0 0 880 300" role="img" aria-label="교육용 형상 코드 S0 직선, L2 양쪽 90도 갈고리, ST 폐합 스터럽과 바깥 치수, 굽힘 중심선 원호">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(40,60)">
+          <text x="0" y="-20" class="t" style="font-weight:700">S0 직선</text>
+          <line x1="0" y1="20" x2="220" y2="20" style="stroke:var(--accent);stroke-width:7;stroke-linecap:butt"/>
+          <line x1="0" y1="44" x2="220" y2="44" style="stroke:var(--text-dim)" marker-start="url(#fb-ah)" marker-end="url(#fb-ah)"/><text x="110" y="62" text-anchor="middle" class="t-mono">A = 절단 길이</text>
+          <text x="0" y="100" class="t-mono">B1·T1(하단·상단 주근)</text><text x="0" y="120" class="t-mono">T2(지점 상단 추가근)</text>
+        </g>
+        <g transform="translate(320,60)">
+          <text x="0" y="-20" class="t" style="font-weight:700">L2 양쪽 90° 갈고리</text>
+          <path d="M6 110V30Q6 14 22 14H198Q214 14 214 30V110" style="fill:none;stroke:var(--accent);stroke-width:7"/>
+          <line x1="2" y1="-2" x2="218" y2="-2" style="stroke:var(--text-dim)" marker-start="url(#fb-ah)" marker-end="url(#fb-ah)"/><text x="110" y="-8" text-anchor="middle" class="t-mono">A(바깥)</text>
+          <line x1="232" y1="10" x2="232" y2="110" style="stroke:var(--text-dim)" marker-start="url(#fb-ah)" marker-end="url(#fb-ah)"/><text x="238" y="64" class="t-mono">B</text>
+          <circle cx="22" cy="30" r="3" style="fill:var(--bad)"/><text x="30" y="52" class="t-mono" style="fill:var(--bad)">r + d_b/2 원호</text>
+          <text x="0" y="140" class="t-mono">L = A + 2B − 2Δ₉₀</text>
+        </g>
+        <g transform="translate(650,50)">
+          <text x="0" y="-10" class="t" style="font-weight:700">ST 폐합 스터럽</text>
+          <rect x="20" y="10" width="80" height="150" rx="8" style="fill:none;stroke:var(--accent);stroke-width:5"/>
+          <path d="M28 20L52 44M38 14L62 38" style="stroke:var(--accent);stroke-width:5"/>
+          <text x="110" y="60" class="t-mono">135° 갈고리 ×2</text>
+          <text x="110" y="90" class="t-mono">중심선 둘레</text>
+          <text x="110" y="110" class="t-mono">2(307.3 + 607.3)</text>
+          <text x="110" y="130" class="t-mono">+ 2 × 10d_b</text>
+          <text x="110" y="150" class="t-mono">≈ 2,083 mm</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-3.</b> 이 장의 교육용 형상 코드. 치수는 바깥면 기준이고, 굽힌 부분은 중심선 원호(빨간 점이 중심)의 길이만큼만 철근이 든다. 스터럽은 MaterialsBook 예제 11.7의 규칙(중심선 둘레 + 갈고리 2 × 10d<sub>b</sub>)을 그대로 쓴다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fb-sched">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>철근 가공표 생성: G1 배근 → 형상 · 절단 길이 · 개수 · 질량</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fb-cv-sched" aria-label="G1 보 입면의 배근과 형상 코드별 철근 그림"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>배근</span><div class="seg" id="fb-sc-mode"><button data-value="cont" class="on">연속보 설계(4·2·8)</button><button data-value="simple">단순 보 근사(7·2·10)</button></div></div>
+          <label class="ctrl"><span>순경간 <output id="fb-sc-l-out"></output></span><input type="range" id="fb-sc-l" min="5.2" max="9.2" step="0.1" value="7.2"></label>
+          <label class="ctrl"><span>스터럽 간격 <output id="fb-sc-s-out"></output></span><input type="range" id="fb-sc-s" min="100" max="300" step="25" value="150"></label>
+          <div class="ctrl"><span>상단 연속근 T1 끝</span><div class="seg" id="fb-sc-hook"><button data-value="straight" class="on">직선</button><button data-value="hook">90° 갈고리 정착</button></div></div>
+          <label class="ctrl"><span>굽힘 반지름 r <output id="fb-sc-r-out"></output></span><input type="range" id="fb-sc-r" min="2" max="5" step="0.5" value="3"></label>
+        </div>
+      </div>
+      <div class="table-wrap" id="fb-sc-tbl"></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">합계(할증 3 %)</span><span class="v" id="fb-sc-o-w">—</span></div>
+        <div class="stat"><span class="k">D25 · D13</span><span class="v" id="fb-sc-o-m">—</span></div>
+        <div class="stat"><span class="k">가공 개수</span><span class="v" id="fb-sc-o-n">—</span></div>
+        <div class="stat"><span class="k">Δ<sub>90</sub>(D25)</span><span class="v" id="fb-sc-o-d">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 G1 한 개 409.6 kg(ConcreteBook 예제 16.10)을 확인하세요 · "단순 보 근사"로 바꾸면 537.5 kg(MaterialsBook 예제 11.7) · T1을 "90° 갈고리 정착"으로 바꾸면 바깥 치수 합보다 굽힘 공제 2 × Δ<sub>90</sub>만큼 짧게 잘라야 합니다 — r을 키우면 공제가 커집니다 · 스터럽 간격 100이면 73개로 늘어납니다 · 모델: 주근·상단 연속근 = 순경간 + 양쪽 0.6 m, 지점 추가근 = 순경간/3 + 0.6 m(2곳), 스터럽 ⌊순경간/s⌋ + 1개 × 2.083 m(400 × 700, 피복 40), 90° 갈고리 다리 12d<sub>b</sub>(형태), 단위 질량 D25 3.98 · D13 0.995 kg/m, 할증 3 %(관행 형태, 표준품셈 확인). 형상 코드는 교육용 기호.</div>
+    </div>
+    <div class="callout"><strong>예제 12.1 (G1 한 개의 가공표, 연속보 설계)</strong> 순경간 7.2 m, D25 3.98 kg/m, D13 0.995 kg/m.
+      <div class="table-wrap"><table class="fb-tbl">
+        <thead><tr><th>마크</th><th>호칭</th><th>형상</th><th>절단 길이 (m)</th><th>개수</th><th>질량 (kg)</th></tr></thead>
+        <tbody>
+          <tr><td>B1 하단 주근</td><td>D25</td><td>S0</td><td class="fb-num">8.400</td><td class="fb-num">4</td><td class="fb-num">133.7</td></tr>
+          <tr><td>T1 상단 연속</td><td>D25</td><td>S0</td><td class="fb-num">8.400</td><td class="fb-num">2</td><td class="fb-num">66.9</td></tr>
+          <tr><td>T2 지점 상단 추가</td><td>D25</td><td>S0</td><td class="fb-num">3.000</td><td class="fb-num">8</td><td class="fb-num">95.5</td></tr>
+          <tr><td>S1 스터럽</td><td>D13</td><td>ST</td><td class="fb-num">2.083</td><td class="fb-num">49</td><td class="fb-num">101.6</td></tr>
+          <tr class="fb-sum"><td colspan="5">합계 397.7 → 할증 3 %</td><td class="fb-num">409.6</td></tr>
+        </tbody></table></div>
+      <p><b>① 굽힘 공제</b> T1을 외부 기둥에 90° 갈고리로 정착하면, \(r = 3d_b = 76.2\) mm에서 \(\Delta_{90} = 2(76.2 + 25.4) - 1.5708\times(76.2 + 12.7) = 203.2 - 139.6 = 63.6\) mm. 갈고리 다리 바깥 치수 \(B = 12d_b + r + d_b = 406.4\) mm이면 \(L = 8{,}400 + 2\times406.4 - 2\times63.6 = 9{,}086\) mm다. 바깥 치수만 더한 9,213 mm로 자르면 갈고리가 127 mm씩 길게 나와 기둥 철근과 부딪힌다.</p>
+      <p><b>② 판단</b> 가공표는 '설계 물량'(ConcreteBook·MaterialsBook)과 같은 숫자를 다른 목적으로 쓴다. 물량은 무게(t)가 중요하지만 가공표는 한 가닥의 길이가 mm 단위로 맞아야 한다. 그래서 가공표는 LOD 400 수준의 철근 모델(4장)에서 뽑고, 굽힘 공제·이음 위치·정착 길이를 모델 규칙으로 넣어 둔다. 다음 절은 이 길이들을 정척 철근에서 어떻게 잘라 낼지 묻는다.</p></div>
+  </section>
+
+  <!-- =============================================================== 3 -->
+  <section id="cutting">
+    <h2>철근 절단 최적화: 1차원 절단 재고 문제</h2>
+    <div class="problem"><strong>12 m 철근에서 8.4 m를 자르면 3.6 m가 남는다</strong>
+      <p>G1 한 개에 D25가 8.4 m 6개, 3.0 m 8개 필요합니다. 철근은 정해진 길이(12 m, 8 m 등)로만 들어옵니다. 순서대로 자르면 12 m 원재료가 몇 개 들고, 얼마가 버려질까요? 8 m 원재료를 쓰면 8.4 m짜리는 어떻게 하나요?</p></div>
+    <p>철근은 공장에서 정해진 길이로 생산되어 들어옵니다. 이 길이를 <span class="term">정척</span><span class="en">(stock length)</span>이라 하며 8 m, 12 m 같은 길이가 흔히 쓰입니다(형태, 시장·규격 확인). 필요한 길이 목록을 정척에서 잘라 낼 때 남는 조각이 <span class="term">자투리</span><span class="en">(offcut)</span>입니다. 자투리를 최소로 하는 배치를 찾는 일이 <span class="term">1차원 절단 재고 문제</span><span class="en">(one-dimensional cutting stock problem)</span>입니다. 가장 적은 정척 수를 정확히 구하는 문제는 계산이 매우 어려운 부류(NP-난해)에 속하지만, 1961년 길모어(Gilmore)와 고모리(Gomory)의 선형 계획 방법 이후 큰 문제도 실용적으로 풀리고, 간단한 휴리스틱도 좋은 답을 줍니다.</p>
+    <div class="callout def"><strong>원리 12.3 (순서대로 자르기와 최초 적합 감소)</strong> 정척 길이 \(S\), 필요한 조각 \(\ell_1, \ell_2, \dots\).
+      <div class="formula">$$N \ge N_{LB} = \left\lceil \frac{\sum_i \ell_i}{S} \right\rceil, \qquad \text{손실률} = \frac{N S - \sum_i \ell_i}{N S}$$<div class="where"><b>순서대로 자르기</b>(next fit): 목록 순서대로, 지금 자르는 정척에 들어가면 자르고 안 들어가면 새 정척을 꺼낸다. <span class="term">최초 적합 감소</span><span class="en">(first-fit decreasing, FFD)</span>: 조각을 긴 것부터 정렬해, 들어가는 <b>첫 번째</b> 정척(남은 길이가 충분한 가장 앞의 것)에 넣고, 없으면 새 정척을 꺼낸다. FFD는 최악의 경우에도 최적 개수의 약 11/9배(작은 상수 추가)를 넘지 않음이 증명되어 있다. \(N_{LB}\)는 길이만 본 하한이라 실제 최적보다 느슨할 수 있다. 정척보다 긴 조각은 <span class="term">겹침 이음</span><span class="en">(lap splice)</span>으로 나눠야 하며 이음 길이만큼 철근이 는다(이음 위치는 구조 설계가 정한다, ConcreteBook 7장).</div></div></div>
+    <figure class="diagram" id="fig-fb-cut">
+      <svg viewBox="0 0 880 300" role="img" aria-label="12 m 정척에 8.4 m와 3.0 m 조각을 순서대로 배치한 것과 FFD로 배치한 것의 비교">
+        <rect x="10" y="10" width="860" height="280" rx="10" class="f-surface"/>
+        <g transform="translate(30,40)" class="t-mono">
+          <text x="0" y="0" class="t" style="font-weight:700">순서대로(8개)</text>
+          <g transform="translate(0,14)">
+            <rect x="0" y="0" width="235" height="14" style="fill:var(--accent)"/><rect x="235" y="0" width="101" height="14" style="fill:var(--warn);opacity:.55"/>
+            <rect x="0" y="20" width="235" height="14" style="fill:var(--accent)"/><rect x="235" y="20" width="101" height="14" style="fill:var(--warn);opacity:.55"/>
+            <text x="0" y="52">… 8.4 m 여섯 개마다 3.6 m 남김</text>
+            <rect x="0" y="62" width="235" height="14" style="fill:var(--accent)"/><rect x="235" y="62" width="84" height="14" style="fill:var(--accent-2)"/><rect x="319" y="62" width="17" height="14" style="fill:var(--bad)"/>
+            <rect x="0" y="82" width="84" height="14" style="fill:var(--accent-2)"/><rect x="84" y="82" width="84" height="14" style="fill:var(--accent-2)"/><rect x="168" y="82" width="84" height="14" style="fill:var(--accent-2)"/><rect x="252" y="82" width="84" height="14" style="fill:var(--accent-2)"/>
+            <rect x="0" y="102" width="84" height="14" style="fill:var(--accent-2)"/><rect x="84" y="102" width="84" height="14" style="fill:var(--accent-2)"/><rect x="168" y="102" width="84" height="14" style="fill:var(--accent-2)"/><rect x="252" y="102" width="84" height="14" style="fill:var(--warn);opacity:.55"/>
+            <text x="0" y="140">96 m 사용, 74.4 m 필요 → 손실 22.5 %</text>
+            <text x="0" y="160">(그중 21 m는 다시 쓸 수 있는 3.6 m 자투리)</text>
+          </g>
+        </g>
+        <g transform="translate(470,40)" class="t-mono">
+          <text x="0" y="0" class="t" style="font-weight:700">FFD(7개 = 하한)</text>
+          <g transform="translate(0,14)">
+            <rect x="0" y="0" width="235" height="14" style="fill:var(--accent)"/><rect x="235" y="0" width="84" height="14" style="fill:var(--accent-2)"/><rect x="319" y="0" width="17" height="14" style="fill:var(--bad)"/>
+            <rect x="0" y="20" width="235" height="14" style="fill:var(--accent)"/><rect x="235" y="20" width="84" height="14" style="fill:var(--accent-2)"/><rect x="319" y="20" width="17" height="14" style="fill:var(--bad)"/>
+            <text x="0" y="52">… 8.4 + 3.0 = 11.4 m, 여섯 개</text>
+            <rect x="0" y="62" width="84" height="14" style="fill:var(--accent-2)"/><rect x="84" y="62" width="84" height="14" style="fill:var(--accent-2)"/><rect x="168" y="62" width="168" height="14" style="fill:var(--warn);opacity:.55"/>
+            <text x="0" y="100">84 m 사용 → 손실 11.4 %</text>
+            <text x="0" y="120">순손실 3.6 m(4.3 %) + 6 m 자투리 1개</text>
+            <text x="0" y="150" style="fill:var(--accent)">■ 8.4 m</text><text x="90" y="150" style="fill:var(--accent-2)">■ 3.0 m</text><text x="180" y="150" style="fill:var(--warn)">■ 재사용 자투리</text><text x="0" y="170" style="fill:var(--bad)">■ 버리는 조각</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-4.</b> G1 한 개의 D25를 12 m 정척에서 자르기. 긴 조각부터 놓고 남은 자리에 짧은 조각을 끼워 넣는 FFD가 정척 하나를 아낀다. 순서대로 자르기의 3.6 m 자투리는 관리만 잘하면 다른 부재의 3.0 m로 쓸 수 있으므로, 손실률은 자투리 재사용 규칙과 함께 보아야 한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fb-cut">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>절단 최적화: 필요 길이 목록 → 정척 배치, 순서대로 vs FFD, 손실률</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fb-cv-cut" aria-label="정척 철근마다 잘라 낸 조각과 자투리를 색으로 보인 막대 그림"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>필요 목록</span><div class="seg" id="fb-ct-list"><button data-value="cont" class="on">G1 연속보</button><button data-value="simple">G1 단순 보 근사</button><button data-value="mix">슬래브·벽 혼합</button></div></div>
+          <label class="ctrl"><span>경간(묶음) 수 <output id="fb-ct-n-out"></output></span><input type="range" id="fb-ct-n" min="1" max="24" step="1" value="1"></label>
+          <div class="ctrl"><span>정척</span><div class="seg" id="fb-ct-stock"><button data-value="12" class="on">12 m</button><button data-value="8">8 m</button></div></div>
+          <div class="ctrl"><span>배치</span><div class="seg" id="fb-ct-alg"><button data-value="nf">순서대로</button><button data-value="ffd" class="on">FFD</button></div></div>
+          <label class="ctrl"><span>재사용 자투리 기준 <output id="fb-ct-re-out"></output></span><input type="range" id="fb-ct-re" min="0.5" max="3" step="0.1" value="1"></label>
+          <label class="ctrl"><span>겹침 이음 길이 <output id="fb-ct-lap-out"></output></span><input type="range" id="fb-ct-lap" min="1" max="2.5" step="0.01" value="1.81"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">정척 수(하한)</span><span class="v" id="fb-ct-o-b">—</span></div>
+        <div class="stat"><span class="k">손실률</span><span class="v" id="fb-ct-o-w">—</span></div>
+        <div class="stat"><span class="k">재사용 자투리</span><span class="v" id="fb-ct-o-r">—</span></div>
+        <div class="stat"><span class="k">순손실(버림)</span><span class="v" id="fb-ct-o-s">—</span></div>
+        <div class="stat"><span class="k">추가 이음</span><span class="v" id="fb-ct-o-j">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값(G1 한 개, 12 m, FFD)에서 7개, 손실 11.4 %(예제 12.2)를 확인하고 "순서대로"로 바꿔 8개 · 22.5 %와 비교하세요 · 경간 수를 24로 늘리면 FFD 손실이 4.6 %로 줄지만 하한(149)과 156개의 차이는 남습니다 — 8.4 m가 든 정척에는 3.6 m밖에 남지 않으므로 156개가 사실상 최적이고, 길이로만 센 하한이 느슨한 것입니다 · 정척을 8 m로 바꾸면 8.4 m가 들어가지 않아 겹침 이음으로 나뉘고, 정척 수와 철근 길이가 모두 늘어납니다 · 모델: 원리 12.3, 정척보다 긴 조각은 [정척, 나머지 + 이음 길이]로 나눔(이음 위치는 구조 검토 필요), 1.81 m는 D25 하단근 B급 이음 1.3ℓ<sub>d</sub>(ConcreteBook 7장 형태), "슬래브·벽 혼합"은 교육용 길이 목록, 그림은 앞의 40개 정척만.</div>
+    </div>
+    <div class="callout"><strong>예제 12.2 (G1 D25의 절단 계획)</strong> 필요 목록: 8.4 m × 6(B1·T1), 3.0 m × 8(T2), 합 74.4 m. 정척 12 m.
+      <p><b>① 하한</b> \(\lceil 74.4/12 \rceil = 7\)개.</p>
+      <p><b>② 순서대로</b> 8.4 m 여섯 개가 각각 새 정척을 열고(3.6 m씩 남김), 여섯 번째 정척의 남은 3.6 m에 3.0 m 하나, 나머지 3.0 m 일곱 개가 정척 두 개(4개 + 3개). 합 8개 = 96 m, 손실 \((96 - 74.4)/96 = 22.5\) %. 다만 남은 조각 중 21 m는 1 m 넘는 자투리다.</p>
+      <p><b>③ FFD</b> 8.4 m 여섯 개를 먼저 놓으면 각 정척에 3.6 m가 남아 3.0 m를 하나씩 끼운다(11.4 m). 남은 3.0 m 두 개가 정척 하나. 합 7개 = 84 m(하한과 같아 최적), 손실 11.4 %. 버리는 조각은 0.6 m × 6 = 3.6 m(4.3 %)이고 6 m 자투리 하나가 남는다.</p>
+      <p><b>④ 정척 8 m라면</b> 8.4 m는 8.0 m + (0.4 + 이음 1.81) = 2.21 m 두 조각이 되어 철근이 6 × 1.81 = 10.9 m 늘고, FFD로도 정척 12개 = 96 m가 든다. 같은 G1에 12 m는 84 m, 8 m는 96 m — 14 % 차이다.</p>
+      <p><b>⑤ 판단</b> 손실을 줄이는 길은 세 가지다. 여러 부재의 필요 목록을 <b>묶어서</b> 최적화하고(한 경간보다 한 층), 자투리를 길이별로 보관해 다음 목록에 먼저 쓰고, 설계 단계에서 철근 길이가 정척과 잘 맞도록 이음 위치와 정착 길이를 정한다(DfMA). 할증률 3 %(관행)는 이런 관리를 전제로 한 값이다.</p></div>
+  </section>
+
+  <!-- =============================================================== 4 -->
+  <section id="modular">
+    <h2>모듈러·프리캐스트 분할과 운송 제약</h2>
+    <div class="problem"><strong>기준층을 몇 개의 상자로 나눌까</strong>
+      <p>SiteBook 16장은 B-10 지상층을 모듈러로 바꾸는 대안에서 기준층을 "코어 제외 약 16유닛(약 3.6 × 12 m)"으로 어림했습니다. 실제로 32 × 24 m 바닥에서 가운데 16 × 8 m 코어를 빼고 3.6 × 12 m 상자로 나누면 몇 개가 되고, 모두 같은 크기일까요? 폭 3.6 m 상자는 트럭에 실을 수 있을까요?</p></div>
+    <p><span class="term">모듈러 건축</span><span class="en">(modular construction)</span>과 <span class="term">프리캐스트 콘크리트</span><span class="en">(precast concrete, PC)</span>는 바닥과 벽을 공장에서 만들 크기로 나누는 일, 곧 <b>분할</b>에서 시작합니다. 분할은 세 조건이 함께 정합니다. ① 구조·평면: 기둥 격자, 코어, 개구부와 경계가 맞아야 잘린 조각이 생기지 않는다. ② 반복: 같은 크기가 많을수록 공장 생산성이 높다(원리 12.1). ③ 운송·양중: 도로 위 차량은 폭·높이·길이·총중량 제한을 받고, 넘으면 운행 허가·호송·야간 운송이 필요하다. 이 책 앞 권들은 도로법령의 차량 운행 제한을 <b>폭 2.5 m, 높이 4.0 m, 길이 16.7 m, 총중량 40 t, 축하중 10 t</b>(형태, 현행 법령 확인)로 적었다(SiteBook 7장, StructureBook 13장). 모듈 폭은 흔히 이 폭을 넘으므로 허가 운송을 전제로 계획한다.</p>
+    <div class="callout def"><strong>정의 12.4 (분할과 운송 판정, 교육용)</strong> 바닥 \(W\times D\)를 한 방향 길이 \(L\), 다른 방향 폭 \(w\)의 직사각형으로 나눈다. 나머지 처리는 ① <b>끝에 몰기</b>(앞에서부터 \(L\)씩, 마지막이 짧은 조각) 또는 ② <b>균등 분배</b>(\(n = \lceil W/L\rceil\)개를 \(W/n\)씩)로 하고, 코어와 겹치는 부분은 잘라 낸다. 운송 단면은 모듈 폭 × (적재면 높이 + 모듈 높이), 운송 길이는 모듈의 긴 변이다. 이 장은 적재면 높이 1.0 m(저상 트레일러 형태)를 가정하고, 폭 2.5 m·높이 4.0 m·길이 16.7 m 가운데 하나라도 넘으면 "허가 운송", 짧은 변이 1.5 m 미만인 조각은 "현장 시공 권장"으로 판정한다(교육용 기준).</div>
+    <figure class="diagram" id="fig-fb-modular">
+      <svg viewBox="0 0 880 320" role="img" aria-label="B-10 기준층 32 × 24 m를 8 × 4 m 모듈 20개로 나눈 평면과 트레일러 위 모듈의 운송 단면">
+        <rect x="10" y="10" width="860" height="300" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <text x="0" y="-8" class="t" style="font-weight:700">격자에 맞춘 분할: 8 × 4 m × 20개</text>
+          <g style="stroke:var(--accent);stroke-width:1.2;fill:var(--accent-soft)">
+            <rect x="0" y="0" width="80" height="40"/><rect x="80" y="0" width="80" height="40"/><rect x="160" y="0" width="80" height="40"/><rect x="240" y="0" width="80" height="40"/>
+            <rect x="0" y="40" width="80" height="40"/><rect x="80" y="40" width="80" height="40"/><rect x="160" y="40" width="80" height="40"/><rect x="240" y="40" width="80" height="40"/>
+            <rect x="0" y="80" width="80" height="40"/><rect x="240" y="80" width="80" height="40"/><rect x="0" y="120" width="80" height="40"/><rect x="240" y="120" width="80" height="40"/>
+            <rect x="0" y="160" width="80" height="40"/><rect x="80" y="160" width="80" height="40"/><rect x="160" y="160" width="80" height="40"/><rect x="240" y="160" width="80" height="40"/>
+            <rect x="0" y="200" width="80" height="40"/><rect x="80" y="200" width="80" height="40"/><rect x="160" y="200" width="80" height="40"/><rect x="240" y="200" width="80" height="40"/>
+          </g>
+          <rect x="80" y="80" width="160" height="80" style="fill:var(--text-faint);opacity:.35;stroke:var(--text-dim)"/><text x="160" y="125" text-anchor="middle" class="t-mono" style="fill:var(--text)">코어(현장 타설)</text>
+          <text x="0" y="262" class="t-mono">768 − 128 = 640 m² = 20 × 32 m², 유형 1개</text>
+        </g>
+        <g transform="translate(470,60)">
+          <text x="0" y="-28" class="t" style="font-weight:700">운송 단면(뒤에서 본 모습)</text>
+          <line x1="0" y1="220" x2="340" y2="220" class="s-axis"/>
+          <rect x="60" y="180" width="200" height="16" style="fill:var(--text-dim)"/><circle cx="90" cy="206" r="13" style="fill:var(--text)"/><circle cx="230" cy="206" r="13" style="fill:var(--text)"/>
+          <rect x="40" y="52" width="240" height="128" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+          <text x="160" y="120" text-anchor="middle" class="t-mono" style="fill:var(--accent)">모듈 폭 4.0 × 높이 3.2</text>
+          <rect x="85" y="20" width="150" height="200" style="fill:none;stroke:var(--bad);stroke-width:1.8;stroke-dasharray:6 4"/>
+          <text x="240" y="16" class="t-mono" style="fill:var(--bad)">제한 2.5 × 4.0 m(형태)</text>
+          <text x="0" y="250" class="t-mono">적재면 1.0 + 3.2 = 4.2 m, 폭 4.0 m → 허가 운송</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-5.</b> 격자에 맞춘 분할(왼쪽)과 운송 단면(오른쪽). 8 m 격자와 코어 경계에 모듈 경계를 맞추면 바닥 전체가 같은 크기 20개로 나뉜다. 그러나 폭 4 m 상자는 폭 제한을 넘어 허가 운송이 필요하고, 모듈 높이와 적재면 높이의 합도 높이 제한을 넘는다. 분할은 평면 · 공장 · 도로가 함께 정한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fb-mod">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>모듈 분할: B-10 기준층 → 모듈 수 · 유형 수 · 운송 판정</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fb-cv-mod" aria-label="B-10 기준층 평면 위 모듈 분할, 유형별 색과 운송 단면"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>모듈 길이 L <output id="fb-md-l-out"></output></span><input type="range" id="fb-md-l" min="4" max="16" step="0.5" value="8"></label>
+          <label class="ctrl"><span>모듈 폭 w <output id="fb-md-w-out"></output></span><input type="range" id="fb-md-w" min="2.4" max="4.8" step="0.1" value="4"></label>
+          <label class="ctrl"><span>모듈 높이 h <output id="fb-md-h-out"></output></span><input type="range" id="fb-md-h" min="2.8" max="4.2" step="0.1" value="3.2"></label>
+          <div class="ctrl"><span>긴 변 방향</span><div class="seg" id="fb-md-dir"><button data-value="x" class="on">X(32 m)</button><button data-value="y">Y(24 m)</button></div></div>
+          <div class="ctrl"><span>나머지 처리</span><div class="seg" id="fb-md-fit"><button data-value="end">끝에 몰기</button><button data-value="even" class="on">균등 분배</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">층당 모듈(10층)</span><span class="v" id="fb-md-o-n">—</span></div>
+        <div class="stat"><span class="k">유형 수 · 최다 유형</span><span class="v" id="fb-md-o-t">—</span></div>
+        <div class="stat"><span class="k">운송 판정</span><span class="v" id="fb-md-o-tr">—</span></div>
+        <div class="stat"><span class="k">최대 모듈 무게</span><span class="v" id="fb-md-o-w">—</span></div>
+      </div>
+      <div class="fb-msg" id="fb-md-msg">—</div>
+      <div class="sim-note">해볼 것: 기본값(8 × 4 m, X 방향)에서 같은 크기 20개(10층 200개)를 확인하세요(예제 12.3) · SiteBook의 3.6 × 12 m로 바꾸고 "끝에 몰기"를 고르면 크기가 제각각인 22개(8가지 유형)가 나옵니다 · 폭을 2.5 m로 줄이면 폭 제한은 맞지만 36개로 늘고 코어 경계에 0.8 m짜리 조각이 생깁니다 · 길이를 16 m로 늘리면 개수는 12개로 줄지만 코어 옆이 8 m짜리 다른 유형이 됩니다 · 모델: 정의 12.4, 바닥 32 × 24 m, 코어 x 8–24 · y 8–16 m 제외, 무게 = 바닥 넓이 × 3.0 kN/m²(StructureBook 예제 13.8의 유닛 고정하중, 교육용), 주황 = 가장 많은 유형, 파랑 = 다른 유형, 빨강 = 짧은 변 1.5 m 미만.</div>
+    </div>
+    <div class="callout"><strong>예제 12.3 (기준층 분할 두 가지)</strong> B-10 기준층 32 × 24 m, 코어 16 × 8 m(x 8–24, y 8–16).
+      <p><b>① 3.6 × 12 m, X 방향, 끝에 몰기</b> x를 0–12–24–32로, y를 3.6 m씩 0–3.6–…–21.6–24로 나누면 조각은 21개, 코어와 겹친 조각을 잘라 내면 22개, 크기는 12 × 3.6(6개), 8 × 3.6(9개) 등 8가지다. SiteBook 16장의 "약 16유닛"은 넓이(640 ÷ 43.2 ≈ 15)로 어림한 값이고, 실제 분할은 코어와 격자 때문에 더 잘게 나뉜다.</p>
+      <p><b>② 8 × 4 m, X 방향</b> 8 m 격자와 코어 경계(y 8, 16)가 모두 4 m의 배수라 잘리는 조각이 없다. 640/32 = 20개, 유형 1개, 10층 200개. 무게는 32 × 3.0 = 96 kN(약 9.8 t, 교육용).</p>
+      <p><b>③ 운송</b> 폭 4.0 m > 2.5 m, 높이 1.0 + 3.2 = 4.2 m > 4.0 m → 허가 운송(형태). 길이 8 m는 문제없다.</p>
+      <p><b>④ 판단</b> 유형 수는 공장의 거푸집·지그 수이고, 모듈 수는 양중 횟수와 접합부 수다. ②는 반복성과 접합부 수에서 ①보다 낫지만 모든 모듈이 허가 운송이다. 폭을 2.5 m로 줄이면 운송은 쉬워지지만 모듈이 36개로 늘고 접합부(현장 마감·방수 위험)가 함께 는다. 이 맞바꿈은 평면 설계 단계에서 정해야 한다 — 기둥 격자를 정한 뒤에 모듈을 맞추는 것이 아니라, 모듈과 운송 조건을 알고 격자를 정하는 것이 DfMA다.</p></div>
+  </section>
+
+  <!-- =============================================================== 5 -->
+  <section id="tolerance">
+    <h2>공차 누적과 조립</h2>
+    <div class="problem"><strong>3 mm씩 틀린 모듈 여덟 개</strong>
+      <p>폭 4 m 모듈 여덟 개를 한 줄로 32 m에 늘어놓습니다. 모듈마다 길이 공차가 ±3 mm, 모듈 사이 이음 간격이 20 ± 2 mm입니다. 마지막 모듈은 반대편 기둥 면과 맞을까요? 최악이면 얼마나 틀리고, 실제로는 얼마쯤 틀릴까요?</p></div>
+    <p>공장 부재는 정밀하지만 오차가 0은 아닙니다. 부재 하나하나의 허용 오차, 곧 <span class="term">공차</span><span class="en">(tolerance)</span>는 작아도, 여러 부재를 한 줄로 이으면 오차가 더해집니다. 이것이 <span class="term">공차 누적</span><span class="en">(tolerance stack-up)</span>입니다. 현장 타설 공사는 다음 층 거푸집에서 오차를 흡수하지만, 공장 부재는 이미 굳은 치수로 오므로 누적 오차를 계산해 <b>조정 이음</b>(길이를 조절할 수 있는 이음, 현장 타설 띠, 끼움판)을 어디에 둘지 미리 정해야 합니다. 건축 공차의 원칙을 다루는 국제 표준으로 ISO 3443 같은 것이 있다(형태).</p>
+    <div class="callout def"><strong>원리 12.5 (최악 조건법과 RSS)</strong> 한 줄로 이어진 \(n\)개 요소의 공차가 \(\pm t_i\)일 때 전체 길이의 오차는
+      <div class="formula">$$T_{WC} = \sum_{i=1}^{n} t_i, \qquad T_{RSS} = \sqrt{\sum_{i=1}^{n} t_i^2}$$<div class="where"><span class="term">최악 조건법</span><span class="en">(worst case)</span> \(T_{WC}\)는 모든 요소가 한꺼번에 같은 쪽 한계에 있을 때로, 절대 넘지 않지만 지나치게 보수적이다. <span class="term">RSS</span><span class="en">(root sum square)</span> 통계적 방법은 요소 오차가 서로 <b>독립</b>이고 평균이 0인 정규 분포이며 \(\pm t_i = \pm3\sigma_i\)라고 볼 때 전체의 \(\pm3\sigma\)다. 가정이 깨지면 틀린다: 오차가 균등 분포면 \(\sigma_i = t_i/\sqrt3\)로 더 퍼지고, 모든 부재가 같은 거푸집에서 나와 한쪽으로 <b>치우치면</b>(평균 \(\mu\)) 치우침은 \(n\mu\)로 그대로 더해진다. 분포를 가정하기 어려우면 <span class="term">몬테카를로 모의실험</span><span class="en">(Monte Carlo simulation)</span>으로 직접 뽑아 본다.</div></div></div>
+    <figure class="diagram" id="fig-fb-tol">
+      <svg viewBox="0 0 880 290" role="img" aria-label="모듈 여덟 개와 이음 일곱 개가 한 줄로 이어진 공차 사슬과 최악 조건, RSS 분포 비교">
+        <rect x="10" y="10" width="860" height="270" rx="10" class="f-surface"/>
+        <g transform="translate(40,50)">
+          <g style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4">
+            <rect x="0" y="0" width="90" height="40"/><rect x="96" y="0" width="90" height="40"/><rect x="192" y="0" width="90" height="40"/><rect x="288" y="0" width="90" height="40"/><rect x="384" y="0" width="90" height="40"/><rect x="480" y="0" width="90" height="40"/><rect x="576" y="0" width="90" height="40"/><rect x="672" y="0" width="90" height="40"/>
+          </g>
+          <g class="t-mono" text-anchor="middle"><text x="45" y="25">±3</text><text x="141" y="25">±3</text><text x="237" y="25">±3</text><text x="333" y="25">±3</text><text x="429" y="25">±3</text><text x="525" y="25">±3</text><text x="621" y="25">±3</text><text x="717" y="25">±3</text></g>
+          <g style="fill:var(--accent-2)"><rect x="90" y="-6" width="6" height="52"/><rect x="186" y="-6" width="6" height="52"/><rect x="282" y="-6" width="6" height="52"/><rect x="378" y="-6" width="6" height="52"/><rect x="474" y="-6" width="6" height="52"/><rect x="570" y="-6" width="6" height="52"/><rect x="666" y="-6" width="6" height="52"/></g>
+          <text x="96" y="66" class="t-mono" style="fill:var(--accent-2)">이음 20 ± 2 mm × 7</text>
+          <line x1="0" y1="84" x2="762" y2="84" style="stroke:var(--text-dim)" marker-start="url(#fb-ah)" marker-end="url(#fb-ah)"/><text x="381" y="102" text-anchor="middle" class="t-mono">32 m 전체: 오차가 누적되는 사슬</text>
+          <g transform="translate(120,130)">
+            <line x1="0" y1="90" x2="520" y2="90" class="s-axis"/>
+            <path d="M120 90C190 90 220 10 260 10C300 10 330 90 400 90" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+            <line x1="200" y1="0" x2="200" y2="96" style="stroke:var(--accent);stroke-dasharray:4 3"/><line x1="320" y1="0" x2="320" y2="96" style="stroke:var(--accent);stroke-dasharray:4 3"/>
+            <line x1="20" y1="0" x2="20" y2="96" style="stroke:var(--bad);stroke-dasharray:4 3"/><line x1="500" y1="0" x2="500" y2="96" style="stroke:var(--bad);stroke-dasharray:4 3"/>
+            <text x="320" y="-4" class="t-mono" style="fill:var(--accent)">RSS ±10</text><text x="500" y="-4" class="t-mono" style="fill:var(--bad)">최악 ±38 mm</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-6.</b> 공차 사슬. 모듈 여덟 개(±3 mm)와 이음 일곱 개(±2 mm)가 32 m를 이룬다. 최악 조건은 ±38 mm지만 오차들이 서로 상쇄되므로 실제 분포는 대개 RSS 폭 ±10 mm 안에 모인다 — 단, 오차가 독립이고 치우침이 없을 때만.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fb-tol">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>공차 누적: 부재 수 · 개별 공차 → 누적 편차 분포, 최악 vs RSS vs 몬테카를로</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fb-cv-tol" aria-label="몬테카를로로 뽑은 누적 편차 히스토그램과 최악·RSS·허용 한계선"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>부재 수 n <output id="fb-tl-n-out"></output></span><input type="range" id="fb-tl-n" min="2" max="20" step="1" value="8"></label>
+          <label class="ctrl"><span>부재 공차 ±t <output id="fb-tl-t-out"></output></span><input type="range" id="fb-tl-t" min="1" max="10" step="0.5" value="3"></label>
+          <label class="ctrl"><span>이음 공차 ±g <output id="fb-tl-g-out"></output></span><input type="range" id="fb-tl-g" min="0" max="5" step="0.5" value="2"></label>
+          <div class="ctrl"><span>부재 오차 분포</span><div class="seg" id="fb-tl-dist"><button data-value="norm" class="on">정규(±t = 3σ)</button><button data-value="unif">균등</button><button data-value="bias">치우침(+t/3)</button></div></div>
+          <label class="ctrl"><span>허용 누적 ±T <output id="fb-tl-a-out"></output></span><input type="range" id="fb-tl-a" min="5" max="40" step="1" value="15"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최악 조건</span><span class="v" id="fb-tl-o-wc">—</span></div>
+        <div class="stat"><span class="k">RSS(±3σ)</span><span class="v" id="fb-tl-o-rss">—</span></div>
+        <div class="stat"><span class="k">모의 99.7 % 범위</span><span class="v" id="fb-tl-o-mc">—</span></div>
+        <div class="stat"><span class="k">허용 초과 확률</span><span class="v" id="fb-tl-o-p">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 기본값에서 최악 ±38 mm, RSS ±10 mm, 모의 결과가 RSS와 거의 같은 것을 확인하세요(예제 12.4) · "균등"으로 바꾸면 같은 ±3 mm라도 분포가 넓어져 99.7 % 범위가 약 ±15 mm로 RSS를 넘습니다 — RSS의 ±t = 3σ 가정이 깨진 것입니다 · "치우침"은 모든 부재가 +1 mm씩 길게 나온 경우로 분포 전체가 +8 mm 옮겨 가 허용 초과가 급증합니다 · 부재 수를 두 배로 늘리면 최악은 두 배, RSS는 √2배입니다 · 모델: 원리 12.5, 이음 오차는 정규(±g = 3σ), 몬테카를로 20,000회(<code>CB.rng</code> 시드 고정), 허용 초과 확률 = |합| &gt; T인 비율.</div>
+    </div>
+    <div class="callout"><strong>예제 12.4 (32 m 줄의 누적 오차)</strong> 모듈 8개(±3 mm), 이음 7개(±2 mm), 마지막 모듈과 기둥 면 사이에 허용 ±15 mm.
+      <p><b>① 최악</b> \(8\times3 + 7\times2 = 38\) mm. 허용 15 mm를 넘는다.</p>
+      <p><b>② RSS</b> \(\sqrt{8\times3^2 + 7\times2^2} = \sqrt{72 + 28} = 10\) mm. 정규·독립이면 99.7 %가 ±10 mm 안이므로 허용한다.</p>
+      <p><b>③ 균등 분포라면</b> 부재 \(\sigma = 3/\sqrt3 = 1.73\) mm, 이음 \(\sigma = 2/3\) mm → 전체 \(\sigma = \sqrt{8\times3 + 7\times0.444} = 5.2\) mm, \(\pm3\sigma = \pm15.6\) mm로 허용에 빠듯하다.</p>
+      <p><b>④ 판단</b> 최악 조건으로 설계하면 이음을 지나치게 넓혀야 하고, RSS만 믿으면 같은 거푸집에서 나온 부재의 치우침을 놓친다. 실무 해법은 <b>조정 이음</b>을 줄 가운데나 끝에 하나 두어 누적 오차를 흡수하고, 공장 검사에서 치우침(평균)을 따로 관리하는 것이다. 현장의 실제 기둥 위치는 11장의 스캔으로 먼저 재서, 공장 부재를 '설계 위치'가 아니라 '실측 위치'에 맞춰 만든다.</p></div>
+  </section>
+
+  <!-- =============================================================== 6 -->
+  <section id="spools">
+    <h2>덕트·배관 스풀 분할</h2>
+    <div class="problem"><strong>31 m 덕트를 어디서 자를까</strong>
+      <p>B-10 각 층의 급기 덕트(1,000 × 400)는 복도를 따라 31 m 이어집니다. 공장에서 통째로 만들 수는 없으니 운반·양중할 수 있는 길이로 나눠야 합니다. 그런데 큰보 바로 아래에서 이음을 만들면 플랜지 볼트를 조일 손이 들어가지 않습니다. 이음은 어디에, 몇 개 둘까요?</p></div>
+    <p>공장에서 미리 만든 배관·덕트 조각을 <span class="term">스풀</span><span class="en">(spool)</span>이라 합니다. 모델에서 경로가 확정되면(6장 간섭 해결 뒤) 경로를 스풀로 나누고 번호를 붙여 공장 제작 도면과 설치 순서를 만듭니다. 나누는 규칙은 ① 최대 길이(운반 차량, 양중, 엘리베이터·반입구, 현장 작업 공간), ② 이음을 둘 수 없는 곳(보 아래, 벽 관통부, 행거 위치), ③ 최소 길이(너무 짧은 조각은 비효율)입니다. B-10 BIM의 덕트는 기본 높이에서 큰보 세 곳과 부딪히므로(6장, 간섭 30건), 이 절은 천장 아래 0.95 m로 내려 간섭을 해결한 경로(<code>model({ ductDrop: 0.95 })</code>)를 나눕니다.</p>
+    <div class="callout def"><strong>원리 12.6 (탐욕적 스풀 분할)</strong> 시작점 \(x_0\)에서 출발해, 다음 이음을 \(x_0 + L_{max}\) 이하에서 <b>가장 먼 허용 위치</b>에 둔다. 허용 위치는 금지 구간(보 중심 ± \(a\))이 아니고 \(x_0 + L_{min}\) 이상이어야 한다. 끝까지 반복한다. 스풀 수의 하한은 \(\lceil L_{total}/L_{max}\rceil\)이고, 금지 구간이 이음을 앞당기면 하한보다 늘 수 있다. 금지 구간 폭이 \(L_{max} - L_{min}\)보다 넓으면 해가 없다. 탐욕법은 스풀 수를 최소로 하지만 마지막 스풀이 짧게 남기 쉬우므로, 실무에서는 길이를 고르게 다시 나누어 유형 수를 줄인다(교육용 모델).</div>
+    <figure class="diagram" id="fig-fb-spool">
+      <svg viewBox="0 0 880 270" role="img" aria-label="큰보 아래를 지나는 덕트를 스풀로 나눈 입면: 보 아래 이음 금지 구간과 이음 위치">
+        <rect x="10" y="10" width="860" height="250" rx="10" class="f-surface"/>
+        <g transform="translate(40,40)">
+          <rect x="0" y="0" width="800" height="14" style="fill:var(--text-dim);opacity:.6"/><text x="804" y="11" class="t-mono">슬래브</text>
+          <g style="fill:var(--text-dim);opacity:.85"><rect x="-5" y="14" width="10" height="40"/><rect x="195" y="14" width="10" height="40"/><rect x="395" y="14" width="10" height="40"/><rect x="595" y="14" width="10" height="40"/><rect x="795" y="14" width="10" height="40"/></g>
+          <g style="fill:var(--bad);opacity:.18"><rect x="185" y="54" width="30" height="80"/><rect x="385" y="54" width="30" height="80"/><rect x="585" y="54" width="30" height="80"/></g>
+          <rect x="12" y="80" width="775" height="30" style="fill:color-mix(in srgb, var(--blue) 25%, transparent);stroke:var(--blue);stroke-width:1.6"/>
+          <g style="stroke:var(--text);stroke-width:3"><line x1="162" y1="74" x2="162" y2="116"/><line x1="312" y1="74" x2="312" y2="116"/><line x1="462" y1="74" x2="462" y2="116"/><line x1="585" y1="74" x2="585" y2="116"/><line x1="735" y1="74" x2="735" y2="116"/></g>
+          <g class="t-mono" text-anchor="middle"><text x="87" y="140">6.0</text><text x="237" y="140">6.0</text><text x="387" y="140">6.0</text><text x="523" y="140">4.9</text><text x="660" y="140">6.0</text><text x="761" y="140">2.1</text></g>
+          <text x="200" y="170" class="t-mono" style="fill:var(--bad)">빨강 = 보 아래 이음 금지(± 0.6 m)</text>
+          <text x="0" y="196" class="t-mono">x = 0.5 → 31.5 m, 최대 6 m: 스풀 6개, 이음 5개(넷째 이음이 24.5 → 23.4 m로 당겨짐)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-7.</b> 급기 덕트의 스풀 분할(입면, 예제 12.5). 보 아래 금지 구간을 피해 이음을 놓으면 일부 스풀이 짧아진다. 탐욕법의 마지막 2.1 m 스풀처럼 짧은 조각은 다른 스풀과 길이를 나눠 고르게 만드는 것이 좋다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fb-spool">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>스풀 분할: 경로 길이 · 최대 스풀 길이 · 금지 구간 → 스풀 수와 이음 수</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fb-cv-spool" aria-label="B-10 한 층의 큰보 아래 덕트 또는 배관 입면과 스풀 이음 위치"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>계통</span><div class="seg" id="fb-sp-sys"><button data-value="duct" class="on">급기 덕트 1,000 × 400</button><button data-value="pipe">스프링클러 주관 φ100</button></div></div>
+          <label class="ctrl"><span>최대 스풀 길이 <output id="fb-sp-l-out"></output></span><input type="range" id="fb-sp-l" min="1.5" max="12" step="0.1" value="6"></label>
+          <label class="ctrl"><span>보 아래 금지 ±a <output id="fb-sp-k-out"></output></span><input type="range" id="fb-sp-k" min="0" max="1.5" step="0.05" value="0.6"></label>
+          <label class="ctrl"><span>최소 스풀 길이 <output id="fb-sp-m-out"></output></span><input type="range" id="fb-sp-m" min="0.5" max="2" step="0.1" value="1"></label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">스풀(10층)</span><span class="v" id="fb-sp-o-n">—</span></div>
+        <div class="stat"><span class="k">이음(10층)</span><span class="v" id="fb-sp-o-j">—</span></div>
+        <div class="stat"><span class="k">길이 유형</span><span class="v" id="fb-sp-o-t">—</span></div>
+        <div class="stat"><span class="k">하한 ⌈L/L<sub>max</sub>⌉</span><span class="v" id="fb-sp-o-lb">—</span></div>
+      </div>
+      <div class="fb-msg" id="fb-sp-msg">—</div>
+      <div class="sim-note">해볼 것: 기본값에서 스풀 6개 · 이음 5개(예제 12.5)를 확인하세요 · 금지 폭을 0으로 하면 이음이 24.5 m에 놓여 6.0 m 스풀이 다섯 개 + 1.0 m가 됩니다 · 최대 길이를 8 m로 늘리면 하한이 4개로 줄지만 금지 구간 때문에 실제로 몇 개인지 보세요 · 금지 폭을 1.5 m, 최대 길이를 3 m로 하면 이음을 둘 곳이 없어 분할이 불가능합니다 · 스프링클러 주관은 보 관통 슬리브 구간을 금지로 봅니다 · 모델: 원리 12.6, B-10 BIM의 덕트(<code>DU-SA</code>, x 0.5–31.5 m, <code>ductDrop</code> 0.95로 간섭 해결)·배관(<code>SP-MAIN</code>, 같은 x 범위), 금지 중심 = Y 방향 큰보 x = 8, 16, 24 m, 층마다 같은 분할(교육용).</div>
+    </div>
+    <div class="callout"><strong>예제 12.5 (급기 덕트 한 층의 스풀)</strong> 경로 x = 0.5–31.5 m(31 m), 최대 6 m, 최소 1 m, 금지 구간 [7.4, 8.6], [15.4, 16.6], [23.4, 24.6] m.
+      <p><b>① 탐욕 분할</b> 0.5 → 6.5 → 12.5 → 18.5 → (24.5는 금지, 23.4로 당김) → 29.4 → 끝 31.5. 스풀 6.0 · 6.0 · 6.0 · 4.9 · 6.0 · 2.1 m, 6개, 이음 5개. 하한 \(\lceil 31/6 \rceil = 6\)이므로 개수는 최소다.</p>
+      <p><b>② 고르게</b> 같은 6개를 약 5.2 m씩 나누면 이음이 5.7, 10.8, 16.0, 21.2, 26.3 m인데 16.0 m가 금지 구간이다. 셋째 이음을 15.4 m로 옮기면 5.2 · 5.2 · 4.6 · 5.8 · 5.2 · 5.2 m로 모두 4.6–5.8 m 안에 든다.</p>
+      <p><b>③ 판단</b> 스풀 수는 같아도 길이가 고르면 운반 묶음·양중 계획이 단순해지고, 10개 층이 같은 분할을 쓰면 스풀 유형이 층마다 반복되어 공장 지그를 다시 쓴다. 스풀 번호는 덕트 요소의 GUID에 순번을 붙여(예: <code>DU-SA-3F/S04</code>) 제작·운송·설치 기록을 잇는다.</p></div>
+  </section>
+
+  <!-- =============================================================== 7 -->
+  <section id="cnc">
+    <h2>CNC와 로봇: 공구 경로 맛보기</h2>
+    <div class="problem"><strong>구멍 24개를 어떤 순서로 뚫을까</strong>
+      <p>철골 접합판에 볼트 구멍 24개를 뚫습니다. 제작 데이터에는 구멍이 설계자가 붙인 번호 순서로 들어 있습니다. 그 순서대로 드릴 헤드를 옮기면 판 위를 오락가락합니다. 가까운 구멍부터 뚫으면 얼마나 줄까요?</p></div>
+    <p><span class="term">CNC</span><span class="en">(computer numerical control)</span> 기계는 좌표와 명령으로 공구를 움직여 절단·천공·용접·굽힘을 합니다. 모델의 부재에서 나온 NC 데이터(그림 12-2)에는 구멍의 위치와 지름이 있지만 <b>방문 순서</b>는 기계 쪽 프로그램이 정합니다. 모든 구멍을 한 번씩 방문하는 가장 짧은 경로를 찾는 문제는 순회 판매원 문제(TSP)로, 정확한 해는 구멍이 많아지면 구하기 어렵습니다. 그래서 '가장 가까운 다음 구멍으로'라는 <span class="term">최근접 이웃 경로</span><span class="en">(nearest neighbour heuristic)</span>로 시작하고, 경로의 두 구간을 바꿔 짧아지면 받아들이는 <span class="term">2-opt</span><span class="en">(2-opt improvement)</span>로 다듬습니다. 철근 결속 로봇, 용접 로봇, 3D 콘크리트 프린팅도 같은 '모델 → 경로 → 기계' 흐름을 따르지만 현장 적용은 아직 초기 단계다(형태).</p>
+    <div class="callout def"><strong>원리 12.7 (공구 경로 길이와 가공 시간)</strong>
+      <div class="formula">$$L = \sum_{k} \lvert p_{\pi(k+1)} - p_{\pi(k)}\rvert, \qquad t = \frac{L}{v} + n\,t_h$$<div class="where">\(\pi\): 방문 순서, \(v\): 공구 이송 속도, \(n\): 구멍 수, \(t_h\): 구멍 하나의 가공 시간. 순서는 \(L/v\)만 바꾸므로, 구멍 가공이 오래 걸리면 경로 최적화의 효과는 작다. 최근접 이웃은 빠르지만 마지막에 멀리 남은 구멍으로 되돌아가는 긴 이동이 생기기 쉽고, 2-opt가 그런 교차를 푼다.</div></div></div>
+    <div class="sim" id="sim-fb-cnc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>CNC 천공 경로: 도면 순서 vs 최근접 이웃 vs 2-opt(교육용)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fb-cv-cnc" aria-label="강판 위 구멍과 방문 순서 화살표, 원점에서 출발하는 공구 경로"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>판</span><div class="seg" id="fb-cn-plate"><button data-value="base">기둥 밑판 6구멍</button><button data-value="splice" class="on">이음판 24구멍</button><button data-value="rand">무작위 40구멍</button></div></div>
+          <div class="ctrl"><span>순서</span><div class="seg" id="fb-cn-ord"><button data-value="given">도면 순서</button><button data-value="nn" class="on">최근접 이웃</button><button data-value="opt">최근접 + 2-opt</button></div></div>
+          <label class="ctrl"><span>이송 속도 v <output id="fb-cn-v-out"></output></span><input type="range" id="fb-cn-v" min="2" max="30" step="1" value="10"></label>
+          <label class="ctrl"><span><span>구멍당 가공 t<sub>h</sub></span> <output id="fb-cn-h-out"></output></span><input type="range" id="fb-cn-h" min="2" max="30" step="1" value="8"></label>
+          <div class="btn-row"><button class="btn" id="fb-cn-seed">다른 배치</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">경로 길이</span><span class="v" id="fb-cn-o-l">—</span></div>
+        <div class="stat"><span class="k">이동 · 전체 시간</span><span class="v" id="fb-cn-o-t">—</span></div>
+        <div class="stat"><span class="k">도면 순서 대비</span><span class="v" id="fb-cn-o-g">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: "기둥 밑판 6구멍"에서 도면 순서 2,449 mm → 최근접 1,271 mm(예제 12.6)를 확인하세요 · 무작위 40구멍에서 최근접 이웃 경로의 긴 되돌아가기를 찾고 2-opt가 얼마나 줄이는지 보세요 · 구멍당 가공 시간을 30초로 늘리면 경로를 줄여도 전체 시간은 거의 그대로입니다 · 모델: 원리 12.7, 공구 원점 (0, 0)에서 출발(돌아오지 않음), 이음판은 볼트군 네 개(4 × 6 배치, 피치 75 mm)를 설계자가 군별·세로줄 순으로 번호 붙인 순서를 섞어 둔 것, 무작위 판은 시드 고정, 2-opt는 개선이 없을 때까지 반복.</div>
+    </div>
+    <div class="callout"><strong>예제 12.6 (기둥 밑판 6구멍)</strong> 500 × 500 mm 밑판, 구멍 1 (50, 50), 2 (450, 450), 3 (450, 50), 4 (50, 450), 5 (250, 50), 6 (250, 450), 공구 원점 (0, 0).
+      <p><b>① 도면 순서 1–2–3–4–5–6</b> 70.7 + 565.7 + 400 + 565.7 + 447.2 + 400 = <b>2,449 mm</b>.</p>
+      <p><b>② 최근접 이웃</b> 원점 → 1(70.7) → 5(200) → 3(200) → 2(400) → 6(200) → 4(200) = <b>1,271 mm</b>, 48 % 짧다.</p>
+      <p><b>③ 판단</b> 이송 속도 10 m/min이면 이동 시간은 14.7초 → 7.6초로 줄지만, 구멍 하나에 8초가 걸리면 전체 62.7초 → 55.6초로 11 % 준다. 경로 최적화는 이동이 많은 일(절단 윤곽, 마킹, 많은 작은 구멍)에서 효과가 크다. 더 큰 효과는 판의 배치(여러 부재를 한 강판에 모아 자르는 네스팅)와 셋업 횟수를 줄이는 데서 나온다.</p></div>
+  </section>
+
+  <!-- =============================================================== 8 -->
+  <section id="assembly">
+    <h2>조립 순서와 품질 추적</h2>
+    <div class="problem"><strong>공장에서 만든 142개 부재, 어느 것부터 세우나</strong>
+      <p>B-10의 1–2층 골조를 PC(프리캐스트) 기둥·보·바닥판으로 세운다고 합시다. 부재는 공장에서 만든 순서대로 현장에 옵니다. 보를 올렸는데 받칠 기둥이 아직 없다면? 현장에 쌓아 둘 자리가 여섯 개뿐이라면? 그리고 설치된 보 하나가 어느 날 어느 거푸집에서 만들어졌는지 어떻게 알까요?</p></div>
+    <p>조립식 공사의 공정은 <span class="term">조립 순서</span><span class="en">(assembly sequence)</span>가 정합니다. 순서는 ① 지지 조건(부재는 그것을 받치는 부재 뒤에), ② 가설 안정(세우는 도중에도 넘어지지 않게, SiteBook 7장), ③ 크레인 반경과 양중 능력, ④ 현장 적치 공간을 함께 만족해야 합니다. 공장은 그 순서대로 만들어 보내고, 현장은 도착한 부재를 바로 거는 <span class="term">적시 반입</span><span class="en">(just-in-time delivery, JIT)</span>을 목표로 합니다. 이때 부재마다 붙은 ID가 공장·운송·현장을 하나로 잇습니다.</p>
+    <div class="callout def"><strong>정의 12.8 (추적성과 부재 ID)</strong> <span class="term">추적성</span><span class="en">(traceability)</span>은 부재 하나의 이력(설계 요소, 제작 로트, 재료 시험, 검사, 운송, 설치 위치·일시, 이후 보수)을 끝까지 따라갈 수 있는 성질이다. 부재에 붙인 <span class="term">QR 코드</span><span class="en">(QR code)</span>(ISO/IEC 18004)나 RFID 태그에 모델 요소의 GUID를 담으면, 현장에서 스캔 한 번으로 모델의 요소와 그 기록을 연다. IFC GlobalId는 128비트 식별자를 22자로 줄인 문자열이고(3장), B-10 BIM에서는 <code>CB.bim.guid</code>가 결정적으로 만든다. 예: 1층 기둥 <code>C-A1-1F</code>의 GUID는 <code>3cqAMllhn7Pqga_sptX5Oi</code>이고, 라벨은 <code>B10|C-A1-1F|3cqAMllhn7Pqga_sptX5Oi</code> 같은 형태가 된다(교육용 형식).</div>
+    <figure class="diagram" id="fig-fb-trace">
+      <svg viewBox="0 0 880 280" role="img" aria-label="부재 ID가 모델, 공장 제작, 검사, 운송, 현장 적치, 설치, 운영 기록을 잇는 추적 흐름">
+        <rect x="10" y="10" width="860" height="260" rx="10" class="f-surface"/>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="30" y="40" width="120" height="60" rx="9" class="f-acc-soft"/><text x="90" y="66" style="fill:var(--accent);font-weight:700">모델 요소</text><text x="90" y="86">GUID</text>
+          <rect x="175" y="40" width="120" height="60" rx="9" class="f-elev"/><text x="235" y="66" style="fill:var(--text);font-weight:700">공장 제작</text><text x="235" y="86">로트 · 거푸집</text>
+          <rect x="320" y="40" width="120" height="60" rx="9" class="f-elev"/><text x="380" y="66" style="fill:var(--text);font-weight:700">검사</text><text x="380" y="86">치수 · 강도</text>
+          <rect x="465" y="40" width="120" height="60" rx="9" class="f-elev"/><text x="525" y="66" style="fill:var(--text);font-weight:700">운송</text><text x="525" y="86">차량 · 반입</text>
+          <rect x="610" y="40" width="120" height="60" rx="9" class="f-elev"/><text x="670" y="66" style="fill:var(--text);font-weight:700">설치</text><text x="670" y="86">위치 · 일시</text>
+          <rect x="745" y="40" width="105" height="60" rx="9" class="f-acc2-soft"/><text x="797" y="66" style="fill:var(--accent-2);font-weight:700">운영</text><text x="797" y="86">13장 자산</text>
+        </g>
+        <g style="stroke:var(--text-dim);stroke-width:1.5;fill:none" marker-end="url(#fb-ah)"><path d="M150 70H171"/><path d="M295 70H316"/><path d="M440 70H461"/><path d="M585 70H606"/><path d="M730 70H741"/></g>
+        <g transform="translate(330,130)">
+          <rect x="0" y="0" width="90" height="90" style="fill:var(--bg-elev);stroke:var(--text);stroke-width:2"/>
+          <g style="fill:var(--text)"><rect x="8" y="8" width="24" height="24"/><rect x="58" y="8" width="24" height="24"/><rect x="8" y="58" width="24" height="24"/><rect x="40" y="40" width="10" height="10"/><rect x="56" y="56" width="8" height="8"/><rect x="70" y="66" width="10" height="10"/><rect x="42" y="64" width="8" height="16"/><rect x="38" y="12" width="10" height="8"/></g>
+          <text x="110" y="30" class="t-mono">B10 | C-A1-1F | 3cqAMllhn7Pqga_sptX5Oi</text>
+          <text x="110" y="56" class="t-mono">스캔 → 모델 요소 열기 → 상태 기록</text>
+          <text x="110" y="82" class="t-mono">같은 ID가 모든 단계의 열쇠</text>
+        </g>
+        <g style="stroke:var(--accent);stroke-dasharray:4 3;fill:none"><path d="M90 100V170H326"/></g>
+      </svg>
+      <figcaption><b>그림 12-8.</b> 부재 ID로 잇는 추적. 각 단계가 자기 기록을 따로 만들더라도 같은 ID를 열쇠로 쓰면, 설치된 부재 하나에서 거꾸로 제작 로트와 검사 결과까지 찾아갈 수 있다. 결함이 발견되면 같은 로트의 다른 부재가 어디에 설치되었는지도 바로 안다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-fb-asm">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>조립 순서 3D: 순서 규칙 → 지지 위반 · 현장 적치 · 부재 추적 기록</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="fb-cv-asm" aria-label="B-10 1–2층 PC 기둥·보·바닥판이 순서대로 설치되는 3D 장면, 지지 위반 부재는 빨강"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>순서 규칙</span><div class="seg" id="fb-as-ord"><button data-value="floor" class="on">층 · 유형 순</button><button data-value="bay">구획(베이) 순</button><button data-value="id">목록(ID) 순</button><button data-value="rand">무작위</button></div></div>
+          <label class="ctrl"><span>설치 단계 <output id="fb-as-k-out"></output></span><input type="range" id="fb-as-k" min="0" max="142" step="1" value="40"></label>
+          <label class="ctrl"><span>현장 적치 한도 <output id="fb-as-b-out"></output></span><input type="range" id="fb-as-b" min="2" max="20" step="1" value="6"></label>
+          <div class="btn-row"><button class="btn" id="fb-as-play">▶ 재생</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">설치</span><span class="v" id="fb-as-o-k">—</span></div>
+        <div class="stat"><span class="k">지지 위반</span><span class="v" id="fb-as-o-v">—</span></div>
+        <div class="stat"><span class="k">적치 · 운송 · 공장</span><span class="v" id="fb-as-o-st">—</span></div>
+        <div class="stat"><span class="k">누적 양중</span><span class="v" id="fb-as-o-w">—</span></div>
+      </div>
+      <div class="fb-msg" id="fb-as-msg">—</div>
+      <div class="sim-note">해볼 것: "층 · 유형 순"과 "구획 순"은 위반 0입니다 — 구획 순은 한 칸씩 완결되어 세우는 도중의 안정에 유리합니다 · "목록(ID) 순"은 모델 목록처럼 기둥을 모두 먼저 세워, 2층 기둥이 1층 보보다 먼저 올라가는 위반 20건이 생깁니다 · "무작위"는 보가 기둥보다 먼저 오는 위반이 쏟아집니다 — 공장 생산 순서와 현장 설치 순서가 어긋나면 생기는 일입니다 · 재생하며 아래 추적 기록이 바뀌는 것을 보세요 · 모델(교육용): 8 m 격자의 PC 기둥 800 × 800(층마다 한 개), 경간마다 보 400 × 490, 칸마다 4 × 8 m 바닥판 두 장(코어 칸 제외), 1–2층 142개, 지지 규칙 = 기둥 ← 아래 기둥과 그 절점의 아래층 보, 보 ← 양 끝 기둥, 바닥판 ← 받치는 두 보, 무게 = 상자 부피 × 2.45 t/m³, 적치 = 다음 설치될 부재(한도만큼), 운송 = 그다음 3개, GUID = <code>CB.bim.guid</code>.</div>
+    </div>
+    <div class="callout"><strong>예제 12.7 (순서 규칙 검사와 추적)</strong> 목록(ID) 순서는 기둥 40개(1층 20, 2층 20) → 보 62개 → 바닥판 40개다.
+      <p><b>① 위반</b> 2층 기둥은 아래 기둥과 그 절점의 1층 보를 필요로 하는데, 1층 보가 41번째 이후에 오므로 2층 기둥 20개가 모두 위반이다. 보·바닥판은 각자의 지지 부재가 앞에 있으므로 위반이 없다.</p>
+      <p><b>② 고치는 법</b> 지지 관계를 그래프(부재 → 받치는 부재)로 두고 위상 정렬하면(SiteBook 9장 CPM의 전진 계산과 같은 구조) 위반 없는 순서가 나온다. 층·유형 순과 구획 순은 모두 그 해의 하나다.</p>
+      <p><b>③ 추적</b> 23번째로 설치되는 부재의 라벨을 스캔하면 모델 요소, 제작 로트, 검사 결과, 반입 순번이 함께 열린다. 공장이 로트 하나의 콘크리트 강도 미달을 통보하면, 같은 로트의 부재가 어느 층 어느 칸에 설치되었는지 모델에서 바로 강조해 보강 검토를 시작할 수 있다.</p></div>
+    <div class="callout site"><strong>B-10의 디지털 제작 묶음(교육용)</strong> B-10의 기본안은 현장 타설 RC 골조다. 그래도 공장으로 옮길 수 있는 일은 많다. ① G1 등 보·기둥 철근은 LOD 400 철근 모델에서 가공표를 뽑아(예제 12.1) 층 단위로 묶어 FFD 절단 계획(예제 12.2)을 세운다 — 층당 G1 상당 24개면 D25 절단 손실을 약 5 % 아래로 관리할 수 있다. ② 급기 덕트·스프링클러 주관은 간섭 해결(6장) 뒤 경로를 확정하고 층마다 같은 스풀 6개로 나눈다(예제 12.5). ③ 커튼월 유닛은 골조 스캔(11장)으로 실측한 슬래브 끝 위치에 앵커를 맞춰 제작하고, 32 m 줄마다 조정 이음을 둔다(예제 12.4). ④ 모든 공장 부재는 모델 GUID를 담은 라벨로 반입·설치를 기록해 준공 모델(11장)과 자산 정보(13장)로 넘긴다. 지상층 전체를 모듈러로 바꾸는 대안(SiteBook 16장: 공기 약 61.5주)은 격자를 모듈에 맞춰 다시 정해야 이 장의 장점(유형 1개, 20개/층)이 살아난다.</div>
+  </section>
+
+  <section id="uses">
+    <h2>이 정보가 쓰이는 곳</h2>
+    <div class="uses">
+      <a href="lod.html"><small>CH.04 · LOD와 정보 요구 사항</small>LOD 400 = 제작 가능한 모델<br><span>가공표와 NC 데이터를 뽑으려면 철근·접합부까지 모델링해야 한다.</span></a>
+      <a href="clash.html"><small>CH.06 · 간섭 검토</small>간섭이 풀려야 스풀을 자른다<br><span>덕트 경로가 확정된 뒤에만 공장 제작을 시작할 수 있다.</span></a>
+      <a href="qto.html"><small>CH.07 · 모델 기반 물량 산출</small>물량에서 가공 길이로<br><span>같은 철근을 무게로 세면 물량, 가닥으로 세면 가공표다.</span></a>
+      <a href="four-d.html"><small>CH.09 · 4D 공정 시뮬레이션</small>조립 순서가 곧 공정<br><span>지지 관계의 위상 정렬이 4D 설치 순서가 된다.</span></a>
+      <a href="reality-capture.html"><small>CH.11 · 현실 캡처</small>실측에 맞춰 만든다<br><span>공장 부재는 스캔한 실제 위치에 맞춰야 현장에서 맞물린다.</span></a>
+      <a href="facility.html"><small>CH.13 · 시설 관리와 자산 정보</small>부재 ID가 자산 ID로<br><span>제작·설치 기록이 운영 단계의 자산 이력이 된다.</span></a>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>DfMA는 부품 수를 줄이고, 반복하고, 격자·운송·공차를 설계 단계에서 함께 정하는 설계다. 효과는 공장 생산보다 GUID로 이어지는 끊기지 않는 정보에서 나온다.</li>
+      <li>철근 가공표는 마크·호칭·형상 코드·바깥 치수·절단 길이·개수·질량의 표다. 굽힘 공제 Δ<sub>90</sub> = 2(r + d<sub>b</sub>) − (π/2)(r + d<sub>b</sub>/2) ≈ 2.5d<sub>b</sub>(r = 3d<sub>b</sub>). G1 한 개 연속보 설계 409.6 kg, 단순 보 근사 537.5 kg.</li>
+      <li>절단 재고 문제는 정척 수를 최소로 하는 배치다. FFD는 긴 조각부터 들어가는 첫 정척에 넣는다. G1 한 개: 순서대로 8개(22.5 %) vs FFD 7개(11.4 %, 하한). 정척보다 긴 조각은 이음으로 철근이 늘고, 손실률은 자투리 재사용 규칙과 함께 본다.</li>
+      <li>모듈 분할은 격자·코어에 맞추면 유형이 줄어든다(B-10: 8 × 4 m 20개, 유형 1개). 운송 제한 폭 2.5 · 높이 4.0 · 길이 16.7 m(형태)를 넘으면 허가 운송이다.</li>
+      <li>공차 누적: 최악 Σt<sub>i</sub>, RSS √Σt<sub>i</sub>²(독립·정규·±t = 3σ 가정). 8 × ±3과 7 × ±2 → 최악 ±38, RSS ±10 mm. 균등 분포는 더 넓고, 치우침은 nμ로 그대로 더해진다. 조정 이음을 둔다.</li>
+      <li>스풀 분할은 최대 길이 안에서 금지 구간을 피해 가장 먼 이음을 고르는 탐욕법으로 개수를 정하고, 길이를 고르게 다시 나눠 유형을 줄인다(B-10 덕트: 6개/층).</li>
+      <li>CNC 경로는 TSP다. 최근접 이웃 + 2-opt로 이동 거리를 줄이지만, 전체 시간은 L/v + n t<sub>h</sub>라 가공 시간이 크면 효과가 작다.</li>
+      <li>조립 순서는 지지 관계의 위상 정렬이고, 적시 반입과 적치 한도가 제작 순서를 묶는다. QR·RFID에 GUID를 담아 제작 로트에서 설치 위치까지 추적한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>1. D25(d<sub>b</sub> = 25.4 mm)를 안쪽 반지름 r = 3d<sub>b</sub>로 90° 굽힐 때 굽힘 공제는 약?</p><div class="opts">
+        <button class="opt">0 mm</button><button class="opt" data-correct>64 mm</button><button class="opt">140 mm</button><button class="opt">203 mm</button>
+      </div><div class="quiz-exp">\(\Delta_{90} = 2(76.2 + 25.4) - (\pi/2)(76.2 + 12.7) = 203.2 - 139.6 = 63.6\) mm ≈ 2.5d<sub>b</sub>. 203 mm는 바깥 치수 두 변이 겹쳐 센 길이, 140 mm는 원호 길이다.</div></div>
+      <div class="quiz-q"><p>2. 필요한 조각이 8.4 m × 6, 3.0 m × 8이고 정척이 12 m다. FFD가 쓰는 정척 수는?</p><div class="opts">
+        <button class="opt">6개</button><button class="opt" data-correct>7개</button><button class="opt">8개</button><button class="opt">9개</button>
+      </div><div class="quiz-exp">8.4 m마다 3.0 m 하나씩(11.4 m) 6개, 남은 3.0 m 둘이 1개 → 7개. 하한 ⌈74.4/12⌉ = 7이므로 최적이다. 순서대로 자르면 8개다.</div></div>
+      <div class="quiz-q"><p>3. 정척 8 m로 8.4 m 철근을 만들어야 할 때 생기는 일은?</p><div class="opts">
+        <button class="opt">0.4 m만 버리면 된다</button><button class="opt" data-correct>겹침 이음이 필요해 이음 길이만큼 철근이 늘고, 이음 위치는 구조 검토가 필요하다</button><button class="opt">굽힘 공제로 해결된다</button><button class="opt">FFD가 자동으로 해결해 손실이 없다</button>
+      </div><div class="quiz-exp">정척보다 긴 조각은 두 조각을 겹쳐 이어야 한다. D25 하단근 B급 이음이면 약 1.8 m가 더 들고, 이음은 응력이 작은 곳에 둬야 한다.</div></div>
+      <div class="quiz-q"><p>4. B-10 기준층(32 × 24 m, 코어 16 × 8 m)을 8 × 4 m 모듈로 나누면?</p><div class="opts">
+        <button class="opt">24개, 유형 3개</button><button class="opt" data-correct>20개, 유형 1개</button><button class="opt">16개, 유형 1개</button><button class="opt">22개, 유형 8개</button>
+      </div><div class="quiz-exp">(768 − 128)/32 = 20. 격자(8 m)와 코어 경계(y 8, 16 m)가 모두 모듈 치수의 배수라 잘린 조각이 없다. 22개·8유형은 3.6 × 12 m를 끝에 몰아 나눈 경우다.</div></div>
+      <div class="quiz-q"><p>5. 부재 9개가 각각 ±4 mm일 때 최악 조건과 RSS 누적은?</p><div class="opts">
+        <button class="opt">±36, ±36</button><button class="opt" data-correct>±36, ±12</button><button class="opt">±12, ±4</button><button class="opt">±36, ±6</button>
+      </div><div class="quiz-exp">최악 9 × 4 = 36, RSS \(\sqrt{9\times16} = 12\) mm. RSS는 \(\sqrt n\)배로만 커진다.</div></div>
+      <div class="quiz-q"><p>6. 같은 거푸집에서 나온 부재가 모두 +1 mm씩 길다(치우침). 부재 10개를 이으면 RSS 계산과 무엇이 다른가?</p><div class="opts">
+        <button class="opt">RSS가 그대로 맞다</button><button class="opt">치우침은 √10 mm만 더해진다</button><button class="opt" data-correct>치우침은 10 × 1 = 10 mm로 그대로 더해져 분포 전체가 옮겨 간다</button><button class="opt">치우침은 서로 상쇄된다</button>
+      </div><div class="quiz-exp">RSS는 평균 0의 독립 오차를 가정한다. 계통적 치우침은 독립이 아니므로 선형으로 더해진다. 공장 검사에서 평균을 따로 관리하는 이유다.</div></div>
+      <div class="quiz-q"><p>7. 31 m 덕트를 최대 6 m 스풀로 나누는데 보 아래 금지 구간 때문에 이음 하나를 1.1 m 앞당겼다. 스풀 수는?</p><div class="opts">
+        <button class="opt">5개</button><button class="opt" data-correct>6개(하한과 같음)</button><button class="opt">7개</button><button class="opt">금지 구간이 있으면 항상 하한 + 1</button>
+      </div><div class="quiz-exp">하한 ⌈31/6⌉ = 6. 예제 12.5처럼 이음을 당겨도 남은 길이가 마지막 스풀 하나에 들어가면 6개로 끝난다. 다만 마지막 스풀이 짧아(2.1 m) 고르게 다시 나누는 것이 좋다.</div></div>
+      <div class="quiz-q"><p>8. PC 부재 설치에서 '목록(ID) 순서'로 기둥을 모두 먼저 세우면 생기는 문제와 해법은?</p><div class="opts">
+        <button class="opt">문제없다 — 기둥이 먼저면 항상 안전하다</button><button class="opt" data-correct>2층 기둥이 1층 보보다 먼저 서서 지지 규칙을 어긴다 — 지지 관계를 위상 정렬해 순서를 정한다</button><button class="opt">바닥판이 보보다 먼저 온다 — 무작위로 섞는다</button><button class="opt">크레인이 부족하다 — 적치 한도를 늘린다</button>
+      </div><div class="quiz-exp">위층 기둥은 아래 기둥과 그 절점의 보가 있어야 안정하다. 부재 → 지지 부재 그래프를 위상 정렬하면(CPM 전진 계산과 같은 구조) 위반 없는 순서가 나온다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- 이 장의 도우미(그리기, 교육용) ---------- */
+const FBX = {
+  font(o) { return `${o.bold === false ? "" : "600 "}${o.size || 12}px ${getComputedStyle(document.body).getPropertyValue(o.mono === false ? "--font" : "--mono")}`; },
+  text(ctx, s, x, y, color, o = {}) {
+    ctx.save(); ctx.font = FBX.font(o); ctx.textAlign = o.align || "center"; ctx.textBaseline = o.baseline || "middle";
+    if (o.halo !== false) { ctx.lineWidth = 3; ctx.strokeStyle = CB.palette().bg; ctx.lineJoin = "round"; ctx.strokeText(s, x, y); }
+    ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+  },
+  line(ctx, x0, y0, x1, y1, color, width = 1.4, dash) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.restore(); },
+  alpha: (c, a) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`,
+  gauss(r) { let u = r(); while (u <= 1e-12) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); },
+  BAR: { D25: { d: 25.4, m: 3.98 }, D13: { d: 12.7, m: 0.995 } },
+  /** 1차원 절단: 순서대로(nf) 또는 최초 적합 감소(ffd). pieces [{len, mark}] → bars [{rem, items}] */
+  pack(pieces, S, alg) {
+    const bars = [];
+    if (alg === "nf") { let cur = null; pieces.forEach((p) => { if (!cur || cur.rem < p.len - 1e-9) { cur = { rem: S, items: [] }; bars.push(cur); } cur.items.push(p); cur.rem -= p.len; }); return bars; }
+    [...pieces].sort((a, b) => b.len - a.len).forEach((p) => { let b = bars.find((x) => x.rem >= p.len - 1e-9); if (!b) { b = { rem: S, items: [] }; bars.push(b); } b.items.push(p); b.rem -= p.len; });
+    return bars;
+  },
+};
+
+/* ---------- 1. 철근 가공표 ---------- */
+(function () {
+  const gm = CB.seg("fb-sc-mode", upd), gl = CB.range("fb-sc-l", (v) => v.toFixed(1) + " m", upd), gs = CB.range("fb-sc-s", (v) => v + " mm", upd);
+  const gh = CB.seg("fb-sc-hook", upd), gr = CB.range("fb-sc-r", (v) => v.toFixed(1) + " d_b", upd);
+  function calc() {
+    const L = gl(), db = 25.4, r = gr() * db, D = 2 * (r + db) - (Math.PI / 2) * (r + db / 2), cont = gm() === "cont";
+    const rows = [];
+    rows.push({ mark: "B1 하단 주근", bar: "D25", code: "S0", dims: `A ${CB.sig((L + 1.2) * 1000)}`, cut: L + 1.2, n: cont ? 4 : 7 });
+    if (gh() === "hook") { const B = (12 * db + r + db) / 1000; rows.push({ mark: "T1 상단 연속", bar: "D25", code: "L2", dims: `A ${CB.sig((L + 1.2) * 1000)} · B ${CB.sig(B * 1000)}`, cut: L + 1.2 + 2 * B - (2 * D) / 1000, n: 2 }); }
+    else rows.push({ mark: "T1 상단 연속", bar: "D25", code: "S0", dims: `A ${CB.sig((L + 1.2) * 1000)}`, cut: L + 1.2, n: 2 });
+    rows.push({ mark: "T2 지점 추가", bar: "D25", code: "S0", dims: `A ${CB.sig((L / 3 + 0.6) * 1000)}`, cut: L / 3 + 0.6, n: 2 * (cont ? 4 : 5) });
+    const st = (2 * (400 - 80 - 12.7 + 700 - 80 - 12.7) + 20 * 12.7) / 1000;
+    rows.push({ mark: "S1 스터럽", bar: "D13", code: "ST", dims: "307 × 607(중심선)", cut: st, n: Math.floor((L * 1000) / gs() + 1e-9) + 1 });
+    rows.forEach((x) => (x.kg = x.cut * x.n * FBX.BAR[x.bar].m));
+    const m25 = rows.filter((x) => x.bar === "D25").reduce((s, x) => s + x.kg, 0), m13 = rows.filter((x) => x.bar === "D13").reduce((s, x) => s + x.kg, 0);
+    return { L, rows, D, m25, m13, tot: (m25 + m13) * 1.03 };
+  }
+  const cv = CB.canvas("#fb-cv-sched", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), m = 20, sc = (W - 2 * m) / (c.L + 2.0), x0 = m + 1.0 * sc, yT = 40, hB = Math.min(110, H * 0.42);
+    const X = (x) => x0 + x * sc;
+    ctx.fillStyle = FBX.alpha(P.dim, 0.25); ctx.fillRect(X(-0.8), yT - 10, 0.8 * sc, hB + 20); ctx.fillRect(X(c.L), yT - 10, 0.8 * sc, hB + 20);
+    ctx.fillStyle = FBX.alpha(P.dim, 0.1); ctx.strokeStyle = P.dim; ctx.fillRect(X(0), yT, c.L * sc, hB); ctx.strokeRect(X(0), yT, c.L * sc, hB);
+    FBX.text(ctx, "기둥", X(-0.4), yT - 18, P.dim, { size: 10.5 }); FBX.text(ctx, "기둥", X(c.L + 0.4), yT - 18, P.dim, { size: 10.5 });
+    const S1 = c.rows[3], s = c.L / Math.max(1, S1.n - 1);
+    ctx.strokeStyle = FBX.alpha(P.ok, 0.7); ctx.lineWidth = 1; for (let i = 0; i < S1.n; i++) { const x = X(i * s); ctx.beginPath(); ctx.moveTo(x, yT + 6); ctx.lineTo(x, yT + hB - 6); ctx.stroke(); }
+    FBX.line(ctx, X(-0.6), yT + hB - 10, X(c.L + 0.6), yT + hB - 10, P.accent, 3.5);
+    const hook = gh() === "hook";
+    FBX.line(ctx, X(-0.6), yT + 10, X(c.L + 0.6), yT + 10, P.accent2, 3.5);
+    if (hook) { FBX.line(ctx, X(-0.6), yT + 10, X(-0.6), yT + 10 + 0.41 * sc, P.accent2, 3.5); FBX.line(ctx, X(c.L + 0.6), yT + 10, X(c.L + 0.6), yT + 10 + 0.41 * sc, P.accent2, 3.5); }
+    const t2 = c.L / 3 + 0.6;
+    FBX.line(ctx, X(-0.6), yT + 18, X(-0.6 + t2), yT + 18, P.bad, 3); FBX.line(ctx, X(c.L + 0.6 - t2), yT + 18, X(c.L + 0.6), yT + 18, P.bad, 3);
+    FBX.text(ctx, `순경간 ${c.L.toFixed(1)} m · 스터럽 ${S1.n}개`, X(c.L / 2), yT + hB + 18, P.text, { size: 12 });
+    const ly = yT + hB + 46, cols = [[P.accent, "B1"], [P.accent2, "T1" + (hook ? " (L2)" : "")], [P.bad, "T2"], [P.ok, "S1"]];
+    cols.forEach(([col, t], i) => { const x = m + (i * (W - 2 * m)) / 4; ctx.fillStyle = col; ctx.fillRect(x, ly - 4, 18, 8); FBX.text(ctx, t, x + 24, ly, P.text, { size: 11, align: "left" }); });
+    FBX.text(ctx, "굽힘 공제 Δ90 = " + CB.num(c.D, 1) + " mm (D25)", W / 2, Math.min(H - 12, ly + 26), P.dim, { size: 11, bold: false });
+  }, { aspect: (W) => (W < 520 ? 0.62 : 0.4), minHeight: 230, maxHeight: 340 });
+  function upd() {
+    cv.redraw(); const c = calc();
+    document.getElementById("fb-sc-tbl").innerHTML = `<table class="fb-tbl"><thead><tr><th>마크</th><th>호칭</th><th>형상</th><th>치수 (mm)</th><th>절단 길이 (m)</th><th>개수</th><th>질량 (kg)</th></tr></thead><tbody>` +
+      c.rows.map((x) => `<tr><td>${x.mark}</td><td>${x.bar}</td><td>${x.code}</td><td>${x.dims}</td><td class="fb-num">${x.cut.toFixed(3)}</td><td class="fb-num">${x.n}</td><td class="fb-num">${x.kg.toFixed(1)}</td></tr>`).join("") +
+      `<tr class="fb-sum"><td colspan="6">합계 ${(c.m25 + c.m13).toFixed(1)} kg → 할증 3 %</td><td class="fb-num">${c.tot.toFixed(1)}</td></tr></tbody></table>`;
+    CB.stat("fb-sc-o-w", c.tot.toFixed(1) + " kg"); CB.stat("fb-sc-o-m", c.m25.toFixed(1) + " · " + c.m13.toFixed(1) + " kg");
+    CB.stat("fb-sc-o-n", c.rows.reduce((s, x) => s + x.n, 0) + "개"); CB.stat("fb-sc-o-d", CB.num(c.D, 1) + " mm");
+  }
+  upd();
+})();
+
+/* ---------- 2. 절단 최적화 ---------- */
+(function () {
+  const LISTS = {
+    cont: [["B1", 8.4, 4], ["T1", 8.4, 2], ["T2", 3.0, 8]],
+    simple: [["B1", 8.4, 7], ["T1", 8.4, 2], ["T2", 3.0, 10]],
+    mix: [["a", 6.8, 2], ["b", 5.6, 3], ["c", 4.2, 4], ["d", 3.3, 5], ["e", 2.7, 4], ["f", 1.9, 6]],
+  };
+  const gli = CB.seg("fb-ct-list", upd), gn = CB.range("fb-ct-n", (v) => v + (v === 1 ? "개" : "개"), upd), gst = CB.seg("fb-ct-stock", upd), gal = CB.seg("fb-ct-alg", upd);
+  const gre = CB.range("fb-ct-re", (v) => v.toFixed(1) + " m", upd), glap = CB.range("fb-ct-lap", (v) => v.toFixed(2) + " m", upd);
+  function calc() {
+    const S = +gst(), lap = glap(), marks = LISTS[gli()].map((x) => x[0]), pieces = []; let splices = 0;
+    for (let k = 0; k < gn(); k++) LISTS[gli()].forEach(([mk, len, n]) => { for (let i = 0; i < n; i++) {
+      let L = len; while (L > S + 1e-9) { pieces.push({ len: S, mark: mk }); L = L - S + lap; splices++; } pieces.push({ len: L, mark: mk }); } });
+    const bars = FBX.pack(pieces, S, gal()), need = pieces.reduce((s, p) => s + p.len, 0), N = bars.length, re = gre();
+    const reuse = bars.reduce((s, b) => s + (b.rem >= re - 1e-9 ? b.rem : 0), 0), scrap = bars.reduce((s, b) => s + (b.rem < re - 1e-9 ? Math.max(0, b.rem) : 0), 0);
+    return { S, bars, need, N, LB: Math.ceil(need / S - 1e-9), loss: (N * S - need) / (N * S), reuse, scrap, splices, marks, re };
+  }
+  const cv = CB.canvas("#fb-cv-cut", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), cols = [P.accent, P.accent2, P.blue, P.ok, P.dim, P.green];
+    const show = c.bars.slice(0, 40), m = 14, top = 30, rh = Math.min(16, (H - top - 20) / Math.max(1, show.length)), sc = (W - 2 * m - 40) / 12;
+    FBX.text(ctx, `정척 ${c.S} m × ${c.N}개` + (c.N > 40 ? " (앞 40개)" : ""), m, 14, P.text, { size: 12, align: "left" });
+    show.forEach((b, i) => {
+      const y = top + i * rh; let x = m + 34;
+      FBX.text(ctx, String(i + 1), m + 26, y + rh / 2, P.faint, { size: 9.5, align: "right", halo: false });
+      b.items.forEach((p) => { const w = p.len * sc; ctx.fillStyle = cols[c.marks.indexOf(p.mark) % cols.length]; ctx.fillRect(x, y + 1, w - 1, rh - 2); if (w > 34 && rh >= 12) FBX.text(ctx, CB.num(p.len, 2), x + w / 2, y + rh / 2, "#fff", { size: 9.5, halo: false }); x += w; });
+      if (b.rem > 1e-6) { ctx.fillStyle = b.rem >= c.re - 1e-9 ? FBX.alpha(P.warn, 0.45) : P.bad; ctx.fillRect(x, y + 1, b.rem * sc - 1, rh - 2); }
+      ctx.strokeStyle = P.border; ctx.strokeRect(m + 34, y + 0.5, c.S * sc, rh - 1);
+    });
+    const ly = Math.min(H - 8, top + show.length * rh + 14);
+    let lx = m; c.marks.forEach((mk, i) => { ctx.fillStyle = cols[i % cols.length]; ctx.fillRect(lx, ly - 5, 12, 10); FBX.text(ctx, mk, lx + 16, ly, P.text, { size: 10.5, align: "left" }); lx += 44; });
+    ctx.fillStyle = FBX.alpha(P.warn, 0.45); ctx.fillRect(lx, ly - 5, 12, 10); FBX.text(ctx, "재사용", lx + 16, ly, P.text, { size: 10.5, align: "left" }); lx += 64;
+    ctx.fillStyle = P.bad; ctx.fillRect(lx, ly - 5, 12, 10); FBX.text(ctx, "버림", lx + 16, ly, P.text, { size: 10.5, align: "left" });
+  }, { aspect: (W) => (W < 520 ? 1.0 : 0.62), minHeight: 260, maxHeight: 560 });
+  function upd() {
+    cv.redraw(); const c = calc();
+    CB.stat("fb-ct-o-b", `${c.N} (${c.LB})`); CB.stat("fb-ct-o-w", CB.num(c.loss * 100, 1) + " %");
+    CB.stat("fb-ct-o-r", CB.num(c.reuse, 1) + " m"); CB.stat("fb-ct-o-s", CB.num((c.scrap / (c.N * c.S)) * 100, 1) + " %");
+    CB.stat("fb-ct-o-j", c.splices + "곳");
+  }
+  upd();
+})();
+
+/* ---------- 3. 모듈 분할 ---------- */
+(function () {
+  const W0 = 32, D0 = 24, CORE = [8, 8, 24, 16], DECK = 1.0, LIM = { w: 2.5, h: 4.0, l: 16.7 }, Q = 3.0;
+  const gl = CB.range("fb-md-l", (v) => v.toFixed(1) + " m", upd), gw = CB.range("fb-md-w", (v) => v.toFixed(1) + " m", upd), gh = CB.range("fb-md-h", (v) => v.toFixed(1) + " m", upd);
+  const gd = CB.seg("fb-md-dir", upd), gf = CB.seg("fb-md-fit", upd);
+  const cuts = (total, len, mode) => {
+    if (mode === "even") { const n = Math.max(1, Math.ceil(total / len - 1e-9)), s = total / n; return Array.from({ length: n }, (_, i) => [i * s, (i + 1) * s]); }
+    const out = []; let a = 0; while (a < total - 1e-9) { const b = Math.min(total, a + len); out.push([a, b]); a = b; } return out;
+  };
+  function calc() {
+    const L = gl(), w = gw(), dir = gd(), mode = gf(), [cx0, cy0, cx1, cy1] = CORE;
+    const xs = dir === "x" ? cuts(W0, L, mode) : cuts(W0, w, mode), ys = dir === "x" ? cuts(D0, w, mode) : cuts(D0, L, mode), mods = [];
+    xs.forEach(([x0, x1]) => ys.forEach(([y0, y1]) => {
+      const ox = Math.min(x1, cx1) - Math.max(x0, cx0), oy = Math.min(y1, cy1) - Math.max(y0, cy0);
+      if (ox <= 1e-9 || oy <= 1e-9) { mods.push([x0, y0, x1, y1]); return; }
+      const parts = [];
+      if (x0 < cx0 - 1e-9) parts.push([x0, y0, cx0, y1]);
+      if (x1 > cx1 + 1e-9) parts.push([cx1, y0, x1, y1]);
+      const ax0 = Math.max(x0, cx0), ax1 = Math.min(x1, cx1);
+      if (y0 < cy0 - 1e-9) parts.push([ax0, y0, ax1, cy0]);
+      if (y1 > cy1 + 1e-9) parts.push([ax0, cy1, ax1, y1]);
+      parts.forEach((p) => { if (p[2] - p[0] > 0.05 && p[3] - p[1] > 0.05) mods.push(p); });
+    }));
+    const key = (m) => { const a = m[2] - m[0], b = m[3] - m[1]; return Math.max(a, b).toFixed(2) + " × " + Math.min(a, b).toFixed(2); };
+    const types = {}; mods.forEach((m) => { const k = key(m); types[k] = (types[k] || 0) + 1; });
+    const top = Object.entries(types).sort((a, b) => b[1] - a[1])[0];
+    const maxLong = Math.max(...mods.map((m) => Math.max(m[2] - m[0], m[3] - m[1]))), maxShort = Math.max(...mods.map((m) => Math.min(m[2] - m[0], m[3] - m[1])));
+    const hT = DECK + gh(), ok = maxShort <= LIM.w + 1e-9 && hT <= LIM.h + 1e-9 && maxLong <= LIM.l + 1e-9;
+    const maxA = Math.max(...mods.map((m) => (m[2] - m[0]) * (m[3] - m[1]))), slivers = mods.filter((m) => Math.min(m[2] - m[0], m[3] - m[1]) < 1.5).length;
+    return { mods, types, top, key, maxLong, maxShort, hT, ok, maxA, slivers };
+  }
+  const cv = CB.canvas("#fb-cv-mod", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), narrow = W < 560;
+    const A = narrow ? { x: 12, y: 24, w: W - 24, h: H * 0.5 } : { x: 14, y: 24, w: W * 0.64, h: H - 44 };
+    const sc = Math.min(A.w / W0, A.h / D0), ox = A.x + (A.w - W0 * sc) / 2, oy = A.y + (A.h + D0 * sc) / 2, X = (x) => ox + x * sc, Y = (y) => oy - y * sc;
+    c.mods.forEach((m) => {
+      const k = c.key(m), sl = Math.min(m[2] - m[0], m[3] - m[1]) < 1.5, col = sl ? P.bad : k === c.top[0] ? P.accent2 : P.blue;
+      ctx.fillStyle = FBX.alpha(col, 0.28); ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.fillRect(X(m[0]), Y(m[3]), (m[2] - m[0]) * sc, (m[3] - m[1]) * sc); ctx.strokeRect(X(m[0]) + 0.5, Y(m[3]) + 0.5, (m[2] - m[0]) * sc - 1, (m[3] - m[1]) * sc - 1);
+    });
+    ctx.fillStyle = FBX.alpha(P.dim, 0.4); ctx.fillRect(X(8), Y(16), 16 * sc, 8 * sc); FBX.text(ctx, "코어", X(16), Y(12), P.text, { size: 11 });
+    ctx.fillStyle = P.text; [0, 8, 16, 24, 32].forEach((x) => [0, 8, 16, 24].forEach((y) => ctx.fillRect(X(x) - 2.5, Y(y) - 2.5, 5, 5)));
+    FBX.text(ctx, `기준층 32 × 24 m · ${c.mods.length}개`, A.x, 12, P.text, { size: 12, align: "left" });
+    // 운송 단면
+    const T = narrow ? { x: 20, y: A.y + A.h + 24, w: W - 40, h: H - A.h - A.y - 34 } : { x: A.x + A.w + 24, y: 40, w: W - A.w - A.x - 40, h: H - 70 };
+    const s2 = Math.min(T.w / 6, T.h / 5.6), bx = T.x + T.w / 2, by = T.y + T.h - 4, wS = c.maxShort;
+    FBX.line(ctx, T.x, by, T.x + T.w, by, P.axis, 1.2);
+    ctx.fillStyle = P.dim; ctx.fillRect(bx - 1.25 * s2, by - DECK * s2, 2.5 * s2, 0.25 * s2);
+    ctx.fillStyle = FBX.alpha(c.ok ? P.ok : P.warn, 0.3); ctx.strokeStyle = c.ok ? P.ok : P.warn; ctx.lineWidth = 2;
+    ctx.fillRect(bx - (wS / 2) * s2, by - c.hT * s2, wS * s2, gh() * s2); ctx.strokeRect(bx - (wS / 2) * s2, by - c.hT * s2, wS * s2, gh() * s2);
+    ctx.setLineDash([6, 4]); ctx.strokeStyle = P.bad; ctx.lineWidth = 1.6; ctx.strokeRect(bx - (LIM.w / 2) * s2, by - LIM.h * s2, LIM.w * s2, LIM.h * s2); ctx.setLineDash([]);
+    FBX.text(ctx, "운송 단면", bx, T.y + 4, P.text, { size: 11.5 });
+    FBX.text(ctx, `${wS.toFixed(1)} × ${c.hT.toFixed(1)} m`, bx, by - c.hT * s2 - 12, c.ok ? P.ok : P.warn, { size: 11 });
+    FBX.text(ctx, "제한 2.5 × 4.0(형태)", bx, by + 12 > H - 4 ? by - 6 : by + 12, P.bad, { size: 10 });
+  }, { aspect: (W) => (W < 560 ? 1.45 : 0.6), minHeight: 280, maxHeight: 520 });
+  function upd() {
+    cv.redraw(); const c = calc(), n = c.mods.length, nt = Object.keys(c.types).length;
+    CB.stat("fb-md-o-n", `${n} (${n * 10})`); CB.stat("fb-md-o-t", `${nt} · ${c.top[0]} m(${c.top[1]}개)`);
+    const why = []; if (c.maxShort > LIM.w + 1e-9) why.push("폭"); if (c.hT > LIM.h + 1e-9) why.push("높이"); if (c.maxLong > LIM.l + 1e-9) why.push("길이");
+    CB.stat("fb-md-o-tr", c.ok ? "제한 안" : "허가 운송(" + why.join("·") + ")");
+    CB.stat("fb-md-o-w", CB.num((c.maxA * Q) / 9.81, 1) + " t");
+    const msg = document.getElementById("fb-md-msg");
+    msg.className = "fb-msg " + (nt === 1 && !c.slivers ? "ok" : c.slivers ? "bad" : "warn");
+    msg.innerHTML = (nt === 1 ? "<b>유형 1개</b> — 모든 모듈이 같은 크기라 공장 지그를 그대로 반복합니다." : `<b>유형 ${nt}개</b> — ` + Object.entries(c.types).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} m × ${v}`).join(", ") + (nt > 5 ? " …" : "")) + (c.slivers ? ` · 짧은 변 1.5 m 미만 조각 ${c.slivers}개는 현장 시공을 권합니다.` : "");
+  }
+  upd();
+})();
+
+/* ---------- 4. 공차 누적 ---------- */
+(function () {
+  const gn = CB.range("fb-tl-n", (v) => v + "개", upd), gt = CB.range("fb-tl-t", (v) => "±" + v.toFixed(1) + " mm", upd), gg = CB.range("fb-tl-g", (v) => "±" + v.toFixed(1) + " mm", upd);
+  const gd = CB.seg("fb-tl-dist", upd), ga = CB.range("fb-tl-a", (v) => "±" + v + " mm", draw);
+  let R = null;
+  function upd() {
+    const n = gn(), t = gt(), g = gg(), d = gd(), r = CB.rng(42), M = 20000, sums = new Float64Array(M);
+    for (let k = 0; k < M; k++) {
+      let s = 0;
+      for (let i = 0; i < n; i++) s += d === "unif" ? (2 * r() - 1) * t : d === "bias" ? t / 3 + (t / 3) * FBX.gauss(r) : (t / 3) * FBX.gauss(r);
+      for (let i = 0; i < n - 1; i++) s += (g / 3) * FBX.gauss(r);
+      sums[k] = s;
+    }
+    const sorted = Array.from(sums).sort((a, b) => a - b);
+    R = { sums, wc: n * t + (n - 1) * g, rss: Math.sqrt(n * t * t + (n - 1) * g * g), lo: sorted[Math.floor(0.0015 * M)], hi: sorted[Math.floor(0.9985 * M)] };
+    draw();
+  }
+  const cv = CB.canvas("#fb-cv-tol", (ctx, W, H) => {
+    if (!R) return;
+    const P = CB.palette(), X0 = Math.max(R.wc, ga(), 5) * 1.08, bins = 60, h = CB.histogram(Array.from(R.sums), bins, [-X0, X0]);
+    const ymax = Math.max(...h.counts) / (R.sums.length * h.width) * 1.15;
+    const res = CB.chart(ctx, null, { x: [-X0, X0], y: [0, ymax], xLabel: "누적 편차 (mm)", yLabel: "확률 밀도", yFmt: (v) => v.toFixed(2),
+      vlines: [{ x: -R.wc, color: P.bad }, { x: R.wc, color: P.bad, label: "최악" }, { x: -R.rss, color: P.accent }, { x: R.rss, color: P.accent, label: "RSS" }, { x: -ga(), color: P.warn, dash: [] }, { x: ga(), color: P.warn, dash: [], label: "허용" }] });
+    h.counts.forEach((c, i) => { const x0 = h.edges[i], x1 = h.edges[i + 1], y = c / (R.sums.length * h.width), out = Math.abs((x0 + x1) / 2) > ga();
+      ctx.fillStyle = FBX.alpha(out ? P.bad : P.accent2, 0.55); ctx.fillRect(res.X(x0), res.Y(y), Math.max(1, res.X(x1) - res.X(x0) - 1), res.Y(0) - res.Y(y)); });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.55), minHeight: 260, maxHeight: 420 });
+  function draw() {
+    if (!R) return; cv.redraw(); const T = ga();
+    let c = 0; for (const s of R.sums) if (Math.abs(s) > T) c++;
+    CB.stat("fb-tl-o-wc", "±" + CB.num(R.wc, 1) + " mm"); CB.stat("fb-tl-o-rss", "±" + CB.num(R.rss, 1) + " mm");
+    CB.stat("fb-tl-o-mc", CB.num(R.lo, 1) + " ~ +" + CB.num(R.hi, 1) + " mm"); CB.stat("fb-tl-o-p", CB.num((c / R.sums.length) * 100, 2) + " %");
+  }
+  upd();
+})();
+
+/* ---------- 5. 스풀 분할 ---------- */
+(function () {
+  const els = CB.bim.model({ floors: 1, ductDrop: 0.95 }), DU = els.find((e) => e.ifc === "IfcDuctSegment"), SP = els.find((e) => e.ifc === "IfcPipeSegment");
+  const BEAMX = [8, 16, 24], DEF = { duct: [6, 0.6, 1.0], pipe: [6, 0.4, 0.5] };
+  const gsys = CB.seg("fb-sp-sys", (v) => { const d = DEF[v]; gl.set(d[0], false); gk.set(d[1], false); gm.set(d[2], false); upd(); });
+  const gl = CB.range("fb-sp-l", (v) => v.toFixed(1) + " m", upd), gk = CB.range("fb-sp-k", (v) => "±" + v.toFixed(2) + " m", upd), gm = CB.range("fb-sp-m", (v) => v.toFixed(1) + " m", upd);
+  function calc() {
+    const e = gsys() === "duct" ? DU : SP, a = e.box[0], b = e.box[3], Lmax = gl(), k = gk(), Lmin = gm();
+    const bad = (x) => BEAMX.some((c) => Math.abs(x - c) < k - 1e-9);
+    const joints = []; let pos = a, ok = true;
+    while (b - pos > Lmax + 1e-9) {
+      let x = Math.min(b, pos + Lmax);
+      while (x >= pos + Lmin - 1e-9 && bad(x)) { const zone = BEAMX.find((c) => Math.abs(x - c) < k - 1e-9); x = zone - k; }
+      if (x < pos + Lmin - 1e-9 || b - x < 1e-9) { ok = false; break; }
+      x = Math.round(x * 1000) / 1000; joints.push(x); pos = x;
+    }
+    if (ok && joints.length && b - joints[joints.length - 1] < Lmin - 1e-9) ok = false;
+    const pts = [a, ...joints, b], lens = pts.slice(1).map((x, i) => x - pts[i]);
+    return { e, a, b, joints, lens, ok, k, lb: Math.ceil((b - a) / Lmax - 1e-9) };
+  }
+  const cv = CB.canvas("#fb-cv-spool", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), m = 18, sc = (W - 2 * m) / 33, X = (x) => m + (x + 0.5) * sc, zs = Math.min(70, (H - 70) / 1.6), Z = (z) => 26 + -z * zs;
+    ctx.fillStyle = FBX.alpha(P.dim, 0.5); ctx.fillRect(X(-0.4), Z(0), 32.8 * sc, 0.21 * zs); FBX.text(ctx, "슬래브", X(4), Z(0) - 9, P.dim, { size: 10.5 });
+    [0, 8, 16, 24, 32].forEach((x) => { ctx.fillStyle = FBX.alpha(P.dim, 0.8); ctx.fillRect(X(x - 0.2), Z(-0.21), 0.4 * sc, 0.49 * zs); if (x > 0 && x < 32) { ctx.fillStyle = FBX.alpha(P.bad, 0.15); ctx.fillRect(X(x - c.k), Z(-0.21), 2 * c.k * sc, (H - 30) - Z(-0.21)); } });
+    const duct = gsys() === "duct", zt = duct ? -0.75 : -0.30, zb = duct ? -1.15 : -0.40;
+    ctx.fillStyle = FBX.alpha(duct ? P.blue : P.ok, 0.3); ctx.strokeStyle = duct ? P.blue : P.ok; ctx.lineWidth = 1.6;
+    ctx.fillRect(X(c.a), Z(zt), (c.b - c.a) * sc, (zt - zb) * zs); ctx.strokeRect(X(c.a), Z(zt), (c.b - c.a) * sc, (zt - zb) * zs);
+    if (!duct) BEAMX.forEach((x) => { ctx.strokeStyle = P.text; ctx.lineWidth = 1; ctx.strokeRect(X(x - 0.2), Z(-0.27), 0.4 * sc, 0.16 * zs); });
+    c.joints.forEach((x) => FBX.line(ctx, X(x), Z(zt) - 6, X(x), Z(zb) + 6, P.text, 3));
+    const pts = [c.a, ...c.joints, c.b];
+    c.lens.forEach((L, i) => { const mid = (pts[i] + pts[i + 1]) / 2; if (L * sc > 26) FBX.text(ctx, CB.num(L, 1), X(mid), Z(zb) + 16, P.text, { size: 10.5 }); });
+    FBX.text(ctx, duct ? "급기 덕트(천장 아래 0.95 m로 내림 → 보 아래 통과)" : "스프링클러 주관(보 관통 슬리브)", W / 2, H - 12, P.dim, { size: 11, bold: false });
+    [0, 8, 16, 24, 32].forEach((x) => FBX.text(ctx, x + " m", X(x), 12, P.faint, { size: 10 }));
+  }, { aspect: (W) => (W < 520 ? 0.6 : 0.34), minHeight: 200, maxHeight: 320 });
+  function upd() {
+    cv.redraw(); const c = calc(), msg = document.getElementById("fb-sp-msg");
+    if (!c.ok) { ["n", "j", "t"].forEach((k) => CB.stat("fb-sp-o-" + k, "—")); CB.stat("fb-sp-o-lb", c.lb + "개"); msg.className = "fb-msg bad"; msg.textContent = "이음을 둘 수 있는 곳이 없습니다: 금지 구간이 (최대 − 최소 길이)보다 넓거나 마지막 조각이 최소 길이보다 짧습니다. 최대 길이를 늘리거나 금지 폭을 줄이세요."; return; }
+    const n = c.lens.length, types = new Set(c.lens.map((L) => L.toFixed(1)));
+    CB.stat("fb-sp-o-n", `${n} (${n * 10})`); CB.stat("fb-sp-o-j", `${n - 1} (${(n - 1) * 10})`); CB.stat("fb-sp-o-t", types.size + "가지"); CB.stat("fb-sp-o-lb", c.lb + "개");
+    msg.className = "fb-msg " + (n === c.lb ? "ok" : "warn");
+    msg.innerHTML = `스풀 길이: ${c.lens.map((L) => CB.num(L, 2)).join(" · ")} m` + (n === c.lb ? " — 하한과 같은 개수입니다." : " — 금지 구간 때문에 하한보다 많습니다.") + ` 번호 예: <code>${c.e.name.replace("1F", "3F")}/S01</code>`;
+  }
+  upd();
+})();
+
+/* ---------- 6. CNC 경로 ---------- */
+(function () {
+  let seed = 9;
+  const gp = CB.seg("fb-cn-plate", upd), go = CB.seg("fb-cn-ord", upd), gv = CB.range("fb-cn-v", (v) => v + " m/min", upd), gh = CB.range("fb-cn-h", (v) => v + " s", upd);
+  document.getElementById("fb-cn-seed").addEventListener("click", () => { seed++; if (gp() !== "rand") gp.set("rand", false); upd(); });
+  function plate() {
+    if (gp() === "base") return { W: 500, H: 500, holes: [[50, 50], [450, 450], [450, 50], [50, 450], [250, 50], [250, 450]] };
+    if (gp() === "splice") {
+      const G = [[90, 70], [420, 220], [420, 70], [90, 220]], holes = [];
+      G.forEach(([gx, gy], gi) => { for (let c = 0; c < 2; c++) for (let r = 0; r < 3; r++) { const rr = c % 2 ? 2 - r : r; holes.push([gx + c * 75, gy + rr * 55]); } });
+      return { W: 600, H: 400, holes };
+    }
+    const r = CB.rng(seed), holes = []; for (let i = 0; i < 40; i++) holes.push([30 + r() * 540, 30 + r() * 340]); return { W: 600, H: 400, holes };
+  }
+  const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const len = (p) => p.slice(1).reduce((s, q, i) => s + d(p[i], q), 0);
+  function order(holes, mode) {
+    const O = [0, 0];
+    if (mode === "given") return [O, ...holes];
+    const left = holes.slice(), path = [O];
+    while (left.length) { const cur = path[path.length - 1]; let bi = 0; left.forEach((h, i) => { if (d(cur, h) < d(cur, left[bi])) bi = i; }); path.push(left.splice(bi, 1)[0]); }
+    if (mode === "opt") {
+      let imp = true, guard = 0;
+      while (imp && guard++ < 200) { imp = false; const n = path.length;
+        for (let i = 1; i < n - 1; i++) for (let j = i + 1; j < n; j++) {
+          const delta = d(path[i - 1], path[j]) + (j + 1 < n ? d(path[i], path[j + 1]) : 0) - d(path[i - 1], path[i]) - (j + 1 < n ? d(path[j], path[j + 1]) : 0);
+          if (delta < -1e-9) { const seg = path.slice(i, j + 1).reverse(); path.splice(i, j - i + 1, ...seg); imp = true; } } }
+    }
+    return path;
+  }
+  function calc() { const pl = plate(), path = order(pl.holes, go()), L = len(path), Lg = len(order(pl.holes, "given")), v = gv(), mv = (L / 1000 / v) * 60; return { pl, path, L, Lg, mv, tot: mv + pl.holes.length * gh() }; }
+  const cv = CB.canvas("#fb-cv-cnc", (ctx, W, H) => {
+    const P = CB.palette(), c = calc(), m = 24, sc = Math.min((W - 2 * m) / (c.pl.W + 40), (H - 2 * m) / (c.pl.H + 40)), ox = m + 20 * sc, oy = H - m - 20 * sc;
+    const X = (x) => ox + x * sc, Y = (y) => oy - y * sc;
+    ctx.fillStyle = FBX.alpha(P.dim, 0.15); ctx.strokeStyle = P.dim; ctx.lineWidth = 1.4; ctx.fillRect(X(0), Y(c.pl.H), c.pl.W * sc, c.pl.H * sc); ctx.strokeRect(X(0), Y(c.pl.H), c.pl.W * sc, c.pl.H * sc);
+    ctx.strokeStyle = P.accent2; ctx.lineWidth = 1.6; ctx.beginPath(); c.path.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])))); ctx.stroke();
+    c.path.slice(1).forEach((p, i) => { const q = c.path[i], a = Math.atan2(Y(p[1]) - Y(q[1]), X(p[0]) - X(q[0])), mx = (X(p[0]) + X(q[0])) / 2, my = (Y(p[1]) + Y(q[1])) / 2;
+      ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.moveTo(mx + 6 * Math.cos(a), my + 6 * Math.sin(a)); ctx.lineTo(mx - 5 * Math.cos(a - 0.5), my - 5 * Math.sin(a - 0.5)); ctx.lineTo(mx - 5 * Math.cos(a + 0.5), my - 5 * Math.sin(a + 0.5)); ctx.fill(); });
+    c.path.slice(1).forEach((p, i) => { ctx.fillStyle = P.bg; ctx.strokeStyle = P.text; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), Math.max(3.5, 11 * sc), 0, 7); ctx.fill(); ctx.stroke();
+      if (c.path.length <= 25) FBX.text(ctx, String(i + 1), X(p[0]) + 9, Y(p[1]) - 9, P.dim, { size: 9.5 }); });
+    ctx.fillStyle = P.bad; ctx.beginPath(); ctx.arc(X(0), Y(0), 5, 0, 7); ctx.fill(); FBX.text(ctx, "원점", X(0) + 4, Y(0) + 12, P.bad, { size: 10, align: "left" });
+    FBX.text(ctx, `${c.pl.W} × ${c.pl.H} mm · 구멍 ${c.pl.holes.length}개`, W / 2, 12, P.text, { size: 11.5 });
+  }, { aspect: (W) => (W < 520 ? 0.8 : 0.62), minHeight: 240, maxHeight: 440 });
+  function upd() {
+    cv.redraw(); const c = calc();
+    CB.stat("fb-cn-o-l", CB.sig(c.L) + " mm"); CB.stat("fb-cn-o-t", CB.num(c.mv, 1) + " · " + CB.num(c.tot, 1) + " s");
+    CB.stat("fb-cn-o-g", go() === "given" ? "기준" : "−" + CB.num((1 - c.L / c.Lg) * 100, 0) + " %");
+  }
+  upd();
+})();
+
+/* ---------- 7. 조립 순서와 추적 ---------- */
+(function () {
+  const H = (k) => (k === 0 ? 0 : 5 + 4 * (k - 1)), XS = [0, 8, 16, 24, 32], YS = [0, 8, 16, 24], AB = "ABCDE", RHO = 2.45;
+  const E = [], byName = {};
+  const add = (type, name, floor, box, sup) => { const e = { type, name, floor, box, sup, guid: CB.bim.guid("PC" + name) }; e.t = (box[3] - box[0]) * (box[4] - box[1]) * (box[5] - box[2]) * RHO; E.push(e); byName[name] = e; };
+  const cn = (i, j, k) => `C-${AB[i]}${j + 1}-${k}F`, bx = (i, j, k) => `GX${j + 1}-${i + 1}-${k}F`, by = (i, j, k) => `GY${AB[i]}-${j + 1}-${k}F`;
+  const isCore = (i, j) => (i === 1 || i === 2) && j === 1;
+  for (const k of [1, 2]) {
+    const z0 = H(k - 1), z1 = H(k);
+    XS.forEach((x, i) => YS.forEach((y, j) => {
+      const sup = k === 1 ? [] : [cn(i, j, 1)].concat([i > 0 ? bx(i - 1, j, 1) : null, i < 4 ? bx(i, j, 1) : null, j > 0 ? by(i, j - 1, 1) : null, j < 3 ? by(i, j, 1) : null].filter(Boolean));
+      add("col", cn(i, j, k), k, [x - 0.4, y - 0.4, z0, x + 0.4, y + 0.4, z1 - 0.7], sup);
+    }));
+  }
+  for (const k of [1, 2]) {
+    const z1 = H(k);
+    YS.forEach((y, j) => [0, 1, 2, 3].forEach((i) => add("beam", bx(i, j, k), k, [8 * i + 0.4, y - 0.2, z1 - 0.7, 8 * i + 7.6, y + 0.2, z1 - 0.21], [cn(i, j, k), cn(i + 1, j, k)])));
+    XS.forEach((x, i) => [0, 1, 2].forEach((j) => add("beam", by(i, j, k), k, [x - 0.2, 8 * j + 0.4, z1 - 0.7, x + 0.2, 8 * j + 7.6, z1 - 0.21], [cn(i, j, k), cn(i, j + 1, k)])));
+  }
+  for (const k of [1, 2]) {
+    const z1 = H(k);
+    [0, 1, 2, 3].forEach((i) => [0, 1, 2].forEach((j) => { if (isCore(i, j)) return; ["a", "b"].forEach((h, q) => add("slab", `SP${i + 1}${j + 1}${h}-${k}F`, k, [8 * i + 4 * q, 8 * j, z1 - 0.21, 8 * i + 4 * q + 4, 8 * j + 8, z1], [bx(i, j, k), bx(i, j + 1, k)])); }));
+  }
+  const N = E.length;
+  function seq(mode) {
+    if (mode === "id") return E.slice();
+    if (mode === "rand") { const r = CB.rng(5), a = E.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+    const out = [], used = new Set(), push = (n) => { const e = byName[n]; if (e && !used.has(e)) { used.add(e); out.push(e); } };
+    for (const k of [1, 2]) {
+      if (mode === "floor") { ["col", "beam", "slab"].forEach((t) => E.filter((e) => e.floor === k && e.type === t).forEach((e) => push(e.name))); continue; }
+      for (let j = 0; j < 3; j++) for (let i = 0; i < 4; i++) {
+        [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]].forEach(([a, b]) => push(cn(a, b, k)));
+        [bx(i, j, k), bx(i, j + 1, k), by(i, j, k), by(i + 1, j, k)].forEach(push);
+        if (!isCore(i, j)) ["a", "b"].forEach((h) => push(`SP${i + 1}${j + 1}${h}-${k}F`));
+      }
+    }
+    return out;
+  }
+  let S = null;
+  const go = CB.seg("fb-as-ord", build), gk = CB.range("fb-as-k", (v) => v + " / " + N, draw), gb = CB.range("fb-as-b", (v) => v + "개", draw);
+  gk.el.max = N;
+  function build() {
+    const order = seq(go()), pos = new Map(order.map((e, i) => [e, i]));
+    const viol = order.map((e, i) => e.sup.some((n) => pos.get(byName[n]) > i));
+    S = { order, viol }; draw();
+  }
+  const KIND = { col: "기둥", beam: "보", slab: "바닥판" };
+  const view = CB.orbit("#fb-cv-asm", {
+    yaw: -0.7, pitch: 0.48, dist: 62, target: [16, 12, 3.5], aspect: 0.72, maxHeight: 500,
+    draw(V) {
+      if (!S) return;
+      const P = V.P, k = gk(), faces = [];
+      V.poly3([[-1, -1, 0], [33, -1, 0], [33, 25, 0], [-1, 25, 0]], { fill: P.dim, fillAlpha: 0.06, color: P.faint, width: 1 });
+      S.order.slice(0, k).forEach((e, i) => {
+        const [x0, y0, z0, x1, y1, z1] = e.box, c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+        const col = S.viol[i] ? P.bad : i === k - 1 ? P.accent2 : e.type === "slab" ? P.faint : P.dim;
+        faces.push({ pts: c.map(([x, y]) => [x, y, z1]), col, cur: i === k - 1 });
+        for (let q = 0; q < 4; q++) faces.push({ pts: [[...c[q], z0], [...c[(q + 1) % 4], z0], [...c[(q + 1) % 4], z1], [...c[q], z1]], col, cur: i === k - 1 });
+      });
+      faces.forEach((f) => (f.dp = V.depth(f.pts)));
+      faces.sort((a, b) => b.dp - a.dp).forEach((f) => V.poly3(f.pts, { fill: f.col, fillAlpha: f.cur ? 0.8 : 0.5, color: f.cur ? P.accent2 : FBX.alpha(P.text, 0.35), width: f.cur ? 2 : 0.6 }));
+    },
+  });
+  const loop = CB.loop(view.cv.canvas, (dt) => { acc += dt; if (acc < 0.15) return; acc = 0; if (gk() >= N) { pb.set(false); loop.stop(); return; } gk.set(gk() + 1, true); });
+  let acc = 0; loop.stop();
+  const pb = CB.playButton("fb-as-play", () => { if (gk() >= N) gk.set(0); loop.start(); }, () => loop.stop());
+  function draw() {
+    if (!S) return; view.redraw();
+    const k = gk(), B = gb(), v = S.viol.slice(0, k).filter(Boolean).length;
+    CB.stat("fb-as-o-k", `${k} / ${N}`); CB.stat("fb-as-o-v", v + "건");
+    const site = Math.max(0, Math.min(B, N - k)), tr = Math.max(0, Math.min(3, N - k - site));
+    CB.stat("fb-as-o-st", `${site} · ${tr} · ${N - k - site - tr}`);
+    CB.stat("fb-as-o-w", CB.sig(S.order.slice(0, k).reduce((s, e) => s + e.t, 0)) + " t");
+    const msg = document.getElementById("fb-as-msg");
+    if (!k) { msg.className = "fb-msg"; msg.textContent = "설치 단계를 움직이면 마지막으로 설치된 부재의 추적 기록이 여기에 나옵니다."; return; }
+    const e = S.order[k - 1], rank = E.filter((x) => x.type === e.type && x.floor === e.floor).indexOf(e), bad = S.viol[k - 1];
+    const lot = `L${e.floor}-${e.type.toUpperCase()}-${String(Math.floor(rank / 8) + 1).padStart(2, "0")}`;
+    msg.className = "fb-msg " + (bad ? "bad" : "ok");
+    msg.innerHTML = `#${k} <b>${KIND[e.type]} ${e.name}</b> · GUID <code>${e.guid}</code> · 제작 로트 ${lot} · 무게 ${CB.num(e.t, 1)} t · QR <code>B10|${e.name}|${e.guid}</code>` + (bad ? ` — <b>지지 위반</b>: 아직 없는 ${e.sup.filter((n) => S.order.indexOf(byName[n]) >= k).slice(0, 3).join(", ")}` : " — 지지 부재 설치 확인");
+  }
+  build();
+})();
+</script>
+</body>
+</html>
