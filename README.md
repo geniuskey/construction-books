@@ -26,6 +26,7 @@ MechanicsBook(`mechanics/`)은 math-books의 CalculusBook 엔진(`MB`)을 물려
 ```text
 index.html, shelf.css                  서가 홈: 책장·분야 필터·검색, 대표 실험, 읽는 순서
 catalog.js                            생성된 책 목록(직접 수정하지 않음)
+catalog.json                          생성된 책 목록과 서가 지도(books.euiyun.com이 읽음, 직접 수정하지 않음)
 book.json                             서가 메타데이터, 각 책의 book.json 목록
 roadmap.json                          준비 중인 책(지금은 비어 있음)
 shared/js/shelf.js                    서가 홈의 책장 렌더링·필터·실험 덱
@@ -34,7 +35,7 @@ shared/css/cover-animations.css       표지 애니메이션(동작 줄이기 �
 shared/js/book-shell.js               모든 책 상단 바의 ‘건설 서가’ 연결
 shared/img/sims/                      홈 ‘직접 해보기’의 시뮬레이터 화면(tools/sim-shots.mjs로 생성)
 {slug}/                               각 책의 본문, 실습 엔진, 용어 데이터
-tools/sync-catalog.py                 catalog.js 생성(LOCAL_BOOKS + roadmap.json)
+tools/sync-catalog.py                 catalog.js·catalog.json 생성(LOCAL_BOOKS + roadmap.json + book.json의 map)
 tools/sync-sitemap.py                 루트 사이트맵 생성
 tools/build.mjs                       정적 배포물(.book-dist/) 생성, meta가 있는 책의 SEO 태그와 수식 미리 렌더링
 tools/katex.mjs, katex.test.mjs       빌드 시 수식 렌더링과 회귀 검사
@@ -67,7 +68,7 @@ node tools/browser-check.cjs --offline mechanics materials geotech structure con
 
 `book.json`에 `meta`가 있는 책은 소스에 canonical·Open Graph·KaTeX 태그를 두지 않습니다. 빌드가 태그를 생성하고 수식을 미리 렌더링해 KaTeX 스타일시트만 붙입니다.
 
-책·장·시뮬레이터 수가 바뀌면 `npm run catalog`, `npm run sitemap`, `node tools/og.mjs`로 목록과 공유 이미지를 갱신합니다. 홈의 실험 카드를 바꾸면 `node tools/sim-shots.mjs`로 이미지를 다시 찍습니다.
+책·장·시뮬레이터 수가 바뀌면 `npm run catalog`, `npm run sitemap`, `node tools/og.mjs`로 목록과 공유 이미지를 갱신합니다. 서가 지도(분야 버튼과 ‘읽는 순서’ 위의 지도)는 `book.json`의 `map`에서 고칩니다. 묶음 `id`는 책의 `stage`와 같고, 모든 책은 한 묶음에 들어가야 합니다. 바꾼 뒤 books 저장소에서 `python3 tools/sync-books.py`를 실행하면 books.euiyun.com 지식 지도에도 반영됩니다. 홈의 실험 카드를 바꾸면 `node tools/sim-shots.mjs`로 이미지를 다시 찍습니다.
 
 ## 라이선스
 

@@ -4,13 +4,10 @@
   "use strict";
   const books = window.CONSTRUCTION_BOOKS || [];
   const byId = new Map(books.map((b) => [b.id, b]));
-  const groups = [
-    { id: "all", label: "전체", stages: [] },
-    { id: "foundations", label: "역학·재료·지반", stages: ["foundations"] },
-    { id: "design", label: "구조 설계", stages: ["design"] },
-    { id: "civil", label: "토목 인프라", stages: ["civil"] },
-    { id: "delivery", label: "시공·디지털", stages: ["delivery"] },
-  ];
+  // 분야 버튼과 서가 지도는 book.json의 map(catalog.js의 CONSTRUCTION_MAP)에서 만든다.
+  const shelfMap = window.CONSTRUCTION_MAP || { groups: [], links: [] };
+  const groups = [{ id: "all", label: "전체", stages: [] },
+    ...shelfMap.groups.map((g) => ({ id: g.id, label: g.name, stages: [g.id] }))];
   // 세로 표지에는 books 포털처럼 짧은 이름을 쓴다.
   const coverTitles = { mechanicsbook: "구조역학", materialsbook: "건설재료", geotechbook: "지반공학", structurebook: "건축구조", concretebook: "철근콘크리트", civilbook: "교량·터널·도로", sitebook: "시공·건설관리", bimbook: "BIM·디지털 건설" };
   const esc = (value) => String(value || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -71,6 +68,18 @@
   });
   search.addEventListener("input", render);
   search.addEventListener("keydown", (event) => { if (event.key === "Escape") { search.value = ""; render(); } });
+
+  // 서가 지도: 묶음을 읽는 순서대로 잇고, 책 사이 연결은 한 줄씩 적는다.
+  const mapEl = document.getElementById("shelf-map");
+  if (mapEl && shelfMap.groups.length) {
+    const chip = (id) => { const b = byId.get(id); return b ? `<a data-book="${esc(b.id)}" href="${esc(b.url)}">${esc(titleOf(b))}</a>` : ""; };
+    mapEl.innerHTML = `<ol class="map-groups">${shelfMap.groups.map((g, i) => `<li><small>${String(i + 1).padStart(2, "0")} · ${esc(g.en)}</small><b>${esc(g.name)}</b><p>${esc(g.desc)}</p><div class="path">${books.filter((b) => b.stage === g.id).map((b) => chip(b.id)).join("")}</div></li>`).join("")}</ol>`
+      + (shelfMap.links.length ? (() => {
+        // 연결이 많으면 접어 두어 첫 화면을 지도 묶음에 쓴다.
+        const list = `<ul class="map-links">${shelfMap.links.map(([a, b, reason]) => `<li><span class="path">${chip(a)}<i aria-label="에서">→</i>${chip(b)}</span>${esc(reason)}</li>`).join("")}</ul>`;
+        return shelfMap.links.length > 6 ? `<details class="map-more"><summary>책 사이 연결 ${shelfMap.links.length}개</summary>${list}</details>` : list;
+      })() : "");
+  }
 
   // 실험 카드와 읽는 순서 칩에 책 색과 코드를 입힌다.
   document.querySelectorAll(".experiment[data-book], .path a[data-book]").forEach((el) => {

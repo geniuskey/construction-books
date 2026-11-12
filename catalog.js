@@ -221,3 +221,125 @@ window.CONSTRUCTION_BOOKS = [
     "simulators": 126
   }
 ];
+window.CONSTRUCTION_MAP = {
+  "title": "힘의 흐름에서 지어지는 건물까지",
+  "desc": "ConstructionBooks의 건설·건축 교재입니다. 구조역학·건설재료·지반에서 건축구조와 철근콘크리트 설계로, 교량·터널과 시공·BIM으로 이어갑니다.",
+  "groups": [
+    {
+      "id": "foundations",
+      "name": "역학·재료·지반",
+      "en": "Foundations",
+      "desc": "하중과 응력, 콘크리트·강재, 흙과 기초의 기본 원리"
+    },
+    {
+      "id": "design",
+      "name": "구조 설계",
+      "en": "Design",
+      "desc": "건물의 구조 시스템과 철근콘크리트 부재 설계"
+    },
+    {
+      "id": "civil",
+      "name": "토목 인프라",
+      "en": "Civil",
+      "desc": "강을 건너고 산을 뚫는 교량·터널·도로"
+    },
+    {
+      "id": "delivery",
+      "name": "시공·디지털",
+      "en": "Delivery",
+      "desc": "도면을 건물로 만드는 시공 관리와 BIM"
+    }
+  ],
+  "links": [
+    [
+      "mechanicsbook",
+      "materialsbook",
+      "응력–변형률·탄성 계수와 콘크리트·강재의 강도"
+    ],
+    [
+      "mechanicsbook",
+      "geotechbook",
+      "평형과 응력 해석을 지중 응력·토압·지지력으로"
+    ],
+    [
+      "mechanicsbook",
+      "structurebook",
+      "하중 경로·부정정 해석에서 건물의 구조 시스템으로"
+    ],
+    [
+      "mechanicsbook",
+      "concretebook",
+      "단면 성질·휨 응력에서 철근콘크리트 단면 설계로"
+    ],
+    [
+      "mechanicsbook",
+      "civilbook",
+      "영향선·케이블·아치와 교량의 이동 하중"
+    ],
+    [
+      "materialsbook",
+      "concretebook",
+      "콘크리트 강도·철근 성질과 균열·처짐 설계"
+    ],
+    [
+      "materialsbook",
+      "sitebook",
+      "타설·양생·강도 시험과 현장 품질 관리"
+    ],
+    [
+      "geotechbook",
+      "civilbook",
+      "기초·사면·흙막이와 교량 기초·터널 지반"
+    ],
+    [
+      "structurebook",
+      "concretebook",
+      "구조 시스템의 부재를 철근콘크리트로 설계하기"
+    ],
+    [
+      "structurebook",
+      "bimbook",
+      "구조 모델과 BIM 정보 모델의 연동"
+    ],
+    [
+      "sitebook",
+      "bimbook",
+      "공정·물량 관리와 디지털 건설 모델"
+    ],
+    [
+      "geotechbook",
+      "structurebook",
+      "지반 분류·액상화와 내진 설계의 지반 증폭"
+    ],
+    [
+      "geotechbook",
+      "concretebook",
+      "지지력·말뚝 반력에서 철근콘크리트 기초 설계로"
+    ],
+    [
+      "geotechbook",
+      "sitebook",
+      "토압·흙막이·말뚝 이론과 토공·기초 시공"
+    ],
+    [
+      "materialsbook",
+      "civilbook",
+      "아스팔트·골재의 성질과 포장 설계"
+    ],
+    [
+      "concretebook",
+      "civilbook",
+      "프리스트레스트 콘크리트와 교량 거더·바닥판"
+    ],
+    [
+      "concretebook",
+      "sitebook",
+      "정착·이음과 철근·거푸집·타설 공사"
+    ],
+    [
+      "civilbook",
+      "bimbook",
+      "도로·하천 시설과 GIS·도시 모델"
+    ]
+  ]
+};
