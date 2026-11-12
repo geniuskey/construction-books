@@ -343,3 +343,18 @@ window.CONSTRUCTION_MAP = {
     ]
   ]
 };
+window.SHELF = Object.assign({
+  "id": "constructionbooks",
+  "title": "ConstructionBooks",
+  "url": "https://construction.euiyun.com/",
+  "coverTitles": {
+    "mechanicsbook": "구조역학",
+    "materialsbook": "건설재료",
+    "geotechbook": "지반공학",
+    "structurebook": "건축구조",
+    "concretebook": "철근콘크리트",
+    "civilbook": "교량·터널·도로",
+    "sitebook": "시공·건설관리",
+    "bimbook": "BIM·디지털 건설"
+  }
+}, { books: window.CONSTRUCTION_BOOKS, map: window.CONSTRUCTION_MAP });
